@@ -1,17 +1,18 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
- * v9 goals:
- *  - CookieRun used MORE widely (UI + sheets + chat cards), while still allowing symbol fallback.
- *  - Fix broken icons that are BUTTON/A elements with .fa-* classes (not only <i>/<span>).
- *  - Reduce chat header actor/player name sizes to ~2/3 of previous.
+ * v10 changes:
+ *  - CookieRun only (Dongle excluded). Wider coverage via Foundry + dnd5e font vars.
+ *  - Fix broken Font Awesome icons that are BUTTON/A/etc with .fa-* classes,
+ *    including the specific selectors you provided (header-control, tokenbar, breaktime).
+ *  - Keep symbol/emoji fallbacks so special characters never tofu.
+ *  - Chat actor/player name sizes kept reduced (≈2/3 of old).
  *
- * Important:
- *  - Custom fonts are limited via unicode-range (Korean + basic Latin + Latin-1).
- *    Other glyphs fall back to system/Foundry fonts (symbols/emoji).
+ * NOTE: Custom CookieRun faces are limited via unicode-range (Korean + basic Latin + Latin-1).
+ *       Other glyphs fall back to system/Foundry fonts (symbols/emoji).
  */
 
 /* -------------------------------
- * 1) Font faces (CookieRun + Dongle)
+ * 1) Font faces (CookieRun)
  * ------------------------------- */
 
 @font-face {
@@ -22,7 +23,6 @@
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  /* Basic Latin + Latin-1 Supplement + Hangul (syllables + jamo + compat jamo) */
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 @font-face {
@@ -46,43 +46,19 @@
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Light.ttf") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-
 /* -------------------------------
- * 2) Stacks + variables
+ * 2) Stacks + variables (coverage)
  * ------------------------------- */
 
 :root {
-  /* Strong symbol/emoji fallbacks so special characters never tofu */
+  /* Symbol/emoji fallbacks so special characters never tofu */
   --fe-symbol-fallback:
     "Segoe UI Symbol",
     "Segoe UI Emoji",
     "Apple Color Emoji",
     "Noto Color Emoji";
 
+  /* Primary stack */
   --fe-font-primary:
     "FE CookieRun",
     "Signika",
@@ -93,27 +69,18 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  --fe-font-sans:
-    "FE Dongle",
-    "Signika",
-    system-ui,
-    -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
-    sans-serif,
-    var(--fe-symbol-fallback);
-
-  /* Hook into Foundry variables for better coverage */
+  /* Foundry global vars */
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);
+  --font-serif: var(--fe-font-primary);
 
-  /* dnd5e system font vars (best-effort; safe if unused) */
+  /* dnd5e v5.2.x font vars (best-effort) */
   --dnd5e-font-roboto: var(--fe-font-primary);
   --dnd5e-font-roboto-slab: var(--fe-font-primary);
   --dnd5e-font-signika: var(--fe-font-primary);
   --dnd5e-font-modesto: var(--fe-font-primary);
 
-  /* Chat header sizes (reduced to ~2/3 of v8) */
+  /* Chat header sizes (reduced) */
   --fe-chat-title-size: 22px;     /* actor name */
   --fe-chat-subtitle-size: 14px;  /* player name */
 
@@ -121,10 +88,10 @@
 }
 
 /* -------------------------------
- * 3) Apply CookieRun broadly (but avoid '*' blanket)
+ * 3) Apply CookieRun broadly
  * ------------------------------- */
 
-body,
+html, body,
 #interface,
 #ui,
 #sidebar,
@@ -142,11 +109,13 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure sheet titles/subtitles also use CookieRun */
+/* Window titles/subtitles (actor name, item name, etc.) */
 .window-app .window-header .window-title,
 .window-app .window-header .window-subtitle,
 .application .window-header .window-title,
-.application .window-header .window-subtitle {
+.application .window-header .window-subtitle,
+.window-app .sheet-header :is(h1, h2, .document-name, .name),
+.dnd5e2 .sheet-header :is(h1, h2, .document-name, .name) {
   font-family: var(--fe-font-primary) !important;
 }
 
@@ -180,7 +149,7 @@ code, pre, .monospace {
 }
 
 /* -------------------------------
- * 4) Font Awesome icon fix — cover BUTTON/A/DIV/etc with .fa-* classes
+ * 4) Font Awesome icon fix (GLOBAL, covers button/a/div with fa-* classes)
  * ------------------------------- */
 
 :root {
@@ -188,8 +157,8 @@ code, pre, .monospace {
   --fe-fa-brands: var(--fa-style-family-brands, "Font Awesome 6 Brands");
 }
 
-/* Any element with FA classes inside the interface (includes header-control buttons, tokenbar buttons, chat controls) */
-#interface :is(
+/* Any element with FA classes anywhere */
+:is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -203,8 +172,8 @@ code, pre, .monospace {
   text-transform: none !important;
 }
 
-/* Pseudo elements hold the glyph. Force them too. */
-#interface :is(
+/* Pseudo elements hold the glyph; force family explicitly */
+:is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -212,7 +181,7 @@ code, pre, .monospace {
   .fa-sharp, .fa-sharp-solid, .fa-sharp-regular, .fa-sharp-light, .fa-sharp-thin,
   .fass, .fasr, .fasl, .fast
 )::before,
-#interface :is(
+:is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -220,29 +189,68 @@ code, pre, .monospace {
   .fa-sharp, .fa-sharp-solid, .fa-sharp-regular, .fa-sharp-light, .fa-sharp-thin,
   .fass, .fasr, .fasl, .fast
 )::after {
-  font-family: inherit !important;
-  font-style: inherit !important;
+  font-family: var(--fe-fa-classic) !important;
+  font-style: normal !important;
 }
 
-/* Weight mapping (classic) */
-#interface :is(.fa-solid, .fas, .fa-sharp-solid, .fass) { font-weight: 900 !important; }
-#interface :is(.fa-regular, .far, .fa-sharp-regular, .fasr) { font-weight: 400 !important; }
+/* Weight mapping */
+:is(.fa-solid, .fas, .fa-sharp-solid, .fass) { font-weight: 900 !important; }
+:is(.fa-regular, .far, .fa-sharp-regular, .fasr) { font-weight: 400 !important; }
 /* Best-effort for Pro light/thin */
-#interface :is(.fa-light, .fal, .fa-sharp-light, .fasl) { font-weight: 300 !important; }
-#interface :is(.fa-thin, .fat, .fa-sharp-thin, .fast) { font-weight: 100 !important; }
+:is(.fa-light, .fal, .fa-sharp-light, .fasl) { font-weight: 300 !important; }
+:is(.fa-thin, .fat, .fa-sharp-thin, .fast) { font-weight: 100 !important; }
 
-/* Brands must use brands family */
-#interface :is(.fa-brands, .fab) {
+/* Brands family */
+:is(.fa-brands, .fab) {
   font-family: var(--fe-fa-brands) !important;
   font-weight: 400 !important;
 }
-#interface :is(.fa-brands, .fab)::before,
-#interface :is(.fa-brands, .fab)::after {
-  font-family: inherit !important;
+:is(.fa-brands, .fab)::before,
+:is(.fa-brands, .fab)::after {
+  font-family: var(--fe-fa-brands) !important;
 }
 
 /* -------------------------------
- * 5) Chat header font sizes (Actor + Player name) — reduced
+ * 4b) HIGH-specificity fixes for the exact broken selectors you posted
+ * ------------------------------- */
+
+/* Window header controls (item/actor sheet top-right) */
+header.window-header button.header-control.icon.fa-solid,
+header.window-header button.header-control.icon.fa-solid::before,
+header.window-header button.header-control.icon.fa-solid::after {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 900 !important;
+}
+
+/* Tokenbar buttons (bottom-left module UI) */
+section.button-group[data-application-part="buttons"] .tokenbar-buttons
+button.inline-control.icon.fa-solid,
+section.button-group[data-application-part="buttons"] .tokenbar-buttons
+button.inline-control.icon.fa-solid::before,
+section.button-group[data-application-part="buttons"] .tokenbar-buttons
+button.inline-control.icon.fa-solid::after {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 900 !important;
+}
+
+/* Tokenbar collapse caret */
+button.tokenbar-header-button.fa-solid.icon,
+button.tokenbar-header-button.fa-solid.icon::before,
+button.tokenbar-header-button.fa-solid.icon::after {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 900 !important;
+}
+
+/* Breaktime clear-remaining trash */
+button.clear-remaining.icon.fa-solid,
+button.clear-remaining.icon.fa-solid::before,
+button.clear-remaining.icon.fa-solid::after {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 900 !important;
+}
+
+/* -------------------------------
+ * 5) Chat header font sizes (Actor + Player name)
  * ------------------------------- */
 
 #sidebar #chat :is(.chat-message .message-sender .name-stacked .title,
