@@ -1,19 +1,15 @@
 /* female_edition: Chat texture remover support CSS (FVTT v13 + dnd5e 5.2.5)
  *
- * Chat Portrait setting provides:
- *   - background-color: player color
- *   - background-blend-mode: screen
- *
- * Our JS removes ONLY texture url() layers and ensures a flat overlay layer exists:
- *   background-image: var(--fe-parchment-overlay), ...
- *
- * This CSS defines the overlay and supports pseudo-element overrides.
+ * - JS removes ONLY texture url() layers and keeps Chat Portrait's color overlay.
+ * - Portrait hiding + related layout tweaks are now OPTIONAL via module setting:
+ *     "채팅 포트레이트 숨김" (adds body class: fe-hide-portraits)
+ * - Bold emphasis in chat content is slightly enlarged for readability.
  */
 
 :root {
   /* Adjust to taste. Higher alpha -> more desaturation (lighter). */
   --fe-paper-rgb: 245 239 229;
-  --fe-paper-alpha: 0.65;
+  --fe-paper-alpha: 0.64;
 
   /* Flat overlay (no texture). */
   --fe-parchment-overlay: linear-gradient(
@@ -22,7 +18,20 @@
   );
 }
 
-/* If textures were applied via pseudo elements, JS sets vars and adds .fe-pseudo-sanitized */
+/* --------------------------------
+ * 1) Bold emphasis readability
+ * --------------------------------
+ * Markdown **bold** becomes <strong>. Slightly enlarge bold fragments.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(strong, b) {
+  font-size: 1.08em;
+}
+
+/* --------------------------------
+ * 2) Pseudo-element texture override support
+ * --------------------------------
+ * If textures were applied via pseudo elements, JS sets vars and adds .fe-pseudo-sanitized
+ */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-pseudo-sanitized::before {
   background-image: var(--fe-before-bgimg) !important;
 }
@@ -30,42 +39,43 @@
   background-image: var(--fe-after-bgimg) !important;
 }
 
-/* ----------------------------
- * Existing visual tweaks
- * ---------------------------- */
+/* --------------------------------
+ * 3) OPTIONAL: Hide portraits + related tweaks
+ * --------------------------------
+ * Enabled when <body> has class "fe-hide-portraits"
+ */
 
-/* 액터/플레이어 이름 중앙 정렬 + 그림자 제거 */
-#sidebar #chat .chat-message .message-header .message-sender .name-stacked {
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
 }
-#sidebar #chat .chat-message .message-header .message-sender,
-#sidebar #chat .chat-message .message-header .message-sender .name-stacked,
-#sidebar #chat .chat-message .message-header .message-sender .name-stacked .title,
-#sidebar #chat .chat-message .message-header .message-sender .name-stacked .subtitle {
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender,
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked,
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked .title,
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked .subtitle {
   text-shadow: none !important;
 }
 
 /* Chat Portrait 헤더/본문 간격 */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content
+body.fe-hide-portraits :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content
 h4.chat-portrait-text-content-name-dnd5e.chat-portrait-flexrow {
   margin-block-start: 0 !important;
   margin-block-end: 10px !important;
 }
 
 /* 아바타/포트레잇 숨김 */
-#sidebar #chat .chat-message .message-header .message-sender .avatar,
-#sidebar #chat .chat-message .message-header .message-sender > img,
-#sidebar #chat .chat-message .message-header .message-sender > video {
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .avatar,
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender > img,
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender > video {
   display: none !important;
 }
-#sidebar #chat .chat-message .message-header .message-sender { gap: 0 !important; }
+body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender { gap: 0 !important; }
 
 /* Chat Portrait 스킬/굴림 아이콘 숨김 */
-#sidebar #chat img.chat-portrait-image-size-name-dnd5e,
-#sidebar #chat img[class*="chat-portrait-image-size"] {
+body.fe-hide-portraits #sidebar #chat img.chat-portrait-image-size-name-dnd5e,
+body.fe-hide-portraits #sidebar #chat img[class*="chat-portrait-image-size"] {
   display: none !important;
 }
