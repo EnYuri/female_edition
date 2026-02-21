@@ -13,7 +13,7 @@
 :root {
   /* Adjust to taste. Higher alpha -> more desaturation (lighter). */
   --fe-paper-rgb: 245 239 229;
-  --fe-paper-alpha: 0.60;
+  --fe-paper-alpha: 0.65;
 
   /* Flat overlay (no texture). */
   --fe-parchment-overlay: linear-gradient(
