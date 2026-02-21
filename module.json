@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "0.1.4",
+  "version": "0.3.0",
   "authors": [
     {
       "name": "nayuri",
@@ -20,12 +20,14 @@
   "esmodules": [
     "scripts/inject-damage-type.js",
     "scripts/inject-conditions.js",
-    "scripts/chat-bg-stripper.js"
+    "scripts/chat-bg-stripper.js",
+    "scripts/fe-chat-enhance.js"
   ],
   "styles": [
     "styles/conditions.css",
     "styles/chat-bg-stripper.css",
-    "styles/ui-font.css"
+    "styles/ui-font.css",
+    "styles/fe-chat-enhance.css"
   ],
   "languages": [
     {

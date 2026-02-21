@@ -1,0 +1,178 @@
+/* female_edition: Chat Enhancements (FVTT v13) */
+
+/* --------------------------- */
+/* Export button (spacing)     */
+/* --------------------------- */
+#chat-controls .fe-export-pdf {
+  /* The chat controls row is aligned to the right; margin-right pulls it slightly left */
+  margin-right: 6px;
+}
+
+/* --------------------------- */
+/* Typing indicator            */
+/* --------------------------- */
+#chat-form .fe-typing-indicator {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  opacity: 0.8;
+  user-select: none;
+}
+
+/* --------------------------- */
+/* Markdown: readability        */
+/* --------------------------- */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content blockquote {
+  margin: 0.5em 0;
+  padding: 0.15em 0.75em;
+  border-left: 3px solid var(--color-border-light-2);
+  opacity: 0.95;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
+  /* readability for **bold** in normal chat text */
+  font-size: 1.06em;
+  font-weight: 800;
+}
+
+/* --------------------------- */
+/* Export (Print to PDF)       */
+/* --------------------------- */
+#fe-chat-export-container {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  overflow: auto;
+  background: white;
+  color: black;
+  padding: 12px;
+}
+
+body.fe-exporting-chat #fe-chat-export-container {
+  display: block;
+}
+
+body.fe-exporting-chat #fe-chat-export-container h1 {
+  margin: 0 0 12px 0;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media print {
+  body.fe-exporting-chat #interface,
+  body.fe-exporting-chat #ui-left,
+  body.fe-exporting-chat #ui-right,
+  body.fe-exporting-chat #players,
+  body.fe-exporting-chat #controls,
+  body.fe-exporting-chat #hotbar {
+    display: none !important;
+  }
+
+  body.fe-exporting-chat #fe-chat-export-container {
+    position: static;
+    display: block;
+    overflow: visible;
+    padding: 0;
+  }
+}
+
+/* --------------------------- */
+/* Chat merge                  */
+/* --------------------------- */
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divider-before::before {
+  content: "";
+  display: block;
+  border-top: 1px solid var(--color-border-light-2);
+  opacity: 0.35;
+  margin: 6px 6px;
+}
+
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-start {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-width: 0 !important;
+}
+
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-mid {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  border-radius: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+}
+
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-end {
+  margin-top: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-top-width: 0 !important;
+}
+
+/* Follow-up header display modes (for mid/end only) */
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+  display: none !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header img {
+  display: none !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-metadata,
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-flavor {
+  display: none !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+  padding: 0 0 2px 0 !important;
+  margin: 0 !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-sender {
+  font-size: 14px !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-sender,
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-metadata,
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-flavor {
+  display: none !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+  padding: 0 0 4px 0 !important;
+  margin: 0 !important;
+}
+
+/* --------------------------- */
+/* DND5E chat-card description  */
+/* (item/spell/feature cards)   */
+/* --------------------------- */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.chat-card, .midi-chat-card) :is(.card-content, .collapsible-content.card-content) {
+  font-size: 13px !important;   /* was 14px */
+  font-weight: 600 !important; /* force a bit bolder */
+}
+
+
+/* Headings in markdown (avoid huge default sizes) */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.5em 0 0.25em 0;
+  line-height: 1.15;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h1 { font-size: 1.35em; }
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h2 { font-size: 1.25em; }
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h3 { font-size: 1.15em; }
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h4 { font-size: 1.10em; }
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h5 { font-size: 1.05em; }
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h6 { font-size: 1.00em; }
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(ul, ol) {
+  margin: 0.5em 0 0.5em 1.2em;
+}

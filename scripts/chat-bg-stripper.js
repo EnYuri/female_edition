@@ -298,7 +298,7 @@ Hooks.once("init", () => {
   // 1) Font toggle (ui-font.css)
   game.settings.register(MODULE_ID, SETTINGS.ENABLE_FONTS, {
     name: "쿠키런 폰트 적용",
-    hint: "UI와 채팅에 새 폰트를 적용합니다. 끄면 Foundry 기본 폰트로 돌아갑니다.",
+    hint: "UI와 채팅에 CookieRun 폰트를 적용합니다. 끄면 Foundry 기본 폰트로 돌아갑니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -309,7 +309,7 @@ Hooks.once("init", () => {
   // 2) Portrait hide toggle (body class)
   game.settings.register(MODULE_ID, SETTINGS.HIDE_PORTRAITS, {
     name: "채팅 포트레이트 숨김",
-    hint: "DnD5e 시스템이 출력하는 채팅 포트레이트/아바타/스킬 아이콘을 숨깁니다.",
+    hint: "Chat Portrait 모듈이 출력하는 채팅 포트레이트/아바타/스킬 아이콘을 숨깁니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -320,7 +320,7 @@ Hooks.once("init", () => {
   // 3) Texture stripping toggle (this script)
   game.settings.register(MODULE_ID, SETTINGS.STRIP_TEXTURES, {
     name: "채팅 카드 텍스쳐 제거",
-    hint: "dnd5e 기본 parchment/texture 배경을 제거합니다.",
+    hint: "dnd5e 기본 parchment/texture 배경만 제거하고, 색상 오버레이(채도 약화)는 유지합니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -356,15 +356,8 @@ Hooks.once("ready", () => {
   });
   bodyObs.observe(document.body, { childList: true, subtree: true });
 
-  // Hooks (both legacy and v13)
-  Hooks.on("renderChatMessage", (_msg, html) => {
-    if (!STATE.stripTextures) return;
-    const el = extractHTMLElement(html);
-    if (!el) return;
-    processMessageRoot(el);
-    requestAnimationFrame(() => processMessageRoot(el));
-  });
-  Hooks.on("renderChatMessageHTML", (_app, html) => {
+  // Hooks (v13)
+  Hooks.on("renderChatMessageHTML", (_msg, html) => {
     if (!STATE.stripTextures) return;
     const el = extractHTMLElement(html);
     if (!el) return;
