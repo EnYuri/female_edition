@@ -24,7 +24,48 @@
  * Markdown **bold** becomes <strong>. Slightly enlarge bold fragments.
  */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(strong, b) {
-  font-size: 1.08em;
+  font-size: 1.16em;
+}
+
+
+
+/* --------------------------------
+ * 1b) Chat card description readability
+ * --------------------------------
+ * dnd5e/midi-qol item/spell/feature cards often render description text small and light.
+ * Increase size, line-height, and darken text inside the collapsible description box.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(section.card-header.description, .card-header.description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content) {
+  font-size: 10px;
+  line-height: 1.40;
+  /* Prefer Foundry variable when available; fallback to near-black. */
+  color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
+  font-weight: 400;
+}
+
+/* Paragraph spacing inside the wrapper */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(section.card-header.description, .card-header.description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(p, li) {
+  margin: 0 0 0.55em 0;
+}
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(section.card-header.description, .card-header.description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(p, li):last-child {
+  margin-bottom: 0;
+}
+
+/* Make emphasized terms stand out more in description blocks */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(section.card-header.description, .card-header.description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(strong, b) {
+  font-weight: 700;
+  color: inherit;
 }
 
 /* --------------------------------
@@ -59,11 +100,10 @@ body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sen
   text-shadow: none !important;
 }
 
-/* Chat Portrait 헤더/본문 간격 */
-body.fe-hide-portraits :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content
+:is(#chat-log, .chat-log, ol.chat-log)
+.chat-message .message-content
 h4.chat-portrait-text-content-name-dnd5e.chat-portrait-flexrow {
-  margin-block-start: 0 !important;
-  margin-block-end: 10px !important;
+  display: none !important;
 }
 
 /* 아바타/포트레잇 숨김 */
@@ -74,7 +114,7 @@ body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sen
 }
 body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender { gap: 0 !important; }
 
-/* Chat Portrait 스킬/굴림 아이콘 숨김 */
+/*  스킬/굴림 아이콘 숨김 */
 body.fe-hide-portraits #sidebar #chat img.chat-portrait-image-size-name-dnd5e,
 body.fe-hide-portraits #sidebar #chat img[class*="chat-portrait-image-size"] {
   display: none !important;
