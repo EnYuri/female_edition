@@ -1,0 +1,111 @@
+/* female_edition: UI + Chat font override (FVTT v13)
+ *
+ * Goals:
+ *  - Apply CookieRun font to UI + chat text
+ *  - Do NOT break Font Awesome icons
+ *  - Improve perceived rendering (as much as Chromium/Electron allows)
+ */
+
+@font-face {
+  font-family: "CookieRun_UI";
+  src:
+    url("/modules/female_edition/font/CookieRun%20Regular.ttf") format("truetype"),
+    url("../font/CookieRun%20Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "CookieRun_UI";
+  src:
+    url("/modules/female_edition/font/CookieRun%20Bold.ttf") format("truetype"),
+    url("../font/CookieRun%20Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --fe-ui-font: "CookieRun_UI", "Noto Sans KR", system-ui, sans-serif;
+
+  /* Foundry uses this widely */
+  --font-primary: var(--fe-ui-font);
+}
+
+/* UI containers (canvas #board 제외) */
+#interface,
+#ui,
+#sidebar,
+.window-app,
+.application {
+  font-family: var(--fe-ui-font) !important;
+  font-synthesis: none;
+
+  /* Rendering hints (Chromium/Electron) */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+/* 폼 컨트롤만 상속 강제 */
+#interface :is(button, input, textarea, select),
+.window-app :is(button, input, textarea, select),
+.application :is(button, input, textarea, select) {
+  font-family: inherit !important;
+}
+
+/* 채팅 영역 명시 */
+#sidebar #chat,
+#sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
+#sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
+#sidebar #chat #chat-form textarea#chat-message,
+.chat-popout #chat,
+.chat-popout #chat :is(.chat-log, #chat-log, ol.chat-log),
+.chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
+.chat-popout #chat-form textarea#chat-message {
+  font-family: inherit !important;
+}
+
+/* 코드/롤 수식은 고정폭 */
+#interface code,
+#interface pre,
+.window-app code,
+.window-app pre,
+.application code,
+.application pre {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace !important;
+}
+
+/* ------------------------------------------------------------
+ * Font Awesome safety net (NO font shorthand; just family+weight)
+ * ------------------------------------------------------------ */
+
+/* Classic family var exists in FA6. Use it when present. */
+:root {
+  --fe-fa-classic: var(--fa-style-family, var(--fa-style-family-classic, "Font Awesome 6 Free"));
+}
+
+/* Solid */
+.fa-solid, .fas {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
+}
+/* Regular */
+.fa-regular, .far {
+  font-family: var(--fe-fa-classic) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+}
+/* Brands */
+.fa-brands, .fab {
+  font-family: var(--fa-style-family-brands, "Font Awesome 6 Brands") !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+}
+
+/* Some Foundry UI uses legacy .fa without style qualifiers */
+i.fa, span.fa {
+  font-family: var(--fe-fa-classic) !important;
+  font-style: normal !important;
+}

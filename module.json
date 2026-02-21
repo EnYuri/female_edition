@@ -1,0 +1,45 @@
+{
+  "id": "female_edition",
+  "title": "Female-cupwhi",
+  "version": "0.1.1",
+  "authors": [
+    {
+      "name": "nayuri",
+      "flags": {}
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {}
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/inject-damage-type.js",
+    "scripts/inject-conditions.js",
+	"scripts/chat-bg-stripper.js"
+  ],
+  "styles": [
+    "styles/conditions.css",
+    "styles/chat-bg-stripper.css",
+    "styles/ui-font.css"
+  ],
+  "languages": [
+    {
+      "lang": "ko",
+      "name": "Korean",
+      "path": "lang/ko.json",
+      "flags": {}
+    }
+  ],
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13.531",
+    "maximum": "14.*"
+  },
+  "description": "",
+  "flags": {}
+}

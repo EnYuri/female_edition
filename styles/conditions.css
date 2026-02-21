@@ -1,0 +1,5 @@
+/* Effects 탭이 class로 구분될 때 대비 */
+.tidy5e-sheet .effects [data-condition-id="condfemalemating"],
+.tidy5e-sheet .effects-tab [data-condition-id="condfemalemating"] {
+  display: none !important;
+}
