@@ -1,0 +1,19 @@
+CookieRun Font License Notice
+
+CookieRun Font © Devsisters Corp.
+
+This module includes the CookieRun font family.
+The CookieRun font is distributed under the official CookieRun Font License.
+
+The font may be used for personal and commercial purposes in accordance
+with the terms specified by Devsisters Corp.
+
+The font files included in this repository are not sold separately
+and are redistributed together with this project in compliance
+with the original license terms.
+
+For the full and official license text, please refer to:
+https://www.cookierunfont.com/
+
+Copyright (c) Devsisters Corp.
+All rights reserved by the original copyright holder.
