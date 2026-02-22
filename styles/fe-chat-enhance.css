@@ -6,6 +6,46 @@
 #chat-controls .fe-export-pdf {
   /* The chat controls row is aligned to the right; margin-right pulls it slightly left */
   margin-right: 20px;
+
+  /* Bigger hit-area (user request: ~32x32) */
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure the Font Awesome glyph scales with the control size */
+#chat-controls .fe-export-pdf i {
+  font-size: 20px;
+}
+
+/* Export toolbar actions (inline fallback container) */
+#fe-chat-export-container .fe-chat-export-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#fe-chat-export-container .fe-chat-export-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+#fe-chat-export-container .fe-chat-export-action:hover {
+  background: rgba(0,0,0,0.05);
 }
 
 /* --------------------------- */
@@ -42,7 +82,7 @@
 
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
   /* readability for **bold** in normal chat text */
-  font-size: 1.12em;
+  font-size: 1.22em;
   font-weight: 800;
 }
 
@@ -119,49 +159,52 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
 
 @media print {
   /*
-   * Foundry runs the app in a fixed viewport with overflow hidden.
-   * If we don't reset this for print, Chromium will only print the visible
-   * viewport (1 page) even if the export DOM contains the full chat log.
+   * Foundry runs the app in a fixed viewport (body.game) with overflow hidden.
+   * If we don't reset *that specific selector* for print, Chromium will only
+   * print the visible viewport (1 page) even if the export log is long.
+   *
+   * We intentionally target body.game.fe-print-chatlog to beat Foundry's own
+   * body.game rules (often marked !important).
    */
-  html, body {
+  html {
+    width: auto !important;
     height: auto !important;
     overflow: visible !important;
   }
 
-  body.fe-print-chatlog {
+  body.game.fe-print-chatlog {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
     background: #fff !important;
   }
 
-  /* Hide everything except the export container (no layout gaps). */
-  body.fe-print-chatlog > :not(#fe-chat-export-container) {
+  body.game.fe-print-chatlog > :not(#fe-chat-export-container) {
     display: none !important;
   }
 
-  body.fe-print-chatlog #fe-chat-export-container {
+  body.game.fe-print-chatlog #fe-chat-export-container {
     display: block !important;
     position: static !important;
     inset: auto !important;
+    overflow: visible !important;
     width: auto !important;
     height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
     margin: 0 !important;
-    padding: 12mm !important;
-    overflow: visible !important;
-    background: #fff !important;
-    border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    border: 0 !important;
   }
 
-  body.fe-print-chatlog .fe-chat-export-close {
+  body.game.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
     display: none !important;
   }
 
-  /* Ensure multi-page printing (avoid flex/scroll containers being clipped to 1 page) */
-  body.fe-print-chatlog #fe-chat-export-container {
-    display: block !important;
-  }
-
-  body.fe-print-chatlog #fe-chat-export-log {
+  body.game.fe-print-chatlog #fe-chat-export-log {
     display: block !important;
     flex: none !important;
     height: auto !important;
@@ -169,6 +212,15 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
     max-height: none !important;
   }
 
+  /* Avoid splitting a single message across pages where possible */
+  body.game.fe-print-chatlog #fe-chat-export-log .chat-message {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 10mm;
+  }
 }
 
 /*

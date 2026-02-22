@@ -9,7 +9,7 @@
 :root {
   /* Adjust to taste. Higher alpha -> more desaturation (lighter). */
   --fe-paper-rgb: 245 239 229;
-  --fe-paper-alpha: 0.42;
+  --fe-paper-alpha: 0.60;
 
   /* Flat overlay (no texture). */
   --fe-parchment-overlay: linear-gradient(
@@ -24,7 +24,7 @@
  * Markdown **bold** becomes <strong>. Slightly enlarge bold fragments.
  */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(strong, b) {
-  font-size: 1.10em;
+  font-size: 1.22em;
 }
 
 
@@ -38,11 +38,11 @@
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content) {
-  font-size: 14.5px;
+  font-size: 12px;
   line-height: 1.40;
   /* Prefer Foundry variable when available; fallback to near-black. */
   color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 /* Paragraph spacing inside the wrapper */

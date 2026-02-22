@@ -81,8 +81,8 @@
   --dnd5e-font-modesto: var(--fe-font-primary);
 
   /* Chat header sizes (reduced) */
-  --fe-chat-title-size: 22px;     /* actor name */
-  --fe-chat-subtitle-size: 14px;  /* player name */
+  --fe-chat-title-size: 20px;     /* actor name */
+  --fe-chat-subtitle-size: 13px;  /* player name */
 
   font-synthesis: none;
 }

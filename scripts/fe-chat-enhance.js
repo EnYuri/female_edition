@@ -851,8 +851,8 @@ function feInjectExportButton(root = document) {
 
   const a = document.createElement("a");
   a.className = "control-icon fe-export-pdf";
-  a.dataset.tooltip = "채팅 로그 PDF(인쇄)";
-  a.ariaLabel = "채팅 로그 PDF(인쇄)";
+  a.dataset.tooltip = "채팅 로그 내보내기(PDF/HTML)";
+  a.ariaLabel = "채팅 로그 내보내기(PDF/HTML)";
   a.innerHTML = '<i class="fa-solid fa-file-pdf"></i>';
 
   a.addEventListener("click", async (ev) => {
@@ -883,7 +883,11 @@ function feEnsureExportContainer() {
     <div class="fe-chat-export-toolbar">
       <div id="fe-chat-export-title">Chat Log</div>
       <div id="fe-chat-export-meta"></div>
-      <a class="fe-chat-export-close" aria-label="Close">✕</a>
+      <div class="fe-chat-export-actions">
+        <a class="fe-chat-export-action fe-chat-export-download" aria-label="Download HTML" data-tooltip="HTML 저장">HTML</a>
+        <a class="fe-chat-export-action fe-chat-export-print" aria-label="Print" data-tooltip="인쇄 / PDF">🖨</a>
+        <a class="fe-chat-export-action fe-chat-export-close" aria-label="Close" data-tooltip="닫기">✕</a>
+      </div>
     </div>
     <ol id="fe-chat-export-log" class="chat-log"></ol>
   `;
@@ -891,20 +895,134 @@ function feEnsureExportContainer() {
   document.body.appendChild(container);
 
   const close = container.querySelector(".fe-chat-export-close");
-  if (close) {
-    close.addEventListener("click", (ev) => {
+  const printBtn = container.querySelector(".fe-chat-export-print");
+  const dlBtn = container.querySelector(".fe-chat-export-download");
+
+  const closeHandler = (ev) => {
+    ev?.preventDefault?.();
+    try {
+      container.remove();
+    } catch {}
+    document.body.classList.remove("fe-print-chatlog");
+  };
+
+  if (close) close.addEventListener("click", closeHandler);
+  if (printBtn) {
+    printBtn.addEventListener("click", (ev) => {
       ev.preventDefault();
-      try {
-        container.remove();
-      } catch {}
-      document.body.classList.remove("fe-print-chatlog");
+      window.print();
+    });
+  }
+  if (dlBtn) {
+    dlBtn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      feDownloadExportHTMLFromCurrentDocument();
     });
   }
 
   return container;
 }
 
+function feEnsurePrintCSSOverrides() {
+  const styleId = "fe-chat-export-printfix";
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.textContent = `
+@media print {
+  html {
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.game.fe-print-chatlog {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.game.fe-print-chatlog > :not(#fe-chat-export-container) {
+    display: none !important;
+  }
+
+  body.game.fe-print-chatlog #fe-chat-export-container {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+
+  body.game.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
+    display: none !important;
+  }
+
+  body.game.fe-print-chatlog #fe-chat-export-log {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  body.game.fe-print-chatlog #fe-chat-export-log .chat-message {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 10mm;
+  }
+}
+`;
+  document.head.appendChild(style);
+}
+
+/**
+ * Primary export entry point.
+ *
+ * Strategy:
+ *  1) Try to open a dedicated "chat archive" popup window and render the log there.
+ *     - Avoids Chromium/Electron print clipping caused by Foundry's fixed viewport.
+ *     - Lets the user save/print like a normal web page (Ctrl+S / Print to PDF).
+ *  2) If popups are blocked, fall back to the in-document export container.
+ */
 async function feExportChatLogToPDF() {
+  // Prefer a separate archive window for reliable multi-page printing.
+  const win = feOpenChatArchiveWindow();
+  if (win) {
+    try {
+      await feRenderChatArchiveWindow(win, { autoPrint: true });
+      return;
+    } catch (err) {
+      console.warn("female_edition | archive window export failed, falling back to inline export", err);
+      try {
+        win.close();
+      } catch {}
+    }
+  }
+
+  // Fallback: in-document export + print.
+  await feExportChatLogToPDFInline();
+}
+
+// ---------------------------
+// Export (Inline fallback)
+// ---------------------------
+
+async function feExportChatLogToPDFInline() {
   if (document.body.classList.contains("fe-print-chatlog")) return;
 
   // Foundry runs the app in a fixed viewport with overflow hidden.
@@ -916,6 +1034,9 @@ async function feExportChatLogToPDF() {
   const prevBodyHeight = document.body.style.height;
 
   document.body.classList.add("fe-print-chatlog");
+
+    // Ensure print CSS beats Foundry's body.game print rules (multi-page PDF fix)
+    feEnsurePrintCSSOverrides();
 
   // Ensure the document can extend beyond the viewport.
   htmlEl.style.overflow = "visible";
@@ -981,8 +1102,9 @@ async function feExportChatLogToPDF() {
       feNormalizeExportNode(li);
       logEl.appendChild(li);
 
-      // Yield occasionally to keep UI responsive
-      if (i % 25 === 0) await feNextTick();
+      // Yield occasionally to keep UI responsive.
+      // IMPORTANT: background tabs clamp timers heavily; avoid yields when hidden so export continues.
+      if (i % 25 === 0) await feMaybeYieldForUI();
     }
 
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
@@ -1009,9 +1131,14 @@ async function feExportChatLogToPDF() {
       logEl.style.overflow = "visible";
     } catch {}
 
-    // Give the browser time to reflow before printing.
-    await new Promise((r) => requestAnimationFrame(r));
-    await new Promise((r) => requestAnimationFrame(r));
+    // Force a synchronous reflow before printing.
+    // Avoid relying on timers here (background tabs clamp setTimeout).
+    try {
+      // eslint-disable-next-line no-unused-expressions
+      container.offsetHeight;
+      // eslint-disable-next-line no-unused-expressions
+      logEl.offsetHeight;
+    } catch {}
 
     metaEl.textContent = "Opening print dialog…";
 
@@ -1044,6 +1171,422 @@ async function feExportChatLogToPDF() {
   } catch (err) {
     console.error(err);
     ui.notifications?.error("Chat log PDF export failed. Check the console for details.");
+  }
+}
+
+// ---------------------------
+// Export (Archive window)
+// ---------------------------
+
+function feOpenChatArchiveWindow() {
+  try {
+    // Reuse the same window if the user exports repeatedly.
+    const features = [
+      "popup=yes",
+      "width=1100",
+      "height=800",
+      "left=100",
+      "top=80",
+    ].join(",");
+
+    const win = window.open("", "fe-chat-archive", features);
+    if (!win || win.closed) return null;
+
+    try {
+      win.focus();
+    } catch {}
+    return win;
+  } catch {
+    return null;
+  }
+}
+
+function feCollectHeadStylesHTML() {
+  try {
+    // Copy all stylesheet links and injected <style> tags.
+    // This makes the archive render match the Foundry UI as closely as possible.
+    const nodes = Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'));
+    return nodes.map((n) => n.outerHTML).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+function feEscapeAttr(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
+  if (!win || win.closed) throw new Error("Archive window is not available.");
+
+  // Collect messages first (so the archive UI can show correct counts immediately).
+  const user = game.user;
+  const all = Array.from(game.messages?.contents ?? []);
+  all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  const messages = all.filter((m) => feCanUserSeeChatMessage(m, user));
+
+  const worldName = game.world?.title ?? game.world?.name ?? "";
+  const sceneName = canvas?.scene?.name ?? "";
+  const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+  const metaText = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
+
+  // Build the archive document.
+  const headStyles = feCollectHeadStylesHTML();
+  const baseHref = feEscapeAttr(document.baseURI ?? window.location.href);
+
+  // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
+  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive`;
+
+  win.document.open();
+  win.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <base href="${baseHref}">
+    <title>${feEscapeHTML(titleText)}</title>
+    ${headStyles}
+    <style>
+      /* Archive window hard overrides: make the document paginatable (no fixed viewport). */
+      html, body {
+        position: static !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        width: auto !important;
+        background: #fff !important;
+      }
+
+      /* Keep the export container in normal flow. */
+      #fe-chat-export-container {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        overflow: visible !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 12mm !important;
+        margin: 0 !important;
+      }
+
+      /* Toolbar: compact, web-page-like controls. */
+      #fe-chat-export-container .fe-chat-export-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 10px 0;
+      }
+
+      #fe-chat-export-title { font-size: 18px; font-weight: 700; }
+      #fe-chat-export-meta { font-size: 12px; opacity: 0.85; }
+
+      .fe-chat-export-actions {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .fe-chat-export-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 28px;
+        padding: 0 8px;
+        border: 1px solid rgba(0,0,0,0.25);
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1;
+        color: #000;
+        text-decoration: none;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .fe-chat-export-action:hover {
+        background: rgba(0,0,0,0.06);
+      }
+
+      @media print {
+        /* Hide the toolbar when printing (save as PDF). */
+        #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
+
+        /* Avoid splitting a single message across pages where possible. */
+        #fe-chat-export-log .chat-message {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        @page { margin: 10mm; }
+      }
+    </style>
+  </head>
+  <body class="${feEscapeAttr(bodyClass)}">
+    <div id="fe-chat-export-container">
+      <div class="fe-chat-export-toolbar">
+        <div>
+          <div id="fe-chat-export-title">${feEscapeHTML(titleText)}</div>
+          <div id="fe-chat-export-meta">${feEscapeHTML(metaText)}</div>
+        </div>
+        <div class="fe-chat-export-actions">
+          <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="HTML 저장">HTML</a>
+          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="인쇄 / PDF">인쇄</a>
+          <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="닫기">닫기</a>
+        </div>
+      </div>
+      <ol id="fe-chat-export-log" class="chat-log"></ol>
+    </div>
+  </body>
+</html>`);
+  win.document.close();
+
+  // Hook up controls.
+  const logEl = win.document.getElementById("fe-chat-export-log");
+  const metaEl = win.document.getElementById("fe-chat-export-meta");
+
+  const btnPrint = win.document.getElementById("fe-archive-print");
+  const btnDownload = win.document.getElementById("fe-archive-download");
+  const btnClose = win.document.getElementById("fe-archive-close");
+
+  if (btnPrint)
+    btnPrint.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      try {
+        win.focus();
+      } catch {}
+      win.print();
+    });
+
+  if (btnDownload)
+    btnDownload.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      feDownloadArchiveHTML(win, titleText);
+    });
+
+  if (btnClose)
+    btnClose.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      try {
+        win.close();
+      } catch {}
+    });
+
+  // Mirror the live chat-log's class list so themes apply (directory-list, etc.).
+  try {
+    const sampleLog = document.querySelector("ol.chat-log, #chat-log");
+    if (sampleLog?.className) logEl.className = sampleLog.className;
+    logEl.id = "fe-chat-export-log";
+  } catch {}
+
+  // Render messages.
+  logEl.innerHTML = "";
+  let i = 0;
+  for (const msg of messages) {
+    i++;
+    if (metaEl && (i === 1 || i % 25 === 0 || i === messages.length)) {
+      metaEl.textContent = `Rendering… ${i}/${messages.length}`;
+    }
+
+    let li = null;
+    try {
+      msg.exporting = true;
+    } catch {}
+
+    try {
+      if (typeof msg.renderHTML === "function") li = await msg.renderHTML();
+      else if (typeof msg.getHTML === "function") li = await msg.getHTML();
+    } catch (err) {
+      console.warn("female_edition | archive export: failed to render message", msg, err);
+    } finally {
+      try {
+        msg.exporting = false;
+      } catch {}
+    }
+
+    if (li && !(li instanceof HTMLElement) && li?.[0] instanceof HTMLElement) li = li[0];
+    if (!(li instanceof HTMLElement)) continue;
+
+    try {
+      li.classList.add("fe-export-message");
+    } catch {}
+
+    feNormalizeExportNode(li);
+
+    // Import into the archive window.
+    try {
+      logEl.insertAdjacentHTML("beforeend", li.outerHTML);
+    } catch {
+      try {
+        const imported = win.document.importNode(li, true);
+        logEl.appendChild(imported);
+      } catch {}
+    }
+
+    // Keep UI responsive only when visible. Background tabs clamp timers heavily.
+    if (i % 25 === 0) await feMaybeYieldForUI();
+  }
+
+  // Apply merge styling in the archive window if enabled.
+  if (feSetting(S.MERGE_ENABLED)) {
+    try {
+      feApplyChatMergeInWindow(win);
+    } catch (err) {
+      console.warn("female_edition | archive merge failed", err);
+    }
+  }
+
+  // Wait for images so avatars/icons actually show up.
+  if (metaEl) metaEl.textContent = "Loading images…";
+  await feWaitForImages(logEl, 20000);
+
+  if (metaEl) metaEl.textContent = metaText;
+
+  // Auto-open print dialog if requested.
+  if (autoPrint) {
+    try {
+      win.focus();
+    } catch {}
+    try {
+      // eslint-disable-next-line no-unused-expressions
+      win.document.body.offsetHeight;
+    } catch {}
+    win.print();
+  }
+}
+
+function feDownloadArchiveHTML(win, titleText = "Chat Log") {
+  try {
+    if (!win || win.closed) return;
+    const docEl = win.document.documentElement;
+    const html = "<!doctype html>\n" + docEl.outerHTML;
+
+    const safeName = String(titleText || "chat-log")
+      .replaceAll(/[^a-zA-Z0-9\u3131-\uD79D\-_. ]+/g, "_")
+      .trim()
+      .slice(0, 80) || "chat-log";
+
+    const filename = `${safeName}.html`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = win.document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    win.document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.warn("female_edition | failed to download archive HTML", err);
+  }
+}
+
+function feDownloadExportHTMLFromCurrentDocument() {
+  try {
+    const container = document.getElementById("fe-chat-export-container");
+    if (!container) return;
+
+    const docEl = document.documentElement;
+    const html = "<!doctype html>\n" + docEl.outerHTML;
+
+    const worldName = game.world?.title ?? game.world?.name ?? "chat-log";
+    const safeName = String(worldName)
+      .replaceAll(/[^a-zA-Z0-9\u3131-\uD79D\-_. ]+/g, "_")
+      .trim()
+      .slice(0, 80) || "chat-log";
+    const filename = `Chat Log - ${safeName}.html`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.warn("female_edition | failed to download export HTML", err);
+  }
+}
+
+async function feMaybeYieldForUI() {
+  // Background tabs/windows clamp timers; yielding there can look like the export "stopped".
+  // Only yield when visible so we keep UI responsive without stalling in background.
+  if (document.visibilityState !== "visible") return;
+  await feNextTick();
+}
+
+function feApplyChatMergeInWindow(win) {
+  // Apply merge classes (start/mid/end/divider) in the archive window.
+  // This simplified version avoids computed-style syncing.
+  try {
+    const logEl = win.document.getElementById("fe-chat-export-log");
+    if (!logEl) return;
+
+    // Mirror merge-related body classes.
+    try {
+      win.document.body.classList.toggle("fe-chat-merge", !!feSetting(S.MERGE_ENABLED));
+      const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
+      win.document.body.classList.toggle("fe-merge-follow-hide", style === "hide");
+      win.document.body.classList.toggle("fe-merge-follow-name", style === "name");
+      win.document.body.classList.toggle("fe-merge-follow-portrait", style === "portrait");
+    } catch {}
+
+    const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
+    const showDivider = !!feSetting(S.MERGE_DIVIDER);
+
+    const els = Array.from(logEl.querySelectorAll("li.chat-message"));
+    for (const el of els) {
+      el.classList.remove("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
+    }
+
+    const infos = els
+      .map((el) => {
+        const id = el.dataset?.messageId;
+        const msg = id ? game.messages?.get(id) : null;
+        const info = feMessageMergeInfo(msg, el);
+        return {
+          el,
+          ...info,
+          key: feMergeKey(info),
+        };
+      })
+      .filter((x) => x && x.el);
+
+    const canMerge = (a, b) => {
+      if (!a || !b) return false;
+      if (a.key !== b.key) return false;
+      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+      return true;
+    };
+
+    const applyGroup = (start, endExclusive) => {
+      const group = infos.slice(start, endExclusive);
+      if (!group.length) return;
+      if (showDivider && start > 0) group[0].el.classList.add("fe-divider-before");
+      if (group.length === 1) return;
+      group[0].el.classList.add("fe-merge-start");
+      for (let i = 1; i < group.length - 1; i++) group[i].el.classList.add("fe-merge-mid");
+      group[group.length - 1].el.classList.add("fe-merge-end");
+    };
+
+    let groupStart = 0;
+    for (let i = 1; i < infos.length; i++) {
+      if (!canMerge(infos[i - 1], infos[i])) {
+        applyGroup(groupStart, i);
+        groupStart = i;
+      }
+    }
+    applyGroup(groupStart, infos.length);
+  } catch (err) {
+    console.warn("female_edition | feApplyChatMergeInWindow failed", err);
   }
 }
 
