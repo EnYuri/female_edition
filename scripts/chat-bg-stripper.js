@@ -145,6 +145,10 @@ function hasGradientLayer(layers) {
   return layers.some(l => /gradient\(/i.test(l));
 }
 
+function hasOverlayLayer(layers) {
+  return layers.some(l => /--fe-parchment-overlay/i.test(l));
+}
+
 function isTextureLayer(layer) {
   return /url\(/i.test(layer) && TEX_RE.test(layer);
 }
@@ -171,10 +175,10 @@ function sanitizeElementBackground(el) {
   const layers = splitLayers(bgImage);
   const stripped = stripTextureLayers(layers);
 
-  // Preserve existing gradient overlays if present; otherwise ensure our flat overlay exists.
-  const needOverlay = !hasGradientLayer(stripped);
-
-  const nextLayers = needOverlay ? [OVERLAY_LAYER, ...stripped] : stripped;
+  // Always ensure a flat overlay exists so Chat Portrait's "screen" blending desaturates consistently.
+  // Do NOT skip this when gradients are present; mixed sources can otherwise cause visible saturation mismatches.
+  const nextLayers = stripped.slice();
+  if (!hasOverlayLayer(nextLayers)) nextLayers.unshift(OVERLAY_LAYER);
   const finalLayers = nextLayers.length ? nextLayers : [OVERLAY_LAYER];
 
   el.style.setProperty("background-image", finalLayers.join(", "), "important");
@@ -192,9 +196,8 @@ function sanitizePseudo(el, pseudo, varName) {
 
     const layers = splitLayers(bgImage);
     const stripped = stripTextureLayers(layers);
-    const needOverlay = !hasGradientLayer(stripped);
-
-    const nextLayers = needOverlay ? [OVERLAY_LAYER, ...stripped] : stripped;
+    const nextLayers = stripped.slice();
+    if (!hasOverlayLayer(nextLayers)) nextLayers.unshift(OVERLAY_LAYER);
     const finalLayers = nextLayers.length ? nextLayers : [OVERLAY_LAYER];
 
     el.style.setProperty(varName, finalLayers.join(", "));

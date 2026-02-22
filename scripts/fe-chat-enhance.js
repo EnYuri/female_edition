@@ -38,6 +38,10 @@ function feSetting(key) {
   return game.settings.get(MODULE_ID, key);
 }
 
+function feGetTextEditor() {
+  return foundry?.applications?.ux?.TextEditor?.implementation ?? globalThis.TextEditor;
+}
+
 function feSetBodyMergeClasses() {
   const enabled = !!feSetting(S.MERGE_ENABLED);
   document.body.classList.toggle("fe-chat-merge", enabled);
@@ -348,13 +352,14 @@ function feInstallMarkdownPreCreateHook() {
 
     // Convert markdown -> HTML -> enrich (rolls, UUID links, etc.)
     const html = feMarkdownToHTML(content);
-    const enriched = await TextEditor.enrichHTML(html, {
+    const te = feGetTextEditor();
+    const enriched = te?.enrichHTML ? await te.enrichHTML(html, {
       async: true,
       secrets: false,
       documents: true,
       links: true,
       rolls: true,
-    });
+    }) : html;
 
     // Store the raw text for later edits
     const flags = foundry.utils.deepClone(data?.flags ?? message.flags ?? {});
@@ -368,124 +373,231 @@ function feInstallMarkdownPreCreateHook() {
 }
 
 // -------------------------------------
-// Edit existing messages
+// Edit existing messages (v13-safe)
+// Inspired by mrkb-fvtt-modules/fvtt-chat-enhancements (chatEditor.mjs)
 // -------------------------------------
+
+let FE_EDITING_MESSAGE_ID = null;
 
 function feCanEditMessage(msg) {
   try {
-    return msg?.canUserModify?.(game.user, "update") ?? false;
-  } catch (_e) {
-    // Fallback
-    return game.user.isGM || msg?.author?.id === game.user.id;
+    return !!msg?.canUserModify?.(game.user, "update");
+  } catch {
+    return false;
   }
+}
+
+function feIsMsgEditable(msg) {
+  return feCanEditMessage(msg);
 }
 
 function feGetEditableRaw(msg) {
-  const flagged = msg?.getFlag?.(MODULE_ID, "raw");
-  if (typeof flagged === "string") return flagged;
-
-  // Fallback: try to convert HTML -> text
-  const div = document.createElement("div");
-  div.innerHTML = msg?.content ?? "";
-  // preserve line breaks
-  div.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
-  return (div.textContent ?? "").trim();
+  return (
+    msg?.getFlag?.(MODULE_ID, "raw") ??
+    msg?.getFlag?.(MODULE_ID, "plain") ??
+    (msg?.content ?? "")
+      .replace(/<br\s*\/?\s*>/gi, "\n")
+      .replace(/<\/p>\s*<p>/gi, "\n")
+      .replace(/<\/?p[^>]*>/gi, "")
+      .replace(/<[^>]+>/g, "")
+      .trim()
+  );
 }
 
-async function feUpdateMessageFromRaw(msg, rawText) {
-  const trimmed = String(rawText ?? "").trim();
+function feEnsureInlineEditorUI() {
+  const chatForm =
+    document.querySelector("#chat-form") ||
+    document.querySelector("form.chat-form") ||
+    document.querySelector("#chat-controls")?.closest("form");
 
-  // Empty => keep but clear content
-  if (!trimmed) {
-    await msg.update({ content: "" });
-    await msg.setFlag(MODULE_ID, "raw", "");
-    await msg.setFlag(MODULE_ID, "markdown", true);
+  if (!chatForm) return null;
+
+  let wrap = chatForm.querySelector("#fe-chat-inline-editor");
+  if (wrap) return wrap;
+
+  wrap = document.createElement("div");
+  wrap.id = "fe-chat-inline-editor";
+  wrap.className = "fe-chat-inline-editor";
+  wrap.innerHTML = `
+    <div class="fe-chat-inline-editor-row">
+      <textarea class="fe-chat-inline-editor-text" rows="3" spellcheck="false"></textarea>
+    </div>
+    <div class="fe-chat-inline-editor-actions">
+      <button type="button" class="fe-chat-inline-editor-save">
+        <i class="fa-solid fa-check"></i>
+        <span>저장</span>
+      </button>
+      <button type="button" class="fe-chat-inline-editor-cancel">
+        <i class="fa-solid fa-xmark"></i>
+        <span>취소</span>
+      </button>
+    </div>
+  `;
+
+  chatForm.prepend(wrap);
+
+  const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
+  const btnSave = wrap.querySelector(".fe-chat-inline-editor-save");
+  const btnCancel = wrap.querySelector(".fe-chat-inline-editor-cancel");
+
+  btnSave.addEventListener("click", () => feCommitInlineEdit());
+  btnCancel.addEventListener("click", () => feCancelInlineEdit());
+
+  textarea.addEventListener("keydown", (ev) => {
+    // Ctrl+Enter => save
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
+      ev.preventDefault();
+      feCommitInlineEdit();
+    }
+    // Escape => cancel
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      feCancelInlineEdit();
+    }
+  });
+
+  wrap.style.display = "none";
+  return wrap;
+}
+
+function feSetChatInputDisabled(disabled) {
+  const input =
+    document.querySelector("#chat-message") ||
+    document.querySelector("#chat-form textarea[name='message']") ||
+    document.querySelector("textarea[name='message']");
+
+  if (!input) return;
+  input.disabled = disabled;
+  input.classList.toggle("fe-chat-input-disabled", disabled);
+}
+
+function feStartInlineEdit(msg) {
+  if (!feCanEditMessage(msg)) {
+    ui?.notifications?.warn("이 메시지를 수정할 권한이 없습니다.");
+    return;
+  }
+  const wrap = feEnsureInlineEditorUI();
+  if (!wrap) return;
+
+  FE_EDITING_MESSAGE_ID = msg.id;
+
+  const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
+  textarea.value = feGetEditableRaw(msg);
+
+  wrap.style.display = "";
+  feSetChatInputDisabled(true);
+
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+}
+
+async function feCommitInlineEdit() {
+  const wrap = document.getElementById("fe-chat-inline-editor");
+  if (!wrap) return;
+  const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
+  const raw = (textarea?.value ?? "").trim();
+
+  const msgId = FE_EDITING_MESSAGE_ID;
+  if (!msgId) return;
+
+  const msg = game?.messages?.get?.(msgId);
+  if (!msg) {
+    feCancelInlineEdit();
     return;
   }
 
-  let html = feSetting(S.MARKDOWN_ENABLED) ? feMarkdownToHTML(rawText) : feEscapeHTML(rawText).replaceAll("\n", "<br>");
-  html = await TextEditor.enrichHTML(html, {
-    async: true,
-    secrets: false,
-    documents: true,
-    links: true,
-    rolls: true,
-  });
+  try {
+    await feUpdateMessageFromRaw(msg, raw);
+  } catch (err) {
+    console.error("[female_edition] edit update failed", err);
+    ui?.notifications?.error("메시지 수정에 실패했습니다. 콘솔을 확인하세요.");
+  }
 
-  await msg.update({ content: html });
-  await msg.setFlag(MODULE_ID, "raw", rawText);
-  await msg.setFlag(MODULE_ID, "markdown", !!feSetting(S.MARKDOWN_ENABLED));
+  feCancelInlineEdit();
 }
 
-function feOpenEditDialog(msg) {
-  const raw = feGetEditableRaw(msg);
-  const safe = feEscapeHTML(raw);
+function feCancelInlineEdit() {
+  const wrap = document.getElementById("fe-chat-inline-editor");
+  if (wrap) {
+    wrap.style.display = "none";
+    const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
+    if (textarea) textarea.value = "";
+  }
+  FE_EDITING_MESSAGE_ID = null;
+  feSetChatInputDisabled(false);
+}
 
-  const content = `
-    <form class="fe-chat-edit-form">
-      <div class="form-group">
-        <label>메시지 내용</label>
-        <textarea name="content" rows="10" style="width:100%; resize: vertical;">${safe}</textarea>
-        <p class="notes">저장 시 현재 설정에 따라 마크다운을 적용합니다.</p>
-      </div>
-    </form>
-  `;
+async function feUpdateMessageFromRaw(msg, rawText) {
+  const raw = (rawText ?? "").toString();
 
-  return new Promise((resolve) => {
-    new Dialog({
-      title: "채팅 메시지 수정",
-      content,
-      buttons: {
-        save: {
-          icon: '<i class="fa-solid fa-check"></i>',
-          label: "저장",
-          callback: async (html) => {
-            const ta = html.querySelector('textarea[name="content"]');
-            const value = ta?.value ?? "";
-            await feUpdateMessageFromRaw(msg, value);
-            resolve(true);
-          },
-        },
-        cancel: {
-          icon: '<i class="fa-solid fa-xmark"></i>',
-          label: "취소",
-          callback: () => resolve(false),
-        },
-      },
-      default: "save",
-    }).render(true);
+  // Keep original raw text so re-editing preserves markdown.
+  const html = await feMarkdownToHTML(raw);
+
+  await msg.update({
+    content: html,
+    [`flags.${MODULE_ID}.raw`]: raw,
+    [`flags.${MODULE_ID}.plain`]: raw,
   });
 }
 
 function feInstallEditHandlers() {
-  Hooks.on("renderChatMessageHTML", (msg, html) => {
-    if (!feSetting(S.EDIT_ENABLED)) return;
-    if (!feCanEditMessage(msg)) return;
+  if (!feSetting(S.EDIT_ENABLED)) return;
 
-    const el = html instanceof HTMLElement ? html : html?.[0];
-    if (!el) return;
+  // Context menu entry (FVTT v13 uses getChatMessageContextOptions)
+  Hooks.on("getChatMessageContextOptions", (_chatLog, options) => {
+    options.push({
+      name: "메시지 수정",
+      icon: '<i class="fa-solid fa-pen-to-square"></i>',
+      condition: (li) => {
+        const msg = feMessageFromContextLI(li);
+        return feIsMsgEditable(msg);
+      },
+      callback: (li) => {
+        const msg = feMessageFromContextLI(li);
+        if (!msg) return;
+        feStartInlineEdit(msg);
+      },
+    });
+  });
 
-    // Existing edit button
-    const btn = el.querySelector(".message-edit");
-    if (btn && !btn.dataset.feBound) {
-      btn.dataset.feBound = "1";
-      btn.addEventListener("click", async (ev) => {
+  // Delegated click handler for the pencil icon (covers existing + newly-rendered messages)
+  if (!feInstallEditHandlers._delegateBound) {
+    feInstallEditHandlers._delegateBound = true;
+    document.addEventListener(
+      "click",
+      (ev) => {
+        if (!feSetting(S.EDIT_ENABLED)) return;
+
+        const btn = ev.target?.closest?.("a.message-edit, button.message-edit");
+        if (!btn) return;
+
+        const li = btn.closest("li.chat-message");
+        if (!li?.dataset?.messageId) return;
+
+        const msg = game.messages?.get?.(li.dataset.messageId);
+        if (!feIsMsgEditable(msg)) return;
+
         ev.preventDefault();
         ev.stopPropagation();
-        await feOpenEditDialog(msg);
-      });
-    }
+        feStartInlineEdit(msg);
+      },
+      true
+    );
+  }
+}
 
-    // Optional: alt-doubleclick on message content
-    if (!el.dataset.feDblBound) {
-      el.dataset.feDblBound = "1";
-      el.addEventListener("dblclick", async (ev) => {
-        if (!ev.altKey) return;
-        if (!feCanEditMessage(msg)) return;
-        await feOpenEditDialog(msg);
-      });
-    }
-  });
+function feMessageFromContextLI(li) {
+  // Foundry passes jQuery <li> in context menu callbacks, but some callers may provide a raw HTMLElement.
+  try {
+    const id =
+      li?.dataset?.messageId ??
+      (typeof li?.data === "function" ? li.data("messageId") : undefined) ??
+      (typeof li?.attr === "function" ? li.attr("data-message-id") : undefined);
+
+    return id ? game.messages?.get?.(id) ?? null : null;
+  } catch (_e) {
+    return null;
+  }
 }
 
 // -------------------------------------
@@ -614,7 +726,10 @@ function feInjectExportButton(root = document) {
   const controls =
     root.querySelector("#chat-controls") ||
     root.querySelector("#sidebar #chat #chat-controls") ||
-    root.querySelector("#sidebar #chat .chat-controls");
+    root.querySelector("#sidebar #chat .chat-controls") ||
+    root.querySelector("#sidebar #chat .chat-control-icons") ||
+    root.querySelector("#sidebar #chat .control-buttons") ||
+    root.querySelector("#sidebar #chat form.chat-form");
 
   if (!controls) return;
   if (controls.querySelector(".fe-export-pdf")) return;
@@ -643,70 +758,240 @@ function feInjectExportButtonsAll() {
   }
 }
 
-async function feExportChatLogToPDF() {
-  // Build export container
-  const containerId = "fe-chat-export-container";
-  let container = document.getElementById(containerId);
-  if (container) container.remove();
+function feEnsureExportContainer() {
+  let container = document.getElementById("fe-chat-export-container");
+  if (container) return container;
 
   container = document.createElement("div");
-  container.id = containerId;
-
-  const title = document.createElement("h1");
-  title.textContent = `${game.world?.title ?? "Chat Log"} — ${new Date().toLocaleString()}`;
-  container.appendChild(title);
-
-  const ol = document.createElement("ol");
-  ol.className = "chat-log";
-  container.appendChild(ol);
+  container.id = "fe-chat-export-container";
+  container.innerHTML = `
+    <div class="fe-chat-export-toolbar">
+      <div id="fe-chat-export-title">Chat Log</div>
+      <div id="fe-chat-export-meta"></div>
+      <a class="fe-chat-export-close" aria-label="Close">✕</a>
+    </div>
+    <ol id="fe-chat-export-log" class="chat-log"></ol>
+  `;
 
   document.body.appendChild(container);
-  document.body.classList.add("fe-exporting-chat");
 
-  // Render messages
-  const msgs = (game.messages?.contents ?? []).slice().sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  for (const msg of msgs) {
-    try {
-      const li = await msg.renderHTML();
-      // Remove per-message controls from print
-      li.querySelectorAll(".message-actions, .message-delete, .message-edit").forEach((n) => n.remove());
-      ol.appendChild(li);
-    } catch (err) {
-      console.warn(`[${MODULE_ID}] failed to render message for export`, err);
-    }
+  const close = container.querySelector(".fe-chat-export-close");
+  if (close) {
+    close.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      try {
+        container.remove();
+      } catch {}
+      document.body.classList.remove("fe-print-chatlog");
+    });
   }
 
-  // Apply merge styling to the export log as well
-  feApplyChatMerge(ol);
-
-  // Ensure images are loaded before printing (best-effort)
-  const imgs = [...container.querySelectorAll("img")];
-  await Promise.all(
-    imgs.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => (img.onload = img.onerror = () => r()))))
-  );
-
-  const cleanup = () => {
-    document.body.classList.remove("fe-exporting-chat");
-    container.remove();
-  };
-
-  window.addEventListener("afterprint", cleanup, { once: true });
-
-  // Some environments don't fire afterprint reliably; fallback
-  setTimeout(() => {
-    if (document.body.classList.contains("fe-exporting-chat")) cleanup();
-  }, 20000);
-
-  window.print();
+  return container;
 }
 
-// -------------------------------------
-// Chat merge (visual)
-// -------------------------------------
+async function feExportChatLogToPDF() {
+  if (document.body.classList.contains("fe-print-chatlog")) return;
 
-function feGetChatLogs() {
-  return Array.from(document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log)")).filter((el) => el instanceof HTMLElement);
+  document.body.classList.add("fe-print-chatlog");
+  const container = feEnsureExportContainer();
+  const titleEl = container.querySelector("#fe-chat-export-title");
+  const metaEl = container.querySelector("#fe-chat-export-meta");
+  const logEl = container.querySelector("#fe-chat-export-log");
+
+  // Match the current chat-log class list as closely as possible (theme, sizing, etc.)
+  const sampleLog = document.querySelector("ol.chat-log, #chat-log");
+  if (sampleLog?.className) logEl.className = sampleLog.className;
+
+  // Keep our id stable
+  logEl.id = "fe-chat-export-log";
+  logEl.innerHTML = "";
+
+  try {
+    const user = game.user;
+
+    // Collect messages the current user can see
+    const all = Array.from(game.messages?.contents ?? []);
+    all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    const messages = all.filter((m) => feCanUserSeeChatMessage(m, user));
+
+    // Header/meta
+    const worldName = game.world?.title ?? game.world?.name ?? "";
+    const sceneName = canvas?.scene?.name ?? "";
+    titleEl.textContent = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+    metaEl.textContent = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
+
+    // Render each message using Foundry's own renderer so we keep portraits/chat cards, etc.
+    let i = 0;
+    for (const msg of messages) {
+      i++;
+      if (i === 1 || i % 25 === 0 || i === messages.length) {
+        metaEl.textContent = `Rendering… ${i}/${messages.length}`;
+      }
+
+      let li = null;
+      try {
+        // Some modules (e.g. portrait mods) look at this
+        msg.exporting = true;
+      } catch {}
+
+      try {
+        if (typeof msg.renderHTML === "function") li = await msg.renderHTML();
+        else if (typeof msg.getHTML === "function") li = await msg.getHTML();
+      } catch (err) {
+        console.warn("female_edition | PDF export: failed to render message", msg, err);
+      } finally {
+        try {
+          msg.exporting = false;
+        } catch {}
+      }
+
+      // Normalize jQuery -> HTMLElement
+      if (li && !(li instanceof HTMLElement) && li?.[0] instanceof HTMLElement) li = li[0];
+      if (!(li instanceof HTMLElement)) continue;
+
+      feNormalizeExportNode(li);
+      logEl.appendChild(li);
+
+      // Yield occasionally to keep UI responsive
+      if (i % 25 === 0) await feNextTick();
+    }
+
+    // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
+    if (feSetting(S.MERGE_ENABLED)) {
+      feApplyChatMerge(logEl);
+    }
+
+    // Wait for images (portraits, item icons) to load so they actually print
+    metaEl.textContent = "Loading images…";
+    await feWaitForImages(logEl, 15000);
+
+    metaEl.textContent = "Opening print dialog…";
+
+    // Cleanup after printing; keep a close button as a fallback.
+    const cleanup = () => {
+      try {
+        container.remove();
+      } catch {}
+      document.body.classList.remove("fe-print-chatlog");
+    };
+
+    const afterPrint = () => cleanup();
+    window.addEventListener("afterprint", afterPrint, { once: true });
+
+    window.print();
+
+    // Some environments (Electron) don't always fire afterprint reliably.
+    // The close button remains available; also attempt a delayed cleanup if print returns immediately.
+    setTimeout(() => {
+      if (document.body.classList.contains("fe-print-chatlog") && !document.getElementById("fe-chat-export-container")) {
+        document.body.classList.remove("fe-print-chatlog");
+      }
+    }, 0);
+  } catch (err) {
+    console.error(err);
+    ui.notifications?.error("Chat log PDF export failed. Check the console for details.");
+  }
 }
+
+function feCanUserSeeChatMessage(msg, user) {
+  try {
+    if (!msg) return false;
+
+    // If Foundry provides a boolean visibility flag, prefer it.
+    if (typeof msg.visible === "boolean") return msg.visible;
+
+    // Whispers: visible to GM and recipients (and the author).
+    const whisper = msg.whisper ?? [];
+    if (Array.isArray(whisper) && whisper.length) {
+      if (user?.isGM) return true;
+      if (whisper.includes(user?.id)) return true;
+      if (msg.author?.id === user?.id) return true;
+      return false;
+    }
+
+    // Hidden messages are still visible to GMs.
+    if (msg.hidden && !user?.isGM) return false;
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function feNormalizeExportNode(rootEl) {
+  try {
+    // Normalize image URLs to absolute so print reliably loads them
+    for (const img of rootEl.querySelectorAll("img")) {
+      const src = img.getAttribute("src");
+      if (!src) continue;
+      try {
+        img.src = new URL(src, window.location.href).href;
+      } catch {}
+      // Ensure intrinsic size isn't lost in print layout
+      if (!img.getAttribute("loading")) img.setAttribute("loading", "eager");
+      if (!img.getAttribute("decoding")) img.setAttribute("decoding", "sync");
+    }
+
+    // Normalize anchor URLs too
+    for (const a of rootEl.querySelectorAll("a[href]")) {
+      const href = a.getAttribute("href");
+      if (!href) continue;
+      try {
+        a.href = new URL(href, window.location.href).href;
+      } catch {}
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+    }
+  } catch {}
+}
+
+function feNextTick() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function feWaitForImages(rootEl, timeoutMs = 10000) {
+  try {
+    const imgs = Array.from(rootEl.querySelectorAll("img")).filter((img) => {
+      const src = img.getAttribute("src");
+      return !!src;
+    });
+
+    if (!imgs.length) return Promise.resolve();
+
+    return new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        resolve();
+      }, timeoutMs);
+
+      let remaining = imgs.length;
+      const onOne = () => {
+        remaining--;
+        if (remaining > 0) return;
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve();
+      };
+
+      for (const img of imgs) {
+        if (img.complete && img.naturalWidth > 0) {
+          onOne();
+          continue;
+        }
+        img.addEventListener("load", onOne, { once: true });
+        img.addEventListener("error", onOne, { once: true });
+      }
+    });
+  } catch {
+    return Promise.resolve();
+  }
+}
+
+
+
 
 function feGetChatMessageElementOrder(el, fallback) {
   const raw = el.dataset.order ?? el.style.order;
@@ -714,112 +999,158 @@ function feGetChatMessageElementOrder(el, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function feMessageMergeInfo(msg) {
-  const authorId = msg?.author?.id ?? msg?.user?.id ?? "";
+function feMessageMergeInfo(msg, el) {
+  // NOTE: v13+: ChatMessage#user is deprecated -> use ChatMessage#author
+  const authorId = msg?.author?.id ?? "";
+
   const speaker = msg?.speaker ?? {};
-  const speakerKey = JSON.stringify({
-    scene: speaker.scene ?? null,
-    token: speaker.token ?? null,
-    actor: speaker.actor ?? null,
-    alias: speaker.alias ?? "",
-  });
+  const speakerKey = [
+    speaker.scene ?? "",
+    speaker.token ?? "",
+    speaker.actor ?? "",
+    speaker.alias ?? ""
+  ].join("|");
 
-  const style = msg?.style ?? msg?.type ?? null;
-
-  const whisper = Array.isArray(msg?.whisper) ? msg.whisper.slice() : [];
-  whisper.sort();
-  const whisperKey = whisper.join(",");
+  // Whisper recipients (if any)
+  const whisper = Array.isArray(msg?.whisper) ? msg.whisper : [];
+  const whisperKey = whisper.length ? whisper.slice().sort().join(",") : "";
 
   const blind = !!msg?.blind;
-  const rollMode = msg?.rollMode ?? null;
+  const rollMode = msg?.rollMode ?? "";
+
+  // ChatMessage#style exists in v13+ (ChatMessage#type was renamed)
+  const style = msg?.style ?? msg?.type ?? null;
+
+  // Rolls are defined in ChatMessage#rolls in v13+
+  const hasRolls = Array.isArray(msg?.rolls) && msg.rolls.length > 0;
 
   const content = String(msg?.content ?? "");
-  const hasRolls = Array.isArray(msg?.rolls) && msg.rolls.length > 0;
-  const hasDiceMarkup = /class="dice-roll\b/.test(content) || /data-action="expandRoll"/.test(content);
-  const hasChatCard = /class="chat-card\b/.test(content) || /class="midi-chat-card\b/.test(content);
+  const hasChatCard = /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/.test(content);
+  const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
 
-  const mergeableText = !(hasRolls || hasDiceMarkup || hasChatCard);
+  // "Merge only text" should merge plain text lines, but avoid merging item cards / dice rolls.
+  const mergeableText = !hasRolls && !hasChatCard && !hasDice;
 
   return {
     authorId,
     speakerKey,
-    style,
     whisperKey,
     blind,
     rollMode,
-    mergeableText,
+    style,
+    mergeableText
   };
 }
 
-function feMergeKey(info) {
-  return `${info.authorId}|${info.speakerKey}|${info.style}|${info.whisperKey}|${info.blind}|${info.rollMode}`;
+
+
+
+function feGetChatLogs() {
+  // Sidebar + any chat popouts
+  const logs = new Set();
+  document.querySelectorAll("ol.chat-log, #chat-log").forEach((el) => {
+    if (el instanceof HTMLElement) logs.add(el);
+  });
+  return Array.from(logs);
 }
 
+function feMergeKey(info) {
+  // Key that defines whether two messages may be merged.
+  // Include style + rollMode + whisper visibility so we don't merge across contexts.
+  const author = info?.authorId ?? "";
+  const speaker = info?.speakerKey ?? "";
+  const whisper = info?.whisperKey ?? "";
+  const blind = info?.blind ? "1" : "0";
+  const rollMode = info?.rollMode ?? "";
+  const style = info?.style ?? "";
+  return [author, speaker, whisper, blind, rollMode, style].join("||");
+}
+
+
+
 function feApplyChatMerge(logEl) {
-  if (!feSetting(S.MERGE_ENABLED)) return;
   if (!(logEl instanceof HTMLElement)) return;
+
+  // Always clear previous merge classes first (so disabling the feature restores normal view).
+  const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
+  for (const el of msgs) {
+    el.classList.remove(
+      "fe-merge-start",
+      "fe-merge-mid",
+      "fe-merge-end",
+      "fe-divider-before"
+    );
+  }
+
+  if (!feSetting(S.MERGE_ENABLED)) return;
 
   const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
 
-  // Collect + sort by visual order
-  const entries = Array.from(logEl.querySelectorAll("li.chat-message"))
-    .map((el, idx) => ({ el, order: feGetChatMessageElementOrder(el, idx) }))
-    .sort((a, b) => a.order - b.order);
+  // Collect message infos
+  const infos = msgs
+    .map((el, idx) => {
+      const id = el.dataset?.messageId;
+      const msg = id ? game.messages?.get(id) : null;
+      const info = feMessageMergeInfo(msg, el);
+      return {
+        ...info,
+        el,
+        idx,
+        order: feGetChatMessageElementOrder(el, idx)
+      };
+    })
+    .filter((x) => x && x.el);
 
-  const infos = entries.map(({ el }) => {
-    const id = el.dataset.messageId || el.getAttribute("data-message-id") || "";
-    const msg = id ? game.messages.get(id) : null;
-    const info = msg ? feMessageMergeInfo(msg) : null;
-    return { el, msg, info, id };
-  });
+  // Sort by visual order (Foundry sometimes uses fractional data-order)
+  infos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  // Clear old classes
-  for (const it of infos) {
-    it.el.classList.remove(
-      "fe-merge-start",
-      "fe-merge-mid",
-      "fe-merge-end",
-      "fe-merge-single",
-      "fe-divider-before",
-      "fe-msg-plain"
-    );
-  }
+  // Precompute merge keys
+  for (const info of infos) info.key = feMergeKey(info);
 
   const canMerge = (a, b) => {
-    if (!a?.info || !b?.info) return false;
-    if (onlyText && (!a.info.mergeableText || !b.info.mergeableText)) return false;
-    return feMergeKey(a.info) === feMergeKey(b.info);
+    if (!a || !b) return false;
+    if (a.key !== b.key) return false;
+    if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+    return true;
   };
 
-  for (let i = 0; i < infos.length; i++) {
-    const cur = infos[i];
-    const prev = infos[i - 1];
-    const next = infos[i + 1];
+  const applyGroup = (startIndex, endIndexExclusive) => {
+    const group = infos.slice(startIndex, endIndexExclusive);
+    const groupLen = group.length;
 
-    const mergePrev = i > 0 && canMerge(prev, cur);
-    const mergeNext = i < infos.length - 1 && canMerge(cur, next);
+    if (groupLen <= 0) return;
 
-    if (cur.info?.mergeableText) cur.el.classList.add("fe-msg-plain");
-
-    if (mergePrev || mergeNext) {
-      if (!mergePrev && mergeNext) cur.el.classList.add("fe-merge-start");
-      else if (mergePrev && mergeNext) cur.el.classList.add("fe-merge-mid");
-      else if (mergePrev && !mergeNext) cur.el.classList.add("fe-merge-end");
-    } else {
-      cur.el.classList.add("fe-merge-single");
+    // Divider at group boundary (except first group)
+    if (showDivider && startIndex > 0) {
+      group[0].el.classList.add("fe-divider-before");
     }
 
-    // Divider before new group
-    if (showDivider && i > 0 && !mergePrev) {
-      cur.el.classList.add("fe-divider-before");
+    // Do not apply "follow" classes for single messages (prevents accidental header hiding).
+    if (groupLen === 1) return;
+
+    group[0].el.classList.add("fe-merge-start");
+    for (let i = 1; i < groupLen - 1; i++) group[i].el.classList.add("fe-merge-mid");
+    group[groupLen - 1].el.classList.add("fe-merge-end");
+  };
+
+  let groupStart = 0;
+  for (let i = 1; i < infos.length; i++) {
+    if (!canMerge(infos[i - 1], infos[i])) {
+      applyGroup(groupStart, i);
+      groupStart = i;
     }
+  }
+  applyGroup(groupStart, infos.length);
+}
+
+
+function feApplyChatMergeToAllLogs() {
+  for (const log of feGetChatLogs()) {
+    feApplyChatMerge(log);
   }
 }
 
-function feApplyChatMergeToAllLogs() {
-  for (const log of feGetChatLogs()) feApplyChatMerge(log);
-}
 
 let feChatLogObserver = null;
 

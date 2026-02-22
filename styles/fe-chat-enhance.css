@@ -5,7 +5,7 @@
 /* --------------------------- */
 #chat-controls .fe-export-pdf {
   /* The chat controls row is aligned to the right; margin-right pulls it slightly left */
-  margin-right: 6px;
+  margin-right: 20px;
 }
 
 /* --------------------------- */
@@ -13,7 +13,7 @@
 /* --------------------------- */
 #chat-form .fe-typing-indicator {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
   opacity: 0.8;
   user-select: none;
@@ -36,7 +36,7 @@
 
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
   /* readability for **bold** in normal chat text */
-  font-size: 1.06em;
+  font-size: 1.12em;
   font-weight: 800;
 }
 
@@ -54,32 +54,61 @@
   padding: 12px;
 }
 
-body.fe-exporting-chat #fe-chat-export-container {
+body.fe-print-chatlog #fe-chat-export-container {
   display: block;
 }
 
-body.fe-exporting-chat #fe-chat-export-container h1 {
-  margin: 0 0 12px 0;
+body.fe-print-chatlog #fe-chat-export-title {
+  margin: 0 0 6px 0;
   padding: 0;
   font-size: 18px;
   font-weight: 700;
 }
 
+body.fe-print-chatlog #fe-chat-export-meta {
+  margin: 0 0 12px 0;
+  padding: 0;
+  opacity: 0.85;
+  font-size: 11px;
+}
+
+body.fe-print-chatlog #fe-chat-export-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
+  margin: 0 0 12px 0;
+}
+
 @media print {
-  body.fe-exporting-chat #interface,
-  body.fe-exporting-chat #ui-left,
-  body.fe-exporting-chat #ui-right,
-  body.fe-exporting-chat #players,
-  body.fe-exporting-chat #controls,
-  body.fe-exporting-chat #hotbar {
+  body.fe-print-chatlog {
+    background: #fff !important;
+  }
+
+  /* Hide everything except the export container (no layout gaps). */
+  body.fe-print-chatlog > :not(#fe-chat-export-container) {
     display: none !important;
   }
 
-  body.fe-exporting-chat #fe-chat-export-container {
-    position: static;
-    display: block;
-    overflow: visible;
-    padding: 0;
+  body.fe-print-chatlog #fe-chat-export-container {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    overflow: visible !important;
+    background: #fff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.fe-print-chatlog .fe-chat-export-close {
+    display: none !important;
   }
 }
 
@@ -92,6 +121,12 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divid
   border-top: 1px solid var(--color-border-light-2);
   opacity: 0.35;
   margin: 6px 6px;
+}
+
+/* Chrome parity: avoid a darker "header strip" only on the first message of a merged group */
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) > .message-header {
+  background: transparent !important;
+  background-image: none !important;
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-start {
@@ -155,8 +190,8 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 /* (item/spell/feature cards)   */
 /* --------------------------- */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.chat-card, .midi-chat-card) :is(.card-content, .collapsible-content.card-content) {
-  font-size: 13px !important;   /* was 14px */
-  font-weight: 600 !important; /* force a bit bolder */
+  font-size: 12px !important;
+  font-weight: 700 !important;
 }
 
 
@@ -175,4 +210,37 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(ul, ol) {
   margin: 0.5em 0 0.5em 1.2em;
+}
+
+
+/* --------------------------- */
+/* Inline message editor       */
+/* --------------------------- */
+#fe-chat-inline-editor {
+  margin-bottom: 6px;
+  padding: 6px;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+#fe-chat-inline-editor .fe-chat-inline-editor-row textarea.fe-chat-inline-editor-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+}
+
+#fe-chat-inline-editor .fe-chat-inline-editor-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+
+#fe-chat-inline-editor button {
+  height: 28px;
+}
+
+textarea.fe-chat-input-disabled {
+  opacity: 0.55;
 }
