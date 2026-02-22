@@ -39,7 +39,7 @@ function feSetting(key) {
 }
 
 function feGetTextEditor() {
-  return foundry?.applications?.ux?.TextEditor?.implementation ?? globalThis.TextEditor;
+  return foundry?.applications?.ux?.TextEditor?.implementation;
 }
 
 function feSetBodyMergeClasses() {
@@ -540,25 +540,76 @@ async function feUpdateMessageFromRaw(msg, rawText) {
   });
 }
 
+function fePatchChatContextOptions(inject) {
+  const method = "_getEntryContextOptions";
+
+  const patchOne = (host, flagKey) => {
+    try {
+      if (!host) return;
+      if (host[flagKey]) return;
+      if (typeof host[method] !== "function") return;
+
+      const original = host[method];
+      host[method] = function (...args) {
+        const options = original.apply(this, args) ?? [];
+        try {
+          inject(options);
+        } catch (e) {
+          console.warn("[female_edition] edit context inject failed", e);
+        }
+        return options;
+      };
+
+      host[flagKey] = true;
+    } catch (e) {
+      console.warn("[female_edition] context patch failed", e);
+    }
+  };
+
+  const patch = () => {
+    const chat = ui?.chat;
+    patchOne(chat?.constructor?.prototype, "__feEditContextPatchedProto");
+    patchOne(chat, "__feEditContextPatchedInstance");
+  };
+
+  patch();
+  Hooks.on("renderChatLog", patch);
+}
+
 function feInstallEditHandlers() {
   if (!feSetting(S.EDIT_ENABLED)) return;
 
-  // Context menu entry (FVTT v13 uses getChatMessageContextOptions)
-  Hooks.on("getChatMessageContextOptions", (_chatLog, options) => {
-    options.push({
+  const inject = (options) => {
+    if (!Array.isArray(options)) return;
+
+    // Avoid duplicates if multiple hooks fire.
+    if (options.some((o) => o?.feId === "fe-edit-message")) return;
+
+    options.unshift({
+      feId: "fe-edit-message",
       name: "메시지 수정",
       icon: '<i class="fa-solid fa-pen-to-square"></i>',
-      condition: (li) => {
-        const msg = feMessageFromContextLI(li);
+      condition: (target) => {
+        const msg = feMessageFromContextLI(target);
         return feIsMsgEditable(msg);
       },
-      callback: (li) => {
-        const msg = feMessageFromContextLI(li);
+      callback: (target) => {
+        const msg = feMessageFromContextLI(target);
         if (!msg) return;
         feStartInlineEdit(msg);
       },
     });
-  });
+  };
+
+  // FVTT v13 (ApplicationV2) - Document context options
+  // ChatMessage => getChatMessageContextOptions
+  Hooks.on("getChatMessageContextOptions", (_app, options) => inject(options));
+
+  // Back-compat: some modules still use legacy chat context hook
+  Hooks.on("getChatLogEntryContext", (_html, options) => inject(options));
+
+  // Fallback: some chat replacements bypass hooks; patch the active chat app prototype
+  fePatchChatContextOptions(inject);
 
   // Delegated click handler for the pencil icon (covers existing + newly-rendered messages)
   if (!feInstallEditHandlers._delegateBound) {
@@ -572,9 +623,10 @@ function feInstallEditHandlers() {
         if (!btn) return;
 
         const li = btn.closest("li.chat-message");
-        if (!li?.dataset?.messageId) return;
+        const msgId = li?.dataset?.messageId;
+        if (!msgId) return;
 
-        const msg = game.messages?.get?.(li.dataset.messageId);
+        const msg = game.messages?.get?.(msgId);
         if (!feIsMsgEditable(msg)) return;
 
         ev.preventDefault();
@@ -584,20 +636,83 @@ function feInstallEditHandlers() {
       true
     );
   }
+
+  // v13+: supported hook (HTMLElement). Ensure an edit control exists even when
+  // other modules/themes remove or hide the default edit icon.
+  if (!feInstallEditHandlers._renderHookBound) {
+    feInstallEditHandlers._renderHookBound = true;
+    Hooks.on("renderChatMessageHTML", (message, html) => {
+      if (!feSetting(S.EDIT_ENABLED)) return;
+      try {
+        const el = feToElement(html);
+        feEnsureMessageEditControl(message, el);
+      } catch (e) {
+        console.warn(`${MODULE_ID} | failed to ensure edit control`, e);
+      }
+    });
+  }
 }
 
-function feMessageFromContextLI(li) {
-  // Foundry passes jQuery <li> in context menu callbacks, but some callers may provide a raw HTMLElement.
+function feMessageFromContextLI(target) {
+  // Foundry may pass either the <li> itself or an inner element. It can also pass a jQuery wrapper.
   try {
+    const el0 = target?.[0] ?? target;
+    const el = el0?.closest ? el0.closest("[data-message-id]") ?? el0 : el0;
+
     const id =
-      li?.dataset?.messageId ??
-      (typeof li?.data === "function" ? li.data("messageId") : undefined) ??
-      (typeof li?.attr === "function" ? li.attr("data-message-id") : undefined);
+      el?.dataset?.messageId ??
+      (typeof target?.data === "function" ? target.data("messageId") : undefined) ??
+      (typeof target?.attr === "function" ? target.attr("data-message-id") : undefined) ??
+      (typeof el?.getAttribute === "function" ? el.getAttribute("data-message-id") : undefined);
 
     return id ? game.messages?.get?.(id) ?? null : null;
   } catch (_e) {
     return null;
   }
+}
+
+function feEnsureMessageEditControl(message, messageEl) {
+  if (!(messageEl instanceof HTMLElement)) return;
+  if (!message || !feCanEditMessage(message)) return;
+
+  const metadata = messageEl.querySelector(".message-metadata");
+  if (!metadata) return;
+
+  // Bind existing edit control (if present)
+  const existing = metadata.querySelector("a.message-edit");
+  if (existing) {
+    if (existing.dataset.feEditBound === "1") return;
+    existing.dataset.feEditBound = "1";
+    existing.addEventListener(
+      "click",
+      (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        feStartInlineEdit(message);
+      },
+      true
+    );
+    return;
+  }
+
+  // Otherwise, insert our own control.
+  const a = document.createElement("a");
+  a.classList.add("message-edit", "fe-message-edit");
+  a.setAttribute("role", "button");
+  a.setAttribute("aria-label", "메시지 수정");
+  a.dataset.action = "feEditMessage";
+  a.innerHTML = '<i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>';
+  a.addEventListener(
+    "click",
+    (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      feStartInlineEdit(message);
+    },
+    true
+  );
+
+  metadata.prepend(a);
 }
 
 // -------------------------------------
@@ -792,7 +907,21 @@ function feEnsureExportContainer() {
 async function feExportChatLogToPDF() {
   if (document.body.classList.contains("fe-print-chatlog")) return;
 
+  // Foundry runs the app in a fixed viewport with overflow hidden.
+  // Chromium printing will otherwise only capture the first visible page.
+  const htmlEl = document.documentElement;
+  const prevHtmlOverflow = htmlEl.style.overflow;
+  const prevHtmlHeight = htmlEl.style.height;
+  const prevBodyOverflow = document.body.style.overflow;
+  const prevBodyHeight = document.body.style.height;
+
   document.body.classList.add("fe-print-chatlog");
+
+  // Ensure the document can extend beyond the viewport.
+  htmlEl.style.overflow = "visible";
+  htmlEl.style.height = "auto";
+  document.body.style.overflow = "visible";
+  document.body.style.height = "auto";
   const container = feEnsureExportContainer();
   const titleEl = container.querySelector("#fe-chat-export-title");
   const metaEl = container.querySelector("#fe-chat-export-meta");
@@ -865,6 +994,25 @@ async function feExportChatLogToPDF() {
     metaEl.textContent = "Loading images…";
     await feWaitForImages(logEl, 15000);
 
+    // IMPORTANT: Force a paginatable layout.
+    // If any part of the export UI remains a fixed/scroll container, Chromium printing will
+    // often clip to a single page.
+    try {
+      container.style.position = "static";
+      container.style.inset = "auto";
+      container.style.width = "auto";
+      container.style.height = "auto";
+      container.style.overflow = "visible";
+      logEl.style.display = "block";
+      logEl.style.height = "auto";
+      logEl.style.maxHeight = "none";
+      logEl.style.overflow = "visible";
+    } catch {}
+
+    // Give the browser time to reflow before printing.
+    await new Promise((r) => requestAnimationFrame(r));
+    await new Promise((r) => requestAnimationFrame(r));
+
     metaEl.textContent = "Opening print dialog…";
 
     // Cleanup after printing; keep a close button as a fallback.
@@ -873,6 +1021,12 @@ async function feExportChatLogToPDF() {
         container.remove();
       } catch {}
       document.body.classList.remove("fe-print-chatlog");
+
+      // Restore document sizing
+      htmlEl.style.overflow = prevHtmlOverflow;
+      htmlEl.style.height = prevHtmlHeight;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.height = prevBodyHeight;
     };
 
     const afterPrint = () => cleanup();
@@ -1068,6 +1222,115 @@ function feMergeKey(info) {
 
 
 
+function feSyncMergedGroupBackground(group) {
+  try {
+    if (!Array.isArray(group) || group.length < 2) return;
+    // Prefer the most recent message in the group as the reference.
+    // Some web environments apply slightly different background stacks to
+    // earlier-rendered messages; syncing to the newest reduces mismatches.
+    const refEl = group?.[group.length - 1]?.el ?? group?.[0]?.el;
+    if (!refEl) return;
+
+    const cs = window.getComputedStyle(refEl);
+    const bg = {
+      color: cs.backgroundColor,
+      image: cs.backgroundImage,
+      blend: cs.backgroundBlendMode,
+      repeat: cs.backgroundRepeat,
+      size: cs.backgroundSize,
+      position: cs.backgroundPosition,
+      attachment: cs.backgroundAttachment,
+      origin: cs.backgroundOrigin,
+      clip: cs.backgroundClip,
+    };
+
+    for (let i = 0; i < group.length; i++) {
+      const el = group?.[i]?.el;
+      if (!el || el === refEl) continue;
+      el.style.backgroundColor = bg.color;
+      el.style.backgroundImage = bg.image;
+      el.style.backgroundBlendMode = bg.blend;
+      el.style.backgroundRepeat = bg.repeat;
+      el.style.backgroundSize = bg.size;
+      el.style.backgroundPosition = bg.position;
+      el.style.backgroundAttachment = bg.attachment;
+      el.style.backgroundOrigin = bg.origin;
+      el.style.backgroundClip = bg.clip;
+    }
+  } catch (e) {
+    console.warn("[female_edition] merge background sync failed", e);
+  }
+}
+
+function feNormalizeKeyBackgrounds(infos) {
+  try {
+    if (!Array.isArray(infos) || infos.length < 2) return;
+
+    const hasBgStyling = (el, cs) => {
+      const styleAttr = el?.getAttribute?.("style") ?? "";
+      if (/background/i.test(styleAttr)) return true;
+      if (!cs) return false;
+      return cs.backgroundBlendMode !== "normal" || cs.backgroundImage !== "none";
+    };
+
+    const extract = (cs) => ({
+      color: cs.backgroundColor,
+      image: cs.backgroundImage,
+      blend: cs.backgroundBlendMode,
+      repeat: cs.backgroundRepeat,
+      size: cs.backgroundSize,
+      position: cs.backgroundPosition,
+      attachment: cs.backgroundAttachment,
+      origin: cs.backgroundOrigin,
+      clip: cs.backgroundClip,
+    });
+
+    const apply = (el, bg) => {
+      el.style.backgroundColor = bg.color;
+      el.style.backgroundImage = bg.image;
+      el.style.backgroundBlendMode = bg.blend;
+      el.style.backgroundRepeat = bg.repeat;
+      el.style.backgroundSize = bg.size;
+      el.style.backgroundPosition = bg.position;
+      el.style.backgroundAttachment = bg.attachment;
+      el.style.backgroundOrigin = bg.origin;
+      el.style.backgroundClip = bg.clip;
+    };
+
+    // Use the most recent message (DOM-bottom) as the reference for a key.
+    const ref = new Map();
+    for (let i = infos.length - 1; i >= 0; i--) {
+      const info = infos[i];
+      const el = info?.el;
+      const key = info?.key;
+      if (!el || !key) continue;
+
+      const cs = window.getComputedStyle(el);
+      if (!hasBgStyling(el, cs)) continue;
+
+      if (!ref.has(key)) {
+        ref.set(key, extract(cs));
+        continue;
+      }
+
+      const bg = ref.get(key);
+      if (!bg) continue;
+
+      // Only apply if a visible mismatch is likely.
+      if (
+        cs.backgroundColor !== bg.color ||
+        cs.backgroundImage !== bg.image ||
+        cs.backgroundBlendMode !== bg.blend
+      ) {
+        apply(el, bg);
+      }
+    }
+  } catch (e) {
+    console.warn("[female_edition] key background normalization failed", e);
+  }
+}
+
+
 function feApplyChatMerge(logEl) {
   if (!(logEl instanceof HTMLElement)) return;
 
@@ -1132,6 +1395,10 @@ function feApplyChatMerge(logEl) {
     group[0].el.classList.add("fe-merge-start");
     for (let i = 1; i < groupLen - 1; i++) group[i].el.classList.add("fe-merge-mid");
     group[groupLen - 1].el.classList.add("fe-merge-end");
+
+
+    // Chrome/Web parity: enforce identical background for merged messages
+    feSyncMergedGroupBackground(group);
   };
 
   let groupStart = 0;
@@ -1142,6 +1409,11 @@ function feApplyChatMerge(logEl) {
     }
   }
   applyGroup(groupStart, infos.length);
+
+  // Web(Chrome) parity: some modules end up applying slightly different
+  // background stacks to messages rendered at different times. Normalise per
+  // merge-key using the most recent message as the reference.
+  feNormalizeKeyBackgrounds(infos);
 }
 
 

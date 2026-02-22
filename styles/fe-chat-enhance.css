@@ -34,6 +34,12 @@
   opacity: 0.95;
 }
 
+/* Chat Portrait: hide the duplicate/empty content-name header inside message-content */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-dnd5e.chat-portrait-flexrow,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-generic.chat-portrait-flexrow {
+  display: none !important;
+}
+
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
   /* readability for **bold** in normal chat text */
   font-size: 1.12em;
@@ -56,6 +62,35 @@
 
 body.fe-print-chatlog #fe-chat-export-container {
   display: block;
+  /* IMPORTANT: Use normal document flow.
+   * If the export view is a fixed/scroll container, Chromium (and Electron printing)
+   * will often only output the first page.
+   * Make it static + non-scroll so the browser can paginate the full log.
+   */
+  position: static;
+  inset: auto;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  padding: 12mm;
+}
+
+/* IMPORTANT: The real Foundry chat log is a scroll container.
+ * If we keep that behavior on the export log, Chromium will clip at 1 page.
+ * Force a normal, paginatable flow *even on screen media*.
+ */
+body.fe-print-chatlog #fe-chat-export-log {
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* While exporting, hide the Foundry UI so the export view becomes the only document content.
+ * This makes pagination consistent in both desktop (Electron) and web browsers.
+ */
+body.fe-print-chatlog > :not(#fe-chat-export-container) {
+  display: none !important;
 }
 
 body.fe-print-chatlog #fe-chat-export-title {
@@ -83,6 +118,16 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
 }
 
 @media print {
+  /*
+   * Foundry runs the app in a fixed viewport with overflow hidden.
+   * If we don't reset this for print, Chromium will only print the visible
+   * viewport (1 page) even if the export DOM contains the full chat log.
+   */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   body.fe-print-chatlog {
     background: #fff !important;
   }
@@ -110,6 +155,61 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
   body.fe-print-chatlog .fe-chat-export-close {
     display: none !important;
   }
+
+  /* Ensure multi-page printing (avoid flex/scroll containers being clipped to 1 page) */
+  body.fe-print-chatlog #fe-chat-export-container {
+    display: block !important;
+  }
+
+  body.fe-print-chatlog #fe-chat-export-log {
+    display: block !important;
+    flex: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+}
+
+/*
+ * Ensure the edit control is visible even when message headers are
+ * collapsed/merged by the chat merge feature.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.message-edit,
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.fe-message-edit {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
+#fe-chat-export-container .chat-message .message-sender .avatar {
+  display: none !important;
+}
+
+
+/* Export view: enforce FE CookieRun (custom UI font) for actor/player names */
+#fe-chat-export-container {
+  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif;
+}
+
+#fe-chat-export-container .chat-message .message-sender,
+#fe-chat-export-container .chat-message .message-sender .name-stacked,
+#fe-chat-export-container .chat-message .message-sender .name-stacked > span {
+  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif !important;
+}
+
+#fe-chat-export-container .chat-message .message-sender .name-stacked .title {
+  font-weight: 700 !important;
+}
+
+#fe-chat-export-container .chat-message .message-sender .name-stacked .subtitle {
+  font-weight: 400 !important;
+}
+
+/* Export view: remove text shadow for readability in PDF */
+#fe-chat-export-container .chat-message :is(.message-header, .message-sender, .message-content) {
+  text-shadow: none !important;
 }
 
 /* --------------------------- */
@@ -127,6 +227,13 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divid
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) > .message-header {
   background: transparent !important;
   background-image: none !important;
+}
+
+/* Chrome parity: also keep the content area transparent so merged groups don't show different tints */
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end)
+  > .message-content {
+  background: transparent !important;
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-start {
