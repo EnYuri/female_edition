@@ -405,6 +405,131 @@ function feRewriteCSSAssetURLs(cssText, baseUrl) {
   return out;
 }
 
+// -------------------------------------
+// Export helper: Chat texture stripping (archive/html)
+// -------------------------------------
+// The live chat log uses chat-bg-stripper.js (MutationObserver) to remove only
+// parchment/texture url() layers while preserving Chat Portrait's color overlay.
+// The archive window renders from ChatMessage templates, so we must re-apply the
+// same sanitization there to match the on-screen chat appearance.
+
+const FE_TEX_RE = /(parchment\.jpg|\/ui\/texture[^"' )]*\.(?:webp|png|jpg|jpeg)|texture[^"' )]*\.(?:webp|png|jpg|jpeg))/i;
+const FE_OVERLAY_LAYER = "var(--fe-parchment-overlay)";
+
+/** Split a CSS background-image string into top-level layers (commas), respecting parentheses/quotes. */
+function feSplitBgLayers(value) {
+  if (!value) return [];
+  const v = String(value).trim();
+  if (!v || v === "none") return [];
+  const out = [];
+  let buf = "";
+  let depth = 0;
+  let q = null;
+  for (let i = 0; i < v.length; i++) {
+    const c = v[i];
+    if (q) {
+      buf += c;
+      if (c === q && v[i - 1] !== "\\") q = null;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      q = c;
+      buf += c;
+      continue;
+    }
+    if (c === "(") depth++;
+    else if (c === ")") depth = Math.max(0, depth - 1);
+
+    if (c === "," && depth === 0) {
+      const s = buf.trim();
+      if (s && s !== "none") out.push(s);
+      buf = "";
+      continue;
+    }
+    buf += c;
+  }
+  const last = buf.trim();
+  if (last && last !== "none") out.push(last);
+  return out;
+}
+
+function feHasOverlayLayer(layers) {
+  return Array.isArray(layers) && layers.some((l) => /--fe-parchment-overlay/i.test(String(l)));
+}
+
+function feIsTextureLayer(layer) {
+  return /url\(/i.test(String(layer)) && FE_TEX_RE.test(String(layer));
+}
+
+function feStripTextureLayers(layers) {
+  return Array.isArray(layers) ? layers.filter((l) => !feIsTextureLayer(l)) : [];
+}
+
+function feSanitizeElementBackgroundInWindow(win, el) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return false;
+    const styleAttr = el.getAttribute?.("style") || "";
+    const cs = win.getComputedStyle?.(el);
+    const bgImage = cs?.backgroundImage || "";
+
+    // Fast reject
+    if (!FE_TEX_RE.test(bgImage) && !FE_TEX_RE.test(styleAttr)) return false;
+
+    const layers = feSplitBgLayers(bgImage);
+    const stripped = feStripTextureLayers(layers);
+
+    // Always ensure a flat overlay exists so screen blending desaturates consistently.
+    const nextLayers = stripped.slice();
+    if (!feHasOverlayLayer(nextLayers)) nextLayers.unshift(FE_OVERLAY_LAYER);
+    const finalLayers = nextLayers.length ? nextLayers : [FE_OVERLAY_LAYER];
+
+    el.style.setProperty("background-image", finalLayers.join(", "), "important");
+    el.classList.add("fe-bg-sanitized");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function feSanitizePseudoInWindow(win, el, pseudo, varName) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return false;
+    const cs = win.getComputedStyle?.(el, pseudo);
+    const bgImage = cs?.backgroundImage || "";
+    if (!FE_TEX_RE.test(bgImage)) return false;
+
+    const layers = feSplitBgLayers(bgImage);
+    const stripped = feStripTextureLayers(layers);
+    const nextLayers = stripped.slice();
+    if (!feHasOverlayLayer(nextLayers)) nextLayers.unshift(FE_OVERLAY_LAYER);
+    const finalLayers = nextLayers.length ? nextLayers : [FE_OVERLAY_LAYER];
+
+    el.style.setProperty(varName, finalLayers.join(", "));
+    el.classList.add("fe-pseudo-sanitized");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function feStripChatTexturesInWindow(win, rootEl) {
+  try {
+    if (!win || !rootEl) return;
+    const root = rootEl instanceof win.Element ? rootEl : win.document;
+    const messages = Array.from(root.querySelectorAll?.(".chat-message") ?? []);
+    for (const msg of messages) {
+      feSanitizeElementBackgroundInWindow(win, msg);
+      msg
+        .querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")
+        ?.forEach?.((el) => feSanitizeElementBackgroundInWindow(win, el));
+      feSanitizePseudoInWindow(win, msg, "::before", "--fe-before-bgimg");
+      feSanitizePseudoInWindow(win, msg, "::after", "--fe-after-bgimg");
+    }
+  } catch (err) {
+    console.warn("female_edition | archive texture strip failed", err);
+  }
+}
+
 
 function feInlineFormat(text) {
   // Inline code: protect first
@@ -1591,11 +1716,14 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         margin: 0 !important;
       }
 
-      /* Match Foundry sidebar feel (prevents images/cards from becoming "full-page wide"). */
+      /* Archive layout width
+       * - Old behavior: hard-locked to Foundry sidebar width (~360px)
+       * - New behavior: use a natural page width (better readability in HTML/PDF)
+       */
       #fe-chat-export-container .fe-chat-export-toolbar,
       #fe-chat-export-container #sidebar {
-        width: min(100%, var(--sidebar-width, 360px)) !important;
-        max-width: var(--sidebar-width, 360px) !important;
+        width: min(100%, var(--fe-export-max-width, 1200px)) !important;
+        max-width: var(--fe-export-max-width, 1200px) !important;
         margin-left: auto !important;
         margin-right: auto !important;
       }
@@ -1603,7 +1731,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
       #fe-chat-export-container #sidebar {
         position: static !important;
-        width: min(100%, var(--sidebar-width, 360px)) !important;
+        width: min(100%, var(--fe-export-max-width, 1200px)) !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
@@ -1629,6 +1757,22 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
+      }
+
+      /* Screen-only text rendering helpers.
+       * Some Windows/Chrome setups look jagged when custom fonts are loaded from file://.
+       * A tiny text-shadow is a common workaround (kept out of print).
+       */
+      @media screen {
+        #fe-chat-export-container {
+          -webkit-font-smoothing: auto;
+          -moz-osx-font-smoothing: auto;
+          text-rendering: optimizeLegibility;
+        }
+
+        #fe-chat-export-container :is(.chat-message, .chat-message *) {
+          text-shadow: rgba(0,0,0,0.01) 0 0 1px !important;
+        }
       }
 
       /* Toolbar: compact, web-page-like controls. */
@@ -1829,6 +1973,17 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
     // Keep UI responsive only when visible. Background tabs clamp timers heavily.
     if (i % 25 === 0) await feMaybeYieldForUI();
+  }
+
+  // If texture stripping / export optimization is enabled, apply the same
+  // sanitization logic used in the live chat log (chat-bg-stripper.js).
+  // This is required for the archive window + downloaded HTML to match the
+  // on-screen chat saturation/overlay behavior.
+  if (effectiveOptimize) {
+    try {
+      if (metaEl) metaEl.textContent = "Applying texture stripping…";
+      feStripChatTexturesInWindow(win, logEl);
+    } catch {}
   }
 
   // Apply merge styling in the archive window if enabled.
@@ -2571,6 +2726,18 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     );
   }
 
+  // Optional: Dongle Light (used as a light variant for small text + chat-card descriptions)
+  // If missing, the light stack falls back to CookieRun/Signika.
+  {
+    const url = `/modules/${MODULE_ID}/font/Dongle-Light.ttf`;
+    const dataUrl = await feFetchAsDataURL(url);
+    if (dataUrl) {
+      faces.push(
+        `@font-face{font-family:"FE Dongle Light Embedded";src:url(${dataUrl}) format("truetype");font-weight:300;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+      );
+    }
+  }
+
   if (!faces.length) return "";
 
   return `
@@ -2597,6 +2764,21 @@ ${faces.join("\n")}
     "Segoe UI",
     sans-serif,
     var(--fe-symbol-fallback);
+
+  /* Light stack: prefer embedded Dongle Light when available */
+  --fe-font-light:
+    "FE Dongle Light Embedded",
+    "FE Dongle Light",
+    "FE CookieRun Embedded",
+    "FE CookieRun",
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+  --fe-font-light-stack: var(--fe-font-light);
 
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);

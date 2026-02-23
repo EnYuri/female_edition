@@ -1,7 +1,7 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
- * v10 changes:
- *  - CookieRun only (Dongle excluded). Wider coverage via Foundry + dnd5e font vars.
+ * v13 changes:
+ *  - CookieRun as primary UI font + Dongle Light as a light variant for small text/chat-card descriptions.
  *  - Fix broken Font Awesome icons that are BUTTON/A/etc with .fa-* classes,
  *    including the specific selectors you provided (header-control, tokenbar, breaktime).
  *  - Keep symbol/emoji fallbacks so special characters never tofu.
@@ -12,7 +12,24 @@
  */
 
 /* -------------------------------
- * 1) Font faces (CookieRun)
+ * 1) Font faces (Dongle Light)
+ * ------------------------------- */
+
+/* Dongle is an OFL-licensed Korean display typeface with Light/Regular/Bold weights.
+ * We use the Light face as a “light variant” for small UI text and chat-card descriptions.
+ */
+@font-face {
+  font-family: "FE Dongle Light";
+  src: url("/modules/female_edition/font/Dongle-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  /* Match CookieRun coverage to keep predictable fallbacks. */
+  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
+}
+
+/* -------------------------------
+ * 2) Font faces (CookieRun)
  * ------------------------------- */
 
 @font-face {
@@ -47,7 +64,7 @@
 }
 
 /* -------------------------------
- * 2) Stacks + variables (coverage)
+ * 3) Stacks + variables (coverage)
  * ------------------------------- */
 
 :root {
@@ -69,6 +86,21 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
+  /* Light stack (small text / chat-card descriptions)
+   * If Dongle-Light.ttf is missing, this falls back to CookieRun/Signika.
+   */
+  --fe-font-light:
+    "FE Dongle Light",
+    "FE CookieRun",
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+  --fe-font-light-stack: var(--fe-font-light);
+
   /* Foundry global vars */
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);
@@ -84,7 +116,25 @@
   --fe-chat-title-size: 22px;     /* actor name */
   --fe-chat-subtitle-size: 14px;  /* player name */
 
+  /* Weight guidance
+   * CookieRun can look heavy when combined with readability boosts.
+   * Use lighter defaults for small UI text and chat-card descriptions.
+   */
+  --fe-font-weight-title: 700;
+  --fe-font-weight-body: 400;
+  --fe-font-weight-small: 300;
+
   font-synthesis: none;
+}
+
+/* dnd5e may override its font variables inside .dnd5e/.dnd5e2 scopes.
+ * Re-assert them with !important so the sheet remains consistent.
+ */
+:is(.dnd5e, .dnd5e2) {
+  --dnd5e-font-roboto: var(--fe-font-primary) !important;
+  --dnd5e-font-roboto-slab: var(--fe-font-primary) !important;
+  --dnd5e-font-signika: var(--fe-font-primary) !important;
+  --dnd5e-font-modesto: var(--fe-font-primary) !important;
 }
 
 /* -------------------------------
@@ -105,8 +155,44 @@ html, body,
   font-family: var(--fe-font-primary) !important;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Do NOT force grayscale anti-aliasing; keep system defaults (subpixel where available). */
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
+/* dnd5e actor sheet: ensure key large labels use the custom font */
+:is(.dnd5e, .dnd5e2)
+  :is(
+    .sheet-header,
+    .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
+    .header,
+    .header :is(.document-name, .name, .charname),
+    .attributes,
+    .attributes :is(.attribute, .ability, .ability-score, .ability, .score),
+    .attributes :is(.label, label, .title, .name),
+    .ability-scores :is(.label, label, .title, .name),
+    .abilities :is(.label, label, .title, .name)
+  ) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* Small UI text (≈12px and below) tends to look too heavy in CookieRun.
+ * Keep it at regular weight.
+ */
+:is(#interface, #ui, #sidebar, .window-app, .application)
+  :is(
+    .hint,
+    .notes,
+    .form-fields,
+    .tags,
+    .pill,
+    .message-metadata,
+    .message-metadata *,
+    .timestamp,
+    .message-timestamp
+  ) {
+  font-family: var(--fe-font-light-stack) !important;
+  font-weight: var(--fe-font-weight-small) !important;
 }
 
 /* Window titles/subtitles (actor name, item name, etc.) */

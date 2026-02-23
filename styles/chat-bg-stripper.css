@@ -23,7 +23,28 @@
 
   /* dnd5e/midi chat-card description text size */
   --fe-chat-card-font-size: 12px;
-  --fe-chat-card-font-weight: 600;
+  /* NOTE:
+   * Chat cards (item/spell/feature descriptions) often look too bold when using
+   * CookieRun + the readability weight boost.
+   * - System font: keep the stronger weight for readability.
+   * - Custom CookieRun font: use a lighter weight.
+   */
+  --fe-chat-card-font-weight-system: 600;
+  /* Use a lighter feel when a custom font is enabled for chat-card descriptions.
+   * When Dongle-Light is available it provides a true light face (w=300).
+   */
+  --fe-chat-card-font-weight-custom: 300;
+  --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-system);
+
+  /* Chat-card description font-family.
+   * Default: inherit (system/dnd5e choice)
+   * Custom: use the module's light stack (Dongle Light -> CookieRun -> fallbacks)
+   */
+  --fe-chat-card-font-family: inherit;
+
+  --fe-chat-card-strong-weight-system: 700;
+  --fe-chat-card-strong-weight-custom: 600;
+  --fe-chat-card-strong-weight: var(--fe-chat-card-strong-weight-system);
   --fe-chat-card-line-height: 1.35;
 
   /* Flat overlay (no texture). */
@@ -31,6 +52,19 @@
     rgb(var(--fe-paper-rgb) / var(--fe-paper-alpha)),
     rgb(var(--fe-paper-rgb) / var(--fe-paper-alpha))
   );
+}
+
+/* When chat-card custom font is enabled, reduce the default “readability boost” weights. */
+body.fe-chatcard-custom-font {
+  --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-custom);
+  --fe-chat-card-strong-weight: var(--fe-chat-card-strong-weight-custom);
+  --fe-chat-card-font-family: var(--fe-font-light-stack, var(--fe-font-primary));
+}
+
+body:not(.fe-chatcard-custom-font) {
+  --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-system);
+  --fe-chat-card-strong-weight: var(--fe-chat-card-strong-weight-system);
+  --fe-chat-card-font-family: inherit;
 }
 
 /* --------------------------------
@@ -68,6 +102,7 @@
   ) {
   font-size: var(--fe-chat-card-font-size) !important;
   line-height: var(--fe-chat-card-line-height) !important;
+  font-family: var(--fe-chat-card-font-family) !important;
   font-weight: var(--fe-chat-card-font-weight) !important;
   /* Prefer Foundry variable when available; fallback to near-black. */
   color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
@@ -88,6 +123,7 @@
   )
   .wrapper :is(p, li, span, div, a, em, code) {
   font-size: inherit !important;
+  font-family: inherit !important;
   font-weight: inherit !important;
   line-height: inherit !important;
 }
@@ -120,7 +156,7 @@
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(strong, b) {
-  font-weight: 700;
+  font-weight: var(--fe-chat-card-strong-weight);
   color: inherit;
 }
 

@@ -265,9 +265,14 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   font-weight: 400 !important;
 }
 
-/* Export view: remove text shadow for readability in PDF */
-#fe-chat-export-container .chat-message :is(.message-header, .message-sender, .message-content) {
-  text-shadow: none !important;
+/* Export view: remove text shadow for readability in PDF (print only).
+ * On-screen (HTML) we may intentionally add a tiny text-shadow to improve
+ * font rendering on some platforms.
+ */
+@media print {
+  #fe-chat-export-container .chat-message :is(.message-header, .message-sender, .message-content) {
+    text-shadow: none !important;
+  }
 }
 
 /* --------------------------- */
