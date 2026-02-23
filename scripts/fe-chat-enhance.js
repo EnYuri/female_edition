@@ -2726,17 +2726,19 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     );
   }
 
-  // Optional: Dongle Light (used as a light variant for small text + chat-card descriptions)
-  // If missing, the light stack falls back to CookieRun/Signika.
-  {
-    const url = `/modules/${MODULE_ID}/font/Dongle-Light.ttf`;
-    const dataUrl = await feFetchAsDataURL(url);
-    if (dataUrl) {
+  // Optional: embed Dongle-Regular.ttf as a “light-feel” helper face.
+  // This file is user-provided in many setups:
+  //   /modules/female_edition/font/Dongle-Regular.ttf
+  // If present, we embed it so saved file:// HTML keeps the same thinner look.
+  try {
+    const dongleUrl = `/modules/${MODULE_ID}/font/Dongle-Regular.ttf`;
+    const dongleData = await feFetchAsDataURL(dongleUrl);
+    if (dongleData) {
       faces.push(
-        `@font-face{font-family:"FE Dongle Light Embedded";src:url(${dataUrl}) format("truetype");font-weight:300;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+        `@font-face{font-family:"FE Dongle Embedded";src:url(${dongleData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
     }
-  }
+  } catch {}
 
   if (!faces.length) return "";
 
@@ -2765,10 +2767,10 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Light stack: prefer embedded Dongle Light when available */
+  /* Light stack for small text / chat-card descriptions */
   --fe-font-light:
-    "FE Dongle Light Embedded",
-    "FE Dongle Light",
+    "FE Dongle Embedded",
+    "FE Dongle",
     "FE CookieRun Embedded",
     "FE CookieRun",
     "Signika",
@@ -2778,7 +2780,6 @@ ${faces.join("\n")}
     "Segoe UI",
     sans-serif,
     var(--fe-symbol-fallback);
-  --fe-font-light-stack: var(--fe-font-light);
 
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);

@@ -1,7 +1,7 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
- * v13 changes:
- *  - CookieRun as primary UI font + Dongle Light as a light variant for small text/chat-card descriptions.
+ * v10 changes:
+ *  - CookieRun only (Dongle excluded). Wider coverage via Foundry + dnd5e font vars.
  *  - Fix broken Font Awesome icons that are BUTTON/A/etc with .fa-* classes,
  *    including the specific selectors you provided (header-control, tokenbar, breaktime).
  *  - Keep symbol/emoji fallbacks so special characters never tofu.
@@ -12,25 +12,22 @@
  */
 
 /* -------------------------------
- * 1) Font faces (Dongle Light)
+ * 1) Font faces (CookieRun)
  * ------------------------------- */
 
-/* Dongle is an OFL-licensed Korean display typeface with Light/Regular/Bold weights.
- * We use the Light face as a “light variant” for small UI text and chat-card descriptions.
+/* Dongle (Light-style helper)
+ * User-provided: /modules/female_edition/font/Dongle-Regular.ttf
+ * Used as a thinner-looking face for small text and chat-card descriptions.
  */
 @font-face {
-  font-family: "FE Dongle Light";
-  src: url("/modules/female_edition/font/Dongle-Light.ttf") format("truetype");
-  font-weight: 300;
+  font-family: "FE Dongle";
+  src: url("/modules/female_edition/font/Dongle-Regular.ttf") format("truetype");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
-  /* Match CookieRun coverage to keep predictable fallbacks. */
+  /* Keep the same coverage strategy as CookieRun: KR + basic Latin + Latin-1 */
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
-
-/* -------------------------------
- * 2) Font faces (CookieRun)
- * ------------------------------- */
 
 @font-face {
   font-family: "FE CookieRun";
@@ -64,7 +61,7 @@
 }
 
 /* -------------------------------
- * 3) Stacks + variables (coverage)
+ * 2) Stacks + variables (coverage)
  * ------------------------------- */
 
 :root {
@@ -86,11 +83,11 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Light stack (small text / chat-card descriptions)
-   * If Dongle-Light.ttf is missing, this falls back to CookieRun/Signika.
+  /* Light stack (for small text / chat-card descriptions)
+   * Dongle is visually thinner than CookieRun even at regular weight.
    */
   --fe-font-light:
-    "FE Dongle Light",
+    "FE Dongle",
     "FE CookieRun",
     "Signika",
     system-ui,
@@ -99,7 +96,6 @@
     "Segoe UI",
     sans-serif,
     var(--fe-symbol-fallback);
-  --fe-font-light-stack: var(--fe-font-light);
 
   /* Foundry global vars */
   --font-primary: var(--fe-font-primary);
@@ -122,7 +118,14 @@
    */
   --fe-font-weight-title: 700;
   --fe-font-weight-body: 400;
-  --fe-font-weight-small: 300;
+  --fe-font-weight-small: 400;
+
+  /* Dongle is designed for large display sizes and can look visually smaller
+   * than CookieRun at the same px size. Add small, targeted compensation
+   * bumps where we intentionally use the light stack.
+   */
+  --fe-light-font-meta-bump: 1px; /* timestamps / metadata */
+  --fe-light-font-card-bump: 2px; /* chat-card description body */
 
   font-synthesis: none;
 }
@@ -176,22 +179,29 @@ html, body,
   font-family: var(--fe-font-primary) !important;
 }
 
-/* Small UI text (≈12px and below) tends to look too heavy in CookieRun.
- * Keep it at regular weight.
- */
+/* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes. */
+:is(#sidebar #chat, .chat-popout #chat)
+  :is(
+    .message-metadata,
+    .message-metadata *,
+    .timestamp,
+    .message-timestamp
+  ) {
+  font-family: var(--fe-font-light) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+  /* size compensation for Dongle */
+  font-size: calc(1em + var(--fe-light-font-meta-bump)) !important;
+}
+
+/* Keep other small UI text at regular weight, but do not force the light face globally. */
 :is(#interface, #ui, #sidebar, .window-app, .application)
   :is(
     .hint,
     .notes,
     .form-fields,
     .tags,
-    .pill,
-    .message-metadata,
-    .message-metadata *,
-    .timestamp,
-    .message-timestamp
+    .pill
   ) {
-  font-family: var(--fe-font-light-stack) !important;
   font-weight: var(--fe-font-weight-small) !important;
 }
 
@@ -351,4 +361,12 @@ button.clear-remaining.icon.fa-solid::after {
   font-family: var(--fe-font-primary) !important;
   font-size: var(--fe-chat-subtitle-size) !important;
   line-height: 1.05;
+}
+
+
+/* Chat only: Dongle size bump down */
+#chat-log,
+.chat-popout #chat-log {
+  --fe-light-font-meta-bump: 0px;   /* (기존 1px → 0px) */
+  --fe-light-font-card-bump: 1px;   /* (기존 2px → 1px) */
 }

@@ -30,17 +30,8 @@
    * - Custom CookieRun font: use a lighter weight.
    */
   --fe-chat-card-font-weight-system: 600;
-  /* Use a lighter feel when a custom font is enabled for chat-card descriptions.
-   * When Dongle-Light is available it provides a true light face (w=300).
-   */
-  --fe-chat-card-font-weight-custom: 300;
+  --fe-chat-card-font-weight-custom: 400;
   --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-system);
-
-  /* Chat-card description font-family.
-   * Default: inherit (system/dnd5e choice)
-   * Custom: use the module's light stack (Dongle Light -> CookieRun -> fallbacks)
-   */
-  --fe-chat-card-font-family: inherit;
 
   --fe-chat-card-strong-weight-system: 700;
   --fe-chat-card-strong-weight-custom: 600;
@@ -58,13 +49,11 @@
 body.fe-chatcard-custom-font {
   --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-custom);
   --fe-chat-card-strong-weight: var(--fe-chat-card-strong-weight-custom);
-  --fe-chat-card-font-family: var(--fe-font-light-stack, var(--fe-font-primary));
 }
 
 body:not(.fe-chatcard-custom-font) {
   --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-system);
   --fe-chat-card-strong-weight: var(--fe-chat-card-strong-weight-system);
-  --fe-chat-card-font-family: inherit;
 }
 
 /* --------------------------------
@@ -102,11 +91,31 @@ body:not(.fe-chatcard-custom-font) {
   ) {
   font-size: var(--fe-chat-card-font-size) !important;
   line-height: var(--fe-chat-card-line-height) !important;
-  font-family: var(--fe-chat-card-font-family) !important;
   font-weight: var(--fe-chat-card-font-weight) !important;
+  /* Default: inherit the UI font stack (CookieRun). */
   /* Prefer Foundry variable when available; fallback to near-black. */
   color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
   text-shadow: none !important;
+}
+
+/* When “chat-card custom font” is enabled, use the lighter face for the description body.
+ * Dongle-Regular.ttf is intentionally used as a visually thinner alternative.
+ */
+body.fe-chatcard-custom-font
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-family: var(--fe-font-light, inherit) !important;
+  /* Dongle is visually smaller than CookieRun at equal px sizes; compensate. */
+  font-size: calc(var(--fe-chat-card-font-size) + var(--fe-light-font-card-bump, 0px)) !important;
 }
 
 /* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) */
@@ -123,7 +132,6 @@ body:not(.fe-chatcard-custom-font) {
   )
   .wrapper :is(p, li, span, div, a, em, code) {
   font-size: inherit !important;
-  font-family: inherit !important;
   font-weight: inherit !important;
   line-height: inherit !important;
 }
