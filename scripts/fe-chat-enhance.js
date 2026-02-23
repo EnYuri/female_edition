@@ -1507,6 +1507,18 @@ function feTryRequire(moduleName) {
 async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = false } = {}) {
   if (!win || win.closed) throw new Error("Archive window is not available.");
 
+  // Treat the chat-bg-stripper's "채팅 카드 텍스쳐 제거" setting as an implicit
+  // export optimization request. Users expect the archive/saved HTML to match the
+  // live chat appearance.
+  const stripTexturesSetting = (() => {
+    try {
+      return !!game.settings.get(MODULE_ID, "stripChatTextures");
+    } catch {
+      return false;
+    }
+  })();
+  const effectiveOptimize = !!optimize || stripTexturesSetting;
+
   // Collect messages first (so the archive UI can show correct counts immediately).
   const user = game.user;
   const all = Array.from(game.messages?.contents ?? []);
@@ -1541,7 +1553,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
           : "";
 
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
-  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${optimize ? " fe-export-optimized" : ""}${printImgClass}`;
+  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
   win.document.open();
   win.document.write(`<!doctype html>
@@ -1555,6 +1567,9 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     <style>
       /* Archive window hard overrides: make the document paginatable (no fixed viewport). */
       html, body {
+        /* Keep on-screen and PDF colors as close as possible */
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
         position: static !important;
         height: auto !important;
         min-height: 0 !important;
@@ -1576,10 +1591,19 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         margin: 0 !important;
       }
 
+      /* Match Foundry sidebar feel (prevents images/cards from becoming "full-page wide"). */
+      #fe-chat-export-container .fe-chat-export-toolbar,
+      #fe-chat-export-container #sidebar {
+        width: min(100%, var(--sidebar-width, 360px)) !important;
+        max-width: var(--sidebar-width, 360px) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
       /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
       #fe-chat-export-container #sidebar {
         position: static !important;
-        width: auto !important;
+        width: min(100%, var(--sidebar-width, 360px)) !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
@@ -1652,6 +1676,11 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       }
 
       @media print {
+        html, body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
         /* Hide the toolbar when printing (save as PDF). */
         #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
 
@@ -1927,6 +1956,21 @@ async function feArchivePrint(win) {
     doc.body.classList.toggle("fe-print-downscale", mode === "downscale");
   } catch {}
 
+  // ---
+  // Print color consistency fixes
+  // ---
+  // Chromium's "Save as PDF" and some printer drivers can render blend modes / translucent
+  // overlays differently, causing message background saturation to vary between messages.
+  // We avoid this by freezing each chat-message background to a single, computed, opaque RGB.
+  // This also tends to speed up PDF printing (less compositing work).
+  let restoreBg = () => {};
+  try {
+    restoreBg = feFreezeMessageBackgroundsForPrint(win, logEl);
+    win.addEventListener("afterprint", restoreBg, { once: true });
+  } catch (err) {
+    console.warn("female_edition | print background freeze failed", err);
+  }
+
   // Memory guard: if images are supposed to be hidden, also blank their src so Chromium won't decode them.
   let restoreImages = () => {};
   if (mode === "hideAll") restoreImages = tempDisableImages(() => true);
@@ -1935,6 +1979,9 @@ async function feArchivePrint(win) {
   const restoreOnce = () => {
     try {
       restoreImages();
+    } catch {}
+    try {
+      restoreBg();
     } catch {}
   };
 
@@ -1956,6 +2003,9 @@ async function feArchivePrint(win) {
         dprCap: isElectron ? 1 : 1.5,
         webpQuality: isElectron ? 0.72 : 0.82,
         jpegQuality: isElectron ? 0.78 : 0.85,
+        avatarDprCap: isElectron ? 1.75 : 2,
+        avatarWebpQuality: isElectron ? 0.86 : 0.92,
+        avatarJpegQuality: isElectron ? 0.88 : 0.94,
       });
     } catch (err) {
       console.warn("female_edition | print downscale failed", err);
@@ -1979,10 +2029,111 @@ async function feArchivePrint(win) {
   }
 }
 
+function feParseRGBAFromCSS(cssColor) {
+  const s = String(cssColor ?? "").trim().toLowerCase();
+  if (!s || s === "transparent") return null;
+
+  // Most browsers expose computed colors as rgb()/rgba() with commas.
+  // Also accept the modern space + slash syntax just in case.
+  const m = s.match(
+    /^rgba?\(\s*([\d.]+)\s*(?:,|\s)\s*([\d.]+)\s*(?:,|\s)\s*([\d.]+)(?:\s*(?:,|\/|\s)\s*([\d.]+))?\s*\)$/i
+  );
+  if (!m) return null;
+
+  const r = Math.max(0, Math.min(255, Number(m[1])));
+  const g = Math.max(0, Math.min(255, Number(m[2])));
+  const b = Math.max(0, Math.min(255, Number(m[3])));
+  const a = m[4] == null ? 1 : Math.max(0, Math.min(1, Number(m[4])));
+
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b) || !Number.isFinite(a)) return null;
+  return { r, g, b, a };
+}
+
+function feScreenBlendChannel(base, overlay) {
+  // base/overlay in [0..255]
+  return 255 - ((255 - base) * (255 - overlay)) / 255;
+}
+
+function feFreezeMessageBackgroundsForPrint(win, logEl) {
+  if (!win || win.closed) return () => {};
+  if (!logEl) return () => {};
+
+  const doc = win.document;
+  const rootCS = win.getComputedStyle(doc.documentElement);
+
+  // Pull the same "paper" overlay params used by chat-bg-stripper
+  // (defaults match styles/chat-bg-stripper.css)
+  const paperRGBRaw = String(rootCS.getPropertyValue("--fe-paper-rgb") || "245 239 229").trim();
+  const paperParts = paperRGBRaw.split(/\s+/).map((x) => Number(x));
+  const paper = {
+    r: Number.isFinite(paperParts[0]) ? Math.max(0, Math.min(255, paperParts[0])) : 245,
+    g: Number.isFinite(paperParts[1]) ? Math.max(0, Math.min(255, paperParts[1])) : 239,
+    b: Number.isFinite(paperParts[2]) ? Math.max(0, Math.min(255, paperParts[2])) : 229,
+  };
+  const paperAlpha = (() => {
+    const a = Number(String(rootCS.getPropertyValue("--fe-paper-alpha") || "0.42").trim());
+    return Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0.42;
+  })();
+
+  const msgs = Array.from(logEl.querySelectorAll(".chat-message"));
+  if (!msgs.length) return () => {};
+
+  const changed = [];
+
+  for (const el of msgs) {
+    try {
+      const cs = win.getComputedStyle(el);
+      const bg = feParseRGBAFromCSS(cs.backgroundColor);
+      if (!bg || bg.a <= 0) continue;
+
+      // Blend the paper overlay using the *screen* blend formula.
+      // We then bake the result into an opaque RGB to avoid print/PDF blend inconsistencies.
+      const sr = feScreenBlendChannel(bg.r, paper.r);
+      const sg = feScreenBlendChannel(bg.g, paper.g);
+      const sb = feScreenBlendChannel(bg.b, paper.b);
+
+      const outR = Math.round(bg.r * (1 - paperAlpha) + sr * paperAlpha);
+      const outG = Math.round(bg.g * (1 - paperAlpha) + sg * paperAlpha);
+      const outB = Math.round(bg.b * (1 - paperAlpha) + sb * paperAlpha);
+
+      const prevStyle = el.getAttribute("style");
+      changed.push({ el, prevStyle });
+
+      el.style.setProperty("background-color", `rgb(${outR}, ${outG}, ${outB})`, "important");
+      el.style.setProperty("background-image", "none", "important");
+      el.style.setProperty("background-blend-mode", "normal", "important");
+      el.style.setProperty("mix-blend-mode", "normal", "important");
+      el.style.setProperty("filter", "none", "important");
+      el.style.setProperty("backdrop-filter", "none", "important");
+    } catch {
+      // ignore
+    }
+  }
+
+  return () => {
+    for (const it of changed) {
+      try {
+        if (it.prevStyle == null) it.el.removeAttribute("style");
+        else it.el.setAttribute("style", it.prevStyle);
+      } catch {}
+    }
+  };
+}
+
 async function feDownscaleImagesForPrint(
   win,
   rootEl,
-  { meta, excludeAvatars = false, dprCap = 1.5, webpQuality = 0.82, jpegQuality = 0.85 } = {}
+  {
+    meta,
+    excludeAvatars = false,
+    dprCap = 1.5,
+    webpQuality = 0.82,
+    jpegQuality = 0.85,
+    // Avatars/portraits: preserve quality (they are small but visually important)
+    avatarDprCap = 2,
+    avatarWebpQuality = 0.92,
+    avatarJpegQuality = 0.94,
+  } = {}
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
   let imgs = Array.from(rootEl.querySelectorAll("img"));
@@ -2003,31 +2154,43 @@ async function feDownscaleImagesForPrint(
 
   // Cap DPR for stability (large DPR values can explode PDF size / memory use)
   const dpr = Math.max(1, Math.min(dprCap, win.devicePixelRatio || 1));
-  let i = 0;
+  const avatarDpr = Math.max(1, Math.min(avatarDprCap, win.devicePixelRatio || 1));
+
+  // 1) Group images by their resolved source.
+  //    This allows de-duplicating identical images (portraits, repeated icons, etc.)
+  //    by generating ONE downscaled data URL and reusing it.
+  const groups = new Map();
+
+  const getKey = (img) => {
+    try {
+      // Prefer the actually-used resource when srcset is present.
+      return img.currentSrc || img.src || img.getAttribute("src") || "";
+    } catch {
+      return "";
+    }
+  };
+
+  // Hard cap to avoid huge canvases (prevents OOM on Electron/Chromium)
+  const MAX_SIDE = 1600;
 
   for (const img of imgs) {
-    i++;
-    if (i === 1 || i % 20 === 0 || i === imgs.length) {
-      setMeta(`Downscaling images… ${i}/${imgs.length}`);
-    }
-
     try {
-      // Skip unloaded or hidden images
       if (!img.complete || img.naturalWidth <= 0) continue;
+
+      const key = getKey(img);
+      if (!key) continue;
 
       const rect = img.getBoundingClientRect();
       const cssW = Math.max(1, Math.round(rect.width));
       const cssH = Math.max(1, Math.round(rect.height));
       if (cssW <= 1 || cssH <= 1) continue;
 
-      let targetW = Math.max(1, Math.round(cssW * dpr));
-      let targetH = Math.max(1, Math.round(cssH * dpr));
+      const isAvatar = isAvatarImage(img);
+      const dprUse = isAvatar ? avatarDpr : dpr;
 
-      // If the source is already small, don't resample.
-      if (img.naturalWidth <= targetW * 1.05 && img.naturalHeight <= targetH * 1.05) continue;
+      let targetW = Math.max(1, Math.round(cssW * dprUse));
+      let targetH = Math.max(1, Math.round(cssH * dprUse));
 
-      // Hard cap to avoid huge canvases (prevents OOM on Electron/Chromium)
-      const MAX_SIDE = 1600;
       const maxSide = Math.max(targetW, targetH);
       if (maxSide > MAX_SIDE) {
         const scale = MAX_SIDE / maxSide;
@@ -2035,28 +2198,99 @@ async function feDownscaleImagesForPrint(
         targetH = Math.max(1, Math.round(targetH * scale));
       }
 
+      const needsResample = !(img.naturalWidth <= targetW * 1.05 && img.naturalHeight <= targetH * 1.05);
+
+      const g = groups.get(key) || {
+        key,
+        imgs: [],
+        maxW: 0,
+        maxH: 0,
+        needsResample: false,
+        isAvatar: false,
+      };
+
+      g.imgs.push(img);
+      g.maxW = Math.max(g.maxW, targetW);
+      g.maxH = Math.max(g.maxH, targetH);
+      g.needsResample = g.needsResample || needsResample;
+      g.isAvatar = g.isAvatar || isAvatar;
+      groups.set(key, g);
+    } catch {
+      // ignore
+    }
+  }
+
+  const groupList = Array.from(groups.values());
+  if (!groupList.length) return;
+
+  // 2) Generate a single downscaled image per group.
+  const cache = new Map();
+  let gi = 0;
+  for (const g of groupList) {
+    gi++;
+    if (gi === 1 || gi % 10 === 0 || gi === groupList.length) {
+      setMeta(`Downscaling images… ${gi}/${groupList.length}`);
+    }
+
+    try {
+      // Only do work when it helps:
+      // - if resampling is needed OR
+      // - if the same image appears multiple times (dedup benefits PDF size)
+      const shouldProcess = g.needsResample || g.imgs.length > 1;
+      if (!shouldProcess) continue;
+
+      const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
+      if (!rep) continue;
+
+      // Avoid upscaling.
+      let outW = Math.min(g.maxW, rep.naturalWidth);
+      let outH = Math.min(g.maxH, rep.naturalHeight);
+      outW = Math.max(1, Math.round(outW));
+      outH = Math.max(1, Math.round(outH));
+      if (outW <= 1 || outH <= 1) continue;
+
       const canvas = win.document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
+      canvas.width = outW;
+      canvas.height = outH;
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) continue;
 
-      ctx.drawImage(img, 0, 0, targetW, targetH);
+      // Improve downscale quality (avoid jaggy / no-AA portraits)
+      try {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+      } catch {}
 
-      const dataUrl = await feCanvasToDataURL(canvas, { webpQuality, jpegQuality });
+      ctx.drawImage(rep, 0, 0, outW, outH);
+
+      const dataUrl = await feCanvasToDataURL(canvas, {
+        webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
+        jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
+      });
       if (!dataUrl) continue;
 
-      img.removeAttribute("srcset");
-      img.src = dataUrl;
+      cache.set(g.key, dataUrl);
 
       // Release memory
       canvas.width = 0;
       canvas.height = 0;
     } catch {
-      // Ignore per-image failures (CORS-taint, decoding error, etc.)
+      // Ignore per-group failures (CORS-taint, decoding error, etc.)
     }
 
-    if (i % 20 === 0) await feNextTick();
+    if (gi % 10 === 0) await feNextTick();
+  }
+
+  // 3) Apply results to every image in the group (dedup).
+  for (const g of groupList) {
+    const dataUrl = cache.get(g.key);
+    if (!dataUrl) continue;
+    for (const img of g.imgs) {
+      try {
+        img.removeAttribute("srcset");
+        img.src = dataUrl;
+      } catch {}
+    }
   }
 }
 
@@ -2118,75 +2352,14 @@ async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } 
     }
   } catch {}
 
-  // Collect CSS in cascade order.
-  // Prefer reading cssRules (keeps dynamically injected CSS). Fallback to fetching sheet.href.
-  const cssParts = [];
-  const origin = (() => {
-    try {
-      return new URL(doc.baseURI ?? window.location.href).origin;
-    } catch {
-      return window.location.origin;
-    }
-  })();
+  // IMPORTANT:
+  // - Do NOT attempt to inline *all* Foundry/system/module CSS.
+  //   In practice, CSSOM access can be partially blocked, and inlining a partial set
+  //   while removing <link> tags results in a badly broken export (giant portraits, no merges, etc.).
+  // - Keep original <link rel="stylesheet"> tags and only add small export-specific helpers.
 
-  const sheets = Array.from(doc.styleSheets ?? []);
-  let idx = 0;
-  for (const sheet of sheets) {
-    idx++;
-    try {
-      if (sheet?.disabled) continue;
-    } catch {}
-
-    // Try CSSOM first
-    try {
-      const rules = sheet?.cssRules;
-      if (rules && rules.length) {
-        setMeta(`Collecting CSS… ${idx}/${sheets.length}`);
-        const text = Array.from(rules)
-          .map((r) => r.cssText)
-          .filter(Boolean)
-          .join("\n");
-        if (text.trim()) {
-          const baseForUrls = sheet?.href || doc.baseURI || origin + "/";
-          cssParts.push(feRewriteCSSAssetURLs(text, baseForUrls));
-        }
-        continue;
-      }
-    } catch {
-      // ignore and fallback to fetch
-    }
-
-    // Fallback: fetch by href (might fail for cross-origin sheets)
-    try {
-      const href = sheet?.href;
-      if (!href) continue;
-      setMeta(`Fetching CSS… ${idx}/${sheets.length}`);
-      const res = await fetch(href, { credentials: "include" });
-      if (!res.ok) continue;
-      const text = await res.text();
-      if (text.trim()) cssParts.push(feRewriteCSSAssetURLs(text, href));
-    } catch (err) {
-      // Not fatal; export will still work with partial styling.
-      console.warn("female_edition | HTML export: failed to fetch stylesheet", sheet?.href, err);
-    }
-  }
-
-  // Embed CookieRun fonts (optional)
-  if (feSetting(S.EXPORT_EMBED_FONTS)) {
-    try {
-      setMeta("Embedding fonts…");
-      const fontCss = await feBuildEmbeddedCookieRunFontCSS();
-      if (fontCss) cssParts.push(fontCss);
-    } catch (err) {
-      console.warn("female_edition | HTML export: failed to embed fonts", err);
-    }
-  }
-
-  // Replace head styles with a single combined <style>
   const head = clone.querySelector("head");
   if (head) {
-    const cssLen = cssParts.reduce((sum, t) => sum + (t?.length || 0), 0);
-
     // Ensure title is correct
     try {
       let t = head.querySelector("title");
@@ -2197,23 +2370,33 @@ async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } 
       t.textContent = titleText;
     } catch {}
 
-    // If we successfully collected a meaningful amount of CSS, inline it for a portable snapshot.
-    // Otherwise, keep existing <link> stylesheets and only append whatever we managed to collect
-    // (typically embedded fonts). This avoids “unstyled giant portraits” exports when CSSOM access is blocked.
-    if (cssLen >= 4096) {
-      try {
-        head.querySelectorAll('link[rel="stylesheet"], style').forEach((n) => n.remove());
-      } catch {}
+    // Make stylesheet hrefs absolute (helps when opening as file://)
+    try {
+      const baseForLinks = doc.baseURI ?? window.location.href;
+      head.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
+        try {
+          const href = l.getAttribute("href");
+          if (!href) return;
+          l.setAttribute("href", new URL(href, baseForLinks).href);
+        } catch {}
+      });
+    } catch {}
 
-      const styleEl = doc.createElement("style");
-      styleEl.id = "fe-export-inline-css";
-      styleEl.textContent = cssParts.join("\n\n/* --- */\n\n");
-      head.appendChild(styleEl);
-    } else if (cssLen > 0) {
-      const styleEl = doc.createElement("style");
-      styleEl.id = "fe-export-inline-css";
-      styleEl.textContent = cssParts.join("\n\n/* --- */\n\n");
-      head.appendChild(styleEl);
+    // Embed CookieRun fonts (optional). This avoids CORS/font-loading issues when opening the
+    // saved HTML from file:// (fonts are often blocked because the origin becomes "null").
+    if (feSetting(S.EXPORT_EMBED_FONTS)) {
+      try {
+        setMeta("Embedding fonts…");
+        const fontCss = await feBuildEmbeddedCookieRunFontCSS();
+        if (fontCss) {
+          const styleEl = doc.createElement("style");
+          styleEl.id = "fe-export-embedded-fonts";
+          styleEl.textContent = fontCss;
+          head.appendChild(styleEl);
+        }
+      } catch (err) {
+        console.warn("female_edition | HTML export: failed to embed fonts", err);
+      }
     }
   }
 
@@ -2358,7 +2541,8 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
 async function feBuildEmbeddedCookieRunFontCSS() {
   // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
   // If files are not present, returns an empty string.
-  const unicodeRange = "U+0020-007E, U+1100-11FF, U+3130-318F, U+AC00-D7A3";
+  // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
+  const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
   const weights = [
     { weight: 400, name: "Regular", files: ["CookieRun%20Regular.ttf", "CookieRun%20Regular.otf"] },
     { weight: 700, name: "Bold", files: ["CookieRun%20Bold.ttf", "CookieRun%20Bold.otf"] },
@@ -2382,12 +2566,63 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
     if (!dataUrl) continue;
 
-    faces.push(`@font-face{font-family:"FE CookieRun";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`);
+    faces.push(
+      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+    );
   }
 
   if (!faces.length) return "";
 
-  return `\n/* female_edition: embedded CookieRun fonts (offline HTML export) */\n${faces.join("\n")}\n`;
+  return `
+/* female_edition: embedded CookieRun fonts (offline HTML export) */
+${faces.join("\n")}
+
+/* Prefer the embedded faces when opening the saved HTML as file://
+ * (remote font files are often blocked by CORS because the origin becomes "null").
+ */
+:root {
+  --fe-symbol-fallback:
+    "Segoe UI Symbol",
+    "Segoe UI Emoji",
+    "Apple Color Emoji",
+    "Noto Color Emoji";
+
+  --fe-font-primary:
+    "FE CookieRun Embedded",
+    "FE CookieRun",
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+
+  --font-primary: var(--fe-font-primary);
+  --font-sans: var(--fe-font-primary);
+  --font-serif: var(--fe-font-primary);
+
+  /* dnd5e v5.2.x font vars (best-effort) */
+  --dnd5e-font-roboto: var(--fe-font-primary);
+  --dnd5e-font-roboto-slab: var(--fe-font-primary);
+  --dnd5e-font-signika: var(--fe-font-primary);
+  --dnd5e-font-modesto: var(--fe-font-primary);
+}
+
+/* Ensure the archive itself uses the embedded stack even when external CSS is partially blocked. */
+#fe-chat-export-container,
+#fe-chat-export-container :is(
+  .chat-message,
+  .message-header,
+  .message-content,
+  .flavor-text,
+  .chat-card,
+  .midi-chat-card,
+  .dnd5e2.chat-card
+) {
+  font-family: var(--fe-font-primary) !important;
+}
+`;
 }
 
 async function feFetchAsDataURL(url) {

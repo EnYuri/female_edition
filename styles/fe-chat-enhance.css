@@ -158,6 +158,12 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 @media print {
+  /* Preserve UI colors in Chromium "Save as PDF" (avoid economy color adjustments). */
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   /*
    * Foundry runs the app in a fixed viewport (body.game) with overflow hidden.
    * If we don't reset *that specific selector* for print, Chromium will only
@@ -378,6 +384,18 @@ body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-con
 }
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::before,
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::after {
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Some themes/systems apply parchment textures to nested areas too.
+ * Remove those explicitly in export mode.
+ */
+body.fe-export-optimized
+  :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log)
+  .chat-message
+  :is(.message-header, .message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) {
   background-image: none !important;
   box-shadow: none !important;
   filter: none !important;
