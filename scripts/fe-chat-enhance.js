@@ -26,6 +26,22 @@ const S = {
 
   // Export
   EXPORT_ENABLED: "ceExportEnabled",
+  EXPORT_AUTO_PRINT: "ceExportAutoPrint",
+  EXPORT_OPTIMIZE: "ceExportOptimize",
+  EXPORT_EMBED_FONTS: "ceExportEmbedFonts",
+  EXPORT_EMBED_IMAGES: "ceExportEmbedImages",
+  EXPORT_PRINT_IMAGE_MODE: "ceExportPrintImageMode", // full | hideAvatars | hideAll | downscale
+  EXPORT_DESKTOP_EXTERNAL_MODE: "ceExportDesktopExternalMode", // off | button | auto
+
+  // Typography
+  CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
+
+  // Style (tunable CSS vars)
+  STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
+  STYLE_PLAYER_NAME_SIZE: "cePlayerNameSize",
+  STYLE_MESSAGE_TEXT_SIZE: "ceMessageTextSize",
+  STYLE_CHATCARD_TEXT_SIZE: "ceChatCardTextSize",
+  STYLE_BG_SATURATION: "ceMessageBgSaturation",
 
   // Markdown
   MARKDOWN_ENABLED: "ceMarkdownEnabled",
@@ -51,6 +67,43 @@ function feSetBodyMergeClasses() {
   document.body.classList.toggle("fe-merge-follow-hide", enabled && style === "hide");
   document.body.classList.toggle("fe-merge-follow-name", enabled && style === "name");
   document.body.classList.toggle("fe-merge-follow-portrait", enabled && style === "portrait");
+}
+
+function feSetChatCardFontClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.CHATCARD_USE_CUSTOM_FONT);
+    doc?.body?.classList?.toggle("fe-chatcard-custom-font", enabled);
+  } catch {}
+}
+
+function feApplyStyleVarsFromSettings(doc = document) {
+  try {
+    const root = doc?.documentElement;
+    if (!root) return;
+
+    const px = (n, fallback) => {
+      const v = Number(n);
+      return Number.isFinite(v) ? `${v}px` : `${fallback}px`;
+    };
+
+    const num = (n, fallback) => {
+      const v = Number(n);
+      return Number.isFinite(v) ? v : fallback;
+    };
+
+    // Chat header sizes
+    root.style.setProperty("--fe-chat-title-size", px(feSetting(S.STYLE_ACTOR_NAME_SIZE), 22));
+    root.style.setProperty("--fe-chat-subtitle-size", px(feSetting(S.STYLE_PLAYER_NAME_SIZE), 14));
+
+    // Chat text sizes
+    root.style.setProperty("--fe-chat-message-font-size", px(feSetting(S.STYLE_MESSAGE_TEXT_SIZE), 14));
+    root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), 12));
+
+    // Message background saturation (paper overlay alpha)
+    root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
+  } catch (err) {
+    console.warn("female_edition | failed to apply style vars", err);
+  }
 }
 
 Hooks.once("init", () => {
@@ -128,6 +181,140 @@ Hooks.once("init", () => {
     onChange: () => feInjectExportButtonsAll(),
   });
 
+  game.settings.register(MODULE_ID, S.EXPORT_AUTO_PRINT, {
+    name: "PDF 버튼: 자동 인쇄창 열기",
+    hint: "켜면 PDF 버튼 클릭 시 아카이브 창을 연 뒤 자동으로 인쇄(프린트) 다이얼로그를 엽니다. 끄면 아카이브만 열립니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
+  game.settings.register(MODULE_ID, S.EXPORT_OPTIMIZE, {
+    name: "내보내기 최적화(용량/멈춤 방지)",
+    hint: "아카이브/인쇄 시 parchment/texture 이미지와 그림자 등을 강제로 제거하여 PDF 용량과 메모리 사용량을 크게 줄입니다(권장).",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, S.EXPORT_EMBED_FONTS, {
+    name: "HTML 저장: 커스텀 폰트 포함",
+    hint: "HTML로 저장할 때 CookieRun 폰트를 파일 안에 포함시켜(임베드) 나중에 단독으로 열어도 폰트가 유지되게 합니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, S.EXPORT_EMBED_IMAGES, {
+    name: "HTML 저장: 이미지 포함(용량 증가)",
+    hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 로그가 크면 저장 시간이 늘고 용량이 커질 수 있습니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
+  game.settings.register(MODULE_ID, S.EXPORT_PRINT_IMAGE_MODE, {
+    name: "PDF/인쇄: 이미지 처리",
+    hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나(권장) 다운스케일할 수 있습니다.",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      full: "그대로(고품질/대용량)",
+      hideAvatars: "아바타/포트레이트 숨김(권장)",
+      hideAll: "모든 이미지 숨김(최대 안정)",
+      downscale: "이미지 다운스케일(실험적)",
+    },
+    default: "hideAvatars",
+  });
+
+  game.settings.register(MODULE_ID, S.EXPORT_DESKTOP_EXTERNAL_MODE, {
+    name: "FVTT 데스크톱: 외부 브라우저로 아카이브 열기",
+    hint: "데스크톱(Electron) 앱에서 인쇄(PDF) 시 메모리/멈춤 문제가 있을 때, 아카이브를 HTML 파일로 만들어 시스템 기본 브라우저로 열 수 있습니다. (Electron/Node API 접근이 가능한 경우에만 동작)",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      off: "사용 안 함",
+      button: "아카이브 창에 버튼 표시",
+      auto: "PDF 아이콘 클릭 시 자동",
+    },
+    default: "button",
+  });
+
+  // -------------------------
+  // Style settings (CSS vars)
+  // -------------------------
+
+  game.settings.register(MODULE_ID, S.STYLE_ACTOR_NAME_SIZE, {
+    name: "채팅: 액터 이름 크기(px)",
+    hint: "채팅 메시지 헤더의 액터(캐릭터) 이름 글자 크기입니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 22,
+    range: { min: 10, max: 40, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.STYLE_PLAYER_NAME_SIZE, {
+    name: "채팅: 플레이어 이름 크기(px)",
+    hint: "채팅 메시지 헤더의 플레이어 이름(서브타이틀) 글자 크기입니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 14,
+    range: { min: 8, max: 28, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.STYLE_MESSAGE_TEXT_SIZE, {
+    name: "채팅: 메시지 글자 크기(px)",
+    hint: "일반 채팅 텍스트(메시지 내용)의 글자 크기입니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 14,
+    range: { min: 9, max: 24, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.STYLE_CHATCARD_TEXT_SIZE, {
+    name: "채팅: 주문/아이템/피처 설명 글자 크기(px)",
+    hint: "dnd5e 채팅 카드(주문/아이템/피처) 설명 영역의 기본 글자 크기입니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 12,
+    range: { min: 9, max: 24, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.CHATCARD_USE_CUSTOM_FONT, {
+    name: "채팅 카드(설명) 커스텀 폰트 적용",
+    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun)를 적용합니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: () => feSetChatCardFontClass(),
+  });
+
+  game.settings.register(MODULE_ID, S.STYLE_BG_SATURATION, {
+    name: "채팅: 배경 채도(페이퍼 오버레이 알파)",
+    hint: "텍스쳐 제거 시 사용하는 '페이퍼 오버레이'의 알파 값입니다. 값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 0.42,
+    range: { min: 0.05, max: 1.0, step: 0.01 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
   game.settings.register(MODULE_ID, S.MARKDOWN_ENABLED, {
     name: "채팅 입력 마크다운 지원",
     hint: "채팅 입력 텍스트를 마크다운으로 처리합니다(이미지/링크/제목/굵게/기울임/취소선/인용구).",
@@ -148,7 +335,9 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", () => {
+  feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
+  feSetChatCardFontClass(document);
   feObserveChatLogs();
   feApplyChatMergeToAllLogs();
   feInjectExportButtonsAll();
@@ -169,6 +358,53 @@ function feEscapeHTML(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+function feRewriteCSSAssetURLs(cssText, baseUrl) {
+  // When exporting to a standalone file:// HTML, any relative URLs inside *inlined* CSS
+  // (url(...), @import ...) would otherwise resolve against the local file path and break.
+  // Rebase them to absolute URLs using the original stylesheet URL as the base.
+  if (!cssText) return "";
+  let out = String(cssText);
+  const base = String(baseUrl || "");
+
+  const isAbsoluteLike = (u) => /^(data:|blob:|https?:|file:|chrome-extension:|about:)/i.test(u);
+
+  const safeResolve = (u) => {
+    try {
+      return new URL(u, base).href;
+    } catch {
+      return null;
+    }
+  };
+
+  // url(...)
+  out = out.replace(/url\(\s*(['"]?)([^'\")]+)\1\s*\)/g, (m, _q, raw) => {
+    const u = String(raw || "").trim();
+    if (!u) return m;
+    if (isAbsoluteLike(u) || u.startsWith("#")) return m;
+    const resolved = safeResolve(u);
+    if (!resolved) return m;
+    return `url("${resolved}")`;
+  });
+
+  // @import "...";  /  @import url(... ) screen;
+  out = out.replace(
+    /@import\s+(url\(\s*)?(['"]?)(\/[^'\")\s;]+|[^'\")\s;]+)\2\s*\)?\s*([^;]*);/g,
+    (m, urlPrefix, _q, raw, mediaTail) => {
+      const u = String(raw || "").trim();
+      if (!u) return m;
+      if (isAbsoluteLike(u)) return m;
+      const resolved = safeResolve(u);
+      if (!resolved) return m;
+      const media = String(mediaTail ?? "").trim();
+      if (urlPrefix) return `@import url("${resolved}")${media ? " " + media : ""};`;
+      return `@import "${resolved}"${media ? " " + media : ""};`;
+    }
+  );
+
+  return out;
+}
+
 
 function feInlineFormat(text) {
   // Inline code: protect first
@@ -1004,7 +1240,21 @@ async function feExportChatLogToPDF() {
   const win = feOpenChatArchiveWindow();
   if (win) {
     try {
-      await feRenderChatArchiveWindow(win, { autoPrint: true });
+      const desktopExternalMode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
+      const wantsExternalAuto = feIsElectron() && desktopExternalMode === "auto";
+      const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
+
+      const worldName = game.world?.title || game.world?.name || "";
+      const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+
+      await feRenderChatArchiveWindow(win, {
+        autoPrint: wantsExternalAuto ? false : !!feSetting(S.EXPORT_AUTO_PRINT),
+        optimize,
+      });
+
+      if (wantsExternalAuto) {
+        await feOpenArchiveInExternalBrowser(win, titleText, { closeAfter: true });
+      }
       return;
     } catch (err) {
       console.warn("female_edition | archive window export failed, falling back to inline export", err);
@@ -1034,6 +1284,7 @@ async function feExportChatLogToPDFInline() {
   const prevBodyHeight = document.body.style.height;
 
   document.body.classList.add("fe-print-chatlog");
+  if (feSetting(S.EXPORT_OPTIMIZE)) document.body.classList.add("fe-export-optimized");
 
     // Ensure print CSS beats Foundry's body.game print rules (multi-page PDF fix)
     feEnsurePrintCSSOverrides();
@@ -1148,6 +1399,7 @@ async function feExportChatLogToPDFInline() {
         container.remove();
       } catch {}
       document.body.classList.remove("fe-print-chatlog");
+      document.body.classList.remove("fe-export-optimized");
 
       // Restore document sizing
       htmlEl.style.overflow = prevHtmlOverflow;
@@ -1166,6 +1418,7 @@ async function feExportChatLogToPDFInline() {
     setTimeout(() => {
       if (document.body.classList.contains("fe-print-chatlog") && !document.getElementById("fe-chat-export-container")) {
         document.body.classList.remove("fe-print-chatlog");
+        document.body.classList.remove("fe-export-optimized");
       }
     }, 0);
   } catch (err) {
@@ -1220,7 +1473,38 @@ function feEscapeAttr(str) {
     .replaceAll(">", "&gt;");
 }
 
-async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
+function feSanitizeFilename(name) {
+  const s = String(name ?? "")
+    .trim()
+    // Windows reserved characters
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s.slice(0, 120);
+}
+
+function feIsElectron() {
+  try {
+    if (window?.process?.versions?.electron) return true;
+  } catch {}
+  try {
+    const ua = String(navigator?.userAgent ?? "");
+    if (ua.includes("Electron")) return true;
+  } catch {}
+  return false;
+}
+
+function feTryRequire(moduleName) {
+  try {
+    const req = window.require || globalThis.require;
+    if (!req) return null;
+    return req(moduleName);
+  } catch {
+    return null;
+  }
+}
+
+async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = false } = {}) {
   if (!win || win.closed) throw new Error("Archive window is not available.");
 
   // Collect messages first (so the archive UI can show correct counts immediately).
@@ -1238,8 +1522,26 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
   const headStyles = feCollectHeadStylesHTML();
   const baseHref = feEscapeAttr(document.baseURI ?? window.location.href);
 
+  // Desktop (Electron) can optionally open the archive in the system browser.
+  const desktopExternalMode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
+  const showExternalBtn = feIsElectron() && desktopExternalMode !== "off";
+  const externalBtnHTML = showExternalBtn
+    ? `<a class="fe-chat-export-action fe-chat-export-external" id="fe-archive-external" data-tooltip="외부 브라우저로 열기">브라우저</a>`
+    : "";
+
+  // Print/PDF image handling (Chrome/Electron can freeze on image-heavy pages)
+  const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "hideAvatars");
+  const printImgClass =
+    printImgMode === "hideAll"
+      ? " fe-print-hide-all"
+      : printImgMode === "downscale"
+        ? " fe-print-downscale"
+        : printImgMode === "hideAvatars"
+          ? " fe-print-hide-avatars"
+          : "";
+
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
-  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive`;
+  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${optimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
   win.document.open();
   win.document.write(`<!doctype html>
@@ -1272,6 +1574,37 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
         max-height: none !important;
         padding: 12mm !important;
         margin: 0 !important;
+      }
+
+      /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
+      #fe-chat-export-container #sidebar {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: 0 0 auto !important;
+        background: #fff !important;
+        border: 0 !important;
+      }
+      #fe-chat-export-container #chat {
+        position: static !important;
+        background: #fff !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+      #fe-chat-export-container #chat-log {
+        position: static !important;
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
       }
 
       /* Toolbar: compact, web-page-like controls. */
@@ -1313,15 +1646,32 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
         background: rgba(0,0,0,0.06);
       }
 
+      .fe-chat-export-action[aria-disabled="true"] {
+        opacity: 0.55;
+        pointer-events: none;
+      }
+
       @media print {
         /* Hide the toolbar when printing (save as PDF). */
         #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
 
         /* Avoid splitting a single message across pages where possible. */
-        #fe-chat-export-log .chat-message {
+        #chat-log .chat-message {
           break-inside: avoid;
           page-break-inside: avoid;
         }
+
+        /* PDF 안정성: 이미지 숨김 옵션 */
+        body.fe-print-hide-avatars #chat-log :is(
+          .message-header img,
+          .message-sender .avatar,
+          .message-sender > img,
+          img.chat-portrait-image-size-name-dnd5e,
+          img[class*="chat-portrait-image-size"]
+        ) {
+          display: none !important;
+        }
+        body.fe-print-hide-all #chat-log img { display: none !important; }
 
         @page { margin: 10mm; }
       }
@@ -1336,37 +1686,58 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
         </div>
         <div class="fe-chat-export-actions">
           <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="HTML 저장">HTML</a>
+          ${externalBtnHTML}
           <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="인쇄 / PDF">인쇄</a>
           <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="닫기">닫기</a>
         </div>
       </div>
-      <ol id="fe-chat-export-log" class="chat-log"></ol>
+      <div id="sidebar" class="sidebar">
+        <section id="chat" class="sidebar-tab tab active" data-tab="chat">
+          <ol id="chat-log" class="chat-log"></ol>
+        </section>
+      </div>
     </div>
   </body>
 </html>`);
   win.document.close();
 
+  // Apply user style variables (font sizes, background saturation) to the archive document.
+  // This also ensures downloaded HTML keeps the chosen values.
+  feApplyStyleVarsFromSettings(win.document);
+  // Apply chat-card font toggle class in the archive window too.
+  feSetChatCardFontClass(win.document);
+
   // Hook up controls.
-  const logEl = win.document.getElementById("fe-chat-export-log");
+  const logEl = win.document.getElementById("chat-log");
   const metaEl = win.document.getElementById("fe-chat-export-meta");
 
   const btnPrint = win.document.getElementById("fe-archive-print");
   const btnDownload = win.document.getElementById("fe-archive-download");
+  const btnExternal = win.document.getElementById("fe-archive-external");
   const btnClose = win.document.getElementById("fe-archive-close");
 
+  // Prevent exporting/printing until rendering is complete.
+  try {
+    btnPrint?.setAttribute?.("aria-disabled", "true");
+    btnDownload?.setAttribute?.("aria-disabled", "true");
+  } catch {}
+
   if (btnPrint)
-    btnPrint.addEventListener("click", (ev) => {
+    btnPrint.addEventListener("click", async (ev) => {
       ev.preventDefault();
-      try {
-        win.focus();
-      } catch {}
-      win.print();
+      await feArchivePrint(win);
     });
 
   if (btnDownload)
-    btnDownload.addEventListener("click", (ev) => {
+    btnDownload.addEventListener("click", async (ev) => {
       ev.preventDefault();
-      feDownloadArchiveHTML(win, titleText);
+      await feDownloadArchiveHTML(win, titleText);
+    });
+
+  if (btnExternal)
+    btnExternal.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      await feOpenArchiveInExternalBrowser(win, titleText);
     });
 
   if (btnClose)
@@ -1381,7 +1752,6 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
   try {
     const sampleLog = document.querySelector("ol.chat-log, #chat-log");
     if (sampleLog?.className) logEl.className = sampleLog.className;
-    logEl.id = "fe-chat-export-log";
   } catch {}
 
   // Render messages.
@@ -1447,6 +1817,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
 
   if (metaEl) metaEl.textContent = metaText;
 
+  // Re-enable actions.
+  try {
+    btnPrint?.removeAttribute?.("aria-disabled");
+    btnDownload?.removeAttribute?.("aria-disabled");
+  } catch {}
+
   // Auto-open print dialog if requested.
   if (autoPrint) {
     try {
@@ -1456,34 +1832,674 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false } = {}) {
       // eslint-disable-next-line no-unused-expressions
       win.document.body.offsetHeight;
     } catch {}
-    win.print();
+    await feArchivePrint(win);
   }
 }
 
-function feDownloadArchiveHTML(win, titleText = "Chat Log") {
-  try {
-    if (!win || win.closed) return;
-    const docEl = win.document.documentElement;
-    const html = "<!doctype html>\n" + docEl.outerHTML;
+async function feArchivePrint(win) {
+  if (!win || win.closed) return;
+  const doc = win.document;
+  const metaEl = doc.getElementById("fe-chat-export-meta");
+  const logEl =
+    doc.getElementById("chat-log") ||
+    doc.getElementById("fe-chat-export-log") ||
+    doc.querySelector("ol.chat-log");
 
-    const safeName = String(titleText || "chat-log")
+  const originalMeta = (() => {
+    try {
+      return metaEl?.textContent ?? "";
+    } catch {
+      return "";
+    }
+  })();
+
+  const setMeta = (t) => {
+    try {
+      if (metaEl) metaEl.textContent = t;
+    } catch {}
+  };
+
+  const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "hideAvatars");
+  const isElectron = feIsElectron();
+  let mode = requested;
+
+  // Desktop app (Electron) is much more prone to OOM when printing images.
+  // If user picked a "full" / unknown mode, fall back to a safer one.
+  if (isElectron && (mode === "full" || mode === "include" || mode === "images")) mode = "downscale";
+
+  const isAvatarImage = (img) => {
+    try {
+      if (!img) return false;
+      if (img.classList?.contains("avatar")) return true;
+      if (img.matches?.('img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return true;
+      if (img.closest?.(".message-header, .message-sender")) return true;
+      if (img.closest?.(".chat-portrait-container")) return true;
+    } catch {}
+    return false;
+  };
+
+  // Temporarily blank out image sources to prevent Chromium from decoding/embedding them in PDF.
+  const tempDisableImages = (filterFn) => {
+    if (!logEl) return () => {};
+    const placeholder =
+      "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+    const changed = [];
+    try {
+      const imgs = Array.from(logEl.querySelectorAll("img"));
+      for (const img of imgs) {
+        if (filterFn && !filterFn(img)) continue;
+        const src = img.getAttribute("src");
+        const srcset = img.getAttribute("srcset");
+        if (src == null && srcset == null) continue;
+
+        changed.push({
+          img,
+          src,
+          srcset,
+          loading: img.getAttribute("loading"),
+        });
+
+        img.setAttribute("src", placeholder);
+        img.removeAttribute("srcset");
+        img.setAttribute("loading", "lazy");
+      }
+    } catch {}
+    return () => {
+      for (const it of changed) {
+        try {
+          if (it.src != null) it.img.setAttribute("src", it.src);
+          else it.img.removeAttribute("src");
+
+          if (it.srcset != null) it.img.setAttribute("srcset", it.srcset);
+          else it.img.removeAttribute("srcset");
+
+          if (it.loading != null) it.img.setAttribute("loading", it.loading);
+          else it.img.removeAttribute("loading");
+        } catch {}
+      }
+    };
+  };
+
+  // Apply print image mode classes.
+  try {
+    doc.body.classList.toggle("fe-print-hide-avatars", mode === "hideAvatars");
+    doc.body.classList.toggle("fe-print-hide-all", mode === "hideAll");
+    doc.body.classList.toggle("fe-print-downscale", mode === "downscale");
+  } catch {}
+
+  // Memory guard: if images are supposed to be hidden, also blank their src so Chromium won't decode them.
+  let restoreImages = () => {};
+  if (mode === "hideAll") restoreImages = tempDisableImages(() => true);
+  else if (mode === "hideAvatars") restoreImages = tempDisableImages((img) => isAvatarImage(img));
+
+  const restoreOnce = () => {
+    try {
+      restoreImages();
+    } catch {}
+  };
+
+  try {
+    win.addEventListener("afterprint", restoreOnce, { once: true });
+  } catch {}
+
+  // Downscale images for stability:
+  // - always when mode === "downscale"
+  // - in Electron, also when images are not fully hidden
+  const shouldDownscale = !!logEl && (mode === "downscale" || (isElectron && mode !== "hideAll"));
+  if (shouldDownscale && logEl) {
+    try {
+      setMeta("Loading images…");
+      await feWaitForImages(logEl, 20000);
+      await feDownscaleImagesForPrint(win, logEl, {
+        meta: setMeta,
+        excludeAvatars: mode === "hideAvatars",
+        dprCap: isElectron ? 1 : 1.5,
+        webpQuality: isElectron ? 0.72 : 0.82,
+        jpegQuality: isElectron ? 0.78 : 0.85,
+      });
+    } catch (err) {
+      console.warn("female_edition | print downscale failed", err);
+    }
+  }
+
+  try {
+    win.focus();
+  } catch {}
+  try {
+    // eslint-disable-next-line no-unused-expressions
+    doc.body.offsetHeight;
+  } catch {}
+
+  try {
+    win.print();
+  } finally {
+    setMeta(originalMeta);
+    // Fallback restore in case afterprint doesn't fire (some Electron builds)
+    setTimeout(restoreOnce, 0);
+  }
+}
+
+async function feDownscaleImagesForPrint(
+  win,
+  rootEl,
+  { meta, excludeAvatars = false, dprCap = 1.5, webpQuality = 0.82, jpegQuality = 0.85 } = {}
+) {
+  const setMeta = typeof meta === "function" ? meta : () => {};
+  let imgs = Array.from(rootEl.querySelectorAll("img"));
+  if (!imgs.length) return;
+
+  const isAvatarImage = (img) => {
+    try {
+      if (!img) return false;
+      if (img.classList?.contains("avatar")) return true;
+      if (img.matches?.('img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return true;
+      if (img.closest?.(".message-header, .message-sender")) return true;
+      if (img.closest?.(".chat-portrait-container")) return true;
+    } catch {}
+    return false;
+  };
+
+  if (excludeAvatars) imgs = imgs.filter((img) => !isAvatarImage(img));
+
+  // Cap DPR for stability (large DPR values can explode PDF size / memory use)
+  const dpr = Math.max(1, Math.min(dprCap, win.devicePixelRatio || 1));
+  let i = 0;
+
+  for (const img of imgs) {
+    i++;
+    if (i === 1 || i % 20 === 0 || i === imgs.length) {
+      setMeta(`Downscaling images… ${i}/${imgs.length}`);
+    }
+
+    try {
+      // Skip unloaded or hidden images
+      if (!img.complete || img.naturalWidth <= 0) continue;
+
+      const rect = img.getBoundingClientRect();
+      const cssW = Math.max(1, Math.round(rect.width));
+      const cssH = Math.max(1, Math.round(rect.height));
+      if (cssW <= 1 || cssH <= 1) continue;
+
+      let targetW = Math.max(1, Math.round(cssW * dpr));
+      let targetH = Math.max(1, Math.round(cssH * dpr));
+
+      // If the source is already small, don't resample.
+      if (img.naturalWidth <= targetW * 1.05 && img.naturalHeight <= targetH * 1.05) continue;
+
+      // Hard cap to avoid huge canvases (prevents OOM on Electron/Chromium)
+      const MAX_SIDE = 1600;
+      const maxSide = Math.max(targetW, targetH);
+      if (maxSide > MAX_SIDE) {
+        const scale = MAX_SIDE / maxSide;
+        targetW = Math.max(1, Math.round(targetW * scale));
+        targetH = Math.max(1, Math.round(targetH * scale));
+      }
+
+      const canvas = win.document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) continue;
+
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      const dataUrl = await feCanvasToDataURL(canvas, { webpQuality, jpegQuality });
+      if (!dataUrl) continue;
+
+      img.removeAttribute("srcset");
+      img.src = dataUrl;
+
+      // Release memory
+      canvas.width = 0;
+      canvas.height = 0;
+    } catch {
+      // Ignore per-image failures (CORS-taint, decoding error, etc.)
+    }
+
+    if (i % 20 === 0) await feNextTick();
+  }
+}
+
+async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
+  // Prefer webp (smaller); fall back to jpeg/png.
+  const tryTypes = [
+    { type: "image/webp", quality: webpQuality },
+    { type: "image/jpeg", quality: jpegQuality },
+    { type: "image/png", quality: 1.0 },
+  ];
+
+  for (const t of tryTypes) {
+    try {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, t.type, t.quality));
+      if (!blob) continue;
+      return await feBlobToDataURL(blob);
+    } catch {}
+  }
+  return null;
+}
+
+async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } = {}) {
+  if (!win || win.closed) throw new Error("Archive window is closed");
+  const setMeta = typeof meta === "function" ? meta : () => {};
+
+  const doc = win.document;
+  const clone = doc.documentElement.cloneNode(true);
+
+  // Remove CSP meta if present - it can block inline styles or resource loading in file:// context.
+  try {
+    clone
+      .querySelectorAll('meta[http-equiv="Content-Security-Policy"], meta[http-equiv="content-security-policy"]')
+      .forEach((m) => m.remove());
+  } catch {}
+
+  // Remove scripts - exported HTML should be a static snapshot.
+  try {
+    clone.querySelectorAll("script").forEach((s) => s.remove());
+  } catch {}
+
+  // Keep a stable <base> so relative links/resources resolve correctly when opening the saved HTML as file://.
+  // (Important for CSS @import and url(...) when core/system CSS contains relative paths.)
+  try {
+    const headEl = clone.querySelector("head");
+    const baseHref = (() => {
+      try {
+        return new URL(doc.baseURI ?? window.location.href).origin + "/";
+      } catch {
+        return "/";
+      }
+    })();
+    if (headEl) {
+      let baseEl = headEl.querySelector("base");
+      if (!baseEl) {
+        baseEl = doc.createElement("base");
+        headEl.prepend(baseEl);
+      }
+      baseEl.setAttribute("href", baseHref);
+    }
+  } catch {}
+
+  // Collect CSS in cascade order.
+  // Prefer reading cssRules (keeps dynamically injected CSS). Fallback to fetching sheet.href.
+  const cssParts = [];
+  const origin = (() => {
+    try {
+      return new URL(doc.baseURI ?? window.location.href).origin;
+    } catch {
+      return window.location.origin;
+    }
+  })();
+
+  const sheets = Array.from(doc.styleSheets ?? []);
+  let idx = 0;
+  for (const sheet of sheets) {
+    idx++;
+    try {
+      if (sheet?.disabled) continue;
+    } catch {}
+
+    // Try CSSOM first
+    try {
+      const rules = sheet?.cssRules;
+      if (rules && rules.length) {
+        setMeta(`Collecting CSS… ${idx}/${sheets.length}`);
+        const text = Array.from(rules)
+          .map((r) => r.cssText)
+          .filter(Boolean)
+          .join("\n");
+        if (text.trim()) {
+          const baseForUrls = sheet?.href || doc.baseURI || origin + "/";
+          cssParts.push(feRewriteCSSAssetURLs(text, baseForUrls));
+        }
+        continue;
+      }
+    } catch {
+      // ignore and fallback to fetch
+    }
+
+    // Fallback: fetch by href (might fail for cross-origin sheets)
+    try {
+      const href = sheet?.href;
+      if (!href) continue;
+      setMeta(`Fetching CSS… ${idx}/${sheets.length}`);
+      const res = await fetch(href, { credentials: "include" });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text.trim()) cssParts.push(feRewriteCSSAssetURLs(text, href));
+    } catch (err) {
+      // Not fatal; export will still work with partial styling.
+      console.warn("female_edition | HTML export: failed to fetch stylesheet", sheet?.href, err);
+    }
+  }
+
+  // Embed CookieRun fonts (optional)
+  if (feSetting(S.EXPORT_EMBED_FONTS)) {
+    try {
+      setMeta("Embedding fonts…");
+      const fontCss = await feBuildEmbeddedCookieRunFontCSS();
+      if (fontCss) cssParts.push(fontCss);
+    } catch (err) {
+      console.warn("female_edition | HTML export: failed to embed fonts", err);
+    }
+  }
+
+  // Replace head styles with a single combined <style>
+  const head = clone.querySelector("head");
+  if (head) {
+    const cssLen = cssParts.reduce((sum, t) => sum + (t?.length || 0), 0);
+
+    // Ensure title is correct
+    try {
+      let t = head.querySelector("title");
+      if (!t) {
+        t = doc.createElement("title");
+        head.appendChild(t);
+      }
+      t.textContent = titleText;
+    } catch {}
+
+    // If we successfully collected a meaningful amount of CSS, inline it for a portable snapshot.
+    // Otherwise, keep existing <link> stylesheets and only append whatever we managed to collect
+    // (typically embedded fonts). This avoids “unstyled giant portraits” exports when CSSOM access is blocked.
+    if (cssLen >= 4096) {
+      try {
+        head.querySelectorAll('link[rel="stylesheet"], style').forEach((n) => n.remove());
+      } catch {}
+
+      const styleEl = doc.createElement("style");
+      styleEl.id = "fe-export-inline-css";
+      styleEl.textContent = cssParts.join("\n\n/* --- */\n\n");
+      head.appendChild(styleEl);
+    } else if (cssLen > 0) {
+      const styleEl = doc.createElement("style");
+      styleEl.id = "fe-export-inline-css";
+      styleEl.textContent = cssParts.join("\n\n/* --- */\n\n");
+      head.appendChild(styleEl);
+    }
+  }
+
+  // Optional: embed images into the HTML (can increase size)
+  if (feSetting(S.EXPORT_EMBED_IMAGES)) {
+    try {
+      await feEmbedImagesInNode(clone, { meta: setMeta });
+    } catch (err) {
+      console.warn("female_edition | HTML export: failed to embed images", err);
+    }
+  }
+
+  return "<!doctype html>\n" + clone.outerHTML;
+}
+
+async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
+  if (!win || win.closed) return;
+  const metaEl = win.document.getElementById("fe-chat-export-meta");
+  const originalMeta = (() => {
+    try {
+      return metaEl?.textContent ?? "";
+    } catch {
+      return "";
+    }
+  })();
+
+  const safeName =
+    String(titleText || "chat-log")
       .replaceAll(/[^a-zA-Z0-9\u3131-\uD79D\-_. ]+/g, "_")
       .trim()
       .slice(0, 80) || "chat-log";
 
-    const filename = `${safeName}.html`;
+  const filename = `${safeName}.html`;
 
+  const setMeta = (t) => {
+    try {
+      if (metaEl) metaEl.textContent = t;
+    } catch {}
+  };
+
+  try {
+    const doc = win.document;
+
+    setMeta("Preparing HTML…");
+    const html = await feBuildArchiveHTMLSnapshot(win, titleText, { meta: setMeta });
+
+    setMeta("Downloading…");
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = win.document.createElement("a");
+    const a = doc.createElement("a");
     a.href = url;
     a.download = filename;
-    win.document.body.appendChild(a);
+    doc.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (err) {
     console.warn("female_edition | failed to download archive HTML", err);
+  } finally {
+    setMeta(originalMeta);
+  }
+}
+
+async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { closeAfter = false } = {}) {
+  const mode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
+  if (mode === "off") return;
+  if (!feIsElectron()) {
+    ui?.notifications?.warn?.("외부 브라우저 열기는 데스크톱(Electron) 앱에서만 지원됩니다.");
+    return;
+  }
+
+  const electron = feTryRequire("electron");
+  const shell = electron?.shell;
+  const fs = feTryRequire("fs");
+  const path = feTryRequire("path");
+  const os = feTryRequire("os");
+
+  if (!shell || !fs || !path || !os) {
+    ui?.notifications?.warn?.("Electron shell/fs 접근이 불가하여 자동으로 외부 브라우저를 열 수 없습니다. 아카이브 창에서 HTML 저장 후 외부 브라우저로 열어주세요.");
+    return;
+  }
+
+  const metaEl = win?.document?.getElementById?.("fe-chat-export-meta");
+  const originalMeta = (() => {
+    try {
+      return metaEl?.textContent ?? "";
+    } catch {
+      return "";
+    }
+  })();
+  const setMeta = (t) => {
+    try {
+      if (metaEl) metaEl.textContent = t;
+    } catch {}
+  };
+
+  try {
+    setMeta("Building HTML…");
+    const html = await feBuildArchiveHTMLSnapshot(win, titleText, { meta: setMeta });
+
+    const safeName = feSanitizeFilename(titleText) || "chat-log";
+    const filePath = path.join(os.tmpdir(), `${safeName}-${Date.now()}.html`);
+    fs.writeFileSync(filePath, html, "utf8");
+
+    setMeta("Opening system browser…");
+
+    // shell.openPath is preferred for opening local files.
+    // It resolves with an error message string, or empty string on success.
+    let errMsg = "";
+    try {
+      if (typeof shell.openPath === "function") {
+        errMsg = (await shell.openPath(filePath)) || "";
+      } else if (typeof shell.openExternal === "function") {
+        await shell.openExternal(`file://${filePath}`);
+      } else {
+        throw new Error("Electron shell has no openPath/openExternal");
+      }
+    } catch (err) {
+      errMsg = String(err?.message ?? err);
+    }
+
+    if (errMsg) {
+      console.warn("female_edition | open external browser failed", errMsg);
+      ui?.notifications?.warn?.(`외부 브라우저 열기 실패: ${errMsg}`);
+    } else {
+      ui?.notifications?.info?.("외부 브라우저에서 채팅 아카이브를 열었습니다.");
+    }
+
+    if (closeAfter) {
+      try {
+        win.close();
+      } catch {}
+    }
+  } catch (err) {
+    console.warn("female_edition | external open failed", err);
+    ui?.notifications?.warn?.("외부 브라우저 열기 실패. HTML 저장 후 수동으로 열어주세요.");
+  } finally {
+    setMeta(originalMeta);
+  }
+}
+
+async function feBuildEmbeddedCookieRunFontCSS() {
+  // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
+  // If files are not present, returns an empty string.
+  const unicodeRange = "U+0020-007E, U+1100-11FF, U+3130-318F, U+AC00-D7A3";
+  const weights = [
+    { weight: 400, name: "Regular", files: ["CookieRun%20Regular.ttf", "CookieRun%20Regular.otf"] },
+    { weight: 700, name: "Bold", files: ["CookieRun%20Bold.ttf", "CookieRun%20Bold.otf"] },
+    { weight: 900, name: "Black", files: ["CookieRun%20Black.ttf", "CookieRun%20Black.otf"] },
+  ];
+
+  const faces = [];
+  for (const w of weights) {
+    let dataUrl = null;
+    let fmt = null;
+
+    for (const f of w.files) {
+      const url = `/modules/${MODULE_ID}/font/${f}`;
+      const attempt = await feFetchAsDataURL(url);
+      if (attempt) {
+        dataUrl = attempt;
+        fmt = f.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
+        break;
+      }
+    }
+
+    if (!dataUrl) continue;
+
+    faces.push(`@font-face{font-family:"FE CookieRun";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`);
+  }
+
+  if (!faces.length) return "";
+
+  return `\n/* female_edition: embedded CookieRun fonts (offline HTML export) */\n${faces.join("\n")}\n`;
+}
+
+async function feFetchAsDataURL(url) {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await feBlobToDataURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+function feBlobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function feEmbedImagesInNode(root, { meta } = {}) {
+  const setMeta = typeof meta === "function" ? meta : () => {};
+
+  const imgs = Array.from(root.querySelectorAll("img"));
+  if (!imgs.length) return;
+
+  // Hard safety limits:
+  // Single-file HTML + embedded images can easily crash Chromium/Electron (STATUS_BREAKPOINT / OOM)
+  // due to base64 expansion + JS string memory overhead.
+  const MAX_IMAGES = 160;
+  const MAX_TOTAL_BYTES = 12_000_000; // ~12MB (binary) before base64/string expansion
+  const MAX_PER_IMAGE = 800_000;      // ~0.8MB per image
+
+  const cache = new Map();
+  let embeddedCount = 0;
+  let embeddedBytes = 0;
+
+  let i = 0;
+  for (const img of imgs) {
+    i++;
+    const src = img.getAttribute("src") || img.src;
+    if (!src || src.startsWith("data:")) continue;
+
+    // Stop when reaching limits
+    if (embeddedCount >= MAX_IMAGES || embeddedBytes >= MAX_TOTAL_BYTES) {
+      setMeta(
+        `Embedding images… stopped (limit reached: ${embeddedCount} images, ${(
+          embeddedBytes /
+          1024 /
+          1024
+        ).toFixed(1)}MB)`
+      );
+      break;
+    }
+
+    // Resolve URL
+    let abs;
+    try {
+      abs = new URL(src, window.location.href).href;
+    } catch {
+      continue;
+    }
+
+    // Only embed same-origin resources (avoid CORS failures).
+    try {
+      const u = new URL(abs);
+      if (u.origin !== window.location.origin) continue;
+    } catch {
+      continue;
+    }
+
+    if (cache.has(abs)) {
+      img.setAttribute("src", cache.get(abs));
+      img.removeAttribute("srcset");
+      img.removeAttribute("loading");
+      continue;
+    }
+
+    setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i}/${imgs.length})`);
+
+    try {
+      const res = await fetch(abs, { credentials: "include" });
+      if (!res.ok) continue;
+      const blob = await res.blob();
+
+      // Per-image limit
+      if (blob.size > MAX_PER_IMAGE) continue;
+
+      // Total limit
+      if (embeddedBytes + blob.size > MAX_TOTAL_BYTES) continue;
+
+      const dataUrl = await feBlobToDataURL(blob);
+      cache.set(abs, dataUrl);
+
+      img.setAttribute("src", dataUrl);
+      img.removeAttribute("srcset");
+      img.removeAttribute("loading");
+
+      embeddedCount++;
+      embeddedBytes += blob.size;
+    } catch (err) {
+      console.warn("female_edition | HTML export: failed to embed image", abs, err);
+    }
+
+    // Yield periodically so Chromium doesn't freeze.
+    if (i % 10 === 0) await feNextTick();
   }
 }
 
@@ -1527,7 +2543,10 @@ function feApplyChatMergeInWindow(win) {
   // Apply merge classes (start/mid/end/divider) in the archive window.
   // This simplified version avoids computed-style syncing.
   try {
-    const logEl = win.document.getElementById("fe-chat-export-log");
+    const logEl =
+      win.document.getElementById("chat-log") ||
+      win.document.getElementById("fe-chat-export-log") ||
+      win.document.querySelector("ol.chat-log");
     if (!logEl) return;
 
     // Mirror merge-related body classes.

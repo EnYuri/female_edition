@@ -9,7 +9,22 @@
 :root {
   /* Adjust to taste. Higher alpha -> more desaturation (lighter). */
   --fe-paper-rgb: 245 239 229;
-  --fe-paper-alpha: 0.60;
+  --fe-paper-alpha: 0.42;
+
+  /* -------------------------------
+   * Chat typography (tunable)
+   * ------------------------------- */
+  /* Chat header sizes */
+  --fe-chat-title-size: 22px;     /* actor name */
+  --fe-chat-subtitle-size: 14px;  /* player name */
+
+  /* Normal chat message text size */
+  --fe-chat-message-font-size: 14px;
+
+  /* dnd5e/midi chat-card description text size */
+  --fe-chat-card-font-size: 12px;
+  --fe-chat-card-font-weight: 600;
+  --fe-chat-card-line-height: 1.35;
 
   /* Flat overlay (no texture). */
   --fe-parchment-overlay: linear-gradient(
@@ -24,7 +39,7 @@
  * Markdown **bold** becomes <strong>. Slightly enlarge bold fragments.
  */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(strong, b) {
-  font-size: 1.22em;
+  font-size: 1.10em;
 }
 
 
@@ -35,24 +50,62 @@
  * dnd5e/midi-qol item/spell/feature cards often render description text small and light.
  * Increase size, line-height, and darken text inside the collapsible description box.
  */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  :is(section.card-header.description, .card-header.description)
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content) {
-  font-size: 12px;
-  line-height: 1.40;
+/*
+ * NOTE:
+ *  - We target the *description/details* region only, not headers/buttons.
+ *  - Apply to export logs too (archive window / inline export) by including #fe-chat-export-log.
+ */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-size: var(--fe-chat-card-font-size) !important;
+  line-height: var(--fe-chat-card-line-height) !important;
+  font-weight: var(--fe-chat-card-font-weight) !important;
   /* Prefer Foundry variable when available; fallback to near-black. */
   color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
-  font-weight: 600;
+  text-shadow: none !important;
+}
+
+/* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  )
+  .wrapper :is(p, li, span, div, a, em, code) {
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
 }
 
 /* Paragraph spacing inside the wrapper */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-content
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(p, li) {
   margin: 0 0 0.55em 0;
 }
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-content
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(p, li):last-child {
@@ -60,12 +113,37 @@
 }
 
 /* Make emphasized terms stand out more in description blocks */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-content
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(strong, b) {
   font-weight: 700;
   color: inherit;
+}
+
+/* --------------------------------
+ * 1c) Chat message text size
+ * -------------------------------- */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message .message-content {
+  font-size: var(--fe-chat-message-font-size);
+}
+
+/* --------------------------------
+ * 1d) Chat header font sizes (Actor + Player name)
+ * -------------------------------- */
+#sidebar #chat :is(.chat-message .message-sender .name-stacked .title,
+                   .chat-message .message-sender .title) {
+  font-size: var(--fe-chat-title-size) !important;
+  line-height: 1.05;
+}
+
+#sidebar #chat :is(.chat-message .message-sender .name-stacked .subtitle,
+                   .chat-message .message-sender .subtitle) {
+  font-size: var(--fe-chat-subtitle-size) !important;
+  line-height: 1.05;
 }
 
 /* --------------------------------

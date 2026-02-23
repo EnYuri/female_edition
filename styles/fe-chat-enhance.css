@@ -82,7 +82,7 @@
 
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
   /* readability for **bold** in normal chat text */
-  font-size: 1.22em;
+  font-size: 1.12em;
   font-weight: 800;
 }
 
@@ -119,7 +119,7 @@ body.fe-print-chatlog #fe-chat-export-container {
  * If we keep that behavior on the export log, Chromium will clip at 1 page.
  * Force a normal, paginatable flow *even on screen media*.
  */
-body.fe-print-chatlog #fe-chat-export-log {
+body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
   display: block !important;
   height: auto !important;
   max-height: none !important;
@@ -147,13 +147,13 @@ body.fe-print-chatlog #fe-chat-export-meta {
   font-size: 11px;
 }
 
-body.fe-print-chatlog #fe-chat-export-log {
+body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
+body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message {
   margin: 0 0 12px 0;
 }
 
@@ -204,7 +204,7 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
     display: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-log {
+  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
     display: block !important;
     flex: none !important;
     height: auto !important;
@@ -213,7 +213,7 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
   }
 
   /* Avoid splitting a single message across pages where possible */
-  body.game.fe-print-chatlog #fe-chat-export-log .chat-message {
+  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message {
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -268,17 +268,29 @@ body.fe-print-chatlog #fe-chat-export-log > li.fe-export-message {
 /* Chat merge                  */
 /* --------------------------- */
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divider-before::before {
+  /* Draw a true group divider *between* message groups.
+   * (The previous inside-the-message divider could look like a tint change.)
+   */
   content: "";
-  display: block;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -7px;
   border-top: 1px solid var(--color-border-light-2);
-  opacity: 0.35;
-  margin: 6px 6px;
+  opacity: 0.55;
+}
+
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divider-before {
+  position: relative;
+  margin-top: 14px !important;
 }
 
 /* Chrome parity: avoid a darker "header strip" only on the first message of a merged group */
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) > .message-header {
   background: transparent !important;
   background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 /* Chrome parity: also keep the content area transparent so merged groups don't show different tints */
@@ -286,6 +298,14 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end)
   > .message-content {
   background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Avoid stacked box-shadows that can make merged groups look darker in Chromium */
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) {
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-merge-start {
@@ -345,12 +365,83 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 }
 
 /* --------------------------- */
-/* DND5E chat-card description  */
-/* (item/spell/feature cards)   */
+/* Export optimization (PDF/HTML)
 /* --------------------------- */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.chat-card, .midi-chat-card) :is(.card-content, .collapsible-content.card-content) {
-  font-size: 12px !important;
-  font-weight: 700 !important;
+/*
+ * When enabled, we force-remove heavy parchment/texture images in export views.
+ * This massively reduces print-to-PDF size and prevents Electron/Chromium freezes.
+ */
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
+  background-image: var(--fe-parchment-overlay) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::before,
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::after {
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* --------------------------- */
+/* Chat card font toggle       */
+/* --------------------------- */
+/*
+ * Some fonts (e.g. CookieRun) may not include all special glyphs.
+ * Allow users to toggle whether chat-card description areas use the custom font.
+ */
+body.fe-chatcard-custom-font
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+body:not(.fe-chatcard-custom-font)
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-family: Signika, system-ui, -apple-system, "Segoe UI", "Noto Sans", "Noto Sans KR", Arial, sans-serif !important;
+}
+
+/* Ensure nested elements don't re-apply custom font via system variables */
+body:not(.fe-chatcard-custom-font)
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  )
+  :is(p, li, span, div, a, em, code, strong, b) {
+  font-family: inherit !important;
+}
+
+@media print {
+  /* Optional extra print stability in optimized mode */
+  body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
+    text-shadow: none !important;
+  }
 }
 
 
@@ -402,4 +493,16 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 
 textarea.fe-chat-input-disabled {
   opacity: 0.55;
+}
+
+
+/* --------------------------- */
+/* Archive window background   */
+/* --------------------------- */
+/* Some themes leave a dark background behind chat cards. Force white in the archive window. */
+body.fe-chat-archive #fe-chat-export-container,
+body.fe-chat-archive #fe-chat-export-container #sidebar,
+body.fe-chat-archive #fe-chat-export-container #chat,
+body.fe-chat-archive #fe-chat-export-container :is(#chat-log, .chat-log, ol.chat-log) {
+  background: #fff !important;
 }
