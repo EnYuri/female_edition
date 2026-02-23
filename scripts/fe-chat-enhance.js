@@ -697,7 +697,9 @@ function feLooksLikeHTML(text) {
 }
 
 function feInstallMarkdownPreCreateHook() {
-  Hooks.on("preCreateChatMessage", async (message, data, _options, userId) => {
+  // NOTE (FVTT v13): Hooks are not awaited. preCreate* hooks are especially sensitive.
+  // Do NOT use async/await here, or message creation can complete before we updateSource.
+  Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
     if (!feSetting(S.MARKDOWN_ENABLED)) return;
     if (userId !== game.user.id) return;
 
@@ -711,16 +713,19 @@ function feInstallMarkdownPreCreateHook() {
     // If message already HTML (chat cards, system messages, etc.), don't touch it.
     if (feLooksLikeHTML(content)) return;
 
-    // Convert markdown -> HTML -> enrich (rolls, UUID links, etc.)
+    // Don't touch roll messages.
+    try {
+      const hasRolls =
+        (Array.isArray(data?.rolls) && data.rolls.length > 0) ||
+        (Array.isArray(message?.rolls) && message.rolls.length > 0);
+      if (hasRolls) return;
+    } catch (_e) {
+      /* noop */
+    }
+
+    // Convert markdown -> HTML (keep it synchronous so the create flow is not raced).
+    // Enrichment (UUID links, inline rolls) is intentionally skipped here.
     const html = feMarkdownToHTML(content);
-    const te = feGetTextEditor();
-    const enriched = te?.enrichHTML ? await te.enrichHTML(html, {
-      async: true,
-      secrets: false,
-      documents: true,
-      links: true,
-      rolls: true,
-    }) : html;
 
     // Store the raw text for later edits
     const flags = foundry.utils.deepClone(data?.flags ?? message.flags ?? {});
@@ -729,7 +734,7 @@ function feInstallMarkdownPreCreateHook() {
       markdown: true,
     });
 
-    message.updateSource({ content: enriched, flags });
+    message.updateSource({ content: html, flags });
   });
 }
 
@@ -1005,8 +1010,8 @@ function feInstallEditHandlers() {
     Hooks.on("renderChatMessageHTML", (message, html) => {
       if (!feSetting(S.EDIT_ENABLED)) return;
       try {
-        const el = feToElement(html);
-        feEnsureMessageEditControl(message, el);
+        // v13 hook provides an HTMLElement already.
+        feEnsureMessageEditControl(message, html);
       } catch (e) {
         console.warn(`${MODULE_ID} | failed to ensure edit control`, e);
       }

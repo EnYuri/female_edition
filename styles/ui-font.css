@@ -362,11 +362,3 @@ button.clear-remaining.icon.fa-solid::after {
   font-size: var(--fe-chat-subtitle-size) !important;
   line-height: 1.05;
 }
-
-
-/* Chat only: Dongle size bump down */
-#chat-log,
-.chat-popout #chat-log {
-  --fe-light-font-meta-bump: 0px;   /* (기존 1px → 0px) */
-  --fe-light-font-card-bump: 1px;   /* (기존 2px → 1px) */
-}
