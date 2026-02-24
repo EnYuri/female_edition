@@ -240,6 +240,15 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   justify-content: center;
 }
 
+/* Hide the header trash icon (we rely on the context menu instead).
+ * Also prevents overlap with the ellipsis on narrow layouts.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) .message-delete,
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) [data-action="deleteMessage"],
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) [data-action="delete"] {
+  display: none !important;
+}
+
 /* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
 #fe-chat-export-container .chat-message .message-sender .avatar {
   display: none !important;

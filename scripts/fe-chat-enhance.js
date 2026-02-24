@@ -332,6 +332,9 @@ Hooks.once("init", () => {
     type: Boolean,
     default: true,
   });
+
+  // Register the Edit Message context menu entry early (before ChatLog creates its context menu).
+  feRegisterEditContextMenuHooks();
 });
 
 Hooks.once("ready", () => {
@@ -753,6 +756,23 @@ function feCanEditMessage(msg) {
   }
 }
 
+function feCanDeleteMessage(msg) {
+  try {
+    // Prefer the built-in permission helper when available
+    if (typeof msg?.canUserModify === "function") return !!msg.canUserModify(game.user, "delete");
+
+    // Fallbacks
+    if (game.user?.isGM) return true;
+    const authorId = msg?.author?.id ?? msg?.user?.id ?? null;
+    if (authorId && authorId === game.user?.id) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+
 function feIsMsgEditable(msg) {
   return feCanEditMessage(msg);
 }
@@ -906,76 +926,163 @@ async function feUpdateMessageFromRaw(msg, rawText) {
   });
 }
 
+const feContextOptionsPatched = new Map();
+
 function fePatchChatContextOptions(inject) {
-  const method = "_getEntryContextOptions";
+  const patchOne = (host, method) => {
+    if (!host || typeof host[method] !== "function") return;
 
-  const patchOne = (host, flagKey) => {
+    const hostName = host?.constructor?.name ?? "<unknown>";
+    const key = `${hostName}:${method}`;
+    if (feContextOptionsPatched.has(key)) return;
+
+    const original = host[method];
+    host[method] = function (...args) {
+      const out = original.apply(this, args);
+      try {
+        inject(out);
+      } catch (_e) {
+        // ignore
+      }
+      return out;
+    };
+
+    feContextOptionsPatched.set(key, true);
+  };
+
+  const patch = (host) => patchOne(host, "_getEntryContextOptions");
+
+  // Foundry v13+ ApplicationV2 path
+  try {
+    const ChatLogV13 = foundry?.applications?.sidebar?.tabs?.ChatLog;
+    if (ChatLogV13?.prototype) patch(ChatLogV13.prototype);
+  } catch (_e) {
+    // ignore
+  }
+
+  // Legacy globals
+  try {
+    if (globalThis.ChatLog?.prototype) patch(globalThis.ChatLog.prototype);
+  } catch (_e) {
+    // ignore
+  }
+
+  // ui.chat exists in some versions; ui.sidebar.tabs.chat in others
+  try {
+    if (ui?.chat?.constructor?.prototype) patch(ui.chat.constructor.prototype);
+    if (ui?.chat) patch(ui.chat);
+    if (ui?.sidebar?.tabs?.chat?.constructor?.prototype) patch(ui.sidebar.tabs.chat.constructor.prototype);
+    if (ui?.sidebar?.tabs?.chat) patch(ui.sidebar.tabs.chat);
+  } catch (_e) {
+    // ignore
+  }
+
+  // Also patch any future chat log renders
+  Hooks.on("renderChatLog", (app) => {
     try {
-      if (!host) return;
-      if (host[flagKey]) return;
-      if (typeof host[method] !== "function") return;
-
-      const original = host[method];
-      host[method] = function (...args) {
-        const options = original.apply(this, args) ?? [];
-        try {
-          inject(options);
-        } catch (e) {
-          console.warn("[female_edition] edit context inject failed", e);
-        }
-        return options;
-      };
-
-      host[flagKey] = true;
-    } catch (e) {
-      console.warn("[female_edition] context patch failed", e);
+      if (app?.constructor?.prototype) patch(app.constructor.prototype);
+      if (app) patch(app);
+      if (ui?.chat?.constructor?.prototype) patch(ui.chat.constructor.prototype);
+      if (ui?.chat) patch(ui.chat);
+      if (ui?.sidebar?.tabs?.chat?.constructor?.prototype) patch(ui.sidebar.tabs.chat.constructor.prototype);
+      if (ui?.sidebar?.tabs?.chat) patch(ui.sidebar.tabs.chat);
+      if (globalThis.ChatLog?.prototype) patch(globalThis.ChatLog.prototype);
+    } catch (_e) {
+      // ignore
     }
+  });
+}
+
+
+
+// -------------------------------------
+// Edit Message: context menu integration
+// -------------------------------------
+
+let feEditContextMenuRegistered = false;
+
+function feRegisterEditContextMenuHooks() {
+  if (feEditContextMenuRegistered) return;
+  feEditContextMenuRegistered = true;
+
+  const inject = (options) => {
+    if (!Array.isArray(options)) return;
+    if (options.some((o) => o?.feId === "fe-edit-message")) return;
+
+    // Ensure a delete option exists in the context menu when we remove the header trash icon.
+    // (Most Foundry versions already provide this, but some themes/modules may remove it.)
+    const hasDelete = options.some((o) => {
+      const name = String(o?.name ?? "");
+      const icon = String(o?.icon ?? "");
+      return (
+        o?.feId === "fe-delete-message" ||
+        /delete/i.test(name) ||
+        /삭제/.test(name) ||
+        /trash/i.test(icon)
+      );
+    });
+
+    if (!hasDelete) {
+      options.push({
+        name: "삭제",
+        icon: '<i class="fas fa-trash"></i>',
+        condition: (li) => {
+          const msg = feMessageFromContextLI(li);
+          return feCanDeleteMessage(msg);
+        },
+        callback: async (li) => {
+          const msg = feMessageFromContextLI(li);
+          if (!msg) return;
+          if (!feCanDeleteMessage(msg)) return;
+          try {
+            await msg.delete();
+          } catch (err) {
+            console.error(`[${MODULE_ID}] delete failed`, err);
+            ui?.notifications?.error("메시지 삭제에 실패했습니다. 콘솔을 확인하세요.");
+          }
+        },
+        feId: "fe-delete-message",
+      });
+    }
+
+
+    options.unshift({
+      name: "메시지 수정",
+      icon: '<i class="fas fa-pen"></i>',
+      condition: (li) => {
+        if (!feSetting(S.EDIT_ENABLED)) return false;
+        const msg = feMessageFromContextLI(li);
+        return feIsMsgEditable(msg);
+      },
+      callback: (li) => {
+        const msg = feMessageFromContextLI(li);
+        if (!msg) return;
+        feStartInlineEdit(msg);
+      },
+      feId: "fe-edit-message",
+    });
   };
 
-  const patch = () => {
-    const chat = ui?.chat;
-    patchOne(chat?.constructor?.prototype, "__feEditContextPatchedProto");
-    patchOne(chat, "__feEditContextPatchedInstance");
-  };
+  // Foundry v13+ (Document-specific context menu hook)
+  try {
+    Hooks.on("getChatMessageContextOptions", (_app, options) => inject(options));
+  } catch (_e) {
+    // ignore
+  }
 
-  patch();
-  Hooks.on("renderChatLog", patch);
+  // Legacy hook (older Foundry versions)
+  try {
+    Hooks.on("getChatLogEntryContext", (_html, options) => inject(options));
+  } catch (_e) {
+    // ignore
+  }
+
+  // Fallback patch: override the method ChatLog uses to assemble context options
+  fePatchChatContextOptions(inject);
 }
 
 function feInstallEditHandlers() {
   if (!feSetting(S.EDIT_ENABLED)) return;
-
-  const inject = (options) => {
-    if (!Array.isArray(options)) return;
-
-    // Avoid duplicates if multiple hooks fire.
-    if (options.some((o) => o?.feId === "fe-edit-message")) return;
-
-    options.unshift({
-      feId: "fe-edit-message",
-      name: "메시지 수정",
-      icon: '<i class="fa-solid fa-pen-to-square"></i>',
-      condition: (target) => {
-        const msg = feMessageFromContextLI(target);
-        return feIsMsgEditable(msg);
-      },
-      callback: (target) => {
-        const msg = feMessageFromContextLI(target);
-        if (!msg) return;
-        feStartInlineEdit(msg);
-      },
-    });
-  };
-
-  // FVTT v13 (ApplicationV2) - Document context options
-  // ChatMessage => getChatMessageContextOptions
-  Hooks.on("getChatMessageContextOptions", (_app, options) => inject(options));
-
-  // Back-compat: some modules still use legacy chat context hook
-  Hooks.on("getChatLogEntryContext", (_html, options) => inject(options));
-
-  // Fallback: some chat replacements bypass hooks; patch the active chat app prototype
-  fePatchChatContextOptions(inject);
 
   // Delegated click handler for the pencil icon (covers existing + newly-rendered messages)
   if (!feInstallEditHandlers._delegateBound) {
@@ -989,7 +1096,7 @@ function feInstallEditHandlers() {
         if (!btn) return;
 
         const li = btn.closest("li.chat-message");
-        const msgId = li?.dataset?.messageId;
+        const msgId = feGetMessageIdFromElement(li);
         if (!msgId) return;
 
         const msg = game.messages?.get?.(msgId);
@@ -1011,11 +1118,22 @@ function feInstallEditHandlers() {
       if (!feSetting(S.EDIT_ENABLED)) return;
       try {
         // v13 hook provides an HTMLElement already.
+        feRemoveMessageDeleteControl(html);
         feEnsureMessageEditControl(message, html);
       } catch (e) {
         console.warn(`${MODULE_ID} | failed to ensure edit control`, e);
       }
     });
+  }
+
+  // Backfill: existing chat log entries were rendered before our hooks ran.
+  // Ensure the edit icon exists for already-posted messages.
+  feEnsureEditControlsForExistingMessages();
+
+  // Re-apply after chat log re-renders (popout, refresh, etc.)
+  if (!feInstallEditHandlers._backfillHookBound) {
+    feInstallEditHandlers._backfillHookBound = true;
+    Hooks.on("renderChatLog", () => feEnsureEditControlsForExistingMessages());
   }
 }
 
@@ -1023,23 +1141,120 @@ function feMessageFromContextLI(target) {
   // Foundry may pass either the <li> itself or an inner element. It can also pass a jQuery wrapper.
   try {
     const el0 = target?.[0] ?? target;
-    const el = el0?.closest ? el0.closest("[data-message-id]") ?? el0 : el0;
+    // FVTT v13+: chat message list items can use either data-message-id or data-document-id.
+    const el = el0?.closest
+      ? el0.closest("[data-message-id],[data-document-id]") ?? el0
+      : el0;
 
     const id =
       el?.dataset?.messageId ??
+      el?.dataset?.documentId ??
       (typeof target?.data === "function" ? target.data("messageId") : undefined) ??
+      (typeof target?.data === "function" ? target.data("documentId") : undefined) ??
       (typeof target?.attr === "function" ? target.attr("data-message-id") : undefined) ??
-      (typeof el?.getAttribute === "function" ? el.getAttribute("data-message-id") : undefined);
+      (typeof target?.attr === "function" ? target.attr("data-document-id") : undefined) ??
+      (typeof el?.getAttribute === "function" ? el.getAttribute("data-message-id") : undefined) ??
+      (typeof el?.getAttribute === "function" ? el.getAttribute("data-document-id") : undefined);
 
-    return id ? game.messages?.get?.(id) ?? null : null;
+    const norm = feNormalizeChatMessageId(id);
+    if (!norm) return null;
+
+    // Prefer the normalized ID (v13 can use UUID-like values such as ChatMessage.<id>).
+    return game.messages?.get?.(norm) ?? game.messages?.get?.(id) ?? null;
   } catch (_e) {
     return null;
+  }
+}
+
+function feNormalizeChatMessageId(rawId) {
+  if (rawId == null) return null;
+  const s = String(rawId).trim();
+  if (!s) return null;
+
+  // In FVTT v13 some DOM attributes store a UUID-like value: "ChatMessage.<id>".
+  // game.messages.get expects the plain Document ID, so strip any dotted prefix.
+  if (s.includes(".")) {
+    const parts = s.split(".").filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return s;
+}
+
+function feGetMessageIdFromElement(el) {
+  try {
+    const e = el?.closest
+      ? el.closest("[data-message-id],[data-document-id]") ?? el
+      : el;
+    const raw =
+      e?.dataset?.messageId ??
+      e?.dataset?.documentId ??
+      (typeof e?.getAttribute === "function" ? e.getAttribute("data-message-id") : null) ??
+      (typeof e?.getAttribute === "function" ? e.getAttribute("data-document-id") : null) ??
+      null;
+    return feNormalizeChatMessageId(raw);
+  } catch {
+    return null;
+  }
+}
+
+function feRemoveMessageDeleteControl(messageEl) {
+  try {
+    const el0 = messageEl?.[0] ?? messageEl;
+    if (!el0?.querySelector) return;
+
+    // Remove any header delete controls. We rely on the context menu instead.
+    const meta = el0.querySelector(".message-metadata");
+    if (!meta) return;
+
+    const selectors = [
+      ".message-delete",
+      'a[data-action="deleteMessage"]',
+      'button[data-action="deleteMessage"]',
+      '[data-action="deleteMessage"]',
+      'a[data-action="delete"]',
+      'button[data-action="delete"]',
+      '[data-action="delete"]',
+    ];
+
+    for (const sel of selectors) {
+      for (const node of meta.querySelectorAll(sel)) node.remove();
+    }
+  } catch (_e) {
+    /* noop */
+  }
+}
+
+function feEnsureEditControlsForExistingMessages() {
+  try {
+    const messages = document.querySelectorAll(
+      "#chat-log li.chat-message, ol.chat-log li.chat-message"
+    );
+
+    for (const li of messages) {
+      // Always remove the delete icon for layout stability.
+      feRemoveMessageDeleteControl(li);
+
+      if (!feSetting(S.EDIT_ENABLED)) continue;
+
+      const msgId = feGetMessageIdFromElement(li);
+      if (!msgId) continue;
+
+      const msg = game?.messages?.get?.(msgId);
+      if (!msg) continue;
+
+      feEnsureMessageEditControl(msg, li);
+    }
+  } catch (e) {
+    console.warn(`[${MODULE_ID}] failed to backfill edit controls`, e);
   }
 }
 
 function feEnsureMessageEditControl(message, messageEl) {
   if (!(messageEl instanceof HTMLElement)) return;
   if (!message || !feCanEditMessage(message)) return;
+
+  // Always remove the header delete icon to prevent overlap with the ellipsis.
+  feRemoveMessageDeleteControl(messageEl);
 
   const metadata = messageEl.querySelector(".message-metadata");
   if (!metadata) return;
@@ -2991,7 +3206,7 @@ function feApplyChatMergeInWindow(win) {
 
     const infos = els
       .map((el) => {
-        const id = el.dataset?.messageId;
+        const id = feGetMessageIdFromElement(el);
         const msg = id ? game.messages?.get(id) : null;
         const info = feMessageMergeInfo(msg, el);
         return {
@@ -3338,7 +3553,7 @@ function feApplyChatMerge(logEl) {
   // Collect message infos
   const infos = msgs
     .map((el, idx) => {
-      const id = el.dataset?.messageId;
+      const id = feGetMessageIdFromElement(el);
       const msg = id ? game.messages?.get(id) : null;
       const info = feMessageMergeInfo(msg, el);
       return {

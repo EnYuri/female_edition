@@ -124,8 +124,21 @@
    * than CookieRun at the same px size. Add small, targeted compensation
    * bumps where we intentionally use the light stack.
    */
-  --fe-light-font-meta-bump: 1px; /* timestamps / metadata */
+  --fe-light-font-meta-bump: 1px; /* (legacy) timestamps / metadata */
   --fe-light-font-card-bump: 2px; /* chat-card description body */
+
+  /* Tidy5e: Dongle can feel smaller inside dense sheet lists.
+   * Bump light-face list text a bit to match original readability.
+   */
+  --fe-tidy-light-font-bump: 2px;
+
+  /* Chat header meta/icon sizing
+   * (Avoid inheriting huge font sizes from chat portrait / system styles.)
+   */
+  --fe-chat-meta-size: 12px;
+  --fe-chat-header-icon-size: 14px;
+  --fe-chat-header-icon-hit: 18px;
+  --fe-chat-meta-gap: 6px;
 
   font-synthesis: none;
 }
@@ -179,18 +192,155 @@ html, body,
   font-family: var(--fe-font-primary) !important;
 }
 
-/* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes. */
-:is(#sidebar #chat, .chat-popout #chat)
+/* Tidy 5e Sheets - numeric values can look better with the light face */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
-    .message-metadata,
-    .message-metadata *,
-    .timestamp,
-    .message-timestamp
+    .ability-score,
+    .ability-scores :is(.score, .value, .mod, .bonus),
+    .abilities :is(.score, .value, .mod, .bonus),
+    .attributes :is(.score, .value, .mod, .bonus)
   ) {
   font-family: var(--fe-font-light) !important;
   font-weight: var(--fe-font-weight-small) !important;
-  /* size compensation for Dongle */
-  font-size: calc(1em + var(--fe-light-font-meta-bump)) !important;
+}
+
+/* -------------------------------
+ * 3b) Tidy 5e Sheets (kgar / sdenec)
+ * -------------------------------
+ * Some Tidy sheet layouts set their own font-family in nested regions.
+ * Apply a simple “big = CookieRun, small/list = Dongle(light)” split.
+ */
+
+/* If Tidy exposes font-family variables, override them first for broad coverage.
+ * (These vars may differ by Tidy version; unused vars are harmless.)
+ */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
+  --t5e-title-font-family: var(--fe-font-primary) !important;
+  --t5e-body-font-family: var(--fe-font-light) !important;
+  --t5e-font-family-title: var(--fe-font-primary) !important;
+  --t5e-font-family-body: var(--fe-font-light) !important;
+  --t5e-primary-font-family: var(--fe-font-primary) !important;
+  --t5e-secondary-font-family: var(--fe-font-light) !important;
+}
+
+/* Large headings / labels (actor name, ability labels, tab titles) */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .tidy5e-sheet-header,
+    .sheet-header,
+    .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
+    .header,
+    .header :is(.document-name, .name, .charname),
+    .actor-name,
+    .actor-name :is(input, textarea, span, div),
+    .ability-scores,
+    .ability-scores :is(.label, label, .title, .name),
+    .abilities,
+    .abilities :is(.label, label, .title, .name),
+    .attributes,
+    .attributes :is(.label, label, .title, .name),
+    nav.tabs,
+    nav.tabs :is(a, .item)
+  ) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* Small list content (skills, items, features, actions, etc.) */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .skills,
+    .skill-list,
+    .skills-list,
+    .items-list,
+    .inventory,
+    .spellbook,
+    .features,
+    .actions,
+    .effects,
+    .traits,
+    .proficiencies
+  ) {
+  font-family: var(--fe-font-light) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+}
+
+/* Ensure nested text nodes inside those lists inherit Dongle, while icons keep FA. */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .skills,
+    .skill-list,
+    .skills-list,
+    .items-list,
+    .inventory,
+    .spellbook,
+    .features,
+    .actions,
+    .effects,
+    .traits,
+    .proficiencies
+  )
+  :is(p, li, span, div, a, em, strong, b, label, small) {
+  font-family: inherit !important;
+
+  /* Dongle's x-height is smaller; compensate a little for readability.
+   * Apply only to text nodes so icons/layout stay stable.
+   */
+  font-size: calc(1em + var(--fe-tidy-light-font-bump)) !important;
+}
+
+/* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
+ * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
+ */
+:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata {
+  font-family: var(--fe-font-light) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+  font-size: var(--fe-chat-meta-size) !important;
+  line-height: 1 !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--fe-chat-meta-gap) !important;
+}
+
+:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata .message-timestamp,
+:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata time {
+  order: 0;
+  font-family: var(--fe-font-light) !important;
+  font-size: var(--fe-chat-meta-size) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+}
+
+/* Edit + ellipsis icons: keep them compact and aligned */
+:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata a.message-edit {
+  order: 1;
+}
+
+:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata a.chat-control {
+  order: 2;
+}
+
+:is(#sidebar #chat, .chat-popout #chat)
+  .chat-message
+  .message-header
+  .message-metadata
+  :is(a.message-edit, a.chat-control) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--fe-chat-header-icon-hit) !important;
+  height: var(--fe-chat-header-icon-hit) !important;
+  line-height: var(--fe-chat-header-icon-hit) !important;
+  font-size: var(--fe-chat-header-icon-size) !important;
+}
+
+/* Ensure the <i> glyph inherits size (some themes override it) */
+:is(#sidebar #chat, .chat-popout #chat)
+  .chat-message
+  .message-header
+  .message-metadata
+  :is(a.message-edit, a.chat-control)
+  i {
+  font-size: inherit !important;
 }
 
 /* Keep other small UI text at regular weight, but do not force the light face globally. */
