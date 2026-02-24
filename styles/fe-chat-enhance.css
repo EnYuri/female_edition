@@ -243,10 +243,20 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 /* Hide the header trash icon (we rely on the context menu instead).
  * Also prevents overlap with the ellipsis on narrow layouts.
  */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) .message-delete,
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) [data-action="deleteMessage"],
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message :is(.message-header, .message-metadata) [data-action="delete"] {
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata .message-delete {
   display: none !important;
+}
+
+/* Markdown/plain text can generate multiple <p> blocks, which can make messages
+ * look like they have excessive top/bottom padding. Reduce paragraph margins,
+ * but only for direct children so chat-cards are unaffected.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content > p {
+  margin: 0 0 0.35em 0;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content > p:last-child {
+  margin-bottom: 0;
 }
 
 /* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
@@ -385,7 +395,7 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 }
 
 /* --------------------------- */
-/* Export optimization (PDF/HTML)
+/* Export optimization (PDF/HTML) */
 /* --------------------------- */
 /*
  * When enabled, we force-remove heavy parchment/texture images in export views.
@@ -413,60 +423,6 @@ body.fe-export-optimized
   background-image: none !important;
   box-shadow: none !important;
   filter: none !important;
-}
-
-/* --------------------------- */
-/* Chat card font toggle       */
-/* --------------------------- */
-/*
- * Some fonts (e.g. CookieRun) may not include all special glyphs.
- * Allow users to toggle whether chat-card description areas use the custom font.
- */
-body.fe-chatcard-custom-font
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  :is(
-    section.details.card-content,
-    .details.card-content,
-    .details.collapsible-content.card-content,
-    .collapsible-content.card-content,
-    .collapsible-content,
-    .card-content
-  ) {
-  font-family: var(--fe-font-primary) !important;
-}
-
-body:not(.fe-chatcard-custom-font)
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  :is(
-    section.details.card-content,
-    .details.card-content,
-    .details.collapsible-content.card-content,
-    .collapsible-content.card-content,
-    .collapsible-content,
-    .card-content
-  ) {
-  font-family: Signika, system-ui, -apple-system, "Segoe UI", "Noto Sans", "Noto Sans KR", Arial, sans-serif !important;
-}
-
-/* Ensure nested elements don't re-apply custom font via system variables */
-body:not(.fe-chatcard-custom-font)
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  :is(
-    section.details.card-content,
-    .details.card-content,
-    .details.collapsible-content.card-content,
-    .collapsible-content.card-content,
-    .collapsible-content,
-    .card-content
-  )
-  :is(p, li, span, div, a, em, code, strong, b) {
-  font-family: inherit !important;
 }
 
 @media print {

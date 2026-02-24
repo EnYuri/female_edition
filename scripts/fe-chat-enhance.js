@@ -50,8 +50,49 @@ const S = {
   EDIT_ENABLED: "ceEditEnabled",
 };
 
+// Default values (used as a safe fallback before settings are registered)
+const FE_DEFAULTS = {
+  // Merge
+  [S.MERGE_ENABLED]: true,
+  [S.MERGE_ONLY_TEXT]: true,
+  [S.MERGE_DIVIDER]: true,
+  [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
+
+  // Typing indicator
+  [S.TYPING_ENABLED]: true,
+
+  // Export
+  [S.EXPORT_ENABLED]: true,
+  [S.EXPORT_AUTO_PRINT]: false,
+  [S.EXPORT_OPTIMIZE]: true,
+  [S.EXPORT_EMBED_FONTS]: true,
+  [S.EXPORT_EMBED_IMAGES]: false,
+  [S.EXPORT_PRINT_IMAGE_MODE]: "hideAvatars",
+  [S.EXPORT_DESKTOP_EXTERNAL_MODE]: "button",
+
+  // Typography
+  [S.CHATCARD_USE_CUSTOM_FONT]: true,
+
+  // Style
+  [S.STYLE_ACTOR_NAME_SIZE]: 22,
+  [S.STYLE_PLAYER_NAME_SIZE]: 14,
+  [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
+  [S.STYLE_CHATCARD_TEXT_SIZE]: 12,
+  [S.STYLE_BG_SATURATION]: 0.42,
+
+  // Markdown
+  [S.MARKDOWN_ENABLED]: true,
+
+  // Edit
+  [S.EDIT_ENABLED]: true,
+};
+
 function feSetting(key) {
-  return game.settings.get(MODULE_ID, key);
+  try {
+    return game.settings.get(MODULE_ID, key);
+  } catch {
+    return FE_DEFAULTS[key];
+  }
 }
 
 function feGetTextEditor() {
@@ -333,8 +374,8 @@ Hooks.once("init", () => {
     default: true,
   });
 
-  // Register the Edit Message context menu entry early (before ChatLog creates its context menu).
-  feRegisterEditContextMenuHooks();
+  // Install the context-menu edit action early (before the first ChatLog context menu is built).
+  feInstallEditContextMenuEarly();
 });
 
 Hooks.once("ready", () => {
@@ -756,23 +797,6 @@ function feCanEditMessage(msg) {
   }
 }
 
-function feCanDeleteMessage(msg) {
-  try {
-    // Prefer the built-in permission helper when available
-    if (typeof msg?.canUserModify === "function") return !!msg.canUserModify(game.user, "delete");
-
-    // Fallbacks
-    if (game.user?.isGM) return true;
-    const authorId = msg?.author?.id ?? msg?.user?.id ?? null;
-    if (authorId && authorId === game.user?.id) return true;
-
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-
 function feIsMsgEditable(msg) {
   return feCanEditMessage(msg);
 }
@@ -926,163 +950,103 @@ async function feUpdateMessageFromRaw(msg, rawText) {
   });
 }
 
-const feContextOptionsPatched = new Map();
-
 function fePatchChatContextOptions(inject) {
-  const patchOne = (host, method) => {
-    if (!host || typeof host[method] !== "function") return;
+  const method = "_getEntryContextOptions";
 
-    const hostName = host?.constructor?.name ?? "<unknown>";
-    const key = `${hostName}:${method}`;
-    if (feContextOptionsPatched.has(key)) return;
+  const patchOne = (host, flagKey) => {
+    try {
+      if (!host) return;
+      if (host[flagKey]) return;
+      if (typeof host[method] !== "function") return;
 
-    const original = host[method];
-    host[method] = function (...args) {
-      const out = original.apply(this, args);
-      try {
-        inject(out);
-      } catch (_e) {
-        // ignore
-      }
-      return out;
-    };
+      const original = host[method];
+      host[method] = function (...args) {
+        const options = original.apply(this, args) ?? [];
+        try {
+          inject(options);
+        } catch (e) {
+          console.warn("[female_edition] edit context inject failed", e);
+        }
+        return options;
+      };
 
-    feContextOptionsPatched.set(key, true);
+      host[flagKey] = true;
+    } catch (e) {
+      console.warn("[female_edition] context patch failed", e);
+    }
   };
 
-  const patch = (host) => patchOne(host, "_getEntryContextOptions");
+  const patch = () => {
+    // Patch the ChatLog class prototype early (v13). This must happen before
+    // the ChatLog builds its ContextMenu, otherwise the handler can capture the
+    // unpatched method.
+    const ChatLogClass = foundry?.applications?.sidebar?.tabs?.ChatLog;
+    patchOne(ChatLogClass?.prototype, "__feEditContextPatchedClassProto");
 
-  // Foundry v13+ ApplicationV2 path
-  try {
-    const ChatLogV13 = foundry?.applications?.sidebar?.tabs?.ChatLog;
-    if (ChatLogV13?.prototype) patch(ChatLogV13.prototype);
-  } catch (_e) {
-    // ignore
-  }
+    const chat = ui?.chat;
+    patchOne(chat?.constructor?.prototype, "__feEditContextPatchedProto");
+    patchOne(chat, "__feEditContextPatchedInstance");
+  };
 
-  // Legacy globals
-  try {
-    if (globalThis.ChatLog?.prototype) patch(globalThis.ChatLog.prototype);
-  } catch (_e) {
-    // ignore
-  }
-
-  // ui.chat exists in some versions; ui.sidebar.tabs.chat in others
-  try {
-    if (ui?.chat?.constructor?.prototype) patch(ui.chat.constructor.prototype);
-    if (ui?.chat) patch(ui.chat);
-    if (ui?.sidebar?.tabs?.chat?.constructor?.prototype) patch(ui.sidebar.tabs.chat.constructor.prototype);
-    if (ui?.sidebar?.tabs?.chat) patch(ui.sidebar.tabs.chat);
-  } catch (_e) {
-    // ignore
-  }
-
-  // Also patch any future chat log renders
-  Hooks.on("renderChatLog", (app) => {
-    try {
-      if (app?.constructor?.prototype) patch(app.constructor.prototype);
-      if (app) patch(app);
-      if (ui?.chat?.constructor?.prototype) patch(ui.chat.constructor.prototype);
-      if (ui?.chat) patch(ui.chat);
-      if (ui?.sidebar?.tabs?.chat?.constructor?.prototype) patch(ui.sidebar.tabs.chat.constructor.prototype);
-      if (ui?.sidebar?.tabs?.chat) patch(ui.sidebar.tabs.chat);
-      if (globalThis.ChatLog?.prototype) patch(globalThis.ChatLog.prototype);
-    } catch (_e) {
-      // ignore
-    }
-  });
+  patch();
+  Hooks.on("renderChatLog", patch);
 }
 
-
-
-// -------------------------------------
-// Edit Message: context menu integration
-// -------------------------------------
-
-let feEditContextMenuRegistered = false;
-
-function feRegisterEditContextMenuHooks() {
-  if (feEditContextMenuRegistered) return;
-  feEditContextMenuRegistered = true;
+/**
+ * Install the "메시지 수정" entry into the chat message context menu.
+ *
+ * Important: this must run during init (before ChatLog creates its ContextMenu)
+ * or Foundry may bind a handler to the original _getEntryContextOptions.
+ */
+function feInstallEditContextMenuEarly() {
+  if (feInstallEditContextMenuEarly._done) return;
+  feInstallEditContextMenuEarly._done = true;
 
   const inject = (options) => {
+    // Respect the setting at runtime (so users can toggle without reload).
+    if (feSetting(S.EDIT_ENABLED) === false) return;
     if (!Array.isArray(options)) return;
-    if (options.some((o) => o?.feId === "fe-edit-message")) return;
 
-    // Ensure a delete option exists in the context menu when we remove the header trash icon.
-    // (Most Foundry versions already provide this, but some themes/modules may remove it.)
-    const hasDelete = options.some((o) => {
-      const name = String(o?.name ?? "");
-      const icon = String(o?.icon ?? "");
-      return (
-        o?.feId === "fe-delete-message" ||
-        /delete/i.test(name) ||
-        /삭제/.test(name) ||
-        /trash/i.test(icon)
-      );
-    });
-
-    if (!hasDelete) {
-      options.push({
-        name: "삭제",
-        icon: '<i class="fas fa-trash"></i>',
-        condition: (li) => {
-          const msg = feMessageFromContextLI(li);
-          return feCanDeleteMessage(msg);
-        },
-        callback: async (li) => {
-          const msg = feMessageFromContextLI(li);
-          if (!msg) return;
-          if (!feCanDeleteMessage(msg)) return;
-          try {
-            await msg.delete();
-          } catch (err) {
-            console.error(`[${MODULE_ID}] delete failed`, err);
-            ui?.notifications?.error("메시지 삭제에 실패했습니다. 콘솔을 확인하세요.");
-          }
-        },
-        feId: "fe-delete-message",
-      });
+    // Avoid duplicates if multiple hooks/patches fire.
+    if (
+      options.some(
+        (o) => o?.feId === "fe-edit-message" || String(o?.name ?? "") === "메시지 수정"
+      )
+    ) {
+      return;
     }
 
-
     options.unshift({
+      feId: "fe-edit-message",
       name: "메시지 수정",
-      icon: '<i class="fas fa-pen"></i>',
-      condition: (li) => {
-        if (!feSetting(S.EDIT_ENABLED)) return false;
-        const msg = feMessageFromContextLI(li);
+      icon: '<i class="fa-solid fa-pen-to-square"></i>',
+      condition: (target) => {
+        const msg = feMessageFromContextLI(target);
         return feIsMsgEditable(msg);
       },
-      callback: (li) => {
-        const msg = feMessageFromContextLI(li);
+      callback: (target) => {
+        const msg = feMessageFromContextLI(target);
         if (!msg) return;
         feStartInlineEdit(msg);
       },
-      feId: "fe-edit-message",
     });
   };
 
-  // Foundry v13+ (Document-specific context menu hook)
-  try {
-    Hooks.on("getChatMessageContextOptions", (_app, options) => inject(options));
-  } catch (_e) {
-    // ignore
-  }
+  // FVTT v13 (ApplicationV2) - Document context options
+  // ChatMessage => getChatMessageContextOptions
+  Hooks.on("getChatMessageContextOptions", (_app, options) => inject(options));
 
-  // Legacy hook (older Foundry versions)
-  try {
-    Hooks.on("getChatLogEntryContext", (_html, options) => inject(options));
-  } catch (_e) {
-    // ignore
-  }
+  // Back-compat: some modules still use legacy chat context hook
+  Hooks.on("getChatLogEntryContext", (_html, options) => inject(options));
 
-  // Fallback patch: override the method ChatLog uses to assemble context options
+  // Patch the ChatLog method as a fallback (works even if hooks aren't fired).
   fePatchChatContextOptions(inject);
 }
 
 function feInstallEditHandlers() {
-  if (!feSetting(S.EDIT_ENABLED)) return;
+  if (feSetting(S.EDIT_ENABLED) === false) return;
+
+  // Context menu injection is installed during init.
 
   // Delegated click handler for the pencil icon (covers existing + newly-rendered messages)
   if (!feInstallEditHandlers._delegateBound) {
@@ -1090,7 +1054,7 @@ function feInstallEditHandlers() {
     document.addEventListener(
       "click",
       (ev) => {
-        if (!feSetting(S.EDIT_ENABLED)) return;
+        if (feSetting(S.EDIT_ENABLED) === false) return;
 
         const btn = ev.target?.closest?.("a.message-edit, button.message-edit");
         if (!btn) return;
@@ -1115,7 +1079,7 @@ function feInstallEditHandlers() {
   if (!feInstallEditHandlers._renderHookBound) {
     feInstallEditHandlers._renderHookBound = true;
     Hooks.on("renderChatMessageHTML", (message, html) => {
-      if (!feSetting(S.EDIT_ENABLED)) return;
+      if (feSetting(S.EDIT_ENABLED) === false) return;
       try {
         // v13 hook provides an HTMLElement already.
         feRemoveMessageDeleteControl(html);
@@ -1201,24 +1165,8 @@ function feRemoveMessageDeleteControl(messageEl) {
   try {
     const el0 = messageEl?.[0] ?? messageEl;
     if (!el0?.querySelector) return;
-
-    // Remove any header delete controls. We rely on the context menu instead.
-    const meta = el0.querySelector(".message-metadata");
-    if (!meta) return;
-
-    const selectors = [
-      ".message-delete",
-      'a[data-action="deleteMessage"]',
-      'button[data-action="deleteMessage"]',
-      '[data-action="deleteMessage"]',
-      'a[data-action="delete"]',
-      'button[data-action="delete"]',
-      '[data-action="delete"]',
-    ];
-
-    for (const sel of selectors) {
-      for (const node of meta.querySelectorAll(sel)) node.remove();
-    }
+    // Remove the header trash icon (it can overlap the ellipsis / edit icon)
+    el0.querySelectorAll(".message-metadata .message-delete")?.forEach((el) => el.remove());
   } catch (_e) {
     /* noop */
   }
@@ -3422,114 +3370,6 @@ function feMergeKey(info) {
 
 
 
-function feSyncMergedGroupBackground(group) {
-  try {
-    if (!Array.isArray(group) || group.length < 2) return;
-    // Prefer the most recent message in the group as the reference.
-    // Some web environments apply slightly different background stacks to
-    // earlier-rendered messages; syncing to the newest reduces mismatches.
-    const refEl = group?.[group.length - 1]?.el ?? group?.[0]?.el;
-    if (!refEl) return;
-
-    const cs = window.getComputedStyle(refEl);
-    const bg = {
-      color: cs.backgroundColor,
-      image: cs.backgroundImage,
-      blend: cs.backgroundBlendMode,
-      repeat: cs.backgroundRepeat,
-      size: cs.backgroundSize,
-      position: cs.backgroundPosition,
-      attachment: cs.backgroundAttachment,
-      origin: cs.backgroundOrigin,
-      clip: cs.backgroundClip,
-    };
-
-    for (let i = 0; i < group.length; i++) {
-      const el = group?.[i]?.el;
-      if (!el || el === refEl) continue;
-      el.style.backgroundColor = bg.color;
-      el.style.backgroundImage = bg.image;
-      el.style.backgroundBlendMode = bg.blend;
-      el.style.backgroundRepeat = bg.repeat;
-      el.style.backgroundSize = bg.size;
-      el.style.backgroundPosition = bg.position;
-      el.style.backgroundAttachment = bg.attachment;
-      el.style.backgroundOrigin = bg.origin;
-      el.style.backgroundClip = bg.clip;
-    }
-  } catch (e) {
-    console.warn("[female_edition] merge background sync failed", e);
-  }
-}
-
-function feNormalizeKeyBackgrounds(infos) {
-  try {
-    if (!Array.isArray(infos) || infos.length < 2) return;
-
-    const hasBgStyling = (el, cs) => {
-      const styleAttr = el?.getAttribute?.("style") ?? "";
-      if (/background/i.test(styleAttr)) return true;
-      if (!cs) return false;
-      return cs.backgroundBlendMode !== "normal" || cs.backgroundImage !== "none";
-    };
-
-    const extract = (cs) => ({
-      color: cs.backgroundColor,
-      image: cs.backgroundImage,
-      blend: cs.backgroundBlendMode,
-      repeat: cs.backgroundRepeat,
-      size: cs.backgroundSize,
-      position: cs.backgroundPosition,
-      attachment: cs.backgroundAttachment,
-      origin: cs.backgroundOrigin,
-      clip: cs.backgroundClip,
-    });
-
-    const apply = (el, bg) => {
-      el.style.backgroundColor = bg.color;
-      el.style.backgroundImage = bg.image;
-      el.style.backgroundBlendMode = bg.blend;
-      el.style.backgroundRepeat = bg.repeat;
-      el.style.backgroundSize = bg.size;
-      el.style.backgroundPosition = bg.position;
-      el.style.backgroundAttachment = bg.attachment;
-      el.style.backgroundOrigin = bg.origin;
-      el.style.backgroundClip = bg.clip;
-    };
-
-    // Use the most recent message (DOM-bottom) as the reference for a key.
-    const ref = new Map();
-    for (let i = infos.length - 1; i >= 0; i--) {
-      const info = infos[i];
-      const el = info?.el;
-      const key = info?.key;
-      if (!el || !key) continue;
-
-      const cs = window.getComputedStyle(el);
-      if (!hasBgStyling(el, cs)) continue;
-
-      if (!ref.has(key)) {
-        ref.set(key, extract(cs));
-        continue;
-      }
-
-      const bg = ref.get(key);
-      if (!bg) continue;
-
-      // Only apply if a visible mismatch is likely.
-      if (
-        cs.backgroundColor !== bg.color ||
-        cs.backgroundImage !== bg.image ||
-        cs.backgroundBlendMode !== bg.blend
-      ) {
-        apply(el, bg);
-      }
-    }
-  } catch (e) {
-    console.warn("[female_edition] key background normalization failed", e);
-  }
-}
-
 
 function feApplyChatMerge(logEl) {
   if (!(logEl instanceof HTMLElement)) return;
@@ -3596,9 +3436,6 @@ function feApplyChatMerge(logEl) {
     for (let i = 1; i < groupLen - 1; i++) group[i].el.classList.add("fe-merge-mid");
     group[groupLen - 1].el.classList.add("fe-merge-end");
 
-
-    // Chrome/Web parity: enforce identical background for merged messages
-    feSyncMergedGroupBackground(group);
   };
 
   let groupStart = 0;
@@ -3609,11 +3446,6 @@ function feApplyChatMerge(logEl) {
     }
   }
   applyGroup(groupStart, infos.length);
-
-  // Web(Chrome) parity: some modules end up applying slightly different
-  // background stacks to messages rendered at different times. Normalise per
-  // merge-key using the most recent message as the reference.
-  feNormalizeKeyBackgrounds(infos);
 }
 
 
@@ -3625,25 +3457,83 @@ function feApplyChatMergeToAllLogs() {
 
 
 let feChatLogObserver = null;
+const feChatLogObservers = new Map();
+
+function feBindChatLogObservers() {
+  for (const log of feGetChatLogs()) {
+    if (!(log instanceof HTMLElement)) continue;
+    if (feChatLogObservers.has(log)) continue;
+
+    const obs = new MutationObserver((_mutations) => {
+      if (obs._scheduled) return;
+      obs._scheduled = true;
+      requestAnimationFrame(() => {
+        obs._scheduled = false;
+        feApplyChatMerge(log);
+      });
+    });
+
+    obs.observe(log, { childList: true, subtree: true });
+    feChatLogObservers.set(log, obs);
+  }
+}
+
+function fePruneChatLogObservers() {
+  for (const [log, obs] of feChatLogObservers.entries()) {
+    if (!document.contains(log)) {
+      try {
+        obs.disconnect();
+      } catch {}
+      feChatLogObservers.delete(log);
+    }
+  }
+}
+
+function feMutationTouchesChat(mutations) {
+  const checkNodes = (nodeList) => {
+    for (const n of nodeList ?? []) {
+      if (!(n instanceof Element)) continue;
+      if (n.matches?.('ol.chat-log, #chat-log, li.chat-message, .chat-popout')) return true;
+      if (n.querySelector?.('ol.chat-log, #chat-log, li.chat-message, .chat-popout')) return true;
+    }
+    return false;
+  };
+
+  for (const m of mutations) {
+    const t = m?.target;
+    if (t?.closest?.('#chat, .chat-popout')) return true;
+    if (checkNodes(m?.addedNodes) || checkNodes(m?.removedNodes)) return true;
+  }
+  return false;
+}
 
 function feObserveChatLogs() {
   if (feChatLogObserver) return;
 
-  feChatLogObserver = new MutationObserver((_mutations) => {
-    // Throttle merge re-application
+  // Observe chat logs directly so we only re-merge when the log actually changes.
+  feBindChatLogObservers();
+
+  // Also observe the document for chat log re-renders / chat popouts being added.
+  feChatLogObserver = new MutationObserver((mutations) => {
+    if (!feMutationTouchesChat(mutations)) return;
+
     if (feChatLogObserver._scheduled) return;
     feChatLogObserver._scheduled = true;
     requestAnimationFrame(() => {
       feChatLogObserver._scheduled = false;
-      feApplyChatMergeToAllLogs();
+      fePruneChatLogObservers();
+      feBindChatLogObservers();
+
+      // Chat UI can re-render controls; keep our buttons/typing indicator alive.
       feInjectExportButtonsAll();
       feRenderTypingIndicator();
+
+      // Newly-attached logs may need an initial merge pass.
+      feApplyChatMergeToAllLogs();
     });
   });
 
-  // Observe #sidebar (chat can rerender) to rebind on changes
-  const sidebar = document.getElementById("sidebar");
-  if (sidebar) feChatLogObserver.observe(sidebar, { childList: true, subtree: true });
+  feChatLogObserver.observe(document.body, { childList: true, subtree: true });
 
   // Initial
   feApplyChatMergeToAllLogs();

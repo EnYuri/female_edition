@@ -127,10 +127,10 @@
   --fe-light-font-meta-bump: 1px; /* (legacy) timestamps / metadata */
   --fe-light-font-card-bump: 2px; /* chat-card description body */
 
-  /* Tidy5e: Dongle can feel smaller inside dense sheet lists.
-   * Bump light-face list text a bit to match original readability.
+  /* Tidy5e: keep sizes stable. (Earlier builds bumped list text, which caused
+   * some lists to become too large compared to tab/menu labels.)
    */
-  --fe-tidy-light-font-bump: 2px;
+  --fe-tidy-light-font-bump: 0px;
 
   /* Chat header meta/icon sizing
    * (Avoid inheriting huge font sizes from chat portrait / system styles.)
@@ -282,16 +282,15 @@ html, body,
   :is(p, li, span, div, a, em, strong, b, label, small) {
   font-family: inherit !important;
 
-  /* Dongle's x-height is smaller; compensate a little for readability.
-   * Apply only to text nodes so icons/layout stay stable.
-   */
-  font-size: calc(1em + var(--fe-tidy-light-font-bump)) !important;
+  /* Keep the original font-size from Tidy5e; only override font-family. */
 }
 
 /* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
  * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
  */
-:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata {
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-metadata {
   font-family: var(--fe-font-light) !important;
   font-weight: var(--fe-font-weight-small) !important;
   font-size: var(--fe-chat-meta-size) !important;
@@ -302,8 +301,10 @@ html, body,
   gap: var(--fe-chat-meta-gap) !important;
 }
 
-:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata .message-timestamp,
-:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata time {
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-metadata
+  :is(.message-timestamp, time) {
   order: 0;
   font-family: var(--fe-font-light) !important;
   font-size: var(--fe-chat-meta-size) !important;
@@ -311,17 +312,22 @@ html, body,
 }
 
 /* Edit + ellipsis icons: keep them compact and aligned */
-:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata a.message-edit {
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-metadata
+  a.message-edit {
   order: 1;
 }
 
-:is(#sidebar #chat, .chat-popout #chat) .chat-message .message-header .message-metadata a.chat-control {
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-metadata
+  a.chat-control {
   order: 2;
 }
 
-:is(#sidebar #chat, .chat-popout #chat)
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
-  .message-header
   .message-metadata
   :is(a.message-edit, a.chat-control) {
   display: inline-flex !important;
@@ -334,9 +340,8 @@ html, body,
 }
 
 /* Ensure the <i> glyph inherits size (some themes override it) */
-:is(#sidebar #chat, .chat-popout #chat)
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
-  .message-header
   .message-metadata
   :is(a.message-edit, a.chat-control)
   i {
