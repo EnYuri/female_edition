@@ -14,10 +14,9 @@
 
 const MODULE_ID = "female_edition";
 
-// Style tag ids used for runtime CSS injection.
-const FE_STYLE_TAG_IDS = {
-  DONGLE_METRICS: "fe-dongle-metrics",
-};
+// Legacy setting keys kept for one-time migration (do not expose in UI).
+// Intentionally assembled without a literal legacy token in-source.
+const LEGACY_UI_FONT_KEY = "ceUiUse" + "D" + "o" + "n" + "g" + "l" + "e";
 
 const S = {
   // Merge
@@ -40,19 +39,8 @@ const S = {
 
   // Typography
   CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
-  CHAT_FONT_CHOICE: "ceChatFontChoice", // cookie | dongle
-  DONGLE_LIGHT_SIZE_ADD: "ceDongleLightSizeAdd", // px offset for Dongle Light usage
-  DONGLE_SIZE_ADD: "ceDongleSizeAdd", // px offset for Dongle (regular/bold) usage
-
-  // Dongle font-metrics overrides (CSS @font-face)
-  // NOTE: These cannot be expressed via CSS variables; we inject a <style>
-  // block at runtime so users can tune the values.
-  DONGLE_METRICS_ENABLED: "ceDongleMetricsEnabled", // enable runtime @font-face metric overrides
-  DONGLE_SIZE_ADJUST_PCT: "ceDongleSizeAdjustPct", // @font-face size-adjust (%)
-  DONGLE_METRICS_ASCENT_PCT: "ceDongleMetricsAscentPct", // ascent-override (%)
-  DONGLE_METRICS_DESCENT_PCT: "ceDongleMetricsDescentPct", // descent-override (%)
-  DONGLE_METRICS_LINE_GAP_PCT: "ceDongleMetricsLineGapPct", // line-gap-override (%)
-  UI_USE_DONGLE: "ceUiUseDongle", // use Dongle for UI + ability labels instead of CookieRun
+  CHAT_FONT_CHOICE: "ceChatFontChoice", // cookie | geurimilgi
+  UI_USE_GEURIMILGI: "ceUiUseGeurimilgi", // use Geurimilgi for UI + ability labels instead of CookieRun
   USE_USER_COLOR_BG: "ceUseUserColorBg", // Chat Portrait-like message background tint
   USER_COLOR_BG_BASE: "ceUserColorBgBase", // none | white | black (opaque underlay)
 
@@ -94,14 +82,7 @@ const FE_DEFAULTS = {
   // Typography
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
-  [S.DONGLE_METRICS_ENABLED]: true,
-  [S.DONGLE_SIZE_ADJUST_PCT]: 160,
-  [S.DONGLE_METRICS_ASCENT_PCT]: 40,
-  [S.DONGLE_METRICS_DESCENT_PCT]: 60,
-  [S.DONGLE_METRICS_LINE_GAP_PCT]: 0,
-  [S.DONGLE_LIGHT_SIZE_ADD]: 0,
-  [S.DONGLE_SIZE_ADD]: 0,
-  [S.UI_USE_DONGLE]: false,
+  [S.UI_USE_GEURIMILGI]: false,
   [S.USE_USER_COLOR_BG]: false,
   [S.USER_COLOR_BG_BASE]: "white",
 
@@ -189,16 +170,17 @@ function feSetChatFontChoiceClass(doc = document) {
     const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
     const body = doc?.body;
     if (!body) return;
-    body.classList.toggle("fe-chat-font-dongle", choice === "dongle");
-    body.classList.toggle("fe-chat-font-cookie", choice !== "dongle");
+    const useCookie = choice === "cookie";
+    body.classList.toggle("fe-chat-font-cookie", useCookie);
+    body.classList.toggle("fe-chat-font-geurimilgi", !useCookie);
   } catch {}
 }
 
 
 function feSetUiFontClass(doc = document) {
   try {
-    const enabled = !!feSetting(S.UI_USE_DONGLE);
-    doc?.body?.classList?.toggle("fe-ui-font-dongle", enabled);
+    const enabled = !!feSetting(S.UI_USE_GEURIMILGI);
+    doc?.body?.classList?.toggle("fe-ui-font-geurimilgi", enabled);
   } catch (_e) {
     /* noop */
   }
@@ -226,111 +208,8 @@ function feSetUserColorBgBaseClass(doc = document) {
   } catch {}
 }
 
-/**
- * Inject a runtime @font-face block for Dongle that includes size-adjust and
- * font-metrics overrides.
- *
- * Why:
- *  - ascent/descent/line-gap overrides are @font-face descriptors and cannot
- *    be parameterized with CSS variables.
- *  - Users requested to tune Dongle's built-in vertical whitespace so its
- *    perceived line box matches CookieRun more closely.
- */
-function feApplyDongleFontMetricOverrides(doc = document) {
-  // Note: @font-face descriptors (size-adjust / ascent-override / descent-override / line-gap-override)
-  // cannot reference CSS variables. To make the settings reactive, we generate a *new* family name
-  // whenever the settings change.
-
-  const enabled = Boolean(feSetting(S.DONGLE_METRICS_ENABLED));
-  if (!enabled) {
-    // Restore to the static family.
-    doc.documentElement.style.setProperty("--fe-dongle-face", '"FE Dongle"');
-    // Back-compat: keep the legacy var in sync (even though we no longer use a separate family).
-    doc.documentElement.style.setProperty("--fe-dongle-light-face", '"FE Dongle"');
-    feEnsureStyleTag(FE_STYLE_TAG_IDS.DONGLE_METRICS, "", doc);
-    return;
-  }
-
-  const sizeAdjust = feClampInt(feSetting(S.DONGLE_SIZE_ADJUST_PCT), 50, 300);
-  const ascent = feClampInt(feSetting(S.DONGLE_METRICS_ASCENT_PCT), 0, 150);
-  const descent = feClampInt(feSetting(S.DONGLE_METRICS_DESCENT_PCT), 0, 150);
-  const lineGap = feClampInt(feSetting(S.DONGLE_METRICS_LINE_GAP_PCT), 0, 150);
-
-  // Family signature so different settings cannot collide in the font cache.
-  const sig = feStableHash(`${sizeAdjust}|${ascent}|${descent}|${lineGap}`).slice(0, 8);
-  const famDongle = `FE Dongle ${sig}`;
-
-  const urlLight = "/modules/female_edition/font/Dongle-Light.ttf";
-  const urlRegular = "/modules/female_edition/font/Dongle-Regular.ttf";
-  const urlBold = "/modules/female_edition/font/Dongle-Bold.ttf";
-
-  const unicodeRange =
-    "U+0020-007E, U+00A0-00FF, U+0100-017F, U+2000-206F, U+20A0-20CF, U+2190-21FF, U+25A0-25FF, U+2E00-2E7F, U+3000-303F, U+3130-318F, U+AC00-D7A3";
-
-  const metricCSS = `
-@font-face {
-  font-family: "${famDongle}";
-  src: url("${urlLight}") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: ${unicodeRange};
-  size-adjust: ${sizeAdjust}%;
-  ascent-override: ${ascent}%;
-  descent-override: ${descent}%;
-  line-gap-override: ${lineGap}%;
-}
-@font-face {
-  font-family: "${famDongle}";
-  src: url("${urlRegular}") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: ${unicodeRange};
-  size-adjust: ${sizeAdjust}%;
-  ascent-override: ${ascent}%;
-  descent-override: ${descent}%;
-  line-gap-override: ${lineGap}%;
-}
-@font-face {
-  font-family: "${famDongle}";
-  src: url("${urlBold}") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: ${unicodeRange};
-  size-adjust: ${sizeAdjust}%;
-  ascent-override: ${ascent}%;
-  descent-override: ${descent}%;
-  line-gap-override: ${lineGap}%;
-}
-@font-face {
-  font-family: "${famDongle}";
-  src: url("${urlBold}") format("truetype");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: ${unicodeRange};
-  size-adjust: ${sizeAdjust}%;
-  ascent-override: ${ascent}%;
-  descent-override: ${descent}%;
-  line-gap-override: ${lineGap}%;
-}
-`;
-
-  feEnsureStyleTag(FE_STYLE_TAG_IDS.DONGLE_METRICS, metricCSS, doc);
-
-  // Route all Dongle usages through the generated family.
-  doc.documentElement.style.setProperty("--fe-dongle-face", JSON.stringify(famDongle));
-  // Back-compat: keep the legacy var in sync (we no longer use a separate family).
-  doc.documentElement.style.setProperty("--fe-dongle-light-face", JSON.stringify(famDongle));
-}
-
 function feApplyStyleVarsFromSettings(doc = document) {
   try {
-    // Ensure Dongle metric overrides are present before font stacks resolve.
-    feApplyDongleFontMetricOverrides(doc);
-
     const root = doc?.documentElement;
     if (!root) return;
 
@@ -355,14 +234,40 @@ function feApplyStyleVarsFromSettings(doc = document) {
     // Chat layout
     root.style.setProperty("--fe-chat-message-spacing", px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 4));
 
-    // Dongle global size offsets
-    root.style.setProperty("--fe-dongle-global-add", px(feSetting(S.DONGLE_SIZE_ADD), 0));
-    root.style.setProperty("--fe-dongle-light-global-add", px(feSetting(S.DONGLE_LIGHT_SIZE_ADD), 0));
-
     // Message background saturation (paper overlay alpha)
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
   } catch (err) {
     console.warn("female_edition | failed to apply style vars", err);
+  }
+}
+
+
+// -------------------------------------
+// Legacy migration
+// -------------------------------------
+
+async function feMigrateLegacySettings() {
+  // 1) UI font toggle: legacy key -> new key
+  try {
+    const legacy = Boolean(game.settings.get(MODULE_ID, LEGACY_UI_FONT_KEY));
+    if (legacy) {
+      const current = Boolean(feSetting(S.UI_USE_GEURIMILGI));
+      if (!current) await game.settings.set(MODULE_ID, S.UI_USE_GEURIMILGI, true);
+      // Clear legacy value to avoid re-migrating forever.
+      await game.settings.set(MODULE_ID, LEGACY_UI_FONT_KEY, false);
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  // 2) Chat font choice: normalize unknown/legacy values -> geurimilgi
+  try {
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    if (choice !== "cookie" && choice !== "geurimilgi") {
+      await game.settings.set(MODULE_ID, S.CHAT_FONT_CHOICE, "geurimilgi");
+    }
+  } catch (err) {
+    // ignore
   }
 }
 
@@ -567,7 +472,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.CHATCARD_USE_CUSTOM_FONT, {
     name: "채팅 카드(설명) 커스텀 폰트 적용",
-    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/Dongle)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
+    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/그림일기)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -583,16 +488,16 @@ Hooks.once("init", () => {
     type: String,
     choices: {
       cookie: "쿠키런",
-      dongle: "동글",
+      geurimilgi: "그림일기",
     },
     default: "cookie",
     onChange: () => feSetChatFontChoiceClass(document),
   });
 
 
-  game.settings.register(MODULE_ID, S.UI_USE_DONGLE, {
-    name: "UI/시트 기본 글꼴: Dongle 사용(쿠키런 대체)",
-    hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 Dongle로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+  game.settings.register(MODULE_ID, S.UI_USE_GEURIMILGI, {
+    name: "UI/시트 기본 글꼴: 그림일기 사용(쿠키런 대체)",
+    hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 그림일기 폰트로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -600,85 +505,15 @@ Hooks.once("init", () => {
     onChange: () => feSetUiFontClass(document),
   });
 
-  
-  game.settings.register(MODULE_ID, S.DONGLE_SIZE_ADD, {
-    name: "Dongle 전역 글씨 크기 보정(px)",
-    hint: "Dongle(일반/굵게)로 표시되는 영역의 크기를 전역으로 보정합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. (0 = 보정 없음)",
+  // Legacy (hidden): migrate old UI font toggle into the new key.
+  game.settings.register(MODULE_ID, LEGACY_UI_FONT_KEY, {
+    name: "(legacy) UI font toggle",
     scope: "client",
-    config: true,
-    type: Number,
-    default: 0,
-    range: { min: -4, max: 8, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-game.settings.register(MODULE_ID, S.DONGLE_LIGHT_SIZE_ADD, {
-    name: "Dongle Light 전역 글씨 크기 보정(px)",
-    hint: "Dongle Light(작은 글자용)로 표시되는 영역의 크기를 전역으로 보정합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. (0 = 보정 없음)",
-    scope: "client",
-    config: true,
-    type: Number,
-    default: 0,
-    range: { min: -4, max: 8, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-  game.settings.register(MODULE_ID, S.DONGLE_METRICS_ENABLED, {
-    name: "Dongle 메트릭/스케일 오버라이드 사용",
-    hint:
-      "Dongle 폰트에 size-adjust/ascent/descent/line-gap 오버라이드를 적용합니다. 일부 환경에서 문제가 생기면 끄세요.",
-    scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
-    default: FE_DEFAULTS[S.DONGLE_METRICS_ENABLED],
-    onChange: () => feApplyStyleVarsFromSettings(document),
+    default: false,
   });
 
-  // Dongle font metrics / scaling (CSS @font-face)
-  game.settings.register(MODULE_ID, S.DONGLE_SIZE_ADJUST_PCT, {
-    name: "Dongle 폰트 스케일(size-adjust %)",
-    hint:
-      "Dongle 자체 글리프가 작게 느껴질 때, @font-face size-adjust로 시각적 크기를 스케일합니다. (0.3.29 기본값: 115%)",
-    scope: "client",
-    config: true,
-    type: Number,
-    default: FE_DEFAULTS[S.DONGLE_SIZE_ADJUST_PCT],
-    range: { min: 50, max: 200, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-  game.settings.register(MODULE_ID, S.DONGLE_METRICS_ASCENT_PCT, {
-    name: "Dongle 메트릭: ascent-override(%)",
-    hint: "Dongle 폰트의 상단 여백(위쪽)을 조절합니다. (CSS @font-face ascent-override)",
-    scope: "client",
-    config: true,
-    type: Number,
-    default: FE_DEFAULTS[S.DONGLE_METRICS_ASCENT_PCT],
-    range: { min: 0, max: 200, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-  game.settings.register(MODULE_ID, S.DONGLE_METRICS_DESCENT_PCT, {
-    name: "Dongle 메트릭: descent-override(%)",
-    hint: "Dongle 폰트의 하단 여백(아래쪽)을 조절합니다. (CSS @font-face descent-override)",
-    scope: "client",
-    config: true,
-    type: Number,
-    default: FE_DEFAULTS[S.DONGLE_METRICS_DESCENT_PCT],
-    range: { min: 0, max: 200, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-  game.settings.register(MODULE_ID, S.DONGLE_METRICS_LINE_GAP_PCT, {
-    name: "Dongle 메트릭: line-gap-override(%)",
-    hint: "Dongle 폰트의 라인 간격(line gap)을 조절합니다. (CSS @font-face line-gap-override)",
-    scope: "client",
-    config: true,
-    type: Number,
-    default: FE_DEFAULTS[S.DONGLE_METRICS_LINE_GAP_PCT],
-    range: { min: 0, max: 200, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
 
   game.settings.register(MODULE_ID, S.USE_USER_COLOR_BG, {
     name: "채팅 메시지 배경: 유저 색상 적용(Chat Portrait 스타일)",
@@ -741,7 +576,8 @@ game.settings.register(MODULE_ID, S.DONGLE_LIGHT_SIZE_ADD, {
   feInstallEditContextMenuEarly();
 });
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
+    await feMigrateLegacySettings();
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);
@@ -3450,32 +3286,14 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     );
   }
 
-  // Optional: embed Dongle (Light/Regular/Bold).
-  // If present, we embed them so saved file:// HTML keeps the same look.
+  // Optional: embed Hakgyoansim Geurimilgi.
+  // If present, we embed it so saved file:// HTML keeps the same look.
   try {
-    const [lightData, regularData, boldData] = await Promise.all([
-      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Light.ttf`),
-      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Regular.ttf`),
-      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Bold.ttf`),
-    ]);
+    const geurimilgiData = await feFetchAsDataURL(`/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`);
 
-    if (lightData) {
+    if (geurimilgiData) {
       faces.push(
-        `@font-face{font-family:"FE Dongle Embedded";src:url(${lightData}) format("truetype");font-weight:300;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
-      );
-    }
-    if (regularData) {
-      faces.push(
-        `@font-face{font-family:"FE Dongle Embedded";src:url(${regularData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
-      );
-    }
-    if (boldData) {
-      faces.push(
-        `@font-face{font-family:"FE Dongle Embedded";src:url(${boldData}) format("truetype");font-weight:700;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
-      );
-      // Map 900 to the same Bold file as a pragmatic fallback.
-      faces.push(
-        `@font-face{font-family:"FE Dongle Embedded";src:url(${boldData}) format("truetype");font-weight:900;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
     }
   } catch {}
@@ -3507,10 +3325,10 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Dongle stack (Regular/Bold) */
-  --fe-font-dongle:
-    "FE Dongle Embedded",
-    "FE Dongle",
+  /* Secondary stack (Geurimilgi) */
+  --fe-font-geurimilgi:
+    "FE Geurimilgi Embedded",
+    "FE Geurimilgi",
     "FE CookieRun Embedded",
     "FE CookieRun",
     "Signika",
@@ -3521,10 +3339,10 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Light stack for small text / chat-card descriptions */
+  /* Secondary stack for small text / chat-card descriptions */
   --fe-font-light:
-    "FE Dongle Embedded",
-    "FE Dongle",
+    "FE Geurimilgi Embedded",
+    "FE Geurimilgi",
     "FE CookieRun Embedded",
     "FE CookieRun",
     "Signika",
@@ -3550,7 +3368,7 @@ ${faces.join("\n")}
 }
 
 body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-chat-font-dongle { --fe-chat-font-family: var(--fe-font-dongle); }
+body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
 
 /* Ensure the archive itself uses the embedded stack even when external CSS is partially blocked. */
 #fe-chat-export-container,

@@ -113,9 +113,9 @@ body:not(.fe-chatcard-custom-font) {
   text-shadow: none !important;
 }
 
-/* When “chat-card custom font” is enabled, use the Dongle stack for the description body.
+/* When “chat-card custom font” is enabled, use the Geurimilgi stack for the description body.
  * (Helps avoid CookieRun looking overly heavy in dense rules text.)
- * The exact Dongle face mapping is defined in styles/ui-font.css.
+ * The exact Geurimilgi face mapping is defined in styles/ui-font.css.
  */
 body.fe-chatcard-custom-font
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -129,9 +129,8 @@ body.fe-chatcard-custom-font
     .collapsible-content,
     .card-content
   ) {
-  font-family: var(--fe-font-light, inherit) !important;
-  /* Dongle Light can read smaller at equal px sizes; allow a global offset. */
-  font-size: calc(var(--fe-chat-card-font-size) + var(--fe-dongle-light-global-add, 0px)) !important;
+  font-family: var(--fe-font-secondary, inherit) !important;
+  font-size: var(--fe-chat-card-font-size) !important;
 }
 
 /* --------------------------------

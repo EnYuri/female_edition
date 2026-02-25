@@ -1,7 +1,7 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
  * v10 changes:
- *  - CookieRun only (Dongle excluded). Wider coverage via Foundry + dnd5e font vars.
+ *  - CookieRun + Geurimilgi stacks. Wider coverage via Foundry + dnd5e font vars.
  *  - Fix broken Font Awesome icons that are BUTTON/A/etc with .fa-* classes,
  *    including the specific selectors you provided (header-control, tokenbar, breaktime).
  *  - Keep symbol/emoji fallbacks so special characters never tofu.
@@ -15,46 +15,21 @@
  * 1) Font faces (CookieRun)
  * ------------------------------- */
 
-/* Dongle (user-provided)
- *  - Light: small UI/text helper (visually thinner)
- *  - Regular/Bold: optional chat font choice
+/* Hakgyoansim Geurimilgi (user-provided)
  *
- * Paths:
- *  - /modules/female_edition/font/Dongle-Light.ttf
- *  - /modules/female_edition/font/Dongle-Regular.ttf
- *  - /modules/female_edition/font/Dongle-Bold.ttf
+ * Per request we now use:
+ *  - Hakgyoansim Geurimilgi TTF R.ttf
+ *
+ * Path:
+ *  - /modules/female_edition/font/HakgyoansimGeurimilgi-R.ttf
  */
 @font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Light.ttf") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-  /* Keep the same coverage strategy as CookieRun: KR + basic Latin + Latin-1 */
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Regular.ttf") format("truetype");
+  font-family: "FE Geurimilgi";
+  src: url("/modules/female_edition/font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-@font-face {
-  font-family: "FE Dongle";
-  src: url("/modules/female_edition/font/Dongle-Bold.ttf") format("truetype");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
+  /* Keep the same coverage strategy as CookieRun: KR + basic Latin + Latin-1 */
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 
@@ -102,7 +77,7 @@
     "Apple Color Emoji",
     "Noto Color Emoji";
 
-  /* Primary stack */
+  /* Primary stack (CookieRun) */
   --fe-font-primary:
     "FE CookieRun",
     "Signika",
@@ -113,18 +88,11 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /*
-   * Dongle family names
-   *
-   * Base face is "FE Dongle" (declared above).
-   * The module may switch these at runtime to a dynamically generated family
-   * that includes size-adjust / font-metrics overrides.
-   */
-  --fe-dongle-face: "FE Dongle";
+  /* Secondary stack (Hakgyoansim Geurimilgi) */
+  --fe-geurimilgi-face: "FE Geurimilgi";
 
-  /* Dongle stack (Regular/Bold) */
-  --fe-font-dongle:
-    var(--fe-dongle-face),
+  --fe-font-geurimilgi:
+    var(--fe-geurimilgi-face),
     "FE CookieRun",
     "Signika",
     system-ui,
@@ -134,35 +102,15 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Light stack (for small text / chat-card descriptions)
-   * Prefer Dongle Light to keep small text from becoming overly bold.
-   */
-  --fe-font-light:
-    var(--fe-dongle-face),
-    "FE CookieRun",
-    "Signika",
-    system-ui,
-    -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
-    sans-serif,
-    var(--fe-symbol-fallback);
+  /* Convenience alias for small/body text */
+  --fe-font-secondary: var(--fe-font-geurimilgi);
 
   /* Chat font choice (default: CookieRun). Controlled via body class. */
   --fe-chat-font-family: var(--fe-font-primary);
 
-  /* UI/능력치 라벨 글꼴(옵션으로 Dongle 전환) */
+  /* UI/능력치 라벨 글꼴(옵션으로 보조 글꼴 전환) */
   --fe-ui-font-family: var(--fe-font-primary);
   --fe-dnd5e-label-font-family: var(--fe-font-primary);
-
-  /* Global size offset for Dongle Light usage (px). Controlled via module setting. */
-  --fe-dongle-light-global-add: 0px;
-
-  /* Global size offset for Dongle (Regular/Bold) usage (px). Controlled via module setting. */
-  --fe-dongle-global-add: 0px;
-
-  /* Combined offset for light text (Dongle global + Dongle Light). */
-  --fe-dongle-light-total-add: calc(var(--fe-dongle-global-add) + var(--fe-dongle-light-global-add));
 
   /* Foundry global vars */
   --font-primary: var(--fe-font-primary);
@@ -179,24 +127,14 @@
   --fe-chat-title-size: 22px;     /* actor name */
   --fe-chat-subtitle-size: 14px;  /* player name */
 
-  /* Weight guidance
-   * CookieRun can look heavy when combined with readability boosts.
-   * Use lighter defaults for small UI text and chat-card descriptions.
-   */
+  /* Weight guidance */
   --fe-font-weight-title: 700;
   --fe-font-weight-body: 400;
-  --fe-font-weight-small: 300;
+  --fe-font-weight-small: 400;
 
-  /* Back-compat aliases (older CSS in this module used per-area bumps).
-   * Now unified under a single global setting.
-   */
-  --fe-light-font-meta-bump: var(--fe-dongle-light-total-add); /* timestamps / metadata */
-  --fe-light-font-card-bump: var(--fe-dongle-light-total-add); /* chat-card description body */
-
-  /* Tidy5e: keep sizes stable. (Earlier builds bumped list text, which caused
-   * some lists to become too large compared to tab/menu labels.)
-   */
-  --fe-tidy-light-font-bump: var(--fe-dongle-light-total-add);
+  /* Inline layout helpers for small chips/buttons (prevents glyph clipping) */
+  --fe-inline-leading: 2px;
+  --fe-inline-pad-y: 1px;
 
   /* Chat header meta/icon sizing
    * (Avoid inheriting huge font sizes from chat portrait / system styles.)
@@ -206,15 +144,15 @@
   --fe-chat-header-icon-hit: 18px;
   --fe-chat-meta-gap: 1px;
 
-  /* Default: keep synthesis OFF to preserve crisp rendering at small sizes.
-   * We'll selectively allow synthetic italic only on <em> tags (Markdown).
+  /* Allow synthetic bold when the chosen font has no real bold face.
+   * We'll still selectively allow italic only on <em> tags (Markdown).
    */
-  font-synthesis: none;
+  font-synthesis: weight;
 }
 
 /* Chat font selection (module setting) */
 body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-chat-font-dongle { --fe-chat-font-family: var(--fe-font-dongle); }
+body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
 
 /* dnd5e may override its font variables inside .dnd5e/.dnd5e2 scopes.
  * Re-assert them with !important so the sheet remains consistent.
@@ -226,23 +164,10 @@ body.fe-chat-font-dongle { --fe-chat-font-family: var(--fe-font-dongle); }
   --dnd5e-font-modesto: var(--fe-font-primary) !important;
 }
 
-
-/* UI/능력치 라벨: 쿠키런 대신 Dongle 사용(옵션) */
-body.fe-ui-font-dongle {
-  --fe-ui-font-family: var(--fe-font-dongle);
-  --fe-dnd5e-label-font-family: var(--fe-font-dongle);
-}
-
-
-/* When using Dongle for chat, allow a global size bump to compensate Dongle's small metrics */
-body.fe-chat-font-dongle :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message .message-content {
-  font-size: calc(var(--fe-chat-message-font-size) + var(--fe-dongle-global-add));
-}
-body.fe-chat-font-dongle #sidebar #chat :is(.chat-message .message-sender .name-stacked .title, .chat-message .message-sender .title) {
-  font-size: calc(var(--fe-chat-title-size) + var(--fe-dongle-global-add)) !important;
-}
-body.fe-chat-font-dongle #sidebar #chat :is(.chat-message .message-sender .name-stacked .subtitle, .chat-message .message-sender .subtitle) {
-  font-size: calc(var(--fe-chat-subtitle-size) + var(--fe-dongle-global-add)) !important;
+/* UI/능력치 라벨: 쿠키런 대신 그림일기 사용(옵션) */
+body.fe-ui-font-geurimilgi {
+  --fe-ui-font-family: var(--fe-font-geurimilgi);
+  --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
 }
 
 /* -------------------------------
@@ -261,7 +186,7 @@ html, body,
 .dnd5e2.application,
 .dnd5e2.app {
   font-family: var(--fe-ui-font-family) !important;
-  font-synthesis: none;
+  font-synthesis: weight;
   /* NOTE: optimizeLegibility can look rough on Windows/Electron at small sizes.
    * Keep the browser default rasterization.
    */
@@ -288,7 +213,7 @@ html, body,
 }
 
 
-/* Option: ability/abilities labels use Dongle instead of CookieRun */
+/* Option: ability/abilities labels use Geurimilgi instead of CookieRun */
 :is(.dnd5e, .dnd5e2) .sheet.actor :is(
   .ability-scores,
   .ability-scores :is(.label, label, .title, .name),
@@ -306,17 +231,16 @@ html, body,
     .abilities :is(.score, .value, .mod, .bonus),
     .attributes :is(.score, .value, .mod, .bonus)
   ) {
-  font-family: var(--fe-font-light) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: var(--fe-font-weight-small) !important;
-  /* Optional global size tuning for Dongle Light (module setting). */
-  font-size: calc(1em + var(--fe-tidy-light-font-bump)) !important;
+  font-size: 1em !important;
 }
 
 /* -------------------------------
  * 3b) Tidy 5e Sheets (kgar / sdenec)
  * -------------------------------
  * Some Tidy sheet layouts set their own font-family in nested regions.
- * Apply a simple “big = CookieRun, small/list = Dongle(light)” split.
+ * Apply a simple “big = CookieRun, small/list = Geurimilgi” split.
  */
 
 /* If Tidy exposes font-family variables, override them first for broad coverage.
@@ -324,11 +248,11 @@ html, body,
  */
 :is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
   --t5e-title-font-family: var(--fe-font-primary) !important;
-  --t5e-body-font-family: var(--fe-font-dongle) !important;
+  --t5e-body-font-family: var(--fe-font-secondary) !important;
   --t5e-font-family-title: var(--fe-font-primary) !important;
-  --t5e-font-family-body: var(--fe-font-dongle) !important;
+  --t5e-font-family-body: var(--fe-font-secondary) !important;
   --t5e-primary-font-family: var(--fe-font-primary) !important;
-  --t5e-secondary-font-family: var(--fe-font-dongle) !important;
+  --t5e-secondary-font-family: var(--fe-font-secondary) !important;
 }
 
 /* Large headings / labels (actor name, ability labels, tab titles) */
@@ -368,13 +292,12 @@ html, body,
     .traits,
     .proficiencies
   ) {
-  font-family: var(--fe-font-light) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: var(--fe-font-weight-small) !important;
-  /* Apply the global Dongle Light size offset inside Tidy too. */
-  font-size: calc(1em + var(--fe-dongle-light-total-add)) !important;
+  font-size: 1em !important;
 }
 
-/* Ensure nested text nodes inside those lists inherit Dongle, while icons keep FA. */
+/* Ensure nested text nodes inside those lists inherit Geurimilgi, while icons keep FA. */
 :is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .skills,
@@ -396,7 +319,7 @@ html, body,
 }
 
 /* -------------------------------
- * 3c) Tidy5e (classic) — user-requested bold Dongle targets
+ * 3c) Tidy5e (classic) — user-requested bold Geurimilgi targets
  * -------------------------------
  * - .tidy5e-sheet.application:where(.classic) .block-score>
  * - .sheet.application:where(.classic):where(.actor) .level
@@ -406,22 +329,22 @@ html, body,
 
 /* Ability score blocks (numbers/labels inside the block) */
 .tidy5e-sheet.application:where(.classic) :is(.block-score, .block-score > *) {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
 /* Actor level indicator in classic actor sheets */
 :is(.sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
 /*
- * HP/resources/xp/movement — force Bold Dongle for numeric overlays and key trackers.
+ * HP/resources/xp/movement — force Bold Geurimilgi for numeric overlays and key trackers.
  * (Selectors vary by Tidy5e version; include a few best-effort aliases.)
  */
 :is(.tidy5e-sheet, .sheet).application:where(.classic)
@@ -433,47 +356,47 @@ html, body,
     .no-gap,
     .actor-movement
   ) {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
 
 
-/* Tidy info-card description (classic): force Dongle Regular */
+/* Tidy info-card description (classic): force Geurimilgi Regular */
 .tidy5e-sheet.application:where(.classic) .tidy-info-card .info-card-description {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 400 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
-/* Additional Dongle targets requested */
+/* Additional Geurimilgi targets requested */
 .origin-points,
 .profile-temp {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 400 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
 span.flex-row.align-items-center.extra-small-gap {
-  font-family: var(--fe-font-dongle) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
-/* Prevent Dongle glyphs from visually overflowing in tight pills/buttons */
+/* Prevent Geurimilgi glyphs from visually overflowing in tight pills/buttons */
 :is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge, .chip) {
-  line-height: calc(1em + var(--fe-dongle-inline-leading, 2px)) !important;
-  padding-block: var(--fe-dongle-inline-pad-y, 1px) !important;
+  line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
+  padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
 
 :is(.dnd5e2, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
-  line-height: calc(1em + var(--fe-dongle-inline-leading, 2px)) !important;
-  padding-block: var(--fe-dongle-inline-pad-y, 1px) !important;
+  line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
+  padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
 /* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
  * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
@@ -481,9 +404,9 @@ span.flex-row.align-items-center.extra-small-gap {
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
   .message-metadata {
-  font-family: var(--fe-font-light) !important;
+  font-family: var(--fe-font-secondary) !important;
   font-weight: var(--fe-font-weight-small) !important;
-  font-size: calc(var(--fe-chat-meta-size) + var(--fe-dongle-light-total-add)) !important;
+  font-size: var(--fe-chat-meta-size) !important;
   line-height: 1 !important;
 
   display: inline-flex !important;
@@ -496,8 +419,8 @@ span.flex-row.align-items-center.extra-small-gap {
   .message-metadata
   :is(.message-timestamp, time) {
   order: 0;
-  font-family: var(--fe-font-light) !important;
-  font-size: calc(var(--fe-chat-meta-size) + var(--fe-dongle-light-total-add)) !important;
+  font-family: var(--fe-font-secondary) !important;
+  font-size: var(--fe-chat-meta-size) !important;
   font-weight: var(--fe-font-weight-small) !important;
 }
 
@@ -573,7 +496,7 @@ span.flex-row.align-items-center.extra-small-gap {
 }
 
 /* Markdown italic visibility
- * CookieRun/Dongle do not ship dedicated italic faces.
+ * CookieRun/Geurimilgi do not ship dedicated italic faces.
  * Keep global synthesis OFF (crisper), but allow synthetic italic ONLY for <em>.
  */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -608,7 +531,12 @@ code, pre, .monospace {
 
 /* ve-night-mode heading contrast fix (white backgrounds) */
 .ve-night-mode .rd__h--3 {
-  color: #111 !important;
+  /* Do not force a specific color; inherit from theme.
+   * Also neutralize any module/base color rules.
+   */
+  color: inherit !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
 }
 /* -------------------------------
  * 4) Font Awesome icon fix (GLOBAL, covers button/a/div with fa-* classes)

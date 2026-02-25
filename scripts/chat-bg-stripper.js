@@ -363,8 +363,8 @@ function extractHTMLElement(html) {
 Hooks.once("init", () => {
   // 1) Font toggle (ui-font.css)
   game.settings.register(MODULE_ID, SETTINGS.ENABLE_FONTS, {
-    name: "커스텀 폰트 적용 (쿠키런/동글)",
-    hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + Dongle 폰트 및 관련 옵션(채팅 글꼴 선택, Dongle 크기 보정 등)이 동작합니다.",
+    name: "커스텀 폰트 적용 (쿠키런/그림일기)",
+    hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + 그림일기 폰트 및 관련 옵션(채팅 글꼴 선택 등)이 동작합니다.",
     scope: "client",
     config: true,
     type: Boolean,
