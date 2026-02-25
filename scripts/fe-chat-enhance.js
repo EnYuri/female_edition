@@ -14,6 +14,11 @@
 
 const MODULE_ID = "female_edition";
 
+// Style tag ids used for runtime CSS injection.
+const FE_STYLE_TAG_IDS = {
+  DONGLE_METRICS: "fe-dongle-metrics",
+};
+
 const S = {
   // Merge
   MERGE_ENABLED: "ceMergeEnabled",
@@ -42,6 +47,7 @@ const S = {
   // Dongle font-metrics overrides (CSS @font-face)
   // NOTE: These cannot be expressed via CSS variables; we inject a <style>
   // block at runtime so users can tune the values.
+  DONGLE_METRICS_ENABLED: "ceDongleMetricsEnabled", // enable runtime @font-face metric overrides
   DONGLE_SIZE_ADJUST_PCT: "ceDongleSizeAdjustPct", // @font-face size-adjust (%)
   DONGLE_METRICS_ASCENT_PCT: "ceDongleMetricsAscentPct", // ascent-override (%)
   DONGLE_METRICS_DESCENT_PCT: "ceDongleMetricsDescentPct", // descent-override (%)
@@ -88,9 +94,10 @@ const FE_DEFAULTS = {
   // Typography
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
-  [S.DONGLE_SIZE_ADJUST_PCT]: 115,
-  [S.DONGLE_METRICS_ASCENT_PCT]: 74,
-  [S.DONGLE_METRICS_DESCENT_PCT]: 46,
+  [S.DONGLE_METRICS_ENABLED]: true,
+  [S.DONGLE_SIZE_ADJUST_PCT]: 160,
+  [S.DONGLE_METRICS_ASCENT_PCT]: 40,
+  [S.DONGLE_METRICS_DESCENT_PCT]: 60,
   [S.DONGLE_METRICS_LINE_GAP_PCT]: 0,
   [S.DONGLE_LIGHT_SIZE_ADD]: 0,
   [S.DONGLE_SIZE_ADD]: 0,
@@ -119,6 +126,40 @@ function feSetting(key) {
   } catch {
     return FE_DEFAULTS[key];
   }
+}
+
+/** Clamp a value to an integer range. */
+function feClampInt(value, min, max) {
+  const n = Math.trunc(Number(value));
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Stable small hash for cache-busting family names.
+ * FNV-1a 32-bit -> hex.
+ */
+function feStableHash(str) {
+  let h = 0x811c9dc5;
+  const s = String(str);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    // FNV prime 16777619
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+/** Create or update a <style> tag by id. */
+function feEnsureStyleTag(id, cssText, doc = document) {
+  let el = doc.getElementById(id);
+  if (!el) {
+    el = doc.createElement("style");
+    el.id = id;
+    doc.head?.appendChild(el);
+  }
+  el.textContent = String(cssText ?? "");
+  return el;
 }
 
 function feGetTextEditor() {
@@ -196,63 +237,52 @@ function feSetUserColorBgBaseClass(doc = document) {
  *    perceived line box matches CookieRun more closely.
  */
 function feApplyDongleFontMetricOverrides(doc = document) {
-  try {
-    if (!doc?.head || !doc.documentElement) return;
+  // Note: @font-face descriptors (size-adjust / ascent-override / descent-override / line-gap-override)
+  // cannot reference CSS variables. To make the settings reactive, we generate a *new* family name
+  // whenever the settings change.
 
-    const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
-    const num = (v, fallback) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
-    };
+  const enabled = Boolean(feSetting(S.DONGLE_METRICS_ENABLED));
+  if (!enabled) {
+    // Restore to the static family.
+    doc.documentElement.style.setProperty("--fe-dongle-face", '"FE Dongle"');
+    // Back-compat: keep the legacy var in sync (even though we no longer use a separate family).
+    doc.documentElement.style.setProperty("--fe-dongle-light-face", '"FE Dongle"');
+    feEnsureStyleTag(FE_STYLE_TAG_IDS.DONGLE_METRICS, "", doc);
+    return;
+  }
 
-    const sizeAdjust = clamp(
-      num(feSetting(S.DONGLE_SIZE_ADJUST_PCT), FE_DEFAULTS[S.DONGLE_SIZE_ADJUST_PCT]),
-      50,
-      200
-    );
-    const ascent = clamp(
-      num(feSetting(S.DONGLE_METRICS_ASCENT_PCT), FE_DEFAULTS[S.DONGLE_METRICS_ASCENT_PCT]),
-      0,
-      200
-    );
-    const descent = clamp(
-      num(feSetting(S.DONGLE_METRICS_DESCENT_PCT), FE_DEFAULTS[S.DONGLE_METRICS_DESCENT_PCT]),
-      0,
-      200
-    );
-    const lineGap = clamp(
-      num(feSetting(S.DONGLE_METRICS_LINE_GAP_PCT), FE_DEFAULTS[S.DONGLE_METRICS_LINE_GAP_PCT]),
-      0,
-      200
-    );
+  const sizeAdjust = feClampInt(feSetting(S.DONGLE_SIZE_ADJUST_PCT), 50, 300);
+  const ascent = feClampInt(feSetting(S.DONGLE_METRICS_ASCENT_PCT), 0, 150);
+  const descent = feClampInt(feSetting(S.DONGLE_METRICS_DESCENT_PCT), 0, 150);
+  const lineGap = feClampInt(feSetting(S.DONGLE_METRICS_LINE_GAP_PCT), 0, 150);
 
-    // Changing @font-face descriptors doesn't reliably refresh metrics once the
-    // font is loaded; use a signature in the family name to force re-resolve.
-    const sig = `${Math.round(sizeAdjust)}_${Math.round(ascent)}_${Math.round(descent)}_${Math.round(lineGap)}`;
-    const famDongle = `FE Dongle ${sig}`;
-    const famLight = `FE Dongle Light ${sig}`;
+  // Family signature so different settings cannot collide in the font cache.
+  const sig = feStableHash(`${sizeAdjust}|${ascent}|${descent}|${lineGap}`).slice(0, 8);
+  const famDongle = `FE Dongle ${sig}`;
 
-    // Update CSS variables that ui-font.css uses in the font stacks.
-    doc.documentElement.style.setProperty("--fe-dongle-face", JSON.stringify(famDongle));
-    doc.documentElement.style.setProperty("--fe-dongle-light-face", JSON.stringify(famLight));
+  const urlLight = "/modules/female_edition/font/Dongle-Light.ttf";
+  const urlRegular = "/modules/female_edition/font/Dongle-Regular.ttf";
+  const urlBold = "/modules/female_edition/font/Dongle-Bold.ttf";
 
-    const styleId = "fe-dongle-metric-overrides";
-    let styleEl = doc.getElementById(styleId);
-    if (!styleEl) {
-      styleEl = doc.createElement("style");
-      styleEl.id = styleId;
-      doc.head.appendChild(styleEl);
-    }
+  const unicodeRange =
+    "U+0020-007E, U+00A0-00FF, U+0100-017F, U+2000-206F, U+20A0-20CF, U+2190-21FF, U+25A0-25FF, U+2E00-2E7F, U+3000-303F, U+3130-318F, U+AC00-D7A3";
 
-    // Keep coverage consistent with the base faces in ui-font.css.
-    const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
-    const base = `/modules/${MODULE_ID}/font`;
-
-    styleEl.textContent = `
-/* Auto-generated by ${MODULE_ID} */
+  const metricCSS = `
 @font-face {
-  font-family: "${famLight}";
-  src: url("${base}/Dongle-Light.ttf") format("truetype");
+  font-family: "${famDongle}";
+  src: url("${urlLight}") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: ${unicodeRange};
+  size-adjust: ${sizeAdjust}%;
+  ascent-override: ${ascent}%;
+  descent-override: ${descent}%;
+  line-gap-override: ${lineGap}%;
+}
+@font-face {
+  font-family: "${famDongle}";
+  src: url("${urlRegular}") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -264,19 +294,7 @@ function feApplyDongleFontMetricOverrides(doc = document) {
 }
 @font-face {
   font-family: "${famDongle}";
-  src: url("${base}/Dongle-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: ${unicodeRange};
-  size-adjust: ${sizeAdjust}%;
-  ascent-override: ${ascent}%;
-  descent-override: ${descent}%;
-  line-gap-override: ${lineGap}%;
-}
-@font-face {
-  font-family: "${famDongle}";
-  src: url("${base}/Dongle-Bold.ttf") format("truetype");
+  src: url("${urlBold}") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -286,10 +304,26 @@ function feApplyDongleFontMetricOverrides(doc = document) {
   descent-override: ${descent}%;
   line-gap-override: ${lineGap}%;
 }
+@font-face {
+  font-family: "${famDongle}";
+  src: url("${urlBold}") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: ${unicodeRange};
+  size-adjust: ${sizeAdjust}%;
+  ascent-override: ${ascent}%;
+  descent-override: ${descent}%;
+  line-gap-override: ${lineGap}%;
+}
 `;
-  } catch (err) {
-    console.warn(`${MODULE_ID} | failed to apply Dongle metric overrides`, err);
-  }
+
+  feEnsureStyleTag(FE_STYLE_TAG_IDS.DONGLE_METRICS, metricCSS, doc);
+
+  // Route all Dongle usages through the generated family.
+  doc.documentElement.style.setProperty("--fe-dongle-face", JSON.stringify(famDongle));
+  // Back-compat: keep the legacy var in sync (we no longer use a separate family).
+  doc.documentElement.style.setProperty("--fe-dongle-light-face", JSON.stringify(famDongle));
 }
 
 function feApplyStyleVarsFromSettings(doc = document) {
@@ -586,6 +620,17 @@ game.settings.register(MODULE_ID, S.DONGLE_LIGHT_SIZE_ADD, {
     type: Number,
     default: 0,
     range: { min: -4, max: 8, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.DONGLE_METRICS_ENABLED, {
+    name: "Dongle 메트릭/스케일 오버라이드 사용",
+    hint:
+      "Dongle 폰트에 size-adjust/ascent/descent/line-gap 오버라이드를 적용합니다. 일부 환경에서 문제가 생기면 끄세요.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: FE_DEFAULTS[S.DONGLE_METRICS_ENABLED],
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
@@ -3405,23 +3450,21 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     );
   }
 
-  // Optional: embed Dongle (Regular/Bold).
-  // Many setups provide these files:
-  //   /modules/female_edition/font/Dongle-Regular.ttf  (used as "Light" helper too)
-  //   /modules/female_edition/font/Dongle-Bold.ttf
+  // Optional: embed Dongle (Light/Regular/Bold).
   // If present, we embed them so saved file:// HTML keeps the same look.
   try {
-    const [regularData, boldData] = await Promise.all([
+    const [lightData, regularData, boldData] = await Promise.all([
+      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Light.ttf`),
       feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Regular.ttf`),
       feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Bold.ttf`),
     ]);
 
-    if (regularData) {
-      // Light helper (same file as Regular, separate family for clarity)
+    if (lightData) {
       faces.push(
-        `@font-face{font-family:"FE Dongle Light Embedded";src:url(${regularData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+        `@font-face{font-family:"FE Dongle Embedded";src:url(${lightData}) format("truetype");font-weight:300;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
-      // Regular
+    }
+    if (regularData) {
       faces.push(
         `@font-face{font-family:"FE Dongle Embedded";src:url(${regularData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
@@ -3429,6 +3472,10 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     if (boldData) {
       faces.push(
         `@font-face{font-family:"FE Dongle Embedded";src:url(${boldData}) format("truetype");font-weight:700;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+      );
+      // Map 900 to the same Bold file as a pragmatic fallback.
+      faces.push(
+        `@font-face{font-family:"FE Dongle Embedded";src:url(${boldData}) format("truetype");font-weight:900;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
     }
   } catch {}
@@ -3476,8 +3523,8 @@ ${faces.join("\n")}
 
   /* Light stack for small text / chat-card descriptions */
   --fe-font-light:
-    "FE Dongle Light Embedded",
-    "FE Dongle Light",
+    "FE Dongle Embedded",
+    "FE Dongle",
     "FE CookieRun Embedded",
     "FE CookieRun",
     "Signika",

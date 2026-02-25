@@ -25,9 +25,9 @@
  *  - /modules/female_edition/font/Dongle-Bold.ttf
  */
 @font-face {
-  font-family: "FE Dongle Light";
+  font-family: "FE Dongle";
   src: url("/modules/female_edition/font/Dongle-Light.ttf") format("truetype");
-  font-weight: 400;
+  font-weight: 300;
   font-style: normal;
   font-display: swap;
   /* Keep the same coverage strategy as CookieRun: KR + basic Latin + Latin-1 */
@@ -49,6 +49,15 @@
   font-display: swap;
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
+@font-face {
+  font-family: "FE Dongle";
+  src: url("/modules/female_edition/font/Dongle-Bold.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
+}
+
 
 @font-face {
   font-family: "FE CookieRun";
@@ -107,12 +116,11 @@
   /*
    * Dongle family names
    *
-   * Base faces are "FE Dongle" / "FE Dongle Light" (declared above).
+   * Base face is "FE Dongle" (declared above).
    * The module may switch these at runtime to a dynamically generated family
    * that includes size-adjust / font-metrics overrides.
    */
   --fe-dongle-face: "FE Dongle";
-  --fe-dongle-light-face: "FE Dongle Light";
 
   /* Dongle stack (Regular/Bold) */
   --fe-font-dongle:
@@ -130,7 +138,7 @@
    * Prefer Dongle Light to keep small text from becoming overly bold.
    */
   --fe-font-light:
-    var(--fe-dongle-light-face),
+    var(--fe-dongle-face),
     "FE CookieRun",
     "Signika",
     system-ui,
@@ -177,7 +185,7 @@
    */
   --fe-font-weight-title: 700;
   --fe-font-weight-body: 400;
-  --fe-font-weight-small: 400;
+  --fe-font-weight-small: 300;
 
   /* Back-compat aliases (older CSS in this module used per-area bumps).
    * Now unified under a single global setting.
@@ -316,11 +324,11 @@ html, body,
  */
 :is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
   --t5e-title-font-family: var(--fe-font-primary) !important;
-  --t5e-body-font-family: var(--fe-font-light) !important;
+  --t5e-body-font-family: var(--fe-font-dongle) !important;
   --t5e-font-family-title: var(--fe-font-primary) !important;
-  --t5e-font-family-body: var(--fe-font-light) !important;
+  --t5e-font-family-body: var(--fe-font-dongle) !important;
   --t5e-primary-font-family: var(--fe-font-primary) !important;
-  --t5e-secondary-font-family: var(--fe-font-light) !important;
+  --t5e-secondary-font-family: var(--fe-font-dongle) !important;
 }
 
 /* Large headings / labels (actor name, ability labels, tab titles) */
@@ -400,12 +408,16 @@ html, body,
 .tidy5e-sheet.application:where(.classic) :is(.block-score, .block-score > *) {
   font-family: var(--fe-font-dongle) !important;
   font-weight: 700 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
 }
 
 /* Actor level indicator in classic actor sheets */
 :is(.sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
   font-family: var(--fe-font-dongle) !important;
   font-weight: 700 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
 }
 
 /*
@@ -423,8 +435,46 @@ html, body,
   ) {
   font-family: var(--fe-font-dongle) !important;
   font-weight: 700 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
 }
 
+
+
+/* Tidy info-card description (classic): force Dongle Regular */
+.tidy5e-sheet.application:where(.classic) .tidy-info-card .info-card-description {
+  font-family: var(--fe-font-dongle) !important;
+  font-weight: 400 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
+}
+
+/* Additional Dongle targets requested */
+.origin-points,
+.profile-temp {
+  font-family: var(--fe-font-dongle) !important;
+  font-weight: 400 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
+}
+
+span.flex-row.align-items-center.extra-small-gap {
+  font-family: var(--fe-font-dongle) !important;
+  font-weight: 700 !important;
+  font-size: calc(1em + var(--fe-dongle-global-add)) !important;
+  line-height: 1.1 !important;
+}
+
+/* Prevent Dongle glyphs from visually overflowing in tight pills/buttons */
+:is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge, .chip) {
+  line-height: calc(1em + var(--fe-dongle-inline-leading, 2px)) !important;
+  padding-block: var(--fe-dongle-inline-pad-y, 1px) !important;
+}
+
+:is(.dnd5e2, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
+  line-height: calc(1em + var(--fe-dongle-inline-leading, 2px)) !important;
+  padding-block: var(--fe-dongle-inline-pad-y, 1px) !important;
+}
 /* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
  * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
  */
@@ -554,6 +604,12 @@ code, pre, .monospace {
   font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace !important;
 }
 
+
+
+/* ve-night-mode heading contrast fix (white backgrounds) */
+.ve-night-mode .rd__h--3 {
+  color: #111 !important;
+}
 /* -------------------------------
  * 4) Font Awesome icon fix (GLOBAL, covers button/a/div with fa-* classes)
  * ------------------------------- */
