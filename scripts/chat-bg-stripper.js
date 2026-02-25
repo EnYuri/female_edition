@@ -187,6 +187,42 @@ function sanitizeElementBackground(el) {
 }
 
 /** If ::before/::after have textures, override them via CSS variables. */
+
+
+// Narrator messages must stay high-contrast and should not be washed out by the paper overlay.
+// However, parchment/texture layers must still be removed.
+function sanitizeNarratorBackground(el) {
+  if (!STATE.stripTextures) return false;
+  if (!(el instanceof Element)) return false;
+
+  // Force-remove all background-image layers (including theme pseudo textures).
+  // Narrator styling (dark/mono) is handled in CSS.
+  el.style.setProperty("background-image", "none", "important");
+  el.classList.add("fe-bg-sanitized");
+  return true;
+}
+
+function sanitizePseudoNone(el, varName) {
+  if (!STATE.stripTextures) return false;
+  if (!(el instanceof Element)) return false;
+  el.style.setProperty(varName, "none");
+  el.classList.add("fe-pseudo-sanitized");
+  return true;
+}
+
+function sanitizeNarratorRoot(root) {
+  if (!STATE.stripTextures) return;
+  if (!(root instanceof Element)) return;
+
+  sanitizeNarratorBackground(root);
+  root
+    .querySelectorAll(":scope .chat-card, :scope .midi-chat-card, :scope .message-content, :scope .message-header")
+    .forEach(sanitizeNarratorBackground);
+
+  // Pseudo layers (depends on theme/system)
+  sanitizePseudoNone(root, "--fe-before-bgimg");
+  sanitizePseudoNone(root, "--fe-after-bgimg");
+}
 function sanitizePseudo(el, pseudo, varName) {
   if (!STATE.stripTextures) return false;
   try {
@@ -227,7 +263,34 @@ function processMessageRoot(root) {
   if (!STATE.stripTextures) return;
   if (!(root instanceof Element)) return;
 
+
+  // Narrator Tools (/desc, /narrate, /note) messages:
+  // - Usually render as white text (theme-dependent)
+  // - Must NOT be washed out by our paper overlay or user-color tint
+  // - But parchment/texture layers MUST still be removed
+  try {
+    const isNarratorDom = root.classList.contains("narrator-chat");
+    let isNarratorFlag = false;
+
+    const rawId = root.dataset?.messageId || root.dataset?.documentId ||
+      root.getAttribute?.("data-message-id") || root.getAttribute?.("data-document-id");
+    const msgId = rawId ? String(rawId).split(".").pop() : null;
+
+    if (!isNarratorDom && msgId && game?.messages?.get) {
+      const msg = game.messages.get(msgId);
+      isNarratorFlag = !!msg?.getFlag?.("narrator-tools", "type") || !!msg?.flags?.["narrator-tools"];
+    }
+
+    if (isNarratorDom || isNarratorFlag) {
+      sanitizeNarratorRoot(root);
+      return;
+    }
+  } catch (_e) {
+    // ignore
+  }
+
   // Root message (common case)
+
   sanitizeElementBackground(root);
 
   // Nested containers where some modules apply textures
@@ -300,8 +363,8 @@ function extractHTMLElement(html) {
 Hooks.once("init", () => {
   // 1) Font toggle (ui-font.css)
   game.settings.register(MODULE_ID, SETTINGS.ENABLE_FONTS, {
-    name: "쿠키런 폰트 적용",
-    hint: "UI와 채팅에 CookieRun 폰트를 적용합니다. 끄면 Foundry 기본 폰트로 돌아갑니다.",
+    name: "커스텀 폰트 적용 (쿠키런/동글)",
+    hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + Dongle 폰트 및 관련 옵션(채팅 글꼴 선택, Dongle 크기 보정 등)이 동작합니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -364,6 +427,7 @@ Hooks.once("ready", () => {
     if (!STATE.stripTextures) return;
     const el = extractHTMLElement(html);
     if (!el) return;
+
     processMessageRoot(el);
     requestAnimationFrame(() => processMessageRoot(el));
   });

@@ -23,6 +23,12 @@
 
   /* dnd5e/midi chat-card description text size */
   --fe-chat-card-font-size: 12px;
+
+  /* Foundry chat layout: spacing between message cards inside chat-sidebar.
+   * Mirrors Foundry's own variable: chat-sidebar { --chat-message-spacing: 4px; }
+   * Controlled via module setting.
+   */
+  --fe-chat-message-spacing: 4px;
   /* NOTE:
    * Chat cards (item/spell/feature descriptions) often look too bold when using
    * CookieRun + the readability weight boost.
@@ -43,6 +49,15 @@
     rgb(var(--fe-paper-rgb) / var(--fe-paper-alpha)),
     rgb(var(--fe-paper-rgb) / var(--fe-paper-alpha))
   );
+
+  /* Optional: user-color background tint (Chat Portrait-like) */
+  --fe-user-color-alpha: 0.22;
+}
+
+/* Propagate the module-controlled spacing into Foundry's chat sidebar. */
+chat-sidebar,
+.chat-sidebar {
+  --chat-message-spacing: var(--fe-chat-message-spacing) !important;
 }
 
 /* When chat-card custom font is enabled, reduce the default “readability boost” weights. */
@@ -98,8 +113,9 @@ body:not(.fe-chatcard-custom-font) {
   text-shadow: none !important;
 }
 
-/* When “chat-card custom font” is enabled, use the lighter face for the description body.
- * Dongle-Regular.ttf is intentionally used as a visually thinner alternative.
+/* When “chat-card custom font” is enabled, use the Dongle stack for the description body.
+ * (Helps avoid CookieRun looking overly heavy in dense rules text.)
+ * The exact Dongle face mapping is defined in styles/ui-font.css.
  */
 body.fe-chatcard-custom-font
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -114,8 +130,48 @@ body.fe-chatcard-custom-font
     .card-content
   ) {
   font-family: var(--fe-font-light, inherit) !important;
-  /* Dongle is visually smaller than CookieRun at equal px sizes; compensate. */
-  font-size: calc(var(--fe-chat-card-font-size) + var(--fe-light-font-card-bump, 0px)) !important;
+  /* Dongle Light can read smaller at equal px sizes; allow a global offset. */
+  font-size: calc(var(--fe-chat-card-font-size) + var(--fe-dongle-light-global-add, 0px)) !important;
+}
+
+/* --------------------------------
+ * 1e) User color as chat background (Chat Portrait-like)
+ * --------------------------------
+ * When enabled, each message gets a per-message CSS var (--fe-user-color-rgb: "r g b").
+ */
+body.fe-msg-bg-usercolor
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color {
+  background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
+  background-blend-mode: screen !important;
+}
+
+/* Optional: opaque base layer under the user-color tint (readability)
+ * - Keeps the page/map/background from bleeding through.
+ * - Implemented with an inset box-shadow so we don't fight with background-image
+ *   layers used by Foundry/themes (and our texture-stripper).
+ */
+body.fe-msg-bg-usercolor.fe-userbg-base-white
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color {
+  --fe-user-bg-base-rgb: 255 255 255;
+}
+
+body.fe-msg-bg-usercolor.fe-userbg-base-black
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color {
+  --fe-user-bg-base-rgb: 0 0 0;
+}
+
+body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color {
+  /* Solid base */
+  background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
+  /* Tint overlay */
+  box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
+  /* In this mode we don't rely on screen blending. */
+  background-blend-mode: normal !important;
 }
 
 /* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) */

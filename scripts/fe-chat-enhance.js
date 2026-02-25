@@ -35,6 +35,20 @@ const S = {
 
   // Typography
   CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
+  CHAT_FONT_CHOICE: "ceChatFontChoice", // cookie | dongle
+  DONGLE_LIGHT_SIZE_ADD: "ceDongleLightSizeAdd", // px offset for Dongle Light usage
+  DONGLE_SIZE_ADD: "ceDongleSizeAdd", // px offset for Dongle (regular/bold) usage
+
+  // Dongle font-metrics overrides (CSS @font-face)
+  // NOTE: These cannot be expressed via CSS variables; we inject a <style>
+  // block at runtime so users can tune the values.
+  DONGLE_SIZE_ADJUST_PCT: "ceDongleSizeAdjustPct", // @font-face size-adjust (%)
+  DONGLE_METRICS_ASCENT_PCT: "ceDongleMetricsAscentPct", // ascent-override (%)
+  DONGLE_METRICS_DESCENT_PCT: "ceDongleMetricsDescentPct", // descent-override (%)
+  DONGLE_METRICS_LINE_GAP_PCT: "ceDongleMetricsLineGapPct", // line-gap-override (%)
+  UI_USE_DONGLE: "ceUiUseDongle", // use Dongle for UI + ability labels instead of CookieRun
+  USE_USER_COLOR_BG: "ceUseUserColorBg", // Chat Portrait-like message background tint
+  USER_COLOR_BG_BASE: "ceUserColorBgBase", // none | white | black (opaque underlay)
 
   // Style (tunable CSS vars)
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
@@ -42,6 +56,7 @@ const S = {
   STYLE_MESSAGE_TEXT_SIZE: "ceMessageTextSize",
   STYLE_CHATCARD_TEXT_SIZE: "ceChatCardTextSize",
   STYLE_BG_SATURATION: "ceMessageBgSaturation",
+  STYLE_CHAT_MESSAGE_SPACING: "ceChatMessageSpacing",
 
   // Markdown
   MARKDOWN_ENABLED: "ceMarkdownEnabled",
@@ -72,6 +87,16 @@ const FE_DEFAULTS = {
 
   // Typography
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
+  [S.CHAT_FONT_CHOICE]: "cookie",
+  [S.DONGLE_SIZE_ADJUST_PCT]: 115,
+  [S.DONGLE_METRICS_ASCENT_PCT]: 74,
+  [S.DONGLE_METRICS_DESCENT_PCT]: 46,
+  [S.DONGLE_METRICS_LINE_GAP_PCT]: 0,
+  [S.DONGLE_LIGHT_SIZE_ADD]: 0,
+  [S.DONGLE_SIZE_ADD]: 0,
+  [S.UI_USE_DONGLE]: false,
+  [S.USE_USER_COLOR_BG]: false,
+  [S.USER_COLOR_BG_BASE]: "white",
 
   // Style
   [S.STYLE_ACTOR_NAME_SIZE]: 22,
@@ -79,6 +104,7 @@ const FE_DEFAULTS = {
   [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
   [S.STYLE_CHATCARD_TEXT_SIZE]: 12,
   [S.STYLE_BG_SATURATION]: 0.42,
+  [S.STYLE_CHAT_MESSAGE_SPACING]: 4,
 
   // Markdown
   [S.MARKDOWN_ENABLED]: true,
@@ -117,8 +143,160 @@ function feSetChatCardFontClass(doc = document) {
   } catch {}
 }
 
+function feSetChatFontChoiceClass(doc = document) {
+  try {
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    const body = doc?.body;
+    if (!body) return;
+    body.classList.toggle("fe-chat-font-dongle", choice === "dongle");
+    body.classList.toggle("fe-chat-font-cookie", choice !== "dongle");
+  } catch {}
+}
+
+
+function feSetUiFontClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.UI_USE_DONGLE);
+    doc?.body?.classList?.toggle("fe-ui-font-dongle", enabled);
+  } catch (_e) {
+    /* noop */
+  }
+}
+
+function feSetUserColorBgClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    doc?.body?.classList?.toggle("fe-msg-bg-usercolor", enabled);
+  } catch {}
+}
+
+function feSetUserColorBgBaseClass(doc = document) {
+  try {
+    const mode = String(feSetting(S.USER_COLOR_BG_BASE) ?? "white");
+    const body = doc?.body;
+    if (!body?.classList) return;
+
+    body.classList.toggle("fe-userbg-base-white", mode === "white");
+    body.classList.toggle("fe-userbg-base-black", mode === "black");
+    // If mode is "none", both classes are removed.
+    if (mode === "none") {
+      body.classList.remove("fe-userbg-base-white", "fe-userbg-base-black");
+    }
+  } catch {}
+}
+
+/**
+ * Inject a runtime @font-face block for Dongle that includes size-adjust and
+ * font-metrics overrides.
+ *
+ * Why:
+ *  - ascent/descent/line-gap overrides are @font-face descriptors and cannot
+ *    be parameterized with CSS variables.
+ *  - Users requested to tune Dongle's built-in vertical whitespace so its
+ *    perceived line box matches CookieRun more closely.
+ */
+function feApplyDongleFontMetricOverrides(doc = document) {
+  try {
+    if (!doc?.head || !doc.documentElement) return;
+
+    const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+    const num = (v, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    const sizeAdjust = clamp(
+      num(feSetting(S.DONGLE_SIZE_ADJUST_PCT), FE_DEFAULTS[S.DONGLE_SIZE_ADJUST_PCT]),
+      50,
+      200
+    );
+    const ascent = clamp(
+      num(feSetting(S.DONGLE_METRICS_ASCENT_PCT), FE_DEFAULTS[S.DONGLE_METRICS_ASCENT_PCT]),
+      0,
+      200
+    );
+    const descent = clamp(
+      num(feSetting(S.DONGLE_METRICS_DESCENT_PCT), FE_DEFAULTS[S.DONGLE_METRICS_DESCENT_PCT]),
+      0,
+      200
+    );
+    const lineGap = clamp(
+      num(feSetting(S.DONGLE_METRICS_LINE_GAP_PCT), FE_DEFAULTS[S.DONGLE_METRICS_LINE_GAP_PCT]),
+      0,
+      200
+    );
+
+    // Changing @font-face descriptors doesn't reliably refresh metrics once the
+    // font is loaded; use a signature in the family name to force re-resolve.
+    const sig = `${Math.round(sizeAdjust)}_${Math.round(ascent)}_${Math.round(descent)}_${Math.round(lineGap)}`;
+    const famDongle = `FE Dongle ${sig}`;
+    const famLight = `FE Dongle Light ${sig}`;
+
+    // Update CSS variables that ui-font.css uses in the font stacks.
+    doc.documentElement.style.setProperty("--fe-dongle-face", JSON.stringify(famDongle));
+    doc.documentElement.style.setProperty("--fe-dongle-light-face", JSON.stringify(famLight));
+
+    const styleId = "fe-dongle-metric-overrides";
+    let styleEl = doc.getElementById(styleId);
+    if (!styleEl) {
+      styleEl = doc.createElement("style");
+      styleEl.id = styleId;
+      doc.head.appendChild(styleEl);
+    }
+
+    // Keep coverage consistent with the base faces in ui-font.css.
+    const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
+    const base = `/modules/${MODULE_ID}/font`;
+
+    styleEl.textContent = `
+/* Auto-generated by ${MODULE_ID} */
+@font-face {
+  font-family: "${famLight}";
+  src: url("${base}/Dongle-Light.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: ${unicodeRange};
+  size-adjust: ${sizeAdjust}%;
+  ascent-override: ${ascent}%;
+  descent-override: ${descent}%;
+  line-gap-override: ${lineGap}%;
+}
+@font-face {
+  font-family: "${famDongle}";
+  src: url("${base}/Dongle-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: ${unicodeRange};
+  size-adjust: ${sizeAdjust}%;
+  ascent-override: ${ascent}%;
+  descent-override: ${descent}%;
+  line-gap-override: ${lineGap}%;
+}
+@font-face {
+  font-family: "${famDongle}";
+  src: url("${base}/Dongle-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: ${unicodeRange};
+  size-adjust: ${sizeAdjust}%;
+  ascent-override: ${ascent}%;
+  descent-override: ${descent}%;
+  line-gap-override: ${lineGap}%;
+}
+`;
+  } catch (err) {
+    console.warn(`${MODULE_ID} | failed to apply Dongle metric overrides`, err);
+  }
+}
+
 function feApplyStyleVarsFromSettings(doc = document) {
   try {
+    // Ensure Dongle metric overrides are present before font stacks resolve.
+    feApplyDongleFontMetricOverrides(doc);
+
     const root = doc?.documentElement;
     if (!root) return;
 
@@ -139,6 +317,13 @@ function feApplyStyleVarsFromSettings(doc = document) {
     // Chat text sizes
     root.style.setProperty("--fe-chat-message-font-size", px(feSetting(S.STYLE_MESSAGE_TEXT_SIZE), 14));
     root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), 12));
+
+    // Chat layout
+    root.style.setProperty("--fe-chat-message-spacing", px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 4));
+
+    // Dongle global size offsets
+    root.style.setProperty("--fe-dongle-global-add", px(feSetting(S.DONGLE_SIZE_ADD), 0));
+    root.style.setProperty("--fe-dongle-light-global-add", px(feSetting(S.DONGLE_LIGHT_SIZE_ADD), 0));
 
     // Message background saturation (paper overlay alpha)
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
@@ -335,14 +520,147 @@ Hooks.once("init", () => {
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
+  game.settings.register(MODULE_ID, S.STYLE_CHAT_MESSAGE_SPACING, {
+    name: "채팅: 메시지 카드 간격(px)",
+    hint: "Foundry 기본 변수 chat-sidebar { --chat-message-spacing } 값을 덮어씁니다. 메시지 카드 사이 간격을 조절합니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 4,
+    range: { min: 0, max: 24, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
   game.settings.register(MODULE_ID, S.CHATCARD_USE_CUSTOM_FONT, {
     name: "채팅 카드(설명) 커스텀 폰트 적용",
-    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun)를 적용합니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
+    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/Dongle)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
     scope: "client",
     config: true,
     type: Boolean,
     default: true,
     onChange: () => feSetChatCardFontClass(),
+  });
+
+  game.settings.register(MODULE_ID, S.CHAT_FONT_CHOICE, {
+    name: "채팅 글꼴 선택",
+    hint: "채팅 메시지 본문/헤더에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      cookie: "쿠키런",
+      dongle: "동글",
+    },
+    default: "cookie",
+    onChange: () => feSetChatFontChoiceClass(document),
+  });
+
+
+  game.settings.register(MODULE_ID, S.UI_USE_DONGLE, {
+    name: "UI/시트 기본 글꼴: Dongle 사용(쿠키런 대체)",
+    hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 Dongle로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => feSetUiFontClass(document),
+  });
+
+  
+  game.settings.register(MODULE_ID, S.DONGLE_SIZE_ADD, {
+    name: "Dongle 전역 글씨 크기 보정(px)",
+    hint: "Dongle(일반/굵게)로 표시되는 영역의 크기를 전역으로 보정합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. (0 = 보정 없음)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 0,
+    range: { min: -4, max: 8, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+game.settings.register(MODULE_ID, S.DONGLE_LIGHT_SIZE_ADD, {
+    name: "Dongle Light 전역 글씨 크기 보정(px)",
+    hint: "Dongle Light(작은 글자용)로 표시되는 영역의 크기를 전역으로 보정합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. (0 = 보정 없음)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 0,
+    range: { min: -4, max: 8, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  // Dongle font metrics / scaling (CSS @font-face)
+  game.settings.register(MODULE_ID, S.DONGLE_SIZE_ADJUST_PCT, {
+    name: "Dongle 폰트 스케일(size-adjust %)",
+    hint:
+      "Dongle 자체 글리프가 작게 느껴질 때, @font-face size-adjust로 시각적 크기를 스케일합니다. (0.3.29 기본값: 115%)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: FE_DEFAULTS[S.DONGLE_SIZE_ADJUST_PCT],
+    range: { min: 50, max: 200, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.DONGLE_METRICS_ASCENT_PCT, {
+    name: "Dongle 메트릭: ascent-override(%)",
+    hint: "Dongle 폰트의 상단 여백(위쪽)을 조절합니다. (CSS @font-face ascent-override)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: FE_DEFAULTS[S.DONGLE_METRICS_ASCENT_PCT],
+    range: { min: 0, max: 200, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.DONGLE_METRICS_DESCENT_PCT, {
+    name: "Dongle 메트릭: descent-override(%)",
+    hint: "Dongle 폰트의 하단 여백(아래쪽)을 조절합니다. (CSS @font-face descent-override)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: FE_DEFAULTS[S.DONGLE_METRICS_DESCENT_PCT],
+    range: { min: 0, max: 200, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.DONGLE_METRICS_LINE_GAP_PCT, {
+    name: "Dongle 메트릭: line-gap-override(%)",
+    hint: "Dongle 폰트의 라인 간격(line gap)을 조절합니다. (CSS @font-face line-gap-override)",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: FE_DEFAULTS[S.DONGLE_METRICS_LINE_GAP_PCT],
+    range: { min: 0, max: 200, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.USE_USER_COLOR_BG, {
+    name: "채팅 메시지 배경: 유저 색상 적용(Chat Portrait 스타일)",
+    hint: "각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => {
+      feSetUserColorBgClass(document);
+      feApplyUserColorBgToAllLogs(document);
+    },
+  });
+
+  game.settings.register(MODULE_ID, S.USER_COLOR_BG_BASE, {
+    name: "채팅 메시지 배경: 유저 색상 하부 배경(불투명)",
+    hint: "유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다. (유저 색상 배경이 켜져 있을 때만 의미가 있습니다)",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      white: "흰색(권장)",
+      black: "검정",
+      none: "사용 안 함(기존 방식)",
+    },
+    default: "white",
+    onChange: () => feSetUserColorBgBaseClass(document),
   });
 
   game.settings.register(MODULE_ID, S.STYLE_BG_SATURATION, {
@@ -382,8 +700,13 @@ Hooks.once("ready", () => {
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);
+  feSetChatFontChoiceClass(document);
+  feSetUiFontClass(document);
+  feSetUserColorBgClass(document);
+  feSetUserColorBgBaseClass(document);
   feObserveChatLogs();
   feApplyChatMergeToAllLogs();
+  feApplyUserColorBgToAllLogs(document);
   feInjectExportButtonsAll();
   feSetupTypingIndicator();
   feInstallMarkdownPreCreateHook();
@@ -1079,10 +1402,14 @@ function feInstallEditHandlers() {
   if (!feInstallEditHandlers._renderHookBound) {
     feInstallEditHandlers._renderHookBound = true;
     Hooks.on("renderChatMessageHTML", (message, html) => {
-      if (feSetting(S.EDIT_ENABLED) === false) return;
       try {
         // v13 hook provides an HTMLElement already.
         feRemoveMessageDeleteControl(html);
+
+        // Optional: Chat Portrait-like user color background tint
+        feApplyUserColorBgToMessageElement(message, html);
+
+        if (feSetting(S.EDIT_ENABLED) === false) return;
         feEnsureMessageEditControl(message, html);
       } catch (e) {
         console.warn(`${MODULE_ID} | failed to ensure edit control`, e);
@@ -1194,6 +1521,183 @@ function feEnsureEditControlsForExistingMessages() {
     }
   } catch (e) {
     console.warn(`[${MODULE_ID}] failed to backfill edit controls`, e);
+  }
+}
+
+// -------------------------------------
+// Chat Portrait-like: user color message backgrounds
+// -------------------------------------
+
+function feParseHexColorToRgb(hex) {
+  try {
+    const s = String(hex || "").trim();
+    if (!s) return null;
+    const m = s.startsWith("#") ? s.slice(1) : s;
+    if (m.length === 3) {
+      const r = parseInt(m[0] + m[0], 16);
+      const g = parseInt(m[1] + m[1], 16);
+      const b = parseInt(m[2] + m[2], 16);
+      if ([r, g, b].every((n) => Number.isFinite(n))) return { r, g, b };
+      return null;
+    }
+    // Accept #RRGGBB or #RRGGBBAA (ignore alpha)
+    if (m.length === 6 || m.length === 8) {
+      const r = parseInt(m.slice(0, 2), 16);
+      const g = parseInt(m.slice(2, 4), 16);
+      const b = parseInt(m.slice(4, 6), 16);
+      if ([r, g, b].every((n) => Number.isFinite(n))) return { r, g, b };
+      return null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function feGetSpeakerActorFromMessage(message) {
+  try {
+    const speaker = message?.speaker ?? message?.data?.speaker ?? null;
+    if (!speaker) return null;
+    if (typeof ChatMessage?.getSpeakerActor === "function") return ChatMessage.getSpeakerActor(speaker);
+    const actorId = speaker?.actor;
+    return actorId ? game.actors?.get?.(actorId) ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+function fePickActorOwnerUser(actor, preferredUser = null) {
+  try {
+    if (!actor || !game?.users) return null;
+    const users = Array.isArray(game.users) ? game.users : game.users.contents ?? [];
+
+    const canOwn = (u) => {
+      try {
+        if (typeof actor.testUserPermission === "function") return actor.testUserPermission(u, "OWNER");
+        const lvl = actor.ownership?.[u.id] ?? 0;
+        const ownerLvl = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+        return lvl >= ownerLvl;
+      } catch {
+        return false;
+      }
+    };
+
+    const owners = users.filter((u) => canOwn(u));
+    if (!owners.length) return null;
+
+    // If the message author is an owner, prefer them (most intuitive for multi-owner actors).
+    if (preferredUser?.id && owners.some((u) => u.id === preferredUser.id)) return preferredUser;
+
+    // Prefer active non-GM owners, then any non-GM owner, then any active owner.
+    return (
+      owners.find((u) => !u.isGM && u.active) ||
+      owners.find((u) => !u.isGM) ||
+      owners.find((u) => u.active) ||
+      owners[0] ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function feGetMessageUserColor(message) {
+  try {
+    // 1) Prefer the owning player's color (actor speaker)
+    const actor = feGetSpeakerActorFromMessage(message);
+    const owner = actor ? fePickActorOwnerUser(actor, message?.author ?? null) : null;
+    if (owner?.color) return String(owner.color);
+
+    // 2) Fallback to message author color
+    const author = message?.author ?? (message?.user ? game.users?.get?.(message.user) : null);
+    if (author?.color) return String(author.color);
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function feApplyUserColorBgToMessageElement(message, messageEl) {
+  try {
+    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const el0 = messageEl?.[0] ?? messageEl;
+    if (!el0?.classList || !el0?.style) return;
+
+    // Narrator Tools (/desc, /narrate, /note) messages should follow the UI theme,
+    // not the per-user background tint.
+    // Detect by DOM class (added by Narrator Tools) and by document flags.
+    const isNarratorTools =
+      el0.classList.contains("narrator-chat") ||
+      !!message?.getFlag?.("narrator-tools", "type") ||
+      !!message?.flags?.["narrator-tools"];
+    if (isNarratorTools) {
+      el0.classList.remove("fe-has-user-color");
+      el0.style.removeProperty("--fe-user-color-rgb");
+      return;
+    }
+
+    if (!enabled) {
+      el0.classList.remove("fe-has-user-color");
+      el0.style.removeProperty("--fe-user-color-rgb");
+      return;
+    }
+
+    const color = feGetMessageUserColor(message);
+    const rgb = feParseHexColorToRgb(color);
+    if (!rgb) {
+      el0.classList.remove("fe-has-user-color");
+      el0.style.removeProperty("--fe-user-color-rgb");
+      return;
+    }
+
+    el0.classList.add("fe-has-user-color");
+    el0.style.setProperty("--fe-user-color-rgb", `${rgb.r} ${rgb.g} ${rgb.b}`);
+  } catch {
+    /* noop */
+  }
+}
+
+function feApplyUserColorBgToAllLogs(doc = document) {
+  try {
+    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const root = doc?.querySelector?.("#chat-log, ol.chat-log, #fe-chat-export-log") ?? doc;
+    if (!root?.querySelectorAll) return;
+    const nodes = root.querySelectorAll("li.chat-message");
+
+    for (const li of nodes) {
+      if (!enabled) {
+        li.classList.remove("fe-has-user-color");
+        li.style?.removeProperty?.("--fe-user-color-rgb");
+        continue;
+      }
+      const msgId = feGetMessageIdFromElement(li);
+      if (!msgId) continue;
+      const msg = game?.messages?.get?.(msgId);
+      if (!msg) continue;
+      feApplyUserColorBgToMessageElement(msg, li);
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+function feApplyUserColorBgToLog(logEl, doc = document) {
+  try {
+    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    if (!enabled) return;
+    if (!logEl?.querySelectorAll) return;
+
+    const nodes = logEl.querySelectorAll("li.chat-message");
+    for (const li of nodes) {
+      const msgId = feGetMessageIdFromElement(li);
+      if (!msgId) continue;
+      const msg = game?.messages?.get?.(msgId);
+      if (!msg) continue;
+      feApplyUserColorBgToMessageElement(msg, li);
+    }
+  } catch {
+    /* noop */
   }
 }
 
@@ -1644,6 +2148,9 @@ async function feExportChatLogToPDFInline() {
       if (!(li instanceof HTMLElement)) continue;
 
       feNormalizeExportNode(li);
+
+      // Optional: apply per-message user color tint variables before serializing.
+      feApplyUserColorBgToMessageElement(msg, li);
       logEl.appendChild(li);
 
       // Yield occasionally to keep UI responsive.
@@ -2047,6 +2554,10 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feApplyStyleVarsFromSettings(win.document);
   // Apply chat-card font toggle class in the archive window too.
   feSetChatCardFontClass(win.document);
+  // Apply chat font choice + optional user-color background class.
+  feSetChatFontChoiceClass(win.document);
+  feSetUserColorBgClass(win.document);
+  feSetUserColorBgBaseClass(win.document);
 
   // Hook up controls.
   const logEl = win.document.getElementById("chat-log");
@@ -2894,16 +3405,30 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     );
   }
 
-  // Optional: embed Dongle-Regular.ttf as a “light-feel” helper face.
-  // This file is user-provided in many setups:
-  //   /modules/female_edition/font/Dongle-Regular.ttf
-  // If present, we embed it so saved file:// HTML keeps the same thinner look.
+  // Optional: embed Dongle (Regular/Bold).
+  // Many setups provide these files:
+  //   /modules/female_edition/font/Dongle-Regular.ttf  (used as "Light" helper too)
+  //   /modules/female_edition/font/Dongle-Bold.ttf
+  // If present, we embed them so saved file:// HTML keeps the same look.
   try {
-    const dongleUrl = `/modules/${MODULE_ID}/font/Dongle-Regular.ttf`;
-    const dongleData = await feFetchAsDataURL(dongleUrl);
-    if (dongleData) {
+    const [regularData, boldData] = await Promise.all([
+      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Regular.ttf`),
+      feFetchAsDataURL(`/modules/${MODULE_ID}/font/Dongle-Bold.ttf`),
+    ]);
+
+    if (regularData) {
+      // Light helper (same file as Regular, separate family for clarity)
       faces.push(
-        `@font-face{font-family:"FE Dongle Embedded";src:url(${dongleData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+        `@font-face{font-family:"FE Dongle Light Embedded";src:url(${regularData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+      );
+      // Regular
+      faces.push(
+        `@font-face{font-family:"FE Dongle Embedded";src:url(${regularData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+      );
+    }
+    if (boldData) {
+      faces.push(
+        `@font-face{font-family:"FE Dongle Embedded";src:url(${boldData}) format("truetype");font-weight:700;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
     }
   } catch {}
@@ -2935,10 +3460,24 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Light stack for small text / chat-card descriptions */
-  --fe-font-light:
+  /* Dongle stack (Regular/Bold) */
+  --fe-font-dongle:
     "FE Dongle Embedded",
     "FE Dongle",
+    "FE CookieRun Embedded",
+    "FE CookieRun",
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+
+  /* Light stack for small text / chat-card descriptions */
+  --fe-font-light:
+    "FE Dongle Light Embedded",
+    "FE Dongle Light",
     "FE CookieRun Embedded",
     "FE CookieRun",
     "Signika",
@@ -2958,7 +3497,13 @@ ${faces.join("\n")}
   --dnd5e-font-roboto-slab: var(--fe-font-primary);
   --dnd5e-font-signika: var(--fe-font-primary);
   --dnd5e-font-modesto: var(--fe-font-primary);
+
+  /* Chat font choice (default: CookieRun). Controlled via body class. */
+  --fe-chat-font-family: var(--fe-font-primary);
 }
+
+body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
+body.fe-chat-font-dongle { --fe-chat-font-family: var(--fe-font-dongle); }
 
 /* Ensure the archive itself uses the embedded stack even when external CSS is partially blocked. */
 #fe-chat-export-container,
@@ -2971,7 +3516,7 @@ ${faces.join("\n")}
   .midi-chat-card,
   .dnd5e2.chat-card
 ) {
-  font-family: var(--fe-font-primary) !important;
+  font-family: var(--fe-chat-font-family) !important;
 }
 `;
 }
@@ -3470,11 +4015,16 @@ function feBindChatLogObservers() {
       requestAnimationFrame(() => {
         obs._scheduled = false;
         feApplyChatMerge(log);
+        feApplyUserColorBgToLog(log, log?.ownerDocument ?? document);
       });
     });
 
     obs.observe(log, { childList: true, subtree: true });
     feChatLogObservers.set(log, obs);
+
+    // Ensure initial (already-rendered) messages get the same treatments.
+    feApplyChatMerge(log);
+    feApplyUserColorBgToLog(log, log?.ownerDocument ?? document);
   }
 }
 

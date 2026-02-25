@@ -259,6 +259,26 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   margin-bottom: 0;
 }
 
+/* --------------------------------
+ * Narrator Tools (/desc, /narrate, /note)
+ * --------------------------------
+ * These messages are intended to follow the UI theme and often use white text.
+ * They must NOT inherit the per-user tint / parchment overlay logic, otherwise
+ * the text can become unreadable.
+ */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat.fe-has-user-color {
+  background-color: rgb(0 0 0 / 1) !important;
+  background-image: none !important;
+  background-blend-mode: normal !important;
+  box-shadow: none !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat .message-content {
+  color: var(--color-text-light-0, #fff) !important;
+  text-shadow: none !important;
+}
+
 /* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
 #fe-chat-export-container .chat-message .message-sender .avatar {
   display: none !important;
@@ -493,4 +513,23 @@ body.fe-chat-archive #fe-chat-export-container #sidebar,
 body.fe-chat-archive #fe-chat-export-container #chat,
 body.fe-chat-archive #fe-chat-export-container :is(#chat-log, .chat-log, ol.chat-log) {
   background: #fff !important;
+}
+
+
+/* Ensure theme/system pseudo textures do not bleed into Narrator messages */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat::before,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat::after,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat .message-header::before,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat .message-header::after,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat .message-content::before,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.narrator-chat .message-content::after {
+  content: none !important;
+  background-image: none !important;
+  display: none !important;
 }
