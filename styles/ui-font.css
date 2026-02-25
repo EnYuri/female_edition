@@ -331,7 +331,8 @@ html, body,
 .tidy5e-sheet.application:where(.classic) :is(.block-score, .block-score > *) {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  font-size: 1em !important;
+  /* Requested: +2px for classic tidy5e block-score readability */
+  font-size: calc(1em + 2px) !important;
   line-height: 1.1 !important;
 }
 

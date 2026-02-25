@@ -35,7 +35,8 @@
    * - System font: keep the stronger weight for readability.
    * - Custom CookieRun font: use a lighter weight.
    */
-  --fe-chat-card-font-weight-system: 600;
+  /* Default should not force-bold the whole description block */
+  --fe-chat-card-font-weight-system: 400;
   --fe-chat-card-font-weight-custom: 400;
   --fe-chat-card-font-weight: var(--fe-chat-card-font-weight-system);
 
@@ -52,6 +53,9 @@
 
   /* Optional: user-color background tint (Chat Portrait-like) */
   --fe-user-color-alpha: 0.22;
+
+  /* Slight grey background for dnd5e/tidy collapsible description areas */
+  --fe-chat-desc-bg: #f0f0f0;
 }
 
 /* Propagate the module-controlled spacing into Foundry's chat sidebar. */
@@ -131,6 +135,19 @@ body.fe-chatcard-custom-font
   ) {
   font-family: var(--fe-font-secondary, inherit) !important;
   font-size: var(--fe-chat-card-font-size) !important;
+}
+
+/* Slight grey background for the collapsible description header box. */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(
+    section.card-header.description,
+    section.card-header.description.collapsible,
+    .card-header.description,
+    .card-header.description.collapsible
+  ) {
+  background-color: var(--fe-chat-desc-bg) !important;
 }
 
 /* --------------------------------

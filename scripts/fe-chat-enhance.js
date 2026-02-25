@@ -574,6 +574,16 @@ Hooks.once("init", () => {
 
   // Install the context-menu edit action early (before the first ChatLog context menu is built).
   feInstallEditContextMenuEarly();
+
+  // Ensure user-color tints are re-applied whenever the ChatLog re-renders.
+  // This helps on first load when other modules/system re-render messages after our initial pass.
+  Hooks.on("renderChatLog", () => {
+    try {
+      feApplyUserColorBgToAllLogs(document);
+    } catch {
+      /* no-op */
+    }
+  });
 });
 
 Hooks.once("ready", async () => {
@@ -588,6 +598,14 @@ Hooks.once("ready", async () => {
   feObserveChatLogs();
   feApplyChatMergeToAllLogs();
   feApplyUserColorBgToAllLogs(document);
+  // Second pass shortly after ready to catch chat DOM rebuilt by the system/other modules.
+  setTimeout(() => {
+    try {
+      feApplyUserColorBgToAllLogs(document);
+    } catch {
+      /* no-op */
+    }
+  }, 350);
   feInjectExportButtonsAll();
   feSetupTypingIndicator();
   feInstallMarkdownPreCreateHook();
@@ -1484,14 +1502,25 @@ function fePickActorOwnerUser(actor, preferredUser = null) {
 
 function feGetMessageUserColor(message) {
   try {
-    // 1) Prefer the owning player's color (actor speaker)
-    const actor = feGetSpeakerActorFromMessage(message);
-    const owner = actor ? fePickActorOwnerUser(actor, message?.author ?? null) : null;
-    if (owner?.color) return String(owner.color);
+    // Chat Portrait-style: tint primarily by the *message author*.
+    // If a GM authored the message on behalf of an actor with a player owner,
+    // prefer a non-GM owner to avoid every PC message inheriting the GM color.
 
-    // 2) Fallback to message author color
     const author = message?.author ?? (message?.user ? game.users?.get?.(message.user) : null);
-    if (author?.color) return String(author.color);
+    const actor = feGetSpeakerActorFromMessage(message);
+
+    // 1) Prefer author color
+    if (author?.color) {
+      if (author.isGM && actor) {
+        const owner = fePickActorOwnerUser(actor, null);
+        if (owner?.color && !owner.isGM) return String(owner.color);
+      }
+      return String(author.color);
+    }
+
+    // 2) Fallback: speaker actor owner (prefer non-GM owners)
+    const owner = actor ? fePickActorOwnerUser(actor, author && !author.isGM ? author : null) : null;
+    if (owner?.color) return String(owner.color);
 
     return null;
   } catch {
