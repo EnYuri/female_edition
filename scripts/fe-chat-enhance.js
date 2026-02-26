@@ -2517,8 +2517,22 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   } catch {}
 
   // Render messages.
-  logEl.innerHTML = "";
+    logEl.innerHTML = "";
+
+  // Render messages in batches to keep UI responsive and reduce reflow/parsing cost.
   let i = 0;
+  let frag = win.document.createDocumentFragment();
+  let fragCount = 0;
+
+  const flush = async () => {
+    if (fragCount) {
+      logEl.appendChild(frag);
+      frag = win.document.createDocumentFragment();
+      fragCount = 0;
+    }
+    await feMaybeYieldForUI();
+  };
+
   for (const msg of messages) {
     i++;
     if (metaEl && (i === 1 || i % 25 === 0 || i === messages.length)) {
@@ -2526,43 +2540,61 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     }
 
     let li = null;
+
+    // Some systems/modules adjust rendering based on this flag.
     try {
       msg.exporting = true;
-    } catch {}
+    } catch (_e) {
+      /* no-op */
+    }
 
     try {
       if (typeof msg.renderHTML === "function") li = await msg.renderHTML();
       else if (typeof msg.getHTML === "function") li = await msg.getHTML();
-    } catch (err) {
-      console.warn("female_edition | archive export: failed to render message", msg, err);
-    } finally {
-      try {
-        msg.exporting = false;
-      } catch {}
+    } catch (e) {
+      console.warn(`${FE_NAME}: renderHTML failed for message`, msg?.id ?? msg, e);
+      li = null;
     }
 
-    if (li && !(li instanceof HTMLElement) && li?.[0] instanceof HTMLElement) li = li[0];
+    try {
+      msg.exporting = false;
+    } catch (_e) {
+      /* no-op */
+    }
+
     if (!(li instanceof HTMLElement)) continue;
 
+    // Clone into the archive window DOM. Prefer importNode to avoid re-parsing HTML strings.
+    let node = null;
     try {
-      li.classList.add("fe-export-message");
-    } catch {}
-
-    feNormalizeExportNode(li);
-
-    // Import into the archive window.
-    try {
-      logEl.insertAdjacentHTML("beforeend", li.outerHTML);
-    } catch {
+      node = win.document.importNode(li, true);
+    } catch (_e) {
       try {
-        const imported = win.document.importNode(li, true);
-        logEl.appendChild(imported);
-      } catch {}
+        const tmp = win.document.createElement("div");
+        tmp.innerHTML = li.outerHTML;
+        node = tmp.firstElementChild;
+      } catch (e2) {
+        console.warn(`${FE_NAME}: Unable to clone message node`, msg?.id ?? msg, e2);
+        node = null;
+      }
     }
 
-    // Keep UI responsive only when visible. Background tabs clamp timers heavily.
-    if (i % 25 === 0) await feMaybeYieldForUI();
+    if (!(node instanceof HTMLElement)) continue;
+
+    node.classList.add("fe-export-message");
+    feNormalizeExportNode(node);
+    feApplyUserColorBgToMessageElement(msg, node);
+
+    frag.appendChild(node);
+    fragCount++;
+
+    // Yield to keep the archive window responsive during large exports.
+    if (i % 25 === 0) await flush();
   }
+
+  // Flush any remaining nodes.
+  if (fragCount) logEl.appendChild(frag);
+
 
   // If texture stripping / export optimization is enabled, apply the same
   // sanitization logic used in the live chat log (chat-bg-stripper.js).
@@ -3899,17 +3931,65 @@ let feChatLogObserver = null;
 const feChatLogObservers = new Map();
 
 function feBindChatLogObservers() {
+  const collectMessages = (node, outSet) => {
+    if (!(node instanceof Element)) return false;
+    if (node.matches?.("li.chat-message")) {
+      outSet.add(node);
+      return true;
+    }
+    const found = node.querySelectorAll?.("li.chat-message");
+    if (found?.length) {
+      found.forEach((el) => outSet.add(el));
+      return true;
+    }
+    return false;
+  };
+
   for (const log of feGetChatLogs()) {
     if (!(log instanceof HTMLElement)) continue;
     if (feChatLogObservers.has(log)) continue;
 
-    const obs = new MutationObserver((_mutations) => {
+    const obs = new MutationObserver((mutations) => {
+      // Only react when chat-message elements are added/removed (ignore dice animations, tooltip DOM churn, etc.)
+      const pending = obs._pendingAdded ?? (obs._pendingAdded = new Set());
+      let touchesMessages = false;
+
+      for (const m of mutations) {
+        for (const n of m.addedNodes ?? []) {
+          touchesMessages ||= collectMessages(n, pending);
+        }
+        for (const n of m.removedNodes ?? []) {
+          if (!(n instanceof Element)) continue;
+          if (n.matches?.("li.chat-message") || n.querySelector?.("li.chat-message")) {
+            touchesMessages = true;
+          }
+        }
+      }
+
+      if (!touchesMessages) return;
       if (obs._scheduled) return;
+
       obs._scheduled = true;
       requestAnimationFrame(() => {
         obs._scheduled = false;
+
+        // Merge groups can be affected by what messages exist, so we recompute on add/remove.
         feApplyChatMerge(log);
-        feApplyUserColorBgToLog(log, log?.ownerDocument ?? document);
+
+        // Apply user-color only to newly added messages (existing messages are already processed).
+        if (pending.size) {
+          for (const el of pending) {
+            try {
+              const msgId = el?.dataset?.messageId;
+              const msg = msgId ? game?.messages?.get?.(msgId) : null;
+              if (!msg) continue;
+              feApplyUserColorBgToMessageElement(msg, el);
+            } catch (_e) {
+              /* no-op */
+            }
+          }
+          pending.clear();
+        }
       });
     });
 
@@ -3937,24 +4017,43 @@ function feMutationTouchesChat(mutations) {
   const checkNodes = (nodeList) => {
     for (const n of nodeList ?? []) {
       if (!(n instanceof Element)) continue;
-      if (n.matches?.('ol.chat-log, #chat-log, li.chat-message, .chat-popout')) return true;
-      if (n.querySelector?.('ol.chat-log, #chat-log, li.chat-message, .chat-popout')) return true;
+      if (
+        n.matches?.(
+          "ol.chat-log, #chat-log, li.chat-message, .chat-popout, #chat-controls, #chat-form"
+        )
+      )
+        return true;
+      if (
+        n.querySelector?.(
+          "ol.chat-log, #chat-log, li.chat-message, .chat-popout, #chat-controls, #chat-form"
+        )
+      )
+        return true;
     }
     return false;
   };
 
   for (const m of mutations) {
     const t = m?.target;
-    if (t?.closest?.('#chat, .chat-popout')) return true;
+
+    // Avoid reacting to every DOM churn inside chat messages (dice animations, tooltips, etc.)
+    // We only care about chat containers/controls and actual message element add/remove.
+    if (t instanceof Element) {
+      if (t.matches?.("#chat-controls, #chat-form, .chat-popout, ol.chat-log, #chat-log"))
+        return true;
+      if (t.closest?.("#chat-controls, #chat-form, .chat-popout")) return true;
+    }
+
     if (checkNodes(m?.addedNodes) || checkNodes(m?.removedNodes)) return true;
   }
+
   return false;
 }
 
 function feObserveChatLogs() {
   if (feChatLogObserver) return;
 
-  // Observe chat logs directly so we only re-merge when the log actually changes.
+  // Observe chat logs directly so we only re-merge when messages are added/removed.
   feBindChatLogObservers();
 
   // Also observe the document for chat log re-renders / chat popouts being added.
@@ -3965,15 +4064,14 @@ function feObserveChatLogs() {
     feChatLogObserver._scheduled = true;
     requestAnimationFrame(() => {
       feChatLogObserver._scheduled = false;
+
+      // Logs can be replaced (re-render) or new ones can be added (popout). Keep observers in sync.
       fePruneChatLogObservers();
       feBindChatLogObservers();
 
       // Chat UI can re-render controls; keep our buttons/typing indicator alive.
       feInjectExportButtonsAll();
       feRenderTypingIndicator();
-
-      // Newly-attached logs may need an initial merge pass.
-      feApplyChatMergeToAllLogs();
     });
   });
 
