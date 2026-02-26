@@ -1,0 +1,50 @@
+/*
+ * Ensure the edit control is visible even when message headers are
+ * collapsed/merged by the chat merge feature.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.message-edit,
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.fe-message-edit {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide the header trash icon (we rely on the context menu instead).
+ * Also prevents overlap with the ellipsis on narrow layouts.
+ */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata .message-delete {
+  display: none !important;
+}
+/* --------------------------- */
+/* Inline message editor       */
+/* --------------------------- */
+#fe-chat-inline-editor {
+  margin-bottom: 6px;
+  padding: 6px;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+#fe-chat-inline-editor .fe-chat-inline-editor-row textarea.fe-chat-inline-editor-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+}
+
+#fe-chat-inline-editor .fe-chat-inline-editor-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+
+#fe-chat-inline-editor button {
+  height: 28px;
+}
+
+textarea.fe-chat-input-disabled {
+  opacity: 0.55;
+}
+
+

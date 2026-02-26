@@ -1,0 +1,313 @@
+<form class="fe-settings" autocomplete="off">
+  <div class="fe-settings__topbar flexrow">
+    <div class="fe-settings__title">
+      <h2>Female-cupwhi 설정</h2>
+      <p class="notes">설정은 <b>클라이언트(개인)</b> 기준입니다. 저장하면 즉시 적용되며, 일부 항목은 채팅 로그가 다시 렌더링될 때 반영됩니다.</p>
+    </div>
+
+    <div class="fe-settings__actions flexrow">
+      <button type="button" class="fe-btn" data-action="expandAll">모두 펼치기</button>
+      <button type="button" class="fe-btn" data-action="collapseAll">모두 접기</button>
+    </div>
+  </div>
+
+  {{#if warnings.chatPortraitDup}}
+  <div class="fe-settings__warning">
+    <p><b>경고:</b> 외부 모듈 <code>chat-portrait</code> 가 활성화되어 있습니다. 이 모듈의 <b>채팅 포트레이트</b> 기능과 중복 표시될 수 있습니다.</p>
+    <p class="notes">중복이 보이면 둘 중 하나를 끄세요.</p>
+  </div>
+  {{/if}}
+
+  <details open>
+    <summary>폰트</summary>
+
+    <div class="form-group">
+      <label>커스텀 폰트 적용 (쿠키런/그림일기)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="enableFonts" data-dtype="Boolean" {{checked values.enableFonts}} />
+      </div>
+      <p class="notes">이 모듈의 커스텀 폰트(CookieRun/그림일기) 및 관련 옵션을 활성화합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 글꼴 선택</label>
+      <div class="form-fields">
+        <select name="ceChatFontChoice" data-dtype="String">
+          {{selectOptions choices.chatFontChoice selected=values.ceChatFontChoice}}
+        </select>
+      </div>
+      <p class="notes">채팅 메시지 본문/헤더의 기본 글꼴을 선택합니다. (커스텀 폰트 적용이 켜져 있어야 합니다)</p>
+    </div>
+
+    <div class="form-group">
+      <label>UI/시트 기본 글꼴: 그림일기 사용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceUiUseGeurimilgi" data-dtype="Boolean" {{checked values.ceUiUseGeurimilgi}} />
+      </div>
+      <p class="notes">html/body, #ui/#interface, dnd5e2 능력치 라벨 등 기본 UI 글꼴을 그림일기로 바꿉니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 카드(설명) 커스텀 폰트 적용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceChatCardUseCustomFont" data-dtype="Boolean" {{checked values.ceChatCardUseCustomFont}} />
+      </div>
+      <p class="notes">주문/아이템/피처 설명 박스(Details/Description)에도 커스텀 폰트를 적용합니다.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>채팅 외형</summary>
+
+    <div class="form-group">
+      <label>채팅 카드 텍스쳐 제거</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stripChatTextures" data-dtype="Boolean" {{checked values.stripChatTextures}} />
+      </div>
+      <p class="notes">dnd5e 기본 parchment/texture 배경만 제거하고, 색상 오버레이(채도 약화)는 유지합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 배경 채도 (페이퍼 오버레이 알파)</label>
+      <div class="form-fields">
+        <input type="number" name="ceMessageBgSaturation" data-dtype="Number" value="{{values.ceMessageBgSaturation}}" step="0.01" min="0.05" max="1" />
+      </div>
+      <p class="notes">값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 메시지 배경: 유저 색상 적용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceUseUserColorBg" data-dtype="Boolean" {{checked values.ceUseUserColorBg}} />
+      </div>
+      <p class="notes">각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>유저 색상 하부 배경(불투명)</label>
+      <div class="form-fields">
+        <select name="ceUserColorBgBase" data-dtype="String">
+          {{selectOptions choices.userColorBgBase selected=values.ceUserColorBgBase}}
+        </select>
+      </div>
+      <p class="notes">유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 기본 포트레이트 숨김(내부/기본)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="hideChatPortraits" data-dtype="Boolean" {{checked values.hideChatPortraits}} />
+      </div>
+      <p class="notes">채팅 카드 헤더의 기본 아바타/포트레이트를 숨깁니다. (이 모듈이 삽입하는 포트레이트는 별도 옵션)</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 메시지 카드 간격(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="1" min="0" max="24" />
+      </div>
+      <p class="notes">Foundry 기본 변수 <code>--chat-message-spacing</code> 값을 덮어씁니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 액터 이름 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceActorNameSize" data-dtype="Number" value="{{values.ceActorNameSize}}" step="1" min="10" max="40" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 플레이어 이름 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="cePlayerNameSize" data-dtype="Number" value="{{values.cePlayerNameSize}}" step="1" min="8" max="28" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 메시지 글자 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceMessageTextSize" data-dtype="Number" value="{{values.ceMessageTextSize}}" step="1" min="9" max="24" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 주문/아이템/피처 설명 글자 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceChatCardTextSize" data-dtype="Number" value="{{values.ceChatCardTextSize}}" step="1" min="9" max="24" />
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>채팅 동작</summary>
+
+    <div class="form-group">
+      <label>채팅 병합(연속 메시지 시각적 묶기)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMergeEnabled" data-dtype="Boolean" {{checked values.ceMergeEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합: 텍스트 메시지만</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMergeOnlyText" data-dtype="Boolean" {{checked values.ceMergeOnlyText}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합: 그룹 구분선 표시</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMergeDivider" data-dtype="Boolean" {{checked values.ceMergeDivider}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합: 후속 메시지 헤더 표시 방식</label>
+      <div class="form-fields">
+        <select name="ceMergeFollowHeaderStyle" data-dtype="String">
+          {{selectOptions choices.mergeFollowHeaderStyle selected=values.ceMergeFollowHeaderStyle}}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 입력 중 표시(타이핑 인디케이터)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTypingEnabled" data-dtype="Boolean" {{checked values.ceTypingEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 입력 마크다운 지원</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMarkdownEnabled" data-dtype="Boolean" {{checked values.ceMarkdownEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 수정(편집) 다이얼로그</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceEditEnabled" data-dtype="Boolean" {{checked values.ceEditEnabled}} />
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>채팅 아카이브 / HTML·PDF 내보내기</summary>
+
+    <div class="form-group">
+      <label>채팅 로그 PDF 내보내기 버튼</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportEnabled" data-dtype="Boolean" {{checked values.ceExportEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>PDF 버튼: 자동 인쇄창 열기</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportAutoPrint" data-dtype="Boolean" {{checked values.ceExportAutoPrint}} />
+      </div>
+      <p class="notes">끄면 아카이브만 열립니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>내보내기 최적화(용량/멈춤 방지)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportOptimize" data-dtype="Boolean" {{checked values.ceExportOptimize}} />
+      </div>
+      <p class="notes">PDF 용량/메모리 사용량을 줄이기 위해 텍스쳐·그림자 등 일부 효과를 강제 제거합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>HTML 저장: 커스텀 폰트 포함</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportEmbedFonts" data-dtype="Boolean" {{checked values.ceExportEmbedFonts}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>HTML 저장: 이미지 포함(용량 증가)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportEmbedImages" data-dtype="Boolean" {{checked values.ceExportEmbedImages}} />
+      </div>
+      <p class="notes">이미지 포함 시 저장 시간이 늘고 파일이 커질 수 있습니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>PDF/인쇄: 이미지 처리</label>
+      <div class="form-fields">
+        <select name="ceExportPrintImageMode" data-dtype="String">
+          {{selectOptions choices.exportPrintImageMode selected=values.ceExportPrintImageMode}}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>FVTT 데스크톱: 외부 브라우저로 아카이브 열기</label>
+      <div class="form-fields">
+        <select name="ceExportDesktopExternalMode" data-dtype="String">
+          {{selectOptions choices.exportDesktopExternalMode selected=values.ceExportDesktopExternalMode}}
+        </select>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>채팅 포트레이트</summary>
+
+    <div class="form-group">
+      <label>채팅 포트레이트 사용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatPortraitEnabled" data-dtype="Boolean" {{checked values.chatPortraitEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>삽입 포트레이트(.fe-chat-portrait-wrap) 숨김</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatPortraitHideWrap" data-dtype="Boolean" {{checked values.chatPortraitHideWrap}} />
+      </div>
+      <p class="notes">채팅 카드에 삽입되는 포트레이트 래퍼 자체를 숨깁니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 대신 토큰 이미지 사용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatPortraitUseTokenImage" data-dtype="Boolean" {{checked values.chatPortraitUseTokenImage}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="1" min="16" max="256" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>컴뱃 트래커에 포트레이트 적용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatPortraitApplyCombatTracker" data-dtype="Boolean" {{checked values.chatPortraitApplyCombatTracker}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>표시할 메시지 타입</label>
+      <div class="form-fields fe-inline-grid">
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowIC" data-dtype="Boolean" {{checked values.chatPortraitShowIC}} /> IC</label>
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowOOC" data-dtype="Boolean" {{checked values.chatPortraitShowOOC}} /> OOC</label>
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowEmote" data-dtype="Boolean" {{checked values.chatPortraitShowEmote}} /> Emote</label>
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowWhisper" data-dtype="Boolean" {{checked values.chatPortraitShowWhisper}} /> Whisper</label>
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowRoll" data-dtype="Boolean" {{checked values.chatPortraitShowRoll}} /> Roll</label>
+        <label class="checkbox"><input type="checkbox" name="chatPortraitShowOther" data-dtype="Boolean" {{checked values.chatPortraitShowOther}} /> Other</label>
+      </div>
+    </div>
+  </details>
+
+  <footer class="sheet-footer flexrow">
+    <button type="submit" class="fe-btn fe-btn--primary">
+      <i class="far fa-save"></i> 저장
+    </button>
+  </footer>
+</form>

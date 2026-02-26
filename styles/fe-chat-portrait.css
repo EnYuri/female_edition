@@ -1,0 +1,46 @@
+:root {
+  --fe-chat-portrait-size: 48px;
+}
+
+/* Chat portrait in messages */
+li.chat-message.fe-has-chat-portrait header.message-header {
+  align-items: center;
+}
+
+li.chat-message .fe-chat-portrait-wrap {
+  display: flex;
+  align-items: center;
+  margin-right: 6px;
+}
+
+li.chat-message .fe-chat-portrait {
+  width: var(--fe-chat-portrait-size);
+  height: var(--fe-chat-portrait-size);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Combat tracker */
+.combat-tracker img.token-image.fe-combat-portrait {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/*
+ * FE Chat Portrait hide toggle (separate from the base "fe-hide-portraits")
+ * - fe-hide-portraits: hides INTERNAL/system portraits (and chat-portrait module artifacts)
+ * - fe-hide-chat-portrait-wrap: hides THIS module's inserted portraits (.fe-chat-portrait-wrap)
+ */
+body.fe-hide-chat-portrait-wrap li.chat-message .fe-chat-portrait-wrap,
+body.fe-hide-chat-portrait-wrap .combat-tracker img.token-image.fe-combat-portrait {
+  display: none !important;
+}
+
+
+/* Chat Portrait: hide the duplicate/empty content-name header inside message-content */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-dnd5e.chat-portrait-flexrow,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-generic.chat-portrait-flexrow {
+  display: none !important;
+}
+
+

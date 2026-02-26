@@ -1,54 +1,6 @@
 /* female_edition: Chat Enhancements (FVTT v13) */
 
 /* --------------------------- */
-/* Export button (spacing)     */
-/* --------------------------- */
-#chat-controls .fe-export-pdf {
-  /* The chat controls row is aligned to the right; margin-right pulls it slightly left */
-  margin-right: 20px;
-
-  /* Bigger hit-area (user request: ~32x32) */
-  width: 32px;
-  height: 32px;
-  line-height: 32px;
-  font-size: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Ensure the Font Awesome glyph scales with the control size */
-#chat-controls .fe-export-pdf i {
-  font-size: 20px;
-}
-
-/* Export toolbar actions (inline fallback container) */
-#fe-chat-export-container .fe-chat-export-actions {
-  margin-left: auto;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-}
-
-#fe-chat-export-container .fe-chat-export-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid var(--color-border-light-2);
-  border-radius: 6px;
-  text-decoration: none;
-  cursor: pointer;
-  user-select: none;
-}
-
-#fe-chat-export-container .fe-chat-export-action:hover {
-  background: rgba(0,0,0,0.05);
-}
-
-/* --------------------------- */
 /* Typing indicator            */
 /* --------------------------- */
 #chat-form .fe-typing-indicator {
@@ -74,178 +26,6 @@
   opacity: 0.95;
 }
 
-/* Chat Portrait: hide the duplicate/empty content-name header inside message-content */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-dnd5e.chat-portrait-flexrow,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) h4.chat-portrait-text-content-name-generic.chat-portrait-flexrow {
-  display: none !important;
-}
-
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
-  /* readability for **bold** in normal chat text */
-  font-size: 1.12em;
-  font-weight: 800;
-}
-
-/* --------------------------- */
-/* Export (Print to PDF)       */
-/* --------------------------- */
-#fe-chat-export-container {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 100000;
-  overflow: auto;
-  background: white;
-  color: black;
-  padding: 12px;
-}
-
-body.fe-print-chatlog #fe-chat-export-container {
-  display: block;
-  /* IMPORTANT: Use normal document flow.
-   * If the export view is a fixed/scroll container, Chromium (and Electron printing)
-   * will often only output the first page.
-   * Make it static + non-scroll so the browser can paginate the full log.
-   */
-  position: static;
-  inset: auto;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  padding: 12mm;
-}
-
-/* IMPORTANT: The real Foundry chat log is a scroll container.
- * If we keep that behavior on the export log, Chromium will clip at 1 page.
- * Force a normal, paginatable flow *even on screen media*.
- */
-body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
-  display: block !important;
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-/* While exporting, hide the Foundry UI so the export view becomes the only document content.
- * This makes pagination consistent in both desktop (Electron) and web browsers.
- */
-body.fe-print-chatlog > :not(#fe-chat-export-container) {
-  display: none !important;
-}
-
-body.fe-print-chatlog #fe-chat-export-title {
-  margin: 0 0 6px 0;
-  padding: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-body.fe-print-chatlog #fe-chat-export-meta {
-  margin: 0 0 12px 0;
-  padding: 0;
-  opacity: 0.85;
-  font-size: 11px;
-}
-
-body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message {
-  margin: 0 0 12px 0;
-}
-
-@media print {
-  /* Preserve UI colors in Chromium "Save as PDF" (avoid economy color adjustments). */
-  html, body {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /*
-   * Foundry runs the app in a fixed viewport (body.game) with overflow hidden.
-   * If we don't reset *that specific selector* for print, Chromium will only
-   * print the visible viewport (1 page) even if the export log is long.
-   *
-   * We intentionally target body.game.fe-print-chatlog to beat Foundry's own
-   * body.game rules (often marked !important).
-   */
-  html {
-    width: auto !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  body.game.fe-print-chatlog {
-    position: static !important;
-    display: block !important;
-    width: auto !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: #fff !important;
-  }
-
-  body.game.fe-print-chatlog > :not(#fe-chat-export-container) {
-    display: none !important;
-  }
-
-  body.game.fe-print-chatlog #fe-chat-export-container {
-    display: block !important;
-    position: static !important;
-    inset: auto !important;
-    overflow: visible !important;
-    width: auto !important;
-    height: auto !important;
-    max-height: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    border: 0 !important;
-  }
-
-  body.game.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
-    display: none !important;
-  }
-
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
-    display: block !important;
-    flex: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    max-height: none !important;
-  }
-
-  /* Avoid splitting a single message across pages where possible */
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  @page {
-    margin: 10mm;
-  }
-}
-
-/*
- * Ensure the edit control is visible even when message headers are
- * collapsed/merged by the chat merge feature.
- */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.message-edit,
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata a.fe-message-edit {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Hide the header trash icon (we rely on the context menu instead).
- * Also prevents overlap with the ellipsis on narrow layouts.
- */
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-metadata .message-delete {
-  display: none !important;
-}
 
 /* Markdown/plain text can generate multiple <p> blocks, which can make messages
  * look like they have excessive top/bottom padding. Reduce paragraph margins,
@@ -274,41 +54,6 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 /* Let narrator-chat text color follow the active theme. */
-
-/* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
-#fe-chat-export-container .chat-message .message-sender .avatar {
-  display: none !important;
-}
-
-
-/* Export view: enforce FE CookieRun (custom UI font) for actor/player names */
-#fe-chat-export-container {
-  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif;
-}
-
-#fe-chat-export-container .chat-message .message-sender,
-#fe-chat-export-container .chat-message .message-sender .name-stacked,
-#fe-chat-export-container .chat-message .message-sender .name-stacked > span {
-  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif !important;
-}
-
-#fe-chat-export-container .chat-message .message-sender .name-stacked .title {
-  font-weight: 700 !important;
-}
-
-#fe-chat-export-container .chat-message .message-sender .name-stacked .subtitle {
-  font-weight: 400 !important;
-}
-
-/* Export view: remove text shadow for readability in PDF (print only).
- * On-screen (HTML) we may intentionally add a tiny text-shadow to improve
- * font rendering on some platforms.
- */
-@media print {
-  #fe-chat-export-container .chat-message :is(.message-header, .message-sender, .message-content) {
-    text-shadow: none !important;
-  }
-}
 
 /* --------------------------- */
 /* Chat merge                  */
@@ -410,45 +155,6 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
   margin: 0 !important;
 }
 
-/* --------------------------- */
-/* Export optimization (PDF/HTML) */
-/* --------------------------- */
-/*
- * When enabled, we force-remove heavy parchment/texture images in export views.
- * This massively reduces print-to-PDF size and prevents Electron/Chromium freezes.
- */
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
-  background-image: var(--fe-parchment-overlay) !important;
-  box-shadow: none !important;
-  filter: none !important;
-}
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::before,
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::after {
-  background-image: none !important;
-  box-shadow: none !important;
-  filter: none !important;
-}
-
-/* Some themes/systems apply parchment textures to nested areas too.
- * Remove those explicitly in export mode.
- */
-body.fe-export-optimized
-  :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log)
-  .chat-message
-  :is(.message-header, .message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) {
-  background-image: none !important;
-  box-shadow: none !important;
-  filter: none !important;
-}
-
-@media print {
-  /* Optional extra print stability in optimized mode */
-  body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
-    text-shadow: none !important;
-  }
-}
-
-
 /* Headings in markdown (avoid huge default sizes) */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(h1, h2, h3, h4, h5, h6) {
   margin: 0.5em 0 0.25em 0;
@@ -464,51 +170,6 @@ body.fe-export-optimized
 
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(ul, ol) {
   margin: 0.5em 0 0.5em 1.2em;
-}
-
-
-/* --------------------------- */
-/* Inline message editor       */
-/* --------------------------- */
-#fe-chat-inline-editor {
-  margin-bottom: 6px;
-  padding: 6px;
-  border: 1px solid var(--color-border-light-2);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-#fe-chat-inline-editor .fe-chat-inline-editor-row textarea.fe-chat-inline-editor-text {
-  width: 100%;
-  resize: vertical;
-  min-height: 64px;
-}
-
-#fe-chat-inline-editor .fe-chat-inline-editor-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-  justify-content: flex-end;
-}
-
-#fe-chat-inline-editor button {
-  height: 28px;
-}
-
-textarea.fe-chat-input-disabled {
-  opacity: 0.55;
-}
-
-
-/* --------------------------- */
-/* Archive window background   */
-/* --------------------------- */
-/* Some themes leave a dark background behind chat cards. Force white in the archive window. */
-body.fe-chat-archive #fe-chat-export-container,
-body.fe-chat-archive #fe-chat-export-container #sidebar,
-body.fe-chat-archive #fe-chat-export-container #chat,
-body.fe-chat-archive #fe-chat-export-container :is(#chat-log, .chat-log, ol.chat-log) {
-  background: #fff !important;
 }
 
 
@@ -528,4 +189,9 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, .chat-log, ol.chat
   content: none !important;
   background-image: none !important;
   display: none !important;
+}
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-msg-plain .message-content strong {
+  /* readability for **bold** in normal chat text */
+  font-size: 1.12em;
+  font-weight: 800;
 }

@@ -1,0 +1,176 @@
+/* Tidy 5e Sheets - numeric values can look better with the light face */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .ability-score,
+    .ability-scores :is(.score, .value, .mod, .bonus),
+    .abilities :is(.score, .value, .mod, .bonus),
+    .attributes :is(.score, .value, .mod, .bonus)
+  ) {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+  font-size: 1em !important;
+}
+
+/* -------------------------------
+ * 3b) Tidy 5e Sheets (kgar / sdenec)
+ * -------------------------------
+ * Some Tidy sheet layouts set their own font-family in nested regions.
+ * Apply a simple “big = CookieRun, small/list = Geurimilgi” split.
+ */
+
+/* If Tidy exposes font-family variables, override them first for broad coverage.
+ * (These vars may differ by Tidy version; unused vars are harmless.)
+ */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
+  --t5e-title-font-family: var(--fe-font-primary) !important;
+  --t5e-body-font-family: var(--fe-font-secondary) !important;
+  --t5e-font-family-title: var(--fe-font-primary) !important;
+  --t5e-font-family-body: var(--fe-font-secondary) !important;
+  --t5e-primary-font-family: var(--fe-font-primary) !important;
+  --t5e-secondary-font-family: var(--fe-font-secondary) !important;
+}
+
+/* Large headings / labels (actor name, ability labels, tab titles) */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .tidy5e-sheet-header,
+    .sheet-header,
+    .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
+    .header,
+    .header :is(.document-name, .name, .charname),
+    .actor-name,
+    .actor-name :is(input, textarea, span, div),
+    .ability-scores,
+    .ability-scores :is(.label, label, .title, .name),
+    .abilities,
+    .abilities :is(.label, label, .title, .name),
+    .attributes,
+    .attributes :is(.label, label, .title, .name),
+    nav.tabs,
+    nav.tabs :is(a, .item)
+  ) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* Small list content (skills, items, features, actions, etc.) */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .skills,
+    .skill-list,
+    .skills-list,
+    .items-list,
+    .inventory,
+    .spellbook,
+    .features,
+    .actions,
+    .effects,
+    .traits,
+    .proficiencies
+  ) {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+  font-size: 1em !important;
+}
+
+/* Ensure nested text nodes inside those lists inherit Geurimilgi, while icons keep FA. */
+:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+  :is(
+    .skills,
+    .skill-list,
+    .skills-list,
+    .items-list,
+    .inventory,
+    .spellbook,
+    .features,
+    .actions,
+    .effects,
+    .traits,
+    .proficiencies
+  )
+  :is(p, li, span, div, a, em, strong, b, label, small) {
+  font-family: inherit !important;
+
+  /* Keep the original font-size from Tidy5e; only override font-family. */
+}
+
+/* -------------------------------
+ * 3c) Tidy5e (classic) — user-requested bold Geurimilgi targets
+ * -------------------------------
+ * - .tidy5e-sheet.application:where(.classic) .block-score>
+ * - .sheet.application:where(.classic):where(.actor) .level
+ * - .portrait-hp.svelte
+ * - (추가) .portrait-hp / .resource-container / .xp-tracker / .no-gap / .actor-movement
+ */
+
+/* Ability score blocks (numbers/labels inside the block) */
+.tidy5e-sheet.application:where(.classic) :is(.block-score, .block-score > *) {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 700 !important;
+  /* Requested: +2px for classic tidy5e block-score readability */
+  font-size: calc(1em + 2px) !important;
+  line-height: 1.1 !important;
+}
+
+/* Actor level indicator in classic actor sheets */
+:is(.sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 700 !important;
+  font-size: 1em !important;
+  line-height: 1.1 !important;
+}
+
+/*
+ * HP/resources/xp/movement — force Bold Geurimilgi for numeric overlays and key trackers.
+ * (Selectors vary by Tidy5e version; include a few best-effort aliases.)
+ */
+:is(.tidy5e-sheet, .sheet).application:where(.classic)
+  :is(
+    .portrait-hp,
+    .portrait-hp.svelte,
+    .resource-container,
+    .xp-tracker,
+    .no-gap,
+    .actor-movement
+  ) {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 700 !important;
+  font-size: 1em !important;
+  line-height: 1.1 !important;
+}
+
+
+
+/* Tidy info-card description (classic): force Geurimilgi Regular */
+.tidy5e-sheet.application:where(.classic) .tidy-info-card .info-card-description {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 400 !important;
+  font-size: 1em !important;
+  line-height: 1.1 !important;
+}
+
+/* Additional Geurimilgi targets requested */
+.origin-points,
+.profile-temp {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 400 !important;
+  font-size: 1em !important;
+  line-height: 1.1 !important;
+}
+
+span.flex-row.align-items-center.extra-small-gap {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: 700 !important;
+  font-size: 1em !important;
+  line-height: 1.1 !important;
+}
+
+/* Prevent Geurimilgi glyphs from visually overflowing in tight pills/buttons */
+:is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge, .chip) {
+  line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
+  padding-block: var(--fe-inline-pad-y, 1px) !important;
+}
+
+:is(.dnd5e2, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
+  line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
+  padding-block: var(--fe-inline-pad-y, 1px) !important;
+}

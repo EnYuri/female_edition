@@ -1,0 +1,56 @@
+/* Female-cupwhi: Settings Menu */
+
+.fe-settings-menu .fe-settings__topbar {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.fe-settings-menu .fe-settings__title h2 {
+  margin: 0 0 4px 0;
+}
+
+.fe-settings-menu .fe-settings__actions {
+  gap: 8px;
+}
+
+.fe-settings-menu details {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 10px 0;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fe-settings-menu details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin: 0;
+}
+
+.fe-settings-menu details[open] > summary {
+  margin-bottom: 8px;
+}
+
+.fe-settings-menu .fe-settings__warning {
+  border: 1px solid rgba(255, 180, 0, 0.35);
+  background: rgba(255, 180, 0, 0.12);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.fe-settings-menu .fe-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 6px 10px;
+}
+
+.fe-settings-menu .fe-btn {
+  padding: 6px 10px;
+}
+
+.fe-settings-menu .fe-btn--primary {
+  font-weight: 700;
+}
