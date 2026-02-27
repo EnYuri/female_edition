@@ -19,6 +19,12 @@ import {
   feGetMessageIdFromElement,
 } from "./fe-chat-enhance.js";
 
+// Chat portrait: ensure exported/archive-rendered messages receive the same portrait injection.
+import {
+  feChatPortraitUpsert,
+  feChatPortraitApplyVars,
+} from "./fe-chat-portrait.js";
+
 // -------------------------------------
 // Export to PDF (Print)
 // -------------------------------------
@@ -302,10 +308,20 @@ async function feExportChatLogToPDFInline() {
       if (li && !(li instanceof HTMLElement) && li?.[0] instanceof HTMLElement) li = li[0];
       if (!(li instanceof HTMLElement)) continue;
 
+      // Ensure chat portraits exist in the export DOM even if hooks do not fire.
+      try {
+        feChatPortraitUpsertToMessageElement(msg, li, document);
+      } catch {}
+
+      // Normalize after portrait insertion so newly added <img> src also become absolute.
       feNormalizeExportNode(li);
 
       // Optional: apply per-message user color tint variables before serializing.
       feApplyUserColorBgToMessageElement(msg, li);
+      // Ensure chat portraits are present in inline export too.
+      try {
+        feChatPortraitUpsert(msg, li);
+      } catch {}
       logEl.appendChild(li);
 
       // Yield occasionally to keep UI responsive.
@@ -713,6 +729,10 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetChatFontChoiceClass(win.document);
   feSetUserColorBgClass(win.document);
   feSetUserColorBgBaseClass(win.document);
+  // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
+  try {
+    feChatPortraitApplyVars(win.document);
+  } catch {}
 
   // Hook up controls.
   const logEl = win.document.getElementById("chat-log");
@@ -827,8 +847,20 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     if (!(node instanceof HTMLElement)) continue;
 
     node.classList.add("fe-export-message");
+
+    // Force-apply chat portraits in the archive/export DOM.
+    // Live chat relies on renderChatMessageHTML hooks; the archive window does not.
+    try {
+      feChatPortraitUpsertToMessageElement(msg, node, win.document);
+    } catch {}
+
+    // Normalize after portrait insertion so newly added <img> src also become absolute.
     feNormalizeExportNode(node);
     feApplyUserColorBgToMessageElement(msg, node);
+    // Ensure chat portraits are present even if the normal ChatLog render hooks did not run.
+    try {
+      feChatPortraitUpsert(msg, node);
+    } catch {}
 
     frag.appendChild(node);
     fragCount++;

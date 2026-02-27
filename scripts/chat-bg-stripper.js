@@ -366,7 +366,7 @@ Hooks.once("init", () => {
     name: "커스텀 폰트 적용 (쿠키런/그림일기)",
     hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + 그림일기 폰트 및 관련 옵션(채팅 글꼴 선택 등)이 동작합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: value => applyFontSetting(value)
@@ -377,7 +377,7 @@ Hooks.once("init", () => {
     name: "채팅 기본 포트레이트 숨김(내부/기본)",
     hint: "채팅 카드 헤더의 기본 아바타/포트레이트(및 chat-portrait 모듈이 추가하는 일부 아이콘)를 숨깁니다. 이 모듈이 삽입하는 포트레이트(.fe-chat-portrait-wrap)는 별도 옵션에서 제어합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: value => applyPortraitSetting(value)
@@ -388,7 +388,7 @@ Hooks.once("init", () => {
     name: "채팅 카드 텍스쳐 제거",
     hint: "dnd5e 기본 parchment/texture 배경만 제거하고, 색상 오버레이(채도 약화)는 유지합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: value => applyTextureSetting(value)

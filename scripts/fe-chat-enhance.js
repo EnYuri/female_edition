@@ -284,7 +284,7 @@ Hooks.once("init", () => {
     name: "채팅 병합(연속 메시지 시각적 묶기)",
     hint: "같은 화자/유저의 연속 메시지를 하나처럼 보이도록 묶습니다(문서 편집 없음).",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => {
@@ -297,7 +297,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 텍스트 메시지만",
     hint: "주사위/채팅 카드(아이템/주문 등) 메시지는 병합하지 않습니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => feApplyChatMergeToAllLogs(),
@@ -307,7 +307,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 그룹 구분선 표시",
     hint: "다른 화자의 새 그룹이 시작될 때 얇은 구분선을 표시합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => feApplyChatMergeToAllLogs(),
@@ -317,7 +317,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 후속 메시지 헤더 표시 방식",
     hint: "같은 화자의 연속 메시지(두 번째부터)의 헤더 표시를 설정합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: String,
     choices: {
       hide: "헤더 완전 숨김",
@@ -335,7 +335,7 @@ Hooks.once("init", () => {
     name: "채팅 입력 중 표시(타이핑 인디케이터)",
     hint: "다른 플레이어가 채팅 입력 중일 때 표시합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => feSetupTypingIndicator(),
@@ -345,7 +345,7 @@ Hooks.once("init", () => {
     name: "채팅 로그 PDF 내보내기 버튼",
     hint: "채팅 입력창 옆에 PDF(인쇄) 버튼을 추가합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => feFireChatUiUpdated(),
@@ -355,7 +355,7 @@ Hooks.once("init", () => {
     name: "PDF 버튼: 자동 인쇄창 열기",
     hint: "켜면 PDF 버튼 클릭 시 아카이브 창을 연 뒤 자동으로 인쇄(프린트) 다이얼로그를 엽니다. 끄면 아카이브만 열립니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: false,
   });
@@ -364,7 +364,7 @@ Hooks.once("init", () => {
     name: "내보내기 최적화(용량/멈춤 방지)",
     hint: "아카이브/인쇄 시 parchment/texture 이미지와 그림자 등을 강제로 제거하여 PDF 용량과 메모리 사용량을 크게 줄입니다(권장).",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
   });
@@ -373,7 +373,7 @@ Hooks.once("init", () => {
     name: "HTML 저장: 커스텀 폰트 포함",
     hint: "HTML로 저장할 때 CookieRun 폰트를 파일 안에 포함시켜(임베드) 나중에 단독으로 열어도 폰트가 유지되게 합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
   });
@@ -382,7 +382,7 @@ Hooks.once("init", () => {
     name: "HTML 저장: 이미지 포함(용량 증가)",
     hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 로그가 크면 저장 시간이 늘고 용량이 커질 수 있습니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: false,
   });
@@ -391,7 +391,7 @@ Hooks.once("init", () => {
     name: "PDF/인쇄: 이미지 처리",
     hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나(권장) 다운스케일할 수 있습니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: String,
     choices: {
       full: "그대로(고품질/대용량)",
@@ -406,7 +406,7 @@ Hooks.once("init", () => {
     name: "FVTT 데스크톱: 외부 브라우저로 아카이브 열기",
     hint: "데스크톱(Electron) 앱에서 인쇄(PDF) 시 메모리/멈춤 문제가 있을 때, 아카이브를 HTML 파일로 만들어 시스템 기본 브라우저로 열 수 있습니다. (Electron/Node API 접근이 가능한 경우에만 동작)",
     scope: "client",
-    config: false,
+    config: true,
     type: String,
     choices: {
       off: "사용 안 함",
@@ -424,7 +424,7 @@ Hooks.once("init", () => {
     name: "채팅: 액터 이름 크기(px)",
     hint: "채팅 메시지 헤더의 액터(캐릭터) 이름 글자 크기입니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 22,
     range: { min: 10, max: 40, step: 1 },
@@ -435,7 +435,7 @@ Hooks.once("init", () => {
     name: "채팅: 플레이어 이름 크기(px)",
     hint: "채팅 메시지 헤더의 플레이어 이름(서브타이틀) 글자 크기입니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 14,
     range: { min: 8, max: 28, step: 1 },
@@ -446,7 +446,7 @@ Hooks.once("init", () => {
     name: "채팅: 메시지 글자 크기(px)",
     hint: "일반 채팅 텍스트(메시지 내용)의 글자 크기입니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 14,
     range: { min: 9, max: 24, step: 1 },
@@ -457,7 +457,7 @@ Hooks.once("init", () => {
     name: "채팅: 주문/아이템/피처 설명 글자 크기(px)",
     hint: "dnd5e 채팅 카드(주문/아이템/피처) 설명 영역의 기본 글자 크기입니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 12,
     range: { min: 9, max: 24, step: 1 },
@@ -468,7 +468,7 @@ Hooks.once("init", () => {
     name: "채팅: 메시지 카드 간격(px)",
     hint: "Foundry 기본 변수 chat-sidebar { --chat-message-spacing } 값을 덮어씁니다. 메시지 카드 사이 간격을 조절합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 4,
     range: { min: 0, max: 24, step: 1 },
@@ -479,7 +479,7 @@ Hooks.once("init", () => {
     name: "채팅 카드(설명) 커스텀 폰트 적용",
     hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/그림일기)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
     onChange: () => feSetChatCardFontClass(),
@@ -489,7 +489,7 @@ Hooks.once("init", () => {
     name: "채팅 글꼴 선택",
     hint: "채팅 메시지 본문/헤더에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: String,
     choices: {
       cookie: "쿠키런",
@@ -504,7 +504,7 @@ Hooks.once("init", () => {
     name: "UI/시트 기본 글꼴: 그림일기 사용(쿠키런 대체)",
     hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 그림일기 폰트로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: false,
     onChange: () => feSetUiFontClass(document),
@@ -524,7 +524,7 @@ Hooks.once("init", () => {
     name: "채팅 메시지 배경: 유저 색상 적용(Chat Portrait 스타일)",
     hint: "각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: false,
     onChange: () => {
@@ -537,7 +537,7 @@ Hooks.once("init", () => {
     name: "채팅 메시지 배경: 유저 색상 하부 배경(불투명)",
     hint: "유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다. (유저 색상 배경이 켜져 있을 때만 의미가 있습니다)",
     scope: "client",
-    config: false,
+    config: true,
     type: String,
     choices: {
       white: "흰색(권장)",
@@ -552,7 +552,7 @@ Hooks.once("init", () => {
     name: "채팅: 배경 채도(페이퍼 오버레이 알파)",
     hint: "텍스쳐 제거 시 사용하는 '페이퍼 오버레이'의 알파 값입니다. 값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Number,
     default: 0.42,
     range: { min: 0.05, max: 1.0, step: 0.01 },
@@ -563,7 +563,7 @@ Hooks.once("init", () => {
     name: "채팅 입력 마크다운 지원",
     hint: "채팅 입력 텍스트를 마크다운으로 처리합니다(이미지/링크/제목/굵게/기울임/취소선/인용구).",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
   });
@@ -572,7 +572,7 @@ Hooks.once("init", () => {
     name: "채팅 수정(편집) 다이얼로그",
     hint: "메시지 수정 버튼 클릭 시 마크다운 기반 편집 다이얼로그를 사용합니다.",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: true,
   });
@@ -613,6 +613,115 @@ Hooks.once("ready", async () => {
   feSetupTypingIndicator();
   feInstallMarkdownPreCreateHook();
 });
+
+// Extra safety: apply user-color background as soon as each message is rendered.
+// This helps when other modules rapidly create->update messages (automation), or when
+// the chat log is re-rendered without a full childList mutation.
+// Extra safety: chat rendering can race when other modules rapidly create->update the same ChatMessage
+// (common with automation like midi-qol). In those cases the same message can be rendered twice or re-rendered
+// after our MutationObserver pass. We defensively:
+//  - Re-apply user-color tint after the message is inserted into the DOM
+//  - Schedule a dedupe + merge recompute for the affected chat log
+// See: Foundry core issue #13067 (duplicate render when update races render).
+const fePendingMergeLogs = new Set();
+let feMergeRefreshScheduled = false;
+
+function feExtractHTMLElement(html) {
+  if (!html) return null;
+  if (html instanceof HTMLElement) return html;
+  // jQuery-like wrappers
+  if (html.jquery && html[0] instanceof HTMLElement) return html[0];
+  if (Array.isArray(html) && html[0] instanceof HTMLElement) return html[0];
+  if (html[0] instanceof HTMLElement) return html[0];
+  return null;
+}
+
+function feDeferTask(fn) {
+  try {
+    queueMicrotask(fn);
+  } catch {
+    Promise.resolve().then(fn);
+  }
+}
+
+function feScheduleMergeRefresh(logEl) {
+  if (!(logEl instanceof HTMLElement)) return;
+  fePendingMergeLogs.add(logEl);
+  if (feMergeRefreshScheduled) return;
+  feMergeRefreshScheduled = true;
+  requestAnimationFrame(() => {
+    feMergeRefreshScheduled = false;
+    for (const log of fePendingMergeLogs) {
+      try {
+        feDedupeChatMessagesInLog(log);
+        feApplyChatMerge(log);
+      } catch {
+        /* no-op */
+      }
+    }
+    fePendingMergeLogs.clear();
+  });
+}
+
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  const el = feExtractHTMLElement(html);
+  if (!el) return;
+
+  // Defer until after the message has been added to the DOM and after all other render hooks ran.
+  feDeferTask(() => {
+    try {
+      if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToMessageElement(message, el);
+
+      if (feSetting(S.MERGE_ENABLED)) {
+        const log = el.closest?.("ol.chat-log, #chat-log");
+        if (log) feScheduleMergeRefresh(log);
+        else feApplyChatMergeToAllLogs();
+      }
+    } catch {
+      /* no-op */
+    }
+  });
+
+  // Some modules mutate the message after render hooks (async). One delayed pass helps stabilize visuals.
+  setTimeout(() => {
+    try {
+      const hasVar = (el.style?.getPropertyValue?.("--fe-user-color-rgb") ?? "").trim().length > 0;
+      if (feSetting(S.USE_USER_COLOR_BG) && (!el.classList.contains("fe-has-user-color") || !hasVar)) {
+        feApplyUserColorBgToMessageElement(message, el);
+      }
+
+      if (feSetting(S.MERGE_ENABLED)) {
+        const log = el.closest?.("ol.chat-log, #chat-log");
+        if (log) feScheduleMergeRefresh(log);
+      }
+    } catch {
+      /* no-op */
+    }
+  }, 0);
+});
+
+// When a ChatMessage document is updated (common in automation), ensure merge groups and user-color tint
+// are re-evaluated for the updated message.
+Hooks.on("updateChatMessage", (message) => {
+  try {
+    if (!feSetting(S.MERGE_ENABLED) && !feSetting(S.USE_USER_COLOR_BG)) return;
+
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (!id) return;
+
+    for (const log of feGetChatLogs()) {
+      const sel = `li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`;
+      const el = log?.querySelector?.(sel);
+      if (!el) continue;
+
+      if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToMessageElement(message, el);
+      if (feSetting(S.MERGE_ENABLED)) feScheduleMergeRefresh(log);
+    }
+  } catch {
+    /* no-op */
+  }
+});
+
 
 // -------------------------------------
 // Markdown
@@ -1336,7 +1445,8 @@ function feGetChatMessageElementOrder(el, fallback) {
 
 function feMessageMergeInfo(msg, el) {
   // NOTE: v13+: ChatMessage#user is deprecated -> use ChatMessage#author
-  const authorId = msg?.author?.id ?? "";
+  // Some automation modules may still populate legacy fields during rapid updates, so keep fallbacks.
+  const authorId = msg?.author?.id ?? msg?.user?.id ?? msg?.user ?? "";
 
   const speaker = msg?.speaker ?? {};
   const speakerKey = [
@@ -1389,6 +1499,67 @@ function feGetChatLogs() {
   return Array.from(logs);
 }
 
+/**
+ * Remove duplicate rendered chat messages inside a single chat log.
+ *
+ * In some Foundry versions, rapid create->update cycles (common in automation modules)
+ * could briefly render the same ChatMessage twice. Foundry has addressed this in core,
+ * but we defensively de-dupe by message id to prevent "old messages mixing in".
+ */
+function feDedupeChatMessagesInLog(logEl) {
+  try {
+    if (!logEl?.querySelectorAll) return;
+    const seen = new Map();
+    const items = Array.from(logEl.querySelectorAll("li.chat-message"));
+    for (const el of items) {
+      const rawId = feGetMessageIdFromElement(el);
+      const id = rawId ? feNormalizeChatMessageId(rawId) : null;
+      if (!id) continue;
+
+      const prev = seen.get(id);
+      if (prev && prev !== el) {
+        // Keep the most recently encountered element (typically the updated render).
+        try {
+          prev.remove();
+        } catch {}
+      }
+      seen.set(id, el);
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+
+const feMergeRetryTimers = new WeakMap();
+
+/**
+ * If a merge pass encounters messages whose ChatMessage documents are not yet available in game.messages,
+ * schedule a short retry. This prevents accidental merges (headers hidden) during rapid create->update races
+ * while still converging to the correct grouping once the documents are ready.
+ */
+function feScheduleMergeRetry(logEl, delay = 80) {
+  try {
+    if (!(logEl instanceof HTMLElement)) return;
+    if (feMergeRetryTimers.has(logEl)) return;
+
+    const t = setTimeout(() => {
+      feMergeRetryTimers.delete(logEl);
+      try {
+        feDedupeChatMessagesInLog(logEl);
+        feApplyChatMerge(logEl);
+        if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToLog(logEl, logEl?.ownerDocument ?? document);
+      } catch {
+        /* no-op */
+      }
+    }, delay);
+
+    feMergeRetryTimers.set(logEl, t);
+  } catch {
+    /* no-op */
+  }
+}
+
 function feMergeKey(info) {
   // Key that defines whether two messages may be merged.
   // Include style + rollMode + whisper visibility so we don't merge across contexts.
@@ -1426,11 +1597,13 @@ function feApplyChatMerge(logEl) {
   // Collect message infos
   const infos = msgs
     .map((el, idx) => {
-      const id = feGetMessageIdFromElement(el);
-      const msg = id ? game.messages?.get(id) : null;
+      const msgId = feGetMessageIdFromElement(el);
+      const msg = msgId ? game.messages?.get(msgId) : null;
       const info = feMessageMergeInfo(msg, el);
       return {
         ...info,
+        msgId,
+        missing: !msg,
         el,
         idx,
         order: feGetChatMessageElementOrder(el, idx)
@@ -1441,8 +1614,20 @@ function feApplyChatMerge(logEl) {
   // Sort by visual order (Foundry sometimes uses fractional data-order)
   infos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  // Precompute merge keys
-  for (const info of infos) info.key = feMergeKey(info);
+  // Precompute merge keys.
+  // If the ChatMessage document isn't available yet (rare race during rapid create->update),
+  // never merge it to avoid "message mixing". We will retry shortly.
+  let hasMissingDocs = false;
+  for (const info of infos) {
+    if (!info.msgId || info.missing) {
+      hasMissingDocs = true;
+      info.key = `__fe_missing__||${info.msgId ?? info.idx}`;
+      info.mergeableText = false;
+    } else {
+      info.key = feMergeKey(info);
+    }
+  }
+  if (hasMissingDocs) feScheduleMergeRetry(logEl);
 
   const canMerge = (a, b) => {
     if (!a || !b) return false;
@@ -1517,6 +1702,16 @@ function feBindChatLogObservers() {
       let touchesMessages = false;
 
       for (const m of mutations) {
+        if (m.type === "attributes") {
+          const t = m.target;
+          if (t instanceof Element && t.matches?.("li.chat-message") && m.attributeName === "data-order") {
+            // Order can be assigned/adjusted after insertion; re-merge in that case to avoid visual mixing.
+            touchesMessages = true;
+            pending.add(t);
+          }
+          continue;
+        }
+
         for (const n of m.addedNodes ?? []) {
           touchesMessages ||= collectMessages(n, pending);
         }
@@ -1535,30 +1730,55 @@ function feBindChatLogObservers() {
       requestAnimationFrame(() => {
         obs._scheduled = false;
 
+        // Mitigate rare core/module races where the same ChatMessage can be rendered twice
+        // (e.g. rapid create->update sequences from automation modules).
+        feDedupeChatMessagesInLog(log);
+
         // Merge groups can be affected by what messages exist, so we recompute on add/remove.
         feApplyChatMerge(log);
 
         // Apply user-color only to newly added messages (existing messages are already processed).
         if (pending.size) {
+          const doc = log?.ownerDocument ?? document;
+          let needsRetry = false;
           for (const el of pending) {
             try {
-              const msgId = el?.dataset?.messageId;
-              const msg = msgId ? game?.messages?.get?.(msgId) : null;
-              if (!msg) continue;
+              const rawId = feGetMessageIdFromElement(el);
+              const msgId = rawId ? feNormalizeChatMessageId(rawId) : null;
+              if (!msgId) {
+                needsRetry = true;
+                continue;
+              }
+
+              const msg = game?.messages?.get?.(msgId) ?? null;
+              if (!msg) {
+                needsRetry = true;
+                continue;
+              }
               feApplyUserColorBgToMessageElement(msg, el);
             } catch (_e) {
               /* no-op */
             }
           }
           pending.clear();
+
+          if (needsRetry && !obs._userColorRetryTimer) {
+            obs._userColorRetryTimer = setTimeout(() => {
+              obs._userColorRetryTimer = null;
+              try {
+                feApplyUserColorBgToLog(log, doc);
+              } catch {}
+            }, 60);
+          }
         }
       });
     });
 
-    obs.observe(log, { childList: true, subtree: true });
+    obs.observe(log, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-order"] });
     feChatLogObservers.set(log, obs);
 
     // Ensure initial (already-rendered) messages get the same treatments.
+    feDedupeChatMessagesInLog(log);
     feApplyChatMerge(log);
     feApplyUserColorBgToLog(log, log?.ownerDocument ?? document);
   }
@@ -1632,7 +1852,7 @@ function feObserveChatLogs() {
       feBindChatLogObservers();
 
       // Chat UI can re-render controls; keep our buttons/typing indicator alive.
-  feFireChatUiUpdated();
+      feFireChatUiUpdated();
       feRenderTypingIndicator();
     });
   });
@@ -1658,6 +1878,7 @@ export {
   feGetChatLogs,
   feMarkdownToHTML,
   feGetSpeakerActorFromMessage,
+  feGetMessageUserColor,
 
   feApplyStyleVarsFromSettings,
   feStripChatTexturesInWindow,

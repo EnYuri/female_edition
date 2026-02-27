@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "0.3.44",
+  "version": "0.3.48",
   "authors": [
     {
       "name": "nayuri",
@@ -28,7 +28,6 @@
     "styles/fe-chat-edit.css",
     "styles/fe-tidy-override.css",
     "styles/fe-chat-portrait.css",
-    "styles/fe-settings-menu.css",
     "styles/conditions.css"
   ],
   "languages": [

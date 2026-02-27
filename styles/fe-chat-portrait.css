@@ -1,5 +1,5 @@
 :root {
-  --fe-chat-portrait-size: 48px;
+  --fe-chat-portrait-size: 64px;
 }
 
 /* Chat portrait in messages */
@@ -25,6 +25,14 @@ li.chat-message .fe-chat-portrait {
   border-radius: 50%;
   object-fit: cover;
 }
+
+
+/* Quality: force smooth downscaling (avoid global pixelated rules) */
+li.chat-message .fe-chat-portrait,
+.combat-tracker img.token-image.fe-combat-portrait {
+  image-rendering: auto !important;
+}
+
 
 /*
  * FE Chat Portrait hide toggle (separate from the base "fe-hide-portraits")
