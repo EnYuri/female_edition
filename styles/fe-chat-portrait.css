@@ -3,34 +3,80 @@
 }
 
 /* Chat portrait in messages */
-li.chat-message.fe-has-chat-portrait header.message-header {
-  align-items: center;
+li.chat-message.fe-has-chat-portrait > .message-header {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  /* Align portrait to the top like chat-portrait. */
+  align-items: flex-start !important;
+  /* Keep sender text attached to the portrait; push metadata to the far right via margin-left:auto. */
+  justify-content: flex-start !important;
+  /* Rely on the portrait's margin-right instead of flex-gap (prevents excessive spacing). */
+  gap: 0 !important;
+
+  padding: 0 !important;
+  margin: 0 0 3px 0 !important;
+  border: none !important;
 }
 
+li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
+  min-width: 0;
+  /* Avoid forcing flex on the sender element (can cause mid-alignment/centering issues). */
+  display: block !important;
+  align-self: center;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+/* If a stacked name wrapper is present, keep it left-aligned next to the portrait. */
+li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked {
+  text-align: left;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+li.chat-message.fe-has-chat-portrait > .message-header .message-metadata {
+  flex: 0 0 auto;
+  /* Put timestamp+icons back to the original top-right corner. */
+  margin-left: auto !important;
+  align-self: flex-start !important;
+
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Legacy wrapper-based injection (<=0.3.49) */
 li.chat-message .fe-chat-portrait-wrap {
   display: flex;
   align-items: center;
-  margin-right: 6px;
+  margin-right: 5px;
 }
 
+/* Portrait image */
 li.chat-message .fe-chat-portrait {
   width: var(--fe-chat-portrait-size);
   height: var(--fe-chat-portrait-size);
-  border-radius: 50%;
-  object-fit: cover;
+  flex: 0 0 var(--fe-chat-portrait-size);
+  margin-right: 5px;
+  margin-bottom: 3px; /* closer to chat-portrait baseline alignment */
+  display: block;
 }
 
 /* Combat tracker */
 .combat-tracker img.token-image.fe-combat-portrait {
-  border-radius: 50%;
-  object-fit: cover;
+  width: var(--fe-chat-portrait-size);
+  height: var(--fe-chat-portrait-size);
+  flex: 0 0 var(--fe-chat-portrait-size);
 }
 
 
-/* Quality: force smooth downscaling (avoid global pixelated rules) */
+/* Quality: prefer smooth downscaling (avoid global pixelated rules) */
 li.chat-message .fe-chat-portrait,
-.combat-tracker img.token-image.fe-combat-portrait {
+.combat-tracker img.token-image.fe-combat-portrait,
+li.chat-message .fe-chat-card-icon {
   image-rendering: auto !important;
+  image-rendering: smooth !important;
 }
 
 
@@ -40,6 +86,7 @@ li.chat-message .fe-chat-portrait,
  * - fe-hide-chat-portrait-wrap: hides THIS module's inserted portraits (.fe-chat-portrait-wrap)
  */
 body.fe-hide-chat-portrait-wrap li.chat-message .fe-chat-portrait-wrap,
+body.fe-hide-chat-portrait-wrap li.chat-message img.fe-chat-portrait,
 body.fe-hide-chat-portrait-wrap .combat-tracker img.token-image.fe-combat-portrait {
   display: none !important;
 }

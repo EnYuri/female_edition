@@ -4,6 +4,8 @@
 
 import {
   MODULE_ID,
+  S,
+  feSetting,
   feGetChatLogs,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
@@ -14,6 +16,7 @@ const CP = Object.freeze({
   HIDE_WRAP: "chatPortraitHideWrap",
   USE_TOKEN: "chatPortraitUseTokenImage",
   SIZE: "chatPortraitSize",
+  CARD_ICON_SIZE: "chatPortraitCardIconSize",
   SHAPE: "chatPortraitShape",
   BORDER_MODE: "chatPortraitBorderMode",
   BORDER_WIDTH: "chatPortraitBorderWidth",
@@ -28,18 +31,91 @@ const CP = Object.freeze({
   SHOW_OTHER: "chatPortraitShowOther",
 });
 
+// ChatMessage flag key (stable portrait src, similar to chat-portrait module's flags.chat-portrait.src)
+const FE_FLAG_PORTRAIT_SRC = "portraitSrc";
+
+// Cache for high-quality downscaled portraits (per src+size+fit)
+const _cpResampleCache = new Map();
+
+// Track in-flight resample promises to avoid duplicating work
+const _cpResampleInflight = new Map();
+
+// Cross-window safe DOM checks (avoid instanceof across Window realms).
+function cpIsElement(node) {
+  return !!node && node.nodeType === 1;
+}
+
+function cpIsImageElement(node) {
+  return cpIsElement(node) && String(node.tagName || "").toUpperCase() === "IMG";
+}
+
+
 function cpGet(key) {
   return game.settings.get(MODULE_ID, key);
 }
 
+function cpGetMergeFollowMode() {
+  try {
+    return String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
+  } catch {
+    return "hide";
+  }
+}
+
+function cpIsMergeEnabled() {
+  try {
+    return !!feSetting(S.MERGE_ENABLED);
+  } catch {
+    return false;
+  }
+}
+
+function cpShouldRenderPortraitForMessageElement(messageEl) {
+  try {
+    if (!messageEl) return true;
+
+    // If FE merge is enabled and this is a follow-up message (mid/end), mimic chat-portrait behavior:
+    // - only show portraits on follow-ups when the merge follow mode is "portrait".
+    if (cpIsMergeEnabled()) {
+      const cl = messageEl.classList;
+      const isFollow = cl?.contains?.("fe-merge-mid") || cl?.contains?.("fe-merge-end");
+      if (isFollow) {
+        const mode = cpGetMergeFollowMode();
+        return mode === "portrait";
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return true;
+}
+
 function cpExtractHTMLElement(html) {
   if (!html) return null;
-  if (html instanceof HTMLElement) return html;
+  if (cpIsElement(html)) return html;
   // jQuery-like wrappers
-  if (html.jquery && html[0] instanceof HTMLElement) return html[0];
-  if (Array.isArray(html) && html[0] instanceof HTMLElement) return html[0];
-  if (html[0] instanceof HTMLElement) return html[0];
+  if (html.jquery && cpIsElement(html[0])) return html[0];
+  if (Array.isArray(html) && cpIsElement(html[0])) return html[0];
+  if (cpIsElement(html[0])) return html[0];
   return null;
+}
+
+function cpExtractChatMessageElement(html) {
+  const el = cpExtractHTMLElement(html);
+  if (!el) return null;
+
+  // Foundry v13 hook passes an HTMLElement for the *message*.
+  // Be defensive: some wrappers/modules may pass a child node.
+  try {
+    if (el.matches?.("li.chat-message")) return el;
+    const closest = el.closest?.("li.chat-message");
+    if (closest) return closest;
+    const found = el.querySelector?.("li.chat-message");
+    if (found) return found;
+  } catch {
+    /* fall through */
+  }
+  return el;
 }
 
 let _cpWarnedChatPortraitActive = false;
@@ -116,7 +192,47 @@ function cpGetTokenDocFromSpeaker(speaker) {
   return tokenObj?.document ?? null;
 }
 
+function cpGetStoredPortraitSrc(message) {
+  try {
+    const feSrc = message?.flags?.[MODULE_ID]?.[FE_FLAG_PORTRAIT_SRC];
+    if (feSrc) return String(feSrc);
+  } catch {
+    // ignore
+  }
+
+  // Compatibility: if chat-portrait module stored src on the message, reuse it.
+  try {
+    const cpSrc = message?.flags?.["chat-portrait"]?.src;
+    if (cpSrc) return String(cpSrc);
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+function cpSetStoredPortraitSrcOnPreCreate(message, src) {
+  try {
+    if (!message || !src) return;
+    // preCreate hooks can mutate source data using updateSource.
+    message.updateSource({
+      flags: {
+        [MODULE_ID]: {
+          ...(message.flags?.[MODULE_ID] ?? {}),
+          [FE_FLAG_PORTRAIT_SRC]: String(src),
+        },
+      },
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 function cpGetPortraitSrc(message) {
+  // Prefer a stored, stable portrait source (mirrors chat-portrait's approach)
+  const stored = cpGetStoredPortraitSrc(message);
+  if (stored) return stored;
+
   const useToken = !!cpGet(CP.USE_TOKEN);
   const actor = feGetSpeakerActorFromMessage(message);
   const speaker = message?.speaker;
@@ -148,7 +264,126 @@ function cpGetPortraitAlt(message) {
 
 function cpRemovePortrait(messageEl) {
   messageEl?.classList?.remove?.("fe-has-chat-portrait");
+  // Clean both the legacy wrapper-based injection (<=0.3.49) and the current direct <img> injection.
+  try {
+    messageEl?.querySelectorAll?.("img.fe-chat-portrait")?.forEach?.((n) => n?.remove?.());
+  } catch {
+    /* no-op */
+  }
   messageEl?.querySelector?.(".fe-chat-portrait-wrap")?.remove?.();
+}
+
+function cpIsDfChatEnhancementsMerged(messageEl) {
+  try {
+    const cl = messageEl?.classList;
+    return cl?.contains?.("dfce-cm-middle") || cl?.contains?.("dfce-cm-bottom");
+  } catch {
+    return false;
+  }
+}
+
+function cpIsRoundMarkerMessage(message, messageEl) {
+  try {
+    // monks-little-details round marker
+    const flag = message?.flags?.["monks-little-details"]?.roundmarker;
+    if (flag === true || String(flag) === "true") return true;
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    // Several modules render a .round-marker element inside the message content.
+    if (messageEl?.querySelector?.(".message-content .round-marker")) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+function cpFindMessageHeader(messageEl) {
+  if (!messageEl) return null;
+
+  // Prefer direct children for correctness (avoid selecting nested headers inside chat cards).
+  try {
+    for (const child of Array.from(messageEl.children ?? [])) {
+      if (child?.classList?.contains?.("message-header")) return child;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Fallback: any descendant
+  try {
+    const any = messageEl.querySelector?.(".message-header");
+    if (any) return any;
+  } catch {
+    /* ignore */
+  }
+
+  // Last resort: some system cards can omit the base message header.
+  try {
+    const cardHeader = messageEl.querySelector?.(".card-header");
+    if (cardHeader) return cardHeader;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function cpApplyChatCardIconSizing(messageEl) {
+  try {
+    if (!messageEl?.querySelectorAll) return;
+    const size = Math.max(0, Number(cpGet(CP.CARD_ICON_SIZE) ?? 36) || 0);
+    if (!size) return;
+
+    // If this is an explicit image-post style message, don't touch its images.
+    if (messageEl.querySelector?.(".message-content .chat-images-container img")) return;
+
+    const cards = messageEl.querySelectorAll(
+      ".message-content .chat-card, .message-content .midi-chat-card, .message-content .dnd5e2.chat-card, .message-content .dnd5e.chat-card"
+    );
+    if (!cards?.length) return;
+
+    for (const card of cards) {
+      if (!cpIsElement(card)) continue;
+
+      const directChildImg = (() => {
+        try {
+          for (const ch of Array.from(card.children ?? [])) {
+            if (cpIsImageElement(ch)) return ch;
+          }
+        } catch {
+          /* ignore */
+        }
+        return null;
+      })();
+
+      // Prefer the standard dnd5e icon location.
+      const icon =
+        card.querySelector("header.card-header img") ||
+        card.querySelector(".card-header img") ||
+        directChildImg ||
+        null;
+
+      if (!cpIsImageElement(icon)) continue;
+
+      // Avoid resizing our own injected chat header portrait.
+      if (icon.classList.contains("fe-chat-portrait")) continue;
+
+      icon.width = size;
+      icon.height = size;
+      icon.style.setProperty("width", `${size}px`, "important");
+      icon.style.setProperty("height", `${size}px`, "important");
+      icon.style.setProperty("flex", `0 0 ${size}px`, "important");
+      icon.style.setProperty("object-fit", "cover", "important");
+      icon.style.setProperty("image-rendering", "auto", "important");
+      // Prefer "smooth" if supported.
+      icon.style.setProperty("image-rendering", "smooth", "important");
+      icon.classList.add("fe-chat-card-icon");
+    }
+  } catch {
+    /* no-op */
+  }
 }
 
 
@@ -184,20 +419,263 @@ function cpPickActorOwnerColor(actor) {
   }
 }
 
+function cpIsSafeCanvasSource(src) {
+  try {
+    if (!src) return false;
+    const s = String(src);
+    // Already processed or ephemeral.
+    if (s.startsWith("data:") || s.startsWith("blob:")) return false;
+    // SVG portraits are better left untouched (rasterization quality differs and can be inconsistent).
+    if (/\.svg(\?.*)?$/i.test(s)) return false;
+
+    const url = new URL(s, window.location.href);
+    return url.origin === window.location.origin;
+  } catch {
+    // If URL parsing fails, assume it's a relative/local path.
+    return true;
+  }
+}
+
+async function cpWaitForImage(img) {
+  try {
+    if (!img) return false;
+    if (img.complete && img.naturalWidth > 0) return true;
+
+    if (typeof img.decode === "function") {
+      try {
+        await img.decode();
+        if (img.complete && img.naturalWidth > 0) return true;
+      } catch {
+        // fall back to onload
+      }
+    }
+
+    await new Promise((resolve, reject) => {
+      const onLoad = () => {
+        cleanup();
+        resolve(true);
+      };
+      const onErr = () => {
+        cleanup();
+        reject(new Error("image load failed"));
+      };
+      const cleanup = () => {
+        img.removeEventListener?.("load", onLoad);
+        img.removeEventListener?.("error", onErr);
+      };
+      img.addEventListener?.("load", onLoad, { once: true });
+      img.addEventListener?.("error", onErr, { once: true });
+    });
+    return img.complete && img.naturalWidth > 0;
+  } catch {
+    return false;
+  }
+}
+
+function cpComputeDrawRect({
+  srcW,
+  srcH,
+  dstSize,
+  fit = "cover", // "cover" | "contain"
+}) {
+  const w = Math.max(1, Number(srcW) || 1);
+  const h = Math.max(1, Number(srcH) || 1);
+  const s = Math.max(1, Number(dstSize) || 1);
+
+  const scale = fit === "contain" ? Math.min(s / w, s / h) : Math.max(s / w, s / h);
+  const dw = w * scale;
+  const dh = h * scale;
+  const dx = (s - dw) / 2;
+  const dy = (s - dh) / 2;
+  return { dx, dy, dw, dh };
+}
+
+function cpComputeSourceCrop({ srcW, srcH, fit = "cover" }) {
+  // Compute a source rectangle (sx,sy,sw,sh) for drawing into a square destination.
+  // - cover: crop to a centered square
+  // - contain: use full image
+  const w = Math.max(1, Number(srcW) || 1);
+  const h = Math.max(1, Number(srcH) || 1);
+
+  if (fit === "contain") return { sx: 0, sy: 0, sw: w, sh: h };
+
+  // cover: crop to square by taking the min dimension
+  const side = Math.min(w, h);
+  const sx = (w - side) / 2;
+  const sy = (h - side) / 2;
+  return { sx, sy, sw: side, sh: side };
+}
+
+function cpDownscaleCanvasStep(srcCanvas, dstW, dstH) {
+  const next = document.createElement("canvas");
+  next.width = dstW;
+  next.height = dstH;
+  const ctx = next.getContext("2d");
+  if (!ctx) return next;
+  ctx.imageSmoothingEnabled = true;
+  try {
+    ctx.imageSmoothingQuality = "high";
+  } catch {
+    /* ignore */
+  }
+  ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, dstW, dstH);
+  return next;
+}
+
+async function cpResampleToDataURL(img, size, fit) {
+  const ok = await cpWaitForImage(img);
+  if (!ok) return null;
+
+  const nw = Number(img.naturalWidth || 0);
+  const nh = Number(img.naturalHeight || 0);
+  if (!nw || !nh) return null;
+
+  // Only resample when we are actually downscaling.
+  if (nw <= size && nh <= size) return null;
+
+  try {
+    // Multi-step downscale for better quality (especially from very large portraits).
+    // Step 1: crop (cover) or keep full (contain) into a working canvas.
+    const { sx, sy, sw, sh } = cpComputeSourceCrop({ srcW: nw, srcH: nh, fit });
+
+    let work = document.createElement("canvas");
+    work.width = Math.max(1, Math.floor(sw));
+    work.height = Math.max(1, Math.floor(sh));
+    let wctx = work.getContext("2d");
+    if (!wctx) return null;
+    wctx.imageSmoothingEnabled = true;
+    try {
+      wctx.imageSmoothingQuality = "high";
+    } catch {
+      /* ignore */
+    }
+    wctx.drawImage(img, sx, sy, sw, sh, 0, 0, work.width, work.height);
+
+    // Step 2: repeatedly half until close to target.
+    while (work.width / 2 > size) {
+      const nextW = Math.max(size, Math.floor(work.width / 2));
+      const nextH = Math.max(size, Math.floor(work.height / 2));
+      work = cpDownscaleCanvasStep(work, nextW, nextH);
+    }
+
+    // Step 3: final draw into a square destination canvas.
+    const out = document.createElement("canvas");
+    out.width = size;
+    out.height = size;
+    const octx = out.getContext("2d");
+    if (!octx) return null;
+    octx.imageSmoothingEnabled = true;
+    try {
+      octx.imageSmoothingQuality = "high";
+    } catch {
+      /* ignore */
+    }
+
+    const { dx, dy, dw, dh } = cpComputeDrawRect({ srcW: sw, srcH: sh, dstSize: size, fit });
+    octx.clearRect(0, 0, size, size);
+    octx.drawImage(work, 0, 0, work.width, work.height, dx, dy, dw, dh);
+
+    return out.toDataURL("image/png");
+  } catch {
+    // Tainted canvas or unsupported draw.
+    return null;
+  }
+}
+
+function cpMaybeApplyHQResample(img, size, shape) {
+  try {
+    if (!cpIsImageElement(img)) return;
+    if (!size || size <= 0) return;
+    if (size > 256) return; // sanity cap
+
+    const origSrc = img.dataset?.fePortraitOrigSrc;
+    const key = img.dataset?.fePortraitResampleKey;
+    if (!origSrc || !key) return;
+    if (!cpIsSafeCanvasSource(origSrc)) return;
+
+    const cached = _cpResampleCache.get(key);
+    if (cached) {
+      if (img.src !== cached) img.src = cached;
+      return;
+    }
+
+    if (_cpResampleInflight.has(key)) return;
+
+    const fit = String(shape) === "none" ? "contain" : "cover";
+
+    const p = (async () => {
+      const dataUrl = await cpResampleToDataURL(img, size, fit);
+      return dataUrl;
+    })();
+
+    _cpResampleInflight.set(key, p);
+
+    p.then((dataUrl) => {
+      _cpResampleInflight.delete(key);
+      if (!dataUrl) return;
+      _cpResampleCache.set(key, dataUrl);
+      // Only apply if this image still refers to the same request.
+      if (img.dataset?.fePortraitResampleKey === key) {
+        img.src = dataUrl;
+      }
+    }).catch(() => {
+      _cpResampleInflight.delete(key);
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 function cpApplyPortraitStyling(message, img) {
   try {
-    if (!(img instanceof HTMLImageElement)) return;
+    if (!cpIsImageElement(img)) return;
+
+    const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
+    // Match chat-portrait's behavior (use width/height attributes) for broader theme compatibility.
+    try {
+      img.width = size;
+      img.height = size;
+      img.style.setProperty("width", `${size}px`, "important");
+      img.style.setProperty("height", `${size}px`, "important");
+      img.style.setProperty("flex", `0 0 ${size}px`, "important");
+    } catch {}
 
     // Shape (cropping)
     const shape = String(cpGet(CP.SHAPE) ?? "circle");
-    img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
+
+    if (shape === "none") {
+      // No border/crop: only size adjustment.
+      img.style.setProperty("border-radius", "0", "important");
+      img.style.setProperty("object-fit", "contain", "important");
+      img.style.setProperty("border", "none", "important");
+      img.style.setProperty("clip-path", "none", "important");
+    } else {
+      img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
+      img.style.setProperty("object-fit", "cover", "important");
+
+      // Some Chromium/Electron builds can render border-radius edges slightly jagged.
+      // clip-path can produce smoother results for circles.
+      if (shape === "circle") {
+        img.style.setProperty("clip-path", "circle(50% at 50% 50%)", "important");
+      } else {
+        img.style.setProperty("clip-path", "none", "important");
+      }
+    }
 
     // Quality: override any global pixelated rules so downscaling looks smooth.
     // (Some themes/modules set image-rendering: pixelated for sidebar images.)
+    img.style.setProperty("display", "block", "important");
     img.style.setProperty("image-rendering", "auto", "important");
-    img.style.setProperty("object-fit", "cover", "important");
+    // Prefer "smooth" if supported.
+    img.style.setProperty("image-rendering", "smooth", "important");
+
+    // Attempt a high-quality resample for small portrait sizes to avoid pixelated downscaling.
+    // (Best-effort; safely no-ops for cross-origin images.)
+    cpMaybeApplyHQResample(img, size, shape);
 
     // Border
+    if (shape === "none") return;
+
     const mode = String(cpGet(CP.BORDER_MODE) ?? "theme");
     if (mode === "theme") {
       // Do not override theme/module styling
@@ -229,13 +707,54 @@ function cpApplyPortraitStyling(message, img) {
 
 function cpApplyCombatPortraitStyling(combatant, img) {
   try {
-    if (!(img instanceof HTMLImageElement)) return;
+    if (!cpIsImageElement(img)) return;
+
+    const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
+    try {
+      img.width = size;
+      img.height = size;
+      img.style.setProperty("width", `${size}px`, "important");
+      img.style.setProperty("height", `${size}px`, "important");
+      img.style.setProperty("flex", `0 0 ${size}px`, "important");
+    } catch {}
 
     const shape = String(cpGet(CP.SHAPE) ?? "circle");
-    img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
+    if (shape === "none") {
+      img.style.setProperty("border-radius", "0", "important");
+      img.style.setProperty("object-fit", "contain", "important");
+      img.style.setProperty("border", "none", "important");
+      img.style.setProperty("clip-path", "none", "important");
+    } else {
+      img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
+      img.style.setProperty("object-fit", "cover", "important");
+      if (shape === "circle") {
+        img.style.setProperty("clip-path", "circle(50% at 50% 50%)", "important");
+      } else {
+        img.style.setProperty("clip-path", "none", "important");
+      }
+    }
 
+    img.style.setProperty("display", "block", "important");
     img.style.setProperty("image-rendering", "auto", "important");
-    img.style.setProperty("object-fit", "cover", "important");
+    img.style.setProperty("image-rendering", "smooth", "important");
+
+    // Seed the same HQ-resample cache key used by chat portraits.
+    try {
+      const candidate = img.dataset?.fePortraitOrigSrc || img.currentSrc || img.getAttribute?.("src") || img.src || "";
+      const isData = String(candidate).startsWith("data:") || String(candidate).startsWith("blob:");
+      if (candidate && !isData) {
+        if (!img.dataset.fePortraitOrigSrc) img.dataset.fePortraitOrigSrc = String(candidate);
+        const fit = shape === "none" ? "contain" : "cover";
+        const key = `${img.dataset.fePortraitOrigSrc}@@${size}@@${fit}`;
+        img.dataset.fePortraitResampleKey = key;
+        const cached = _cpResampleCache.get(key);
+        if (cached && img.src !== cached) img.src = cached;
+      }
+    } catch {}
+
+    cpMaybeApplyHQResample(img, size, shape);
+
+    if (shape === "none") return;
 
     const mode = String(cpGet(CP.BORDER_MODE) ?? "theme");
     if (mode === "theme") {
@@ -268,6 +787,12 @@ function cpApplyCombatPortraitStyling(combatant, img) {
 function cpUpsertPortrait(message, messageEl) {
   if (!messageEl) return;
 
+  // Restrict to the actual chat message element.
+  if (!messageEl.matches?.("li.chat-message")) {
+    const closest = messageEl.closest?.("li.chat-message");
+    if (closest) messageEl = closest;
+  }
+
   // Coexistence policy: allow duplicates, warn once (no hard-block).
   cpWarnIfChatPortraitModuleActive();
 
@@ -282,8 +807,37 @@ function cpUpsertPortrait(message, messageEl) {
     return;
   }
 
-  const header = messageEl.querySelector?.("header.message-header");
+  // Respect FE's chat-merge follow-up behavior (match chat-portrait expectations)
+  if (!cpShouldRenderPortraitForMessageElement(messageEl)) {
+    cpRemovePortrait(messageEl);
+    return;
+  }
+
+  // Compatibility: skip known "round marker" / merged-message variants from other modules.
+  if (cpIsDfChatEnhancementsMerged(messageEl) || cpIsRoundMarkerMessage(message, messageEl)) {
+    cpRemovePortrait(messageEl);
+    return;
+  }
+
+  const header = cpFindMessageHeader(messageEl);
   if (!header) return;
+
+  // If another portrait module (e.g. chat-portrait) already injected a portrait into the
+  // message header and we don't already have ours, avoid duplicating portraits.
+  try {
+    const hasOur = !!header.querySelector?.("img.fe-chat-portrait");
+    const hasOther = !!header.querySelector?.(
+      'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container'
+    );
+    if (!hasOur && hasOther) return;
+  } catch {}
+
+  // Add predictable classes so CSS can align header layout similarly to chat-portrait.
+  try {
+    header.classList.add("fe-chat-portrait-message-header");
+    const sys = game?.system?.id;
+    if (sys) header.classList.add(`fe-chat-portrait-message-header-${sys}`);
+  } catch {}
 
   const src = cpGetPortraitSrc(message);
   if (!src) return;
@@ -292,27 +846,47 @@ function cpUpsertPortrait(message, messageEl) {
   // Always create elements using the message element's ownerDocument.
   const doc = messageEl.ownerDocument ?? document;
 
-  let wrap = header.querySelector?.(".fe-chat-portrait-wrap");
-  if (!wrap) {
-    wrap = doc.createElement("div");
-    wrap.className = "fe-chat-portrait-wrap";
-    header.prepend(wrap);
-  }
+  // Remove legacy wrapper injection if present.
+  try {
+    header.querySelector?.(".fe-chat-portrait-wrap")?.remove?.();
+  } catch {}
 
-  let img = wrap.querySelector("img.fe-chat-portrait");
+  let img = header.querySelector?.("img.fe-chat-portrait");
   if (!img) {
     img = doc.createElement("img");
     img.className = "fe-chat-portrait";
     img.loading = "lazy";
     img.decoding = "async";
-    wrap.appendChild(img);
+    header.prepend(img);
   }
 
-  img.src = src;
+  // Keep a stable reference to the original resource.
+  // If we already have a HQ-resampled data URL for this exact request, keep using it.
+  const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
+  const shape = String(cpGet(CP.SHAPE) ?? "circle");
+  const fit = shape === "none" ? "contain" : "cover";
+  const key = `${src}@@${size}@@${fit}`;
+
+  const cached = _cpResampleCache.get(key);
+  const prevKey = img.dataset?.fePortraitResampleKey;
+  const prevOrig = img.dataset?.fePortraitOrigSrc;
+
+  if (prevKey !== key || prevOrig !== src) {
+    img.dataset.fePortraitOrigSrc = src;
+    img.dataset.fePortraitResampleKey = key;
+    img.src = cached || src;
+  } else {
+    // Same request; only swap to cache if it arrived since the last render.
+    if (cached && img.src !== cached) img.src = cached;
+  }
+
   img.alt = cpGetPortraitAlt(message);
   img.title = img.alt;
 
   cpApplyPortraitStyling(message, img);
+
+  // Resize common dnd5e/midi chat-card icons to avoid huge portraits inside message content.
+  cpApplyChatCardIconSizing(messageEl);
 
   messageEl.classList.add("fe-has-chat-portrait");
 }
@@ -341,7 +915,7 @@ function cpRefreshAllChatMessages() {
   // feGetChatLogs() returns actual <ol.chat-log> / #chat-log HTMLElements.
   // Do NOT treat them as Application objects.
   for (const logEl of feGetChatLogs()) {
-    if (!(logEl instanceof HTMLElement)) continue;
+    if (!cpIsElement(logEl)) continue;
     const messages = logEl.querySelectorAll?.("li.chat-message");
     if (!messages?.length) continue;
 
@@ -373,12 +947,47 @@ export function feChatPortraitApplyVars(doc = document) {
 
 function cpApplyCombatTrackerPortraits(html) {
   cpWarnIfChatPortraitModuleActive();
-  if (!cpGet(CP.ENABLED)) return;
-  if (!cpGet(CP.APPLY_COMBAT)) return;
-
   const root = html?.querySelector ? html : document;
   const combat = root.querySelector?.("#combat") ?? root.querySelector?.(".combat-tracker");
   if (!combat) return;
+
+  const enabled = !!cpGet(CP.ENABLED);
+  const applyCombat = enabled && !!cpGet(CP.APPLY_COMBAT);
+
+  // If feature is off, clean up any previously injected portraits/styling.
+  if (!applyCombat) {
+    try {
+      const imgs = Array.from(combat.querySelectorAll?.("img.token-image.fe-combat-portrait") ?? []);
+      for (const img of imgs) {
+        try {
+          img.classList.remove("fe-combat-portrait");
+        } catch {}
+
+        // Attempt to restore the default token image.
+        try {
+          const li = img.closest?.("li.combatant") ?? img.closest?.("li");
+          const cid = li?.dataset?.combatantId;
+          const combatant = cid ? game.combat?.combatants?.get(cid) : null;
+          const tokenDoc = combatant?.token;
+          const restore = tokenDoc?.texture?.src || tokenDoc?.img || combatant?.actor?.img;
+          if (restore) img.src = restore;
+        } catch {}
+
+        try {
+          img.style.removeProperty("width");
+          img.style.removeProperty("height");
+          img.style.removeProperty("flex");
+          img.style.removeProperty("border-radius");
+          img.style.removeProperty("object-fit");
+          img.style.removeProperty("clip-path");
+          img.style.removeProperty("display");
+          img.style.removeProperty("image-rendering");
+          img.style.removeProperty("border");
+        } catch {}
+      }
+    } catch {}
+    return;
+  }
 
   const useToken = !!cpGet(CP.USE_TOKEN);
 
@@ -422,7 +1031,7 @@ function cpRegisterSettings() {
 
   game.settings.register(MODULE_ID, CP.HIDE_WRAP, {
     name: "채팅 포트레이트(삽입) 숨김",
-    hint: "이 모듈이 채팅 카드 헤더에 삽입하는 포트레이트(.fe-chat-portrait-wrap)를 숨깁니다. 기존 '채팅 포트레이트 숨김'(내부/기본 포트레이트) 옵션과 별개입니다.",
+    hint: "이 모듈이 채팅 카드 헤더에 삽입하는 포트레이트(이미지)를 숨깁니다. 기존 '채팅 기본 포트레이트 숨김(내부/기본)' 옵션과 별개입니다.",
     scope: "client",
     config: true,
     type: Boolean,
@@ -461,10 +1070,24 @@ function cpRegisterSettings() {
     },
   });
 
+  game.settings.register(MODULE_ID, CP.CARD_ICON_SIZE, {
+    name: "채팅 카드 아이콘 크기(px)",
+    hint: "midi-qol/dnd5e 채팅 카드 안의 큰 이미지(아이콘/포트레이트)가 과도하게 크게 보이는 경우를 방지하기 위해, 카드 헤더 이미지 크기를 강제로 조정합니다. 0으로 설정하면 비활성화됩니다.",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 128, step: 1 },
+    default: 36,
+    onChange: () => {
+      cpRefreshAllChatMessages();
+      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+    },
+  });
+
 
   game.settings.register(MODULE_ID, CP.SHAPE, {
     name: "채팅 포트레이트 모양",
-    hint: "포트레이트 이미지를 원형/사각형으로 표시합니다.",
+    hint: "포트레이트 모양/자르기 방식을 설정합니다. '미적용'은 보더/자르기 없이 크기만 조절합니다.",
     scope: "client",
     config: true,
     type: String,
@@ -472,6 +1095,7 @@ function cpRegisterSettings() {
     choices: {
       circle: "원형",
       square: "사각형",
+      none: "미적용(자르지 않음)",
     },
     onChange: () => {
       cpRefreshAllChatMessages();
@@ -565,8 +1189,28 @@ Hooks.once("ready", () => {
   cpRefreshAllChatMessages();
 });
 
+// Store a stable portrait src on the message at creation time.
+// This mirrors chat-portrait's behavior and improves long-term consistency
+// (archives, renamed/deleted actors, etc.).
+Hooks.on("preCreateChatMessage", (message, data) => {
+  try {
+    // Respect module enable, but it's harmless to store even if later hidden.
+    if (!cpGet(CP.ENABLED)) return;
+
+    // Avoid overwriting an existing stored portrait.
+    const existing = cpGetStoredPortraitSrc(message) || data?.flags?.[MODULE_ID]?.[FE_FLAG_PORTRAIT_SRC];
+    if (existing) return;
+
+    const src = cpGetPortraitSrc(message);
+    if (!src) return;
+    cpSetStoredPortraitSrcOnPreCreate(message, src);
+  } catch {
+    /* no-op */
+  }
+});
+
 Hooks.on("renderChatMessageHTML", (message, html) => {
-  cpUpsertPortrait(message, cpExtractHTMLElement(html));
+  cpUpsertPortrait(message, cpExtractChatMessageElement(html));
 });
 
 Hooks.on("renderChatLog", () => {

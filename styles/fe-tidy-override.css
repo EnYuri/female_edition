@@ -174,3 +174,16 @@ span.flex-row.align-items-center.extra-small-gap {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
+
+
+/* -------------------------------------------------------------------------
+ * Tidy5e Classic: Item summary text
+ * - The summary area is often longer-form text; use the more readable font.
+ * ------------------------------------------------------------------------- */
+.tidy5e-sheet.application:where(.classic) .item-summary,
+.tidy5e-sheet.application:where(.classic)
+  .item-summary
+  :is(p, li, span, div, a, em, strong, b, u, small, label) {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: var(--fe-font-weight-normal) !important;
+}

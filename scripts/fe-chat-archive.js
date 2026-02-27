@@ -63,7 +63,7 @@ function feInjectExportButtonsAll() {
   // also for popped-out chat logs if present
   for (const w of Object.values(ui.windows ?? {})) {
     const root = w?.element?.[0] ?? w?.element ?? null;
-    if (root instanceof HTMLElement) feInjectExportButton(root);
+    if (root && typeof root.querySelector === "function") feInjectExportButton(root);
   }
 }
 
@@ -279,6 +279,9 @@ async function feExportChatLogToPDFInline() {
     titleEl.textContent = worldName ? `Chat Log – ${worldName}` : "Chat Log";
     metaEl.textContent = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
 
+    // Prefer cloning from the already-rendered live chat log DOM when possible.
+    const liveMessageMap = feBuildLiveChatMessageElementMap();
+
     // Render each message using Foundry's own renderer so we keep portraits/chat cards, etc.
     let i = 0;
     for (const msg of messages) {
@@ -287,41 +290,44 @@ async function feExportChatLogToPDFInline() {
         metaEl.textContent = `Rendering… ${i}/${messages.length}`;
       }
 
-      let li = null;
-      try {
-        // Some modules (e.g. portrait mods) look at this
-        msg.exporting = true;
-      } catch {}
+      const msgId = String(msg?.id ?? msg?._id ?? "");
 
-      try {
-        if (typeof msg.renderHTML === "function") li = await msg.renderHTML();
-        else if (typeof msg.getHTML === "function") li = await msg.getHTML();
-      } catch (err) {
-        console.warn("female_edition | PDF export: failed to render message", msg, err);
-      } finally {
+      // 1) Try to clone from live DOM
+      let li = null;
+      const liveEl = msgId ? liveMessageMap.get(msgId) : null;
+      if (liveEl) {
         try {
-          msg.exporting = false;
-        } catch {}
+          li = liveEl.cloneNode(true);
+        } catch {
+          li = null;
+        }
       }
 
-      // Normalize jQuery -> HTMLElement
-      if (li && !(li instanceof HTMLElement) && li?.[0] instanceof HTMLElement) li = li[0];
-      if (!(li instanceof HTMLElement)) continue;
+      // 2) Fallback: minimal render if not present in DOM
+      if (!feIsElement(li)) {
+        try {
+          li = feFallbackRenderChatMessage(document, msg);
+        } catch {
+          li = null;
+        }
+      }
 
-      // Ensure chat portraits exist in the export DOM even if hooks do not fire.
-      try {
-        feChatPortraitUpsertToMessageElement(msg, li, document);
-      } catch {}
+      if (!feIsElement(li)) continue;
 
-      // Normalize after portrait insertion so newly added <img> src also become absolute.
+      // Normalize URLs so print/export loads images reliably.
       feNormalizeExportNode(li);
 
       // Optional: apply per-message user color tint variables before serializing.
       feApplyUserColorBgToMessageElement(msg, li);
-      // Ensure chat portraits are present in inline export too.
+
+      // Ensure our chat portraits exist in inline export too, but don't duplicate other modules.
       try {
-        feChatPortraitUpsert(msg, li);
+        const hasOtherPortrait = !!li.querySelector?.(
+          'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container'
+        );
+        if (!hasOtherPortrait) feChatPortraitUpsert(msg, li);
       } catch {}
+
       logEl.appendChild(li);
 
       // Yield occasionally to keep UI responsive.
@@ -427,12 +433,120 @@ function feOpenChatArchiveWindow() {
 
 function feCollectHeadStylesHTML() {
   try {
+    const baseHref = feGetFoundryBaseHref();
+
     // Copy all stylesheet links and injected <style> tags.
     // This makes the archive render match the Foundry UI as closely as possible.
     const nodes = Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'));
-    return nodes.map((n) => n.outerHTML).join("\n");
+    return nodes
+      .map((n) => {
+        // IMPORTANT:
+        // Some settings (including this module's "enableFonts") toggle stylesheets by setting
+        // HTMLLinkElement.disabled. That state is not reliably preserved by outerHTML.
+        // Preserve it explicitly for the archive window.
+        try {
+          if (n?.tagName === "LINK") {
+            const c = n.cloneNode(true);
+
+            // Ensure the disabled state is copied.
+            c.disabled = !!n.disabled;
+
+            // IMPORTANT: Archive windows use about:blank as their URL.
+            // If we keep relative hrefs (e.g. modules/..), they can resolve incorrectly
+            // when Foundry is hosted under a route prefix or when the game URL ends with /game/.
+            // Rewrite hrefs to absolute URLs rooted at the Foundry route prefix.
+            try {
+              const href = c.getAttribute("href");
+              if (href) c.setAttribute("href", new URL(href, baseHref).href);
+            } catch {}
+
+            return c.outerHTML;
+          }
+        } catch {
+          /* fall through */
+        }
+        return n.outerHTML;
+      })
+      .join("\n");
   } catch {
     return "";
+  }
+}
+
+/**
+ * Best-effort base href rooted at Foundry's route prefix.
+ *
+ * Why:
+ * - The game client URL is commonly /<prefix>/game
+ * - But static assets live under /<prefix>/modules, /<prefix>/systems, /<prefix>/icons, ...
+ * - Using document.baseURI (often /<prefix>/game/) makes relative assets resolve to /game/modules/... (wrong)
+ */
+function feGetFoundryBaseHref() {
+  try {
+    const route = (() => {
+      try {
+        const r = foundry?.utils?.getRoute?.("/");
+        if (typeof r === "string" && r.length) return r;
+      } catch {}
+      return "/";
+    })();
+
+    const path = route.endsWith("/") ? route : `${route}/`;
+    return new URL(path, window.location.origin).href;
+  } catch {
+    try {
+      return new URL("/", window.location.origin).href;
+    } catch {
+      return "/";
+    }
+  }
+}
+
+/**
+ * Apply module settings which toggle stylesheets via JS (e.g. enableFonts -> ui-font.css).
+ * The archive window is a new Document, so we must re-apply these toggles explicitly.
+ */
+function feApplyModuleStylesheetSettingsToDocument(doc) {
+  try {
+    if (!doc?.querySelectorAll) return;
+
+    // chat-bg-stripper.js controls the ui-font.css <link> using HTMLLinkElement.disabled.
+    let enableFonts = true;
+    try {
+      enableFonts = !!game.settings.get(MODULE_ID, "enableFonts");
+    } catch {
+      enableFonts = true;
+    }
+
+    const needleAbs = `/modules/${MODULE_ID}/styles/ui-font.css`;
+    const needleRel = `modules/${MODULE_ID}/styles/ui-font.css`;
+
+    const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
+    for (const l of links) {
+      try {
+        const hrefAttr = l.getAttribute("href") || "";
+        const hrefAbs = l.href || "";
+        const match =
+          hrefAttr.includes(needleAbs) ||
+          hrefAbs.includes(needleAbs) ||
+          hrefAttr.includes(needleRel) ||
+          hrefAbs.includes(needleRel);
+        if (!match) continue;
+        l.disabled = !enableFonts;
+      } catch {
+        /* no-op */
+      }
+    }
+
+    // Mirror the "hideChatPortraits" body class toggle too (defensive).
+    try {
+      const hidePortraits = !!game.settings.get(MODULE_ID, "hideChatPortraits");
+      doc.body?.classList?.toggle?.("fe-hide-portraits", hidePortraits);
+    } catch {
+      /* no-op */
+    }
+  } catch (err) {
+    console.warn("female_edition | failed to apply module stylesheet settings to archive document", err);
   }
 }
 
@@ -442,6 +556,15 @@ function feEscapeAttr(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function feEscapeHTML(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function feSanitizeFilename(name) {
@@ -503,7 +626,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
   // Build the archive document.
   const headStyles = feCollectHeadStylesHTML();
-  const baseHref = feEscapeAttr(document.baseURI ?? window.location.href);
+  const baseHref = feEscapeAttr(feGetFoundryBaseHref());
 
   // Desktop (Electron) can optionally open the archive in the system browser.
   const desktopExternalMode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
@@ -720,6 +843,13 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 </html>`);
   win.document.close();
 
+  // The archive window is a new Document; mirror any module settings that are applied
+  // via JS on <link rel="stylesheet"> elements (e.g. enableFonts -> ui-font.css).
+  // Without this, the archive can ignore the user's live CSS toggles.
+  try {
+    feApplyModuleStylesheetSettingsToDocument(win.document);
+  } catch {}
+
   // Apply user style variables (font sizes, background saturation) to the archive document.
   // This also ensures downloaded HTML keeps the chosen values.
   feApplyStyleVarsFromSettings(win.document);
@@ -782,7 +912,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   } catch {}
 
   // Render messages.
-    logEl.innerHTML = "";
+  logEl.innerHTML = "";
+
+  // Prefer cloning from the already-rendered live chat log DOM when possible.
+  // This avoids re-running render hooks from other modules (e.g. chat-portrait) which
+  // can throw during automation-heavy sessions (midi-qol, tokenbar, etc.).
+  const liveMessageMap = feBuildLiveChatMessageElementMap();
 
   // Render messages in batches to keep UI responsive and reduce reflow/parsing cost.
   let i = 0;
@@ -804,62 +939,46 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       metaEl.textContent = `Rendering… ${i}/${messages.length}`;
     }
 
-    let li = null;
+    const msgId = String(msg?.id ?? msg?._id ?? "");
 
-    // Some systems/modules adjust rendering based on this flag.
-    try {
-      msg.exporting = true;
-    } catch (_e) {
-      /* no-op */
-    }
-
-    try {
-      if (typeof msg.renderHTML === "function") li = await msg.renderHTML();
-      else if (typeof msg.getHTML === "function") li = await msg.getHTML();
-    } catch (e) {
-      console.warn(`${MODULE_ID}: renderHTML failed for message`, msg?.id ?? msg, e);
-      li = null;
-    }
-
-    try {
-      msg.exporting = false;
-    } catch (_e) {
-      /* no-op */
-    }
-
-    if (!(li instanceof HTMLElement)) continue;
-
-    // Clone into the archive window DOM. Prefer importNode to avoid re-parsing HTML strings.
+    // 1) Try to clone from live DOM
     let node = null;
-    try {
-      node = win.document.importNode(li, true);
-    } catch (_e) {
+    const liveEl = msgId ? liveMessageMap.get(msgId) : null;
+    if (liveEl) {
       try {
-        const tmp = win.document.createElement("div");
-        tmp.innerHTML = li.outerHTML;
-        node = tmp.firstElementChild;
-      } catch (e2) {
-        console.warn(`${MODULE_ID}: Unable to clone message node`, msg?.id ?? msg, e2);
+        node = win.document.importNode(liveEl, true);
+      } catch (_e) {
         node = null;
       }
     }
 
-    if (!(node instanceof HTMLElement)) continue;
+    // 2) Fallback: render a minimal message if not present in DOM
+    if (!feIsElement(node)) {
+      try {
+        node = feFallbackRenderChatMessage(win.document, msg);
+      } catch (e) {
+        console.warn(`${MODULE_ID}: fallback render failed for message`, msgId || msg, e);
+        node = null;
+      }
+    }
+
+    if (!feIsElement(node)) continue;
 
     node.classList.add("fe-export-message");
 
-    // Force-apply chat portraits in the archive/export DOM.
-    // Live chat relies on renderChatMessageHTML hooks; the archive window does not.
-    try {
-      feChatPortraitUpsertToMessageElement(msg, node, win.document);
-    } catch {}
-
-    // Normalize after portrait insertion so newly added <img> src also become absolute.
+    // Normalize URLs so print/export loads images reliably.
     feNormalizeExportNode(node);
+
+    // Apply per-message user color tint variables.
     feApplyUserColorBgToMessageElement(msg, node);
-    // Ensure chat portraits are present even if the normal ChatLog render hooks did not run.
+
+    // Ensure our chat portraits exist in the archive DOM, but avoid duplicating
+    // other portrait modules if they already injected portraits.
     try {
-      feChatPortraitUpsert(msg, node);
+      const hasOtherPortrait = !!node.querySelector?.(
+        'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container'
+      );
+      if (!hasOtherPortrait) feChatPortraitUpsert(msg, node);
     } catch {}
 
     frag.appendChild(node);
@@ -1390,7 +1509,11 @@ async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } 
     const headEl = clone.querySelector("head");
     const baseHref = (() => {
       try {
-        return new URL(doc.baseURI ?? window.location.href).origin + "/";
+        // Prefer the archive window's <base> if present; otherwise fall back to
+        // the Foundry route prefix base href.
+        const b = doc.querySelector?.("base")?.getAttribute?.("href") || doc.querySelector?.("base")?.href;
+        if (b) return String(b);
+        return feGetFoundryBaseHref();
       } catch {
         return "/";
       }
@@ -1433,6 +1556,30 @@ async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } 
           l.setAttribute("href", new URL(href, baseForLinks).href);
         } catch {}
       });
+    } catch {}
+
+    // Preserve this module's runtime stylesheet toggles in the saved HTML snapshot.
+    // Our "enableFonts" setting disables ui-font.css via HTMLLinkElement.disabled.
+    // A static HTML file won't run that JS, so we must mirror it here.
+    try {
+      const enableFonts = (() => {
+        try {
+          return !!game.settings.get(MODULE_ID, "enableFonts");
+        } catch {
+          return true;
+        }
+      })();
+
+      if (!enableFonts) {
+        const needleAbs = `/modules/${MODULE_ID}/styles/ui-font.css`;
+        const needleRel = `modules/${MODULE_ID}/styles/ui-font.css`;
+        head.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
+          try {
+            const href = l.getAttribute("href") || "";
+            if (href.includes(needleAbs) || href.includes(needleRel)) l.remove();
+          } catch {}
+        });
+      }
     } catch {}
 
     // Embed CookieRun fonts (optional). This avoids CORS/font-loading issues when opening the
@@ -1594,6 +1741,26 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
 async function feBuildEmbeddedCookieRunFontCSS() {
   // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
   // If files are not present, returns an empty string.
+  //
+  // IMPORTANT: Base64 embedding multi-megabyte fonts can easily crash Chromium/Electron
+  // (OOM / STATUS_BREAKPOINT) due to base64 expansion + JS string memory overhead.
+  // To keep exports reliable, we only embed when the server reports a small Content-Length.
+  const MAX_TOTAL_BYTES = 1_500_000; // ~1.5MB binary before base64 expansion
+  const MAX_PER_FILE_BYTES = 900_000;
+  let totalBytes = 0;
+
+  const headSize = async (url) => {
+    try {
+      const res = await fetch(url, { method: "HEAD", credentials: "include" });
+      if (!res.ok) return null;
+      const len = res.headers.get("content-length");
+      const n = Number(len);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
   const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
   const weights = [
@@ -1609,10 +1776,17 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
     for (const f of w.files) {
       const url = `/modules/${MODULE_ID}/font/${f}`;
+      const size = await headSize(url);
+      // If we can't confidently estimate size, skip to avoid OOM.
+      if (!size) continue;
+      if (size > MAX_PER_FILE_BYTES) continue;
+      if (totalBytes + size > MAX_TOTAL_BYTES) continue;
+
       const attempt = await feFetchAsDataURL(url);
       if (attempt) {
         dataUrl = attempt;
         fmt = f.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
+        totalBytes += size;
         break;
       }
     }
@@ -1627,12 +1801,18 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   // Optional: embed Hakgyoansim Geurimilgi.
   // If present, we embed it so saved file:// HTML keeps the same look.
   try {
-    const geurimilgiData = await feFetchAsDataURL(`/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`);
+    const geurUrl = `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`;
+    const geurSize = await headSize(geurUrl);
+    const geurimilgiData =
+      geurSize && geurSize <= MAX_PER_FILE_BYTES && totalBytes + geurSize <= MAX_TOTAL_BYTES
+        ? await feFetchAsDataURL(geurUrl)
+        : null;
 
     if (geurimilgiData) {
       faces.push(
         `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
+      totalBytes += geurSize ?? 0;
     }
   } catch {}
 
@@ -1995,6 +2175,11 @@ function feNormalizeExportNode(rootEl) {
   } catch {}
 }
 
+function feIsElement(node) {
+  // Cross-window safe element check (avoid instanceof HTMLElement which fails across Window realms).
+  return !!node && node.nodeType === 1;
+}
+
 function feNextTick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -2038,6 +2223,91 @@ function feWaitForImages(rootEl, timeoutMs = 10000) {
   } catch {
     return Promise.resolve();
   }
+}
+
+function feBuildLiveChatMessageElementMap() {
+  const map = new Map();
+  try {
+    const logs = feGetChatLogs?.() ?? [];
+    for (const log of logs) {
+      if (!log?.querySelectorAll) continue;
+      const items = Array.from(log.querySelectorAll("li.chat-message"));
+      for (const el of items) {
+        const id = feGetMessageIdFromElement?.(el);
+        if (id) map.set(String(id), el);
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return map;
+}
+
+function feFallbackRenderChatMessage(doc, msg) {
+  if (!doc) throw new Error("No document provided");
+  const li = doc.createElement("li");
+  li.className = "chat-message message";
+
+  try {
+    const id = msg?.id ?? msg?._id;
+    if (id) li.dataset.messageId = String(id);
+  } catch {}
+
+  // Speaker / author name
+  const speakerName = (() => {
+    try {
+      const s = msg?.speaker;
+      if (s?.alias) return String(s.alias);
+    } catch {}
+    try {
+      const a = msg?.author ?? msg?.user;
+      if (a?.name) return String(a.name);
+    } catch {}
+    return "Unknown";
+  })();
+
+  const timestampText = (() => {
+    try {
+      const ts = Number(msg?.timestamp);
+      if (!Number.isFinite(ts) || ts <= 0) return "";
+      // Keep it simple and locale-friendly.
+      return new Date(ts).toLocaleString();
+    } catch {
+      return "";
+    }
+  })();
+
+  const header = doc.createElement("header");
+  header.className = "message-header flexrow";
+
+  const sender = doc.createElement("h4");
+  sender.className = "message-sender";
+  sender.textContent = speakerName;
+
+  const meta = doc.createElement("span");
+  meta.className = "message-metadata";
+  if (timestampText) {
+    const time = doc.createElement("time");
+    time.className = "message-timestamp";
+    time.textContent = timestampText;
+    meta.appendChild(time);
+  }
+
+  header.appendChild(sender);
+  header.appendChild(meta);
+
+  const content = doc.createElement("div");
+  content.className = "message-content";
+  try {
+    // ChatMessage.content is already HTML.
+    content.innerHTML = String(msg?.content ?? "");
+  } catch {
+    content.textContent = String(msg?.content ?? "");
+  }
+
+  li.appendChild(header);
+  li.appendChild(content);
+  return li;
 }
 
 

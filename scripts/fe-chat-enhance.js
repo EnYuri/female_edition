@@ -41,6 +41,7 @@ const S = {
   CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
   CHAT_FONT_CHOICE: "ceChatFontChoice", // cookie | geurimilgi
   UI_USE_GEURIMILGI: "ceUiUseGeurimilgi", // use Geurimilgi for UI + ability labels instead of CookieRun
+  UI_OVERRIDE_FONT_H1_COOKIE: "ceUiOverrideFontH1Cookie", // override --font-h1 to CookieRun
   USE_USER_COLOR_BG: "ceUseUserColorBg", // Chat Portrait-like message background tint
   USER_COLOR_BG_BASE: "ceUserColorBgBase", // none | white | black (opaque underlay)
 
@@ -74,7 +75,9 @@ const FE_DEFAULTS = {
   [S.EXPORT_ENABLED]: true,
   [S.EXPORT_AUTO_PRINT]: false,
   [S.EXPORT_OPTIMIZE]: true,
-  [S.EXPORT_EMBED_FONTS]: true,
+  // Embedding multi-megabyte fonts as base64 can easily OOM in Chromium.
+  // Keep default off for reliability.
+  [S.EXPORT_EMBED_FONTS]: false,
   [S.EXPORT_EMBED_IMAGES]: false,
   [S.EXPORT_PRINT_IMAGE_MODE]: "hideAvatars",
   [S.EXPORT_DESKTOP_EXTERNAL_MODE]: "button",
@@ -83,6 +86,7 @@ const FE_DEFAULTS = {
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
   [S.UI_USE_GEURIMILGI]: false,
+  [S.UI_OVERRIDE_FONT_H1_COOKIE]: false,
   [S.USE_USER_COLOR_BG]: false,
   [S.USER_COLOR_BG_BASE]: "white",
 
@@ -241,6 +245,11 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     // Message background saturation (paper overlay alpha)
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
+
+    // Optional: override Foundry's heading font variable
+    const h1Cookie = !!feSetting(S.UI_OVERRIDE_FONT_H1_COOKIE);
+    if (h1Cookie) root.style.setProperty("--font-h1", "var(--fe-font-primary)");
+    else root.style.removeProperty("--font-h1");
   } catch (err) {
     console.warn("female_edition | failed to apply style vars", err);
   }
@@ -508,6 +517,16 @@ Hooks.once("init", () => {
     type: Boolean,
     default: false,
     onChange: () => feSetUiFontClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.UI_OVERRIDE_FONT_H1_COOKIE, {
+    name: "헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기",
+    hint: "Foundry/테마가 사용하는 CSS 변수 --font-h1 값을 쿠키런 폰트로 덮어씌웁니다. 일부 테마의 제목/헤딩 글꼴이 바뀔 수 있습니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
   // Legacy (hidden): migrate old UI font toggle into the new key.

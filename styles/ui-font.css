@@ -25,7 +25,7 @@
  */
 @font-face {
   font-family: "FE Geurimilgi";
-  src: url("/modules/female_edition/font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
+  src: url("../font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -37,8 +37,8 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("/modules/female_edition/font/CookieRun%20Regular.otf") format("opentype"),
-    url("/modules/female_edition/font/CookieRun%20Regular.ttf") format("truetype");
+    url("../font/CookieRun%20Regular.otf") format("opentype"),
+    url("../font/CookieRun%20Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -47,8 +47,8 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("/modules/female_edition/font/CookieRun%20Bold.otf") format("opentype"),
-    url("/modules/female_edition/font/CookieRun%20Bold.ttf") format("truetype");
+    url("../font/CookieRun%20Bold.otf") format("opentype"),
+    url("../font/CookieRun%20Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -57,8 +57,8 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("/modules/female_edition/font/CookieRun%20Black.otf") format("opentype"),
-    url("/modules/female_edition/font/CookieRun%20Black.ttf") format("truetype");
+    url("../font/CookieRun%20Black.otf") format("opentype"),
+    url("../font/CookieRun%20Black.ttf") format("truetype");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -247,6 +247,16 @@ html, body,
   font-family: var(--fe-font-secondary) !important;
   font-size: var(--fe-chat-meta-size) !important;
   font-weight: var(--fe-font-weight-small) !important;
+}
+
+/* Timestamp glyph width: visually condense to ~75% (does not affect layout flow) */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message
+  .message-metadata
+  :is(time.message-timestamp, .message-timestamp) {
+  display: inline-block !important;
+  transform: scaleX(0.75);
+  transform-origin: right center;
 }
 
 /* Edit + ellipsis icons: keep them compact and aligned */
