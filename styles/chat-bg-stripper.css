@@ -55,7 +55,7 @@
   --fe-user-color-alpha: 0.22;
 
   /* Slight grey background for dnd5e/tidy collapsible description areas */
-  --fe-chat-desc-bg: #C8C8C8;
+  --fe-chat-desc-bg: #f0f0f0;
 }
 
 /* Propagate the module-controlled spacing into Foundry's chat sidebar. */

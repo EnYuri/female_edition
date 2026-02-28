@@ -8,5 +8,6 @@
 	"MYDMG.FemaleRadiant": "쾌락",
 	"MYDMG.FemaleFire": "발정",
 	"MYCOND.CondFemaleMating": "교미 중",
+	"MYCOND.Mark": "표식",
 	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>"
 }
