@@ -2312,6 +2312,7 @@ const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
   "align-self",
   "justify-self",
   "grid-template-columns",
+  "grid-template-rows",
   "grid-template-areas",
   "grid-auto-flow",
   "grid-area",
@@ -2341,6 +2342,22 @@ const FE_ARCHIVE_TREE_STYLE_PROPS = Array.from(new Set([
   ...FE_ARCHIVE_CONTAINER_STYLE_PROPS,
   ...FE_ARCHIVE_TEXT_STYLE_PROPS,
 ]));
+const FE_ARCHIVE_MIXED_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
+const FE_ARCHIVE_TREE_MAX_SIMPLE = 56;
+const FE_ARCHIVE_TREE_MAX_PORTRAIT = 88;
+const FE_ARCHIVE_TREE_MAX_COMPLEX = 120;
+
+function feGetArchiveTreeMirrorBudget(liveEl) {
+  try {
+    const hasCard = !!liveEl?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .details.card-content, .details.collapsible-content.card-content');
+    if (hasCard) return FE_ARCHIVE_TREE_MAX_COMPLEX;
+    const hasPortraitHeader = !!liveEl?.classList?.contains?.('fe-has-chat-portrait');
+    if (hasPortraitHeader) return FE_ARCHIVE_TREE_MAX_PORTRAIT;
+  } catch {
+    /* no-op */
+  }
+  return FE_ARCHIVE_TREE_MAX_SIMPLE;
+}
 
 function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
   try {
@@ -2395,7 +2412,7 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl) {
 
     // First, mirror a broad-but-safe subset of computed styles across the cloned tree.
     // This keeps archive HTML visually close to the live chat without freezing absolute widths.
-    feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes: 96 });
+    feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes: feGetArchiveTreeMirrorBudget(liveEl) });
 
     const sync = (selector, props) => {
       const srcList = feSelectScoped(liveEl, selector);
@@ -2407,12 +2424,12 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl) {
     sync(":scope", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
     sync(":scope > .message-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
     sync(":scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-    sync(":scope > .message-header .message-sender", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
-    sync(":scope > .message-header .message-sender .name-stacked", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+    sync(":scope > .message-header .message-sender", FE_ARCHIVE_MIXED_STYLE_PROPS);
+    sync(":scope > .message-header .message-sender .name-stacked", FE_ARCHIVE_MIXED_STYLE_PROPS);
     sync(":scope > .message-header .message-sender .name-stacked .title, :scope > .message-header .message-sender .title", FE_ARCHIVE_TEXT_STYLE_PROPS);
     sync(":scope > .message-header .message-sender .name-stacked .subtitle, :scope > .message-header .message-sender .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
-    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
-    sync(":scope > .message-header .message-metadata", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", FE_ARCHIVE_MIXED_STYLE_PROPS);
+    sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS);
 
     const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
     if (hasCard) {
