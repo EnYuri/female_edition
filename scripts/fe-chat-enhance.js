@@ -645,13 +645,17 @@ Hooks.once("ready", async () => {
 const fePendingMergeLogs = new Set();
 let feMergeRefreshScheduled = false;
 
+function feIsElementNode(node) {
+  return !!node && node.nodeType === 1;
+}
+
 function feExtractHTMLElement(html) {
   if (!html) return null;
-  if (html instanceof HTMLElement) return html;
+  if (feIsElementNode(html)) return html;
   // jQuery-like wrappers
-  if (html.jquery && html[0] instanceof HTMLElement) return html[0];
-  if (Array.isArray(html) && html[0] instanceof HTMLElement) return html[0];
-  if (html[0] instanceof HTMLElement) return html[0];
+  if (html.jquery && feIsElementNode(html[0])) return html[0];
+  if (Array.isArray(html) && feIsElementNode(html[0])) return html[0];
+  if (feIsElementNode(html[0])) return html[0];
   return null;
 }
 
@@ -664,7 +668,7 @@ function feDeferTask(fn) {
 }
 
 function feScheduleMergeRefresh(logEl) {
-  if (!(logEl instanceof HTMLElement)) return;
+  if (!feIsElementNode(logEl)) return;
   fePendingMergeLogs.add(logEl);
   if (feMergeRefreshScheduled) return;
   feMergeRefreshScheduled = true;
@@ -1467,13 +1471,30 @@ function feMessageMergeInfo(msg, el) {
   // Some automation modules may still populate legacy fields during rapid updates, so keep fallbacks.
   const authorId = msg?.author?.id ?? msg?.user?.id ?? msg?.user ?? "";
 
+  // Narrator Tools (/desc, /narrate, /note) messages:
+  // - often share the same author as the GM
+  // - can have minimal/empty sender markup
+  // If merged with normal IC/OOC lines, FE's merge-follow styles can hide the header,
+  // making the narrator message look like it has no name/portrait.
+  // Always keep narrator messages as standalone blocks.
+  const isNarratorTools = (() => {
+    try {
+      if (el?.classList?.contains?.("narrator-chat")) return true;
+      if (msg?.getFlag?.("narrator-tools", "type")) return true;
+      if (msg?.flags?.["narrator-tools"]) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  })();
+
   const speaker = msg?.speaker ?? {};
   const speakerKey = [
     speaker.scene ?? "",
     speaker.token ?? "",
     speaker.actor ?? "",
     speaker.alias ?? ""
-  ].join("|");
+  ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "");
 
   // Whisper recipients (if any)
   const whisper = Array.isArray(msg?.whisper) ? msg.whisper : [];
@@ -1502,7 +1523,9 @@ function feMessageMergeInfo(msg, el) {
     blind,
     rollMode,
     style,
-    mergeableText
+    mergeableText,
+    // Never merge narrator messages with anything.
+    noMerge: isNarratorTools
   };
 }
 
@@ -1513,7 +1536,7 @@ function feGetChatLogs() {
   // Sidebar + any chat popouts
   const logs = new Set();
   document.querySelectorAll("ol.chat-log, #chat-log").forEach((el) => {
-    if (el instanceof HTMLElement) logs.add(el);
+    if (feIsElementNode(el)) logs.add(el);
   });
   return Array.from(logs);
 }
@@ -1559,7 +1582,7 @@ const feMergeRetryTimers = new WeakMap();
  */
 function feScheduleMergeRetry(logEl, delay = 80) {
   try {
-    if (!(logEl instanceof HTMLElement)) return;
+    if (!feIsElementNode(logEl)) return;
     if (feMergeRetryTimers.has(logEl)) return;
 
     const t = setTimeout(() => {
@@ -1595,7 +1618,7 @@ function feMergeKey(info) {
 
 
 function feApplyChatMerge(logEl) {
-  if (!(logEl instanceof HTMLElement)) return;
+  if (!feIsElementNode(logEl)) return;
 
   // Always clear previous merge classes first (so disabling the feature restores normal view).
   const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
@@ -1650,6 +1673,7 @@ function feApplyChatMerge(logEl) {
 
   const canMerge = (a, b) => {
     if (!a || !b) return false;
+    if (a.noMerge || b.noMerge) return false;
     if (a.key !== b.key) return false;
     if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
     return true;
@@ -1904,6 +1928,7 @@ export {
   feApplyUserColorBgToMessageElement,
   feSetChatFontChoiceClass,
   feSetChatCardFontClass,
+  feSetUiFontClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
 

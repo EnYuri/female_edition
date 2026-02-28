@@ -396,8 +396,6 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", () => {
-  console.log(`${FE.LOG} ${FE.VERSION} loaded`);
-
   // Apply settings (initial)
   const fontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, true);
   const hidePortraits = safeGetSetting(SETTINGS.HIDE_PORTRAITS, true);

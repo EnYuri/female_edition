@@ -15,20 +15,20 @@
    * Chat typography (tunable)
    * ------------------------------- */
   /* Chat header sizes */
-  --fe-chat-title-size: 22px;     /* actor name */
-  --fe-chat-subtitle-size: 14px;  /* player name */
+  --fe-chat-title-size: 18px;     /* actor name */
+  --fe-chat-subtitle-size: 12px;  /* player name */
 
   /* Normal chat message text size */
   --fe-chat-message-font-size: 14px;
 
   /* dnd5e/midi chat-card description text size */
-  --fe-chat-card-font-size: 12px;
+  --fe-chat-card-font-size: 13px;
 
   /* Foundry chat layout: spacing between message cards inside chat-sidebar.
-   * Mirrors Foundry's own variable: chat-sidebar { --chat-message-spacing: 4px; }
+   * Mirrors Foundry's own variable: chat-sidebar { --chat-message-spacing: 3px; }
    * Controlled via module setting.
    */
-  --fe-chat-message-spacing: 4px;
+  --fe-chat-message-spacing: 3px;
   /* NOTE:
    * Chat cards (item/spell/feature descriptions) often look too bold when using
    * CookieRun + the readability weight boost.
@@ -55,7 +55,7 @@
   --fe-user-color-alpha: 0.22;
 
   /* Slight grey background for dnd5e/tidy collapsible description areas */
-  --fe-chat-desc-bg: transparent;
+  --fe-chat-desc-bg: #C8C8C8;
 }
 
 /* Propagate the module-controlled spacing into Foundry's chat sidebar. */
@@ -81,7 +81,7 @@ body:not(.fe-chatcard-custom-font) {
  * Markdown **bold** becomes <strong>. Slightly enlarge bold fragments.
  */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(strong, b) {
-  font-size: 1.10em;
+  font-size: 1.16em;
 }
 
 
@@ -162,6 +162,37 @@ body.fe-msg-bg-usercolor
   background-blend-mode: screen !important;
 }
 
+/* --------------------------------
+ * 1f) Prevent user-color tint from bleeding into dnd5e/midi chat-card description boxes
+ * --------------------------------
+ * Player-color background tint is applied on the outer .chat-message.
+ * Many system chat-cards use partially transparent backgrounds; the tint can
+ * reduce readability inside dense rules text blocks.
+ *
+ * Force an opaque (theme-neutral) background for the *description/details* region only.
+ */
+ 
+ 
+ /*
+body.fe-msg-bg-usercolor
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color
+  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dnd5e.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    section.card-content.description,
+    .card-content.description
+  ) {
+
+  background-color: var(--color-bg-option, rgb(255 255 255 / 0.92)) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+*/
+
 /* Optional: opaque base layer under the user-color tint (readability)
  * - Keeps the page/map/background from bleeding through.
  * - Implemented with an inset box-shadow so we don't fight with background-image
@@ -190,7 +221,7 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
   background-blend-mode: normal !important;
 }
 
-/* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) */
+/* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) 
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
@@ -207,7 +238,7 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
   font-weight: inherit !important;
   line-height: inherit !important;
 }
-
+*/
 /* Paragraph spacing inside the wrapper */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message

@@ -300,6 +300,43 @@ function cpIsRoundMarkerMessage(message, messageEl) {
   return false;
 }
 
+function cpIsNarratorToolsMessage(message, messageEl) {
+  try {
+    if (messageEl?.classList?.contains?.("narrator-chat")) return true;
+  } catch {}
+
+  try {
+    if (message?.getFlag?.("narrator-tools", "type")) return true;
+  } catch {}
+
+  try {
+    if (message?.flags?.["narrator-tools"]) return true;
+  } catch {}
+
+  // Fallback: if the speaker alias is literally "Narrator" / "내레이터".
+  // (Avoid hard-coding beyond these two common labels.)
+  try {
+    const alias = String(message?.speaker?.alias ?? "").trim();
+    if (!alias) return false;
+    return alias === "Narrator" || alias === "내레이터";
+  } catch {
+    return false;
+  }
+}
+
+function cpHideHeaderForNarrator(messageEl) {
+  try {
+    if (!messageEl) return;
+    // Prefer the real message header (direct child) so we don't hide nested chat-card headers.
+    const header = messageEl.querySelector?.(":scope > .message-header") || messageEl.querySelector?.(".message-header");
+    if (!header) return;
+    header.style.setProperty("display", "none", "important");
+    header.setAttribute?.("aria-hidden", "true");
+  } catch {
+    /* no-op */
+  }
+}
+
 function cpFindMessageHeader(messageEl) {
   if (!messageEl) return null;
 
@@ -342,9 +379,8 @@ function cpApplyChatCardIconSizing(messageEl) {
     const cards = messageEl.querySelectorAll(
       ".message-content .chat-card, .message-content .midi-chat-card, .message-content .dnd5e2.chat-card, .message-content .dnd5e.chat-card"
     );
-    if (!cards?.length) return;
 
-    for (const card of cards) {
+    for (const card of cards ?? []) {
       if (!cpIsElement(card)) continue;
 
       const directChildImg = (() => {
@@ -376,10 +412,66 @@ function cpApplyChatCardIconSizing(messageEl) {
       icon.style.setProperty("height", `${size}px`, "important");
       icon.style.setProperty("flex", `0 0 ${size}px`, "important");
       icon.style.setProperty("object-fit", "cover", "important");
+      // Some themes apply a background to inline <img> icons; keep it transparent.
+      icon.style.setProperty("background-color", "transparent", "important");
       icon.style.setProperty("image-rendering", "auto", "important");
       // Prefer "smooth" if supported.
       icon.style.setProperty("image-rendering", "smooth", "important");
       icon.classList.add("fe-chat-card-icon");
+    }
+
+    // Some automation modules (monks-tokenbar, midi-qol, etc.) embed large portrait-like
+    // images directly inside message content without using the standard chat-card classes.
+    // Clamp abnormally large inline images so chat layout remains consistent.
+    cpClampLargeInlinePortraits(messageEl, size);
+  } catch {
+    /* no-op */
+  }
+}
+
+function cpClampLargeInlinePortraits(messageEl, size) {
+  try {
+    if (!messageEl?.querySelectorAll) return;
+    if (!size) return;
+
+    // If this is an explicit image-post style message, don't touch its images.
+    if (messageEl.querySelector?.(".message-content .chat-images-container img")) return;
+
+    const forceClamp = !!messageEl.querySelector?.(
+      ".message-content .monks-tokenbar, .message-content [class*=\"midi-qol\"], .message-content .midi-qol"
+    );
+    const threshold = Math.max(size * 2, size + 32);
+
+    for (const img of messageEl.querySelectorAll(".message-content img")) {
+      if (!cpIsImageElement(img)) continue;
+
+      // Skip our own portraits and already-sized chat-card icons.
+      if (img.classList.contains("fe-chat-portrait") || img.classList.contains("fe-chat-card-icon")) continue;
+
+      // Skip dice UI images/tooltips.
+      if (img.closest?.(".dice-roll, .dice-tooltip, .dice-result")) continue;
+
+      const wAttr = Number(img.getAttribute?.("width") || 0);
+      const hAttr = Number(img.getAttribute?.("height") || 0);
+      const sw = Number.parseFloat(String(img.style?.width || "")) || 0;
+      const sh = Number.parseFloat(String(img.style?.height || "")) || 0;
+      const looksLarge =
+        (wAttr && wAttr >= threshold) ||
+        (hAttr && hAttr >= threshold) ||
+        (sw && sw >= threshold) ||
+        (sh && sh >= threshold);
+
+      if (!forceClamp && !looksLarge) continue;
+
+      // Clamp to the configured chat-card icon size.
+      img.style.setProperty("width", `${size}px`, "important");
+      img.style.setProperty("height", `${size}px`, "important");
+      img.style.setProperty("max-width", `${size}px`, "important");
+      img.style.setProperty("max-height", `${size}px`, "important");
+      img.style.setProperty("flex", `0 0 ${size}px`, "important");
+      img.style.setProperty("object-fit", "cover", "important");
+      img.style.setProperty("image-rendering", "auto", "important");
+      img.style.setProperty("image-rendering", "smooth", "important");
     }
   } catch {
     /* no-op */
@@ -647,11 +739,15 @@ function cpApplyPortraitStyling(message, img) {
       // No border/crop: only size adjustment.
       img.style.setProperty("border-radius", "0", "important");
       img.style.setProperty("object-fit", "contain", "important");
+      // Keep the visible content aligned to the left so any extra letterboxing
+      // space stays on the right (requested behavior).
+      img.style.setProperty("object-position", "left center", "important");
       img.style.setProperty("border", "none", "important");
       img.style.setProperty("clip-path", "none", "important");
     } else {
       img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
       img.style.setProperty("object-fit", "cover", "important");
+      img.style.setProperty("object-position", "center center", "important");
 
       // Some Chromium/Electron builds can render border-radius edges slightly jagged.
       // clip-path can produce smoother results for circles.
@@ -722,11 +818,13 @@ function cpApplyCombatPortraitStyling(combatant, img) {
     if (shape === "none") {
       img.style.setProperty("border-radius", "0", "important");
       img.style.setProperty("object-fit", "contain", "important");
+      img.style.setProperty("object-position", "left center", "important");
       img.style.setProperty("border", "none", "important");
       img.style.setProperty("clip-path", "none", "important");
     } else {
       img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
       img.style.setProperty("object-fit", "cover", "important");
+      img.style.setProperty("object-position", "center center", "important");
       if (shape === "circle") {
         img.style.setProperty("clip-path", "circle(50% at 50% 50%)", "important");
       } else {
@@ -783,6 +881,64 @@ function cpApplyCombatPortraitStyling(combatant, img) {
 }
 
 
+function cpLocalize(key, fallback = "") {
+  try {
+    const s = game?.i18n?.localize?.(key);
+    if (s && s !== key) return String(s);
+  } catch {
+    /* ignore */
+  }
+  return String(fallback ?? "");
+}
+
+function cpEnsureSenderText(message, messageEl, headerEl) {
+  try {
+    // Narrator Tools messages must NOT show header/name/portrait.
+    if (cpIsNarratorToolsMessage(message, messageEl)) return;
+
+    if (!messageEl || !headerEl) return;
+    const doc = messageEl.ownerDocument ?? document;
+
+    const sender = headerEl.querySelector?.(".message-sender");
+    if (!sender) return;
+
+    // If the sender already has meaningful content, do nothing.
+    const existingTitle = sender.querySelector?.(":scope .title")?.textContent?.trim?.() ?? "";
+    const existingText = sender.textContent?.trim?.() ?? "";
+    if (existingTitle || existingText) return;
+
+    const actor = feGetSpeakerActorFromMessage?.(message);
+    const actorName = actor?.name ? String(actor.name).trim() : "";
+    const speakerAlias = message?.speaker?.alias ? String(message.speaker.alias).trim() : "";
+    const authorName = message?.author?.name ? String(message.author.name).trim() : "";
+
+    const unknownLabel = cpLocalize("CHAT.Unknown", "Unknown");
+
+    const title = actorName || speakerAlias || authorName || unknownLabel;
+    const subtitle = authorName && authorName !== title ? authorName : "";
+
+    sender.textContent = "";
+    const wrap = doc.createElement("span");
+    wrap.className = "name-stacked";
+
+    const titleEl = doc.createElement("span");
+    titleEl.className = "title";
+    titleEl.textContent = title;
+    wrap.appendChild(titleEl);
+
+    if (subtitle) {
+      const subEl = doc.createElement("span");
+      subEl.className = "subtitle";
+      subEl.textContent = subtitle;
+      wrap.appendChild(subEl);
+    }
+
+    sender.appendChild(wrap);
+  } catch {
+    /* no-op */
+  }
+}
+
 
 function cpUpsertPortrait(message, messageEl) {
   if (!messageEl) return;
@@ -791,6 +947,15 @@ function cpUpsertPortrait(message, messageEl) {
   if (!messageEl.matches?.("li.chat-message")) {
     const closest = messageEl.closest?.("li.chat-message");
     if (closest) messageEl = closest;
+  }
+
+  // Narrator Tools messages must have NO header/portrait/names.
+  // Do not inject portraits and actively hide any base message header.
+  if (cpIsNarratorToolsMessage(message, messageEl)) {
+    cpRemovePortrait(messageEl);
+    messageEl.classList.add("fe-narrator-chat");
+    cpHideHeaderForNarrator(messageEl);
+    return;
   }
 
   // Coexistence policy: allow duplicates, warn once (no hard-block).
@@ -821,6 +986,10 @@ function cpUpsertPortrait(message, messageEl) {
 
   const header = cpFindMessageHeader(messageEl);
   if (!header) return;
+
+  // Narrator Tools and some automation modules can render an empty sender block.
+  // Ensure the name(s) are present so the header doesn't look blank.
+  cpEnsureSenderText(message, messageEl, header);
 
   // If another portrait module (e.g. chat-portrait) already injected a portrait into the
   // message header and we don't already have ours, avoid duplicating portraits.

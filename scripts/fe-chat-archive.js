@@ -11,6 +11,7 @@ import {
   feApplyUserColorBgToMessageElement,
   feSetChatCardFontClass,
   feSetChatFontChoiceClass,
+  feSetUiFontClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
   feApplyChatMerge,
@@ -24,6 +25,12 @@ import {
   feChatPortraitUpsert,
   feChatPortraitApplyVars,
 } from "./fe-chat-portrait.js";
+
+const FE_EXPORT_RENDER_BATCH = 25;
+const FE_EXPORT_STATUS_EVERY = 25;
+const FE_EXPORT_WAIT_IMAGES_MAX = 800;
+const FE_EXPORT_WAIT_IMAGES_TIMEOUT = 20000;
+const FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT = 15000;
 
 // -------------------------------------
 // Export to PDF (Print)
@@ -332,7 +339,7 @@ async function feExportChatLogToPDFInline() {
 
       // Yield occasionally to keep UI responsive.
       // IMPORTANT: background tabs clamp timers heavily; avoid yields when hidden so export continues.
-      if (i % 25 === 0) await feMaybeYieldForUI();
+      if (i % FE_EXPORT_RENDER_BATCH === 0) await feMaybeYieldForUI();
     }
 
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
@@ -342,7 +349,7 @@ async function feExportChatLogToPDFInline() {
 
     // Wait for images (portraits, item icons) to load so they actually print
     metaEl.textContent = "Loading images…";
-    await feWaitForImages(logEl, 15000);
+    await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
 
     // IMPORTANT: Force a paginatable layout.
     // If any part of the export UI remains a fixed/scroll container, Chromium printing will
@@ -857,6 +864,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetChatCardFontClass(win.document);
   // Apply chat font choice + optional user-color background class.
   feSetChatFontChoiceClass(win.document);
+  feSetUiFontClass(win.document);
   feSetUserColorBgClass(win.document);
   feSetUserColorBgBaseClass(win.document);
   // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
@@ -930,12 +938,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       frag = win.document.createDocumentFragment();
       fragCount = 0;
     }
-    await feMaybeYieldForUI();
+    await feMaybeYieldForUI(win);
   };
 
   for (const msg of messages) {
     i++;
-    if (metaEl && (i === 1 || i % 25 === 0 || i === messages.length)) {
+    if (metaEl && (i === 1 || i % FE_EXPORT_STATUS_EVERY === 0 || i === messages.length)) {
       metaEl.textContent = `Rendering… ${i}/${messages.length}`;
     }
 
@@ -985,7 +993,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     fragCount++;
 
     // Yield to keep the archive window responsive during large exports.
-    if (i % 25 === 0) await flush();
+    if (i % FE_EXPORT_RENDER_BATCH === 0) await flush();
   }
 
   // Flush any remaining nodes.
@@ -1014,7 +1022,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
   // Wait for images so avatars/icons actually show up.
   if (metaEl) metaEl.textContent = "Loading images…";
-  await feWaitForImages(logEl, 20000);
+  await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
 
   if (metaEl) metaEl.textContent = metaText;
 
@@ -1168,7 +1176,7 @@ async function feArchivePrint(win) {
   if (shouldDownscale && logEl) {
     try {
       setMeta("Loading images…");
-      await feWaitForImages(logEl, 20000);
+      await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
       await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
@@ -1484,132 +1492,143 @@ async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.8
   return null;
 }
 
-async function feBuildArchiveHTMLSnapshot(win, titleText = "Chat Log", { meta } = {}) {
+async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta } = {}) {
   if (!win || win.closed) throw new Error("Archive window is closed");
   const setMeta = typeof meta === "function" ? meta : () => {};
 
   const doc = win.document;
-  const clone = doc.documentElement.cloneNode(true);
 
-  // Remove CSP meta if present - it can block inline styles or resource loading in file:// context.
-  try {
-    clone
-      .querySelectorAll('meta[http-equiv="Content-Security-Policy"], meta[http-equiv="content-security-policy"]')
-      .forEach((m) => m.remove());
-  } catch {}
+  // IMPORTANT (memory):
+  // Do NOT deep-clone the full <html> tree for large logs.
+  // Cloning thousands of chat messages can easily OOM Chromium/Electron.
+  // Instead, clone only <head> (small) and serialize <body> directly.
 
-  // Remove scripts - exported HTML should be a static snapshot.
-  try {
-    clone.querySelectorAll("script").forEach((s) => s.remove());
-  } catch {}
+  // ---
+  // Head snapshot
+  // ---
+  const headClone = (doc.head ? doc.head.cloneNode(true) : doc.createElement("head"));
 
-  // Keep a stable <base> so relative links/resources resolve correctly when opening the saved HTML as file://.
-  // (Important for CSS @import and url(...) when core/system CSS contains relative paths.)
+  // Ensure a stable <base> so relative URLs resolve when opening as file://
   try {
-    const headEl = clone.querySelector("head");
     const baseHref = (() => {
       try {
-        // Prefer the archive window's <base> if present; otherwise fall back to
-        // the Foundry route prefix base href.
         const b = doc.querySelector?.("base")?.getAttribute?.("href") || doc.querySelector?.("base")?.href;
         if (b) return String(b);
-        return feGetFoundryBaseHref();
+      } catch {}
+      return feGetFoundryBaseHref();
+    })();
+
+    let baseEl = headClone.querySelector?.("base");
+    if (!baseEl) {
+      baseEl = doc.createElement("base");
+      headClone.prepend(baseEl);
+    }
+    baseEl.setAttribute?.("href", baseHref);
+  } catch {}
+
+  // Ensure title is correct
+  try {
+    let t = headClone.querySelector?.("title");
+    if (!t) {
+      t = doc.createElement("title");
+      headClone.appendChild(t);
+    }
+    t.textContent = titleText;
+  } catch {}
+
+  // Make stylesheet hrefs absolute (helps when opening as file://)
+  try {
+    const baseForLinks = doc.baseURI ?? window.location.href;
+    headClone.querySelectorAll?.('link[rel="stylesheet"]').forEach((l) => {
+      try {
+        const href = l.getAttribute("href");
+        if (!href) return;
+        l.setAttribute("href", new URL(href, baseForLinks).href);
+      } catch {}
+    });
+  } catch {}
+
+  // Preserve runtime stylesheet toggles in the saved HTML snapshot.
+  // (HTMLLinkElement.disabled does not serialize.)
+  try {
+    const enableFonts = (() => {
+      try {
+        return !!game.settings.get(MODULE_ID, "enableFonts");
       } catch {
-        return "/";
+        return true;
       }
     })();
-    if (headEl) {
-      let baseEl = headEl.querySelector("base");
-      if (!baseEl) {
-        baseEl = doc.createElement("base");
-        headEl.prepend(baseEl);
-      }
-      baseEl.setAttribute("href", baseHref);
+
+    if (!enableFonts) {
+      const needleAbs = `/modules/${MODULE_ID}/styles/ui-font.css`;
+      const needleRel = `modules/${MODULE_ID}/styles/ui-font.css`;
+      headClone.querySelectorAll?.('link[rel="stylesheet"]').forEach((l) => {
+        try {
+          const href = l.getAttribute("href") || "";
+          if (href.includes(needleAbs) || href.includes(needleRel)) l.remove();
+        } catch {}
+      });
     }
   } catch {}
 
-  // IMPORTANT:
-  // - Do NOT attempt to inline *all* Foundry/system/module CSS.
-  //   In practice, CSSOM access can be partially blocked, and inlining a partial set
-  //   while removing <link> tags results in a badly broken export (giant portraits, no merges, etc.).
-  // - Keep original <link rel="stylesheet"> tags and only add small export-specific helpers.
-
-  const head = clone.querySelector("head");
-  if (head) {
-    // Ensure title is correct
+  // Embed custom fonts (optional).
+  if (feSetting(S.EXPORT_EMBED_FONTS)) {
     try {
-      let t = head.querySelector("title");
-      if (!t) {
-        t = doc.createElement("title");
-        head.appendChild(t);
+      setMeta("Embedding fonts…");
+      const fontCss = await feBuildEmbeddedCookieRunFontCSS();
+      if (fontCss) {
+        const styleEl = doc.createElement("style");
+        styleEl.id = "fe-export-embedded-fonts";
+        styleEl.textContent = fontCss;
+        headClone.appendChild(styleEl);
       }
-      t.textContent = titleText;
-    } catch {}
-
-    // Make stylesheet hrefs absolute (helps when opening as file://)
-    try {
-      const baseForLinks = doc.baseURI ?? window.location.href;
-      head.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
-        try {
-          const href = l.getAttribute("href");
-          if (!href) return;
-          l.setAttribute("href", new URL(href, baseForLinks).href);
-        } catch {}
-      });
-    } catch {}
-
-    // Preserve this module's runtime stylesheet toggles in the saved HTML snapshot.
-    // Our "enableFonts" setting disables ui-font.css via HTMLLinkElement.disabled.
-    // A static HTML file won't run that JS, so we must mirror it here.
-    try {
-      const enableFonts = (() => {
-        try {
-          return !!game.settings.get(MODULE_ID, "enableFonts");
-        } catch {
-          return true;
-        }
-      })();
-
-      if (!enableFonts) {
-        const needleAbs = `/modules/${MODULE_ID}/styles/ui-font.css`;
-        const needleRel = `modules/${MODULE_ID}/styles/ui-font.css`;
-        head.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
-          try {
-            const href = l.getAttribute("href") || "";
-            if (href.includes(needleAbs) || href.includes(needleRel)) l.remove();
-          } catch {}
-        });
-      }
-    } catch {}
-
-    // Embed CookieRun fonts (optional). This avoids CORS/font-loading issues when opening the
-    // saved HTML from file:// (fonts are often blocked because the origin becomes "null").
-    if (feSetting(S.EXPORT_EMBED_FONTS)) {
-      try {
-        setMeta("Embedding fonts…");
-        const fontCss = await feBuildEmbeddedCookieRunFontCSS();
-        if (fontCss) {
-          const styleEl = doc.createElement("style");
-          styleEl.id = "fe-export-embedded-fonts";
-          styleEl.textContent = fontCss;
-          head.appendChild(styleEl);
-        }
-      } catch (err) {
-        console.warn("female_edition | HTML export: failed to embed fonts", err);
-      }
+    } catch (err) {
+      console.warn("female_edition | HTML export: failed to embed fonts", err);
     }
   }
 
-  // Optional: embed images into the HTML (can increase size)
+  // ---
+  // Body snapshot
+  // ---
+  let bodyHTML = "";
   if (feSetting(S.EXPORT_EMBED_IMAGES)) {
+    // Image embedding requires mutating src/srcset to data: URLs.
+    // Do it on a cloned <body> so the archive window stays visually unchanged.
     try {
-      await feEmbedImagesInNode(clone, { meta: setMeta });
+      setMeta("Embedding images…");
+      const bodyClone = doc.body.cloneNode(true);
+      await feEmbedImagesInNode(bodyClone, { meta: setMeta });
+      bodyHTML = bodyClone.outerHTML;
     } catch (err) {
       console.warn("female_edition | HTML export: failed to embed images", err);
+      // Fallback: still produce a valid snapshot.
+      bodyHTML = doc.body.outerHTML;
     }
+  } else {
+    bodyHTML = doc.body.outerHTML;
   }
 
-  return "<!doctype html>\n" + clone.outerHTML;
+  // ---
+  // HTML wrapper (preserve attributes like lang/class)
+  // ---
+  const htmlEl = doc.documentElement;
+  const htmlAttrs = (() => {
+    try {
+      const attrs = Array.from(htmlEl?.attributes ?? []).map((a) => {
+        const n = String(a?.name ?? "");
+        const v = feEscapeAttr(String(a?.value ?? ""));
+        return n ? `${n}="${v}"` : "";
+      }).filter(Boolean);
+      return attrs.length ? " " + attrs.join(" ") : "";
+    } catch {
+      return "";
+    }
+  })();
+
+  return new Blob(
+    ["<!doctype html>\n", `<html${htmlAttrs}>`, "\n", headClone.outerHTML, "\n", bodyHTML, "\n</html>"],
+    { type: "text/html;charset=utf-8" }
+  );
 }
 
 async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
@@ -1641,10 +1660,9 @@ async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
     const doc = win.document;
 
     setMeta("Preparing HTML…");
-    const html = await feBuildArchiveHTMLSnapshot(win, titleText, { meta: setMeta });
+    const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta });
 
     setMeta("Downloading…");
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = doc.createElement("a");
     a.href = url;
@@ -1695,11 +1713,14 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
 
   try {
     setMeta("Building HTML…");
-    const html = await feBuildArchiveHTMLSnapshot(win, titleText, { meta: setMeta });
+    const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta });
 
     const safeName = feSanitizeFilename(titleText) || "chat-log";
     const filePath = path.join(os.tmpdir(), `${safeName}-${Date.now()}.html`);
-    fs.writeFileSync(filePath, html, "utf8");
+    // Write as binary to avoid constructing one massive JS string for huge logs.
+    const ab = await blob.arrayBuffer();
+    const buf = globalThis.Buffer ? globalThis.Buffer.from(ab) : new Uint8Array(ab);
+    fs.writeFileSync(filePath, buf);
 
     setMeta("Opening system browser…");
 
@@ -1745,8 +1766,14 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   // IMPORTANT: Base64 embedding multi-megabyte fonts can easily crash Chromium/Electron
   // (OOM / STATUS_BREAKPOINT) due to base64 expansion + JS string memory overhead.
   // To keep exports reliable, we only embed when the server reports a small Content-Length.
-  const MAX_TOTAL_BYTES = 1_500_000; // ~1.5MB binary before base64 expansion
-  const MAX_PER_FILE_BYTES = 900_000;
+  // CookieRun OTF files shipped with this module are ~0.9–1.0MB each.
+  // Hakgyoansim Geurimilgi (TTF) is larger (~6MB).
+  // We keep separate per-file caps to avoid accidentally embedding oversized TTF variants
+  // of CookieRun while still allowing Geurimilgi to be included when the user explicitly
+  // enables "embed custom fonts".
+  const MAX_TOTAL_BYTES = 11_000_000; // binary before base64 expansion
+  const MAX_PER_FILE_BYTES_COOKIE = 1_200_000;
+  const MAX_PER_FILE_BYTES_GEUR = 7_000_000;
   let totalBytes = 0;
 
   const headSize = async (url) => {
@@ -1761,12 +1788,36 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     }
   };
 
+  const fetchFont = async (url, { perFileCap }) => {
+    // Try to get a size estimate first.
+    const size = await headSize(url);
+
+    // Enforce caps using either the reported size, or a conservative streaming cap.
+    const remaining = Math.max(0, MAX_TOTAL_BYTES - totalBytes);
+    const cap = Math.max(0, Math.min(perFileCap, remaining));
+    if (!cap) return null;
+
+    if (size && (size > perFileCap || size > remaining)) return null;
+
+    // Prefer the capped streaming fetch so exports still work on servers that:
+    // - do not support HEAD
+    // - omit Content-Length
+    const got = await feFetchAsDataURLCapped(url, cap);
+    if (!got?.dataUrl) return null;
+
+    const bytes = size || got.bytes || 0;
+    if (bytes && totalBytes + bytes > MAX_TOTAL_BYTES) return null;
+    totalBytes += bytes;
+    return got.dataUrl;
+  };
+
   // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
   const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
   const weights = [
-    { weight: 400, name: "Regular", files: ["CookieRun%20Regular.ttf", "CookieRun%20Regular.otf"] },
-    { weight: 700, name: "Bold", files: ["CookieRun%20Bold.ttf", "CookieRun%20Bold.otf"] },
-    { weight: 900, name: "Black", files: ["CookieRun%20Black.ttf", "CookieRun%20Black.otf"] },
+    // Prefer OTF first (smaller than TTF in this module)
+    { weight: 400, name: "Regular", files: ["CookieRun%20Regular.otf", "CookieRun%20Regular.ttf"] },
+    { weight: 700, name: "Bold", files: ["CookieRun%20Bold.otf", "CookieRun%20Bold.ttf"] },
+    { weight: 900, name: "Black", files: ["CookieRun%20Black.otf", "CookieRun%20Black.ttf"] },
   ];
 
   const faces = [];
@@ -1776,19 +1827,11 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
     for (const f of w.files) {
       const url = `/modules/${MODULE_ID}/font/${f}`;
-      const size = await headSize(url);
-      // If we can't confidently estimate size, skip to avoid OOM.
-      if (!size) continue;
-      if (size > MAX_PER_FILE_BYTES) continue;
-      if (totalBytes + size > MAX_TOTAL_BYTES) continue;
-
-      const attempt = await feFetchAsDataURL(url);
-      if (attempt) {
-        dataUrl = attempt;
-        fmt = f.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
-        totalBytes += size;
-        break;
-      }
+      const attempt = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_COOKIE });
+      if (!attempt) continue;
+      dataUrl = attempt;
+      fmt = f.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
+      break;
     }
 
     if (!dataUrl) continue;
@@ -1802,17 +1845,11 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   // If present, we embed it so saved file:// HTML keeps the same look.
   try {
     const geurUrl = `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`;
-    const geurSize = await headSize(geurUrl);
-    const geurimilgiData =
-      geurSize && geurSize <= MAX_PER_FILE_BYTES && totalBytes + geurSize <= MAX_TOTAL_BYTES
-        ? await feFetchAsDataURL(geurUrl)
-        : null;
-
+    const geurimilgiData = await fetchFont(geurUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
     if (geurimilgiData) {
       faces.push(
         `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
       );
-      totalBytes += geurSize ?? 0;
     }
   } catch {}
 
@@ -1887,8 +1924,16 @@ ${faces.join("\n")}
 
 body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
 body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
+body.fe-ui-font-geurimilgi {
+  --fe-ui-font-family: var(--fe-font-geurimilgi);
+  --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
+}
 
 /* Ensure the archive itself uses the embedded stack even when external CSS is partially blocked. */
+html, body {
+  font-family: var(--fe-ui-font-family, var(--fe-font-primary)) !important;
+}
+
 #fe-chat-export-container,
 #fe-chat-export-container :is(
   .chat-message,
@@ -1911,6 +1956,64 @@ async function feFetchAsDataURL(url) {
     const blob = await res.blob();
     return await feBlobToDataURL(blob);
   } catch {
+    return null;
+  }
+}
+
+async function feFetchAsDataURLCapped(url, maxBytes) {
+  // Stream the response and abort if it exceeds maxBytes.
+  // This avoids OOM when servers omit Content-Length.
+  const cap = Math.max(0, Number(maxBytes) || 0);
+  if (!cap) return null;
+
+  const controller = new AbortController();
+  try {
+    const res = await fetch(url, { credentials: "include", signal: controller.signal });
+    if (!res.ok) return null;
+
+    // Respect content-length if present.
+    try {
+      const len = Number(res.headers.get("content-length") || 0);
+      if (Number.isFinite(len) && len > 0 && len > cap) {
+        try {
+          controller.abort();
+        } catch {}
+        return null;
+      }
+    } catch {}
+
+    // If streams aren't available, fall back to blob() (still capped).
+    if (!res.body || typeof res.body.getReader !== "function") {
+      const blob = await res.blob();
+      if (blob.size > cap) return null;
+      return { dataUrl: await feBlobToDataURL(blob), bytes: blob.size };
+    }
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      received += value.byteLength || value.length || 0;
+      if (received > cap) {
+        try {
+          controller.abort();
+        } catch {}
+        return null;
+      }
+      chunks.push(value);
+    }
+
+    const blob = new Blob(chunks);
+    if (blob.size > cap) return null;
+    return { dataUrl: await feBlobToDataURL(blob), bytes: blob.size };
+  } catch {
+    try {
+      controller.abort();
+    } catch {}
     return null;
   }
 }
@@ -2046,16 +2149,27 @@ function feDownloadExportHTMLFromCurrentDocument() {
   }
 }
 
-async function feMaybeYieldForUI() {
+async function feMaybeYieldForUI(targetWindow = window) {
   // Background tabs/windows clamp timers; yielding there can look like the export "stopped".
-  // Only yield when visible so we keep UI responsive without stalling in background.
-  if (document.visibilityState !== "visible") return;
-  await feNextTick();
+  // Only yield when the *target* document is visible.
+  try {
+    const doc = targetWindow?.document ?? document;
+    if (doc.visibilityState !== "visible") return;
+  } catch {
+    // If we can't read visibility state, fall back to yielding.
+  }
+
+  try {
+    const t = targetWindow?.setTimeout ?? setTimeout;
+    await new Promise((resolve) => t(resolve, 0));
+  } catch {
+    await feNextTick();
+  }
 }
 
 function feApplyChatMergeInWindow(win) {
   // Apply merge classes (start/mid/end/divider) in the archive window.
-  // This simplified version avoids computed-style syncing.
+  // This version keeps allocations low for large exports.
   try {
     const logEl =
       win.document.getElementById("chat-log") ||
@@ -2075,24 +2189,6 @@ function feApplyChatMergeInWindow(win) {
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
     const showDivider = !!feSetting(S.MERGE_DIVIDER);
 
-    const els = Array.from(logEl.querySelectorAll("li.chat-message"));
-    for (const el of els) {
-      el.classList.remove("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
-    }
-
-    const infos = els
-      .map((el) => {
-        const id = feGetMessageIdFromElement(el);
-        const msg = id ? game.messages?.get(id) : null;
-        const info = feMessageMergeInfo(msg, el);
-        return {
-          el,
-          ...info,
-          key: feMergeKey(info),
-        };
-      })
-      .filter((x) => x && x.el);
-
     const canMerge = (a, b) => {
       if (!a || !b) return false;
       if (a.key !== b.key) return false;
@@ -2100,24 +2196,42 @@ function feApplyChatMergeInWindow(win) {
       return true;
     };
 
-    const applyGroup = (start, endExclusive) => {
-      const group = infos.slice(start, endExclusive);
-      if (!group.length) return;
-      if (showDivider && start > 0) group[0].el.classList.add("fe-divider-before");
-      if (group.length === 1) return;
-      group[0].el.classList.add("fe-merge-start");
-      for (let i = 1; i < group.length - 1; i++) group[i].el.classList.add("fe-merge-mid");
-      group[group.length - 1].el.classList.add("fe-merge-end");
-    };
+    let prevInfo = null;
+    let groupCount = 0;
+    let firstInGroup = null;
+    let lastInGroup = null;
+    let seenAny = false;
 
-    let groupStart = 0;
-    for (let i = 1; i < infos.length; i++) {
-      if (!canMerge(infos[i - 1], infos[i])) {
-        applyGroup(groupStart, i);
-        groupStart = i;
+    for (const el of logEl.querySelectorAll("li.chat-message")) {
+      el.classList.remove("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
+
+      const id = feGetMessageIdFromElement(el);
+      const msg = id ? game.messages?.get(id) : null;
+      const info = feMessageMergeInfo(msg, el);
+      const current = { el, ...info, key: feMergeKey(info) };
+
+      if (!seenAny) {
+        seenAny = true;
+      } else if (showDivider && !canMerge(prevInfo, current)) {
+        el.classList.add("fe-divider-before");
       }
+
+      if (canMerge(prevInfo, current)) {
+        groupCount += 1;
+        if (groupCount === 2 && firstInGroup) firstInGroup.el.classList.add("fe-merge-start");
+        if (groupCount > 2 && lastInGroup) {
+          lastInGroup.el.classList.remove("fe-merge-end");
+          lastInGroup.el.classList.add("fe-merge-mid");
+        }
+        el.classList.add("fe-merge-end");
+      } else {
+        groupCount = 1;
+        firstInGroup = current;
+      }
+
+      lastInGroup = current;
+      prevInfo = current;
     }
-    applyGroup(groupStart, infos.length);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
   }
@@ -2150,12 +2264,14 @@ function feCanUserSeeChatMessage(msg, user) {
 
 function feNormalizeExportNode(rootEl) {
   try {
+    const baseHref = rootEl?.ownerDocument?.baseURI || window.location.href;
+
     // Normalize image URLs to absolute so print reliably loads them
     for (const img of rootEl.querySelectorAll("img")) {
       const src = img.getAttribute("src");
       if (!src) continue;
       try {
-        img.src = new URL(src, window.location.href).href;
+        img.src = new URL(src, baseHref).href;
       } catch {}
       // Ensure intrinsic size isn't lost in print layout
       if (!img.getAttribute("loading")) img.setAttribute("loading", "eager");
@@ -2167,7 +2283,7 @@ function feNormalizeExportNode(rootEl) {
       const href = a.getAttribute("href");
       if (!href) continue;
       try {
-        a.href = new URL(href, window.location.href).href;
+        a.href = new URL(href, baseHref).href;
       } catch {}
       a.setAttribute("target", "_blank");
       a.setAttribute("rel", "noopener");
@@ -2184,12 +2300,22 @@ function feNextTick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function feWaitForImages(rootEl, timeoutMs = 10000) {
+function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } = {}) {
   try {
-    const imgs = Array.from(rootEl.querySelectorAll("img")).filter((img) => {
-      const src = img.getAttribute("src");
-      return !!src;
-    });
+    if (!rootEl?.querySelectorAll) return Promise.resolve();
+
+    // Avoid materializing a giant array for huge chat logs.
+    const nodeList = rootEl.querySelectorAll("img[src]");
+    if (!nodeList?.length) return Promise.resolve();
+
+    // Hard cap: waiting on thousands of images can allocate too many listeners and stall.
+    const imgs = [];
+    let count = 0;
+    for (const img of nodeList) {
+      imgs.push(img);
+      count++;
+      if (count >= maxImages) break;
+    }
 
     if (!imgs.length) return Promise.resolve();
 
@@ -2212,12 +2338,18 @@ function feWaitForImages(rootEl, timeoutMs = 10000) {
       };
 
       for (const img of imgs) {
-        if (img.complete && img.naturalWidth > 0) {
+        try {
+          // `complete` is true for both successfully loaded and permanently failed images.
+          // Missing/404 images must NOT stall export until timeout.
+          if (img.complete) {
+            onOne();
+            continue;
+          }
+          img.addEventListener?.("load", onOne, { once: true });
+          img.addEventListener?.("error", onOne, { once: true });
+        } catch {
           onOne();
-          continue;
         }
-        img.addEventListener("load", onOne, { once: true });
-        img.addEventListener("error", onOne, { once: true });
       }
     });
   } catch {
@@ -2231,8 +2363,7 @@ function feBuildLiveChatMessageElementMap() {
     const logs = feGetChatLogs?.() ?? [];
     for (const log of logs) {
       if (!log?.querySelectorAll) continue;
-      const items = Array.from(log.querySelectorAll("li.chat-message"));
-      for (const el of items) {
+      for (const el of log.querySelectorAll("li.chat-message")) {
         const id = feGetMessageIdFromElement?.(el);
         if (id) map.set(String(id), el);
       }
