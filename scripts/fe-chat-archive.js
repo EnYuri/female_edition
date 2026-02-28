@@ -299,26 +299,8 @@ async function feExportChatLogToPDFInline() {
 
       const msgId = String(msg?.id ?? msg?._id ?? "");
 
-      // 1) Try to clone from live DOM
-      let li = null;
       const liveEl = msgId ? liveMessageMap.get(msgId) : null;
-      if (liveEl) {
-        try {
-          li = liveEl.cloneNode(true);
-        } catch {
-          li = null;
-        }
-      }
-
-      // 2) Fallback: minimal render if not present in DOM
-      if (!feIsElement(li)) {
-        try {
-          li = feFallbackRenderChatMessage(document, msg);
-        } catch {
-          li = null;
-        }
-      }
-
+      const li = await feRenderExportMessageNode(document, msg, { liveEl });
       if (!feIsElement(li)) continue;
 
       // Normalize URLs so print/export loads images reliably.
@@ -572,6 +554,86 @@ function feEscapeHTML(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+
+function feCoerceElement(node) {
+  try {
+    if (feIsElement(node)) return node;
+    if (node?.jquery && feIsElement(node[0])) return node[0];
+    if (Array.isArray(node) && feIsElement(node[0])) return node[0];
+    if (feIsElement(node?.[0])) return node[0];
+  } catch {}
+  return null;
+}
+
+function feCoerceChatMessageElement(node) {
+  const el = feCoerceElement(node);
+  if (!el) return null;
+  try {
+    if (el.matches?.("li.chat-message")) return el;
+    return el.querySelector?.("li.chat-message") || el.closest?.("li.chat-message") || el;
+  } catch {
+    return el;
+  }
+}
+
+async function feTryFoundryRenderMessage(msg) {
+  try {
+    const ChatLogCls = ui?.chat?.constructor || foundry?.applications?.sidebar?.tabs?.ChatLog;
+    if (typeof ChatLogCls?.renderMessage === "function") {
+      const rendered = await ChatLogCls.renderMessage(msg, {});
+      const el = feCoerceChatMessageElement(rendered);
+      if (el) return el;
+    }
+  } catch {}
+
+  try {
+    if (typeof msg?.renderHTML === "function") {
+      const rendered = await msg.renderHTML();
+      const el = feCoerceChatMessageElement(rendered);
+      if (el) return el;
+    }
+  } catch {}
+
+  return null;
+}
+
+async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null } = {}) {
+  let node = null;
+
+  if (feIsElement(liveEl)) {
+    try {
+      node = targetDoc?.importNode ? targetDoc.importNode(liveEl, true) : liveEl.cloneNode(true);
+      feMirrorLiveMessageStyles(liveEl, node);
+    } catch {
+      node = null;
+    }
+  }
+
+  if (!feIsElement(node)) {
+    try {
+      const rendered = await feTryFoundryRenderMessage(msg);
+      const el = feCoerceChatMessageElement(rendered);
+      if (feIsElement(el)) {
+        node = targetDoc && el.ownerDocument !== targetDoc
+          ? targetDoc.importNode(el, true)
+          : el.cloneNode?.(true) || el;
+      }
+    } catch {
+      node = null;
+    }
+  }
+
+  if (!feIsElement(node)) {
+    try {
+      node = feFallbackRenderChatMessage(targetDoc || document, msg);
+    } catch {
+      node = null;
+    }
+  }
+
+  return feIsElement(node) ? node : null;
 }
 
 function feSanitizeFilename(name) {
@@ -949,27 +1011,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
     const msgId = String(msg?.id ?? msg?._id ?? "");
 
-    // 1) Try to clone from live DOM
-    let node = null;
     const liveEl = msgId ? liveMessageMap.get(msgId) : null;
-    if (liveEl) {
-      try {
-        node = win.document.importNode(liveEl, true);
-      } catch (_e) {
-        node = null;
-      }
-    }
-
-    // 2) Fallback: render a minimal message if not present in DOM
-    if (!feIsElement(node)) {
-      try {
-        node = feFallbackRenderChatMessage(win.document, msg);
-      } catch (e) {
-        console.warn(`${MODULE_ID}: fallback render failed for message`, msgId || msg, e);
-        node = null;
-      }
-    }
-
+    const node = await feRenderExportMessageNode(win.document, msg, { liveEl });
     if (!feIsElement(node)) continue;
 
     node.classList.add("fe-export-message");
@@ -2234,6 +2277,158 @@ function feApplyChatMergeInWindow(win) {
     }
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
+  }
+}
+
+const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
+  "color",
+  "background-color",
+  "background-image",
+  "background-size",
+  "background-position",
+  "background-repeat",
+  "background-blend-mode",
+  "border",
+  "border-color",
+  "border-style",
+  "border-width",
+  "border-top",
+  "border-right",
+  "border-bottom",
+  "border-left",
+  "border-radius",
+  "box-shadow",
+  "outline",
+  "outline-color",
+  "outline-style",
+  "outline-width",
+  "filter",
+  "opacity",
+  "display",
+  "padding",
+  "margin",
+  "align-items",
+  "justify-content",
+  "align-self",
+  "justify-self",
+  "grid-template-columns",
+  "grid-template-areas",
+  "grid-auto-flow",
+  "grid-area",
+  "gap",
+  "column-gap",
+  "row-gap",
+  "white-space",
+  "overflow",
+  "text-overflow",
+];
+
+const FE_ARCHIVE_TEXT_STYLE_PROPS = [
+  "color",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "text-shadow",
+  "text-transform",
+  "text-align",
+  "white-space",
+];
+
+const FE_ARCHIVE_TREE_STYLE_PROPS = Array.from(new Set([
+  ...FE_ARCHIVE_CONTAINER_STYLE_PROPS,
+  ...FE_ARCHIVE_TEXT_STYLE_PROPS,
+]));
+
+function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
+  try {
+    if (!srcEl || !dstEl) return;
+    const cs = window.getComputedStyle?.(srcEl);
+    if (!cs) return;
+    for (const prop of propNames) {
+      const value = cs.getPropertyValue?.(prop);
+      if (!value) continue;
+      dstEl.style.setProperty(prop, value.trim());
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feSelectScoped(root, selector) {
+  try {
+    if (!root) return [];
+    if (selector === ":scope") return [root];
+    return Array.from(root.querySelectorAll?.(selector) ?? []);
+  } catch {
+    return [];
+  }
+}
+
+
+function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80 } = {}) {
+  try {
+    if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
+    const liveWalker = document.createTreeWalker(liveEl, NodeFilter.SHOW_ELEMENT);
+    const cloneWalker = cloneEl.ownerDocument.createTreeWalker(cloneEl, NodeFilter.SHOW_ELEMENT);
+
+    let liveNode = liveWalker.currentNode;
+    let cloneNode = cloneWalker.currentNode;
+    let count = 0;
+
+    while (liveNode && cloneNode && count < maxNodes) {
+      feCopyComputedStyleSubset(liveNode, cloneNode, FE_ARCHIVE_TREE_STYLE_PROPS);
+      liveNode = liveWalker.nextNode();
+      cloneNode = cloneWalker.nextNode();
+      count += 1;
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feMirrorLiveMessageStyles(liveEl, cloneEl) {
+  try {
+    if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
+
+    // First, mirror a broad-but-safe subset of computed styles across the cloned tree.
+    // This keeps archive HTML visually close to the live chat without freezing absolute widths.
+    feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes: 96 });
+
+    const sync = (selector, props) => {
+      const srcList = feSelectScoped(liveEl, selector);
+      const dstList = feSelectScoped(cloneEl, selector);
+      const n = Math.min(srcList.length, dstList.length);
+      for (let i = 0; i < n; i++) feCopyComputedStyleSubset(srcList[i], dstList[i], props);
+    };
+
+    sync(":scope", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+    sync(":scope > .message-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+    sync(":scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+    sync(":scope > .message-header .message-sender", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+    sync(":scope > .message-header .message-sender .name-stacked", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+    sync(":scope > .message-header .message-sender .name-stacked .title, :scope > .message-header .message-sender .title", FE_ARCHIVE_TEXT_STYLE_PROPS);
+    sync(":scope > .message-header .message-sender .name-stacked .subtitle, :scope > .message-header .message-sender .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
+    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+    sync(":scope > .message-header .message-metadata", [...FE_ARCHIVE_CONTAINER_STYLE_PROPS, ...FE_ARCHIVE_TEXT_STYLE_PROPS]);
+
+    const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
+    if (hasCard) {
+      sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .chat-card .name-stacked .title, :scope .midi-chat-card .name-stacked .title, :scope .chat-card .name-stacked .subtitle, :scope .midi-chat-card .name-stacked .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
+      sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+    }
+
+    if (liveEl.classList?.contains?.("narrator-chat")) {
+      sync(":scope, :scope > .message-header, :scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .message-content", FE_ARCHIVE_TEXT_STYLE_PROPS);
+    }
+  } catch {
+    /* no-op */
   }
 }
 

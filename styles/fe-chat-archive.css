@@ -206,6 +206,25 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif !important;
 }
 
+#fe-chat-export-container .chat-message .message-sender {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: var(--fe-chat-title-size) !important;
+  line-height: 1.05 !important;
+  font-weight: 700 !important;
+  color: var(--color-text-dark-primary, #191813) !important;
+}
+
+#fe-chat-export-container .chat-message .message-sender .name-stacked {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
 #fe-chat-export-container .chat-message .message-sender .name-stacked .title {
   font-weight: 700 !important;
 }
@@ -213,6 +232,32 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container .chat-message .message-sender .name-stacked .subtitle {
   font-weight: 400 !important;
 }
+
+#fe-chat-export-container .chat-message :is(.message-sender .name-stacked .title,
+  .message-sender .title,
+  .name-stacked .title) {
+  font-size: var(--fe-chat-title-size) !important;
+  line-height: 1.05 !important;
+  color: var(--color-text-dark-primary, #191813) !important;
+}
+
+#fe-chat-export-container .chat-message :is(.message-sender .name-stacked .subtitle,
+  .message-sender .subtitle,
+  .name-stacked .subtitle) {
+  font-size: var(--fe-chat-subtitle-size) !important;
+  line-height: 1.05 !important;
+  color: var(--color-text-dark-secondary, #6b6a66) !important;
+}
+
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat) :is(.message-header, .message-content,
+  .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
+  color: var(--color-text-dark-primary, #191813);
+}
+
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat) .message-metadata {
+  color: var(--color-text-dark-secondary, #6b6a66) !important;
+}
+
 
 /* Export view: remove text shadow for readability in PDF (print only).
  * On-screen (HTML) we may intentionally add a tiny text-shadow to improve
@@ -233,7 +278,6 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
  */
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
   background-image: var(--fe-parchment-overlay) !important;
-  box-shadow: none !important;
   filter: none !important;
 }
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::before,
@@ -261,9 +305,19 @@ body.fe-export-optimized.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userb
 body.fe-export-optimized
   :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log)
   .chat-message
-  :is(.message-header, .message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) {
+  :is(.message-header, .message-content) {
   background-image: none !important;
-  box-shadow: none !important;
+  filter: none !important;
+}
+
+body.fe-export-optimized
+  :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+    .chat-card .card-header, .midi-chat-card .card-header, .dnd5e.chat-card .card-header, .dnd5e2.chat-card .card-header,
+    .chat-card .card-content, .midi-chat-card .card-content, .dnd5e.chat-card .card-content, .dnd5e2.chat-card .card-content,
+    .details.card-content, .details.collapsible-content.card-content) {
+  background-image: none !important;
   filter: none !important;
 }
 

@@ -912,12 +912,64 @@ function feSanitizePseudoInWindow(win, el, pseudo, varName) {
   }
 }
 
+function feIsNarratorMessageElementInWindow(win, msgEl) {
+  try {
+    if (!win || !msgEl || !(msgEl instanceof win.Element)) return false;
+    if (msgEl.classList?.contains?.("narrator-chat")) return true;
+
+    const rawId =
+      msgEl.dataset?.messageId ||
+      msgEl.dataset?.documentId ||
+      msgEl.getAttribute?.("data-message-id") ||
+      msgEl.getAttribute?.("data-document-id");
+    const msgId = rawId ? String(rawId).split(".").pop() : null;
+    if (!msgId) return false;
+
+    const msg = game.messages?.get?.(msgId);
+    return !!msg?.getFlag?.("narrator-tools", "type") || !!msg?.flags?.["narrator-tools"];
+  } catch {
+    return false;
+  }
+}
+
+function feSanitizeNarratorBackgroundInWindow(win, el) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return false;
+    el.style.setProperty("background-image", "none", "important");
+    el.classList.add("fe-bg-sanitized");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function feSanitizePseudoNoneInWindow(win, el, varName) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return false;
+    el.style.setProperty(varName, "none");
+    el.classList.add("fe-pseudo-sanitized");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function feStripChatTexturesInWindow(win, rootEl) {
   try {
     if (!win || !rootEl) return;
     const root = rootEl instanceof win.Element ? rootEl : win.document;
     const messages = Array.from(root.querySelectorAll?.(".chat-message") ?? []);
     for (const msg of messages) {
+      if (feIsNarratorMessageElementInWindow(win, msg)) {
+        feSanitizeNarratorBackgroundInWindow(win, msg);
+        msg
+          .querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")
+          ?.forEach?.((el) => feSanitizeNarratorBackgroundInWindow(win, el));
+        feSanitizePseudoNoneInWindow(win, msg, "--fe-before-bgimg");
+        feSanitizePseudoNoneInWindow(win, msg, "--fe-after-bgimg");
+        continue;
+      }
+
       feSanitizeElementBackgroundInWindow(win, msg);
       msg
         .querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")

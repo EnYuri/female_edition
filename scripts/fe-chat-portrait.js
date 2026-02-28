@@ -577,7 +577,9 @@ function cpComputeDrawRect({
   const scale = fit === "contain" ? Math.min(s / w, s / h) : Math.max(s / w, s / h);
   const dw = w * scale;
   const dh = h * scale;
-  const dx = (s - dw) / 2;
+  // For "contain" mode, keep the artwork left-aligned so any empty space remains
+  // on the right only (user-requested behavior). Vertical centering is preserved.
+  const dx = fit === "contain" ? 0 : (s - dw) / 2;
   const dy = (s - dh) / 2;
   return { dx, dy, dw, dh };
 }
@@ -902,11 +904,6 @@ function cpEnsureSenderText(message, messageEl, headerEl) {
     const sender = headerEl.querySelector?.(".message-sender");
     if (!sender) return;
 
-    // If the sender already has meaningful content, do nothing.
-    const existingTitle = sender.querySelector?.(":scope .title")?.textContent?.trim?.() ?? "";
-    const existingText = sender.textContent?.trim?.() ?? "";
-    if (existingTitle || existingText) return;
-
     const actor = feGetSpeakerActorFromMessage?.(message);
     const actorName = actor?.name ? String(actor.name).trim() : "";
     const speakerAlias = message?.speaker?.alias ? String(message.speaker.alias).trim() : "";
@@ -917,19 +914,39 @@ function cpEnsureSenderText(message, messageEl, headerEl) {
     const title = actorName || speakerAlias || authorName || unknownLabel;
     const subtitle = authorName && authorName !== title ? authorName : "";
 
+    const existingWrap = sender.querySelector?.(":scope .name-stacked");
+    const existingTitle = sender.querySelector?.(":scope .title")?.textContent?.trim?.() ?? "";
+    const existingSubtitle = sender.querySelector?.(":scope .subtitle")?.textContent?.trim?.() ?? "";
+    const existingText = sender.textContent?.trim?.() ?? "";
+
+    // If structured title/subtitle already exists, keep it.
+    if (existingWrap && (existingTitle || existingSubtitle)) return;
+
+    // Normalize plain-text senders into the same stacked markup used elsewhere so
+    // archive/live rendering stays consistent (actor title + optional player subtitle).
+    // Only rewrite when the sender is empty or effectively plain text.
+    const hasComplexChildren = Array.from(sender.children ?? []).some((el) => {
+      const cl = el?.classList;
+      return !(cl?.contains?.("name-stacked") || cl?.contains?.("title") || cl?.contains?.("subtitle"));
+    });
+    if (hasComplexChildren) return;
+
+    const resolvedTitle = title || existingText || unknownLabel;
+    const resolvedSubtitle = subtitle && subtitle !== resolvedTitle ? subtitle : "";
+
     sender.textContent = "";
     const wrap = doc.createElement("span");
     wrap.className = "name-stacked";
 
     const titleEl = doc.createElement("span");
     titleEl.className = "title";
-    titleEl.textContent = title;
+    titleEl.textContent = resolvedTitle;
     wrap.appendChild(titleEl);
 
-    if (subtitle) {
+    if (resolvedSubtitle) {
       const subEl = doc.createElement("span");
       subEl.className = "subtitle";
-      subEl.textContent = subtitle;
+      subEl.textContent = resolvedSubtitle;
       wrap.appendChild(subEl);
     }
 
@@ -1002,10 +1019,24 @@ function cpUpsertPortrait(message, messageEl) {
   } catch {}
 
   // Add predictable classes so CSS can align header layout similarly to chat-portrait.
+  let portraitSystemId = "generic";
   try {
-    header.classList.add("fe-chat-portrait-message-header");
-    const sys = game?.system?.id;
-    if (sys) header.classList.add(`fe-chat-portrait-message-header-${sys}`);
+    portraitSystemId = String(game?.system?.id || "generic");
+    header.classList.add("fe-chat-portrait-message-header", "chat-portrait-message-header");
+    if (portraitSystemId) {
+      header.classList.add(`fe-chat-portrait-message-header-${portraitSystemId}`);
+      header.classList.add(`chat-portrait-message-header-${portraitSystemId}`);
+    }
+
+    const sender = header.querySelector?.(".message-sender");
+    if (sender?.classList) {
+      sender.classList.add(`chat-portrait-text-size-name-${portraitSystemId}`);
+      sender.classList.add(`chat-portrait-text-header-name-${portraitSystemId}`);
+      sender.style?.setProperty?.("align-self", "center", "important");
+    }
+
+    const metadata = header.querySelector?.(".message-metadata");
+    metadata?.style?.setProperty?.("position", "static", "important");
   } catch {}
 
   const src = cpGetPortraitSrc(message);
@@ -1028,6 +1059,11 @@ function cpUpsertPortrait(message, messageEl) {
     img.decoding = "async";
     header.prepend(img);
   }
+
+  try {
+    img.classList.add("chat-portrait-message-portrait");
+    if (portraitSystemId) img.classList.add(`chat-portrait-message-portrait-${portraitSystemId}`);
+  } catch {}
 
   // Keep a stable reference to the original resource.
   // If we already have a HQ-resampled data URL for this exact request, keep using it.
