@@ -326,7 +326,9 @@ async function feExportChatLogToPDFInline() {
 
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
     if (feSetting(S.MERGE_ENABLED)) {
+      feSyncArchiveMergeBodyClasses(document);
       feApplyChatMerge(logEl);
+      feRefreshPortraitsForLog(logEl);
     }
 
     // Wait for images (portraits, item icons) to load so they actually print
@@ -536,6 +538,33 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
     }
   } catch (err) {
     console.warn("female_edition | failed to apply module stylesheet settings to archive document", err);
+  }
+}
+
+function feSyncArchiveMergeBodyClasses(doc) {
+  try {
+    const enabled = !!feSetting(S.MERGE_ENABLED);
+    const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
+    doc?.body?.classList?.toggle?.("fe-chat-merge", enabled);
+    doc?.body?.classList?.toggle?.("fe-merge-follow-hide", enabled && style === "hide");
+    doc?.body?.classList?.toggle?.("fe-merge-follow-name", enabled && style === "name");
+    doc?.body?.classList?.toggle?.("fe-merge-follow-portrait", enabled && style === "portrait");
+  } catch {
+    /* no-op */
+  }
+}
+
+function feRefreshPortraitsForLog(logEl) {
+  try {
+    if (!logEl?.querySelectorAll) return;
+    for (const el of logEl.querySelectorAll("li.chat-message")) {
+      const id = feGetMessageIdFromElement(el);
+      const msg = id ? game.messages?.get(id) : null;
+      if (!msg) continue;
+      feChatPortraitUpsert(msg, el);
+    }
+  } catch {
+    /* no-op */
   }
 }
 
@@ -929,6 +958,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetUiFontClass(win.document);
   feSetUserColorBgClass(win.document);
   feSetUserColorBgBaseClass(win.document);
+  feSyncArchiveMergeBodyClasses(win.document);
   // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
   try {
     feChatPortraitApplyVars(win.document);
@@ -2211,8 +2241,6 @@ async function feMaybeYieldForUI(targetWindow = window) {
 }
 
 function feApplyChatMergeInWindow(win) {
-  // Apply merge classes (start/mid/end/divider) in the archive window.
-  // This version keeps allocations low for large exports.
   try {
     const logEl =
       win.document.getElementById("chat-log") ||
@@ -2220,61 +2248,9 @@ function feApplyChatMergeInWindow(win) {
       win.document.querySelector("ol.chat-log");
     if (!logEl) return;
 
-    // Mirror merge-related body classes.
-    try {
-      win.document.body.classList.toggle("fe-chat-merge", !!feSetting(S.MERGE_ENABLED));
-      const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
-      win.document.body.classList.toggle("fe-merge-follow-hide", style === "hide");
-      win.document.body.classList.toggle("fe-merge-follow-name", style === "name");
-      win.document.body.classList.toggle("fe-merge-follow-portrait", style === "portrait");
-    } catch {}
-
-    const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
-    const showDivider = !!feSetting(S.MERGE_DIVIDER);
-
-    const canMerge = (a, b) => {
-      if (!a || !b) return false;
-      if (a.key !== b.key) return false;
-      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
-      return true;
-    };
-
-    let prevInfo = null;
-    let groupCount = 0;
-    let firstInGroup = null;
-    let lastInGroup = null;
-    let seenAny = false;
-
-    for (const el of logEl.querySelectorAll("li.chat-message")) {
-      el.classList.remove("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
-
-      const id = feGetMessageIdFromElement(el);
-      const msg = id ? game.messages?.get(id) : null;
-      const info = feMessageMergeInfo(msg, el);
-      const current = { el, ...info, key: feMergeKey(info) };
-
-      if (!seenAny) {
-        seenAny = true;
-      } else if (showDivider && !canMerge(prevInfo, current)) {
-        el.classList.add("fe-divider-before");
-      }
-
-      if (canMerge(prevInfo, current)) {
-        groupCount += 1;
-        if (groupCount === 2 && firstInGroup) firstInGroup.el.classList.add("fe-merge-start");
-        if (groupCount > 2 && lastInGroup) {
-          lastInGroup.el.classList.remove("fe-merge-end");
-          lastInGroup.el.classList.add("fe-merge-mid");
-        }
-        el.classList.add("fe-merge-end");
-      } else {
-        groupCount = 1;
-        firstInGroup = current;
-      }
-
-      lastInGroup = current;
-      prevInfo = current;
-    }
+    feSyncArchiveMergeBodyClasses(win.document);
+    feApplyChatMerge(logEl);
+    feRefreshPortraitsForLog(logEl);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
   }
