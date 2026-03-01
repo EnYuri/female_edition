@@ -1,30 +1,30 @@
 :root {
   --fe-chat-portrait-size: 64px;
   --fe-chat-header-meta-reserve: 64px;
+  --fe-chat-header-meta-strip: 18px;
 }
 
 /* Chat portrait in messages */
 li.chat-message.fe-has-chat-portrait > .message-header {
   position: relative !important;
   display: grid !important;
-  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr);
-  grid-template-rows: 10px auto auto;
+  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
   grid-template-areas:
     "portrait sender"
-    "portrait sender"
-    "portrait flavor";
+    "portrait flavor" !important;
   align-items: start !important;
   column-gap: 8px !important;
   row-gap: 1px !important;
-
-  padding: 0 var(--fe-chat-header-meta-reserve) 0 0 !important;
-  margin: 0 0 3px 0 !important;
+  padding: var(--fe-chat-header-meta-strip) 0 0 0 !important;
+  margin: 0 0 2px 0 !important;
   border: none !important;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header > img.fe-chat-portrait {
   grid-area: portrait;
-  align-self: flex-start;
+  align-self: stretch !important;
+  justify-self: start !important;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
@@ -39,8 +39,7 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
   align-self: center !important;
   justify-self: stretch !important;
   margin: 0 !important;
-  padding: 0 !important;
-  text-align: center !important;
+  padding: 1px 0 0 0 !important;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -48,18 +47,16 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
   word-break: break-word !important;
 }
 
-/* If a stacked name wrapper is present, keep it centered in the middle lane. */
 li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked {
   display: grid !important;
   grid-auto-flow: row;
   align-items: center !important;
   justify-items: stretch !important;
-  justify-content: center !important;
-  text-align: center !important;
   min-width: 0 !important;
   min-inline-size: 0 !important;
   max-width: none !important;
   width: 100% !important;
+  inline-size: 100% !important;
   flex: 1 1 auto !important;
 }
 
@@ -69,7 +66,9 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender :is(.titl
   min-width: 0 !important;
   min-inline-size: 0 !important;
   max-width: none !important;
+  max-inline-size: none !important;
   width: 100% !important;
+  inline-size: 100% !important;
   flex: 1 1 auto !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -85,10 +84,10 @@ li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .fla
   min-width: 0 !important;
   min-inline-size: 0 !important;
   width: 100% !important;
+  inline-size: 100% !important;
   align-self: start !important;
   justify-self: stretch !important;
   margin: 0 !important;
-  text-align: center !important;
   overflow: visible !important;
   text-overflow: clip !important;
   white-space: normal !important;
@@ -104,25 +103,44 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-metadata {
   position: absolute !important;
   top: 0 !important;
   right: 0 !important;
-  flex: 0 0 auto;
-  min-width: max-content;
-  max-width: var(--fe-chat-header-meta-reserve);
-  margin-left: 0 !important;
-  align-self: flex-start !important;
-  justify-self: end !important;
-
+  left: calc(var(--fe-chat-portrait-size) + 8px) !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: var(--fe-chat-header-meta-strip) !important;
+  min-height: var(--fe-chat-header-meta-strip) !important;
+  margin: 0 !important;
+  padding: 0 !important;
   display: flex !important;
   align-items: flex-start !important;
   justify-content: flex-end !important;
+  justify-self: auto !important;
+  align-self: auto !important;
+  text-align: right !important;
+}
+
+body.fe-chat-portrait-name-align-center li.chat-message.fe-has-chat-portrait > .message-header .message-sender,
+body.fe-chat-portrait-name-align-center li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
+body.fe-chat-portrait-name-align-center li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+  text-align: center !important;
+  justify-content: center !important;
+  justify-items: stretch !important;
+}
+
+body.fe-chat-portrait-name-align-left li.chat-message.fe-has-chat-portrait > .message-header .message-sender,
+body.fe-chat-portrait-name-align-left li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
+body.fe-chat-portrait-name-align-left li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+  text-align: left !important;
+  justify-content: start !important;
+  justify-items: stretch !important;
 }
 
 @media (max-width: 380px) {
   li.chat-message.fe-has-chat-portrait > .message-header {
-    grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr);
+    grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
     grid-template-areas:
       "portrait sender"
-      "portrait flavor";
-    padding-right: 84px !important;
+      "portrait flavor" !important;
   }
 }
 

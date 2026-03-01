@@ -647,6 +647,95 @@ Hooks.once("ready", async () => {
 // See: Foundry core issue #13067 (duplicate render when update races render).
 const fePendingMergeLogs = new Set();
 let feMergeRefreshScheduled = false;
+let feInlineRollSnapshots = null;
+let feInlineRollSnapshotPersistTimer = null;
+const FE_INLINE_ROLL_SNAPSHOT_KEY = `${MODULE_ID}.inlineRollSnapshots.v1`;
+const FE_INLINE_ROLL_SNAPSHOT_LIMIT = 800;
+
+function feEnsureInlineRollSnapshotStore() {
+  if (feInlineRollSnapshots instanceof Map) return feInlineRollSnapshots;
+  feInlineRollSnapshots = new Map();
+  try {
+    const raw = sessionStorage.getItem(FE_INLINE_ROLL_SNAPSHOT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const [id, value] of parsed) {
+          if (!id || !Array.isArray(value?.items)) continue;
+          feInlineRollSnapshots.set(String(id), value);
+        }
+      }
+    }
+  } catch {}
+  return feInlineRollSnapshots;
+}
+
+function fePersistInlineRollSnapshotsSoon() {
+  try {
+    if (feInlineRollSnapshotPersistTimer) return;
+    feInlineRollSnapshotPersistTimer = setTimeout(() => {
+      feInlineRollSnapshotPersistTimer = null;
+      try {
+        const store = feEnsureInlineRollSnapshotStore();
+        const entries = Array.from(store.entries()).slice(-FE_INLINE_ROLL_SNAPSHOT_LIMIT);
+        sessionStorage.setItem(FE_INLINE_ROLL_SNAPSHOT_KEY, JSON.stringify(entries));
+      } catch {}
+    }, 120);
+  } catch {}
+}
+
+function feTrimInlineRollSnapshots() {
+  try {
+    const store = feEnsureInlineRollSnapshotStore();
+    while (store.size > FE_INLINE_ROLL_SNAPSHOT_LIMIT) {
+      const first = store.keys().next();
+      if (first.done) break;
+      store.delete(first.value);
+    }
+  } catch {}
+}
+
+function feClearInlineRollSnapshot(messageId) {
+  try {
+    const id = feNormalizeChatMessageId(messageId);
+    if (!id) return;
+    const store = feEnsureInlineRollSnapshotStore();
+    if (!store.delete(id)) return;
+    fePersistInlineRollSnapshotsSoon();
+  } catch {}
+}
+
+function feSnapshotOrRestoreInlineRolls(message, rootEl) {
+  try {
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id ?? feGetMessageIdFromElement(rootEl));
+    if (!id || !rootEl?.querySelectorAll) return;
+    const rolls = Array.from(rootEl.querySelectorAll('.inline-roll.inline-result'));
+    if (!rolls.length) return;
+    const store = feEnsureInlineRollSnapshotStore();
+    const existing = store.get(id);
+    if (existing?.items?.length === rolls.length) {
+      for (let i = 0; i < rolls.length; i += 1) {
+        const snap = existing.items[i];
+        const el = rolls[i];
+        if (!snap || !el) continue;
+        if (typeof snap.html === 'string') el.innerHTML = snap.html;
+        if (typeof snap.title === 'string') el.setAttribute('title', snap.title);
+        if (typeof snap.aria === 'string') el.setAttribute('aria-label', snap.aria);
+        else el.removeAttribute('aria-label');
+      }
+      return;
+    }
+    const items = rolls.map((el) => ({
+      html: String(el.innerHTML ?? ''),
+      title: String(el.getAttribute?.('title') ?? ''),
+      aria: String(el.getAttribute?.('aria-label') ?? ''),
+    }));
+    store.set(id, { items, t: Date.now() });
+    feTrimInlineRollSnapshots();
+    fePersistInlineRollSnapshotsSoon();
+  } catch {}
+}
+
 
 function feIsElementNode(node) {
   return !!node && node.nodeType === 1;
@@ -696,6 +785,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   // Defer until after the message has been added to the DOM and after all other render hooks ran.
   feDeferTask(() => {
     try {
+      feSnapshotOrRestoreInlineRolls(message, el);
       if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToMessageElement(message, el);
 
       if (feSetting(S.MERGE_ENABLED)) {
@@ -708,17 +798,13 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     }
   });
 
-  // Some modules mutate the message after render hooks (async). One delayed pass helps stabilize visuals.
+  // Some modules mutate the message after render hooks (async). Keep only a lightweight delayed color pass.
   setTimeout(() => {
     try {
+      feSnapshotOrRestoreInlineRolls(message, el);
       const hasVar = (el.style?.getPropertyValue?.("--fe-user-color-rgb") ?? "").trim().length > 0;
       if (feSetting(S.USE_USER_COLOR_BG) && (!el.classList.contains("fe-has-user-color") || !hasVar)) {
         feApplyUserColorBgToMessageElement(message, el);
-      }
-
-      if (feSetting(S.MERGE_ENABLED)) {
-        const log = el.closest?.("ol.chat-log, #chat-log");
-        if (log) feScheduleMergeRefresh(log);
       }
     } catch {
       /* no-op */
@@ -730,6 +816,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 // are re-evaluated for the updated message.
 Hooks.on("updateChatMessage", (message) => {
   try {
+    feClearInlineRollSnapshot(message?.id ?? message?._id);
     if (!feSetting(S.MERGE_ENABLED) && !feSetting(S.USE_USER_COLOR_BG)) return;
 
     const id = feNormalizeChatMessageId(message?.id ?? message?._id);
@@ -1842,7 +1929,7 @@ const feChatLogObservers = new Map();
 
 function feBindChatLogObservers() {
   const collectMessages = (node, outSet) => {
-    if (!(node instanceof Element)) return false;
+    if (!feIsElementNode(node)) return false;
     if (node.matches?.("li.chat-message")) {
       outSet.add(node);
       return true;
@@ -1866,12 +1953,6 @@ function feBindChatLogObservers() {
 
       for (const m of mutations) {
         if (m.type === "attributes") {
-          const t = m.target;
-          if (t instanceof Element && t.matches?.("li.chat-message") && m.attributeName === "data-order") {
-            // Order can be assigned/adjusted after insertion; re-merge in that case to avoid visual mixing.
-            touchesMessages = true;
-            pending.add(t);
-          }
           continue;
         }
 
@@ -1879,7 +1960,7 @@ function feBindChatLogObservers() {
           touchesMessages ||= collectMessages(n, pending);
         }
         for (const n of m.removedNodes ?? []) {
-          if (!(n instanceof Element)) continue;
+          if (!feIsElementNode(n)) continue;
           if (n.matches?.("li.chat-message") || n.querySelector?.("li.chat-message")) {
             touchesMessages = true;
           }
@@ -1937,7 +2018,7 @@ function feBindChatLogObservers() {
       });
     });
 
-    obs.observe(log, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-order"] });
+    obs.observe(log, { childList: true, subtree: false });
     feChatLogObservers.set(log, obs);
 
     // Ensure initial (already-rendered) messages get the same treatments.

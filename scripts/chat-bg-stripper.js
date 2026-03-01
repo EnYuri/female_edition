@@ -359,18 +359,13 @@ function attachToChatLog(log) {
   const obs = new MutationObserver(muts => {
     for (const m of muts) {
       if (!STATE.stripTextures) continue;
-
-      if (m.type === "childList") {
-        m.addedNodes?.forEach(processNode);
-      } else if (m.type === "attributes") {
-        const t = m.target;
-        if (!(t instanceof Element)) continue;
-        if (m.attributeName === "style" && TEX_RE.test(t.getAttribute("style") || "")) processNode(t);
-      }
+      if (m.type === "childList") m.addedNodes?.forEach(processNode);
     }
   });
 
-  obs.observe(log, { subtree: true, childList: true, attributes: true, attributeFilter: ["style"] });
+  // Observe only direct chat-message additions; style churn inside cards/inline-rolls causes
+  // unnecessary re-processing and visible jank during play.
+  obs.observe(log, { subtree: false, childList: true });
 }
 
 function attachAllChatLogs() {

@@ -642,24 +642,11 @@ function feStampArchiveMessageIdentity(node, msg) {
   }
 }
 
-async function feTryFoundryRenderMessage(msg) {
-  try {
-    const ChatLogCls = ui?.chat?.constructor || foundry?.applications?.sidebar?.tabs?.ChatLog;
-    if (typeof ChatLogCls?.renderMessage === "function") {
-      const rendered = await ChatLogCls.renderMessage(msg, {});
-      const el = feCoerceChatMessageElement(rendered);
-      if (el) return el;
-    }
-  } catch {}
-
-  try {
-    if (typeof msg?.renderHTML === "function") {
-      const rendered = await msg.renderHTML();
-      const el = feCoerceChatMessageElement(rendered);
-      if (el) return el;
-    }
-  } catch {}
-
+async function feTryFoundryRenderMessage(_msg) {
+  // Intentionally disabled in export/archive.
+  // Calling ChatLog.renderMessage / ChatMessage.renderHTML for every archived message
+  // triggers Foundry's backwards-compatibility path for deprecated renderChatMessage hooks
+  // in third-party modules. For export we prefer: live DOM clone -> custom fallback.
   return null;
 }
 
@@ -755,28 +742,12 @@ async function feRenderMessagesIntoLog({
 
 async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
+  const preferStandardFallback = feArchiveShouldUseStandardFallback(msg, liveEl);
 
-  if (feIsElement(liveEl)) {
+  if (!preferStandardFallback && feIsElement(liveEl)) {
     try {
       node = targetDoc?.importNode ? targetDoc.importNode(liveEl, true) : liveEl.cloneNode(true);
       feMirrorLiveMessageStyles(liveEl, node, { renderProfile });
-    } catch {
-      node = null;
-    }
-  }
-
-  if (!feIsElement(node)) {
-    try {
-      const rendered = await feTryFoundryRenderMessage(msg);
-      const el = feCoerceChatMessageElement(rendered);
-      if (feIsElement(el)) {
-        node = targetDoc && el.ownerDocument !== targetDoc
-          ? targetDoc.importNode(el, true)
-          : el.cloneNode?.(true) || el;
-        try {
-          if (feIsElement(node)) feMirrorLiveMessageStyles(el, node, { renderProfile });
-        } catch {}
-      }
     } catch {
       node = null;
     }
@@ -793,6 +764,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
   if (feIsElement(node)) {
     try {
       feStampArchiveMessageIdentity(node, msg);
+      feMarkPlainArchiveMessage(node, msg, liveEl);
     } catch {}
   }
 
@@ -937,7 +909,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
        * - New behavior: use a natural page width (better readability in HTML/PDF)
        */
       #fe-chat-export-container .fe-chat-export-toolbar,
-      #fe-chat-export-container #sidebar {
+      #fe-chat-export-container #fe-chat-export-sidebar {
         width: 100% !important;
         max-width: none !important;
         min-width: 0 !important;
@@ -946,7 +918,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       }
 
       /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
-      #fe-chat-export-container #sidebar {
+      #fe-chat-export-container #fe-chat-export-sidebar {
         position: static !important;
         width: 100% !important;
         min-width: 0 !important;
@@ -958,7 +930,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         background: #fff !important;
         border: 0 !important;
       }
-      #fe-chat-export-container #chat {
+      #fe-chat-export-container #fe-chat-export-chat {
         position: static !important;
         background: #fff !important;
         width: 100% !important;
@@ -969,7 +941,6 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         overflow: visible !important;
         display: block !important;
       }
-      #fe-chat-export-container #chat-log,
       #fe-chat-export-container #fe-chat-export-log {
         position: static !important;
         background: #fff !important;
@@ -1054,19 +1025,19 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
 
         /* Avoid splitting a single message across pages where possible. */
-        #chat-log .chat-message {
+        #fe-chat-export-log .chat-message {
           break-inside: avoid;
           page-break-inside: avoid;
         }
 
-        #chat-log .chat-message:last-child {
+        #fe-chat-export-log .chat-message:last-child {
           break-after: auto !important;
           page-break-after: auto !important;
           margin-bottom: 0 !important;
         }
 
         /* PDF 안정성: 이미지 숨김 옵션 */
-        body.fe-print-hide-avatars #chat-log :is(
+        body.fe-print-hide-avatars #fe-chat-export-log :is(
           .message-header img,
           .message-sender .avatar,
           .message-sender > img,
@@ -1075,7 +1046,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         ) {
           display: none !important;
         }
-        body.fe-print-hide-all #chat-log img { display: none !important; }
+        body.fe-print-hide-all #fe-chat-export-log img { display: none !important; }
 
         @page { margin: 10mm; }
       }
@@ -1095,9 +1066,9 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
           <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="닫기">닫기</a>
         </div>
       </div>
-      <div id="sidebar" class="sidebar">
-        <section id="chat" class="sidebar-tab tab active" data-tab="chat">
-          <ol id="chat-log" class="chat-log"></ol>
+      <div id="fe-chat-export-sidebar" class="sidebar">
+        <section id="fe-chat-export-chat" class="sidebar-tab tab active" data-tab="chat">
+          <ol id="fe-chat-export-log" class="chat-log"></ol>
         </section>
       </div>
     </div>
@@ -1129,7 +1100,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   } catch {}
 
   // Hook up controls.
-  const logEl = win.document.getElementById("chat-log");
+  const logEl = win.document.getElementById("fe-chat-export-log") || win.document.getElementById("chat-log");
   const metaEl = win.document.getElementById("fe-chat-export-meta");
 
   const btnPrint = win.document.getElementById("fe-archive-print");
@@ -1255,8 +1226,8 @@ async function feArchivePrint(win) {
   const doc = win.document;
   const metaEl = doc.getElementById("fe-chat-export-meta");
   const logEl =
-    doc.getElementById("chat-log") ||
     doc.getElementById("fe-chat-export-log") ||
+    doc.getElementById("chat-log") ||
     doc.querySelector("ol.chat-log");
 
   const originalMeta = (() => {
@@ -1931,7 +1902,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // ---
   let bodyHTML = "";
   const embedFonts = !!feSetting(S.EXPORT_EMBED_FONTS);
-  const liveLogEl = doc.getElementById("chat-log") || doc.getElementById("fe-chat-export-log") || doc.querySelector("ol.chat-log");
+  const liveLogEl = doc.getElementById("fe-chat-export-log") || doc.getElementById("chat-log") || doc.querySelector("ol.chat-log");
   const restoreBg = feFreezeMessageBackgroundsForPrint(win, liveLogEl);
   const restoreShell = feNormalizeArchiveShellLayout(doc, { restore: true });
   const restoreLayout = feNormalizeArchiveMessageLayout(doc.body, { restore: true });
@@ -2309,9 +2280,8 @@ html, body {
 #fe-chat-export-container,
 
 
-#fe-chat-export-container #sidebar,
-#fe-chat-export-container #chat,
-#fe-chat-export-container #chat-log,
+#fe-chat-export-container #fe-chat-export-sidebar,
+#fe-chat-export-container #fe-chat-export-chat,
 #fe-chat-export-container #fe-chat-export-log,
 #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message {
   width: 100% !important;
@@ -2681,8 +2651,8 @@ async function feMaybeYieldForUI(targetWindow = window) {
 function feApplyChatMergeInWindow(win) {
   try {
     const logEl =
-      win.document.getElementById("chat-log") ||
       win.document.getElementById("fe-chat-export-log") ||
+      win.document.getElementById("chat-log") ||
       win.document.querySelector("ol.chat-log");
     if (!logEl) return;
 
@@ -2907,11 +2877,11 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
       sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
       sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
       sync(":scope .chat-card .name-stacked .title, :scope .midi-chat-card .name-stacked .title, :scope .chat-card .name-stacked .subtitle, :scope .midi-chat-card .name-stacked .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
-      sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
       const midiSelector = lean
         ? ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target)"
         : ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target, [class*=\"midi\"], [class*=\"roll\"], [class*=\"damage\"], [class*=\"attack\"] )";
-      sync(midiSelector, lean ? FE_ARCHIVE_CONTAINER_STYLE_PROPS : FE_ARCHIVE_CARD_TREE_STYLE_PROPS);
+      sync(midiSelector, lean ? FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE : FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE);
     }
 
     if (liveEl.classList?.contains?.("narrator-chat")) {
@@ -2983,10 +2953,12 @@ function feNormalizeArchiveShellLayout(doc, { restore = false } = {}) {
     if (!doc?.querySelectorAll) return () => {};
     const targets = [
       doc.getElementById?.("fe-chat-export-container"),
+      doc.getElementById?.("fe-chat-export-sidebar"),
+      doc.getElementById?.("fe-chat-export-chat"),
+      doc.getElementById?.("fe-chat-export-log"),
       doc.getElementById?.("sidebar"),
       doc.getElementById?.("chat"),
       doc.getElementById?.("chat-log"),
-      doc.getElementById?.("fe-chat-export-log"),
     ].filter(Boolean);
     for (const el of targets) {
       try {
@@ -3064,7 +3036,7 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
       push(msg.querySelector?.(":scope > .message-header .message-flavor"));
       push(msg.querySelector?.(":scope > .message-header .flavor-text"));
       push(msg.querySelector?.(":scope > .message-header .message-metadata"));
-      for (const card of msg.querySelectorAll?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content") || []) push(card);
+      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .dice-roll, .dice-result, .dice-formula, .dice-tooltip") || []) push(el);
     }
 
     for (const el of targets) {
@@ -3074,8 +3046,11 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
         const isMessage = el.classList?.contains?.("chat-message");
         const isHeader = el.classList?.contains?.("message-header");
         const isContent = el.classList?.contains?.("message-content");
-        const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content");
-        const isWideContainer = isMessage || isHeader || isContent || isCard;
+        const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content") || el.classList?.contains?.("dice-roll") || el.classList?.contains?.("dice-result") || el.classList?.contains?.("dice-formula") || el.classList?.contains?.("dice-tooltip");
+        const tag = String(el.tagName || '').toUpperCase();
+        const isStructural = ["DIV", "SECTION", "ARTICLE", "ASIDE", "NAV", "FORM", "TABLE", "FIELDSET"].includes(tag);
+        const isMedia = ["IMG", "VIDEO", "CANVAS", "SVG"].includes(tag);
+        const isWideContainer = isMessage || isHeader || isContent || isCard || isStructural;
         el.style.setProperty("max-width", "none", "important");
         el.style.setProperty("max-inline-size", "none", "important");
         if (isWideContainer) {
@@ -3092,13 +3067,18 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
           } else {
             // Keep header/card display modes from CSS (grid/flex/none). Overwriting display here breaks
             // merge follow-hides, portrait header grids, and round-marker headers.
-            el.style.setProperty("width", "100%", "important");
-            el.style.setProperty("inline-size", "100%", "important");
-            el.style.setProperty("min-width", "0", "important");
-            el.style.setProperty("min-inline-size", "0", "important");
-            if (isCard || isContent) {
+            if (!isMedia) {
+              el.style.setProperty("width", "100%", "important");
+              el.style.setProperty("inline-size", "100%", "important");
+              el.style.setProperty("min-width", "0", "important");
+              el.style.setProperty("min-inline-size", "0", "important");
+              el.style.setProperty("max-width", "none", "important");
+              el.style.setProperty("max-inline-size", "none", "important");
+            }
+            if (isCard || isContent || isStructural) {
               el.style.setProperty("flex", "none", "important");
               el.style.setProperty("flex-basis", "auto", "important");
+              el.style.setProperty("box-sizing", "border-box", "important");
             }
           }
         } else {
@@ -3109,7 +3089,7 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
             el.style.setProperty("min-inline-size", "0", "important");
             el.style.setProperty("max-width", "none", "important");
             el.style.setProperty("max-inline-size", "none", "important");
-          } else {
+          } else if (!isMedia) {
             el.style.setProperty("width", "auto", "important");
             if (el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
               el.style.setProperty("min-width", "0", "important");
@@ -3247,34 +3227,82 @@ function feBuildLiveChatMessageElementMap() {
   return map;
 }
 
+function feArchiveMessageLooksComplex(msg, liveEl = null) {
+  try {
+    const el = liveEl;
+    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, .round-marker, .chat-images-container, .ci-message-image, img, video, table, blockquote, pre, iframe')) return true;
+  } catch {}
+  try {
+    const content = String(msg?.content ?? '');
+    if (!content) return false;
+    return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img|<video|<table|<blockquote|<pre|<iframe)/i.test(content);
+  } catch {
+    return false;
+  }
+}
+
+function feArchiveShouldUseStandardFallback(msg, liveEl = null) {
+  try {
+    if (!msg) return true;
+    if (feArchiveMessageLooksComplex(msg, liveEl)) return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function feMarkPlainArchiveMessage(node, msg, liveEl = null) {
+  try {
+    if (!feIsElement(node)) return;
+    const plain = feArchiveShouldUseStandardFallback(msg, liveEl);
+    node.classList.toggle('fe-msg-plain', !!plain);
+  } catch {}
+}
+
 function feFallbackRenderChatMessage(doc, msg) {
   if (!doc) throw new Error("No document provided");
   const li = doc.createElement("li");
-  li.className = "chat-message message";
+  li.className = "chat-message message flexcol dnd5e2 fe-pseudo-sanitized";
 
   try {
     const id = msg?.id ?? msg?._id;
-    if (id) li.dataset.messageId = String(id);
+    if (id) {
+      li.dataset.messageId = String(id);
+      li.dataset.documentId = String(id);
+    }
   } catch {}
 
-  // Speaker / author name
-  const speakerName = (() => {
+  try {
+    const style = Number(msg?.style ?? msg?.type ?? -1);
+    const styles = CONST?.CHAT_MESSAGE_STYLES || {};
+    if (style === styles.OTHER) li.classList.add("other");
+    else if (style === styles.IC) li.classList.add("ic");
+    else if (style === styles.OOC) li.classList.add("ooc");
+    else if (style === styles.EMOTE) li.classList.add("emote");
+    else if (style === styles.WHISPER) li.classList.add("whisper");
+    else if (style === styles.ROLL) li.classList.add("roll");
+  } catch {}
+  try {
+    if (Array.isArray(msg?.whisper) && msg.whisper.length) li.classList.add("whisper");
+  } catch {}
+
+  const actorName = (() => {
+    try { if (msg?.speaker?.alias) return String(msg.speaker.alias); } catch {}
     try {
-      const s = msg?.speaker;
-      if (s?.alias) return String(s.alias);
+      const actor = game.actors?.get?.(msg?.speaker?.actor) || game.actors?.tokens?.[msg?.speaker?.token];
+      if (actor?.name) return String(actor.name);
     } catch {}
-    try {
-      const a = msg?.author ?? msg?.user;
-      if (a?.name) return String(a.name);
-    } catch {}
+    try { const a = msg?.author ?? msg?.user; if (a?.name) return String(a.name); } catch {}
     return "Unknown";
+  })();
+  const playerName = (() => {
+    try { const a = msg?.author ?? msg?.user; return String(a?.name || "").trim(); } catch { return ""; }
   })();
 
   const timestampText = (() => {
     try {
       const ts = Number(msg?.timestamp);
       if (!Number.isFinite(ts) || ts <= 0) return "";
-      // Keep it simple and locale-friendly.
       return new Date(ts).toLocaleString();
     } catch {
       return "";
@@ -3285,8 +3313,20 @@ function feFallbackRenderChatMessage(doc, msg) {
   header.className = "message-header flexrow";
 
   const sender = doc.createElement("h4");
-  sender.className = "message-sender";
-  sender.textContent = speakerName;
+  sender.className = "message-sender chat-portrait-text-size-name-dnd5e chat-portrait-text-header-name-dnd5e";
+  const wrap = doc.createElement("span");
+  wrap.className = "name-stacked";
+  const title = doc.createElement("span");
+  title.className = "title";
+  title.textContent = actorName;
+  wrap.appendChild(title);
+  if (playerName && playerName !== actorName) {
+    const sub = doc.createElement("span");
+    sub.className = "subtitle";
+    sub.textContent = playerName;
+    wrap.appendChild(sub);
+  }
+  sender.appendChild(wrap);
 
   const meta = doc.createElement("span");
   meta.className = "message-metadata";
@@ -3297,13 +3337,19 @@ function feFallbackRenderChatMessage(doc, msg) {
     meta.appendChild(time);
   }
 
+  const flavor = String(msg?.flavor ?? "").trim();
   header.appendChild(sender);
   header.appendChild(meta);
+  if (flavor) {
+    const flavorEl = doc.createElement("span");
+    flavorEl.className = "message-flavor";
+    flavorEl.textContent = flavor;
+    header.appendChild(flavorEl);
+  }
 
   const content = doc.createElement("div");
   content.className = "message-content";
   try {
-    // ChatMessage.content is already HTML.
     content.innerHTML = String(msg?.content ?? "");
   } catch {
     content.textContent = String(msg?.content ?? "");

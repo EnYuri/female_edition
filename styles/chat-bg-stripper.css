@@ -314,9 +314,9 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
 body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked {
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  /* text-align intentionally not forced; portrait-name alignment setting should win. */
 }
 body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender,
 body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked,

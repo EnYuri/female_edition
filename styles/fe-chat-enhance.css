@@ -109,7 +109,7 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-mid {
-  margin-top: 0 !important;
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
   margin-bottom: 0 !important;
   border-radius: 0 !important;
   border-top-width: 0 !important;
@@ -117,7 +117,7 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
-  margin-top: 0 !important;
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top-width: 0 !important;

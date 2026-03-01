@@ -22,6 +22,7 @@ const CP = Object.freeze({
   BORDER_WIDTH: "chatPortraitBorderWidth",
   BORDER_COLOR: "chatPortraitBorderColor",
   APPLY_COMBAT: "chatPortraitApplyCombatTracker",
+  NAME_ALIGN: "chatPortraitNameAlign",
 
   SHOW_IC: "chatPortraitShowIC",
   SHOW_OOC: "chatPortraitShowOOC",
@@ -52,6 +53,25 @@ function cpIsImageElement(node) {
 
 function cpGet(key) {
   return game.settings.get(MODULE_ID, key);
+}
+
+function cpGetNameAlign() {
+  try {
+    const value = String(cpGet(CP.NAME_ALIGN) || "center").trim().toLowerCase();
+    return value === "left" ? "left" : "center";
+  } catch {
+    return "center";
+  }
+}
+
+function cpApplyNameAlignClasses(doc = document) {
+  try {
+    const body = doc?.body;
+    if (!body?.classList) return;
+    const align = cpGetNameAlign();
+    body.classList.toggle("fe-chat-portrait-name-align-left", align === "left");
+    body.classList.toggle("fe-chat-portrait-name-align-center", align !== "left");
+  } catch {}
 }
 
 function cpGetMergeFollowMode() {
@@ -138,6 +158,8 @@ function cpSetRootVars() {
 
   const hideWrap = !!cpGet(CP.HIDE_WRAP);
   document.body.classList.toggle("fe-hide-chat-portrait-wrap", hideWrap);
+
+  cpApplyNameAlignClasses(document);
 }
 
 function cpIsChatPortraitModuleActive() {
@@ -1166,6 +1188,8 @@ function cpApplyVarsToDocument(doc) {
   try {
     doc.body?.classList?.toggle?.("fe-hide-chat-portrait-wrap", hideWrap);
   } catch {}
+
+  cpApplyNameAlignClasses(doc);
 }
 
 function cpRefreshAllChatMessages() {
@@ -1403,6 +1427,24 @@ function cpRegisterSettings() {
     type: String,
     default: "#000000",
     onChange: () => {
+      cpRefreshAllChatMessages();
+      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+    },
+  });
+
+  game.settings.register(MODULE_ID, CP.NAME_ALIGN, {
+    name: "채팅 포트레이트 이름 정렬",
+    hint: "헤더의 액터 이름/플레이어 이름을 가운데 정렬 또는 좌측 정렬로 표시합니다.",
+    scope: "client",
+    config: true,
+    type: String,
+    default: "center",
+    choices: {
+      center: "가운데 정렬",
+      left: "좌측 정렬",
+    },
+    onChange: () => {
+      cpSetRootVars();
       cpRefreshAllChatMessages();
       Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
     },
