@@ -1,7 +1,7 @@
 // Female-cupwhi: Unified settings menu (collapsible sections)
 // This dialog is the primary UI because individual settings are hidden from core Module Settings.
 
-import { MODULE_ID, S, FE_DEFAULTS } from "./fe-chat-enhance.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES } from "./fe-chat-enhance.js";
 
 // Settings keys owned by other split modules
 const BG = Object.freeze({
@@ -148,12 +148,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         name: "이름만 남김",
         portrait: "포트레이트만 남김",
       },
-      exportPrintImageMode: {
-        full: "그대로(고품질/대용량)",
-        hideAvatars: "아바타/포트레이트 숨김(권장)",
-        hideAll: "모든 이미지 숨김(최대 안정)",
-        downscale: "이미지 다운스케일(실험적)",
-      },
+      exportPrintImageMode: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
       exportDesktopExternalMode: {
         off: "사용 안 함",
         button: "아카이브 창에 버튼 표시",

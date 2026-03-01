@@ -34,7 +34,7 @@ const S = {
   EXPORT_OPTIMIZE: "ceExportOptimize",
   EXPORT_EMBED_FONTS: "ceExportEmbedFonts",
   EXPORT_EMBED_IMAGES: "ceExportEmbedImages",
-  EXPORT_PRINT_IMAGE_MODE: "ceExportPrintImageMode", // full | hideAvatars | hideAll | downscale
+  EXPORT_PRINT_IMAGE_MODE: "ceExportPrintImageMode", // full | hideAvatars | hideAll | downscale | downscaleLite
   EXPORT_DESKTOP_EXTERNAL_MODE: "ceExportDesktopExternalMode", // off | button | auto
 
   // Typography
@@ -61,6 +61,14 @@ const S = {
 };
 
 // Default values (used as a safe fallback before settings are registered)
+const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
+  full: "그대로(고품질/대용량)",
+  hideAvatars: "아바타/포트레이트 숨김(권장)",
+  hideAll: "모든 이미지 숨김(최대 안정)",
+  downscaleLite: "이미지 다운스케일(완화/품질 우선)",
+  downscale: "이미지 다운스케일(실험적)",
+});
+
 const FE_DEFAULTS = {
   // Merge
   [S.MERGE_ENABLED]: true,
@@ -402,12 +410,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: String,
-    choices: {
-      full: "그대로(고품질/대용량)",
-      hideAvatars: "아바타/포트레이트 숨김(권장)",
-      hideAll: "모든 이미지 숨김(최대 안정)",
-      downscale: "이미지 다운스케일(실험적)",
-    },
+    choices: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
     default: "hideAvatars",
   });
 
@@ -1576,8 +1579,9 @@ function feMessageMergeInfo(msg, el) {
     rollMode,
     style,
     mergeableText,
-    // Never merge narrator messages with anything.
-    noMerge: isNarratorTools
+    isNarrator: isNarratorTools,
+    // Live chat keeps narrator lines standalone by default; archive/print can opt in.
+    noMerge: isNarratorTools,
   };
 }
 
@@ -1669,7 +1673,7 @@ function feMergeKey(info) {
 
 
 
-function feApplyChatMerge(logEl) {
+function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   if (!feIsElementNode(logEl)) return;
 
   // Always clear previous merge classes first (so disabling the feature restores normal view).
@@ -1728,7 +1732,8 @@ function feApplyChatMerge(logEl) {
 
   const canMerge = (a, b) => {
     if (!a || !b) return false;
-    if (a.noMerge || b.noMerge) return false;
+    const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
+    if ((a.noMerge || b.noMerge) && !narratorPair) return false;
     if (a.key !== b.key) return false;
     if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
     return true;
@@ -1965,6 +1970,7 @@ export {
   MODULE_ID,
   S,
   FE_DEFAULTS,
+  FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   feSetting,
   feFireChatUiUpdated,
 

@@ -336,7 +336,7 @@ async function feExportChatLogToPDFInline() {
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
     if (feSetting(S.MERGE_ENABLED)) {
       feSyncArchiveMergeBodyClasses(document);
-      feApplyChatMerge(logEl);
+      feApplyChatMerge(logEl, feArchiveMergeOptions());
       feRefreshPortraitsForLog(logEl);
     } else if (renderProfile.deferPortraits) {
       feRefreshPortraitsForLog(logEl);
@@ -577,6 +577,14 @@ function feRefreshPortraitsForLog(logEl) {
   } catch {
     /* no-op */
   }
+}
+
+function feArchiveMergeOptions() {
+  return {
+    // Archive/print does not rely on narrator headers, so allowing narrator-only groups to merge
+    // keeps PDF/HTML closer to the live visual grouping while still avoiding cross-type merges.
+    allowNarratorMerge: true,
+  };
 }
 
 function feEscapeAttr(str) {
@@ -857,9 +865,11 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       ? " fe-print-hide-all"
       : printImgMode === "downscale"
         ? " fe-print-downscale"
-        : printImgMode === "hideAvatars"
-          ? " fe-print-hide-avatars"
-          : "";
+        : printImgMode === "downscaleLite"
+          ? " fe-print-downscale-lite"
+          : printImgMode === "hideAvatars"
+            ? " fe-print-hide-avatars"
+            : "";
 
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
   const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${renderProfile.bodyClass}${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
@@ -1306,6 +1316,7 @@ async function feArchivePrint(win) {
     doc.body.classList.toggle("fe-print-hide-avatars", mode === "hideAvatars");
     doc.body.classList.toggle("fe-print-hide-all", mode === "hideAll");
     doc.body.classList.toggle("fe-print-downscale", mode === "downscale");
+    doc.body.classList.toggle("fe-print-downscale-lite", mode === "downscaleLite");
   } catch {}
 
   // ---
@@ -1347,22 +1358,24 @@ async function feArchivePrint(win) {
   // Downscale images for stability:
   // - always when mode === "downscale"
   // - in Electron, also when images are not fully hidden
-  const shouldDownscale = !!logEl && (mode === "downscale" || (isElectron && mode !== "hideAll"));
+  const shouldDownscale = !!logEl && (mode === "downscale" || mode === "downscaleLite" || (isElectron && mode !== "hideAll"));
   let restoreDownscaledImages = () => {};
   if (shouldDownscale && logEl) {
     try {
-      setMeta("Loading images…");
+      const mildDownscale = mode === "downscaleLite";
+      setMeta(mildDownscale ? "Loading images… (품질 우선)" : "Loading images…");
       fePrepareArchiveImagesForOutput(logEl);
       await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.min(FE_EXPORT_WAIT_IMAGES_MAX, Math.max(160, renderProfile.initialImageWaitMax * 4)) });
       restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
-        dprCap: isElectron ? 1 : 1.5,
-        webpQuality: isElectron ? 0.72 : 0.82,
-        jpegQuality: isElectron ? 0.78 : 0.85,
-        avatarDprCap: isElectron ? 1.75 : 2,
-        avatarWebpQuality: isElectron ? 0.86 : 0.92,
-        avatarJpegQuality: isElectron ? 0.88 : 0.94,
+        dprCap: mildDownscale ? (isElectron ? 1.2 : 1.75) : (isElectron ? 1 : 1.5),
+        webpQuality: mildDownscale ? (isElectron ? 0.80 : 0.88) : (isElectron ? 0.72 : 0.82),
+        jpegQuality: mildDownscale ? (isElectron ? 0.86 : 0.91) : (isElectron ? 0.78 : 0.85),
+        avatarDprCap: mildDownscale ? (isElectron ? 2 : 2.25) : (isElectron ? 1.75 : 2),
+        avatarWebpQuality: mildDownscale ? (isElectron ? 0.90 : 0.95) : (isElectron ? 0.86 : 0.92),
+        avatarJpegQuality: mildDownscale ? (isElectron ? 0.92 : 0.96) : (isElectron ? 0.88 : 0.94),
+        maxSide: mildDownscale ? (isElectron ? 2048 : 2304) : 1600,
       });
     } catch (err) {
       console.warn("female_edition | print downscale failed", err);
@@ -1547,6 +1560,7 @@ async function feDownscaleImagesForPrint(
     avatarDprCap = 2,
     avatarWebpQuality = 0.92,
     avatarJpegQuality = 0.94,
+    maxSide = 1600,
   } = {}
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
@@ -1572,7 +1586,7 @@ async function feDownscaleImagesForPrint(
   const dpr = Math.max(1, Math.min(dprCap, win.devicePixelRatio || 1));
   const avatarDpr = Math.max(1, Math.min(avatarDprCap, win.devicePixelRatio || 1));
   const groups = new Map();
-  const MAX_SIDE = 1600;
+  const MAX_SIDE = Math.max(256, Number(maxSide) || 1600);
 
   const resolvePosition = (value, axis = "x") => {
     const raw = String(value || "").trim().toLowerCase();
@@ -2629,7 +2643,7 @@ function feApplyChatMergeInWindow(win) {
     if (!logEl) return;
 
     feSyncArchiveMergeBodyClasses(win.document);
-    feApplyChatMerge(logEl);
+    feApplyChatMerge(logEl, feArchiveMergeOptions());
     feRefreshPortraitsForLog(logEl);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
