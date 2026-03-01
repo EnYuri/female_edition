@@ -1673,7 +1673,7 @@ function feApplyChatMerge(logEl) {
   if (!feIsElementNode(logEl)) return;
 
   // Always clear previous merge classes first (so disabling the feature restores normal view).
-  const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
+  const msgs = logEl.querySelectorAll("li.chat-message");
   for (const el of msgs) {
     el.classList.remove(
       "fe-merge-start",
@@ -1683,27 +1683,30 @@ function feApplyChatMerge(logEl) {
     );
   }
 
-  if (!feSetting(S.MERGE_ENABLED)) return;
+  const mergeEnabled = !!feSetting(S.MERGE_ENABLED);
+  if (!mergeEnabled) return;
 
   const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
 
-  // Collect message infos
-  const infos = msgs
-    .map((el, idx) => {
-      const msgId = feGetMessageIdFromElement(el);
-      const msg = msgId ? game.messages?.get(msgId) : null;
-      const info = feMessageMergeInfo(msg, el);
-      return {
-        ...info,
-        msgId,
-        missing: !msg,
-        el,
-        idx,
-        order: feGetChatMessageElementOrder(el, idx)
-      };
-    })
-    .filter((x) => x && x.el);
+  const infos = [];
+  let idx = 0;
+  for (const el of msgs) {
+    const msgId = feGetMessageIdFromElement(el);
+    const msg = msgId ? game.messages?.get(msgId) : null;
+    const info = feMessageMergeInfo(msg, el);
+    infos.push({
+      ...info,
+      msgId,
+      missing: !msg,
+      el,
+      idx,
+      order: feGetChatMessageElementOrder(el, idx),
+    });
+    idx++;
+  }
+
+  if (!infos.length) return;
 
   // Sort by visual order (Foundry sometimes uses fractional data-order)
   infos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -1717,9 +1720,9 @@ function feApplyChatMerge(logEl) {
       hasMissingDocs = true;
       info.key = `__fe_missing__||${info.msgId ?? info.idx}`;
       info.mergeableText = false;
-    } else {
-      info.key = feMergeKey(info);
+      continue;
     }
+    info.key = feMergeKey(info);
   }
   if (hasMissingDocs) feScheduleMergeRetry(logEl);
 
@@ -1732,23 +1735,21 @@ function feApplyChatMerge(logEl) {
   };
 
   const applyGroup = (startIndex, endIndexExclusive) => {
-    const group = infos.slice(startIndex, endIndexExclusive);
-    const groupLen = group.length;
-
+    const groupLen = endIndexExclusive - startIndex;
     if (groupLen <= 0) return;
 
+    const first = infos[startIndex];
+    if (!first?.el) return;
+
     // Divider at group boundary (except first group)
-    if (showDivider && startIndex > 0) {
-      group[0].el.classList.add("fe-divider-before");
-    }
+    if (showDivider && startIndex > 0) first.el.classList.add("fe-divider-before");
 
     // Do not apply "follow" classes for single messages (prevents accidental header hiding).
     if (groupLen === 1) return;
 
-    group[0].el.classList.add("fe-merge-start");
-    for (let i = 1; i < groupLen - 1; i++) group[i].el.classList.add("fe-merge-mid");
-    group[groupLen - 1].el.classList.add("fe-merge-end");
-
+    first.el.classList.add("fe-merge-start");
+    for (let i = startIndex + 1; i < endIndexExclusive - 1; i++) infos[i]?.el?.classList?.add("fe-merge-mid");
+    infos[endIndexExclusive - 1]?.el?.classList?.add("fe-merge-end");
   };
 
   let groupStart = 0;

@@ -184,10 +184,17 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
     page-break-inside: avoid;
   }
 
+  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
   @page {
     margin: 10mm;
   }
 }
+
 
 /* Export view: Chat Portrait already prints a portrait image; hide the duplicate sender avatar */
 #fe-chat-export-container .chat-message .message-sender .avatar {
@@ -196,14 +203,24 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 
 
 /* Export view: enforce FE CookieRun (custom UI font) for actor/player names */
-#fe-chat-export-container {
-  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif;
+#fe-chat-export-container,
+#fe-chat-export-container .chat-message,
+#fe-chat-export-container .chat-message * {
+  font-family: var(--fe-chat-font-family, var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif) !important;
 }
 
-#fe-chat-export-container .chat-message .message-sender,
-#fe-chat-export-container .chat-message .message-sender .name-stacked,
-#fe-chat-export-container .chat-message .message-sender .name-stacked > span {
-  font-family: var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif !important;
+#fe-chat-export-container .chat-message,
+#fe-chat-export-container :is(#fe-chat-export-log, #chat-log) > .chat-message {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+#fe-chat-export-container .chat-message > .message-header,
+#fe-chat-export-container .chat-message > .message-content {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
 }
 
 #fe-chat-export-container .chat-message .message-sender {
@@ -291,6 +308,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat) .message-metadata {
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
+
+#fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
+  font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
+}
+
 
 
 /* Export view: remove text shadow for readability in PDF (print only).

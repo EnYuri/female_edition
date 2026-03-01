@@ -681,6 +681,7 @@ function cpMaybeApplyHQResample(img, size, shape) {
     if (!cpIsImageElement(img)) return;
     if (!size || size <= 0) return;
     if (size > 256) return; // sanity cap
+    if (!cpShouldUseHQResample(img)) return;
 
     const origSrc = img.dataset?.fePortraitOrigSrc;
     const key = img.dataset?.fePortraitResampleKey;
@@ -718,6 +719,22 @@ function cpMaybeApplyHQResample(img, size, shape) {
   } catch {
     /* no-op */
   }
+}
+
+function cpShouldUseHQResample(img) {
+  try {
+    const body = img?.ownerDocument?.body;
+    if (!body?.classList) return true;
+
+    // Archive/export documents can contain thousands of repeated portraits.
+    // Replacing each one with a cached data: URL dramatically increases memory usage,
+    // so prefer the original source there and let CSS handle downscaling.
+    if (body.classList.contains("fe-chat-archive")) return false;
+    if (body.classList.contains("fe-print-chatlog")) return false;
+  } catch {
+    /* fall through */
+  }
+  return true;
 }
 
 function cpApplyPortraitStyling(message, img) {
@@ -1072,7 +1089,8 @@ function cpUpsertPortrait(message, messageEl) {
   const fit = shape === "none" ? "contain" : "cover";
   const key = `${src}@@${size}@@${fit}`;
 
-  const cached = _cpResampleCache.get(key);
+  const allowHQResample = cpShouldUseHQResample(img);
+  const cached = allowHQResample ? _cpResampleCache.get(key) : null;
   const prevKey = img.dataset?.fePortraitResampleKey;
   const prevOrig = img.dataset?.fePortraitOrigSrc;
 
@@ -1083,6 +1101,7 @@ function cpUpsertPortrait(message, messageEl) {
   } else {
     // Same request; only swap to cache if it arrived since the last render.
     if (cached && img.src !== cached) img.src = cached;
+    else if (!allowHQResample && img.src !== src) img.src = src;
   }
 
   img.alt = cpGetPortraitAlt(message);

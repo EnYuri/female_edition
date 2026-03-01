@@ -26,11 +26,48 @@ import {
   feChatPortraitApplyVars,
 } from "./fe-chat-portrait.js";
 
-const FE_EXPORT_RENDER_BATCH = 25;
+const FE_EXPORT_RENDER_BATCH = 64;
+const FE_EXPORT_RENDER_CONCURRENCY = 6;
 const FE_EXPORT_STATUS_EVERY = 25;
 const FE_EXPORT_WAIT_IMAGES_MAX = 800;
 const FE_EXPORT_WAIT_IMAGES_TIMEOUT = 20000;
 const FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT = 15000;
+const FE_EXPORT_WAIT_FONTS_TIMEOUT = 12000;
+const FE_EXPORT_PORTRAIT_MARKER_SELECTOR = 'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container';
+const FE_ARCHIVE_LARGE_LOG_THRESHOLD = 1600;
+const FE_ARCHIVE_HUGE_LOG_THRESHOLD = 3200;
+const FE_EXPORT_RENDER_BATCH_LARGE = 48;
+const FE_EXPORT_RENDER_BATCH_HUGE = 32;
+const FE_EXPORT_RENDER_CONCURRENCY_LARGE = 6;
+const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 4;
+const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 64;
+const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 32;
+let feEmbeddedFontCssPromise = null;
+let feEmbeddedFontCssValue = null;
+
+function feGetArchiveRenderProfile(messageCount = 0) {
+  const count = Math.max(0, Number(messageCount) || 0);
+  const large = count >= FE_ARCHIVE_LARGE_LOG_THRESHOLD;
+  const huge = count >= FE_ARCHIVE_HUGE_LOG_THRESHOLD;
+
+  return {
+    count,
+    large,
+    huge,
+    lean: large,
+    renderBatch: huge ? FE_EXPORT_RENDER_BATCH_HUGE : large ? FE_EXPORT_RENDER_BATCH_LARGE : FE_EXPORT_RENDER_BATCH,
+    renderConcurrency: huge ? FE_EXPORT_RENDER_CONCURRENCY_HUGE : large ? FE_EXPORT_RENDER_CONCURRENCY_LARGE : FE_EXPORT_RENDER_CONCURRENCY,
+    initialImageWaitMax: huge ? FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE : large ? FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE : FE_EXPORT_WAIT_IMAGES_MAX,
+    mirrorTree: !large,
+    mirrorCardTree: !huge,
+    normalizeImageLoading: large ? "lazy" : "eager",
+    normalizeImageDecoding: large ? "async" : "sync",
+    deferPortraits: true,
+    restoreOriginalPortraitSources: true,
+    bodyClass: huge ? " fe-archive-huge fe-archive-lean" : large ? " fe-archive-lean" : "",
+    statusLabel: large ? "메모리 절약 모드" : "",
+  };
+}
 
 // -------------------------------------
 // Export to PDF (Print)
@@ -273,12 +310,8 @@ async function feExportChatLogToPDFInline() {
   logEl.innerHTML = "";
 
   try {
-    const user = game.user;
-
-    // Collect messages the current user can see
-    const all = Array.from(game.messages?.contents ?? []);
-    all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-    const messages = all.filter((m) => feCanUserSeeChatMessage(m, user));
+    const messages = feCollectVisibleChatMessages(game.user);
+    const renderProfile = feGetArchiveRenderProfile(messages.length);
 
     // Header/meta
     const worldName = game.world?.title ?? game.world?.name ?? "";
@@ -289,51 +322,29 @@ async function feExportChatLogToPDFInline() {
     // Prefer cloning from the already-rendered live chat log DOM when possible.
     const liveMessageMap = feBuildLiveChatMessageElementMap();
 
-    // Render each message using Foundry's own renderer so we keep portraits/chat cards, etc.
-    let i = 0;
-    for (const msg of messages) {
-      i++;
-      if (i === 1 || i % 25 === 0 || i === messages.length) {
-        metaEl.textContent = `Rendering… ${i}/${messages.length}`;
-      }
-
-      const msgId = String(msg?.id ?? msg?._id ?? "");
-
-      const liveEl = msgId ? liveMessageMap.get(msgId) : null;
-      const li = await feRenderExportMessageNode(document, msg, { liveEl });
-      if (!feIsElement(li)) continue;
-
-      // Normalize URLs so print/export loads images reliably.
-      feNormalizeExportNode(li);
-
-      // Optional: apply per-message user color tint variables before serializing.
-      feApplyUserColorBgToMessageElement(msg, li);
-
-      // Ensure our chat portraits exist in inline export too, but don't duplicate other modules.
-      try {
-        const hasOtherPortrait = !!li.querySelector?.(
-          'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container'
-        );
-        if (!hasOtherPortrait) feChatPortraitUpsert(msg, li);
-      } catch {}
-
-      logEl.appendChild(li);
-
-      // Yield occasionally to keep UI responsive.
-      // IMPORTANT: background tabs clamp timers heavily; avoid yields when hidden so export continues.
-      if (i % FE_EXPORT_RENDER_BATCH === 0) await feMaybeYieldForUI();
-    }
+    await feRenderMessagesIntoLog({
+      targetDoc: document,
+      logEl,
+      messages,
+      metaEl,
+      yieldWindow: window,
+      liveMessageMap,
+      annotateExportMessage: false,
+      renderProfile,
+    });
 
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
     if (feSetting(S.MERGE_ENABLED)) {
       feSyncArchiveMergeBodyClasses(document);
       feApplyChatMerge(logEl);
       feRefreshPortraitsForLog(logEl);
+    } else if (renderProfile.deferPortraits) {
+      feRefreshPortraitsForLog(logEl);
     }
 
     // Wait for images (portraits, item icons) to load so they actually print
-    metaEl.textContent = "Loading images…";
-    await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
+    metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
+    await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
 
     // IMPORTANT: Force a paginatable layout.
     // If any part of the export UI remains a fixed/scroll container, Chromium printing will
@@ -628,13 +639,103 @@ async function feTryFoundryRenderMessage(msg) {
   return null;
 }
 
-async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null } = {}) {
+function feCollectVisibleChatMessages(user = game.user) {
+  const all = Array.from(game.messages?.contents ?? []);
+  all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  return all.filter((m) => feCanUserSeeChatMessage(m, user));
+}
+
+function feHasPortraitMarkup(rootEl) {
+  try {
+    return !!rootEl?.querySelector?.(FE_EXPORT_PORTRAIT_MARKER_SELECTOR);
+  } catch {
+    return false;
+  }
+}
+
+async function feRenderMessagesIntoLog({
+  targetDoc,
+  logEl,
+  messages,
+  metaEl = null,
+  yieldWindow = window,
+  liveMessageMap = null,
+  annotateExportMessage = false,
+  renderProfile = null,
+} = {}) {
+  if (!targetDoc || !logEl || !Array.isArray(messages) || !messages.length) return 0;
+
+  const flushEvery = Math.max(1, Number(renderProfile?.renderBatch) || FE_EXPORT_RENDER_BATCH);
+  const concurrency = Math.max(1, Number(renderProfile?.renderConcurrency) || FE_EXPORT_RENDER_CONCURRENCY);
+  const deferPortraits = !!renderProfile?.deferPortraits;
+  let renderedCount = 0;
+  let frag = targetDoc.createDocumentFragment();
+  let fragCount = 0;
+
+  const flush = async () => {
+    if (fragCount) {
+      logEl.appendChild(frag);
+      frag = targetDoc.createDocumentFragment();
+      fragCount = 0;
+    }
+    await feMaybeYieldForUI(yieldWindow);
+  };
+
+  const renderOne = async (msg) => {
+    const msgId = String(msg?.id ?? msg?._id ?? "");
+    const liveEl = msgId && typeof liveMessageMap?.get === "function" ? liveMessageMap.get(msgId) : null;
+    const node = await feRenderExportMessageNode(targetDoc, msg, { liveEl, renderProfile });
+    if (!feIsElement(node)) return null;
+
+    if (annotateExportMessage) node.classList.add("fe-export-message");
+
+    feNormalizeExportNode(node, {
+      loading: renderProfile?.normalizeImageLoading,
+      decoding: renderProfile?.normalizeImageDecoding,
+    });
+    feApplyUserColorBgToMessageElement(msg, node);
+
+    if (!deferPortraits) {
+      try {
+        if (!feHasPortraitMarkup(node)) feChatPortraitUpsert(msg, node);
+      } catch {}
+    }
+
+    return node;
+  };
+
+  for (let start = 0; start < messages.length; start += concurrency) {
+    const slice = messages.slice(start, start + concurrency);
+    const nodes = await Promise.all(slice.map((msg) => renderOne(msg)));
+
+    for (let i = 0; i < nodes.length; i += 1) {
+      renderedCount += 1;
+      if (metaEl && (renderedCount === 1 || renderedCount % FE_EXPORT_STATUS_EVERY === 0 || renderedCount === messages.length)) {
+        try {
+          metaEl.textContent = `Rendering… ${renderedCount}/${messages.length}`;
+        } catch {}
+      }
+
+      const node = nodes[i];
+      if (!feIsElement(node)) continue;
+      frag.appendChild(node);
+      fragCount += 1;
+    }
+
+    if (fragCount >= flushEvery) await flush();
+  }
+
+  if (fragCount) await flush();
+  return renderedCount;
+}
+
+async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
 
   if (feIsElement(liveEl)) {
     try {
       node = targetDoc?.importNode ? targetDoc.importNode(liveEl, true) : liveEl.cloneNode(true);
-      feMirrorLiveMessageStyles(liveEl, node);
+      feMirrorLiveMessageStyles(liveEl, node, { renderProfile });
     } catch {
       node = null;
     }
@@ -648,6 +749,9 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null } = {})
         node = targetDoc && el.ownerDocument !== targetDoc
           ? targetDoc.importNode(el, true)
           : el.cloneNode?.(true) || el;
+        try {
+          if (feIsElement(node)) feMirrorLiveMessageStyles(el, node, { renderProfile });
+        } catch {}
       }
     } catch {
       node = null;
@@ -660,6 +764,18 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null } = {})
     } catch {
       node = null;
     }
+  }
+
+  if (feIsElement(node) && renderProfile?.restoreOriginalPortraitSources) {
+    try {
+      feRestoreOriginalPortraitSources(node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      feNormalizeArchiveMessageLayout(node);
+    } catch {}
   }
 
   return feIsElement(node) ? node : null;
@@ -712,15 +828,16 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   const effectiveOptimize = !!optimize || stripTexturesSetting;
 
   // Collect messages first (so the archive UI can show correct counts immediately).
-  const user = game.user;
-  const all = Array.from(game.messages?.contents ?? []);
-  all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  const messages = all.filter((m) => feCanUserSeeChatMessage(m, user));
+  const messages = feCollectVisibleChatMessages(game.user);
+  const renderProfile = feGetArchiveRenderProfile(messages.length);
 
   const worldName = game.world?.title ?? game.world?.name ?? "";
   const sceneName = canvas?.scene?.name ?? "";
   const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
-  const metaText = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
+  const metaParts = [`${messages.length} messages`];
+  if (sceneName) metaParts.push(sceneName);
+  if (renderProfile.statusLabel) metaParts.push(renderProfile.statusLabel);
+  const metaText = metaParts.join(" • ");
 
   // Build the archive document.
   const headStyles = feCollectHeadStylesHTML();
@@ -745,7 +862,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
           : "";
 
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
-  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
+  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${renderProfile.bodyClass}${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
   win.document.open();
   win.document.write(`<!doctype html>
@@ -901,6 +1018,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
           page-break-inside: avoid;
         }
 
+        #chat-log .chat-message:last-child {
+          break-after: auto !important;
+          page-break-after: auto !important;
+          margin-bottom: 0 !important;
+        }
+
         /* PDF 안정성: 이미지 숨김 옵션 */
         body.fe-print-hide-avatars #chat-log :is(
           .message-header img,
@@ -1019,58 +1142,16 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // can throw during automation-heavy sessions (midi-qol, tokenbar, etc.).
   const liveMessageMap = feBuildLiveChatMessageElementMap();
 
-  // Render messages in batches to keep UI responsive and reduce reflow/parsing cost.
-  let i = 0;
-  let frag = win.document.createDocumentFragment();
-  let fragCount = 0;
-
-  const flush = async () => {
-    if (fragCount) {
-      logEl.appendChild(frag);
-      frag = win.document.createDocumentFragment();
-      fragCount = 0;
-    }
-    await feMaybeYieldForUI(win);
-  };
-
-  for (const msg of messages) {
-    i++;
-    if (metaEl && (i === 1 || i % FE_EXPORT_STATUS_EVERY === 0 || i === messages.length)) {
-      metaEl.textContent = `Rendering… ${i}/${messages.length}`;
-    }
-
-    const msgId = String(msg?.id ?? msg?._id ?? "");
-
-    const liveEl = msgId ? liveMessageMap.get(msgId) : null;
-    const node = await feRenderExportMessageNode(win.document, msg, { liveEl });
-    if (!feIsElement(node)) continue;
-
-    node.classList.add("fe-export-message");
-
-    // Normalize URLs so print/export loads images reliably.
-    feNormalizeExportNode(node);
-
-    // Apply per-message user color tint variables.
-    feApplyUserColorBgToMessageElement(msg, node);
-
-    // Ensure our chat portraits exist in the archive DOM, but avoid duplicating
-    // other portrait modules if they already injected portraits.
-    try {
-      const hasOtherPortrait = !!node.querySelector?.(
-        'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container'
-      );
-      if (!hasOtherPortrait) feChatPortraitUpsert(msg, node);
-    } catch {}
-
-    frag.appendChild(node);
-    fragCount++;
-
-    // Yield to keep the archive window responsive during large exports.
-    if (i % FE_EXPORT_RENDER_BATCH === 0) await flush();
-  }
-
-  // Flush any remaining nodes.
-  if (fragCount) logEl.appendChild(frag);
+  await feRenderMessagesIntoLog({
+    targetDoc: win.document,
+    logEl,
+    messages,
+    metaEl,
+    yieldWindow: win,
+    liveMessageMap,
+    annotateExportMessage: true,
+    renderProfile,
+  });
 
 
   // If texture stripping / export optimization is enabled, apply the same
@@ -1091,11 +1172,20 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     } catch (err) {
       console.warn("female_edition | archive merge failed", err);
     }
+  } else if (renderProfile.deferPortraits) {
+    feRefreshPortraitsForLog(logEl);
   }
 
+  try {
+    feNormalizeArchiveMessageLayout(logEl);
+  } catch {}
+
   // Wait for images so avatars/icons actually show up.
-  if (metaEl) metaEl.textContent = "Loading images…";
-  await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
+  if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
+  await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+
+  if (metaEl) metaEl.textContent = "Loading fonts…";
+  await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
 
   if (metaEl) metaEl.textContent = metaText;
 
@@ -1140,6 +1230,15 @@ async function feArchivePrint(win) {
       if (metaEl) metaEl.textContent = t;
     } catch {}
   };
+
+  const renderProfile = (() => {
+    try {
+      const count = logEl?.querySelectorAll?.("li.chat-message")?.length || 0;
+      return feGetArchiveRenderProfile(count);
+    } catch {
+      return feGetArchiveRenderProfile(0);
+    }
+  })();
 
   const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "hideAvatars");
   const isElectron = feIsElectron();
@@ -1231,6 +1330,9 @@ async function feArchivePrint(win) {
 
   const restoreOnce = () => {
     try {
+      restoreDownscaledImages();
+    } catch {}
+    try {
       restoreImages();
     } catch {}
     try {
@@ -1246,11 +1348,13 @@ async function feArchivePrint(win) {
   // - always when mode === "downscale"
   // - in Electron, also when images are not fully hidden
   const shouldDownscale = !!logEl && (mode === "downscale" || (isElectron && mode !== "hideAll"));
+  let restoreDownscaledImages = () => {};
   if (shouldDownscale && logEl) {
     try {
       setMeta("Loading images…");
-      await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: FE_EXPORT_WAIT_IMAGES_MAX });
-      await feDownscaleImagesForPrint(win, logEl, {
+      fePrepareArchiveImagesForOutput(logEl);
+      await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.min(FE_EXPORT_WAIT_IMAGES_MAX, Math.max(160, renderProfile.initialImageWaitMax * 4)) });
+      restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
         dprCap: isElectron ? 1 : 1.5,
@@ -1264,6 +1368,18 @@ async function feArchivePrint(win) {
       console.warn("female_edition | print downscale failed", err);
     }
   }
+
+  if (!shouldDownscale && logEl) {
+    try {
+      fePrepareArchiveImagesForOutput(logEl);
+    } catch {}
+  }
+
+  try {
+    setMeta("Loading fonts…");
+    await feEnsureArchiveEmbeddedFonts(win);
+    await feWaitForFonts(doc, FE_EXPORT_WAIT_FONTS_TIMEOUT);
+  } catch {}
 
   try {
     win.focus();
@@ -1302,6 +1418,26 @@ function feParseRGBAFromCSS(cssColor) {
   return { r, g, b, a };
 }
 
+function feParseRGBTriplet(raw) {
+  try {
+    const parts = String(raw ?? "")
+      .trim()
+      .split(/[^\d.]+/)
+      .filter(Boolean)
+      .map((v) => Number(v));
+    if (parts.length < 3) return null;
+    const [r, g, b] = parts;
+    if (![r, g, b].every((v) => Number.isFinite(v))) return null;
+    return {
+      r: Math.max(0, Math.min(255, r)),
+      g: Math.max(0, Math.min(255, g)),
+      b: Math.max(0, Math.min(255, b)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function feScreenBlendChannel(base, overlay) {
   // base/overlay in [0..255]
   return 255 - ((255 - base) * (255 - overlay)) / 255;
@@ -1333,21 +1469,45 @@ function feFreezeMessageBackgroundsForPrint(win, logEl) {
 
   const changed = [];
 
+  const body = doc.body;
+  const hasUserColor = !!body?.classList?.contains?.("fe-msg-bg-usercolor");
+  const hasUserBase = !!(body?.classList?.contains?.("fe-userbg-base-white") || body?.classList?.contains?.("fe-userbg-base-black"));
+
   for (const el of msgs) {
     try {
       const cs = win.getComputedStyle(el);
       const bg = feParseRGBAFromCSS(cs.backgroundColor);
       if (!bg || bg.a <= 0) continue;
 
-      // Blend the paper overlay using the *screen* blend formula.
-      // We then bake the result into an opaque RGB to avoid print/PDF blend inconsistencies.
-      const sr = feScreenBlendChannel(bg.r, paper.r);
-      const sg = feScreenBlendChannel(bg.g, paper.g);
-      const sb = feScreenBlendChannel(bg.b, paper.b);
+      let outR;
+      let outG;
+      let outB;
 
-      const outR = Math.round(bg.r * (1 - paperAlpha) + sr * paperAlpha);
-      const outG = Math.round(bg.g * (1 - paperAlpha) + sg * paperAlpha);
-      const outB = Math.round(bg.b * (1 - paperAlpha) + sb * paperAlpha);
+      // When the user-color tint is implemented via an inset box-shadow (base white/black mode),
+      // computed backgroundColor only reports the solid base layer. Bake the tint explicitly so
+      // print/PDF preserves the same pastel message color, including merged follow-up messages.
+      if (hasUserColor && hasUserBase && el.classList?.contains?.("fe-has-user-color")) {
+        const tint = feParseRGBTriplet(cs.getPropertyValue("--fe-user-color-rgb"));
+        const alphaRaw = Number(String(cs.getPropertyValue("--fe-user-color-alpha") || rootCS.getPropertyValue("--fe-user-color-alpha") || "0.22").trim());
+        const tintAlpha = Number.isFinite(alphaRaw) ? Math.max(0, Math.min(1, alphaRaw)) : 0.22;
+        if (tint) {
+          outR = Math.round(bg.r * (1 - tintAlpha) + tint.r * tintAlpha);
+          outG = Math.round(bg.g * (1 - tintAlpha) + tint.g * tintAlpha);
+          outB = Math.round(bg.b * (1 - tintAlpha) + tint.b * tintAlpha);
+        }
+      }
+
+      if (outR == null || outG == null || outB == null) {
+        // Blend the paper overlay using the *screen* blend formula.
+        // We then bake the result into an opaque RGB to avoid print/PDF blend inconsistencies.
+        const sr = feScreenBlendChannel(bg.r, paper.r);
+        const sg = feScreenBlendChannel(bg.g, paper.g);
+        const sb = feScreenBlendChannel(bg.b, paper.b);
+
+        outR = Math.round(bg.r * (1 - paperAlpha) + sr * paperAlpha);
+        outG = Math.round(bg.g * (1 - paperAlpha) + sg * paperAlpha);
+        outB = Math.round(bg.b * (1 - paperAlpha) + sb * paperAlpha);
+      }
 
       const prevStyle = el.getAttribute("style");
       changed.push({ el, prevStyle });
@@ -1356,6 +1516,7 @@ function feFreezeMessageBackgroundsForPrint(win, logEl) {
       el.style.setProperty("background-image", "none", "important");
       el.style.setProperty("background-blend-mode", "normal", "important");
       el.style.setProperty("mix-blend-mode", "normal", "important");
+      el.style.setProperty("box-shadow", "none", "important");
       el.style.setProperty("filter", "none", "important");
       el.style.setProperty("backdrop-filter", "none", "important");
     } catch {
@@ -1390,13 +1551,16 @@ async function feDownscaleImagesForPrint(
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
   let imgs = Array.from(rootEl.querySelectorAll("img"));
-  if (!imgs.length) return;
+  if (!imgs.length) return () => {};
+
+  const changed = [];
 
   const isAvatarImage = (img) => {
     try {
       if (!img) return false;
       if (img.classList?.contains("avatar")) return true;
       if (img.matches?.('img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return true;
+      if (img.matches?.('img.fe-chat-portrait, img.chat-portrait-message-portrait')) return true;
       if (img.closest?.(".message-header, .message-sender")) return true;
       if (img.closest?.(".chat-portrait-container")) return true;
     } catch {}
@@ -1405,34 +1569,86 @@ async function feDownscaleImagesForPrint(
 
   if (excludeAvatars) imgs = imgs.filter((img) => !isAvatarImage(img));
 
-  // Cap DPR for stability (large DPR values can explode PDF size / memory use)
   const dpr = Math.max(1, Math.min(dprCap, win.devicePixelRatio || 1));
   const avatarDpr = Math.max(1, Math.min(avatarDprCap, win.devicePixelRatio || 1));
-
-  // 1) Group images by their resolved source.
-  //    This allows de-duplicating identical images (portraits, repeated icons, etc.)
-  //    by generating ONE downscaled data URL and reusing it.
   const groups = new Map();
+  const MAX_SIDE = 1600;
 
-  const getKey = (img) => {
+  const resolvePosition = (value, axis = "x") => {
+    const raw = String(value || "").trim().toLowerCase();
+    const parts = raw.split(/\s+/).filter(Boolean);
+    const token = axis === "x"
+      ? (parts[0] || "center")
+      : (parts[1] || parts[0] || "center");
+    if (token.endsWith("%")) {
+      const n = Number(token.replace("%", ""));
+      if (Number.isFinite(n)) return Math.max(0, Math.min(1, n / 100));
+    }
+    if (token === "left" || token === "top") return 0;
+    if (token === "right" || token === "bottom") return 1;
+    return 0.5;
+  };
+
+  const computeDrawSpec = (img, outW, outH) => {
+    let fit = "fill";
+    let position = "center center";
     try {
-      // Prefer the actually-used resource when srcset is present.
-      return img.currentSrc || img.src || img.getAttribute("src") || "";
+      const cs = win.getComputedStyle?.(img);
+      fit = String(cs?.objectFit || img.style?.objectFit || "fill").trim() || "fill";
+      position = String(cs?.objectPosition || img.style?.objectPosition || "center center").trim() || "center center";
+    } catch {}
+
+    const naturalW = Math.max(1, Number(img.naturalWidth) || 1);
+    const naturalH = Math.max(1, Number(img.naturalHeight) || 1);
+    const px = resolvePosition(position, "x");
+    const py = resolvePosition(position, "y");
+
+    if (fit === "contain") {
+      const scale = Math.min(outW / naturalW, outH / naturalH);
+      const drawW = Math.max(1, Math.round(naturalW * scale));
+      const drawH = Math.max(1, Math.round(naturalH * scale));
+      const dx = Math.round((outW - drawW) * px);
+      const dy = Math.round((outH - drawH) * py);
+      return { fit, position, sx: 0, sy: 0, sw: naturalW, sh: naturalH, dx, dy, dw: drawW, dh: drawH };
+    }
+
+    if (fit === "cover") {
+      const scale = Math.max(outW / naturalW, outH / naturalH);
+      const cropW = Math.max(1, Math.round(outW / scale));
+      const cropH = Math.max(1, Math.round(outH / scale));
+      const sx = Math.round((naturalW - cropW) * px);
+      const sy = Math.round((naturalH - cropH) * py);
+      return {
+        fit,
+        position,
+        sx: Math.max(0, Math.min(naturalW - cropW, sx)),
+        sy: Math.max(0, Math.min(naturalH - cropH, sy)),
+        sw: cropW,
+        sh: cropH,
+        dx: 0,
+        dy: 0,
+        dw: outW,
+        dh: outH,
+      };
+    }
+
+    return { fit, position, sx: 0, sy: 0, sw: naturalW, sh: naturalH, dx: 0, dy: 0, dw: outW, dh: outH };
+  };
+
+  const getKey = (img, targetW, targetH) => {
+    try {
+      const src = img.currentSrc || img.src || img.getAttribute("src") || "";
+      if (!src) return "";
+      const spec = computeDrawSpec(img, targetW, targetH);
+      return [src, targetW, targetH, spec.fit, spec.position, isAvatarImage(img) ? "avatar" : "img"].join("@@");
     } catch {
       return "";
     }
   };
 
-  // Hard cap to avoid huge canvases (prevents OOM on Electron/Chromium)
-  const MAX_SIDE = 1600;
-
   for (const img of imgs) {
     try {
       if (!img.complete || img.naturalWidth <= 0) continue;
-
-      const key = getKey(img);
-      if (!key) continue;
-
       const rect = img.getBoundingClientRect();
       const cssW = Math.max(1, Math.round(rect.width));
       const cssH = Math.max(1, Math.round(rect.height));
@@ -1440,10 +1656,8 @@ async function feDownscaleImagesForPrint(
 
       const isAvatar = isAvatarImage(img);
       const dprUse = isAvatar ? avatarDpr : dpr;
-
       let targetW = Math.max(1, Math.round(cssW * dprUse));
       let targetH = Math.max(1, Math.round(cssH * dprUse));
-
       const maxSide = Math.max(targetW, targetH);
       if (maxSide > MAX_SIDE) {
         const scale = MAX_SIDE / maxSide;
@@ -1451,8 +1665,10 @@ async function feDownscaleImagesForPrint(
         targetH = Math.max(1, Math.round(targetH * scale));
       }
 
+      const key = getKey(img, targetW, targetH);
+      if (!key) continue;
+      const spec = computeDrawSpec(img, targetW, targetH);
       const needsResample = !(img.naturalWidth <= targetW * 1.05 && img.naturalHeight <= targetH * 1.05);
-
       const g = groups.get(key) || {
         key,
         imgs: [],
@@ -1460,8 +1676,8 @@ async function feDownscaleImagesForPrint(
         maxH: 0,
         needsResample: false,
         isAvatar: false,
+        spec,
       };
-
       g.imgs.push(img);
       g.maxW = Math.max(g.maxW, targetW);
       g.maxH = Math.max(g.maxH, targetH);
@@ -1474,80 +1690,83 @@ async function feDownscaleImagesForPrint(
   }
 
   const groupList = Array.from(groups.values());
-  if (!groupList.length) return;
-
-  // 2) Generate a single downscaled image per group.
+  if (!groupList.length) return () => {};
   const cache = new Map();
   let gi = 0;
+
   for (const g of groupList) {
-    gi++;
+    gi += 1;
     if (gi === 1 || gi % 10 === 0 || gi === groupList.length) {
       setMeta(`Downscaling images… ${gi}/${groupList.length}`);
     }
-
     try {
-      // Only do work when it helps:
-      // - if resampling is needed OR
-      // - if the same image appears multiple times (dedup benefits PDF size)
       const shouldProcess = g.needsResample || g.imgs.length > 1;
       if (!shouldProcess) continue;
-
       const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
       if (!rep) continue;
-
-      // Avoid upscaling.
-      let outW = Math.min(g.maxW, rep.naturalWidth);
-      let outH = Math.min(g.maxH, rep.naturalHeight);
-      outW = Math.max(1, Math.round(outW));
-      outH = Math.max(1, Math.round(outH));
-      if (outW <= 1 || outH <= 1) continue;
-
+      const outW = Math.max(1, Math.min(g.maxW, Math.round(g.maxW)));
+      const outH = Math.max(1, Math.min(g.maxH, Math.round(g.maxH)));
       const canvas = win.document.createElement("canvas");
       canvas.width = outW;
       canvas.height = outH;
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) continue;
-
-      // Improve downscale quality (avoid jaggy / no-AA portraits)
       try {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
       } catch {}
 
-      ctx.drawImage(rep, 0, 0, outW, outH);
+      const spec = computeDrawSpec(rep, outW, outH);
+      ctx.clearRect(0, 0, outW, outH);
+      ctx.drawImage(rep, spec.sx, spec.sy, spec.sw, spec.sh, spec.dx, spec.dy, spec.dw, spec.dh);
 
       const dataUrl = await feCanvasToDataURL(canvas, {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
         jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
       });
       if (!dataUrl) continue;
-
       cache.set(g.key, dataUrl);
-
-      // Release memory
       canvas.width = 0;
       canvas.height = 0;
     } catch {
-      // Ignore per-group failures (CORS-taint, decoding error, etc.)
+      // Ignore per-group failures.
     }
-
     if (gi % 10 === 0) await feNextTick();
   }
 
-  // 3) Apply results to every image in the group (dedup).
   for (const g of groupList) {
     const dataUrl = cache.get(g.key);
     if (!dataUrl) continue;
     for (const img of g.imgs) {
       try {
+        changed.push({
+          img,
+          src: img.getAttribute("src"),
+          srcset: img.getAttribute("srcset"),
+          loading: img.getAttribute("loading"),
+        });
         img.removeAttribute("srcset");
-        img.src = dataUrl;
+        img.setAttribute("src", dataUrl);
       } catch {}
     }
   }
+
+  return () => {
+    for (let i = changed.length - 1; i >= 0; i -= 1) {
+      const it = changed[i];
+      try {
+        if (it.src == null) it.img.removeAttribute("src");
+        else it.img.setAttribute("src", it.src);
+        if (it.srcset == null) it.img.removeAttribute("srcset");
+        else it.img.setAttribute("srcset", it.srcset);
+        if (it.loading == null) it.img.removeAttribute("loading");
+        else it.img.setAttribute("loading", it.loading);
+      } catch {}
+    }
+  };
 }
 
-async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
+async function feCanvasToDataURLasync function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
   // Prefer webp (smaller); fall back to jpeg/png.
   const tryTypes = [
     { type: "image/webp", quality: webpQuality },
@@ -1654,6 +1873,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         styleEl.id = "fe-export-embedded-fonts";
         styleEl.textContent = fontCss;
         headClone.appendChild(styleEl);
+        feInjectExportFontReadyBootstrap(headClone, doc);
       }
     } catch (err) {
       console.warn("female_edition | HTML export: failed to embed fonts", err);
@@ -1664,21 +1884,43 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // Body snapshot
   // ---
   let bodyHTML = "";
-  if (feSetting(S.EXPORT_EMBED_IMAGES)) {
-    // Image embedding requires mutating src/srcset to data: URLs.
-    // Do it on a cloned <body> so the archive window stays visually unchanged.
-    try {
-      setMeta("Embedding images…");
-      const bodyClone = doc.body.cloneNode(true);
-      await feEmbedImagesInNode(bodyClone, { meta: setMeta });
-      bodyHTML = bodyClone.outerHTML;
-    } catch (err) {
-      console.warn("female_edition | HTML export: failed to embed images", err);
-      // Fallback: still produce a valid snapshot.
-      bodyHTML = doc.body.outerHTML;
+  const embedFonts = !!feSetting(S.EXPORT_EMBED_FONTS);
+  const liveLogEl = doc.getElementById("chat-log") || doc.getElementById("fe-chat-export-log") || doc.querySelector("ol.chat-log");
+  const restoreBg = feFreezeMessageBackgroundsForPrint(win, liveLogEl);
+  const restoreLayout = feNormalizeArchiveMessageLayout(doc.body, { restore: true });
+  try {
+    if (feSetting(S.EXPORT_EMBED_IMAGES)) {
+      // Image embedding requires mutating src/srcset to data: URLs.
+      // Do it on a cloned <body> so the archive window stays visually unchanged.
+      try {
+        setMeta("Embedding images…");
+        const bodyClone = doc.body.cloneNode(true);
+        feRestoreOriginalPortraitSources(bodyClone);
+        feNormalizeArchiveMessageLayout(bodyClone);
+        if (embedFonts) fePatchInlineFontFamiliesForExport(bodyClone);
+        await feEmbedImagesInNode(bodyClone, { meta: setMeta });
+        bodyHTML = bodyClone.outerHTML;
+      } catch (err) {
+        console.warn("female_edition | HTML export: failed to embed images", err);
+        // Fallback: still produce a valid snapshot.
+        const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+        try {
+          bodyHTML = doc.body.outerHTML;
+        } finally {
+          try { restore(); } catch {}
+        }
+      }
+    } else {
+      const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+      try {
+        bodyHTML = doc.body.outerHTML;
+      } finally {
+        try { restore(); } catch {}
+      }
     }
-  } else {
-    bodyHTML = doc.body.outerHTML;
+  } finally {
+    try { restoreLayout(); } catch {}
+    try { restoreBg(); } catch {}
   }
 
   // ---
@@ -1833,6 +2075,10 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
 }
 
 async function feBuildEmbeddedCookieRunFontCSS() {
+  if (typeof feEmbeddedFontCssValue === "string") return feEmbeddedFontCssValue;
+  if (feEmbeddedFontCssPromise) return feEmbeddedFontCssPromise;
+
+  feEmbeddedFontCssPromise = (async () => {
   // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
   // If files are not present, returns an empty string.
   //
@@ -1910,7 +2156,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     if (!dataUrl) continue;
 
     faces.push(
-      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
     );
   }
 
@@ -1921,14 +2167,17 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     const geurimilgiData = await fetchFont(geurUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
     if (geurimilgiData) {
       faces.push(
-        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:swap;}`
+        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
       );
     }
   } catch {}
 
-  if (!faces.length) return "";
+  if (!faces.length) {
+    feEmbeddedFontCssValue = "";
+    return "";
+  }
 
-  return `
+  const css = `
 /* female_edition: embedded CookieRun fonts (offline HTML export) */
 ${faces.join("\n")}
 
@@ -1984,6 +2233,9 @@ ${faces.join("\n")}
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);
   --font-serif: var(--fe-font-primary);
+  --font-h1: var(--fe-font-primary);
+  --font-h2: var(--fe-font-primary);
+  --font-body: var(--fe-font-primary);
 
   /* dnd5e v5.2.x font vars (best-effort) */
   --dnd5e-font-roboto: var(--fe-font-primary);
@@ -2008,28 +2260,24 @@ html, body {
 }
 
 #fe-chat-export-container,
-#fe-chat-export-container :is(
-  .chat-message,
-  .message-header,
-  .message-content,
-  .flavor-text,
-  .chat-card,
-  .midi-chat-card,
-  .dnd5e2.chat-card
-) {
+#fe-chat-export-container .chat-message,
+#fe-chat-export-container .chat-message * {
   font-family: var(--fe-chat-font-family) !important;
 }
-`;
-}
 
-async function feFetchAsDataURL(url) {
+#fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
+  font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
+}
+`;
+
+    feEmbeddedFontCssValue = css;
+    return css;
+  })();
+
   try {
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await feBlobToDataURL(blob);
-  } catch {
-    return null;
+    return await feEmbeddedFontCssPromise;
+  } finally {
+    feEmbeddedFontCssPromise = null;
   }
 }
 
@@ -2193,6 +2441,138 @@ async function feEmbedImagesInNode(root, { meta } = {}) {
   }
 }
 
+function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false } = {}) {
+  const restores = [];
+  try {
+    restores.push(feRestoreOriginalPortraitSources(root));
+  } catch {}
+  if (embedFonts) {
+    try {
+      restores.push(fePatchInlineFontFamiliesForExport(root));
+    } catch {}
+  }
+  return () => {
+    for (let i = restores.length - 1; i >= 0; i--) {
+      try {
+        restores[i]?.();
+      } catch {}
+    }
+  };
+}
+
+function feRestoreOriginalPortraitSources(root) {
+  const changed = [];
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    const imgs = root.querySelectorAll('img.fe-chat-portrait, img.chat-portrait-message-portrait, img[data-fe-portrait-orig-src]');
+    for (const img of imgs) {
+      const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.('data-fe-portrait-orig-src') || '';
+      if (!orig) continue;
+      const prevSrc = img.getAttribute('src');
+      const prevSrcset = img.getAttribute('srcset');
+      const prevLoading = img.getAttribute('loading');
+      if (prevSrc === orig && !prevSrcset) continue;
+      changed.push({ img, prevSrc, prevSrcset, prevLoading });
+      img.setAttribute('src', orig);
+      img.removeAttribute('srcset');
+      img.setAttribute('loading', 'eager');
+    }
+  } catch {}
+  return () => {
+    for (const it of changed) {
+      try {
+        if (it.prevSrc == null) it.img.removeAttribute('src');
+        else it.img.setAttribute('src', it.prevSrc);
+        if (it.prevSrcset == null) it.img.removeAttribute('srcset');
+        else it.img.setAttribute('srcset', it.prevSrcset);
+        if (it.prevLoading == null) it.img.removeAttribute('loading');
+        else it.img.setAttribute('loading', it.prevLoading);
+      } catch {}
+    }
+  };
+}
+
+function fePatchInlineFontFamiliesForExport(root) {
+  const changed = [];
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    for (const el of root.querySelectorAll('[style]')) {
+      let ff = '';
+      try {
+        ff = el.style.getPropertyValue('font-family') || '';
+      } catch {}
+      if (!ff) continue;
+
+      let next = ff;
+      if (/FE\s+Geurimilgi/i.test(next) && !/FE\s+Geurimilgi\s+Embedded/i.test(next)) {
+        next = next.replace(/FE\s+Geurimilgi/gi, '"FE Geurimilgi Embedded", "FE Geurimilgi"');
+      }
+      if (/FE\s+CookieRun/i.test(next) && !/FE\s+CookieRun\s+Embedded/i.test(next)) {
+        next = next.replace(/FE\s+CookieRun/gi, '"FE CookieRun Embedded", "FE CookieRun"');
+      }
+      if (!/FE\s+CookieRun\s+Embedded/i.test(next) && !/FE\s+Geurimilgi\s+Embedded/i.test(next) && /\bSignika\b/i.test(next)) {
+        next = '"FE CookieRun Embedded", "FE CookieRun", ' + next;
+      }
+      if (next === ff) continue;
+
+      const prev = ff;
+      const prevPriority = el.style.getPropertyPriority('font-family');
+      changed.push({ el, prev, prevPriority });
+      el.style.setProperty('font-family', next, 'important');
+    }
+  } catch {}
+  return () => {
+    for (const it of changed) {
+      try {
+        if (it.prev) it.el.style.setProperty('font-family', it.prev, it.prevPriority || '');
+        else it.el.style.removeProperty('font-family');
+      } catch {}
+    }
+  };
+}
+
+function feInjectExportFontReadyBootstrap(headClone, doc) {
+  try {
+    const styleEl = doc.createElement('style');
+    styleEl.id = 'fe-export-font-ready-gate';
+    styleEl.textContent = 'html.fe-fonts-loading #fe-chat-export-container{visibility:hidden !important;}';
+    headClone.appendChild(styleEl);
+
+    const scriptEl = doc.createElement('script');
+    scriptEl.id = 'fe-export-font-ready-script';
+    scriptEl.textContent = `(function(){try{document.documentElement.classList.add("fe-fonts-loading");var done=function(){try{document.documentElement.classList.remove("fe-fonts-loading");}catch(_e){}};if(document.fonts&&document.fonts.ready){Promise.race([document.fonts.ready,new Promise(function(resolve){setTimeout(resolve,5000);})]).then(done,done);}else{done();}}catch(_err){}})();`;
+    headClone.appendChild(scriptEl);
+  } catch {}
+}
+
+async function feWaitForFonts(doc, timeoutMs = FE_EXPORT_WAIT_FONTS_TIMEOUT) {
+  try {
+    const fonts = doc?.fonts;
+    if (!fonts?.ready) return;
+
+    const loads = [fonts.ready.catch(() => {})];
+    const families = [
+      '400 16px "FE CookieRun Embedded"',
+      '700 16px "FE CookieRun Embedded"',
+      '900 16px "FE CookieRun Embedded"',
+      '400 16px "FE Geurimilgi Embedded"',
+      '400 16px "FE CookieRun"',
+      '700 16px "FE CookieRun"',
+      '400 16px "FE Geurimilgi"',
+    ];
+    for (const spec of families) {
+      try {
+        loads.push(fonts.load(spec, '가나다ABC123').catch(() => {}));
+      } catch {}
+    }
+
+    await Promise.race([
+      Promise.all(loads),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  } catch {}
+}
+
 function feDownloadExportHTMLFromCurrentDocument() {
   try {
     const container = document.getElementById("fe-chat-export-container");
@@ -2287,17 +2667,54 @@ const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
   "justify-content",
   "align-self",
   "justify-self",
+  "justify-items",
+  "align-content",
+  "place-items",
+  "place-content",
   "grid-template-columns",
   "grid-template-rows",
   "grid-template-areas",
+  "grid-auto-columns",
+  "grid-auto-rows",
   "grid-auto-flow",
   "grid-area",
+  "grid-column",
+  "grid-column-start",
+  "grid-column-end",
+  "grid-row",
+  "grid-row-start",
+  "grid-row-end",
   "gap",
   "column-gap",
   "row-gap",
   "white-space",
   "overflow",
   "text-overflow",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "z-index",
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "box-sizing",
+  "flex",
+  "flex-direction",
+  "flex-wrap",
+  "flex-grow",
+  "flex-shrink",
+  "flex-basis",
+  "transform",
+  "transform-origin",
+  "translate",
+  "scale",
+  "rotate",
+  "vertical-align",
 ];
 
 const FE_ARCHIVE_TEXT_STYLE_PROPS = [
@@ -2314,14 +2731,22 @@ const FE_ARCHIVE_TEXT_STYLE_PROPS = [
   "white-space",
 ];
 
+const FE_ARCHIVE_FIXED_SIZE_PROPS = ["width", "height", "min-width", "min-height", "max-width", "max-height"];
+const FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_CONTAINER_STYLE_PROPS.filter((p) => !FE_ARCHIVE_FIXED_SIZE_PROPS.includes(p));
 const FE_ARCHIVE_TREE_STYLE_PROPS = Array.from(new Set([
   ...FE_ARCHIVE_CONTAINER_STYLE_PROPS,
   ...FE_ARCHIVE_TEXT_STYLE_PROPS,
 ]));
+const FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE = Array.from(new Set([
+  ...FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE,
+  ...FE_ARCHIVE_TEXT_STYLE_PROPS,
+]));
+const FE_ARCHIVE_CARD_TREE_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
 const FE_ARCHIVE_MIXED_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
-const FE_ARCHIVE_TREE_MAX_SIMPLE = 56;
-const FE_ARCHIVE_TREE_MAX_PORTRAIT = 88;
-const FE_ARCHIVE_TREE_MAX_COMPLEX = 120;
+const FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
+const FE_ARCHIVE_TREE_MAX_SIMPLE = 72;
+const FE_ARCHIVE_TREE_MAX_PORTRAIT = 112;
+const FE_ARCHIVE_TREE_MAX_COMPLEX = 260;
 
 function feGetArchiveTreeMirrorBudget(liveEl) {
   try {
@@ -2361,7 +2786,7 @@ function feSelectScoped(root, selector) {
 }
 
 
-function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80 } = {}) {
+function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80, propNames = FE_ARCHIVE_TREE_STYLE_PROPS } = {}) {
   try {
     if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
     const liveWalker = document.createTreeWalker(liveEl, NodeFilter.SHOW_ELEMENT);
@@ -2372,7 +2797,7 @@ function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80 } = {}) {
     let count = 0;
 
     while (liveNode && cloneNode && count < maxNodes) {
-      feCopyComputedStyleSubset(liveNode, cloneNode, FE_ARCHIVE_TREE_STYLE_PROPS);
+      feCopyComputedStyleSubset(liveNode, cloneNode, propNames);
       liveNode = liveWalker.nextNode();
       cloneNode = cloneWalker.nextNode();
       count += 1;
@@ -2382,13 +2807,24 @@ function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80 } = {}) {
   }
 }
 
-function feMirrorLiveMessageStyles(liveEl, cloneEl) {
+function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {}) {
   try {
     if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
 
+    const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
+    const lean = !!renderProfile?.lean;
+    const mirrorTree = renderProfile?.mirrorTree !== false;
+    const mirrorCardTree = renderProfile?.mirrorCardTree !== false;
+
     // First, mirror a broad-but-safe subset of computed styles across the cloned tree.
-    // This keeps archive HTML visually close to the live chat without freezing absolute widths.
-    feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes: feGetArchiveTreeMirrorBudget(liveEl) });
+    // For complex chat cards (notably midi-qol), preserve more layout properties so saved HTML/PDF
+    // stays close to the live sidebar rendering even without the full live stylesheet environment.
+    if (mirrorTree && (!hasCard || mirrorCardTree)) {
+      feMirrorLiveTreeStyles(liveEl, cloneEl, {
+        maxNodes: feGetArchiveTreeMirrorBudget(liveEl),
+        propNames: hasCard ? FE_ARCHIVE_CARD_TREE_STYLE_PROPS : FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE,
+      });
+    }
 
     const sync = (selector, props) => {
       const srcList = feSelectScoped(liveEl, selector);
@@ -2397,23 +2833,26 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl) {
       for (let i = 0; i < n; i++) feCopyComputedStyleSubset(srcList[i], dstList[i], props);
     };
 
-    sync(":scope", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-    sync(":scope > .message-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-    sync(":scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-    sync(":scope > .message-header .message-sender", FE_ARCHIVE_MIXED_STYLE_PROPS);
-    sync(":scope > .message-header .message-sender .name-stacked", FE_ARCHIVE_MIXED_STYLE_PROPS);
+    sync(":scope", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(":scope > .message-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(":scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(":scope > .message-header .message-sender", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(":scope > .message-header .message-sender .name-stacked", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
     sync(":scope > .message-header .message-sender .name-stacked .title, :scope > .message-header .message-sender .title", FE_ARCHIVE_TEXT_STYLE_PROPS);
     sync(":scope > .message-header .message-sender .name-stacked .subtitle, :scope > .message-header .message-sender .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
-    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", FE_ARCHIVE_MIXED_STYLE_PROPS);
-    sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS);
+    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
 
-    const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
     if (hasCard) {
       sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
       sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
       sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
       sync(":scope .chat-card .name-stacked .title, :scope .midi-chat-card .name-stacked .title, :scope .chat-card .name-stacked .subtitle, :scope .midi-chat-card .name-stacked .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
       sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      const midiSelector = lean
+        ? ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target)"
+        : ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target, [class*=\"midi\"], [class*=\"roll\"], [class*=\"damage\"], [class*=\"attack\"] )";
+      sync(midiSelector, lean ? FE_ARCHIVE_CONTAINER_STYLE_PROPS : FE_ARCHIVE_CARD_TREE_STYLE_PROPS);
     }
 
     if (liveEl.classList?.contains?.("narrator-chat")) {
@@ -2450,7 +2889,7 @@ function feCanUserSeeChatMessage(msg, user) {
   }
 }
 
-function feNormalizeExportNode(rootEl) {
+function feNormalizeExportNode(rootEl, { loading = "eager", decoding = "sync" } = {}) {
   try {
     const baseHref = rootEl?.ownerDocument?.baseURI || window.location.href;
 
@@ -2461,9 +2900,9 @@ function feNormalizeExportNode(rootEl) {
       try {
         img.src = new URL(src, baseHref).href;
       } catch {}
-      // Ensure intrinsic size isn't lost in print layout
-      if (!img.getAttribute("loading")) img.setAttribute("loading", "eager");
-      if (!img.getAttribute("decoding")) img.setAttribute("decoding", "sync");
+      // Keep archive rendering memory-friendly for large logs.
+      if (!img.getAttribute("loading")) img.setAttribute("loading", loading || "eager");
+      if (!img.getAttribute("decoding")) img.setAttribute("decoding", decoding || "sync");
     }
 
     // Normalize anchor URLs too
@@ -2477,6 +2916,104 @@ function feNormalizeExportNode(rootEl) {
       a.setAttribute("rel", "noopener");
     }
   } catch {}
+}
+
+function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true } = {}) {
+  try {
+    if (!rootEl?.querySelectorAll) return;
+    if (restorePortraits) {
+      try {
+        feRestoreOriginalPortraitSources(rootEl);
+      } catch {}
+    }
+    for (const img of rootEl.querySelectorAll("img")) {
+      try {
+        img.setAttribute("loading", "eager");
+        if (!img.getAttribute("decoding") || img.getAttribute("decoding") === "async") {
+          img.setAttribute("decoding", "sync");
+        }
+      } catch {
+        /* no-op */
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
+  const changed = [];
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    const targets = [];
+    const push = (el) => {
+      if (el && !targets.includes(el)) targets.push(el);
+    };
+    const messages = root.matches?.("li.chat-message") ? [root] : Array.from(root.querySelectorAll("li.chat-message"));
+    for (const msg of messages) {
+      push(msg);
+      push(msg.querySelector?.(":scope > .message-header"));
+      push(msg.querySelector?.(":scope > .message-content"));
+      push(msg.querySelector?.(":scope > .message-header .message-sender"));
+      push(msg.querySelector?.(":scope > .message-header .message-flavor"));
+      push(msg.querySelector?.(":scope > .message-header .flavor-text"));
+      push(msg.querySelector?.(":scope > .message-header .message-metadata"));
+    }
+
+    for (const el of targets) {
+      try {
+        const prevStyle = restore ? el.getAttribute("style") : null;
+        if (restore) changed.push({ el, prevStyle });
+        el.style.setProperty("width", "auto", "important");
+        el.style.setProperty("max-width", "none", "important");
+        if (el.classList?.contains?.("message-header") || el.classList?.contains?.("message-content") || el.classList?.contains?.("message-sender") || el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
+          el.style.setProperty("min-width", "0", "important");
+        }
+      } catch {
+        /* no-op */
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return () => {
+    for (let i = changed.length - 1; i >= 0; i -= 1) {
+      const it = changed[i];
+      try {
+        if (it.prevStyle == null) it.el.removeAttribute("style");
+        else it.el.setAttribute("style", it.prevStyle);
+      } catch {
+        /* no-op */
+      }
+    }
+  };
+}
+
+async function feEnsureArchiveEmbeddedFonts(win) {
+  try {
+    if (!win || win.closed) return;
+    const doc = win.document;
+    if (!doc?.head) return;
+
+    let enableFonts = true;
+    try {
+      enableFonts = !!game.settings.get(MODULE_ID, "enableFonts");
+    } catch {
+      enableFonts = true;
+    }
+    if (!enableFonts) return;
+    if (doc.getElementById("fe-export-embedded-fonts-live")) return;
+
+    const fontCss = await feBuildEmbeddedCookieRunFontCSS();
+    if (!fontCss) return;
+
+    const styleEl = doc.createElement("style");
+    styleEl.id = "fe-export-embedded-fonts-live";
+    styleEl.textContent = fontCss;
+    doc.head.appendChild(styleEl);
+  } catch (err) {
+    console.warn("female_edition | failed to embed fonts in archive window", err);
+  }
 }
 
 function feIsElement(node) {
