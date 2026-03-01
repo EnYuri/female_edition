@@ -13,6 +13,7 @@ import "./fe-chat-edit.js";
 import "./fe-chat-archive.js";
 import "./fe-tidy-override.js";
 import "./fe-chat-portrait.js";
+import "./fe-chat-images.js";
 
 // Data injections
 import "./inject-conditions.js";

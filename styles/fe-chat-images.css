@@ -1,0 +1,40 @@
+@charset "UTF-8";#chat-form{position:relative}#ci-spinner{z-index:1;border:5px solid #b2c3ff;border-top:5px solid #5d49ff;border-radius:50%;width:50px;height:50px;animation:spin 2s linear infinite;position:absolute;left:42%;top:45%}#ci-chat-upload-area:has(.ci-upload-area-image)~#ci-spinner{top:70%}@keyframes spin{0%{transform:rotate(0)}to{transform:rotate(360deg)}}.ci-message-image:not(:only-child):not(:last-child){margin-bottom:.5rem}.ci-message-image img{cursor:pointer}.ci-message-image img:hover{box-shadow:0 2px 12px #0000004d}#chat-controls .ci-control-buttons-gm{flex:0 0 72px}#chat-controls .ci-control-buttons-p{flex:0 0 24px}#ci-upload-image-hidden-input{opacity:0;width:0;height:0;pointer-events:none}#ci-chat-upload-area{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;padding:4px;margin:4px 7px 0 5px;background:rgba(0,0,0,.2);border:1px solid var(--color-border-light-primary);border-radius:4px;max-width:100%}#ci-chat-upload-area.hidden{display:none}.ci-upload-area-image{position:relative;display:flex;justify-content:center;align-items:center;width:80px;height:80px;flex:0 0 auto;overflow:hidden;border-radius:3px;border:1px solid var(--color-border-light-primary)}.ci-image-preview{width:100%;height:100%;object-fit:cover}.ci-remove-image-icon{position:absolute;top:2px;right:2px;font-size:16px;line-height:1;cursor:pointer;color:var(--color-text-light-header);background:rgba(0,0,0,.55);border-radius:50%;padding:2px}.ci-remove-image-icon:hover{text-shadow:0 0 6px var(--color-shadow-primary)}
+
+
+/* female_edition additions for chat-images integration */
+#ci-chat-upload-area.hidden { display: none !important; }
+#ci-chat-upload-area .ci-upload-area-images { display: inline-flex; gap: 6px; align-items: center; }
+#ci-chat-upload-area .ci-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light-2, rgba(0,0,0,.2));
+  cursor: pointer;
+  text-decoration: none;
+}
+#ci-chat-upload-area .ci-clear-all:hover {
+  background: rgba(0,0,0,.06);
+}
+.ci-message {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.ci-message-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.ci-notes {
+  margin-top: .5rem;
+}
+#fe-chat-export-container .ci-message-image img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}

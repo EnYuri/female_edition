@@ -33,13 +33,15 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
   align-items: center !important;
   justify-content: center !important;
   align-self: start !important;
-  justify-self: center !important;
+  justify-self: stretch !important;
   margin: 0 !important;
   padding: 0 !important;
   text-align: center !important;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* If a stacked name wrapper is present, keep it centered in the middle lane. */
@@ -50,14 +52,22 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-sta
   justify-content: center;
   text-align: center;
   min-width: 0;
-  max-width: 100%;
+  max-width: none !important;
+  width: 100% !important;
+  flex: 1 1 auto !important;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked > span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  max-width: none !important;
+  width: 100% !important;
+  flex: 1 1 auto !important;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.05;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text,

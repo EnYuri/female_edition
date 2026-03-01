@@ -284,6 +284,12 @@ function cpIsDfChatEnhancementsMerged(messageEl) {
 
 function cpIsRoundMarkerMessage(message, messageEl) {
   try {
+    if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
+  } catch {
+    /* ignore */
+  }
+
+  try {
     // monks-little-details round marker
     const flag = message?.flags?.["monks-little-details"]?.roundmarker;
     if (flag === true || String(flag) === "true") return true;
@@ -293,7 +299,14 @@ function cpIsRoundMarkerMessage(message, messageEl) {
 
   try {
     // Several modules render a .round-marker element inside the message content.
-    if (messageEl?.querySelector?.(".message-content .round-marker")) return true;
+    if (messageEl?.querySelector?.(".message-content .round-marker, .round-marker")) return true;
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const content = String(message?.content ?? "");
+    if (/\bround-marker\b/i.test(content)) return true;
   } catch {
     /* ignore */
   }
@@ -324,7 +337,7 @@ function cpIsNarratorToolsMessage(message, messageEl) {
   }
 }
 
-function cpHideHeaderForNarrator(messageEl) {
+function cpHideHeaderForSpecial(messageEl) {
   try {
     if (!messageEl) return;
     // Prefer the real message header (direct child) so we don't hide nested chat-card headers.
@@ -374,7 +387,7 @@ function cpApplyChatCardIconSizing(messageEl) {
     if (!size) return;
 
     // If this is an explicit image-post style message, don't touch its images.
-    if (messageEl.querySelector?.(".message-content .chat-images-container img")) return;
+    if (messageEl.querySelector?.(".message-content .chat-images-container img, .message-content .ci-message-image img")) return;
 
     const cards = messageEl.querySelectorAll(
       ".message-content .chat-card, .message-content .midi-chat-card, .message-content .dnd5e2.chat-card, .message-content .dnd5e.chat-card"
@@ -435,7 +448,7 @@ function cpClampLargeInlinePortraits(messageEl, size) {
     if (!size) return;
 
     // If this is an explicit image-post style message, don't touch its images.
-    if (messageEl.querySelector?.(".message-content .chat-images-container img")) return;
+    if (messageEl.querySelector?.(".message-content .chat-images-container img, .message-content .ci-message-image img")) return;
 
     const forceClamp = !!messageEl.querySelector?.(
       ".message-content .monks-tokenbar, .message-content [class*=\"midi-qol\"], .message-content .midi-qol"
@@ -983,12 +996,16 @@ function cpUpsertPortrait(message, messageEl) {
     if (closest) messageEl = closest;
   }
 
-  // Narrator Tools messages must have NO header/portrait/names.
-  // Do not inject portraits and actively hide any base message header.
-  if (cpIsNarratorToolsMessage(message, messageEl)) {
+  // Narrator/round-marker style system messages must have NO portrait modifications.
+  // Narrator messages hide the base header entirely; round-marker messages keep their original
+  // header because, for several modules, the header *is* the marker UI.
+  const isNarratorSpecial = cpIsNarratorToolsMessage(message, messageEl);
+  const isRoundMarkerSpecial = cpIsRoundMarkerMessage(message, messageEl);
+  if (isNarratorSpecial || isRoundMarkerSpecial) {
     cpRemovePortrait(messageEl);
-    messageEl.classList.add("fe-narrator-chat");
-    cpHideHeaderForNarrator(messageEl);
+    messageEl.classList.toggle("fe-narrator-chat", isNarratorSpecial);
+    messageEl.classList.toggle("fe-round-marker-chat", isRoundMarkerSpecial);
+    if (isNarratorSpecial) cpHideHeaderForSpecial(messageEl);
     return;
   }
 

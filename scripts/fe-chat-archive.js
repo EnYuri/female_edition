@@ -916,16 +916,19 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
        */
       #fe-chat-export-container .fe-chat-export-toolbar,
       #fe-chat-export-container #sidebar {
-        width: min(100%, var(--fe-export-max-width, 1200px)) !important;
-        max-width: var(--fe-export-max-width, 1200px) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
       }
 
       /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
       #fe-chat-export-container #sidebar {
         position: static !important;
-        width: min(100%, var(--fe-export-max-width, 1200px)) !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
@@ -936,21 +939,27 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       #fe-chat-export-container #chat {
         position: static !important;
         background: #fff !important;
-        width: auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
         display: block !important;
       }
-      #fe-chat-export-container #chat-log {
+      #fe-chat-export-container #chat-log,
+      #fe-chat-export-container #fe-chat-export-log {
         position: static !important;
         background: #fff !important;
         padding: 0 !important;
         margin: 0 !important;
-        width: auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
+        display: block !important;
       }
 
       /* Screen-only text rendering helpers.
@@ -2274,6 +2283,17 @@ html, body {
 }
 
 #fe-chat-export-container,
+
+
+#fe-chat-export-container #sidebar,
+#fe-chat-export-container #chat,
+#fe-chat-export-container #chat-log,
+#fe-chat-export-container #fe-chat-export-log,
+#fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
 #fe-chat-export-container .chat-message,
 #fe-chat-export-container .chat-message * {
   font-family: var(--fe-chat-font-family) !important;
@@ -2756,6 +2776,7 @@ const FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE = Array.from(new Set([
   ...FE_ARCHIVE_TEXT_STYLE_PROPS,
 ]));
 const FE_ARCHIVE_CARD_TREE_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
+const FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
 const FE_ARCHIVE_MIXED_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
 const FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
 const FE_ARCHIVE_TREE_MAX_SIMPLE = 72;
@@ -2836,7 +2857,7 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
     if (mirrorTree && (!hasCard || mirrorCardTree)) {
       feMirrorLiveTreeStyles(liveEl, cloneEl, {
         maxNodes: feGetArchiveTreeMirrorBudget(liveEl),
-        propNames: hasCard ? FE_ARCHIVE_CARD_TREE_STYLE_PROPS : FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE,
+        propNames: hasCard ? FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE : FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE,
       });
     }
 
@@ -2858,9 +2879,9 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
     sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
 
     if (hasCard) {
-      sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-      sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-      sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
+      sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
+      sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
+      sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
       sync(":scope .chat-card .name-stacked .title, :scope .midi-chat-card .name-stacked .title, :scope .chat-card .name-stacked .subtitle, :scope .midi-chat-card .name-stacked .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
       sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
       const midiSelector = lean
@@ -2972,16 +2993,48 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
       push(msg.querySelector?.(":scope > .message-header .message-flavor"));
       push(msg.querySelector?.(":scope > .message-header .flavor-text"));
       push(msg.querySelector?.(":scope > .message-header .message-metadata"));
+      for (const card of msg.querySelectorAll?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content") || []) push(card);
     }
 
     for (const el of targets) {
       try {
         const prevStyle = restore ? el.getAttribute("style") : null;
         if (restore) changed.push({ el, prevStyle });
-        el.style.setProperty("width", "auto", "important");
+        const isMessage = el.classList?.contains?.("chat-message");
+        const isHeader = el.classList?.contains?.("message-header");
+        const isContent = el.classList?.contains?.("message-content");
+        const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content");
+        const isWideContainer = isMessage || isHeader || isContent || isCard;
         el.style.setProperty("max-width", "none", "important");
-        if (el.classList?.contains?.("message-header") || el.classList?.contains?.("message-content") || el.classList?.contains?.("message-sender") || el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
-          el.style.setProperty("min-width", "0", "important");
+        if (isWideContainer) {
+          if (isMessage) {
+            el.style.setProperty("display", "block", "important");
+            el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("min-width", "0", "important");
+            el.style.setProperty("flex", "none", "important");
+            el.style.setProperty("flex-basis", "auto", "important");
+            el.style.setProperty("align-self", "stretch", "important");
+          } else {
+            // Keep header/card display modes from CSS (grid/flex/none). Overwriting display here breaks
+            // merge follow-hides, portrait header grids, and round-marker headers.
+            el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("min-width", "0", "important");
+            if (isCard || isContent) {
+              el.style.setProperty("flex", "none", "important");
+              el.style.setProperty("flex-basis", "auto", "important");
+            }
+          }
+        } else {
+          if (el.classList?.contains?.("message-sender")) {
+            el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("min-width", "0", "important");
+            el.style.setProperty("max-width", "none", "important");
+          } else {
+            el.style.setProperty("width", "auto", "important");
+            if (el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
+              el.style.setProperty("min-width", "0", "important");
+            }
+          }
         }
       } catch {
         /* no-op */

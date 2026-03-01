@@ -211,16 +211,32 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 
 #fe-chat-export-container .chat-message,
 #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) > .chat-message {
-  width: auto !important;
+  display: block !important;
+  width: 100% !important;
   max-width: none !important;
   min-width: 0 !important;
+  flex: none !important;
+  flex-basis: auto !important;
+  align-self: stretch !important;
 }
 
 #fe-chat-export-container .chat-message > .message-header,
 #fe-chat-export-container .chat-message > .message-content {
-  width: auto !important;
+  width: 100% !important;
   max-width: none !important;
   min-width: 0 !important;
+  flex: none !important;
+  flex-basis: auto !important;
+}
+
+#fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+  .card-header, .card-content) {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  flex: none !important;
+  flex-basis: auto !important;
+  box-sizing: border-box !important;
 }
 
 #fe-chat-export-container .chat-message .message-sender {
@@ -232,6 +248,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   line-height: 1.05 !important;
   font-weight: 700 !important;
   color: var(--color-text-dark-primary, #191813) !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header {
@@ -250,14 +271,14 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
   align-self: start !important;
-  justify-self: center !important;
+  justify-self: stretch !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text,
   [class*="chat-portrait-whisper-to-"]) {
   grid-area: flavor;
   align-self: start !important;
-  justify-self: center !important;
+  justify-self: stretch !important;
   width: 100%;
   text-align: center !important;
 }
@@ -274,6 +295,27 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+}
+
+#fe-chat-export-container .chat-message .message-sender .name-stacked > span,
+#fe-chat-export-container .chat-message :is(.message-sender .name-stacked .title,
+  .message-sender .name-stacked .subtitle,
+  .message-sender .title,
+  .message-sender .subtitle,
+  .name-stacked .title,
+  .name-stacked .subtitle) {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 #fe-chat-export-container .chat-message .message-sender .name-stacked .title {
@@ -300,12 +342,12 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
 
-#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat) :is(.message-header, .message-content,
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) :is(.message-header, .message-content,
   .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
   color: var(--color-text-dark-primary, #191813);
 }
 
-#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat) .message-metadata {
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) .message-metadata {
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
 
@@ -332,12 +374,12 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
  * When enabled, we force-remove heavy parchment/texture images in export views.
  * This massively reduces print-to-PDF size and prevents Electron/Chromium freezes.
  */
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message {
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
   background-image: var(--fe-parchment-overlay) !important;
   filter: none !important;
 }
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::before,
-body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message::after {
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)::before,
+body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)::after {
   background-image: none !important;
   box-shadow: none !important;
   filter: none !important;

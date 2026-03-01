@@ -47,7 +47,9 @@
  * the text can become unreadable.
  */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat.fe-has-user-color {
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat.fe-has-user-color,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-round-marker-chat,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-round-marker-chat.fe-has-user-color {
   background-image: none !important;
   background-blend-mode: normal !important;
   box-shadow: none !important;

@@ -244,6 +244,34 @@ function sanitizePseudo(el, pseudo, varName) {
   }
 }
 
+
+function isRoundMarkerRoot(root) {
+  try {
+    if (!(root instanceof Element)) return false;
+    if (root.classList.contains("round-marker") || root.classList.contains("fe-round-marker-chat")) return true;
+    if (root.querySelector?.(".round-marker")) return true;
+
+    const rawId = root.dataset?.messageId || root.dataset?.documentId ||
+      root.getAttribute?.("data-message-id") || root.getAttribute?.("data-document-id");
+    const msgId = rawId ? String(rawId).split(".").pop() : null;
+    if (!msgId || !game?.messages?.get) return false;
+    const msg = game.messages.get(msgId);
+    const flag = msg?.flags?.["monks-little-details"]?.roundmarker;
+    if (flag === true || String(flag) === "true") return true;
+    const content = String(msg?.content ?? "");
+    return /\bround-marker\b/i.test(content);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function restoreRootAndSubtree(root) {
+  if (!(root instanceof Element)) return;
+  restoreElement(root);
+  root.querySelectorAll?.(":scope .chat-card, :scope .midi-chat-card, :scope .message-content, :scope .message-header")
+    ?.forEach?.(restoreElement);
+}
+
 /** Restore any changes made by this module (background-image + pseudo vars). */
 function restoreElement(el) {
   if (!(el instanceof Element)) return;
@@ -264,12 +292,14 @@ function processMessageRoot(root) {
   if (!(root instanceof Element)) return;
 
 
-  // Narrator Tools (/desc, /narrate, /note) messages:
-  // - Usually render as white text (theme-dependent)
-  // - Must NOT be washed out by our paper overlay or user-color tint
-  // - But parchment/texture layers MUST still be removed
+  // Untouched special messages (narrator / round-marker)
   try {
-    const isNarratorDom = root.classList.contains("narrator-chat");
+    if (isRoundMarkerRoot(root)) {
+      restoreRootAndSubtree(root);
+      return;
+    }
+
+    const isNarratorDom = root.classList.contains("narrator-chat") || root.classList.contains("fe-narrator-chat");
     let isNarratorFlag = false;
 
     const rawId = root.dataset?.messageId || root.dataset?.documentId ||

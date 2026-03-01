@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "0.3.68",
+  "version": "0.3.71",
   "authors": [
     {
       "name": "nayuri",
@@ -25,6 +25,7 @@
     "styles/chat-bg-stripper.css",
     "styles/fe-chat-enhance.css",
     "styles/fe-chat-archive.css",
+    "styles/fe-chat-images.css",
     "styles/fe-chat-edit.css",
     "styles/fe-tidy-override.css",
     "styles/fe-chat-portrait.css",

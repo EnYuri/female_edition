@@ -935,6 +935,40 @@ function feIsNarratorMessageElementInWindow(win, msgEl) {
   }
 }
 
+function feIsRoundMarkerMessageElementInWindow(win, msgEl) {
+  try {
+    if (!win || !msgEl || !(msgEl instanceof win.Element)) return false;
+    if (msgEl.classList?.contains?.("round-marker") || msgEl.classList?.contains?.("fe-round-marker-chat")) return true;
+    if (msgEl.querySelector?.(".round-marker")) return true;
+
+    const rawId =
+      msgEl.dataset?.messageId ||
+      msgEl.dataset?.documentId ||
+      msgEl.getAttribute?.("data-message-id") ||
+      msgEl.getAttribute?.("data-document-id");
+    const msgId = rawId ? String(rawId).split(".").pop() : null;
+    if (!msgId) return false;
+
+    const msg = game.messages?.get?.(msgId);
+    const flag = msg?.flags?.["monks-little-details"]?.roundmarker;
+    if (flag === true || String(flag) === "true") return true;
+    const content = String(msg?.content ?? "");
+    return /\bround-marker\b/i.test(content);
+  } catch {
+    return false;
+  }
+}
+
+function feGetSpecialMessageKindInWindow(win, msgEl) {
+  try {
+    if (feIsNarratorMessageElementInWindow(win, msgEl)) return "narrator";
+    if (feIsRoundMarkerMessageElementInWindow(win, msgEl)) return "round-marker";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function feSanitizeNarratorBackgroundInWindow(win, el) {
   try {
     if (!win || !el || !(el instanceof win.Element)) return false;
@@ -963,13 +997,17 @@ function feStripChatTexturesInWindow(win, rootEl) {
     const root = rootEl instanceof win.Element ? rootEl : win.document;
     const messages = Array.from(root.querySelectorAll?.(".chat-message") ?? []);
     for (const msg of messages) {
-      if (feIsNarratorMessageElementInWindow(win, msg)) {
+      const specialKind = feGetSpecialMessageKindInWindow(win, msg);
+      if (specialKind === "narrator") {
         feSanitizeNarratorBackgroundInWindow(win, msg);
         msg
           .querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")
           ?.forEach?.((el) => feSanitizeNarratorBackgroundInWindow(win, el));
         feSanitizePseudoNoneInWindow(win, msg, "--fe-before-bgimg");
         feSanitizePseudoNoneInWindow(win, msg, "--fe-after-bgimg");
+        continue;
+      }
+      if (specialKind === "round-marker") {
         continue;
       }
 
@@ -1298,20 +1336,51 @@ function feGetMessageUserColor(message) {
   }
 }
 
+function feIsNarratorToolsMessage(message, messageEl) {
+  try {
+    if (messageEl?.classList?.contains?.("narrator-chat") || messageEl?.classList?.contains?.("fe-narrator-chat")) return true;
+    if (message?.getFlag?.("narrator-tools", "type")) return true;
+    if (message?.flags?.["narrator-tools"]) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function feIsRoundMarkerMessage(message, messageEl) {
+  try {
+    if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
+    if (messageEl?.querySelector?.(".round-marker")) return true;
+  } catch {}
+
+  try {
+    const flag = message?.flags?.["monks-little-details"]?.roundmarker;
+    if (flag === true || String(flag) === "true") return true;
+  } catch {}
+
+  try {
+    const content = String(message?.content ?? "");
+    if (/\bround-marker\b/i.test(content)) return true;
+  } catch {}
+
+  return false;
+}
+
+function feIsUntouchedSpecialMessage(message, messageEl) {
+  return feIsNarratorToolsMessage(message, messageEl) || feIsRoundMarkerMessage(message, messageEl);
+}
+
 function feApplyUserColorBgToMessageElement(message, messageEl) {
   try {
     const enabled = !!feSetting(S.USE_USER_COLOR_BG);
     const el0 = messageEl?.[0] ?? messageEl;
     if (!el0?.classList || !el0?.style) return;
 
-    // Narrator Tools (/desc, /narrate, /note) messages should follow the UI theme,
-    // not the per-user background tint.
-    // Detect by DOM class (added by Narrator Tools) and by document flags.
-    const isNarratorTools =
-      el0.classList.contains("narrator-chat") ||
-      !!message?.getFlag?.("narrator-tools", "type") ||
-      !!message?.flags?.["narrator-tools"];
-    if (isNarratorTools) {
+    const isNarratorTools = feIsNarratorToolsMessage(message, el0);
+    const isRoundMarker = feIsRoundMarkerMessage(message, el0);
+    el0.classList.toggle("fe-narrator-chat", isNarratorTools);
+    el0.classList.toggle("fe-round-marker-chat", isRoundMarker);
+    if (isNarratorTools || isRoundMarker) {
       el0.classList.remove("fe-has-user-color");
       el0.style.removeProperty("--fe-user-color-rgb");
       return;
@@ -1532,16 +1601,8 @@ function feMessageMergeInfo(msg, el) {
   // If merged with normal IC/OOC lines, FE's merge-follow styles can hide the header,
   // making the narrator message look like it has no name/portrait.
   // Always keep narrator messages as standalone blocks.
-  const isNarratorTools = (() => {
-    try {
-      if (el?.classList?.contains?.("narrator-chat")) return true;
-      if (msg?.getFlag?.("narrator-tools", "type")) return true;
-      if (msg?.flags?.["narrator-tools"]) return true;
-      return false;
-    } catch {
-      return false;
-    }
-  })();
+  const isNarratorTools = feIsNarratorToolsMessage(msg, el);
+  const isRoundMarker = feIsRoundMarkerMessage(msg, el);
 
   const speaker = msg?.speaker ?? {};
   const speakerKey = [
@@ -1549,7 +1610,7 @@ function feMessageMergeInfo(msg, el) {
     speaker.token ?? "",
     speaker.actor ?? "",
     speaker.alias ?? ""
-  ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "");
+  ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "") + (isRoundMarker ? "|__fe_roundmarker__" : "");
 
   // Whisper recipients (if any)
   const whisper = Array.isArray(msg?.whisper) ? msg.whisper : [];
@@ -1580,8 +1641,9 @@ function feMessageMergeInfo(msg, el) {
     style,
     mergeableText,
     isNarrator: isNarratorTools,
-    // Live chat keeps narrator lines standalone by default; archive/print can opt in.
-    noMerge: isNarratorTools,
+    isRoundMarker,
+    // Keep narrator/round-marker lines standalone in live chat; archive/print can opt specific cases back in.
+    noMerge: isNarratorTools || isRoundMarker,
   };
 }
 
@@ -1994,4 +2056,7 @@ export {
   feApplyChatMerge,
   feMessageMergeInfo,
   feMergeKey,
+  feIsNarratorToolsMessage,
+  feIsRoundMarkerMessage,
+  feIsUntouchedSpecialMessage,
 };
