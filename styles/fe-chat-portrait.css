@@ -1,21 +1,23 @@
 :root {
   --fe-chat-portrait-size: 64px;
+  --fe-chat-header-meta-reserve: 64px;
 }
 
 /* Chat portrait in messages */
 li.chat-message.fe-has-chat-portrait > .message-header {
+  position: relative !important;
   display: grid !important;
-  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) auto;
+  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr);
   grid-template-rows: 10px auto auto;
   grid-template-areas:
-    "portrait spacer metadata"
-    "portrait sender metadata"
-    "portrait flavor metadata";
+    "portrait sender"
+    "portrait sender"
+    "portrait flavor";
   align-items: start !important;
   column-gap: 8px !important;
   row-gap: 1px !important;
 
-  padding: 0 !important;
+  padding: 0 var(--fe-chat-header-meta-reserve) 0 0 !important;
   margin: 0 0 3px 0 !important;
   border: none !important;
 }
@@ -27,12 +29,14 @@ li.chat-message.fe-has-chat-portrait > .message-header > img.fe-chat-portrait {
 
 li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
-  min-width: 0;
-  width: 100%;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: start !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  display: block !important;
+  align-self: center !important;
   justify-self: stretch !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -40,48 +44,56 @@ li.chat-message.fe-has-chat-portrait > .message-header .message-sender {
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 /* If a stacked name wrapper is present, keep it centered in the middle lane. */
 li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked {
-  display: flex !important;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-width: 0;
+  display: grid !important;
+  grid-auto-flow: row;
+  align-items: center !important;
+  justify-items: stretch !important;
+  justify-content: center !important;
+  text-align: center !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
   max-width: none !important;
   width: 100% !important;
   flex: 1 1 auto !important;
 }
 
-li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked > span {
-  display: block;
+li.chat-message.fe-has-chat-portrait > .message-header .message-sender .name-stacked > span,
+li.chat-message.fe-has-chat-portrait > .message-header .message-sender :is(.title, .subtitle) {
+  display: block !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
   max-width: none !important;
   width: 100% !important;
   flex: 1 1 auto !important;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  line-height: 1.05;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.05 !important;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text,
   [class*="chat-portrait-whisper-to-"]) {
   grid-area: flavor;
-  min-width: 0;
-  width: 100%;
-  align-self: start;
-  justify-self: center;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  width: 100% !important;
+  align-self: start !important;
+  justify-self: stretch !important;
   margin: 0 !important;
   text-align: center !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text):empty {
@@ -89,25 +101,28 @@ li.chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .fla
 }
 
 li.chat-message.fe-has-chat-portrait > .message-header .message-metadata {
-  grid-area: metadata;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
   flex: 0 0 auto;
   min-width: max-content;
+  max-width: var(--fe-chat-header-meta-reserve);
   margin-left: 0 !important;
   align-self: flex-start !important;
-  justify-self: end;
-  position: static !important;
+  justify-self: end !important;
 
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
 }
 
 @media (max-width: 380px) {
   li.chat-message.fe-has-chat-portrait > .message-header {
-    grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) auto;
+    grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr);
     grid-template-areas:
-      "portrait sender metadata"
-      "portrait flavor metadata";
+      "portrait sender"
+      "portrait flavor";
+    padding-right: 84px !important;
   }
 }
 

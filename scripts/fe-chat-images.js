@@ -205,6 +205,11 @@ function ciAddPendingTile(item, root = document) {
   img.className = "ci-image-preview";
   img.src = item.previewUrl || item.src || item.imageSrc || "";
   img.alt = item.name || "image";
+  img.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ciOpenImagePopout(img.currentSrc || img.src);
+  });
 
   tile.append(remove, img);
   strip.appendChild(tile);
@@ -369,37 +374,11 @@ function ciBuildMessageHtml(items, note) {
 
 async function ciHandleSubmit(ev, root = document) {
   if (!ciEnabled()) return;
-  if (CI_STATE.busy) return;
-  const pending = ciGetPendingItems();
-  if (!pending.length) return;
-
-  ev.preventDefault();
-  ev.stopPropagation();
-
-  CI_STATE.busy = true;
-  const textarea = ciGetTextarea(root);
-  const note = textarea?.value ? String(textarea.value) : "";
-
-  try {
-    const resolved = [];
-    for (const item of [...pending]) {
-      const src = await ciResolvePendingSource(item);
-      if (!src) continue;
-      resolved.push({ ...item, src });
-    }
-    if (!resolved.length) return;
-
-    await ChatMessage.create({
-      content: ciBuildMessageHtml(resolved, note),
-      style: ciGetMessageStyleOOC(),
-      user: game.user?.id,
-    });
-
-    if (textarea) textarea.value = "";
-    ciClearPending(root);
-  } finally {
-    CI_STATE.busy = false;
-  }
+  if (!ciGetPendingItems().length) return;
+  ev?.preventDefault?.();
+  ev?.stopPropagation?.();
+  try { ev?.stopImmediatePropagation?.(); } catch {}
+  await ciSendPending(root);
 }
 
 function ciEnsureUploadArea(root = document) {
@@ -418,16 +397,33 @@ function ciEnsureUploadArea(root = document) {
 
     const strip = doc.createElement("div");
     strip.className = "ci-upload-area-images";
+    const actions = doc.createElement("div");
+    actions.className = "ci-upload-area-actions";
+
+    const send = doc.createElement("a");
+    send.className = "ci-send-all";
+    send.title = "이미지 전송";
+    send.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
+    send.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { ev.stopImmediatePropagation?.(); } catch {}
+      await ciSendPending(root);
+    });
+
     const clear = doc.createElement("a");
     clear.className = "ci-clear-all";
     clear.title = "모두 제거";
     clear.innerHTML = '<i class="fa-solid fa-trash"></i>';
     clear.addEventListener("click", (ev) => {
       ev.preventDefault();
+      ev.stopPropagation();
+      try { ev.stopImmediatePropagation?.(); } catch {}
       ciClearPending(root);
     });
 
-    area.append(strip, clear);
+    actions.append(send, clear);
+    area.append(strip, actions);
 
     const ref = textarea || controls || chatForm;
     if (ref?.parentNode) ref.parentNode.insertBefore(area, ref);
@@ -463,6 +459,7 @@ function ciEnsureUploadButton(root = document) {
     btn = doc.createElement("a");
     btn.id = "ci-upload-image";
     btn.title = "이미지 업로드";
+    btn.setAttribute("role", "button");
     btn.innerHTML = '<i class="fas fa-images"></i>';
     const target = controls.querySelector?.(".control-buttons") || controls;
     target.appendChild(btn);
@@ -496,21 +493,68 @@ function ciEnsureUploadButton(root = document) {
 }
 
 function ciHandleTransfer(event, root = document) {
-  if (!ciEnabled()) return;
+  if (!ciEnabled()) return false;
   const data = event?.clipboardData || event?.dataTransfer;
-  if (!data) return;
+  if (!data) return false;
+
+  const stop = () => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    try { event?.stopImmediatePropagation?.(); } catch {}
+  };
 
   const files = ciExtractFiles(data);
   if (files.length) {
-    event.preventDefault?.();
+    stop();
     for (const file of files) ciPushPending({ file, name: file.name, type: file.type }, root);
-    return;
+    try { ciGetTextarea(root)?.focus?.(); } catch {}
+    return true;
   }
 
   const urls = ciExtractClipboardHtmlImages(data);
   if (urls.length) {
-    event.preventDefault?.();
+    stop();
     for (const src of urls) ciPushPending({ src, name: src.split("/").pop() || "image" }, root);
+    try { ciGetTextarea(root)?.focus?.(); } catch {}
+    return true;
+  }
+  return false;
+}
+
+async function ciSendPending(root = document) {
+  if (!ciEnabled()) return false;
+  if (CI_STATE.busy) return false;
+  const pending = ciGetPendingItems();
+  if (!pending.length) return false;
+
+  CI_STATE.busy = true;
+  const textarea = ciGetTextarea(root);
+  const note = textarea?.value ? String(textarea.value) : "";
+
+  try {
+    const resolved = [];
+    for (const item of [...pending]) {
+      const src = await ciResolvePendingSource(item);
+      if (!src) continue;
+      resolved.push({ ...item, src });
+    }
+    if (!resolved.length) return false;
+
+    await ChatMessage.create({
+      content: ciBuildMessageHtml(resolved, note),
+      style: ciGetMessageStyleOOC(),
+      user: game.user?.id,
+    });
+
+    if (textarea) textarea.value = "";
+    ciClearPending(root);
+    return true;
+  } catch (err) {
+    console.error("female_edition | chat-images send failed", err);
+    ui?.notifications?.error?.("채팅 이미지 전송에 실패했습니다.");
+    return false;
+  } finally {
+    CI_STATE.busy = false;
   }
 }
 
@@ -523,12 +567,30 @@ function ciBindChatForm(root = document) {
   const bindTransfer = (el) => {
     if (!el || el.dataset?.feCiTransferBound === "1") return;
     el.dataset.feCiTransferBound = "1";
-    el.addEventListener("paste", (ev) => ciHandleTransfer(ev, root));
-    el.addEventListener("drop", (ev) => ciHandleTransfer(ev, root));
+    el.addEventListener("paste", (ev) => { ciHandleTransfer(ev, root); }, true);
+    el.addEventListener("drop", (ev) => { ciHandleTransfer(ev, root); }, true);
     el.addEventListener("dragover", (ev) => {
       if (!ciEnabled()) return;
-      if ((ev.dataTransfer?.types || []).length) ev.preventDefault();
-    });
+      if ((ev.dataTransfer?.types || []).length) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        try { ev.stopImmediatePropagation?.(); } catch {}
+      }
+    }, true);
+  };
+
+  const bindSubmitKey = (el) => {
+    if (!el || el.dataset?.feCiKeyBound === "1") return;
+    el.dataset.feCiKeyBound = "1";
+    el.addEventListener("keydown", async (ev) => {
+      if (!ciEnabled() || !ciGetPendingItems().length) return;
+      if (ev.key !== "Enter") return;
+      if (ev.shiftKey || ev.ctrlKey || ev.altKey || ev.metaKey || ev.isComposing) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { ev.stopImmediatePropagation?.(); } catch {}
+      await ciSendPending(root);
+    }, true);
   };
 
   if (chatForm && chatForm.dataset.feCiBound !== "1") {
@@ -539,6 +601,7 @@ function ciBindChatForm(root = document) {
   bindTransfer(chatForm);
   bindTransfer(textarea);
   bindTransfer(controls);
+  bindSubmitKey(textarea);
 }
 
 function ciRefreshUi(root = document) {

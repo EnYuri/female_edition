@@ -38,3 +38,31 @@
   height: auto;
   object-fit: contain;
 }
+
+#ci-chat-upload-area { pointer-events: auto; position: relative; z-index: 4; }
+#ci-chat-upload-area .ci-upload-area-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+#ci-chat-upload-area .ci-send-all,
+#ci-chat-upload-area .ci-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light-2, rgba(0,0,0,.2));
+  cursor: pointer;
+  text-decoration: none;
+  pointer-events: auto;
+}
+#ci-chat-upload-area .ci-send-all:hover,
+#ci-chat-upload-area .ci-clear-all:hover {
+  background: rgba(0,0,0,.06);
+}
+#ci-chat-upload-area .ci-upload-area-images { flex: 1 1 auto; min-width: 0; }
+#ci-chat-upload-area .ci-image-preview { cursor: pointer; }

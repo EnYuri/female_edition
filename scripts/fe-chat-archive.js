@@ -333,6 +333,8 @@ async function feExportChatLogToPDFInline() {
       renderProfile,
     });
 
+    try { feNormalizeArchiveShellLayout(document); } catch {}
+
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
     if (feSetting(S.MERGE_ENABLED)) {
       feSyncArchiveMergeBodyClasses(document);
@@ -626,6 +628,20 @@ function feCoerceChatMessageElement(node) {
   }
 }
 
+function feStampArchiveMessageIdentity(node, msg) {
+  try {
+    if (!node || !msg) return;
+    const id = String(msg?.id ?? msg?._id ?? "").trim();
+    if (!id) return;
+    node.dataset.messageId = id;
+    node.dataset.documentId = id;
+    node.setAttribute?.("data-message-id", id);
+    node.setAttribute?.("data-document-id", id);
+  } catch {
+    /* no-op */
+  }
+}
+
 async function feTryFoundryRenderMessage(msg) {
   try {
     const ChatLogCls = ui?.chat?.constructor || foundry?.applications?.sidebar?.tabs?.ChatLog;
@@ -772,6 +788,12 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     } catch {
       node = null;
     }
+  }
+
+  if (feIsElement(node)) {
+    try {
+      feStampArchiveMessageIdentity(node, msg);
+    } catch {}
   }
 
   if (feIsElement(node) && renderProfile?.restoreOriginalPortraitSources) {
@@ -1196,6 +1218,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   }
 
   try {
+    feNormalizeArchiveShellLayout(win.document);
     feNormalizeArchiveMessageLayout(logEl);
   } catch {}
 
@@ -1910,6 +1933,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   const embedFonts = !!feSetting(S.EXPORT_EMBED_FONTS);
   const liveLogEl = doc.getElementById("chat-log") || doc.getElementById("fe-chat-export-log") || doc.querySelector("ol.chat-log");
   const restoreBg = feFreezeMessageBackgroundsForPrint(win, liveLogEl);
+  const restoreShell = feNormalizeArchiveShellLayout(doc, { restore: true });
   const restoreLayout = feNormalizeArchiveMessageLayout(doc.body, { restore: true });
   try {
     if (feSetting(S.EXPORT_EMBED_IMAGES)) {
@@ -2953,6 +2977,53 @@ function feNormalizeExportNode(rootEl, { loading = "eager", decoding = "sync" } 
   } catch {}
 }
 
+function feNormalizeArchiveShellLayout(doc, { restore = false } = {}) {
+  const changed = [];
+  try {
+    if (!doc?.querySelectorAll) return () => {};
+    const targets = [
+      doc.getElementById?.("fe-chat-export-container"),
+      doc.getElementById?.("sidebar"),
+      doc.getElementById?.("chat"),
+      doc.getElementById?.("chat-log"),
+      doc.getElementById?.("fe-chat-export-log"),
+    ].filter(Boolean);
+    for (const el of targets) {
+      try {
+        const prevStyle = restore ? el.getAttribute("style") : null;
+        if (restore) changed.push({ el, prevStyle });
+        el.style.setProperty("display", "block", "important");
+        el.style.setProperty("width", "100%", "important");
+        el.style.setProperty("inline-size", "100%", "important");
+        el.style.setProperty("min-width", "0", "important");
+        el.style.setProperty("min-inline-size", "0", "important");
+        el.style.setProperty("max-width", "none", "important");
+        el.style.setProperty("max-inline-size", "none", "important");
+        el.style.setProperty("flex", "none", "important");
+        el.style.setProperty("flex-basis", "auto", "important");
+        el.style.setProperty("overflow", "visible", "important");
+        el.style.setProperty("height", "auto", "important");
+        el.style.setProperty("max-height", "none", "important");
+      } catch {
+        /* no-op */
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return () => {
+    for (let i = changed.length - 1; i >= 0; i -= 1) {
+      const it = changed[i];
+      try {
+        if (it.prevStyle == null) it.el.removeAttribute("style");
+        else it.el.setAttribute("style", it.prevStyle);
+      } catch {
+        /* no-op */
+      }
+    }
+  };
+}
+
 function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true } = {}) {
   try {
     if (!rootEl?.querySelectorAll) return;
@@ -3006,33 +3077,43 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
         const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content");
         const isWideContainer = isMessage || isHeader || isContent || isCard;
         el.style.setProperty("max-width", "none", "important");
+        el.style.setProperty("max-inline-size", "none", "important");
         if (isWideContainer) {
           if (isMessage) {
             el.style.setProperty("display", "block", "important");
             el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("inline-size", "100%", "important");
             el.style.setProperty("min-width", "0", "important");
+            el.style.setProperty("min-inline-size", "0", "important");
             el.style.setProperty("flex", "none", "important");
             el.style.setProperty("flex-basis", "auto", "important");
             el.style.setProperty("align-self", "stretch", "important");
+            el.style.setProperty("justify-self", "stretch", "important");
           } else {
             // Keep header/card display modes from CSS (grid/flex/none). Overwriting display here breaks
             // merge follow-hides, portrait header grids, and round-marker headers.
             el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("inline-size", "100%", "important");
             el.style.setProperty("min-width", "0", "important");
+            el.style.setProperty("min-inline-size", "0", "important");
             if (isCard || isContent) {
               el.style.setProperty("flex", "none", "important");
               el.style.setProperty("flex-basis", "auto", "important");
             }
           }
         } else {
-          if (el.classList?.contains?.("message-sender")) {
+          if (el.classList?.contains?.("message-sender") || el.classList?.contains?.("name-stacked") || el.classList?.contains?.("title") || el.classList?.contains?.("subtitle")) {
             el.style.setProperty("width", "100%", "important");
+            el.style.setProperty("inline-size", "100%", "important");
             el.style.setProperty("min-width", "0", "important");
+            el.style.setProperty("min-inline-size", "0", "important");
             el.style.setProperty("max-width", "none", "important");
+            el.style.setProperty("max-inline-size", "none", "important");
           } else {
             el.style.setProperty("width", "auto", "important");
             if (el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
               el.style.setProperty("min-width", "0", "important");
+              el.style.setProperty("min-inline-size", "0", "important");
             }
           }
         }

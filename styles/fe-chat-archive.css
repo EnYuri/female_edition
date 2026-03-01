@@ -1,3 +1,6 @@
+
+:root { --fe-chat-header-meta-reserve: 64px; }
+
 /* --------------------------- */
 /* Export button (spacing)     */
 /* --------------------------- */
@@ -213,8 +216,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) > .chat-message {
   display: block !important;
   width: 100% !important;
+  inline-size: 100% !important;
   max-width: none !important;
+  max-inline-size: none !important;
   min-width: 0 !important;
+  min-inline-size: 0 !important;
   flex: none !important;
   flex-basis: auto !important;
   align-self: stretch !important;
@@ -223,8 +229,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container .chat-message > .message-header,
 #fe-chat-export-container .chat-message > .message-content {
   width: 100% !important;
+  inline-size: 100% !important;
   max-width: none !important;
+  max-inline-size: none !important;
   min-width: 0 !important;
+  min-inline-size: 0 !important;
   flex: none !important;
   flex-basis: auto !important;
 }
@@ -232,8 +241,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
   .card-header, .card-content) {
   width: 100% !important;
+  inline-size: 100% !important;
   max-width: none !important;
+  max-inline-size: none !important;
   min-width: 0 !important;
+  min-inline-size: 0 !important;
   flex: none !important;
   flex-basis: auto !important;
   box-sizing: border-box !important;
@@ -256,21 +268,30 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header {
+  position: relative !important;
   display: grid !important;
-  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) auto;
-  grid-template-rows: 10px auto auto;
+  grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) !important;
+  grid-template-rows: 10px auto auto !important;
   grid-template-areas:
-    "portrait spacer metadata"
-    "portrait sender metadata"
-    "portrait flavor metadata";
+    "portrait sender"
+    "portrait sender"
+    "portrait flavor" !important;
   align-items: start !important;
   column-gap: 8px !important;
   row-gap: 1px !important;
+  padding-right: var(--fe-chat-header-meta-reserve) !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
-  align-self: start !important;
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  align-self: center !important;
   justify-self: stretch !important;
 }
 
@@ -279,24 +300,36 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   grid-area: flavor;
   align-self: start !important;
   justify-self: stretch !important;
-  width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
   text-align: center !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-metadata {
-  grid-area: metadata;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  max-width: var(--fe-chat-header-meta-reserve) !important;
   align-self: start !important;
   justify-self: end !important;
 }
 
 #fe-chat-export-container .chat-message .message-sender .name-stacked {
-  display: flex !important;
-  flex-direction: column;
+  display: grid !important;
+  grid-auto-flow: row;
   align-items: center !important;
+  justify-items: stretch !important;
   justify-content: center !important;
   text-align: center !important;
   width: 100% !important;
   min-width: 0 !important;
+  min-inline-size: 0 !important;
   max-width: none !important;
   flex: 1 1 auto !important;
 }
@@ -310,7 +343,9 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   .name-stacked .subtitle) {
   display: block !important;
   width: 100% !important;
+  inline-size: 100% !important;
   max-width: none !important;
+  max-inline-size: none !important;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -439,3 +474,36 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, .chat-log, ol.chat
 }
 
 
+
+
+/* Archive shell: aggressively clear any sidebar-width theme constraints. */
+body.fe-chat-archive #fe-chat-export-container,
+body.fe-chat-archive #fe-chat-export-container #sidebar,
+body.fe-chat-archive #fe-chat-export-container #chat,
+body.fe-chat-archive #fe-chat-export-container #chat-log,
+body.fe-chat-archive #fe-chat-export-container #fe-chat-export-log,
+body.fe-chat-archive #fe-chat-export-container #chat-log.chat-log,
+body.fe-chat-archive #fe-chat-export-container #fe-chat-export-log.chat-log {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: none !important;
+  flex: none !important;
+  flex-basis: auto !important;
+  overflow: visible !important;
+}
+
+body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message,
+body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message.message,
+body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message.flexcol {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: none !important;
+  flex: none !important;
+  flex-basis: auto !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+}

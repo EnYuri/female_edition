@@ -350,6 +350,21 @@ function cpHideHeaderForSpecial(messageEl) {
   }
 }
 
+
+function cpRestoreHeaderForSpecial(messageEl) {
+  try {
+    if (!messageEl) return;
+    const header = messageEl.querySelector?.(":scope > .message-header") || messageEl.querySelector?.(".message-header");
+    if (!header) return;
+    header.style.removeProperty?.("display");
+    header.style.removeProperty?.("visibility");
+    header.removeAttribute?.("aria-hidden");
+    if (String(header.getAttribute?.("style") || "").trim() === "") header.removeAttribute?.("style");
+  } catch {
+    /* no-op */
+  }
+}
+
 function cpFindMessageHeader(messageEl) {
   if (!messageEl) return null;
 
@@ -1006,8 +1021,11 @@ function cpUpsertPortrait(message, messageEl) {
     messageEl.classList.toggle("fe-narrator-chat", isNarratorSpecial);
     messageEl.classList.toggle("fe-round-marker-chat", isRoundMarkerSpecial);
     if (isNarratorSpecial) cpHideHeaderForSpecial(messageEl);
+    else cpRestoreHeaderForSpecial(messageEl);
     return;
   }
+
+  cpRestoreHeaderForSpecial(messageEl);
 
   // Coexistence policy: allow duplicates, warn once (no hard-block).
   cpWarnIfChatPortraitModuleActive();
