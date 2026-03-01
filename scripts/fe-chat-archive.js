@@ -1766,7 +1766,7 @@ async function feDownscaleImagesForPrint(
   };
 }
 
-async function feCanvasToDataURLasync function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
+async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
   // Prefer webp (smaller); fall back to jpeg/png.
   const tryTypes = [
     { type: "image/webp", quality: webpQuality },
