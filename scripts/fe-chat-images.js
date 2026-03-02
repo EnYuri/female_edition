@@ -661,22 +661,26 @@ Hooks.once("ready", async () => {
 });
 
 Hooks.on("renderChatLog", (app, html) => {
-  ciRefreshUi(html || app?.element || document);
-  setTimeout(() => ciRefreshUi(document), 0);
+  // The input form UI does not need a whole-document refresh every time the log renders.
+  // Keep this root-scoped so new/popped-out chat apps get their controls bound without
+  // re-scanning the entire document on every log update.
+  ciRefreshUi(app?.element || html || document);
 });
 
 Hooks.on("activateChatLog", (app) => {
   ciRefreshUi(app?.element || document);
-  setTimeout(() => ciRefreshUi(document), 0);
 });
 
 Hooks.on("collapseSidebar", (_app, collapsed) => {
   if (collapsed) return;
-  setTimeout(() => ciRefreshUi(document), 0);
+  ciRefreshUi(document);
 });
 
-Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
-  ciRefreshUi(document);
+Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
+  // A chat-log re-render does not invalidate the input controls; avoid forcing a full
+  // document-wide refresh on every log update.
+  if (payload?.reason === "renderChatLog") return;
+  ciRefreshUi(payload?.document || document);
 });
 
 Hooks.on("renderChatMessageHTML", (_message, html) => {

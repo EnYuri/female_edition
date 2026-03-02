@@ -39,7 +39,8 @@ function feEnsureMessageEditControl(message, messageEl) {
   }
 
   // Otherwise, insert our own control.
-  const a = document.createElement("a");
+  const doc = messageEl?.ownerDocument ?? document;
+  const a = doc.createElement("a");
   a.classList.add("message-edit", "fe-message-edit");
   a.setAttribute("role", "button");
   a.setAttribute("aria-label", "메시지 수정");
@@ -213,17 +214,41 @@ function feCancelInlineEdit() {
   feSetChatInputDisabled(false);
 }
 
-async function feUpdateMessageFromRaw(msg, rawText) {
+function feBuildEditUpdate(rawText) {
   const raw = (rawText ?? "").toString();
-
-  // Keep original raw text so re-editing preserves markdown.
-  const html = await feMarkdownToHTML(raw);
-
-  await msg.update({
-    content: html,
+  return {
+    content: feMarkdownToHTML(raw),
     [`flags.${MODULE_ID}.raw`]: raw,
     [`flags.${MODULE_ID}.plain`]: raw,
-  });
+    [`flags.${MODULE_ID}.markdown`]: true,
+  };
+}
+
+function feApplyRawEditPreUpdate(changed) {
+  try {
+    if (!changed || typeof changed !== "object") return;
+    const modFlags = changed.flags?.[MODULE_ID] ?? null;
+    const hasRaw = !!(modFlags && Object.prototype.hasOwnProperty.call(modFlags, "raw"));
+    const hasPlain = !!(modFlags && Object.prototype.hasOwnProperty.call(modFlags, "plain"));
+    if (!hasRaw && !hasPlain) return;
+
+    const raw = String((hasRaw ? modFlags.raw : modFlags.plain) ?? "");
+    const html = feMarkdownToHTML(raw);
+    changed.content = html;
+
+    if (!changed.flags || typeof changed.flags !== "object") changed.flags = {};
+    if (!changed.flags[MODULE_ID] || typeof changed.flags[MODULE_ID] !== "object") changed.flags[MODULE_ID] = {};
+    changed.flags[MODULE_ID].raw = raw;
+    changed.flags[MODULE_ID].plain = raw;
+    changed.flags[MODULE_ID].markdown = true;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to prepare raw edit update`, err);
+  }
+}
+
+async function feUpdateMessageFromRaw(msg, rawText) {
+  const payload = feBuildEditUpdate(rawText);
+  await msg.update(payload);
 }
 
 function fePatchChatContextOptions(inject) {
@@ -374,7 +399,14 @@ function feInstallEditHandlers() {
   // Re-apply after chat log re-renders (popout, refresh, etc.)
   if (!feInstallEditHandlers._backfillHookBound) {
     feInstallEditHandlers._backfillHookBound = true;
-    Hooks.on("renderChatLog", () => feEnsureEditControlsForExistingMessages());
+    Hooks.on("renderChatLog", (_app, html) => {
+      try {
+        const root = html?.[0] ?? html?.element?.[0] ?? html ?? document;
+        feEnsureEditControlsForExistingMessages(root);
+      } catch {
+        feEnsureEditControlsForExistingMessages();
+      }
+    });
   }
 }
 
@@ -420,11 +452,21 @@ function feRemoveMessageDeleteControl(messageEl) {
   }
 }
 
-function feEnsureEditControlsForExistingMessages() {
+function feGetChatMessagesInRoot(rootLike = document) {
   try {
-    const messages = document.querySelectorAll(
-      "#chat-log li.chat-message, ol.chat-log li.chat-message"
-    );
+    const root = rootLike?.[0] ?? rootLike ?? document;
+    if (!root?.querySelectorAll) return document.querySelectorAll("#chat-log li.chat-message, ol.chat-log li.chat-message");
+    if (root.matches?.("li.chat-message")) return [root];
+    if (root.matches?.("#chat-log, ol.chat-log, .chat-log")) return root.querySelectorAll("li.chat-message");
+    return root.querySelectorAll("li.chat-message");
+  } catch {
+    return document.querySelectorAll("#chat-log li.chat-message, ol.chat-log li.chat-message");
+  }
+}
+
+function feEnsureEditControlsForExistingMessages(rootLike = document) {
+  try {
+    const messages = feGetChatMessagesInRoot(rootLike);
 
     for (const li of messages) {
       // Always remove the delete icon for layout stability.
@@ -454,10 +496,21 @@ Hooks.once("ready", () => {
   feInstallEditHandlers();
 });
 
-Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
-  // Re-scan existing logs when the chat UI is re-rendered or popped out.
+Hooks.on("preUpdateChatMessage", (_message, changed) => {
+  feApplyRawEditPreUpdate(changed);
+});
+
+Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
   try {
-    feEnsureEditControlsForExistingMessages();
+    const reason = payload?.reason ?? null;
+    const root = payload?.root ?? payload?.document ?? document;
+    if (reason === "renderChatLog") {
+      feEnsureEditControlsForExistingMessages(root);
+      return;
+    }
+    // Settings changes may fire a generic UI update without a concrete chat-log root.
+    // Keep that path, but avoid whole-document rescans for normal per-message updates.
+    if (!reason) feEnsureEditControlsForExistingMessages(document);
   } catch (err) {
     console.warn("[female_edition] fe-chat-edit: refresh failed", err);
   }

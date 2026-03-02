@@ -96,6 +96,7 @@ function restoreAllExisting() {
 
 function applyTextureSetting(enabled) {
   STATE.stripTextures = !!enabled;
+  try { document.body?.classList?.toggle("fe-strip-chat-textures", STATE.stripTextures); } catch {}
   if (STATE.stripTextures) sanitizeAllExisting();
   else restoreAllExisting();
 }
@@ -294,22 +295,19 @@ function processMessageRoot(root) {
 
   // Untouched special messages (narrator / round-marker)
   try {
-    if (isRoundMarkerRoot(root)) {
+    const rawId = root.dataset?.messageId || root.dataset?.documentId ||
+      root.getAttribute?.("data-message-id") || root.getAttribute?.("data-document-id");
+    const msgId = rawId ? String(rawId).split(".").pop() : null;
+    const msg = msgId && game?.messages?.get ? game.messages.get(msgId) : null;
+    const specialKind = String(msg?.flags?.[MODULE_ID]?.specialKind ?? "");
+
+    if (specialKind === "round-marker" || isRoundMarkerRoot(root)) {
       restoreRootAndSubtree(root);
       return;
     }
 
     const isNarratorDom = root.classList.contains("narrator-chat") || root.classList.contains("fe-narrator-chat");
-    let isNarratorFlag = false;
-
-    const rawId = root.dataset?.messageId || root.dataset?.documentId ||
-      root.getAttribute?.("data-message-id") || root.getAttribute?.("data-document-id");
-    const msgId = rawId ? String(rawId).split(".").pop() : null;
-
-    if (!isNarratorDom && msgId && game?.messages?.get) {
-      const msg = game.messages.get(msgId);
-      isNarratorFlag = !!msg?.getFlag?.("narrator-tools", "type") || !!msg?.flags?.["narrator-tools"];
-    }
+    const isNarratorFlag = specialKind === "narrator" || !!msg?.getFlag?.("narrator-tools", "type") || !!msg?.flags?.["narrator-tools"];
 
     if (isNarratorDom || isNarratorFlag) {
       sanitizeNarratorRoot(root);
@@ -352,24 +350,23 @@ function attachToChatLog(log) {
   if (observedLogs.has(log)) return;
   observedLogs.add(log);
 
-  // Existing messages (will early-return if stripping disabled)
+  // Existing messages only. Live updates are handled via renderChatMessageHTML/renderChatLog hooks
+  // to avoid repeated MutationObserver-driven reprocessing and scroll jank.
   log.querySelectorAll(".chat-message").forEach(processMessageRoot);
-
-  // Observe new messages + style reinjection
-  const obs = new MutationObserver(muts => {
-    for (const m of muts) {
-      if (!STATE.stripTextures) continue;
-      if (m.type === "childList") m.addedNodes?.forEach(processNode);
-    }
-  });
-
-  // Observe only direct chat-message additions; style churn inside cards/inline-rolls causes
-  // unnecessary re-processing and visible jank during play.
-  obs.observe(log, { subtree: false, childList: true });
 }
 
 function attachAllChatLogs() {
   document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log)").forEach(attachToChatLog);
+}
+
+function processChatLogRoot(rootLike) {
+  const root = extractHTMLElement(rootLike) || rootLike?.element?.[0] || rootLike || null;
+  if (!(root instanceof Element)) return;
+  const log = root.matches?.(":is(#chat-log, .chat-log, ol.chat-log)")
+    ? root
+    : root.querySelector?.(":is(#chat-log, .chat-log, ol.chat-log)") || null;
+  if (!log) return;
+  attachToChatLog(log);
 }
 
 function extractHTMLElement(html) {
@@ -429,35 +426,23 @@ Hooks.once("ready", () => {
   applyFontSetting(fontsEnabled);
   applyPortraitSetting(hidePortraits);
   STATE.stripTextures = !!stripTextures;
+  try { document.body?.classList?.toggle("fe-strip-chat-textures", STATE.stripTextures); } catch {}
 
-  // Attach to existing logs
+  // Existing logs only. Live updates rely on renderChatMessageHTML/renderChatLog hooks.
   attachAllChatLogs();
 
-  // Watch for new chat logs / popouts
-  const bodyObs = new MutationObserver(muts => {
-    for (const m of muts) {
-      m.addedNodes?.forEach(n => {
-        if (!(n instanceof Element)) return;
-        if (n.matches?.(":is(#chat-log, .chat-log, ol.chat-log)")) attachToChatLog(n);
-        n.querySelectorAll?.(":is(#chat-log, .chat-log, ol.chat-log)").forEach(attachToChatLog);
-      });
-    }
-  });
-  bodyObs.observe(document.body, { childList: true, subtree: true });
-
-  // Hooks (v13)
   Hooks.on("renderChatMessageHTML", (_msg, html) => {
     if (!STATE.stripTextures) return;
     const el = extractHTMLElement(html);
     if (!el) return;
-
     processMessageRoot(el);
-    requestAnimationFrame(() => processMessageRoot(el));
   });
 
-  Hooks.on("renderChatLog", () => attachAllChatLogs());
+  Hooks.on("renderChatLog", (_app, html) => {
+    if (!STATE.stripTextures) return;
+    processChatLogRoot(html);
+  });
 
-  // Ensure current state is reflected immediately on load
   if (STATE.stripTextures) sanitizeAllExisting();
   else restoreAllExisting();
 });

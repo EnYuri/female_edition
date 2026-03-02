@@ -1,3 +1,16 @@
+#fe-chat-export-container,
+#fe-chat-export-container #fe-chat-export-sidebar,
+#fe-chat-export-container #fe-chat-export-chat,
+#fe-chat-export-container #fe-chat-export-log,
+#fe-chat-export-container #fe-chat-export-log > li.chat-message {
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+}
+
 
 :root { --fe-chat-header-meta-reserve: 64px; }
 
@@ -238,6 +251,38 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   flex-basis: auto !important;
 }
 
+#fe-chat-export-container .chat-message > .message-content,
+#fe-chat-export-container .chat-message > .message-content > * {
+  box-sizing: border-box !important;
+}
+
+#fe-chat-export-container .chat-message > .message-content {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  justify-content: flex-start !important;
+  align-content: stretch !important;
+  gap: 0 !important;
+}
+
+#fe-chat-export-container .chat-message > .message-content > :is(div, section, article, aside, nav, form, table, fieldset, p, blockquote, ul, ol, hr,
+  .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+  .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content,
+  .dice-roll, .dice-result, .dice-formula, .dice-tooltip, .roll-request, .roll-request-card) {
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+}
+
 #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
   .card-header, .card-content) {
   width: 100% !important;
@@ -266,10 +311,25 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 #fe-chat-export-container .chat-message.fe-msg-plain > .message-content {
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
   line-height: 1.3 !important;
+  justify-content: flex-start !important;
+  align-content: stretch !important;
+  gap: 0 !important;
 }
 
-#fe-chat-export-container .chat-message.fe-msg-plain > .message-content > :is(p, div, blockquote, ul, ol) {
+#fe-chat-export-container .chat-message.fe-msg-plain > .message-content > :is(p, div, blockquote, ul, ol, hr) {
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
   margin: 0 0 0.25em 0 !important;
 }
 
@@ -300,28 +360,31 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   position: relative !important;
   display: grid !important;
   grid-template-columns: var(--fe-chat-portrait-size) minmax(0, 1fr) !important;
-  grid-template-rows: auto auto !important;
+  grid-template-rows: var(--fe-chat-header-meta-strip) minmax(calc(var(--fe-chat-portrait-size) - var(--fe-chat-header-meta-strip)), auto) auto !important;
   grid-template-areas:
+    "portrait metadata"
     "portrait sender"
     "portrait flavor" !important;
-  align-items: start !important;
+  align-items: stretch !important;
   column-gap: 8px !important;
-  row-gap: 1px !important;
-  padding: var(--fe-chat-header-meta-strip) 0 0 0 !important;
+  row-gap: 0 !important;
+  padding: 0 !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
   width: 100% !important;
   inline-size: 100% !important;
   max-width: none !important;
   max-inline-size: none !important;
   min-width: 0 !important;
   min-inline-size: 0 !important;
-  align-self: center !important;
+  align-self: stretch !important;
   justify-self: stretch !important;
-  padding-top: 1px !important;
+  padding: 0 !important;
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text,
@@ -333,6 +396,7 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   inline-size: 100% !important;
   min-width: 0 !important;
   min-inline-size: 0 !important;
+  padding: 0 !important;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -341,12 +405,15 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-metadata {
-  position: absolute !important;
-  top: 0 !important;
-  right: 0 !important;
-  left: calc(var(--fe-chat-portrait-size) + 8px) !important;
+  grid-area: metadata;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
   min-width: 0 !important;
   max-width: none !important;
+  width: 100% !important;
+  inline-size: 100% !important;
   height: var(--fe-chat-header-meta-strip) !important;
   min-height: var(--fe-chat-header-meta-strip) !important;
   margin: 0 !important;
@@ -354,8 +421,8 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   display: flex !important;
   align-items: flex-start !important;
   justify-content: flex-end !important;
-  justify-self: auto !important;
-  align-self: auto !important;
+  justify-self: stretch !important;
+  align-self: start !important;
   text-align: right !important;
 }
 

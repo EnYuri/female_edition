@@ -113,8 +113,8 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
 };
 
-function feFireChatUiUpdated() {
-  Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+function feFireChatUiUpdated(payload = null) {
+  Hooks.callAll(`${MODULE_ID}.chatUiUpdated`, payload);
 }
 
 
@@ -599,12 +599,29 @@ Hooks.once("init", () => {
     default: true,
   });
 
-  // Install the context-menu edit action early (before the first ChatLog context menu is built).
-  // Ensure user-color tints are re-applied whenever the ChatLog re-renders.
-  // This helps on first load when other modules/system re-render messages after our initial pass.
-  Hooks.on("renderChatLog", () => {
+  // Install chat-log level refreshes on the supported v13 render hook.
+  Hooks.on("renderChatLog", (_app, html) => {
     try {
-      feApplyUserColorBgToAllLogs(document);
+      const root = feExtractHTMLElement(html) ?? html?.element?.[0] ?? null;
+      const log = root?.matches?.("ol.chat-log, #chat-log")
+        ? root
+        : root?.querySelector?.("ol.chat-log, #chat-log") ?? null;
+
+      if (log) {
+        feApplyRenderedStateToLog(log);
+        feDeferTask(() => feApplyRenderedStateToLog(log));
+      } else {
+        feApplyRenderedStateToAllLogs();
+        feDeferTask(() => feApplyRenderedStateToAllLogs());
+      }
+
+      feFireChatUiUpdated({
+        reason: "renderChatLog",
+        root: root ?? log ?? null,
+        log: log ?? null,
+        document: (root?.ownerDocument ?? log?.ownerDocument ?? document),
+      });
+      feRenderTypingIndicator();
     } catch {
       /* no-op */
     }
@@ -612,7 +629,7 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
-    await feMigrateLegacySettings();
+  await feMigrateLegacySettings();
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);
@@ -620,18 +637,9 @@ Hooks.once("ready", async () => {
   feSetUiFontClass(document);
   feSetUserColorBgClass(document);
   feSetUserColorBgBaseClass(document);
-  feObserveChatLogs();
-  feApplyChatMergeToAllLogs();
-  feApplyUserColorBgToAllLogs(document);
-  // Second pass shortly after ready to catch chat DOM rebuilt by the system/other modules.
-  setTimeout(() => {
-    try {
-      feApplyUserColorBgToAllLogs(document);
-    } catch {
-      /* no-op */
-    }
-  }, 350);
-  feFireChatUiUpdated();
+  feApplyRenderedStateToAllLogs();
+  feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
+  feRenderTypingIndicator();
   feSetupTypingIndicator();
   feInstallMarkdownPreCreateHook();
 });
@@ -641,7 +649,7 @@ Hooks.once("ready", async () => {
 // the chat log is re-rendered without a full childList mutation.
 // Extra safety: chat rendering can race when other modules rapidly create->update the same ChatMessage
 // (common with automation like midi-qol). In those cases the same message can be rendered twice or re-rendered
-// after our MutationObserver pass. We defensively:
+// after the message HTML has been produced. We defensively:
 //  - Re-apply user-color tint after the message is inserted into the DOM
 //  - Schedule a dedupe + merge recompute for the affected chat log
 // See: Foundry core issue #13067 (duplicate render when update races render).
@@ -651,6 +659,8 @@ let feInlineRollSnapshots = null;
 let feInlineRollSnapshotPersistTimer = null;
 const FE_INLINE_ROLL_SNAPSHOT_KEY = `${MODULE_ID}.inlineRollSnapshots.v1`;
 const FE_INLINE_ROLL_SNAPSHOT_LIMIT = 800;
+const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
+const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
 
 function feEnsureInlineRollSnapshotStore() {
   if (feInlineRollSnapshots instanceof Map) return feInlineRollSnapshots;
@@ -759,77 +769,247 @@ function feDeferTask(fn) {
   }
 }
 
-function feScheduleMergeRefresh(logEl) {
-  if (!feIsElementNode(logEl)) return;
-  fePendingMergeLogs.add(logEl);
-  if (feMergeRefreshScheduled) return;
-  feMergeRefreshScheduled = true;
-  requestAnimationFrame(() => {
-    feMergeRefreshScheduled = false;
-    for (const log of fePendingMergeLogs) {
-      try {
-        feDedupeChatMessagesInLog(log);
-        feApplyChatMerge(log);
-      } catch {
-        /* no-op */
+
+const fePendingRenderedMessageRefreshes = new Map();
+
+function feScheduleRenderedMessageRefresh(messageOrId, { retries = 8, delay = 16, allowNarratorMerge = false } = {}) {
+  try {
+    const id = feNormalizeChatMessageId(messageOrId?.id ?? messageOrId?._id ?? messageOrId);
+    if (!id) return;
+    if (fePendingRenderedMessageRefreshes.has(id)) return;
+
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      let found = false;
+      const message = game?.messages?.get?.(id) ?? null;
+      for (const log of feGetChatLogs()) {
+        const el = log?.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
+        if (!el) continue;
+        found = true;
+        feApplyRenderedStateToMessageElement(message, el, { allowNarratorMerge });
+      }
+      if ((!found || attempts < 2) && attempts < retries) {
+        const t = setTimeout(tick, delay);
+        fePendingRenderedMessageRefreshes.set(id, t);
+      } else {
+        const t = fePendingRenderedMessageRefreshes.get(id);
+        if (t) clearTimeout(t);
+        fePendingRenderedMessageRefreshes.delete(id);
+      }
+    };
+
+    const t = setTimeout(tick, 0);
+    fePendingRenderedMessageRefreshes.set(id, t);
+  } catch {
+    /* no-op */
+  }
+}
+
+function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = false } = {}) {
+  try {
+    if (!feIsElementNode(logEl) || !feIsElementNode(anchorEl)) return [];
+    const items = Array.from(logEl.querySelectorAll("li.chat-message"));
+    const idx = items.indexOf(anchorEl);
+    if (idx === -1) return [];
+
+    const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
+    const makeInfo = (el) => {
+      const msgId = feGetMessageIdFromElement(el);
+      const msg = msgId ? game.messages?.get(msgId) : null;
+      const info = feMessageMergeInfo(msg, el);
+      info.msgId = msgId;
+      info.missing = !msg;
+      info.el = el;
+      info.order = feGetChatMessageElementOrder(el, 0);
+      info.key = msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? Math.random()}`;
+      if (!msg) info.mergeableText = false;
+      return info;
+    };
+    const canMerge = (a, b) => {
+      if (!a || !b) return false;
+      const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
+      if ((a.noMerge || b.noMerge) && !narratorPair) return false;
+      if (a.key !== b.key) return false;
+      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+      return true;
+    };
+
+    const infos = items.map(makeInfo);
+    let start = idx;
+    let end = idx;
+    while (start > 0 && canMerge(infos[start - 1], infos[start])) start -= 1;
+    while (end < infos.length - 1 && canMerge(infos[end], infos[end + 1])) end += 1;
+    start = Math.max(0, start - 1);
+    end = Math.min(infos.length - 1, end + 1);
+    return infos.slice(start, end + 1);
+  } catch {
+    return [];
+  }
+}
+
+function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = false } = {}) {
+  try {
+    if (!Array.isArray(infos) || !infos.length) return;
+    const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
+    const showDivider = !!feSetting(S.MERGE_DIVIDER);
+    const canMerge = (a, b) => {
+      if (!a || !b) return false;
+      const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
+      if ((a.noMerge || b.noMerge) && !narratorPair) return false;
+      if (a.key !== b.key) return false;
+      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+      return true;
+    };
+    for (const info of infos) {
+      info?.el?.classList?.remove?.("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
+    }
+    const applyGroup = (startIndex, endIndexExclusive) => {
+      const groupLen = endIndexExclusive - startIndex;
+      if (groupLen <= 0) return;
+      const first = infos[startIndex];
+      if (!first?.el) return;
+      if (showDivider && (startOffset + startIndex) > 0) first.el.classList.add("fe-divider-before");
+      if (groupLen === 1) return;
+      first.el.classList.add("fe-merge-start");
+      for (let i = startIndex + 1; i < endIndexExclusive - 1; i += 1) infos[i]?.el?.classList?.add?.("fe-merge-mid");
+      infos[endIndexExclusive - 1]?.el?.classList?.add?.("fe-merge-end");
+    };
+    let groupStart = 0;
+    for (let i = 1; i < infos.length; i += 1) {
+      if (!canMerge(infos[i - 1], infos[i])) {
+        applyGroup(groupStart, i);
+        groupStart = i;
       }
     }
-    fePendingMergeLogs.clear();
-  });
+    applyGroup(groupStart, infos.length);
+  } catch {
+    /* no-op */
+  }
+}
+
+function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false } = {}) {
+  try {
+    const anchor = messageEl?.closest?.("li.chat-message") ?? messageEl;
+    const log = anchor?.closest?.("ol.chat-log, #chat-log, #fe-chat-export-log");
+    if (!feIsElementNode(anchor) || !feIsElementNode(log)) return;
+    const all = Array.from(log.querySelectorAll("li.chat-message"));
+    const slice = feCollectMergeNeighborhood(log, anchor, { allowNarratorMerge });
+    if (!slice.length) return;
+    const firstIndex = Math.max(0, all.indexOf(slice[0]?.el));
+    feApplyChatMergeSlice(slice, firstIndex, { allowNarratorMerge });
+  } catch {
+    /* no-op */
+  }
+}
+
+function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarratorMerge = false } = {}) {
+  try {
+    const el = feExtractHTMLElement(messageEl);
+    if (!el) return;
+    // Do NOT mutate .message-content during normal live-chat refreshes.
+    // Merge only relies on message classes/header visibility, and touching inline-roll DOM here
+    // can cause visible churn when Foundry re-renders messages while scrolling.
+    feApplyUserColorBgToMessageElement(message, el);
+    if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge });
+  } catch {
+    /* no-op */
+  }
+}
+
+function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
+  try {
+    if (!feIsElementNode(logEl)) return;
+    const nodes = Array.from(logEl.querySelectorAll?.("li.chat-message") ?? []);
+    for (const li of nodes) {
+      const msgId = feGetMessageIdFromElement(li);
+      const msg = msgId ? game?.messages?.get?.(msgId) : null;
+      if (!msg) continue;
+      feApplyUserColorBgToMessageElement(msg, li);
+    }
+    if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge });
+  } catch {
+    /* no-op */
+  }
+}
+
+function feApplyRenderedStateToAllLogs() {
+  try {
+    for (const log of feGetChatLogs()) feApplyRenderedStateToLog(log);
+  } catch {
+    /* no-op */
+  }
+}
+
+function feRefreshRenderedMessageById(message) {
+  try {
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (!id) return;
+    for (const log of feGetChatLogs()) {
+      const sel = `li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`;
+      const el = log?.querySelector?.(sel);
+      if (!el) continue;
+      feApplyRenderedStateToMessageElement(message, el);
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feChangeTouchesRenderState(change) {
+  try {
+    if (!change || typeof change !== "object") return false;
+    return ["content", "rolls", "speaker", "whisper", "blind", "rollMode", "style", "type", "user", "flavor", "flags"]
+      .some((k) => Object.prototype.hasOwnProperty.call(change, k));
+  } catch {
+    return false;
+  }
+}
+
+function feHydrateRenderStateOverride(message, data = null, userId = null) {
+  try {
+    const state = feComputeMessageRenderState(message, data ?? {}, userId);
+    feStoreRenderStateOverride(message?.id ?? message?._id, state);
+    return state;
+  } catch {
+    return null;
+  }
 }
 
 Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
-
-  // Defer until after the message has been added to the DOM and after all other render hooks ran.
-  feDeferTask(() => {
-    try {
-      feSnapshotOrRestoreInlineRolls(message, el);
-      if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToMessageElement(message, el);
-
-      if (feSetting(S.MERGE_ENABLED)) {
-        const log = el.closest?.("ol.chat-log, #chat-log");
-        if (log) feScheduleMergeRefresh(log);
-        else feApplyChatMergeToAllLogs();
-      }
-    } catch {
-      /* no-op */
-    }
-  });
-
-  // Some modules mutate the message after render hooks (async). Keep only a lightweight delayed color pass.
-  setTimeout(() => {
-    try {
-      feSnapshotOrRestoreInlineRolls(message, el);
-      const hasVar = (el.style?.getPropertyValue?.("--fe-user-color-rgb") ?? "").trim().length > 0;
-      if (feSetting(S.USE_USER_COLOR_BG) && (!el.classList.contains("fe-has-user-color") || !hasVar)) {
-        feApplyUserColorBgToMessageElement(message, el);
-      }
-    } catch {
-      /* no-op */
-    }
-  }, 0);
+  try {
+    feApplyUserColorBgToMessageElement(message, el);
+  } catch {
+    /* no-op */
+  }
+  feScheduleRenderedMessageRefresh(message);
 });
 
-// When a ChatMessage document is updated (common in automation), ensure merge groups and user-color tint
-// are re-evaluated for the updated message.
-Hooks.on("updateChatMessage", (message) => {
+Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
-    feClearInlineRollSnapshot(message?.id ?? message?._id);
-    if (!feSetting(S.MERGE_ENABLED) && !feSetting(S.USE_USER_COLOR_BG)) return;
+    feHydrateRenderStateOverride(message, null, userId);
+    feScheduleRenderedMessageRefresh(message);
+  } catch {
+    /* no-op */
+  }
+});
 
-    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
-    if (!id) return;
+Hooks.on("deleteChatMessage", (message) => {
+  try {
+    feStoreRenderStateOverride(message?.id ?? message?._id, null);
+    if (feSetting(S.MERGE_ENABLED)) feApplyRenderedStateToAllLogs();
+  } catch {
+    /* no-op */
+  }
+});
 
-    for (const log of feGetChatLogs()) {
-      const sel = `li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`;
-      const el = log?.querySelector?.(sel);
-      if (!el) continue;
-
-      if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToMessageElement(message, el);
-      if (feSetting(S.MERGE_ENABLED)) feScheduleMergeRefresh(log);
-    }
+Hooks.on("updateChatMessage", (message, change, _options, userId) => {
+  try {
+    if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
+    feRefreshRenderedMessageById(message);
+    feScheduleRenderedMessageRefresh(message);
   } catch {
     /* no-op */
   }
@@ -898,7 +1078,7 @@ function feRewriteCSSAssetURLs(cssText, baseUrl) {
 // -------------------------------------
 // Export helper: Chat texture stripping (archive/html)
 // -------------------------------------
-// The live chat log uses chat-bg-stripper.js (MutationObserver) to remove only
+// The live chat log uses chat-bg-stripper.js on render hooks to remove only
 // parchment/texture url() layers while preserving Chat Portrait's color overlay.
 // The archive window renders from ChatMessage templates, so we must re-apply the
 // same sanitization there to match the on-screen chat appearance.
@@ -1318,6 +1498,24 @@ function feInstallMarkdownPreCreateHook() {
   });
 }
 
+Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
+  try {
+    if (userId !== game.user.id) return;
+    feCaptureMessageRenderFlagsOnPreCreate(message, data, userId);
+  } catch {
+    /* no-op */
+  }
+});
+
+Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
+  try {
+    if (userId !== game.user.id) return;
+    feCaptureMessageRenderFlagsOnPreUpdate(message, changed);
+  } catch {
+    /* no-op */
+  }
+});
+
 // -------------------------------------
 // Chat Portrait-like: user color message backgrounds
 // -------------------------------------
@@ -1423,9 +1621,176 @@ function feGetMessageUserColor(message) {
   }
 }
 
+const FE_RENDER_STATE_FLAG = "renderState";
+const FE_RENDER_STATE_VERSION = 1;
+const feMessageRenderStateOverrides = new Map();
+
+function feGetSpeakerActorFromLike(message, data = {}) {
+  try {
+    const speaker = data?.speaker ?? message?.speaker ?? message?.data?.speaker ?? null;
+    if (!speaker) return null;
+    if (typeof ChatMessage?.getSpeakerActor === "function") return ChatMessage.getSpeakerActor(speaker);
+    const actorId = speaker?.actor;
+    return actorId ? game.actors?.get?.(actorId) ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+function feGetMessageUserColorForData(message, data = {}, userId = null) {
+  try {
+    const actor = feGetSpeakerActorFromLike(message, data);
+    const authorId = data?.user ?? message?.author?.id ?? message?.user?.id ?? message?.user ?? userId ?? game?.user?.id ?? null;
+    const author = authorId ? game?.users?.get?.(authorId) ?? null : null;
+
+    if (author?.color) {
+      if (author.isGM && actor) {
+        const owner = fePickActorOwnerUser(actor, null);
+        if (owner?.color && !owner.isGM) return String(owner.color);
+      }
+      return String(author.color);
+    }
+
+    const owner = actor ? fePickActorOwnerUser(actor, author && !author.isGM ? author : null) : null;
+    if (owner?.color) return String(owner.color);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function feComputeMessageRenderState(message, data = {}, userId = null) {
+  try {
+    const flags = data?.flags ?? message?.flags ?? {};
+    const narrator = !!(
+      flags?.["narrator-tools"] ||
+      flags?.[MODULE_ID]?.isNarrator ||
+      message?.getFlag?.("narrator-tools", "type")
+    );
+    const roundFlag = flags?.["monks-little-details"]?.roundmarker;
+    const content = String(data?.content ?? message?.content ?? "");
+    const isRoundMarker = !!(
+      flags?.[MODULE_ID]?.isRoundMarker ||
+      roundFlag === true ||
+      String(roundFlag) === "true" ||
+      /\bround-marker\b/i.test(content)
+    );
+
+    const speaker = data?.speaker ?? message?.speaker ?? {};
+    const authorId = String(data?.user ?? message?.author?.id ?? message?.user?.id ?? message?.user ?? userId ?? game?.user?.id ?? "");
+    const whisper = Array.isArray(data?.whisper) ? data.whisper : (Array.isArray(message?.whisper) ? message.whisper : []);
+    const blind = !!(data?.blind ?? message?.blind);
+    const rollMode = String(data?.rollMode ?? message?.rollMode ?? "");
+    const style = String(data?.style ?? data?.type ?? message?.style ?? message?.type ?? "");
+    const rolls = Array.isArray(data?.rolls) ? data.rolls : (Array.isArray(message?.rolls) ? message.rolls : []);
+    const hasRolls = rolls.length > 0;
+    const hasChatCard = /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/.test(content);
+    const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
+    const mergeableText = !hasRolls && !hasChatCard && !hasDice;
+    const speakerKey = [
+      speaker?.scene ?? "",
+      speaker?.token ?? "",
+      speaker?.actor ?? "",
+      speaker?.alias ?? "",
+    ].join("|") + (narrator ? "|__fe_narrator__" : "") + (isRoundMarker ? "|__fe_roundmarker__" : "");
+
+    const userColorHex = feGetMessageUserColorForData(message, data, userId);
+    const userColorRgbObj = feParseHexColorToRgb(userColorHex);
+
+    return {
+      v: FE_RENDER_STATE_VERSION,
+      userColorHex,
+      userColorRgb: userColorRgbObj ? `${userColorRgbObj.r} ${userColorRgbObj.g} ${userColorRgbObj.b}` : null,
+      isNarrator: narrator,
+      isRoundMarker,
+      merge: {
+        authorId,
+        speakerKey,
+        whisperKey: whisper.length ? whisper.slice().sort().join(",") : "",
+        blind,
+        rollMode,
+        style,
+        mergeableText,
+        isNarrator: narrator,
+        isRoundMarker,
+        noMerge: narrator || isRoundMarker,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function feGetStoredRenderState(message) {
+  try {
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (id && feMessageRenderStateOverrides.has(id)) return feMessageRenderStateOverrides.get(id) ?? null;
+    const state = message?.flags?.[MODULE_ID]?.[FE_RENDER_STATE_FLAG] ?? null;
+    if (state?.v === FE_RENDER_STATE_VERSION) return state;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function feStoreRenderStateOverride(messageId, state) {
+  try {
+    const id = feNormalizeChatMessageId(messageId);
+    if (!id) return;
+    if (state) feMessageRenderStateOverrides.set(id, state);
+    else feMessageRenderStateOverrides.delete(id);
+  } catch {}
+}
+
+function feCaptureMessageRenderFlagsOnPreCreate(message, data = {}, userId = null) {
+  try {
+    const renderState = feComputeMessageRenderState(message, data, userId);
+    if (!renderState) return;
+    const flags = foundry.utils.deepClone(data?.flags ?? message?.flags ?? {});
+    const specialKind = renderState.isNarrator ? "narrator" : renderState.isRoundMarker ? "round-marker" : "normal";
+    flags[MODULE_ID] = foundry.utils.mergeObject(flags[MODULE_ID] ?? {}, {
+      userColorHex: renderState.userColorHex ?? null,
+      userColorRgb: renderState.userColorRgb ?? null,
+      isNarrator: !!renderState.isNarrator,
+      isRoundMarker: !!renderState.isRoundMarker,
+      [FE_RENDER_SPECIAL_KIND_FLAG]: specialKind,
+      [FE_RENDER_MERGE_HINT_FLAG]: renderState.merge ?? null,
+      [FE_RENDER_STATE_FLAG]: renderState,
+    });
+    message.updateSource({ flags });
+  } catch {
+    /* no-op */
+  }
+}
+
+function feCaptureMessageRenderFlagsOnPreUpdate(message, changed = {}, userId = null) {
+  try {
+    const merged = foundry.utils.mergeObject(foundry.utils.deepClone(message?.toObject?.() ?? {}), changed ?? {}, { inplace: true, recursive: true });
+    const renderState = feComputeMessageRenderState(message, merged, userId ?? game?.user?.id ?? null);
+    if (!renderState) return;
+    const flags = foundry.utils.deepClone(merged?.flags ?? message?.flags ?? {});
+    const specialKind = renderState.isNarrator ? "narrator" : renderState.isRoundMarker ? "round-marker" : "normal";
+    flags[MODULE_ID] = foundry.utils.mergeObject(flags[MODULE_ID] ?? {}, {
+      userColorHex: renderState.userColorHex ?? null,
+      userColorRgb: renderState.userColorRgb ?? null,
+      isNarrator: !!renderState.isNarrator,
+      isRoundMarker: !!renderState.isRoundMarker,
+      [FE_RENDER_SPECIAL_KIND_FLAG]: specialKind,
+      [FE_RENDER_MERGE_HINT_FLAG]: renderState.merge ?? null,
+      [FE_RENDER_STATE_FLAG]: renderState,
+    });
+    changed.flags = flags;
+    feStoreRenderStateOverride(message?.id ?? message?._id, renderState);
+  } catch {
+    /* no-op */
+  }
+}
+
 function feIsNarratorToolsMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("narrator-chat") || messageEl?.classList?.contains?.("fe-narrator-chat")) return true;
+    const state = feGetStoredRenderState(message);
+    if (typeof state?.isNarrator === "boolean") return state.isNarrator;
     if (message?.getFlag?.("narrator-tools", "type")) return true;
     if (message?.flags?.["narrator-tools"]) return true;
     return false;
@@ -1441,6 +1806,11 @@ function feIsRoundMarkerMessage(message, messageEl) {
   } catch {}
 
   try {
+    const state = feGetStoredRenderState(message);
+    if (typeof state?.isRoundMarker === "boolean") return state.isRoundMarker;
+  } catch {}
+
+  try {
     const flag = message?.flags?.["monks-little-details"]?.roundmarker;
     if (flag === true || String(flag) === "true") return true;
   } catch {}
@@ -1452,7 +1822,6 @@ function feIsRoundMarkerMessage(message, messageEl) {
 
   return false;
 }
-
 function feIsUntouchedSpecialMessage(message, messageEl) {
   return feIsNarratorToolsMessage(message, messageEl) || feIsRoundMarkerMessage(message, messageEl);
 }
@@ -1479,16 +1848,24 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
       return;
     }
 
-    const color = feGetMessageUserColor(message);
-    const rgb = feParseHexColorToRgb(color);
-    if (!rgb) {
+    const state = feGetStoredRenderState(message);
+    const rgbString = state?.userColorRgb || message?.flags?.[MODULE_ID]?.userColorRgb || null;
+    let rgb = null;
+    if (rgbString) {
+      rgb = { text: String(rgbString) };
+    } else {
+      const color = state?.userColorHex || message?.flags?.[MODULE_ID]?.userColorHex || feGetMessageUserColor(message);
+      const parsed = feParseHexColorToRgb(color);
+      if (parsed) rgb = { text: `${parsed.r} ${parsed.g} ${parsed.b}` };
+    }
+    if (!rgb?.text) {
       el0.classList.remove("fe-has-user-color");
       el0.style.removeProperty("--fe-user-color-rgb");
       return;
     }
 
     el0.classList.add("fe-has-user-color");
-    el0.style.setProperty("--fe-user-color-rgb", `${rgb.r} ${rgb.g} ${rgb.b}`);
+    el0.style.setProperty("--fe-user-color-rgb", rgb.text);
   } catch {
     /* noop */
   }
@@ -1678,36 +2055,33 @@ function feGetChatMessageElementOrder(el, fallback) {
 }
 
 function feMessageMergeInfo(msg, el) {
+  const storedState = feGetStoredRenderState(msg);
+  const storedHint = storedState?.merge ?? msg?.flags?.[MODULE_ID]?.[FE_RENDER_MERGE_HINT_FLAG] ?? null;
+
   // NOTE: v13+: ChatMessage#user is deprecated -> use ChatMessage#author
   // Some automation modules may still populate legacy fields during rapid updates, so keep fallbacks.
-  const authorId = msg?.author?.id ?? msg?.user?.id ?? msg?.user ?? "";
+  const authorId = storedHint?.authorId ?? msg?.author?.id ?? msg?.user?.id ?? msg?.user ?? "";
 
-  // Narrator Tools (/desc, /narrate, /note) messages:
-  // - often share the same author as the GM
-  // - can have minimal/empty sender markup
-  // If merged with normal IC/OOC lines, FE's merge-follow styles can hide the header,
-  // making the narrator message look like it has no name/portrait.
-  // Always keep narrator messages as standalone blocks.
   const isNarratorTools = feIsNarratorToolsMessage(msg, el);
   const isRoundMarker = feIsRoundMarkerMessage(msg, el);
 
   const speaker = msg?.speaker ?? {};
-  const speakerKey = [
+  const speakerKey = storedHint?.speakerKey ?? ([
     speaker.scene ?? "",
     speaker.token ?? "",
     speaker.actor ?? "",
     speaker.alias ?? ""
-  ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "") + (isRoundMarker ? "|__fe_roundmarker__" : "");
+  ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "") + (isRoundMarker ? "|__fe_roundmarker__" : ""));
 
   // Whisper recipients (if any)
   const whisper = Array.isArray(msg?.whisper) ? msg.whisper : [];
-  const whisperKey = whisper.length ? whisper.slice().sort().join(",") : "";
+  const whisperKey = storedHint?.whisperKey ?? (whisper.length ? whisper.slice().sort().join(",") : "");
 
-  const blind = !!msg?.blind;
-  const rollMode = msg?.rollMode ?? "";
+  const blind = typeof storedHint?.blind === "boolean" ? storedHint.blind : !!msg?.blind;
+  const rollMode = storedHint?.rollMode ?? msg?.rollMode ?? "";
 
   // ChatMessage#style exists in v13+ (ChatMessage#type was renamed)
-  const style = msg?.style ?? msg?.type ?? null;
+  const style = storedHint?.style ?? msg?.style ?? msg?.type ?? null;
 
   // Rolls are defined in ChatMessage#rolls in v13+
   const hasRolls = Array.isArray(msg?.rolls) && msg.rolls.length > 0;
@@ -1717,7 +2091,9 @@ function feMessageMergeInfo(msg, el) {
   const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
 
   // "Merge only text" should merge plain text lines, but avoid merging item cards / dice rolls.
-  const mergeableText = !hasRolls && !hasChatCard && !hasDice;
+  const mergeableText = typeof storedHint?.mergeableText === "boolean"
+    ? storedHint.mergeableText
+    : (!hasRolls && !hasChatCard && !hasDice);
 
   return {
     authorId,
@@ -1808,8 +2184,7 @@ function feScheduleMergeRetry(logEl, delay = 80) {
 }
 
 function feMergeKey(info) {
-  // Key that defines whether two messages may be merged.
-  // Include style + rollMode + whisper visibility so we don't merge across contexts.
+  if (info?.precomputedKey) return String(info.precomputedKey);
   const author = info?.authorId ?? "";
   const speaker = info?.speakerKey ?? "";
   const whisper = info?.whisperKey ?? "";
@@ -1924,189 +2299,17 @@ function feApplyChatMergeToAllLogs() {
 }
 
 
-let feChatLogObserver = null;
-const feChatLogObservers = new Map();
-
-function feBindChatLogObservers() {
-  const collectMessages = (node, outSet) => {
-    if (!feIsElementNode(node)) return false;
-    if (node.matches?.("li.chat-message")) {
-      outSet.add(node);
-      return true;
-    }
-    const found = node.querySelectorAll?.("li.chat-message");
-    if (found?.length) {
-      found.forEach((el) => outSet.add(el));
-      return true;
-    }
-    return false;
-  };
-
-  for (const log of feGetChatLogs()) {
-    if (!(log instanceof HTMLElement)) continue;
-    if (feChatLogObservers.has(log)) continue;
-
-    const obs = new MutationObserver((mutations) => {
-      // Only react when chat-message elements are added/removed (ignore dice animations, tooltip DOM churn, etc.)
-      const pending = obs._pendingAdded ?? (obs._pendingAdded = new Set());
-      let touchesMessages = false;
-
-      for (const m of mutations) {
-        if (m.type === "attributes") {
-          continue;
-        }
-
-        for (const n of m.addedNodes ?? []) {
-          touchesMessages ||= collectMessages(n, pending);
-        }
-        for (const n of m.removedNodes ?? []) {
-          if (!feIsElementNode(n)) continue;
-          if (n.matches?.("li.chat-message") || n.querySelector?.("li.chat-message")) {
-            touchesMessages = true;
-          }
-        }
-      }
-
-      if (!touchesMessages) return;
-      if (obs._scheduled) return;
-
-      obs._scheduled = true;
-      requestAnimationFrame(() => {
-        obs._scheduled = false;
-
-        // Mitigate rare core/module races where the same ChatMessage can be rendered twice
-        // (e.g. rapid create->update sequences from automation modules).
-        feDedupeChatMessagesInLog(log);
-
-        // Merge groups can be affected by what messages exist, so we recompute on add/remove.
-        feApplyChatMerge(log);
-
-        // Apply user-color only to newly added messages (existing messages are already processed).
-        if (pending.size) {
-          const doc = log?.ownerDocument ?? document;
-          let needsRetry = false;
-          for (const el of pending) {
-            try {
-              const rawId = feGetMessageIdFromElement(el);
-              const msgId = rawId ? feNormalizeChatMessageId(rawId) : null;
-              if (!msgId) {
-                needsRetry = true;
-                continue;
-              }
-
-              const msg = game?.messages?.get?.(msgId) ?? null;
-              if (!msg) {
-                needsRetry = true;
-                continue;
-              }
-              feApplyUserColorBgToMessageElement(msg, el);
-            } catch (_e) {
-              /* no-op */
-            }
-          }
-          pending.clear();
-
-          if (needsRetry && !obs._userColorRetryTimer) {
-            obs._userColorRetryTimer = setTimeout(() => {
-              obs._userColorRetryTimer = null;
-              try {
-                feApplyUserColorBgToLog(log, doc);
-              } catch {}
-            }, 60);
-          }
-        }
-      });
-    });
-
-    obs.observe(log, { childList: true, subtree: false });
-    feChatLogObservers.set(log, obs);
-
-    // Ensure initial (already-rendered) messages get the same treatments.
-    feDedupeChatMessagesInLog(log);
-    feApplyChatMerge(log);
-    feApplyUserColorBgToLog(log, log?.ownerDocument ?? document);
-  }
-}
-
-function fePruneChatLogObservers() {
-  for (const [log, obs] of feChatLogObservers.entries()) {
-    if (!document.contains(log)) {
-      try {
-        obs.disconnect();
-      } catch {}
-      feChatLogObservers.delete(log);
-    }
-  }
-}
-
-function feMutationTouchesChat(mutations) {
-  const checkNodes = (nodeList) => {
-    for (const n of nodeList ?? []) {
-      if (!(n instanceof Element)) continue;
-      if (
-        n.matches?.(
-          "ol.chat-log, #chat-log, li.chat-message, .chat-popout, #chat-controls, #chat-form"
-        )
-      )
-        return true;
-      if (
-        n.querySelector?.(
-          "ol.chat-log, #chat-log, li.chat-message, .chat-popout, #chat-controls, #chat-form"
-        )
-      )
-        return true;
-    }
-    return false;
-  };
-
-  for (const m of mutations) {
-    const t = m?.target;
-
-    // Avoid reacting to every DOM churn inside chat messages (dice animations, tooltips, etc.)
-    // We only care about chat containers/controls and actual message element add/remove.
-    if (t instanceof Element) {
-      if (t.matches?.("#chat-controls, #chat-form, .chat-popout, ol.chat-log, #chat-log"))
-        return true;
-      if (t.closest?.("#chat-controls, #chat-form, .chat-popout")) return true;
-    }
-
-    if (checkNodes(m?.addedNodes) || checkNodes(m?.removedNodes)) return true;
-  }
-
-  return false;
-}
-
+// Legacy observer-based chat log passes were removed in favor of
+// preCreate/preUpdate/create/renderChatMessageHTML-driven rendering.
+// Keep a tiny compatibility shim so older internal call sites remain harmless.
 function feObserveChatLogs() {
-  if (feChatLogObserver) return;
-
-  // Observe chat logs directly so we only re-merge when messages are added/removed.
-  feBindChatLogObservers();
-
-  // Also observe the document for chat log re-renders / chat popouts being added.
-  feChatLogObserver = new MutationObserver((mutations) => {
-    if (!feMutationTouchesChat(mutations)) return;
-
-    if (feChatLogObserver._scheduled) return;
-    feChatLogObserver._scheduled = true;
-    requestAnimationFrame(() => {
-      feChatLogObserver._scheduled = false;
-
-      // Logs can be replaced (re-render) or new ones can be added (popout). Keep observers in sync.
-      fePruneChatLogObservers();
-      feBindChatLogObservers();
-
-      // Chat UI can re-render controls; keep our buttons/typing indicator alive.
-      feFireChatUiUpdated();
-      feRenderTypingIndicator();
-    });
-  });
-
-  feChatLogObserver.observe(document.body, { childList: true, subtree: true });
-
-  // Initial
-  feApplyChatMergeToAllLogs();
-  feFireChatUiUpdated();
-  feSetupTypingIndicator();
+  try {
+    feApplyRenderedStateToAllLogs();
+    feFireChatUiUpdated();
+    feRenderTypingIndicator();
+  } catch {
+    /* no-op */
+  }
 }
 
 export {
@@ -2128,6 +2331,8 @@ export {
   feApplyStyleVarsFromSettings,
   feStripChatTexturesInWindow,
   feApplyUserColorBgToMessageElement,
+  feApplyRenderedStateToLog,
+  feApplyRenderedStateToAllLogs,
   feSetChatFontChoiceClass,
   feSetChatCardFontClass,
   feSetUiFontClass,

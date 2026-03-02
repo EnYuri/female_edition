@@ -306,6 +306,19 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
 }
 
 /* --------------------------------
+ * 2b) Pure CSS message texture removal
+ * --------------------------------
+ * dnd5e applies a parchment/texture layer with .message::before.
+ * This can be safely disabled with CSS for normal chat messages so the rule
+ * applies to existing, newly-created, and history-loaded messages equally.
+ */
+body.fe-strip-chat-textures :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)::before {
+  background: transparent none !important;
+  background-image: none !important;
+}
+
+/* --------------------------------
  * 3) OPTIONAL: Hide portraits + related tweaks
  * --------------------------------
  * Enabled when <body> has class "fe-hide-portraits"
@@ -345,4 +358,13 @@ body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sen
 body.fe-hide-portraits #sidebar #chat img.chat-portrait-image-size-name-dnd5e,
 body.fe-hide-portraits #sidebar #chat img[class*="chat-portrait-image-size"] {
   display: none !important;
+}
+
+
+/* System texture stripping must apply equally to newly rendered and lazily-loaded old messages.
+ * dnd5e uses .message::before with ui/texture-gray1.webp; override it at CSS level.
+ */
+body.fe-strip-chat-textures :is(.chat-popout, #chat-log, .chat-log, ol.chat-log) .message::before {
+  background-image: none !important;
+  background: transparent !important;
 }

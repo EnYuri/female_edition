@@ -651,9 +651,31 @@ async function feTryFoundryRenderMessage(_msg) {
 }
 
 function feCollectVisibleChatMessages(user = game.user) {
+  const liveItems = [];
+  try {
+    const seen = new Set();
+    for (const log of feGetChatLogs?.() ?? []) {
+      if (!log?.querySelectorAll) continue;
+      for (const el of log.querySelectorAll("li.chat-message")) {
+        const id = feGetMessageIdFromElement?.(el) || null;
+        const key = id || `__dom__${liveItems.length}`;
+        if (seen.has(key)) continue;
+        const msg = id ? game?.messages?.get?.(id) ?? null : null;
+        if (msg && !feCanUserSeeChatMessage(msg, user)) continue;
+        liveItems.push({ key, id, msg, liveEl: el });
+        seen.add(key);
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  if (liveItems.length) return liveItems;
+
   const all = Array.from(game.messages?.contents ?? []);
   all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  return all.filter((m) => feCanUserSeeChatMessage(m, user));
+  return all
+    .filter((m) => feCanUserSeeChatMessage(m, user))
+    .map((m) => ({ key: String(m?.id ?? m?._id ?? Math.random()), id: String(m?.id ?? m?._id ?? ""), msg: m, liveEl: null }));
 }
 
 function feHasPortraitMarkup(rootEl) {
@@ -692,9 +714,11 @@ async function feRenderMessagesIntoLog({
     await feMaybeYieldForUI(yieldWindow);
   };
 
-  const renderOne = async (msg) => {
-    const msgId = String(msg?.id ?? msg?._id ?? "");
-    const liveEl = msgId && typeof liveMessageMap?.get === "function" ? liveMessageMap.get(msgId) : null;
+  const renderOne = async (item) => {
+    const msg = item?.msg ?? null;
+    const explicitLive = item?.liveEl ?? null;
+    const msgId = String(item?.id ?? msg?.id ?? msg?._id ?? "");
+    const liveEl = explicitLive || (msgId && typeof liveMessageMap?.get === "function" ? liveMessageMap.get(msgId) : null) || null;
     const node = await feRenderExportMessageNode(targetDoc, msg, { liveEl, renderProfile });
     if (!feIsElement(node)) return null;
 
@@ -704,11 +728,11 @@ async function feRenderMessagesIntoLog({
       loading: renderProfile?.normalizeImageLoading,
       decoding: renderProfile?.normalizeImageDecoding,
     });
-    feApplyUserColorBgToMessageElement(msg, node);
+    if (msg) feApplyUserColorBgToMessageElement(msg, node);
 
     if (!deferPortraits) {
       try {
-        if (!feHasPortraitMarkup(node)) feChatPortraitUpsert(msg, node);
+        if (msg && !feHasPortraitMarkup(node)) feChatPortraitUpsert(msg, node);
       } catch {}
     }
 
@@ -742,17 +766,11 @@ async function feRenderMessagesIntoLog({
 
 async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
-  const preferStandardFallback = feArchiveShouldUseStandardFallback(msg, liveEl);
-
-  if (!preferStandardFallback && feIsElement(liveEl)) {
-    try {
-      node = targetDoc?.importNode ? targetDoc.importNode(liveEl, true) : liveEl.cloneNode(true);
-      feMirrorLiveMessageStyles(liveEl, node, { renderProfile });
-    } catch {
-      node = null;
-    }
+  try {
+    if (feIsElement(liveEl)) node = targetDoc.importNode(liveEl, true);
+  } catch {
+    node = null;
   }
-
   if (!feIsElement(node)) {
     try {
       node = feFallbackRenderChatMessage(targetDoc || document, msg);
@@ -761,9 +779,17 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     }
   }
 
+  if (feIsElement(node) && feIsElement(liveEl)) {
+    try {
+      feMirrorLiveMessageStyles(liveEl, node, { renderProfile });
+    } catch {
+      /* no-op */
+    }
+  }
+
   if (feIsElement(node)) {
     try {
-      feStampArchiveMessageIdentity(node, msg);
+      feStampArchiveMessageIdentity(node, msg || { id: feGetMessageIdFromElement(liveEl) || undefined });
       feMarkPlainArchiveMessage(node, msg, liveEl);
     } catch {}
   }
@@ -2897,9 +2923,6 @@ function feCanUserSeeChatMessage(msg, user) {
   try {
     if (!msg) return false;
 
-    // If Foundry provides a boolean visibility flag, prefer it.
-    if (typeof msg.visible === "boolean") return msg.visible;
-
     // Whispers: visible to GM and recipients (and the author).
     const whisper = msg.whisper ?? [];
     if (Array.isArray(whisper) && whisper.length) {
@@ -3046,6 +3069,7 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
         const isMessage = el.classList?.contains?.("chat-message");
         const isHeader = el.classList?.contains?.("message-header");
         const isContent = el.classList?.contains?.("message-content");
+        const isPlainContent = el.classList?.contains?.("fe-archive-standard-content");
         const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content") || el.classList?.contains?.("dice-roll") || el.classList?.contains?.("dice-result") || el.classList?.contains?.("dice-formula") || el.classList?.contains?.("dice-tooltip");
         const tag = String(el.tagName || '').toUpperCase();
         const isStructural = ["DIV", "SECTION", "ARTICLE", "ASIDE", "NAV", "FORM", "TABLE", "FIELDSET"].includes(tag);
@@ -3060,6 +3084,9 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
             el.style.setProperty("inline-size", "100%", "important");
             el.style.setProperty("min-width", "0", "important");
             el.style.setProperty("min-inline-size", "0", "important");
+            el.style.setProperty("height", "auto", "important");
+            el.style.setProperty("min-height", "0", "important");
+            el.style.setProperty("max-height", "none", "important");
             el.style.setProperty("flex", "none", "important");
             el.style.setProperty("flex-basis", "auto", "important");
             el.style.setProperty("align-self", "stretch", "important");
@@ -3074,6 +3101,17 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
               el.style.setProperty("min-inline-size", "0", "important");
               el.style.setProperty("max-width", "none", "important");
               el.style.setProperty("max-inline-size", "none", "important");
+              el.style.setProperty("height", "auto", "important");
+              el.style.setProperty("min-height", "0", "important");
+              el.style.setProperty("max-height", "none", "important");
+            }
+            if (isContent || isPlainContent) {
+              el.style.setProperty("display", "block", "important");
+              el.style.setProperty("justify-content", "flex-start", "important");
+              el.style.setProperty("align-content", "stretch", "important");
+              el.style.setProperty("gap", "0", "important");
+              el.style.setProperty("column-gap", "0", "important");
+              el.style.setProperty("row-gap", "0", "important");
             }
             if (isCard || isContent || isStructural) {
               el.style.setProperty("flex", "none", "important");
@@ -3328,6 +3366,9 @@ function feFallbackRenderChatMessage(doc, msg) {
   }
   sender.appendChild(wrap);
 
+  const hideSender = !!feIsRoundMarkerMessage(msg, null);
+  if (hideSender) sender.style.setProperty("display", "none", "important");
+
   const meta = doc.createElement("span");
   meta.className = "message-metadata";
   if (timestampText) {
@@ -3348,7 +3389,7 @@ function feFallbackRenderChatMessage(doc, msg) {
   }
 
   const content = doc.createElement("div");
-  content.className = "message-content";
+  content.className = "message-content fe-archive-standard-content";
   try {
     content.innerHTML = String(msg?.content ?? "");
   } catch {

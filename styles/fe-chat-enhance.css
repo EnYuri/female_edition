@@ -86,21 +86,6 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
   filter: none !important;
 }
 
-/* Chrome parity: also keep the content area transparent so merged groups don't show different tints */
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end)
-  > .message-content {
-  background: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-}
-
-/* Avoid stacked box-shadows that can make merged groups look darker in Chromium */
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) {
-  box-shadow: none !important;
-  filter: none !important;
-}
-
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-start {
   margin-bottom: 0 !important;
   border-bottom-left-radius: 0 !important;
@@ -123,18 +108,6 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
   border-top-width: 0 !important;
 }
 
-
-/* Preserve per-user tint on merged messages when the tint is implemented via an inset box-shadow.
- * The generic merge rule removes box-shadow to avoid stacked outer shadows, but the user-color
- * background uses an *inset* shadow as the actual tint layer in base-white/base-black mode.
- */
-body.fe-chat-merge.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) {
-  box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
-  background-image: none !important;
-  background-blend-mode: normal !important;
-}
 
 /* Follow-up header display modes (for mid/end only) */
 body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {

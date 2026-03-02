@@ -1192,22 +1192,43 @@ function cpApplyVarsToDocument(doc) {
   cpApplyNameAlignClasses(doc);
 }
 
+function cpRefreshMessagesInRoot(rootLike = document) {
+  try {
+    const root = rootLike?.[0] ?? rootLike ?? document;
+    if (!root?.querySelectorAll) return;
+
+    const messages = root.matches?.("li.chat-message")
+      ? [root]
+      : root.matches?.("#chat-log, ol.chat-log, .chat-log")
+        ? root.querySelectorAll("li.chat-message")
+        : root.querySelectorAll("li.chat-message");
+
+    for (const li of messages) {
+      const id = li?.dataset?.messageId || li?.dataset?.documentId || li?.getAttribute?.("data-message-id") || li?.getAttribute?.("data-document-id");
+      const msg = id ? game.messages?.get(id) : null;
+      if (!msg) {
+        // Older messages rehydrated by Foundry/chat-log-prune may no longer have a live ChatMessage
+        // document in game.messages. Round-marker system messages still need their portrait/header
+        // cleanup to run, but plain messages should be left untouched.
+        const isRoundMarker = li?.classList?.contains?.("round-marker") || li?.classList?.contains?.("fe-round-marker-chat") || !!li?.querySelector?.(".round-marker");
+        if (isRoundMarker) {
+          cpRemovePortrait(li);
+          li.classList.add("fe-round-marker-chat");
+          cpRestoreHeaderForSpecial(li);
+        }
+        continue;
+      }
+      cpUpsertPortrait(msg, li);
+    }
+  } catch {}
+}
+
 function cpRefreshAllChatMessages() {
   cpWarnIfChatPortraitModuleActive();
 
-  // feGetChatLogs() returns actual <ol.chat-log> / #chat-log HTMLElements.
-  // Do NOT treat them as Application objects.
   for (const logEl of feGetChatLogs()) {
     if (!cpIsElement(logEl)) continue;
-    const messages = logEl.querySelectorAll?.("li.chat-message");
-    if (!messages?.length) continue;
-
-    for (const li of messages) {
-      const id = li?.dataset?.messageId || li?.getAttribute?.("data-message-id");
-      const msg = id ? game.messages?.get(id) : null;
-      if (!msg) continue;
-      cpUpsertPortrait(msg, li);
-    }
+    cpRefreshMessagesInRoot(logEl);
   }
 }
 
@@ -1515,15 +1536,23 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 });
 
 Hooks.on("renderChatLog", () => {
-  // Chat popouts / re-render
-  cpRefreshAllChatMessages();
+  // Portrait insertion is performed per-message via renderChatMessageHTML.
+  // Keep this hook lightweight to avoid whole-log post-processing passes.
+  cpSetRootVars();
 });
 
 Hooks.on("renderCombatTracker", (app, html) => {
   cpApplyCombatTrackerPortraits(html);
 });
 
-Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
-  cpSetRootVars();
-  cpRefreshAllChatMessages();
+Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
+  try {
+    const doc = payload?.document ?? payload?.root?.ownerDocument ?? document;
+    cpSetRootVars(doc);
+    if (payload?.reason === "renderChatLog" && payload?.root) cpRefreshMessagesInRoot(payload.root);
+    else cpRefreshAllChatMessages();
+  } catch {
+    cpSetRootVars();
+    cpRefreshAllChatMessages();
+  }
 });
