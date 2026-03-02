@@ -23,6 +23,7 @@ const S = {
   MERGE_ENABLED: "ceMergeEnabled",
   MERGE_ONLY_TEXT: "ceMergeOnlyText",
   MERGE_DIVIDER: "ceMergeDivider",
+  MERGE_MODE: "ceMergeMode", // standard | simple
   MERGE_FOLLOW_HEADER_STYLE: "ceMergeFollowHeaderStyle", // hide | name | portrait
 
   // Typing indicator
@@ -74,6 +75,7 @@ const FE_DEFAULTS = {
   [S.MERGE_ENABLED]: true,
   [S.MERGE_ONLY_TEXT]: true,
   [S.MERGE_DIVIDER]: true,
+  [S.MERGE_MODE]: "standard",
   [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
 
   // Typing indicator
@@ -167,6 +169,10 @@ function feGetTextEditor() {
 function feSetBodyMergeClasses() {
   const enabled = !!feSetting(S.MERGE_ENABLED);
   document.body.classList.toggle("fe-chat-merge", enabled);
+
+  const mode = String(feSetting(S.MERGE_MODE) ?? "standard");
+  document.body.classList.toggle("fe-merge-mode-standard", enabled && mode === "standard");
+  document.body.classList.toggle("fe-merge-mode-simple", enabled && mode === "simple");
 
   // Follow header style class (only matters when merge enabled)
   const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
@@ -328,6 +334,23 @@ Hooks.once("init", () => {
     type: Boolean,
     default: true,
     onChange: () => feApplyChatMergeToAllLogs(),
+  });
+
+  game.settings.register(MODULE_ID, S.MERGE_MODE, {
+    name: "채팅 병합 방식",
+    hint: "표준은 메시지 박스 경계까지 붙여 묶고, 간소화는 연속 메시지의 헤더만 줄입니다.",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      standard: "표준(경계/간격까지 묶기)",
+      simple: "간소화(후속 헤더만 정리)",
+    },
+    default: "standard",
+    onChange: () => {
+      feSetBodyMergeClasses();
+      feApplyChatMergeToAllLogs();
+    },
   });
 
   game.settings.register(MODULE_ID, S.MERGE_FOLLOW_HEADER_STYLE, {
@@ -966,6 +989,15 @@ function feChangeTouchesRenderState(change) {
   }
 }
 
+function feChangeTouchesInlineRollSnapshot(change) {
+  try {
+    if (!change || typeof change !== "object") return false;
+    return ["content", "rolls", "flavor"].some((k) => Object.prototype.hasOwnProperty.call(change, k));
+  } catch {
+    return false;
+  }
+}
+
 function feHydrateRenderStateOverride(message, data = null, userId = null) {
   try {
     const state = feComputeMessageRenderState(message, data ?? {}, userId);
@@ -980,6 +1012,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
   try {
+    feSnapshotOrRestoreInlineRolls(message, el);
     feApplyUserColorBgToMessageElement(message, el);
   } catch {
     /* no-op */
@@ -998,6 +1031,7 @@ Hooks.on("createChatMessage", (message, _options, userId) => {
 
 Hooks.on("deleteChatMessage", (message) => {
   try {
+    feClearInlineRollSnapshot(message?.id ?? message?._id);
     feStoreRenderStateOverride(message?.id ?? message?._id, null);
     if (feSetting(S.MERGE_ENABLED)) feApplyRenderedStateToAllLogs();
   } catch {
@@ -1007,6 +1041,7 @@ Hooks.on("deleteChatMessage", (message) => {
 
 Hooks.on("updateChatMessage", (message, change, _options, userId) => {
   try {
+    if (feChangeTouchesInlineRollSnapshot(change)) feClearInlineRollSnapshot(message?.id ?? message?._id);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
     feRefreshRenderedMessageById(message);
     feScheduleRenderedMessageRefresh(message);
@@ -2207,6 +2242,7 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
       "fe-merge-start",
       "fe-merge-mid",
       "fe-merge-end",
+      "fe-merge-follow",
       "fe-divider-before"
     );
   }
@@ -2216,6 +2252,8 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
 
   const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
+  const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
+  const simpleMode = mergeMode === "simple";
 
   const infos = [];
   let idx = 0;
@@ -2273,8 +2311,13 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
     // Divider at group boundary (except first group)
     if (showDivider && startIndex > 0) first.el.classList.add("fe-divider-before");
 
-    // Do not apply "follow" classes for single messages (prevents accidental header hiding).
+    // Do not apply follow classes for single messages.
     if (groupLen === 1) return;
+
+    if (simpleMode) {
+      for (let i = startIndex + 1; i < endIndexExclusive; i += 1) infos[i]?.el?.classList?.add("fe-merge-follow");
+      return;
+    }
 
     first.el.classList.add("fe-merge-start");
     for (let i = startIndex + 1; i < endIndexExclusive - 1; i++) infos[i]?.el?.classList?.add("fe-merge-mid");

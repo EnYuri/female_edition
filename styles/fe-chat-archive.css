@@ -310,6 +310,52 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   flex-basis: auto !important;
 }
 
+
+#fe-chat-export-container .chat-message :is(
+  .chat-card .card-content,
+  .midi-chat-card .card-content,
+  .dnd5e.chat-card .card-content,
+  .dnd5e2.chat-card .card-content,
+  .details.card-content,
+  .details.collapsible-content.card-content,
+  .chat-card .card-content > *,
+  .midi-chat-card .card-content > *,
+  .dnd5e.chat-card .card-content > *,
+  .dnd5e2.chat-card .card-content > *,
+  .details.card-content > *,
+  .details.collapsible-content.card-content > *
+) {
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  box-sizing: border-box !important;
+}
+
+#fe-chat-export-container .chat-message :is(
+  .chat-card .card-content p,
+  .midi-chat-card .card-content p,
+  .dnd5e.chat-card .card-content p,
+  .dnd5e2.chat-card .card-content p,
+  .details.card-content p,
+  .details.collapsible-content.card-content p,
+  .chat-card .card-content div,
+  .midi-chat-card .card-content div,
+  .dnd5e.chat-card .card-content div,
+  .dnd5e2.chat-card .card-content div,
+  .details.card-content div,
+  .details.collapsible-content.card-content div
+) {
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+}
+
 #fe-chat-export-container .chat-message.fe-msg-plain > .message-content {
   display: block !important;
   width: 100% !important;

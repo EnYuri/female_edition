@@ -79,21 +79,21 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divid
 }
 
 /* Chrome parity: avoid a darker "header strip" only on the first message of a merged group */
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) > .message-header {
+body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-end) > .message-header {
   background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
   filter: none !important;
 }
 
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-start {
+body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-start {
   margin-bottom: 0 !important;
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
   border-bottom-width: 0 !important;
 }
 
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-mid {
+body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-mid {
   margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
   margin-bottom: 0 !important;
   border-radius: 0 !important;
@@ -101,7 +101,7 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
   border-bottom-width: 0 !important;
 }
 
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
+body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
   margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
@@ -109,36 +109,46 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
 }
 
 
+/* Simple merge mode: keep message boxes intact, only collapse follow-up headers. */
+body.fe-chat-merge.fe-merge-mode-simple :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow > .message-header {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+
+
 /* Follow-up header display modes (for mid/end only) */
-body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header {
   display: none !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header img {
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header img {
   display: none !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-metadata,
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-flavor {
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata,
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-flavor {
   display: none !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header {
   padding: 0 0 2px 0 !important;
   margin: 0 !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-sender {
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-sender {
   font-size: 14px !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-sender,
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-metadata,
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header .message-flavor {
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-sender,
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata,
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-flavor {
   display: none !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end) .message-header {
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header {
   padding: 0 0 4px 0 !important;
   margin: 0 !important;
 }

@@ -651,6 +651,29 @@ async function feTryFoundryRenderMessage(_msg) {
 }
 
 function feCollectVisibleChatMessages(user = game.user) {
+  const liveMap = feBuildLiveChatMessageElementMap();
+
+  const all = Array.from(game.messages?.contents ?? []);
+  if (all.length) {
+    all.sort((a, b) => {
+      const ao = Number(a?.sort ?? a?.timestamp ?? 0);
+      const bo = Number(b?.sort ?? b?.timestamp ?? 0);
+      if (ao !== bo) return ao - bo;
+      return String(a?.id ?? a?._id ?? "").localeCompare(String(b?.id ?? b?._id ?? ""));
+    });
+    return all
+      .filter((m) => feCanUserSeeChatMessage(m, user))
+      .map((m) => {
+        const id = String(m?.id ?? m?._id ?? "");
+        return {
+          key: id || `__msg__${Math.random()}`,
+          id,
+          msg: m,
+          liveEl: id ? liveMap.get(id) || null : null,
+        };
+      });
+  }
+
   const liveItems = [];
   try {
     const seen = new Set();
@@ -669,13 +692,7 @@ function feCollectVisibleChatMessages(user = game.user) {
   } catch {
     /* no-op */
   }
-  if (liveItems.length) return liveItems;
-
-  const all = Array.from(game.messages?.contents ?? []);
-  all.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  return all
-    .filter((m) => feCanUserSeeChatMessage(m, user))
-    .map((m) => ({ key: String(m?.id ?? m?._id ?? Math.random()), id: String(m?.id ?? m?._id ?? ""), msg: m, liveEl: null }));
+  return liveItems;
 }
 
 function feHasPortraitMarkup(rootEl) {
@@ -3059,7 +3076,7 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
       push(msg.querySelector?.(":scope > .message-header .message-flavor"));
       push(msg.querySelector?.(":scope > .message-header .flavor-text"));
       push(msg.querySelector?.(":scope > .message-header .message-metadata"));
-      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .dice-roll, .dice-result, .dice-formula, .dice-tooltip") || []) push(el);
+      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .card-content > *, .details.card-content > *, .details.collapsible-content.card-content > *, .dice-roll, .dice-result, .dice-formula, .dice-tooltip") || []) push(el);
     }
 
     for (const el of targets) {
