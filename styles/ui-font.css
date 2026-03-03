@@ -226,7 +226,7 @@ html, body,
 /* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
  * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
  */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata {
   font-family: var(--fe-font-secondary) !important;
@@ -239,7 +239,7 @@ html, body,
   gap: var(--fe-chat-meta-gap) !important;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   :is(.message-timestamp, time) {
@@ -250,7 +250,7 @@ html, body,
 }
 
 /* Timestamp glyph width: visually condense to ~75% (does not affect layout flow) */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   :is(time.message-timestamp, .message-timestamp) {
@@ -260,21 +260,21 @@ html, body,
 }
 
 /* Edit + ellipsis icons: keep them compact and aligned */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   a.message-edit {
   order: 1;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   a.chat-control {
   order: 2;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   :is(a.message-edit, a.chat-control) {
@@ -288,7 +288,7 @@ html, body,
 }
 
 /* Ensure the <i> glyph inherits size (some themes override it) */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-metadata
   :is(a.message-edit, a.chat-control)
@@ -323,6 +323,9 @@ html, body,
 #sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
 #sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
 #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
+#chat-notifications,
+#chat-notifications :is(.chat-message, .message-header, .message-content, .flavor-text),
+#chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
 .chat-popout #chat,
 .chat-popout #chat :is(.chat-log, #chat-log, ol.chat-log),
 .chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
@@ -334,10 +337,10 @@ html, body,
  * CookieRun/Geurimilgi do not ship dedicated italic faces.
  * Keep global synthesis OFF (crisper), but allow synthetic italic ONLY for <em>.
  */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   .message-content em,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
   em {
@@ -478,14 +481,14 @@ button.clear-remaining.icon.fa-solid::after {
  * 5) Chat header font sizes (Actor + Player name)
  * ------------------------------- */
 
-#sidebar #chat :is(.chat-message .message-sender .name-stacked .title,
+:is(#sidebar #chat, #chat-notifications) :is(.chat-message .message-sender .name-stacked .title,
                    .chat-message .message-sender .title) {
   font-family: var(--fe-font-primary) !important;
   font-size: var(--fe-chat-title-size) !important;
   line-height: 1.05;
 }
 
-#sidebar #chat :is(.chat-message .message-sender .name-stacked .subtitle,
+:is(#sidebar #chat, #chat-notifications) :is(.chat-message .message-sender .name-stacked .subtitle,
                    .chat-message .message-sender .subtitle) {
   font-family: var(--fe-font-primary) !important;
   font-size: var(--fe-chat-subtitle-size) !important;

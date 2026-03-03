@@ -6,7 +6,7 @@
 //  - Convert !ci|...! shortcode into image embeds
 //  - Click to open image popout
 
-import { MODULE_ID, feFireChatUiUpdated } from "./fe-chat-enhance.js";
+import { MODULE_ID, feCaptureMessageRenderFlagsOnPreCreate } from "./fe-chat-enhance.js";
 
 const CI = Object.freeze({
   ENABLED: "chatImagesEnabled",
@@ -604,6 +604,25 @@ function ciBindChatForm(root = document) {
   bindSubmitKey(textarea);
 }
 
+const _ciRefreshTimers = new WeakMap();
+
+function ciScheduleRefreshUi(rootLike = document, delay = 0) {
+  try {
+    const root = rootLike?.[0] ?? rootLike ?? document;
+    if (!root) return;
+    const existing = _ciRefreshTimers.get(root);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      try { ciRefreshUi(root); } catch {}
+      finally {
+        const cur = _ciRefreshTimers.get(root);
+        if (cur === t) _ciRefreshTimers.delete(root);
+      }
+    }, Math.max(0, Number(delay) || 0));
+    _ciRefreshTimers.set(root, t);
+  } catch {}
+}
+
 function ciRefreshUi(root = document) {
   ciEnsureUploadArea(root);
   ciEnsureUploadButton(root);
@@ -620,7 +639,7 @@ function ciRegisterSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => feFireChatUiUpdated(),
+    onChange: () => ciScheduleRefreshUi(document, 0),
   });
 
   game.settings.register(MODULE_ID, CI.SHOW_BUTTON, {
@@ -630,7 +649,7 @@ function ciRegisterSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => feFireChatUiUpdated(),
+    onChange: () => ciScheduleRefreshUi(document, 0),
   });
 
   game.settings.register(MODULE_ID, CI.UPLOAD_LOCATION, {
@@ -657,31 +676,25 @@ Hooks.once("ready", async () => {
   try {
     await ciEnsureUploadDirectory(ciUploadLocation());
   } catch {}
-  ciRefreshUi(document);
+  ciScheduleRefreshUi(document, 0);
 });
 
 Hooks.on("renderChatLog", (app, html) => {
   // The input form UI does not need a whole-document refresh every time the log renders.
   // Keep this root-scoped so new/popped-out chat apps get their controls bound without
   // re-scanning the entire document on every log update.
-  ciRefreshUi(app?.element || html || document);
+  ciScheduleRefreshUi(app?.element || html || document, 0);
 });
 
 Hooks.on("activateChatLog", (app) => {
-  ciRefreshUi(app?.element || document);
+  ciScheduleRefreshUi(app?.element || document, 0);
 });
 
 Hooks.on("collapseSidebar", (_app, collapsed) => {
   if (collapsed) return;
-  ciRefreshUi(document);
+  ciScheduleRefreshUi(document, 0);
 });
 
-Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
-  // A chat-log re-render does not invalidate the input controls; avoid forcing a full
-  // document-wide refresh on every log update.
-  if (payload?.reason === "renderChatLog") return;
-  ciRefreshUi(payload?.document || document);
-});
 
 Hooks.on("renderChatMessageHTML", (_message, html) => {
   if (!ciEnabled()) return;
@@ -689,7 +702,7 @@ Hooks.on("renderChatMessageHTML", (_message, html) => {
   ciBindRenderedImages(root);
 });
 
-Hooks.on("preCreateChatMessage", (message, data) => {
+Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   if (!ciEnabled()) return;
   try {
     const current = String(data?.content ?? message?.content ?? "");
@@ -697,6 +710,12 @@ Hooks.on("preCreateChatMessage", (message, data) => {
     if (next !== current) {
       if (typeof message?.updateSource === "function") message.updateSource({ content: next });
       else if (data) data.content = next;
+      try {
+        const pending = message?.toObject?.() ?? { ...data, content: next };
+        feCaptureMessageRenderFlagsOnPreCreate(message, pending, userId ?? game?.user?.id ?? null);
+      } catch {
+        /* no-op */
+      }
     }
   } catch {}
 });

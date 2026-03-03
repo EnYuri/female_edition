@@ -66,3 +66,27 @@
 }
 #ci-chat-upload-area .ci-upload-area-images { flex: 1 1 auto; min-width: 0; }
 #ci-chat-upload-area .ci-image-preview { cursor: pointer; }
+
+
+#ci-upload-image {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+#ci-upload-image > i {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}

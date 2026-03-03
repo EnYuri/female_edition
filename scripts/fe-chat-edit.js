@@ -9,6 +9,7 @@ import {
   feGetChatLogs,
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
+  feCaptureMessageRenderFlagsOnPreUpdate,
 } from "./fe-chat-enhance.js";
 
 function feEnsureMessageEditControl(message, messageEl) {
@@ -394,7 +395,7 @@ function feInstallEditHandlers() {
 
   // Backfill: existing chat log entries were rendered before our hooks ran.
   // Ensure the edit icon exists for already-posted messages.
-  feEnsureEditControlsForExistingMessages();
+  feScheduleEditControlsRefresh(document, 0);
 
   // Re-apply after chat log re-renders (popout, refresh, etc.)
   if (!feInstallEditHandlers._backfillHookBound) {
@@ -402,9 +403,9 @@ function feInstallEditHandlers() {
     Hooks.on("renderChatLog", (_app, html) => {
       try {
         const root = html?.[0] ?? html?.element?.[0] ?? html ?? document;
-        feEnsureEditControlsForExistingMessages(root);
+        feScheduleEditControlsRefresh(root, 0);
       } catch {
-        feEnsureEditControlsForExistingMessages();
+        feScheduleEditControlsRefresh(document, 0);
       }
     });
   }
@@ -452,6 +453,25 @@ function feRemoveMessageDeleteControl(messageEl) {
   }
 }
 
+const feEditRefreshTimers = new WeakMap();
+
+function feScheduleEditControlsRefresh(rootLike = document, delay = 0) {
+  try {
+    const root = rootLike?.[0] ?? rootLike ?? document;
+    if (!root) return;
+    const existing = feEditRefreshTimers.get(root);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      try { feEnsureEditControlsForExistingMessages(root); } catch {}
+      finally {
+        const cur = feEditRefreshTimers.get(root);
+        if (cur === t) feEditRefreshTimers.delete(root);
+      }
+    }, Math.max(0, Number(delay) || 0));
+    feEditRefreshTimers.set(root, t);
+  } catch {}
+}
+
 function feGetChatMessagesInRoot(rootLike = document) {
   try {
     const root = rootLike?.[0] ?? rootLike ?? document;
@@ -496,21 +516,20 @@ Hooks.once("ready", () => {
   feInstallEditHandlers();
 });
 
-Hooks.on("preUpdateChatMessage", (_message, changed) => {
+Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
   feApplyRawEditPreUpdate(changed);
+  try {
+    feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
+  } catch {
+    /* no-op */
+  }
 });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
   try {
     const reason = payload?.reason ?? null;
-    const root = payload?.root ?? payload?.document ?? document;
-    if (reason === "renderChatLog") {
-      feEnsureEditControlsForExistingMessages(root);
-      return;
-    }
-    // Settings changes may fire a generic UI update without a concrete chat-log root.
-    // Keep that path, but avoid whole-document rescans for normal per-message updates.
-    if (!reason) feEnsureEditControlsForExistingMessages(document);
+    if (reason !== "edit-settings") return;
+    feScheduleEditControlsRefresh(payload?.document ?? document, 0);
   } catch (err) {
     console.warn("[female_edition] fe-chat-edit: refresh failed", err);
   }

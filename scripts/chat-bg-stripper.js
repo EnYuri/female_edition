@@ -97,8 +97,11 @@ function restoreAllExisting() {
 function applyTextureSetting(enabled) {
   STATE.stripTextures = !!enabled;
   try { document.body?.classList?.toggle("fe-strip-chat-textures", STATE.stripTextures); } catch {}
-  if (STATE.stripTextures) sanitizeAllExisting();
-  else restoreAllExisting();
+
+  // v0.3.91+: texture stripping is intentionally CSS-first.
+  // Clean up any legacy inline sanitization from earlier builds, then let the
+  // stylesheet handle current and future chat messages uniformly.
+  restoreAllExisting();
 }
 
 /* --------------------------------
@@ -428,21 +431,8 @@ Hooks.once("ready", () => {
   STATE.stripTextures = !!stripTextures;
   try { document.body?.classList?.toggle("fe-strip-chat-textures", STATE.stripTextures); } catch {}
 
-  // Existing logs only. Live updates rely on renderChatMessageHTML/renderChatLog hooks.
-  attachAllChatLogs();
-
-  Hooks.on("renderChatMessageHTML", (_msg, html) => {
-    if (!STATE.stripTextures) return;
-    const el = extractHTMLElement(html);
-    if (!el) return;
-    processMessageRoot(el);
-  });
-
-  Hooks.on("renderChatLog", (_app, html) => {
-    if (!STATE.stripTextures) return;
-    processChatLogRoot(html);
-  });
-
-  if (STATE.stripTextures) sanitizeAllExisting();
-  else restoreAllExisting();
+  // v0.3.91+: texture stripping is CSS-first.
+  // Remove any legacy inline overrides from earlier builds and do not attach
+  // per-message render hooks for texture processing anymore.
+  restoreAllExisting();
 });

@@ -324,17 +324,17 @@ body.fe-strip-chat-textures :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-expo
  * Enabled when <body> has class "fe-hide-portraits"
  */
 
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
   justify-content: flex-start !important;
   /* text-align intentionally not forced; portrait-name alignment setting should win. */
 }
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender,
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked,
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked .title,
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .name-stacked .subtitle {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .title,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .subtitle {
   text-shadow: none !important;
 }
 
@@ -347,16 +347,16 @@ body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sen
   padding: 0 !important;
 }
 /* 아바타/포트레잇 숨김 */
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender .avatar,
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender > img,
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender > video {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .avatar,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > img,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > video {
   display: none !important;
 }
-body.fe-hide-portraits #sidebar #chat .chat-message .message-header .message-sender { gap: 0 !important; }
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender { gap: 0 !important; }
 
 /* Chat Portrait 스킬/굴림 아이콘 숨김 */
-body.fe-hide-portraits #sidebar #chat img.chat-portrait-image-size-name-dnd5e,
-body.fe-hide-portraits #sidebar #chat img[class*="chat-portrait-image-size"] {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img.chat-portrait-image-size-name-dnd5e,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img[class*="chat-portrait-image-size"] {
   display: none !important;
 }
 
@@ -365,6 +365,28 @@ body.fe-hide-portraits #sidebar #chat img[class*="chat-portrait-image-size"] {
  * dnd5e uses .message::before with ui/texture-gray1.webp; override it at CSS level.
  */
 body.fe-strip-chat-textures :is(.chat-popout, #chat-log, .chat-log, ol.chat-log) .message::before {
+  background-image: none !important;
+  background: transparent !important;
+}
+
+
+body.fe-hide-portraits #chat-notifications .chat-message .message-header img.fe-chat-portrait,
+body.fe-hide-portraits #chat-notifications .chat-message .message-header .fe-chat-portrait-wrap {
+  display: none !important;
+}
+
+
+/* --------------------------------
+ * 2c) CSS-first dnd5e texture stripping (v0.3.91+)
+ * --------------------------------
+ * Prefer static CSS overrides to per-message JS sanitization.
+ * dnd5e injects its parchment/gray texture via .message::before; neutralize it
+ * everywhere the same chat message markup can appear.
+ */
+body.fe-strip-chat-textures :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) :is(.message, .chat-message)::before,
+body.fe-strip-chat-textures :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) :is(.message, .chat-message)::after,
+body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-message)::before,
+body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-message)::after {
   background-image: none !important;
   background: transparent !important;
 }

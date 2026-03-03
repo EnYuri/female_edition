@@ -242,3 +242,10 @@ li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header :is(.
   margin: 0 !important;
   padding: 0 !important;
 }
+
+
+/* CSS-only round marker normalization so older/lazy-loaded messages match freshly-rendered ones. */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, :has(.round-marker)) > .message-header img.fe-chat-portrait,
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, :has(.round-marker)) > .message-header .fe-chat-portrait-wrap {
+  display: none !important;
+}

@@ -15,9 +15,8 @@ import {
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
   feApplyChatMerge,
-  feMessageMergeInfo,
-  feMergeKey,
   feGetMessageIdFromElement,
+  feIsRoundMarkerMessage,
 } from "./fe-chat-enhance.js";
 
 // Chat portrait: ensure exported/archive-rendered messages receive the same portrait injection.
@@ -34,14 +33,16 @@ const FE_EXPORT_WAIT_IMAGES_TIMEOUT = 20000;
 const FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT = 15000;
 const FE_EXPORT_WAIT_FONTS_TIMEOUT = 12000;
 const FE_EXPORT_PORTRAIT_MARKER_SELECTOR = 'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container';
-const FE_ARCHIVE_LARGE_LOG_THRESHOLD = 1600;
-const FE_ARCHIVE_HUGE_LOG_THRESHOLD = 3200;
-const FE_EXPORT_RENDER_BATCH_LARGE = 48;
-const FE_EXPORT_RENDER_BATCH_HUGE = 32;
-const FE_EXPORT_RENDER_CONCURRENCY_LARGE = 6;
-const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 4;
-const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 64;
-const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 32;
+const FE_ARCHIVE_LARGE_LOG_THRESHOLD = 1200;
+const FE_ARCHIVE_HUGE_LOG_THRESHOLD = 2600;
+const FE_EXPORT_RENDER_BATCH_LARGE = 40;
+const FE_EXPORT_RENDER_BATCH_HUGE = 24;
+const FE_EXPORT_RENDER_CONCURRENCY_LARGE = 4;
+const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 2;
+const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 40;
+const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
+const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
+const FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE = 96;
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
 
@@ -59,11 +60,13 @@ function feGetArchiveRenderProfile(messageCount = 0) {
     renderConcurrency: huge ? FE_EXPORT_RENDER_CONCURRENCY_HUGE : large ? FE_EXPORT_RENDER_CONCURRENCY_LARGE : FE_EXPORT_RENDER_CONCURRENCY,
     initialImageWaitMax: huge ? FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE : large ? FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE : FE_EXPORT_WAIT_IMAGES_MAX,
     mirrorTree: !large,
-    mirrorCardTree: !huge,
+    mirrorCardTree: !large,
     normalizeImageLoading: large ? "lazy" : "eager",
     normalizeImageDecoding: large ? "async" : "sync",
     deferPortraits: true,
     restoreOriginalPortraitSources: true,
+    collapseDuplicateImages: large,
+    collapseDuplicateImagesAggressive: huge,
     bodyClass: huge ? " fe-archive-huge fe-archive-lean" : large ? " fe-archive-lean" : "",
     statusLabel: large ? "메모리 절약 모드" : "",
   };
@@ -310,7 +313,8 @@ async function feExportChatLogToPDFInline() {
   logEl.innerHTML = "";
 
   try {
-    const messages = feCollectVisibleChatMessages(game.user);
+    const liveMessageMap = feBuildLiveChatMessageElementMap();
+    const messages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
     const renderProfile = feGetArchiveRenderProfile(messages.length);
 
     // Header/meta
@@ -320,7 +324,6 @@ async function feExportChatLogToPDFInline() {
     metaEl.textContent = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
 
     // Prefer cloning from the already-rendered live chat log DOM when possible.
-    const liveMessageMap = feBuildLiveChatMessageElementMap();
 
     await feRenderMessagesIntoLog({
       targetDoc: document,
@@ -542,10 +545,16 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
       }
     }
 
-    // Mirror the "hideChatPortraits" body class toggle too (defensive).
+    // Mirror body class toggles used by stylesheet-driven chat UI features.
     try {
       const hidePortraits = !!game.settings.get(MODULE_ID, "hideChatPortraits");
       doc.body?.classList?.toggle?.("fe-hide-portraits", hidePortraits);
+    } catch {
+      /* no-op */
+    }
+    try {
+      const stripTextures = !!game.settings.get(MODULE_ID, "stripChatTextures");
+      doc.body?.classList?.toggle?.("fe-strip-chat-textures", stripTextures);
     } catch {
       /* no-op */
     }
@@ -558,7 +567,10 @@ function feSyncArchiveMergeBodyClasses(doc) {
   try {
     const enabled = !!feSetting(S.MERGE_ENABLED);
     const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
+    const mode = String(feSetting(S.MERGE_MODE) ?? "standard");
     doc?.body?.classList?.toggle?.("fe-chat-merge", enabled);
+    doc?.body?.classList?.toggle?.("fe-merge-mode-standard", enabled && mode === "standard");
+    doc?.body?.classList?.toggle?.("fe-merge-mode-simple", enabled && mode === "simple");
     doc?.body?.classList?.toggle?.("fe-merge-follow-hide", enabled && style === "hide");
     doc?.body?.classList?.toggle?.("fe-merge-follow-name", enabled && style === "name");
     doc?.body?.classList?.toggle?.("fe-merge-follow-portrait", enabled && style === "portrait");
@@ -572,7 +584,7 @@ function feRefreshPortraitsForLog(logEl) {
     if (!logEl?.querySelectorAll) return;
     for (const el of logEl.querySelectorAll("li.chat-message")) {
       const id = feGetMessageIdFromElement(el);
-      const msg = id ? game.messages?.get(id) : null;
+      const msg = (id ? game.messages?.get(id) : null) || el.__feMessage || null;
       if (!msg) continue;
       feChatPortraitUpsert(msg, el);
     }
@@ -650,49 +662,107 @@ async function feTryFoundryRenderMessage(_msg) {
   return null;
 }
 
-function feCollectVisibleChatMessages(user = game.user) {
-  const liveMap = feBuildLiveChatMessageElementMap();
 
-  const all = Array.from(game.messages?.contents ?? []);
-  if (all.length) {
-    all.sort((a, b) => {
-      const ao = Number(a?.sort ?? a?.timestamp ?? 0);
-      const bo = Number(b?.sort ?? b?.timestamp ?? 0);
-      if (ao !== bo) return ao - bo;
-      return String(a?.id ?? a?._id ?? "").localeCompare(String(b?.id ?? b?._id ?? ""));
-    });
-    return all
-      .filter((m) => feCanUserSeeChatMessage(m, user))
-      .map((m) => {
-        const id = String(m?.id ?? m?._id ?? "");
-        return {
-          key: id || `__msg__${Math.random()}`,
-          id,
-          msg: m,
-          liveEl: id ? liveMap.get(id) || null : null,
-        };
-      });
-  }
-
-  const liveItems = [];
+async function feEnsureAllChatHistoryRendered() {
   try {
-    const seen = new Set();
-    for (const log of feGetChatLogs?.() ?? []) {
-      if (!log?.querySelectorAll) continue;
-      for (const el of log.querySelectorAll("li.chat-message")) {
-        const id = feGetMessageIdFromElement?.(el) || null;
-        const key = id || `__dom__${liveItems.length}`;
-        if (seen.has(key)) continue;
-        const msg = id ? game?.messages?.get?.(id) ?? null : null;
-        if (msg && !feCanUserSeeChatMessage(msg, user)) continue;
-        liveItems.push({ key, id, msg, liveEl: el });
-        seen.add(key);
-      }
+    const chat = ui?.chat;
+    const log = chat?.element?.querySelector?.("ol.chat-log, #chat-log") || document.querySelector?.("ol.chat-log, #chat-log");
+    if (!chat?.renderBatch || !log) return;
+
+    let iterations = 0;
+    while (iterations < 40) {
+      const beforeCount = log.querySelectorAll?.("li.chat-message")?.length ?? 0;
+      const beforeFirst = feGetMessageIdFromElement?.(log.querySelector?.("li.chat-message")) || "";
+      await chat.renderBatch(100);
+      await feMaybeYieldForUI(window);
+      const afterCount = log.querySelectorAll?.("li.chat-message")?.length ?? 0;
+      const afterFirst = feGetMessageIdFromElement?.(log.querySelector?.("li.chat-message")) || "";
+      iterations += 1;
+      if (afterCount === beforeCount && afterFirst === beforeFirst) break;
     }
+  } catch {}
+}
+
+async function feFetchAllChatMessagesFromDatabase() {
+  try {
+    const docClass = game?.messages?.documentClass || CONFIG?.ChatMessage?.documentClass || foundry?.documents?.ChatMessage || globalThis.ChatMessage?.implementation || globalThis.ChatMessage;
+    const backend = docClass?.database;
+    if (!docClass || !backend?.get) return [];
+    const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, game?.user);
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row) => {
+      if (!row) return null;
+      if (typeof row.getFlag === "function" || row.documentName === "ChatMessage") return row;
+      try {
+        return docClass.fromSource ? docClass.fromSource(row) : new docClass(row, {});
+      } catch {
+        try { return new docClass(row, {}); } catch { return null; }
+      }
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap = null } = {}) {
+  const liveMap = liveMessageMap instanceof Map ? liveMessageMap : feBuildLiveChatMessageElementMap();
+
+  let all = Array.from(game.messages?.contents ?? []);
+  // Archive/export should prefer the fullest document source available.
+  // Some worlds/clients may only have the most recent chat page hydrated in memory,
+  // so always probe the backend and keep whichever source is longer.
+  try {
+    const dbAll = await feFetchAllChatMessagesFromDatabase();
+    if (dbAll.length > all.length) all = dbAll;
   } catch {
     /* no-op */
   }
-  return liveItems;
+
+  // As a final best-effort fallback, harvest any live DOM-only history that has been
+  // paged in by ChatLog.renderBatch so the archive can still preserve older messages.
+  let harvested = null;
+  if (liveMap.size > all.length) {
+    try {
+      harvested = await feHarvestFullChatHistory({ batchSize: 100, maxIterations: 24 });
+      if (harvested?.cloneMap?.size) {
+        for (const [id, el] of harvested.cloneMap.entries()) {
+          if (!liveMap.has(id)) liveMap.set(id, el);
+        }
+      }
+    } catch {
+      harvested = null;
+    }
+  }
+
+  const visibleDocs = all
+    .filter((m) => feCanUserSeeChatMessage(m, user))
+    .sort((a, b) => {
+      const ao = Number(a?.sort ?? a?.timestamp ?? 0);
+      const bo = Number(b?.sort ?? b?.timestamp ?? 0);
+      if (ao !== bo) return ao - bo;
+      return String(a?.id ?? a?._id ?? '').localeCompare(String(b?.id ?? b?._id ?? ''));
+    });
+
+  const items = visibleDocs.map((m) => {
+    const id = String(m?.id ?? m?._id ?? '');
+    return {
+      key: id || `__msg__${Math.random()}`,
+      id,
+      msg: m,
+      liveEl: id ? (liveMap.get(id) || null) : null,
+    };
+  });
+
+  if (!items.length && harvested?.orderedIds?.length) {
+    return harvested.orderedIds.map((id, idx) => ({
+      key: id || `__harvest__${idx}`,
+      id,
+      msg: null,
+      liveEl: id ? (liveMap.get(id) || null) : null,
+    })).filter((it) => it.liveEl);
+  }
+
+  return items;
 }
 
 function feHasPortraitMarkup(rootEl) {
@@ -700,6 +770,100 @@ function feHasPortraitMarkup(rootEl) {
     return !!rootEl?.querySelector?.(FE_EXPORT_PORTRAIT_MARKER_SELECTOR);
   } catch {
     return false;
+  }
+}
+
+function feArchiveGetImageSourceKey(img, baseHref = null) {
+  try {
+    const raw = img?.getAttribute?.("src") || img?.currentSrc || img?.src || "";
+    if (!raw) return "";
+    if (/^(?:data:|blob:)/i.test(raw)) return raw;
+    return new URL(raw, baseHref || img?.ownerDocument?.baseURI || document.baseURI).href;
+  } catch {
+    return String(img?.getAttribute?.("src") || img?.currentSrc || img?.src || "");
+  }
+}
+
+function feArchiveIsProtectedImage(img) {
+  try {
+    if (!img) return true;
+    if (img.classList?.contains("avatar")) return true;
+    if (img.matches?.('img.fe-chat-portrait, img.chat-portrait-message-portrait, img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return true;
+    if (img.closest?.('.message-header, .message-sender, .chat-portrait-container')) return true;
+    if (img.closest?.('.chat-card .card-header, .midi-chat-card .card-header, .dnd5e.chat-card .card-header, .dnd5e2.chat-card .card-header')) return true;
+
+    const width = Number(img.getAttribute?.("width") || img.width || 0);
+    const height = Number(img.getAttribute?.("height") || img.height || 0);
+    if ((width && width <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE) && (!height || height <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE)) return true;
+    if ((height && height <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE) && (!width || width <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE)) return true;
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
+function feArchiveShouldCollapseDuplicateImage(img, renderProfile = null) {
+  try {
+    if (!renderProfile?.collapseDuplicateImages) return false;
+    const src = feArchiveGetImageSourceKey(img);
+    if (!src || /^(?:data:|blob:)/i.test(src)) return false;
+    if (feArchiveIsProtectedImage(img)) return false;
+    if (renderProfile?.collapseDuplicateImagesAggressive) return true;
+    if (img.classList?.contains("ci-message-image")) return true;
+    if (img.closest?.('.chat-images-container, .ci-message-image, .message-content, figure, .editor-content')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function feCreateArchiveImageReference(doc, src, img, occurrence = 2) {
+  const parentAnchor = !!img?.parentElement?.matches?.('a[href]');
+  const ref = doc.createElement(parentAnchor ? "span" : "a");
+  ref.className = "fe-archive-image-reference";
+  ref.dataset.feOriginalSrc = src;
+  if (!parentAnchor) {
+    ref.href = src;
+    ref.target = "_blank";
+    ref.rel = "noopener noreferrer";
+  } else {
+    ref.dataset.feInlineLink = "1";
+  }
+
+  const label = String(img?.getAttribute?.("alt") || img?.getAttribute?.("title") || "").trim();
+  const text = occurrence > 1 ? `동일 이미지 링크 ×${occurrence}` : "동일 이미지 링크";
+  ref.textContent = text;
+  ref.setAttribute("title", label ? `${label} — ${src}` : src);
+  ref.setAttribute("aria-label", label ? `${label}: ${src}` : src);
+  return ref;
+}
+
+function feOptimizeArchiveNodeImages(rootEl, { targetDoc = document, renderProfile = null, imageRegistry = null } = {}) {
+  try {
+    if (!imageRegistry || !renderProfile?.collapseDuplicateImages || !rootEl?.querySelectorAll) return 0;
+    let collapsed = 0;
+    const imgs = Array.from(rootEl.querySelectorAll('img[src]'));
+    for (const img of imgs) {
+      if (!feArchiveShouldCollapseDuplicateImage(img, renderProfile)) continue;
+      const srcKey = feArchiveGetImageSourceKey(img, targetDoc?.baseURI || rootEl?.ownerDocument?.baseURI || document.baseURI);
+      if (!srcKey || /^(?:data:|blob:)/i.test(srcKey)) continue;
+
+      const entry = imageRegistry.get(srcKey) ?? { count: 0 };
+      entry.count += 1;
+      imageRegistry.set(srcKey, entry);
+      if (entry.count <= FE_ARCHIVE_DUPLICATE_IMAGE_KEEP) continue;
+
+      const ref = feCreateArchiveImageReference(targetDoc || rootEl.ownerDocument || document, srcKey, img, entry.count);
+      try {
+        img.replaceWith(ref);
+        collapsed += 1;
+      } catch {
+        /* no-op */
+      }
+    }
+    return collapsed;
+  } catch {
+    return 0;
   }
 }
 
@@ -718,6 +882,7 @@ async function feRenderMessagesIntoLog({
   const flushEvery = Math.max(1, Number(renderProfile?.renderBatch) || FE_EXPORT_RENDER_BATCH);
   const concurrency = Math.max(1, Number(renderProfile?.renderConcurrency) || FE_EXPORT_RENDER_CONCURRENCY);
   const deferPortraits = !!renderProfile?.deferPortraits;
+  const imageRegistry = renderProfile?.collapseDuplicateImages ? new Map() : null;
   let renderedCount = 0;
   let frag = targetDoc.createDocumentFragment();
   let fragCount = 0;
@@ -770,6 +935,7 @@ async function feRenderMessagesIntoLog({
 
       const node = nodes[i];
       if (!feIsElement(node)) continue;
+      feOptimizeArchiveNodeImages(node, { targetDoc, renderProfile, imageRegistry });
       frag.appendChild(node);
       fragCount += 1;
     }
@@ -783,8 +949,9 @@ async function feRenderMessagesIntoLog({
 
 async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
+  const shouldCloneLive = !!feIsElement(liveEl) && (!renderProfile?.lean || feArchiveMessageLooksComplex(msg, liveEl));
   try {
-    if (feIsElement(liveEl)) node = targetDoc.importNode(liveEl, true);
+    if (shouldCloneLive && feIsElement(liveEl)) node = targetDoc.importNode(liveEl, true);
   } catch {
     node = null;
   }
@@ -796,7 +963,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     }
   }
 
-  if (feIsElement(node) && feIsElement(liveEl)) {
+  if (feIsElement(node) && shouldCloneLive && feIsElement(liveEl)) {
     try {
       feMirrorLiveMessageStyles(liveEl, node, { renderProfile });
     } catch {
@@ -806,6 +973,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
 
   if (feIsElement(node)) {
     try {
+      node.__feMessage = msg || node.__feMessage || null;
       feStampArchiveMessageIdentity(node, msg || { id: feGetMessageIdFromElement(liveEl) || undefined });
       feMarkPlainArchiveMessage(node, msg, liveEl);
     } catch {}
@@ -873,7 +1041,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   const effectiveOptimize = !!optimize || stripTexturesSetting;
 
   // Collect messages first (so the archive UI can show correct counts immediately).
-  const messages = feCollectVisibleChatMessages(game.user);
+  const liveMessageMap = feBuildLiveChatMessageElementMap();
+  const messages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
   const renderProfile = feGetArchiveRenderProfile(messages.length);
 
   const worldName = game.world?.title ?? game.world?.name ?? "";
@@ -1195,7 +1364,6 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // Prefer cloning from the already-rendered live chat log DOM when possible.
   // This avoids re-running render hooks from other modules (e.g. chat-portrait) which
   // can throw during automation-heavy sessions (midi-qol, tokenbar, etc.).
-  const liveMessageMap = feBuildLiveChatMessageElementMap();
 
   await feRenderMessagesIntoLog({
     targetDoc: win.document,
@@ -3282,6 +3450,113 @@ function feBuildLiveChatMessageElementMap() {
   return map;
 }
 
+function feCloneChatMessageElement(el) {
+  try {
+    if (!feIsElement(el)) return null;
+    return el.cloneNode(true);
+  } catch {
+    return null;
+  }
+}
+
+async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80 } = {}) {
+  const cloneMap = new Map();
+  let orderedIds = [];
+  try {
+    const chat = game?.messages?.directory || ui?.chat;
+    const logs = feGetChatLogs?.() ?? [];
+    if (!chat?.renderBatch || !logs.length) return { cloneMap, orderedIds };
+
+    const logStates = logs.map((log) => ({
+      log,
+      top: Number(log?.scrollTop ?? 0),
+      height: Number(log?.scrollHeight ?? 0),
+    }));
+
+    const harvestOnce = () => {
+      const visibleIds = [];
+      for (const log of logs) {
+        if (!log?.querySelectorAll) continue;
+        for (const el of log.querySelectorAll('li.chat-message')) {
+          const id = feGetMessageIdFromElement?.(el);
+          if (!id) continue;
+          const sid = String(id);
+          visibleIds.push(sid);
+          if (!cloneMap.has(sid)) {
+            const clone = feCloneChatMessageElement(el);
+            if (clone) cloneMap.set(sid, clone);
+          }
+        }
+      }
+      if (visibleIds.length) {
+        const seen = new Set();
+        const merged = [];
+        for (const id of visibleIds) {
+          if (seen.has(id)) continue;
+          seen.add(id);
+          merged.push(id);
+        }
+        for (const id of orderedIds) {
+          if (seen.has(id)) continue;
+          seen.add(id);
+          merged.push(id);
+        }
+        orderedIds = merged;
+      }
+      return visibleIds;
+    };
+
+    let prevFirst = '';
+    let prevCount = -1;
+    let stablePasses = 0;
+    for (let i = 0; i < maxIterations; i += 1) {
+      const before = harvestOnce();
+      const beforeFirst = before[0] || '';
+      const beforeCount = before.length;
+
+      for (const st of logStates) {
+        try {
+          st.log.scrollTop = 0;
+          st.log.dispatchEvent?.(new Event('scroll'));
+        } catch {}
+      }
+      await feMaybeYieldForUI(window);
+
+      try {
+        await chat.renderBatch(batchSize);
+      } catch {
+        break;
+      }
+      await feMaybeYieldForUI(window);
+      await feMaybeYieldForUI(window);
+
+      const after = harvestOnce();
+      const afterFirst = after[0] || '';
+      const afterCount = after.length;
+
+      if (afterCount === beforeCount && afterFirst === beforeFirst) stablePasses += 1;
+      else stablePasses = 0;
+
+      if (afterCount === prevCount && afterFirst === prevFirst) stablePasses += 1;
+      prevCount = afterCount;
+      prevFirst = afterFirst;
+
+      if (stablePasses >= 2) break;
+    }
+
+    harvestOnce();
+
+    for (const st of logStates) {
+      try {
+        st.log.scrollTop = st.top;
+      } catch {}
+    }
+  } catch {
+    // swallow and return best-effort partial history
+  }
+  return { cloneMap, orderedIds };
+}
+
 function feArchiveMessageLooksComplex(msg, liveEl = null) {
   try {
     const el = liveEl;
@@ -3419,17 +3694,41 @@ function feFallbackRenderChatMessage(doc, msg) {
 }
 
 
+let feInjectExportButtonsTimer = null;
+function feScheduleInjectExportButtons(delay = 0) {
+  try {
+    if (feInjectExportButtonsTimer) clearTimeout(feInjectExportButtonsTimer);
+    feInjectExportButtonsTimer = setTimeout(() => {
+      feInjectExportButtonsTimer = null;
+      try { feInjectExportButtonsAll(); } catch (err) { console.warn("[female_edition] fe-chat-archive: inject failed", err); }
+    }, Math.max(0, Number(delay) || 0));
+  } catch {}
+}
+
 Hooks.once("ready", () => {
   try {
-    feInjectExportButtonsAll();
+    feScheduleInjectExportButtons(0);
   } catch (err) {
     console.warn("[female_edition] fe-chat-archive: initial inject failed", err);
   }
 });
 
-Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
+// FVTT v13 reparents the shared chat input/controls outside the normal ChatLog render flow.
+// Re-inject the export control whenever that input block is adopted so the archive button
+// survives sidebar toggles, notifications, and popout transitions.
+Hooks.on("renderChatInput", () => {
   try {
-    feInjectExportButtonsAll();
+    feScheduleInjectExportButtons(0);
+  } catch (err) {
+    console.warn("[female_edition] fe-chat-archive: chat input reinject failed", err);
+  }
+});
+
+Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
+  try {
+    const reason = payload?.reason ?? null;
+    if (reason !== "ready" && reason !== "renderChatLog" && reason !== "export-settings") return;
+    feScheduleInjectExportButtons(0);
   } catch (err) {
     console.warn("[female_edition] fe-chat-archive: reinject failed", err);
   }

@@ -60,7 +60,7 @@
 /* --------------------------- */
 /* Chat merge                  */
 /* --------------------------- */
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divider-before::before {
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-divider-before::before {
   /* Draw a true group divider *between* message groups.
    * (The previous inside-the-message divider could look like a tint change.)
    */
@@ -73,7 +73,7 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divid
   opacity: 0.55;
 }
 
-body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-divider-before {
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-divider-before {
   position: relative;
   margin-top: 14px !important;
 }

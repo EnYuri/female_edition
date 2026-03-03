@@ -128,6 +128,14 @@ function feSetting(key) {
   }
 }
 
+function feHasRenderedStateWork() {
+  try {
+    return !!feSetting(S.MERGE_ENABLED) || !!feSetting(S.USE_USER_COLOR_BG);
+  } catch {
+    return true;
+  }
+}
+
 /** Clamp a value to an integer range. */
 function feClampInt(value, min, max) {
   const n = Math.trunc(Number(value));
@@ -274,6 +282,16 @@ function feApplyStyleVarsFromSettings(doc = document) {
 // Legacy migration
 // -------------------------------------
 
+async function feNormalizeChoiceSetting(key, allowedValues, fallback) {
+  try {
+    const allowed = new Set(Array.isArray(allowedValues) ? allowedValues : []);
+    const value = String(feSetting(key) ?? fallback ?? "").trim();
+    if (!allowed.has(value)) await game.settings.set(MODULE_ID, key, fallback);
+  } catch (_err) {
+    // ignore
+  }
+}
+
 async function feMigrateLegacySettings() {
   // 1) UI font toggle: legacy key -> new key
   try {
@@ -288,15 +306,13 @@ async function feMigrateLegacySettings() {
     // ignore
   }
 
-  // 2) Chat font choice: normalize unknown/legacy values -> geurimilgi
-  try {
-    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
-    if (choice !== "cookie" && choice !== "geurimilgi") {
-      await game.settings.set(MODULE_ID, S.CHAT_FONT_CHOICE, "geurimilgi");
-    }
-  } catch (err) {
-    // ignore
-  }
+  // 2) Choice-valued settings: normalize unknown/legacy values to safe defaults.
+  await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "geurimilgi"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
+  await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
+  await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
+  await feNormalizeChoiceSetting(S.USER_COLOR_BG_BASE, ["white", "black", "none"], FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
+  await feNormalizeChoiceSetting(S.EXPORT_PRINT_IMAGE_MODE, Object.keys(FE_EXPORT_PRINT_IMAGE_MODE_CHOICES), FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
+  await feNormalizeChoiceSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE, ["off", "button", "auto"], FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]);
 }
 
 Hooks.once("init", () => {
@@ -338,13 +354,13 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.MERGE_MODE, {
     name: "채팅 병합 방식",
-    hint: "표준은 메시지 박스 경계까지 붙여 묶고, 간소화는 연속 메시지의 헤더만 줄입니다.",
+    hint: "표준은 메시지 박스 경계까지 붙여 묶고, 간소화는 같은 화자의 후속 메시지에서 헤더만 숨깁니다.",
     scope: "client",
     config: true,
     type: String,
     choices: {
       standard: "표준(경계/간격까지 묶기)",
-      simple: "간소화(후속 헤더만 정리)",
+      simple: "간소화(후속 헤더만 숨김)",
     },
     default: "standard",
     onChange: () => {
@@ -388,7 +404,7 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => feFireChatUiUpdated(),
+    onChange: () => feFireChatUiUpdated({ reason: "export-settings", document }),
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_AUTO_PRINT, {
@@ -415,7 +431,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: false,
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_EMBED_IMAGES, {
@@ -620,6 +636,7 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: true,
+    onChange: () => feFireChatUiUpdated({ reason: "edit-settings", document }),
   });
 
   // Install chat-log level refreshes on the supported v13 render hook.
@@ -630,13 +647,8 @@ Hooks.once("init", () => {
         ? root
         : root?.querySelector?.("ol.chat-log, #chat-log") ?? null;
 
-      if (log) {
-        feApplyRenderedStateToLog(log);
-        feDeferTask(() => feApplyRenderedStateToLog(log));
-      } else {
-        feApplyRenderedStateToAllLogs();
-        feDeferTask(() => feApplyRenderedStateToAllLogs());
-      }
+      if (log) feScheduleRenderedLogRefresh(log, { delay: 0 });
+      else feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
 
       feFireChatUiUpdated({
         reason: "renderChatLog",
@@ -660,11 +672,10 @@ Hooks.once("ready", async () => {
   feSetUiFontClass(document);
   feSetUserColorBgClass(document);
   feSetUserColorBgBaseClass(document);
-  feApplyRenderedStateToAllLogs();
+  if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
   feRenderTypingIndicator();
   feSetupTypingIndicator();
-  feInstallMarkdownPreCreateHook();
 });
 
 // Extra safety: apply user-color background as soon as each message is rendered.
@@ -676,102 +687,37 @@ Hooks.once("ready", async () => {
 //  - Re-apply user-color tint after the message is inserted into the DOM
 //  - Schedule a dedupe + merge recompute for the affected chat log
 // See: Foundry core issue #13067 (duplicate render when update races render).
-const fePendingMergeLogs = new Set();
-let feMergeRefreshScheduled = false;
 let feInlineRollSnapshots = null;
 let feInlineRollSnapshotPersistTimer = null;
-const FE_INLINE_ROLL_SNAPSHOT_KEY = `${MODULE_ID}.inlineRollSnapshots.v1`;
-const FE_INLINE_ROLL_SNAPSHOT_LIMIT = 800;
-const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
-const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
-
-function feEnsureInlineRollSnapshotStore() {
-  if (feInlineRollSnapshots instanceof Map) return feInlineRollSnapshots;
-  feInlineRollSnapshots = new Map();
-  try {
-    const raw = sessionStorage.getItem(FE_INLINE_ROLL_SNAPSHOT_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        for (const [id, value] of parsed) {
-          if (!id || !Array.isArray(value?.items)) continue;
-          feInlineRollSnapshots.set(String(id), value);
-        }
-      }
-    }
-  } catch {}
-  return feInlineRollSnapshots;
+// Inline-roll snapshotting was used by older post-processing passes.
+// The current pipeline freezes new inline rolls at preCreate/preUpdate time instead,
+// so these helpers are kept as no-op shims to avoid extra session churn while preserving call sites.
+function feClearInlineRollSnapshot(_messageId) {
+  /* no-op */
 }
 
-function fePersistInlineRollSnapshotsSoon() {
-  try {
-    if (feInlineRollSnapshotPersistTimer) return;
-    feInlineRollSnapshotPersistTimer = setTimeout(() => {
-      feInlineRollSnapshotPersistTimer = null;
-      try {
-        const store = feEnsureInlineRollSnapshotStore();
-        const entries = Array.from(store.entries()).slice(-FE_INLINE_ROLL_SNAPSHOT_LIMIT);
-        sessionStorage.setItem(FE_INLINE_ROLL_SNAPSHOT_KEY, JSON.stringify(entries));
-      } catch {}
-    }, 120);
-  } catch {}
+function feSnapshotOrRestoreInlineRolls(_message, _rootEl) {
+  /* no-op */
 }
-
-function feTrimInlineRollSnapshots() {
-  try {
-    const store = feEnsureInlineRollSnapshotStore();
-    while (store.size > FE_INLINE_ROLL_SNAPSHOT_LIMIT) {
-      const first = store.keys().next();
-      if (first.done) break;
-      store.delete(first.value);
-    }
-  } catch {}
-}
-
-function feClearInlineRollSnapshot(messageId) {
-  try {
-    const id = feNormalizeChatMessageId(messageId);
-    if (!id) return;
-    const store = feEnsureInlineRollSnapshotStore();
-    if (!store.delete(id)) return;
-    fePersistInlineRollSnapshotsSoon();
-  } catch {}
-}
-
-function feSnapshotOrRestoreInlineRolls(message, rootEl) {
-  try {
-    const id = feNormalizeChatMessageId(message?.id ?? message?._id ?? feGetMessageIdFromElement(rootEl));
-    if (!id || !rootEl?.querySelectorAll) return;
-    const rolls = Array.from(rootEl.querySelectorAll('.inline-roll.inline-result'));
-    if (!rolls.length) return;
-    const store = feEnsureInlineRollSnapshotStore();
-    const existing = store.get(id);
-    if (existing?.items?.length === rolls.length) {
-      for (let i = 0; i < rolls.length; i += 1) {
-        const snap = existing.items[i];
-        const el = rolls[i];
-        if (!snap || !el) continue;
-        if (typeof snap.html === 'string') el.innerHTML = snap.html;
-        if (typeof snap.title === 'string') el.setAttribute('title', snap.title);
-        if (typeof snap.aria === 'string') el.setAttribute('aria-label', snap.aria);
-        else el.removeAttribute('aria-label');
-      }
-      return;
-    }
-    const items = rolls.map((el) => ({
-      html: String(el.innerHTML ?? ''),
-      title: String(el.getAttribute?.('title') ?? ''),
-      aria: String(el.getAttribute?.('aria-label') ?? ''),
-    }));
-    store.set(id, { items, t: Date.now() });
-    feTrimInlineRollSnapshots();
-    fePersistInlineRollSnapshotsSoon();
-  } catch {}
-}
-
 
 function feIsElementNode(node) {
   return !!node && node.nodeType === 1;
+}
+
+function feGetMessageFromElementOrCollection(elOrId) {
+  try {
+    if (elOrId && typeof elOrId === "object" && (elOrId.id || elOrId._id) && typeof elOrId.getFlag === "function") return elOrId;
+    if (feIsElementNode(elOrId)) {
+      const direct = elOrId.__feMessage || elOrId.closest?.("li.chat-message")?.__feMessage;
+      if (direct) return direct;
+      const id = feGetMessageIdFromElement(elOrId);
+      return id ? game.messages?.get?.(id) ?? null : null;
+    }
+    const id = feNormalizeChatMessageId(elOrId);
+    return id ? game.messages?.get?.(id) ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 function feExtractHTMLElement(html) {
@@ -793,37 +739,208 @@ function feDeferTask(fn) {
 }
 
 
-const fePendingRenderedMessageRefreshes = new Map();
+const fePendingRenderedLogs = new Set();
+const fePendingRenderedLogOptions = new WeakMap();
+const fePendingRenderedLogFrames = new Map();
 
-function feScheduleRenderedMessageRefresh(messageOrId, { retries = 8, delay = 16, allowNarratorMerge = false } = {}) {
+const feQueuedRenderedMessageIds = new Set();
+let feQueuedRenderedMessageTimer = null;
+let feQueuedRenderedMessagePass = 0;
+let feQueuedRenderedMessageNarratorMerge = false;
+
+function feWindowRequestFrame(win, fn) {
+  try {
+    const w = win ?? window;
+    if (typeof w?.requestAnimationFrame === "function") return w.requestAnimationFrame(fn);
+  } catch {
+    /* no-op */
+  }
+  return setTimeout(fn, 16);
+}
+
+function feWindowCancelFrame(win, handle) {
+  try {
+    const w = win ?? window;
+    if (typeof w?.cancelAnimationFrame === "function") {
+      w.cancelAnimationFrame(handle);
+      return;
+    }
+  } catch {
+    /* no-op */
+  }
+  clearTimeout(handle);
+}
+
+function feFlushRenderedLogsForWindow(win = window) {
+  try {
+    const pending = Array.from(fePendingRenderedLogs).filter((log) => (log?.ownerDocument?.defaultView ?? window) === win);
+    for (const log of pending) {
+      fePendingRenderedLogs.delete(log);
+      const opts = fePendingRenderedLogOptions.get(log) ?? {};
+      fePendingRenderedLogOptions.delete(log);
+      try {
+        feDedupeChatMessagesInLog(log);
+        feApplyRenderedStateToLog(log, opts);
+      } catch {
+        /* no-op */
+      }
+    }
+  } finally {
+    fePendingRenderedLogFrames.delete(win);
+  }
+}
+
+function feScheduleRenderedLogRefresh(logEl, { delay = 24, allowNarratorMerge = false } = {}) {
+  try {
+    if (!feHasRenderedStateWork()) return;
+    if (!feIsElementNode(logEl)) return;
+    const opts = fePendingRenderedLogOptions.get(logEl) ?? { allowNarratorMerge: false };
+    opts.allowNarratorMerge = opts.allowNarratorMerge || !!allowNarratorMerge;
+    fePendingRenderedLogOptions.set(logEl, opts);
+    fePendingRenderedLogs.add(logEl);
+
+    const win = logEl?.ownerDocument?.defaultView ?? window;
+    const existing = fePendingRenderedLogFrames.get(win);
+    if (existing) return;
+
+    const wait = Math.max(0, Number(delay) || 0);
+    const kickoff = () => {
+      const current = fePendingRenderedLogFrames.get(win);
+      if (typeof current === "number") {
+        // timeout handle is consumed; the next stored handle becomes the animation frame.
+      }
+      const raf = feWindowRequestFrame(win, () => feFlushRenderedLogsForWindow(win));
+      fePendingRenderedLogFrames.set(win, raf);
+    };
+
+    if (wait > 0) {
+      const timeout = setTimeout(kickoff, wait);
+      fePendingRenderedLogFrames.set(win, timeout);
+    } else {
+      kickoff();
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feScheduleRenderedStateRefreshForAllLogs({ delay = 24, allowNarratorMerge = false } = {}) {
+  try {
+    if (!feHasRenderedStateWork()) return;
+    for (const log of feGetChatLogs()) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge });
+  } catch {
+    /* no-op */
+  }
+}
+
+function feGetChatLogsInDocument(doc = document) {
+  try {
+    const rootDoc = doc?.querySelectorAll ? doc : document;
+    const logs = new Set();
+    rootDoc.querySelectorAll?.("ol.chat-log, #chat-log")?.forEach?.((el) => {
+      if (feIsElementNode(el)) logs.add(el);
+    });
+    return Array.from(logs);
+  } catch {
+    return feGetChatLogs();
+  }
+}
+
+function feCssEscape(value) {
+  try {
+    if (globalThis.CSS?.escape) return globalThis.CSS.escape(String(value ?? ""));
+  } catch {
+    /* no-op */
+  }
+  return String(value ?? "").replace(/[^a-zA-Z0-9_\-]/g, "\$&");
+}
+
+function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, allowNarratorMerge = false, doc = document } = {}) {
+  try {
+    if (!feHasRenderedStateWork()) return;
+    const id = feNormalizeChatMessageId(messageId);
+    const rootDoc = doc?.querySelectorAll ? doc : document;
+    const logs = new Set();
+    if (id) {
+      const escaped = feCssEscape(id);
+      const selector = `[data-message-id="${escaped}"], [data-document-id="${escaped}"], [data-document-id$=".${escaped}"]`;
+      rootDoc.querySelectorAll?.(selector)?.forEach?.((node) => {
+        const li = node?.closest?.("li.chat-message");
+        const log = li?.closest?.("ol.chat-log, #chat-log") ?? node?.closest?.("ol.chat-log, #chat-log");
+        if (feIsElementNode(log)) logs.add(log);
+      });
+    }
+    if (!logs.size) {
+      const fallbackLogs = feGetChatLogsInDocument(rootDoc);
+      for (const log of fallbackLogs) logs.add(log);
+    }
+    if (!logs.size) {
+      feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge });
+      return;
+    }
+    for (const log of logs) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge });
+  } catch {
+    feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge });
+  }
+}
+
+function feFlushQueuedRenderedMessageRefreshes() {
+  try {
+    const ids = Array.from(feQueuedRenderedMessageIds);
+    feQueuedRenderedMessageIds.clear();
+    feQueuedRenderedMessageTimer = null;
+
+    if (!ids.length) {
+      feQueuedRenderedMessagePass = 0;
+      feQueuedRenderedMessageNarratorMerge = false;
+      return;
+    }
+
+    const logs = feGetChatLogs();
+    let missing = false;
+    for (const log of logs) {
+      if (!feIsElementNode(log)) continue;
+      try { feDedupeChatMessagesInLog(log); } catch {}
+      const anchors = new Set();
+      for (const id of ids) {
+        const el = log.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
+        if (!el) {
+          missing = true;
+          continue;
+        }
+        anchors.add(el);
+      }
+      for (const el of anchors) {
+        const msg = feGetMessageFromElementOrCollection(el);
+        feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+        if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+      }
+    }
+
+    if (missing && feQueuedRenderedMessagePass < 2) {
+      feQueuedRenderedMessagePass += 1;
+      for (const id of ids) feQueuedRenderedMessageIds.add(id);
+      feQueuedRenderedMessageTimer = setTimeout(feFlushQueuedRenderedMessageRefreshes, 28 + (feQueuedRenderedMessagePass * 18));
+      return;
+    }
+
+    feQueuedRenderedMessagePass = 0;
+    feQueuedRenderedMessageNarratorMerge = false;
+  } catch {
+    feQueuedRenderedMessageTimer = null;
+    feQueuedRenderedMessagePass = 0;
+    feQueuedRenderedMessageNarratorMerge = false;
+  }
+}
+
+function feScheduleRenderedMessageRefresh(messageOrId, { delay = 16, allowNarratorMerge = false } = {}) {
   try {
     const id = feNormalizeChatMessageId(messageOrId?.id ?? messageOrId?._id ?? messageOrId);
     if (!id) return;
-    if (fePendingRenderedMessageRefreshes.has(id)) return;
-
-    let attempts = 0;
-    const tick = () => {
-      attempts += 1;
-      let found = false;
-      const message = game?.messages?.get?.(id) ?? null;
-      for (const log of feGetChatLogs()) {
-        const el = log?.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
-        if (!el) continue;
-        found = true;
-        feApplyRenderedStateToMessageElement(message, el, { allowNarratorMerge });
-      }
-      if ((!found || attempts < 2) && attempts < retries) {
-        const t = setTimeout(tick, delay);
-        fePendingRenderedMessageRefreshes.set(id, t);
-      } else {
-        const t = fePendingRenderedMessageRefreshes.get(id);
-        if (t) clearTimeout(t);
-        fePendingRenderedMessageRefreshes.delete(id);
-      }
-    };
-
-    const t = setTimeout(tick, 0);
-    fePendingRenderedMessageRefreshes.set(id, t);
+    feQueuedRenderedMessageIds.add(id);
+    feQueuedRenderedMessageNarratorMerge = feQueuedRenderedMessageNarratorMerge || !!allowNarratorMerge;
+    if (feQueuedRenderedMessageTimer) return;
+    feQueuedRenderedMessageTimer = setTimeout(feFlushQueuedRenderedMessageRefreshes, Math.max(0, Number(delay) || 0));
   } catch {
     /* no-op */
   }
@@ -839,14 +956,15 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
     const makeInfo = (el) => {
       const msgId = feGetMessageIdFromElement(el);
-      const msg = msgId ? game.messages?.get(msgId) : null;
+      const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game.messages?.get?.(msgId) : null);
       const info = feMessageMergeInfo(msg, el);
+      const hasStampedKey = !!info?.key;
       info.msgId = msgId;
-      info.missing = !msg;
+      info.missing = !msg && !hasStampedKey;
       info.el = el;
       info.order = feGetChatMessageElementOrder(el, 0);
-      info.key = msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? Math.random()}`;
-      if (!msg) info.mergeableText = false;
+      info.key = info.key || (msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? Math.random()}`);
+      if (!msg && !hasStampedKey) info.mergeableText = false;
       return info;
     };
     const canMerge = (a, b) => {
@@ -876,6 +994,8 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
     if (!Array.isArray(infos) || !infos.length) return;
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
     const showDivider = !!feSetting(S.MERGE_DIVIDER);
+    const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
+    const simpleMode = mergeMode === "simple";
     const canMerge = (a, b) => {
       if (!a || !b) return false;
       const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
@@ -885,7 +1005,7 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
       return true;
     };
     for (const info of infos) {
-      info?.el?.classList?.remove?.("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-divider-before");
+      info?.el?.classList?.remove?.("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before");
     }
     const applyGroup = (startIndex, endIndexExclusive) => {
       const groupLen = endIndexExclusive - startIndex;
@@ -894,6 +1014,10 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
       if (!first?.el) return;
       if (showDivider && (startOffset + startIndex) > 0) first.el.classList.add("fe-divider-before");
       if (groupLen === 1) return;
+      if (simpleMode) {
+        for (let i = startIndex + 1; i < endIndexExclusive; i += 1) infos[i]?.el?.classList?.add?.("fe-merge-follow");
+        return;
+      }
       first.el.classList.add("fe-merge-start");
       for (let i = startIndex + 1; i < endIndexExclusive - 1; i += 1) infos[i]?.el?.classList?.add?.("fe-merge-mid");
       infos[endIndexExclusive - 1]?.el?.classList?.add?.("fe-merge-end");
@@ -928,13 +1052,14 @@ function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false }
 
 function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarratorMerge = false } = {}) {
   try {
+    void allowNarratorMerge;
     const el = feExtractHTMLElement(messageEl);
     if (!el) return;
     // Do NOT mutate .message-content during normal live-chat refreshes.
     // Merge only relies on message classes/header visibility, and touching inline-roll DOM here
     // can cause visible churn when Foundry re-renders messages while scrolling.
+    feStampRenderedStateAttributes(message, el);
     feApplyUserColorBgToMessageElement(message, el);
-    if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge });
   } catch {
     /* no-op */
   }
@@ -942,6 +1067,7 @@ function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarrato
 
 function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
   try {
+    if (!feHasRenderedStateWork()) return;
     if (!feIsElementNode(logEl)) return;
     const nodes = Array.from(logEl.querySelectorAll?.("li.chat-message") ?? []);
     for (const li of nodes) {
@@ -1012,18 +1138,20 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
   try {
-    feSnapshotOrRestoreInlineRolls(message, el);
     feApplyUserColorBgToMessageElement(message, el);
   } catch {
     /* no-op */
   }
-  feScheduleRenderedMessageRefresh(message);
+  // The message element is not yet inserted into the ChatLog at this point.
+  // Schedule one debounced, message-targeted log pass for the next tick instead of mutating the
+  // neighborhood immediately; this keeps merge display stable and avoids touching message-content.
+  feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
 });
 
 Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
     feHydrateRenderStateOverride(message, null, userId);
-    feScheduleRenderedMessageRefresh(message);
+    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
   } catch {
     /* no-op */
   }
@@ -1033,7 +1161,7 @@ Hooks.on("deleteChatMessage", (message) => {
   try {
     feClearInlineRollSnapshot(message?.id ?? message?._id);
     feStoreRenderStateOverride(message?.id ?? message?._id, null);
-    if (feSetting(S.MERGE_ENABLED)) feApplyRenderedStateToAllLogs();
+    feScheduleRenderedStateRefreshForAllLogs({ delay: 24 });
   } catch {
     /* no-op */
   }
@@ -1043,8 +1171,7 @@ Hooks.on("updateChatMessage", (message, change, _options, userId) => {
   try {
     if (feChangeTouchesInlineRollSnapshot(change)) feClearInlineRollSnapshot(message?.id ?? message?._id);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
-    feRefreshRenderedMessageById(message);
-    feScheduleRenderedMessageRefresh(message);
+    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
   } catch {
     /* no-op */
   }
@@ -1062,6 +1189,36 @@ function feEscapeHTML(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function feFreezeInlineRollSyntax(content) {
+  try {
+    const src = String(content ?? "");
+    if (!src || !src.includes("[[") || /class=["']inline-roll\b/i.test(src)) return src;
+    return src.replace(/\[\[([\s\S]+?)\]\]/g, (match, rawExpr) => {
+      try {
+        let expr = String(rawExpr ?? "").trim();
+        if (!expr) return match;
+        expr = expr.replace(/^\/(?:r|roll|gmroll|blindroll|selfroll|publicroll|pr|br|sr)\s+/i, "").trim();
+        if (!expr) return match;
+        let roll = null;
+        try { roll = Roll.create ? Roll.create(expr) : new Roll(expr); } catch { roll = new Roll(expr); }
+        if (!roll) return match;
+        if (typeof roll.evaluateSync === "function") roll = roll.evaluateSync({ strict: false });
+        else if (typeof roll.evaluate === "function") roll = roll.evaluate({ async: false, strict: false });
+        const total = roll?.total ?? "";
+        const json = typeof roll?.toJSON === "function" ? roll.toJSON() : roll;
+        const dataRoll = encodeURIComponent(JSON.stringify(json));
+        const title = feEscapeHTML(expr);
+        const label = feEscapeHTML(String(total ?? ""));
+        return `<a class="inline-roll inline-result" data-roll="${dataRoll}" data-tooltip="${title}" title="${title}"><i class="fas fa-dice-d20"></i>${label}</a>`;
+      } catch {
+        return match;
+      }
+    });
+  } catch {
+    return String(content ?? "");
+  }
 }
 
 function feRewriteCSSAssetURLs(cssText, baseUrl) {
@@ -1230,7 +1387,7 @@ function feIsNarratorMessageElementInWindow(win, msgEl) {
     const msgId = rawId ? String(rawId).split(".").pop() : null;
     if (!msgId) return false;
 
-    const msg = game.messages?.get?.(msgId);
+    const msg = feGetMessageFromElementOrCollection(msgEl) || game.messages?.get?.(msgId);
     return !!msg?.getFlag?.("narrator-tools", "type") || !!msg?.flags?.["narrator-tools"];
   } catch {
     return false;
@@ -1251,7 +1408,7 @@ function feIsRoundMarkerMessageElementInWindow(win, msgEl) {
     const msgId = rawId ? String(rawId).split(".").pop() : null;
     if (!msgId) return false;
 
-    const msg = game.messages?.get?.(msgId);
+    const msg = feGetMessageFromElementOrCollection(msgEl) || game.messages?.get?.(msgId);
     const flag = msg?.flags?.["monks-little-details"]?.roundmarker;
     if (flag === true || String(flag) === "true") return true;
     const content = String(msg?.content ?? "");
@@ -1491,52 +1648,77 @@ function feLooksLikeHTML(text) {
   return /<\s*[a-zA-Z][\s\S]*?>/.test(text);
 }
 
-function feInstallMarkdownPreCreateHook() {
-  // NOTE (FVTT v13): Hooks are not awaited. preCreate* hooks are especially sensitive.
-  // Do NOT use async/await here, or message creation can complete before we updateSource.
-  Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
-    if (!feSetting(S.MARKDOWN_ENABLED)) return;
-    if (userId !== game.user.id) return;
+function feApplyMarkdownOnPreCreate(message, data = {}, userId = null) {
+  try {
+    if (!feSetting(S.MARKDOWN_ENABLED)) return false;
+    if (userId !== game.user.id) return false;
 
-    const content = (data?.content ?? message.content ?? "").toString();
+    const content = String(data?.content ?? message?.content ?? "");
     const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
+    if (trimmed.startsWith("/")) return false;
+    if (feLooksLikeHTML(content)) return false;
 
-    // Slash commands / roll commands should be handled by Foundry
-    if (trimmed.startsWith("/")) return;
-
-    // If message already HTML (chat cards, system messages, etc.), don't touch it.
-    if (feLooksLikeHTML(content)) return;
-
-    // Don't touch roll messages.
     try {
       const hasRolls =
         (Array.isArray(data?.rolls) && data.rolls.length > 0) ||
         (Array.isArray(message?.rolls) && message.rolls.length > 0);
-      if (hasRolls) return;
+      if (hasRolls) return false;
     } catch (_e) {
       /* noop */
     }
 
-    // Convert markdown -> HTML (keep it synchronous so the create flow is not raced).
-    // Enrichment (UUID links, inline rolls) is intentionally skipped here.
-    const html = feMarkdownToHTML(content);
+    let html = feMarkdownToHTML(content);
+    html = feFreezeInlineRollSyntax(html);
 
-    // Store the raw text for later edits
-    const flags = foundry.utils.deepClone(data?.flags ?? message.flags ?? {});
+    const flags = foundry.utils.deepClone(data?.flags ?? message?.flags ?? {});
     flags[MODULE_ID] = foundry.utils.mergeObject(flags[MODULE_ID] ?? {}, {
       raw: content,
       markdown: true,
     });
 
     message.updateSource({ content: html, flags });
-  });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function feMaybeFreezeInlineRollContentOnPreCreate(message, data = {}, userId = null) {
+  try {
+    if (userId !== game.user.id) return false;
+    const content = String(data?.content ?? message?.content ?? "");
+    if (!content || !content.includes("[[") || /class=["']inline-roll\b/i.test(content)) return false;
+    const frozen = feFreezeInlineRollSyntax(content);
+    if (frozen && frozen !== content) {
+      message.updateSource({ content: frozen });
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function feGetPendingMessageSource(message, data = {}) {
+  try {
+    const pending = message?.toObject?.() ?? {};
+    return foundry.utils.mergeObject(foundry.utils.deepClone(data ?? {}), pending, {
+      inplace: false,
+      recursive: true,
+      overwrite: true,
+    });
+  } catch {
+    return data ?? {};
+  }
 }
 
 Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
-    feCaptureMessageRenderFlagsOnPreCreate(message, data, userId);
+    feApplyMarkdownOnPreCreate(message, data, userId);
+    feMaybeFreezeInlineRollContentOnPreCreate(message, data, userId);
+    feCaptureMessageRenderFlagsOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
   } catch {
     /* no-op */
   }
@@ -1545,7 +1727,10 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
 Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
-    feCaptureMessageRenderFlagsOnPreUpdate(message, changed);
+    if (typeof changed?.content === "string" && changed.content.includes("[[") && !/class=["']inline-roll\b/i.test(changed.content)) {
+      changed.content = feFreezeInlineRollSyntax(changed.content);
+    }
+    feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
   } catch {
     /* no-op */
   }
@@ -1657,6 +1842,8 @@ function feGetMessageUserColor(message) {
 }
 
 const FE_RENDER_STATE_FLAG = "renderState";
+const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
+const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
 const FE_RENDER_STATE_VERSION = 1;
 const feMessageRenderStateOverrides = new Map();
 
@@ -1669,6 +1856,21 @@ function feGetSpeakerActorFromLike(message, data = {}) {
     return actorId ? game.actors?.get?.(actorId) ?? null : null;
   } catch {
     return null;
+  }
+}
+
+function feMessageHasDynamicRollContent(content, message = null, el = null) {
+  try {
+    const src = String(content ?? "");
+    if (/class=["'][^"']*\binline-roll\b[^"']*["']/i.test(src)) return true;
+    if (/class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/i.test(src)) return true;
+    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/i.test(src)) return true;
+    if (/\[\[[\s\S]+?\]\]/.test(src)) return true;
+    if ((Array.isArray(message?.rolls) && message.rolls.length > 0)) return true;
+    if (el?.querySelector?.('.inline-roll.inline-result, .dice-roll, .dice-result, .chat-card, .midi-chat-card')) return true;
+    return false;
+  } catch {
+    return false;
   }
 }
 
@@ -1721,7 +1923,8 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
     const hasRolls = rolls.length > 0;
     const hasChatCard = /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/.test(content);
     const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
-    const mergeableText = !hasRolls && !hasChatCard && !hasDice;
+    const hasDynamicRoll = feMessageHasDynamicRollContent(content, message, null) || hasRolls;
+    const mergeableText = !hasDynamicRoll && !hasChatCard && !hasDice;
     const speakerKey = [
       speaker?.scene ?? "",
       speaker?.token ?? "",
@@ -1746,6 +1949,7 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
         rollMode,
         style,
         mergeableText,
+        hasDynamicRoll,
         isNarrator: narrator,
         isRoundMarker,
         noMerge: narrator || isRoundMarker,
@@ -1867,8 +2071,15 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     const el0 = messageEl?.[0] ?? messageEl;
     if (!el0?.classList || !el0?.style) return;
 
-    const isNarratorTools = feIsNarratorToolsMessage(message, el0);
-    const isRoundMarker = feIsRoundMarkerMessage(message, el0);
+    feStampRenderedStateAttributes(message, el0);
+
+    const state = feGetStoredRenderState(message);
+    const isNarratorTools = typeof state?.isNarrator === "boolean"
+      ? state.isNarrator
+      : feIsNarratorToolsMessage(message, el0);
+    const isRoundMarker = typeof state?.isRoundMarker === "boolean"
+      ? state.isRoundMarker
+      : feIsRoundMarkerMessage(message, el0);
     el0.classList.toggle("fe-narrator-chat", isNarratorTools);
     el0.classList.toggle("fe-round-marker-chat", isRoundMarker);
     if (isNarratorTools || isRoundMarker) {
@@ -1883,7 +2094,6 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
       return;
     }
 
-    const state = feGetStoredRenderState(message);
     const rgbString = state?.userColorRgb || message?.flags?.[MODULE_ID]?.userColorRgb || null;
     let rgb = null;
     if (rgbString) {
@@ -2089,7 +2299,85 @@ function feGetChatMessageElementOrder(el, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function feReadStampedMergeInfoFromElement(el) {
+  try {
+    const node = feExtractHTMLElement(el);
+    const ds = node?.dataset;
+    if (!ds) return null;
+    const hasAny =
+      Object.prototype.hasOwnProperty.call(ds, "feMergeKey") ||
+      Object.prototype.hasOwnProperty.call(ds, "feNoMerge") ||
+      Object.prototype.hasOwnProperty.call(ds, "feIsNarrator") ||
+      Object.prototype.hasOwnProperty.call(ds, "feIsRoundMarker");
+    if (!hasAny) return null;
+
+    const key = String(ds.feMergeKey ?? "").trim();
+    return {
+      key: key || null,
+      mergeableText: ds.feMergeableText === "1",
+      isNarrator: ds.feIsNarrator === "1",
+      isRoundMarker: ds.feIsRoundMarker === "1",
+      noMerge: ds.feNoMerge === "1",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function feStampRenderedStateAttributes(message, messageEl) {
+  try {
+    const el = feExtractHTMLElement(messageEl);
+    const ds = el?.dataset;
+    if (!el?.classList || !ds || !message) return;
+
+    const state = feGetStoredRenderState(message);
+    const storedHint = state?.merge ?? message?.flags?.[MODULE_ID]?.[FE_RENDER_MERGE_HINT_FLAG] ?? null;
+    const isNarratorTools = typeof state?.isNarrator === "boolean"
+      ? state.isNarrator
+      : feIsNarratorToolsMessage(message, el);
+    const isRoundMarker = typeof state?.isRoundMarker === "boolean"
+      ? state.isRoundMarker
+      : feIsRoundMarkerMessage(message, el);
+
+    const speaker = message?.speaker ?? {};
+    const whisper = Array.isArray(message?.whisper) ? message.whisper : [];
+    const mergeInfo = {
+      authorId: storedHint?.authorId ?? message?.author?.id ?? message?.user?.id ?? message?.user ?? "",
+      speakerKey: storedHint?.speakerKey ?? ([
+        speaker.scene ?? "",
+        speaker.token ?? "",
+        speaker.actor ?? "",
+        speaker.alias ?? "",
+      ].join("|") + (isNarratorTools ? "|__fe_narrator__" : "") + (isRoundMarker ? "|__fe_roundmarker__" : "")),
+      whisperKey: storedHint?.whisperKey ?? (whisper.length ? whisper.slice().sort().join(",") : ""),
+      blind: typeof storedHint?.blind === "boolean" ? storedHint.blind : !!message?.blind,
+      rollMode: storedHint?.rollMode ?? message?.rollMode ?? "",
+      style: storedHint?.style ?? message?.style ?? message?.type ?? null,
+      mergeableText: typeof storedHint?.mergeableText === "boolean"
+        ? storedHint.mergeableText
+        : !feMessageHasDynamicRollContent(String(message?.content ?? ""), message, el),
+      isNarrator: isNarratorTools,
+      isRoundMarker,
+      noMerge: typeof storedHint?.noMerge === "boolean"
+        ? storedHint.noMerge
+        : (isNarratorTools || isRoundMarker),
+    };
+
+    const mergeKey = feMergeKey(mergeInfo);
+    if (mergeKey) ds.feMergeKey = mergeKey;
+    else delete ds.feMergeKey;
+
+    ds.feMergeableText = mergeInfo.mergeableText ? "1" : "0";
+    ds.feNoMerge = mergeInfo.noMerge ? "1" : "0";
+    ds.feIsNarrator = isNarratorTools ? "1" : "0";
+    ds.feIsRoundMarker = isRoundMarker ? "1" : "0";
+  } catch {
+    /* no-op */
+  }
+}
+
 function feMessageMergeInfo(msg, el) {
+  const stamped = feReadStampedMergeInfoFromElement(el);
   const storedState = feGetStoredRenderState(msg);
   const storedHint = storedState?.merge ?? msg?.flags?.[MODULE_ID]?.[FE_RENDER_MERGE_HINT_FLAG] ?? null;
 
@@ -2097,8 +2385,12 @@ function feMessageMergeInfo(msg, el) {
   // Some automation modules may still populate legacy fields during rapid updates, so keep fallbacks.
   const authorId = storedHint?.authorId ?? msg?.author?.id ?? msg?.user?.id ?? msg?.user ?? "";
 
-  const isNarratorTools = feIsNarratorToolsMessage(msg, el);
-  const isRoundMarker = feIsRoundMarkerMessage(msg, el);
+  const isNarratorTools = typeof stamped?.isNarrator === "boolean"
+    ? stamped.isNarrator
+    : (typeof storedState?.isNarrator === "boolean" ? storedState.isNarrator : feIsNarratorToolsMessage(msg, el));
+  const isRoundMarker = typeof stamped?.isRoundMarker === "boolean"
+    ? stamped.isRoundMarker
+    : (typeof storedState?.isRoundMarker === "boolean" ? storedState.isRoundMarker : feIsRoundMarkerMessage(msg, el));
 
   const speaker = msg?.speaker ?? {};
   const speakerKey = storedHint?.speakerKey ?? ([
@@ -2122,13 +2414,18 @@ function feMessageMergeInfo(msg, el) {
   const hasRolls = Array.isArray(msg?.rolls) && msg.rolls.length > 0;
 
   const content = String(msg?.content ?? "");
-  const hasChatCard = /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/.test(content);
-  const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
+  const hasDynamicRoll = typeof storedHint?.hasDynamicRoll === "boolean"
+    ? storedHint.hasDynamicRoll
+    : feMessageHasDynamicRollContent(content, msg, el) || hasRolls;
 
-  // "Merge only text" should merge plain text lines, but avoid merging item cards / dice rolls.
+  // "Merge only text" should merge plain text lines, but avoid inline rolls / dice rolls / chat cards.
   const mergeableText = typeof storedHint?.mergeableText === "boolean"
     ? storedHint.mergeableText
-    : (!hasRolls && !hasChatCard && !hasDice);
+    : (typeof stamped?.mergeableText === "boolean" ? stamped.mergeableText : !hasDynamicRoll);
+
+  const noMerge = typeof storedHint?.noMerge === "boolean"
+    ? storedHint.noMerge
+    : (typeof stamped?.noMerge === "boolean" ? stamped.noMerge : (isNarratorTools || isRoundMarker));
 
   return {
     authorId,
@@ -2138,10 +2435,11 @@ function feMessageMergeInfo(msg, el) {
     rollMode,
     style,
     mergeableText,
+    key: stamped?.key ?? null,
     isNarrator: isNarratorTools,
     isRoundMarker,
-    // Keep narrator/round-marker lines standalone in live chat; archive/print can opt specific cases back in.
-    noMerge: isNarratorTools || isRoundMarker,
+    // Keep narrator/round-marker lines standalone in live chat; inline-roll / dice messages can also opt out.
+    noMerge,
   };
 }
 
@@ -2149,11 +2447,36 @@ function feMessageMergeInfo(msg, el) {
 
 
 function feGetChatLogs() {
-  // Sidebar + any chat popouts
+  // Sidebar + any chat popouts / adopted chat roots in other windows.
   const logs = new Set();
-  document.querySelectorAll("ol.chat-log, #chat-log").forEach((el) => {
-    if (feIsElementNode(el)) logs.add(el);
-  });
+  const scannedDocs = new Set();
+
+  const collect = (root) => {
+    try {
+      const queryRoot = root?.querySelectorAll ? root : root?.document ?? null;
+      if (!queryRoot || scannedDocs.has(queryRoot)) return;
+      scannedDocs.add(queryRoot);
+      queryRoot.querySelectorAll("ol.chat-log, #chat-log").forEach((el) => {
+        if (feIsElementNode(el)) logs.add(el);
+      });
+    } catch {
+      /* no-op */
+    }
+  };
+
+  collect(document);
+
+  try {
+    for (const app of Object.values(ui?.windows ?? {})) {
+      const root = app?.element?.[0] ?? app?.element ?? null;
+      if (root) collect(root);
+      const doc = root?.ownerDocument ?? app?.window?.document ?? null;
+      if (doc && doc !== document) collect(doc);
+    }
+  } catch {
+    /* no-op */
+  }
+
   return Array.from(logs);
 }
 
@@ -2232,23 +2555,48 @@ function feMergeKey(info) {
 
 
 
+const feMergeClassSignatureCache = new WeakMap();
+
+function feBuildMergeClassSignature(desiredSet) {
+  try {
+    if (!desiredSet || !desiredSet.size) return "";
+    return Array.from(desiredSet).sort().join("|");
+  } catch {
+    return "";
+  }
+}
+
 function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   if (!feIsElementNode(logEl)) return;
 
-  // Always clear previous merge classes first (so disabling the feature restores normal view).
-  const msgs = logEl.querySelectorAll("li.chat-message");
-  for (const el of msgs) {
-    el.classList.remove(
-      "fe-merge-start",
-      "fe-merge-mid",
-      "fe-merge-end",
-      "fe-merge-follow",
-      "fe-divider-before"
-    );
-  }
+  const mergeClasses = ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"];
+  const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
+
+  const applyDesiredClasses = (desiredMap) => {
+    for (const el of msgs) {
+      const desired = desiredMap.get(el) ?? null;
+      const signature = feBuildMergeClassSignature(desired);
+      if (feMergeClassSignatureCache.get(el) === signature) continue;
+      for (const cls of mergeClasses) {
+        const shouldHave = desired ? desired.has(cls) : false;
+        if (shouldHave) el.classList.add(cls);
+        else el.classList.remove(cls);
+      }
+      feMergeClassSignatureCache.set(el, signature);
+      try {
+        if (signature) el.dataset.feMergeSig = signature;
+        else delete el.dataset.feMergeSig;
+      } catch {
+        /* no-op */
+      }
+    }
+  };
 
   const mergeEnabled = !!feSetting(S.MERGE_ENABLED);
-  if (!mergeEnabled) return;
+  if (!mergeEnabled || !msgs.length) {
+    applyDesiredClasses(new Map());
+    return;
+  }
 
   const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
@@ -2259,29 +2607,24 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   let idx = 0;
   for (const el of msgs) {
     const msgId = feGetMessageIdFromElement(el);
-    const msg = msgId ? game.messages?.get(msgId) : null;
+    const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game.messages?.get?.(msgId) : null);
     const info = feMessageMergeInfo(msg, el);
     infos.push({
       ...info,
       msgId,
-      missing: !msg,
+      missing: !msg && !info?.key,
       el,
       idx,
       order: feGetChatMessageElementOrder(el, idx),
     });
-    idx++;
+    idx += 1;
   }
 
-  if (!infos.length) return;
-
-  // Sort by visual order (Foundry sometimes uses fractional data-order)
   infos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  // Precompute merge keys.
-  // If the ChatMessage document isn't available yet (rare race during rapid create->update),
-  // never merge it to avoid "message mixing". We will retry shortly.
   let hasMissingDocs = false;
   for (const info of infos) {
+    if (info.key) continue;
     if (!info.msgId || info.missing) {
       hasMissingDocs = true;
       info.key = `__fe_missing__||${info.msgId ?? info.idx}`;
@@ -2301,37 +2644,40 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
     return true;
   };
 
+  const desiredMap = new Map();
+  for (const info of infos) desiredMap.set(info.el, new Set());
+
+  const mark = (el, cls) => {
+    const set = desiredMap.get(el);
+    if (set) set.add(cls);
+  };
+
   const applyGroup = (startIndex, endIndexExclusive) => {
     const groupLen = endIndexExclusive - startIndex;
     if (groupLen <= 0) return;
-
     const first = infos[startIndex];
     if (!first?.el) return;
-
-    // Divider at group boundary (except first group)
-    if (showDivider && startIndex > 0) first.el.classList.add("fe-divider-before");
-
-    // Do not apply follow classes for single messages.
+    if (showDivider && startIndex > 0) mark(first.el, "fe-divider-before");
     if (groupLen === 1) return;
-
     if (simpleMode) {
-      for (let i = startIndex + 1; i < endIndexExclusive; i += 1) infos[i]?.el?.classList?.add("fe-merge-follow");
+      for (let i = startIndex + 1; i < endIndexExclusive; i += 1) mark(infos[i]?.el, "fe-merge-follow");
       return;
     }
-
-    first.el.classList.add("fe-merge-start");
-    for (let i = startIndex + 1; i < endIndexExclusive - 1; i++) infos[i]?.el?.classList?.add("fe-merge-mid");
-    infos[endIndexExclusive - 1]?.el?.classList?.add("fe-merge-end");
+    mark(first.el, "fe-merge-start");
+    for (let i = startIndex + 1; i < endIndexExclusive - 1; i += 1) mark(infos[i]?.el, "fe-merge-mid");
+    mark(infos[endIndexExclusive - 1]?.el, "fe-merge-end");
   };
 
   let groupStart = 0;
-  for (let i = 1; i < infos.length; i++) {
+  for (let i = 1; i < infos.length; i += 1) {
     if (!canMerge(infos[i - 1], infos[i])) {
       applyGroup(groupStart, i);
       groupStart = i;
     }
   }
   applyGroup(groupStart, infos.length);
+
+  applyDesiredClasses(desiredMap);
 }
 
 
@@ -2347,7 +2693,7 @@ function feApplyChatMergeToAllLogs() {
 // Keep a tiny compatibility shim so older internal call sites remain harmless.
 function feObserveChatLogs() {
   try {
-    feApplyRenderedStateToAllLogs();
+    if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
     feFireChatUiUpdated();
     feRenderTypingIndicator();
   } catch {
@@ -2376,6 +2722,8 @@ export {
   feApplyUserColorBgToMessageElement,
   feApplyRenderedStateToLog,
   feApplyRenderedStateToAllLogs,
+  feScheduleRenderedStateRefreshForAllLogs,
+  feScheduleRenderedStateRefreshForMessageId,
   feSetChatFontChoiceClass,
   feSetChatCardFontClass,
   feSetUiFontClass,
@@ -2383,6 +2731,8 @@ export {
   feSetUserColorBgClass,
 
   feApplyChatMerge,
+  feCaptureMessageRenderFlagsOnPreCreate,
+  feCaptureMessageRenderFlagsOnPreUpdate,
   feMessageMergeInfo,
   feMergeKey,
   feIsNarratorToolsMessage,

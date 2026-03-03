@@ -9,6 +9,7 @@ import {
   feGetChatLogs,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
+  feFireChatUiUpdated,
 } from "./fe-chat-enhance.js";
 
 const CP = Object.freeze({
@@ -40,6 +41,9 @@ const _cpResampleCache = new Map();
 
 // Track in-flight resample promises to avoid duplicating work
 const _cpResampleInflight = new Map();
+
+const _cpRefreshRootTimers = new WeakMap();
+let _cpRefreshAllTimer = null;
 
 // Cross-window safe DOM checks (avoid instanceof across Window realms).
 function cpIsElement(node) {
@@ -98,7 +102,10 @@ function cpShouldRenderPortraitForMessageElement(messageEl) {
     // - only show portraits on follow-ups when the merge follow mode is "portrait".
     if (cpIsMergeEnabled()) {
       const cl = messageEl.classList;
-      const isFollow = cl?.contains?.("fe-merge-mid") || cl?.contains?.("fe-merge-end");
+      const isFollow =
+        cl?.contains?.("fe-merge-mid") ||
+        cl?.contains?.("fe-merge-end") ||
+        cl?.contains?.("fe-merge-follow");
       if (isFollow) {
         const mode = cpGetMergeFollowMode();
         return mode === "portrait";
@@ -1232,6 +1239,33 @@ function cpRefreshAllChatMessages() {
   }
 }
 
+function cpScheduleRefreshMessagesInRoot(rootLike = document, { delay = 24 } = {}) {
+  try {
+    const root = rootLike?.[0] ?? rootLike ?? document;
+    if (!root) return;
+    const existing = _cpRefreshRootTimers.get(root);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      try { cpRefreshMessagesInRoot(root); } catch {}
+      finally {
+        const cur = _cpRefreshRootTimers.get(root);
+        if (cur === t) _cpRefreshRootTimers.delete(root);
+      }
+    }, Math.max(0, Number(delay) || 0));
+    _cpRefreshRootTimers.set(root, t);
+  } catch {}
+}
+
+function cpScheduleRefreshAllChatMessages({ delay = 24 } = {}) {
+  try {
+    if (_cpRefreshAllTimer) clearTimeout(_cpRefreshAllTimer);
+    _cpRefreshAllTimer = setTimeout(() => {
+      _cpRefreshAllTimer = null;
+      cpRefreshAllChatMessages();
+    }, Math.max(0, Number(delay) || 0));
+  } catch {}
+}
+
 // -------------------------------------
 // Exports for other feature modules (e.g. chat archive export)
 // -------------------------------------
@@ -1328,8 +1362,8 @@ function cpRegisterSettings() {
     default: true,
     onChange: () => {
       cpSetRootVars();
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1342,7 +1376,7 @@ function cpRegisterSettings() {
     default: false,
     onChange: () => {
       cpSetRootVars();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1354,8 +1388,8 @@ function cpRegisterSettings() {
     type: Boolean,
     default: false,
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1369,8 +1403,8 @@ function cpRegisterSettings() {
     default: 64,
     onChange: () => {
       cpSetRootVars();
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1383,8 +1417,8 @@ function cpRegisterSettings() {
     range: { min: 0, max: 128, step: 1 },
     default: 36,
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1402,8 +1436,8 @@ function cpRegisterSettings() {
       none: "미적용(자르지 않음)",
     },
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1421,8 +1455,8 @@ function cpRegisterSettings() {
       custom: "사용자 지정",
     },
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1435,8 +1469,8 @@ function cpRegisterSettings() {
     range: { min: 0, max: 12, step: 1 },
     default: 2,
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1448,8 +1482,8 @@ function cpRegisterSettings() {
     type: String,
     default: "#000000",
     onChange: () => {
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1466,8 +1500,8 @@ function cpRegisterSettings() {
     },
     onChange: () => {
       cpSetRootVars();
-      cpRefreshAllChatMessages();
-      Hooks.callAll(`${MODULE_ID}.chatUiUpdated`);
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
     },
   });
 
@@ -1478,7 +1512,7 @@ function cpRegisterSettings() {
     config: true,
     type: Boolean,
     default: false,
-    onChange: () => Hooks.callAll(`${MODULE_ID}.chatUiUpdated`),
+    onChange: () => feFireChatUiUpdated({ reason: "portrait-settings", document }),
   });
 
   // Message type filters
@@ -1490,7 +1524,7 @@ function cpRegisterSettings() {
       type: Boolean,
       default: def,
       onChange: () => {
-        cpRefreshAllChatMessages();
+        cpScheduleRefreshAllChatMessages({ delay: 0 });
       },
     });
 
@@ -1508,7 +1542,7 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   cpSetRootVars();
-  cpRefreshAllChatMessages();
+  cpScheduleRefreshAllChatMessages({ delay: 0 });
 });
 
 // Store a stable portrait src on the message at creation time.
@@ -1549,10 +1583,20 @@ Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
   try {
     const doc = payload?.document ?? payload?.root?.ownerDocument ?? document;
     cpSetRootVars(doc);
-    if (payload?.reason === "renderChatLog" && payload?.root) cpRefreshMessagesInRoot(payload.root);
-    else cpRefreshAllChatMessages();
+
+    // renderChatMessageHTML already upserts portraits one message at a time.
+    // Avoid whole-root rescans on every chat-log render; reserve broad refreshes
+    // for explicit UI/setting changes instead.
+    if (payload?.reason === "renderChatLog") return;
+
+    // Portrait settings already perform an immediate local refresh in their onChange handlers.
+    // Do not refresh again here, or the same whole-log pass runs twice.
+    if (payload?.reason === "portrait-settings") return;
+
+    if (payload?.root && payload?.reason === "archive-render") cpScheduleRefreshMessagesInRoot(payload.root, { delay: 0 });
+    else cpScheduleRefreshAllChatMessages({ delay: 0 });
   } catch {
     cpSetRootVars();
-    cpRefreshAllChatMessages();
+    cpScheduleRefreshAllChatMessages({ delay: 0 });
   }
 });
