@@ -1,0 +1,486 @@
+/* female_edition — v13 chat surface compatibility layer
+ * Normalizes styling across:
+ * - main chat log
+ * - chat notifications tray (#chat-notifications)
+ * - chat popout
+ *
+ * FVTT v13 can surface recent chat lines in #chat-notifications where the root
+ * element may be .message instead of li.chat-message. Several legacy selectors
+ * in the module were scoped only to .chat-message, which caused partial style
+ * loss in the notifications tray. Archive/export has a dedicated stylesheet and
+ * should not be restyled by this compatibility layer.
+ */
+
+/* ------------------------------------------------------------------
+ * 1) Notification tray / popout / archive typography consistency
+ * ------------------------------------------------------------------ */
+#chat-notifications,
+#chat-notifications :is(.message, .message-header, .message-content, .flavor-text, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card),
+.chat-popout #chat :is(.message, .message-header, .message-content, .flavor-text),
+.chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card),
+.chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
+  font-family: var(--fe-chat-font-family, var(--fe-font-primary), var(--font-primary), Signika, sans-serif) !important;
+}
+
+:is(#sidebar #chat, .chat-popout #chat, #chat-notifications)
+  :is(.chat-message, .message)
+  :is(.message-sender .name-stacked .title, .message-sender .title, .name-stacked .title) {
+  font-size: var(--fe-chat-title-size) !important;
+  line-height: 1.05 !important;
+}
+
+:is(#sidebar #chat, .chat-popout #chat, #chat-notifications)
+  :is(.chat-message, .message)
+  :is(.message-sender .name-stacked .subtitle, .message-sender .subtitle, .name-stacked .subtitle) {
+  font-size: var(--fe-chat-subtitle-size) !important;
+  line-height: 1.05 !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata {
+  font-family: var(--fe-font-secondary, var(--fe-chat-font-family, inherit)) !important;
+  font-weight: var(--fe-font-weight-small, 400) !important;
+  font-size: var(--fe-chat-meta-size, 12px) !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--fe-chat-meta-gap, 1px) !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata
+  :is(.message-timestamp, time) {
+  order: 0;
+  font-family: var(--fe-font-secondary, var(--fe-chat-font-family, inherit)) !important;
+  font-size: var(--fe-chat-meta-size, 12px) !important;
+  font-weight: var(--fe-font-weight-small, 400) !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata
+  :is(time.message-timestamp, .message-timestamp) {
+  display: inline-block !important;
+  transform: scaleX(0.75);
+  transform-origin: right center;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata
+  :is(a.message-edit, a.chat-control) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--fe-chat-header-icon-hit, 18px) !important;
+  height: var(--fe-chat-header-icon-hit, 18px) !important;
+  line-height: var(--fe-chat-header-icon-hit, 18px) !important;
+  font-size: var(--fe-chat-header-icon-size, 14px) !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata
+  :is(a.message-edit, a.chat-control)
+  i {
+  font-size: inherit !important;
+}
+
+/* ------------------------------------------------------------------
+ * 2) Message content readability parity (notifications + archive)
+ * ------------------------------------------------------------------ */
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content {
+  font-size: var(--fe-chat-message-font-size, inherit);
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content blockquote {
+  margin: 0.5em 0;
+  padding: 0.15em 0.75em;
+  border-left: 3px solid var(--color-border-light-2);
+  opacity: 0.95;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content > p {
+  margin: 0 0 0.35em 0;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content > p:last-child {
+  margin-bottom: 0;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.5em 0 0.25em 0;
+  line-height: 1.15;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h1 { font-size: 1.35em; }
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h2 { font-size: 1.25em; }
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h3 { font-size: 1.15em; }
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h4 { font-size: 1.10em; }
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h5 { font-size: 1.05em; }
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content h6 { font-size: 1em; }
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content :is(ul, ol) {
+  margin: 0.5em 0 0.5em 1.2em;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content :is(strong, b) {
+  font-size: 1.12em;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content em,
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  em {
+  font-style: italic !important;
+  font-synthesis: style;
+}
+
+/* Chat-card readability parity where notifications/archive surface full cards. */
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-size: var(--fe-chat-card-font-size, inherit) !important;
+  line-height: var(--fe-chat-card-line-height, 1.35) !important;
+  font-weight: var(--fe-chat-card-font-weight, 400) !important;
+  color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
+  text-shadow: none !important;
+}
+
+body.fe-chatcard-custom-font
+  #chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.details.card-content,
+    .details.card-content,
+    .details.collapsible-content.card-content,
+    .collapsible-content.card-content,
+    .collapsible-content,
+    .card-content
+  ) {
+  font-family: var(--fe-font-secondary, inherit) !important;
+  font-size: var(--fe-chat-card-font-size, inherit) !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.card-header.description,
+    .card-header.description,
+    section.card-header.description.collapsible,
+    .card-header.description.collapsible
+  ) {
+  background-color: var(--fe-chat-desc-bg, transparent) !important;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.card-header.description,
+    .card-header.description
+  )
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(p, li) {
+  margin: 0 0 0.55em 0;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.card-header.description,
+    .card-header.description
+  )
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(p, li):last-child {
+  margin-bottom: 0;
+}
+
+#chat-notifications
+  :is(.chat-message, .message)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  :is(
+    section.card-header.description,
+    .card-header.description
+  )
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  .wrapper :is(strong, b) {
+  font-weight: var(--fe-chat-card-strong-weight, 700);
+  color: inherit;
+}
+
+/* ------------------------------------------------------------------
+ * 3) Notification tray support for portrait / hide-portrait settings
+ * ------------------------------------------------------------------ */
+#chat-notifications .message.fe-has-chat-portrait > .message-header {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: var(--fe-chat-portrait-size, 64px) minmax(0, 1fr) !important;
+  grid-template-rows: var(--fe-chat-header-meta-strip, 18px) minmax(calc(var(--fe-chat-portrait-size, 64px) - var(--fe-chat-header-meta-strip, 18px)), auto) auto !important;
+  grid-template-areas:
+    "portrait metadata"
+    "portrait sender"
+    "portrait flavor" !important;
+  align-items: stretch !important;
+  column-gap: 8px !important;
+  row-gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 0 2px 0 !important;
+  border: none !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header > img.fe-chat-portrait {
+  grid-area: portrait;
+  align-self: stretch !important;
+  justify-self: start !important;
+  margin-bottom: 0 !important;
+  margin-right: 0 !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender {
+  grid-area: sender;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked {
+  display: grid !important;
+  grid-auto-flow: row;
+  align-items: center !important;
+  justify-items: stretch !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  flex: 1 1 auto !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked > span,
+#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender :is(.title, .subtitle) {
+  display: block !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  flex: 1 1 auto !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.05 !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+  grid-area: flavor;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  align-self: start !important;
+  justify-self: stretch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text):empty {
+  display: none !important;
+}
+
+#chat-notifications .message.fe-has-chat-portrait > .message-header .message-metadata {
+  grid-area: metadata;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  height: var(--fe-chat-header-meta-strip, 18px) !important;
+  min-height: var(--fe-chat-header-meta-strip, 18px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+  justify-self: stretch !important;
+  align-self: start !important;
+  text-align: right !important;
+}
+
+body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender,
+body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
+body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+  text-align: center !important;
+  justify-content: center !important;
+  justify-items: stretch !important;
+}
+
+body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender,
+body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
+body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+  text-align: left !important;
+  justify-content: start !important;
+  justify-items: stretch !important;
+}
+
+body.fe-hide-chat-portrait-wrap #chat-notifications .message .fe-chat-portrait-wrap,
+body.fe-hide-chat-portrait-wrap #chat-notifications .message img.fe-chat-portrait {
+  display: none !important;
+}
+
+#chat-notifications .message .fe-chat-portrait,
+#chat-notifications .message .fe-chat-card-icon {
+  image-rendering: auto !important;
+  image-rendering: smooth !important;
+}
+
+/* ------------------------------------------------------------------
+ * 4) Notification tray support for texture stripping / portrait hiding
+ * ------------------------------------------------------------------ */
+#chat-notifications .message.fe-pseudo-sanitized::before {
+  background-image: var(--fe-before-bgimg) !important;
+}
+
+#chat-notifications .message.fe-pseudo-sanitized::after {
+  background-image: var(--fe-after-bgimg) !important;
+}
+
+body.fe-strip-chat-textures #chat-notifications .message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))::before {
+  background: transparent none !important;
+  background-image: none !important;
+}
+
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender .name-stacked {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+}
+
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender,
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender .name-stacked,
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender .name-stacked .title,
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender .name-stacked .subtitle {
+  text-shadow: none !important;
+}
+
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender .avatar,
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender > img,
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender > video,
+body.fe-hide-portraits #chat-notifications .message .message-header img.fe-chat-portrait,
+body.fe-hide-portraits #chat-notifications .message .message-header .fe-chat-portrait-wrap {
+  display: none !important;
+}
+
+body.fe-hide-portraits #chat-notifications .message .message-header .message-sender {
+  gap: 0 !important;
+}
+
+body.fe-hide-portraits #chat-notifications :is(img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]) {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------
+ * 5) User-color background parity for notification tray
+ * ------------------------------------------------------------------ */
+body.fe-msg-bg-usercolor #chat-notifications .message.fe-has-user-color {
+  background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)) !important;
+  background-blend-mode: screen !important;
+}
+
+body.fe-msg-bg-usercolor.fe-userbg-base-white #chat-notifications .message.fe-has-user-color {
+  --fe-user-bg-base-rgb: 255 255 255;
+}
+
+body.fe-msg-bg-usercolor.fe-userbg-base-black #chat-notifications .message.fe-has-user-color {
+  --fe-user-bg-base-rgb: 0 0 0;
+}
+
+body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black) #chat-notifications .message.fe-has-user-color {
+  background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
+  box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)) !important;
+  background-blend-mode: normal !important;
+}
+
+/* ------------------------------------------------------------------
+ * 6) Notification tray intentionally opts out of FE chat merge
+ * ------------------------------------------------------------------ */
+#chat-notifications > .message.fe-divider-before::before {
+  content: none !important;
+  display: none !important;
+}

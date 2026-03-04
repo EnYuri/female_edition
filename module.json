@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "0.3.97",
+  "version": "0.4.8",
   "authors": [
     {
       "name": "nayuri",
@@ -18,7 +18,15 @@
     ]
   },
   "esmodules": [
-    "scripts/fe-main.js"
+    "scripts/chat-bg-stripper.js",
+    "scripts/fe-chat-enhance.js",
+    "scripts/fe-chat-edit.js",
+    "scripts/fe-chat-archive.js",
+    "scripts/fe-tidy-override.js",
+    "scripts/fe-chat-portrait.js",
+    "scripts/fe-chat-images.js",
+    "scripts/inject-conditions.js",
+    "scripts/inject-damage-type.js"
   ],
   "styles": [
     "styles/ui-font.css",
@@ -29,7 +37,8 @@
     "styles/fe-chat-edit.css",
     "styles/fe-tidy-override.css",
     "styles/fe-chat-portrait.css",
-    "styles/conditions.css"
+    "styles/conditions.css",
+    "styles/fe-chat-v13-compat.css"
   ],
   "languages": [
     {
@@ -40,9 +49,8 @@
     }
   ],
   "compatibility": {
-    "minimum": "12",
-    "verified": "13.531",
-    "maximum": "14.*"
+    "minimum": "13",
+    "verified": "13.531"
   },
   "description": "",
   "flags": {}

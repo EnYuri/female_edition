@@ -5,6 +5,7 @@ import {
   MODULE_ID,
   S,
   feSetting,
+  feFireChatUiUpdated,
   feGetChatLogs,
   feApplyStyleVarsFromSettings,
   feStripChatTexturesInWindow,
@@ -16,6 +17,7 @@ import {
   feSetUserColorBgClass,
   feApplyChatMerge,
   feGetMessageIdFromElement,
+  feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,
 } from "./fe-chat-enhance.js";
 
@@ -43,6 +45,9 @@ const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 40;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
 const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
 const FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE = 96;
+const FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT = 4500;
+const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
+const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
 
@@ -314,7 +319,12 @@ async function feExportChatLogToPDFInline() {
 
   try {
     const liveMessageMap = feBuildLiveChatMessageElementMap();
-    const messages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
+    const messages = await feCollectVisibleChatMessages(game.user, {
+      liveMessageMap,
+      progress: (text) => {
+        try { if (metaEl) metaEl.textContent = text; } catch {}
+      },
+    });
     const renderProfile = feGetArchiveRenderProfile(messages.length);
 
     // Header/meta
@@ -347,6 +357,10 @@ async function feExportChatLogToPDFInline() {
       feRefreshPortraitsForLog(logEl);
     }
 
+    try {
+      feFireArchiveRenderUpdated(document, logEl);
+    } catch {}
+
     // Wait for images (portraits, item icons) to load so they actually print
     metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
     await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
@@ -369,10 +383,8 @@ async function feExportChatLogToPDFInline() {
     // Force a synchronous reflow before printing.
     // Avoid relying on timers here (background tabs clamp setTimeout).
     try {
-      // eslint-disable-next-line no-unused-expressions
-      container.offsetHeight;
-      // eslint-disable-next-line no-unused-expressions
-      logEl.offsetHeight;
+      void container.offsetHeight;
+      void logEl.offsetHeight;
     } catch {}
 
     metaEl.textContent = "Opening print dialog…";
@@ -455,8 +467,14 @@ function feCollectHeadStylesHTML() {
           if (n?.tagName === "LINK") {
             const c = n.cloneNode(true);
 
-            // Ensure the disabled state is copied.
-            c.disabled = !!n.disabled;
+            // Preserve disabled stylesheet state in a *serialized* form.
+            // HTMLLinkElement.disabled is not reliably reflected by outerHTML, so use
+            // media="not all" + a data marker that the archive window can later inspect.
+            const disabled = !!n.disabled;
+            if (disabled) {
+              c.setAttribute("data-fe-disabled-link", "1");
+              c.setAttribute("media", "not all");
+            }
 
             // IMPORTANT: Archive windows use about:blank as their URL.
             // If we keep relative hrefs (e.g. modules/..), they can resolve incorrectly
@@ -509,6 +527,41 @@ function feGetFoundryBaseHref() {
   }
 }
 
+function feSyncArchiveDocumentChrome(doc) {
+  try {
+    if (!doc?.documentElement) return;
+    const srcHtml = document.documentElement;
+    const dstHtml = doc.documentElement;
+
+    if (srcHtml?.className != null) dstHtml.className = srcHtml.className;
+    const htmlStyle = srcHtml?.getAttribute?.("style");
+    if (htmlStyle) dstHtml.setAttribute("style", htmlStyle);
+    else dstHtml.removeAttribute?.("style");
+
+    for (const attr of Array.from(srcHtml?.attributes ?? [])) {
+      const name = String(attr?.name ?? "");
+      if (!name || name === "class" || name === "style") continue;
+      if (name === "lang" || name === "dir" || name.startsWith("data-") || name.startsWith("aria-")) {
+        dstHtml.setAttribute(name, String(attr?.value ?? ""));
+      }
+    }
+
+    const srcBody = document.body;
+    const dstBody = doc.body;
+    if (srcBody && dstBody) {
+      for (const attr of Array.from(srcBody.attributes ?? [])) {
+        const name = String(attr?.name ?? "");
+        if (!name || name === "class") continue;
+        if (name === "style" || name.startsWith("data-") || name.startsWith("aria-")) {
+          dstBody.setAttribute(name, String(attr?.value ?? ""));
+        }
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 /**
  * Apply module settings which toggle stylesheets via JS (e.g. enableFonts -> ui-font.css).
  * The archive window is a new Document, so we must re-apply these toggles explicitly.
@@ -531,6 +584,12 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
     const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
     for (const l of links) {
       try {
+        // Generic disabled-state replay for cloned head links.
+        if (l.getAttribute?.("data-fe-disabled-link") === "1") {
+          l.disabled = true;
+          l.setAttribute("media", "not all");
+        }
+
         const hrefAttr = l.getAttribute("href") || "";
         const hrefAbs = l.href || "";
         const match =
@@ -539,7 +598,16 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
           hrefAttr.includes(needleRel) ||
           hrefAbs.includes(needleRel);
         if (!match) continue;
-        l.disabled = !enableFonts;
+
+        if (enableFonts) {
+          l.disabled = false;
+          if (l.getAttribute("media") === "not all") l.removeAttribute("media");
+          l.removeAttribute?.("data-fe-disabled-link");
+        } else {
+          l.disabled = true;
+          l.setAttribute("media", "not all");
+          l.setAttribute("data-fe-disabled-link", "1");
+        }
       } catch {
         /* no-op */
       }
@@ -704,26 +772,56 @@ async function feFetchAllChatMessagesFromDatabase() {
   }
 }
 
-async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap = null } = {}) {
+async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap = null, progress = null } = {}) {
   const liveMap = liveMessageMap instanceof Map ? liveMessageMap : feBuildLiveChatMessageElementMap();
+  const report = (text) => {
+    try {
+      if (typeof progress === "function") progress(String(text ?? ""));
+    } catch {
+      /* no-op */
+    }
+  };
+
+  report("메시지 수집 중…");
 
   let all = Array.from(game.messages?.contents ?? []);
   // Archive/export should prefer the fullest document source available.
   // Some worlds/clients may only have the most recent chat page hydrated in memory,
   // so always probe the backend and keep whichever source is longer.
   try {
+    report("메시지 DB 확인 중…");
     const dbAll = await feFetchAllChatMessagesFromDatabase();
     if (dbAll.length > all.length) all = dbAll;
   } catch {
     /* no-op */
   }
 
+  const collectProfile = feGetArchiveRenderProfile(all.length);
+
   // As a final best-effort fallback, harvest any live DOM-only history that has been
   // paged in by ChatLog.renderBatch so the archive can still preserve older messages.
+  // IMPORTANT: this is a fidelity enhancement only. Do not let it block the archive UI
+  // forever; large worlds should prefer completion over perfect DOM clones.
   let harvested = null;
-  if (liveMap.size > all.length) {
+  const needsHarvest = all.length > liveMap.size && liveMap.size > 0 && !collectProfile.lean;
+  if (needsHarvest) {
     try {
-      harvested = await feHarvestFullChatHistory({ batchSize: 100, maxIterations: 24 });
+      const timeBudgetMs = collectProfile.huge
+        ? FE_ARCHIVE_HARVEST_TIMEOUT_HUGE
+        : collectProfile.large
+          ? FE_ARCHIVE_HARVEST_TIMEOUT_LARGE
+          : FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT;
+      const maxIterations = collectProfile.huge ? 4 : collectProfile.large ? 6 : 10;
+      report(`이전 채팅 보강 중… ${Math.min(liveMap.size, all.length)}/${all.length}`);
+      harvested = await feHarvestFullChatHistory({
+        batchSize: collectProfile.large ? 80 : 100,
+        maxIterations,
+        timeBudgetMs,
+        progress: ({ collected = 0, total = all.length, timedOut = false } = {}) => {
+          const suffix = timedOut ? " (시간 제한 도달)" : "";
+          report(`이전 채팅 보강 중… ${Math.min(collected, total)}/${total}${suffix}`);
+        },
+      });
       if (harvested?.cloneMap?.size) {
         for (const [id, el] of harvested.cloneMap.entries()) {
           if (!liveMap.has(id)) liveMap.set(id, el);
@@ -733,6 +831,8 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
       harvested = null;
     }
   }
+
+  report("메시지 정렬 중…");
 
   const visibleDocs = all
     .filter((m) => feCanUserSeeChatMessage(m, user))
@@ -754,14 +854,17 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
   });
 
   if (!items.length && harvested?.orderedIds?.length) {
-    return harvested.orderedIds.map((id, idx) => ({
+    const out = harvested.orderedIds.map((id, idx) => ({
       key: id || `__harvest__${idx}`,
       id,
       msg: null,
       liveEl: id ? (liveMap.get(id) || null) : null,
     })).filter((it) => it.liveEl);
+    report(`메시지 ${out.length}개 준비 완료`);
+    return out;
   }
 
+  report(`메시지 ${items.length}개 준비 완료`);
   return items;
 }
 
@@ -770,6 +873,52 @@ function feHasPortraitMarkup(rootEl) {
     return !!rootEl?.querySelector?.(FE_EXPORT_PORTRAIT_MARKER_SELECTOR);
   } catch {
     return false;
+  }
+}
+
+function feNormalizeArchiveMessageRoot(targetDoc, node) {
+  try {
+    if (!feIsElement(node)) return null;
+    if (node.matches?.("li.chat-message")) return node;
+
+    // Notification tray roots in FVTT v13 can be .message instead of li.chat-message.
+    // Normalize them to the archive's expected list-item structure.
+    const wrapper = targetDoc?.createElement?.("li") || document.createElement("li");
+    const classNames = new Set(["chat-message", "message"]);
+    for (const cls of Array.from(node.classList ?? [])) classNames.add(cls);
+    wrapper.className = Array.from(classNames).join(" ");
+
+    for (const attr of Array.from(node.attributes ?? [])) {
+      const name = String(attr?.name ?? "");
+      if (!name || name === "class") continue;
+      wrapper.setAttribute(name, String(attr?.value ?? ""));
+    }
+
+    // Notification tray messages intentionally opt out of FE's visual merge.
+    // If we use them as a fidelity fallback for export, start from a clean state and let
+    // the archive log compute its own merge classes later.
+    for (const cls of ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"]) {
+      wrapper.classList.remove(cls);
+    }
+    wrapper.removeAttribute?.("data-fe-merge-sig");
+
+    while (node.firstChild) wrapper.appendChild(node.firstChild);
+    return wrapper;
+  } catch {
+    return node;
+  }
+}
+
+function feFireArchiveRenderUpdated(targetDoc, logEl) {
+  try {
+    feFireChatUiUpdated({
+      reason: "archive-render",
+      root: logEl,
+      log: logEl,
+      document: targetDoc,
+    });
+  } catch {
+    /* no-op */
   }
 }
 
@@ -838,6 +987,27 @@ function feCreateArchiveImageReference(doc, src, img, occurrence = 2) {
   return ref;
 }
 
+function fePrepareArchiveSharedImage(img, src, occurrence = 2) {
+  try {
+    if (!img || !src) return;
+    img.classList?.add?.("fe-archive-shared-image");
+    img.dataset.feArchiveSharedImage = "1";
+    img.dataset.feArchiveSharedSrc = src;
+    img.dataset.feArchiveSharedOccurrence = String(Math.max(2, Number(occurrence) || 2));
+    img.setAttribute("src", src);
+    img.removeAttribute("srcset");
+    if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
+    if (!img.getAttribute("decoding")) img.setAttribute("decoding", "async");
+
+    const label = String(img.getAttribute("title") || img.getAttribute("alt") || "").trim();
+    const suffix = occurrence > 1 ? ` (shared ×${occurrence})` : "";
+    if (label) img.setAttribute("title", `${label}${suffix}`);
+    else img.setAttribute("title", `shared image${suffix}`);
+  } catch {
+    /* no-op */
+  }
+}
+
 function feOptimizeArchiveNodeImages(rootEl, { targetDoc = document, renderProfile = null, imageRegistry = null } = {}) {
   try {
     if (!imageRegistry || !renderProfile?.collapseDuplicateImages || !rootEl?.querySelectorAll) return 0;
@@ -853,9 +1023,8 @@ function feOptimizeArchiveNodeImages(rootEl, { targetDoc = document, renderProfi
       imageRegistry.set(srcKey, entry);
       if (entry.count <= FE_ARCHIVE_DUPLICATE_IMAGE_KEEP) continue;
 
-      const ref = feCreateArchiveImageReference(targetDoc || rootEl.ownerDocument || document, srcKey, img, entry.count);
       try {
-        img.replaceWith(ref);
+        fePrepareArchiveSharedImage(img, srcKey, entry.count);
         collapsed += 1;
       } catch {
         /* no-op */
@@ -947,9 +1116,39 @@ async function feRenderMessagesIntoLog({
   return renderedCount;
 }
 
+function feArchiveShouldPreferLiveClone(msg, liveEl = null, renderProfile = null) {
+  try {
+    if (!feIsElement(liveEl)) return false;
+    if (!msg) return true;
+    if (!renderProfile?.lean) return true;
+    if (feArchiveMessageLooksComplex(msg, liveEl)) return true;
+
+    const cl = liveEl.classList;
+    if (
+      cl?.contains?.("fe-has-chat-portrait") ||
+      cl?.contains?.("fe-has-user-color") ||
+      cl?.contains?.("narrator-chat") ||
+      cl?.contains?.("fe-narrator-chat") ||
+      cl?.contains?.("round-marker") ||
+      cl?.contains?.("fe-round-marker-chat") ||
+      cl?.contains?.("fe-merge-start") ||
+      cl?.contains?.("fe-merge-mid") ||
+      cl?.contains?.("fe-merge-end") ||
+      cl?.contains?.("fe-merge-follow") ||
+      cl?.contains?.("fe-divider-before")
+    ) return true;
+
+    if (liveEl.querySelector?.(FE_EXPORT_PORTRAIT_MARKER_SELECTOR)) return true;
+    if (liveEl.querySelector?.('.message-content :is(img, video, blockquote, pre, code, table, ul, ol, hr)')) return true;
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
 async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
-  const shouldCloneLive = !!feIsElement(liveEl) && (!renderProfile?.lean || feArchiveMessageLooksComplex(msg, liveEl));
+  const shouldCloneLive = feArchiveShouldPreferLiveClone(msg, liveEl, renderProfile);
   try {
     if (shouldCloneLive && feIsElement(liveEl)) node = targetDoc.importNode(liveEl, true);
   } catch {
@@ -973,6 +1172,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
 
   if (feIsElement(node)) {
     try {
+      node = feNormalizeArchiveMessageRoot(targetDoc || document, node) || node;
       node.__feMessage = msg || node.__feMessage || null;
       feStampArchiveMessageIdentity(node, msg || { id: feGetMessageIdFromElement(liveEl) || undefined });
       feMarkPlainArchiveMessage(node, msg, liveEl);
@@ -1040,20 +1240,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   })();
   const effectiveOptimize = !!optimize || stripTexturesSetting;
 
-  // Collect messages first (so the archive UI can show correct counts immediately).
-  const liveMessageMap = feBuildLiveChatMessageElementMap();
-  const messages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
-  const renderProfile = feGetArchiveRenderProfile(messages.length);
-
   const worldName = game.world?.title ?? game.world?.name ?? "";
   const sceneName = canvas?.scene?.name ?? "";
   const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
-  const metaParts = [`${messages.length} messages`];
-  if (sceneName) metaParts.push(sceneName);
-  if (renderProfile.statusLabel) metaParts.push(renderProfile.statusLabel);
-  const metaText = metaParts.join(" • ");
 
-  // Build the archive document.
+  // Build the archive document immediately so the popup is never left as a blank about:blank
+  // while we collect older message history.
   const headStyles = feCollectHeadStylesHTML();
   const baseHref = feEscapeAttr(feGetFoundryBaseHref());
 
@@ -1078,7 +1270,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
             : "";
 
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
-  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive${renderProfile.bodyClass}${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
+  const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive fe-chat-archive-window${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
   win.document.open();
   win.document.write(`<!doctype html>
@@ -1227,6 +1419,21 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         pointer-events: none;
       }
 
+      #fe-chat-export-status {
+        margin: 0 0 10px 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: rgba(0,0,0,0.82);
+        background: rgba(0,0,0,0.03);
+      }
+
+      #fe-chat-export-status[hidden] {
+        display: none !important;
+      }
+
       @media print {
         html, body {
           -webkit-print-color-adjust: exact !important;
@@ -1269,7 +1476,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       <div class="fe-chat-export-toolbar">
         <div>
           <div id="fe-chat-export-title">${feEscapeHTML(titleText)}</div>
-          <div id="fe-chat-export-meta">${feEscapeHTML(metaText)}</div>
+          <div id="fe-chat-export-meta">메시지 수집 중…</div>
         </div>
         <div class="fe-chat-export-actions">
           <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="HTML 저장">HTML</a>
@@ -1278,8 +1485,9 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
           <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="닫기">닫기</a>
         </div>
       </div>
-      <div id="fe-chat-export-sidebar" class="sidebar">
+      <div id="fe-chat-export-sidebar" class="sidebar chat-sidebar">
         <section id="fe-chat-export-chat" class="sidebar-tab tab active" data-tab="chat">
+          <div id="fe-chat-export-status" class="fe-chat-export-status">메시지 수집 중…</div>
           <ol id="fe-chat-export-log" class="chat-log"></ol>
         </section>
       </div>
@@ -1287,6 +1495,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   </body>
 </html>`);
   win.document.close();
+
+  // Mirror root-level theme / dark-mode classes and data-* attributes so CSS variables
+  // resolve the same way as they do in the live Foundry document.
+  try {
+    feSyncArchiveDocumentChrome(win.document);
+  } catch {}
 
   // The archive window is a new Document; mirror any module settings that are applied
   // via JS on <link rel="stylesheet"> elements (e.g. enableFonts -> ui-font.css).
@@ -1319,6 +1533,23 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   const btnDownload = win.document.getElementById("fe-archive-download");
   const btnExternal = win.document.getElementById("fe-archive-external");
   const btnClose = win.document.getElementById("fe-archive-close");
+  const statusEl = win.document.getElementById("fe-chat-export-status");
+
+  const setStatus = (text, { hide = false } = {}) => {
+    try {
+      if (statusEl) {
+        statusEl.textContent = String(text ?? "");
+        statusEl.hidden = !!hide;
+      }
+    } catch {
+      /* no-op */
+    }
+    try {
+      if (metaEl) metaEl.textContent = String(text ?? "");
+    } catch {
+      /* no-op */
+    }
+  };
 
   // Prevent exporting/printing until rendering is complete.
   try {
@@ -1357,6 +1588,32 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     const sampleLog = document.querySelector("ol.chat-log, #chat-log");
     if (sampleLog?.className) logEl.className = sampleLog.className;
   } catch {}
+
+  // Let the popup paint its shell before heavy collection/harvesting starts.
+  await feMaybeYieldForUI(win);
+
+  // Collect messages after the shell exists so the user sees progress instead of a blank about:blank window.
+  const liveMessageMap = feBuildLiveChatMessageElementMap();
+  const messages = await feCollectVisibleChatMessages(game.user, {
+    liveMessageMap,
+    progress: (text) => {
+      setStatus(text);
+    },
+  });
+  const renderProfile = feGetArchiveRenderProfile(messages.length);
+
+  try {
+    win.document.body.classList.remove("fe-archive-huge", "fe-archive-lean");
+    for (const cls of String(renderProfile.bodyClass || "").split(/\s+/).filter(Boolean)) win.document.body.classList.add(cls);
+  } catch {
+    /* no-op */
+  }
+
+  const metaParts = [`${messages.length} messages`];
+  if (sceneName) metaParts.push(sceneName);
+  if (renderProfile.statusLabel) metaParts.push(renderProfile.statusLabel);
+  const metaText = metaParts.join(" • ");
+  setStatus(metaText);
 
   // Render messages.
   logEl.innerHTML = "";
@@ -1404,6 +1661,10 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     feNormalizeArchiveMessageLayout(logEl);
   } catch {}
 
+  try {
+    feFireArchiveRenderUpdated(win.document, logEl);
+  } catch {}
+
   // Wait for images so avatars/icons actually show up.
   if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
   await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
@@ -1412,6 +1673,11 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
 
   if (metaEl) metaEl.textContent = metaText;
+  try {
+    if (statusEl) statusEl.hidden = true;
+  } catch {
+    /* no-op */
+  }
 
   // Re-enable actions.
   try {
@@ -1425,8 +1691,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       win.focus();
     } catch {}
     try {
-      // eslint-disable-next-line no-unused-expressions
-      win.document.body.offsetHeight;
+      void win.document.body.offsetHeight;
     } catch {}
     await feArchivePrint(win);
   }
@@ -1612,8 +1877,7 @@ async function feArchivePrint(win) {
     win.focus();
   } catch {}
   try {
-    // eslint-disable-next-line no-unused-expressions
-    doc.body.offsetHeight;
+    void doc.body.offsetHeight;
   } catch {}
 
   try {
@@ -1928,7 +2192,7 @@ async function feDownscaleImagesForPrint(
       setMeta(`Downscaling images… ${gi}/${groupList.length}`);
     }
     try {
-      const shouldProcess = g.needsResample || g.imgs.length > 1;
+      const shouldProcess = g.needsResample;
       if (!shouldProcess) continue;
       const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
       if (!rep) continue;
@@ -1951,6 +2215,7 @@ async function feDownscaleImagesForPrint(
       const dataUrl = await feCanvasToDataURL(canvas, {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
         jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
+        preferLossless: g.isAvatar || Math.max(outW, outH) <= 224 || (outW * outH) <= 90_000,
       });
       if (!dataUrl) continue;
       cache.set(g.key, dataUrl);
@@ -1994,17 +2259,40 @@ async function feDownscaleImagesForPrint(
   };
 }
 
-async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85 } = {}) {
-  // Prefer webp (smaller); fall back to jpeg/png.
-  const tryTypes = [
-    { type: "image/webp", quality: webpQuality },
-    { type: "image/jpeg", quality: jpegQuality },
-    { type: "image/png", quality: 1.0 },
-  ];
+async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85, preferLossless = false } = {}) {
+  const toBlob = async (type, quality) => {
+    try {
+      return await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    } catch {
+      return null;
+    }
+  };
+
+  if (preferLossless) {
+    try {
+      const pngBlob = await toBlob("image/png", 1.0);
+      if (pngBlob && pngBlob.size <= 650_000) return await feBlobToDataURL(pngBlob);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  // Prefer webp for normal content, but keep quality high in the "품질 우선" path.
+  const tryTypes = preferLossless
+    ? [
+        { type: "image/webp", quality: Math.max(webpQuality, 0.92) },
+        { type: "image/jpeg", quality: Math.max(jpegQuality, 0.93) },
+        { type: "image/png", quality: 1.0 },
+      ]
+    : [
+        { type: "image/webp", quality: webpQuality },
+        { type: "image/jpeg", quality: jpegQuality },
+        { type: "image/png", quality: 1.0 },
+      ];
 
   for (const t of tryTypes) {
     try {
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, t.type, t.quality));
+      const blob = await toBlob(t.type, t.quality);
       if (!blob) continue;
       return await feBlobToDataURL(blob);
     } catch {}
@@ -2149,6 +2437,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
     }
   } finally {
     try { restoreLayout(); } catch {}
+    try { restoreShell(); } catch {}
     try { restoreBg(); } catch {}
   }
 
@@ -2643,9 +2932,17 @@ async function feEmbedImagesInNode(root, { meta } = {}) {
     }
 
     if (cache.has(abs)) {
-      img.setAttribute("src", cache.get(abs));
-      img.removeAttribute("srcset");
-      img.removeAttribute("loading");
+      // For duplicate archive images, keep the original absolute src instead of repeating
+      // the same large data: URL over and over in saved HTML.
+      if (img.dataset?.feArchiveSharedImage === "1") {
+        img.setAttribute("src", abs);
+        img.removeAttribute("srcset");
+        if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
+      } else {
+        img.setAttribute("src", cache.get(abs));
+        img.removeAttribute("srcset");
+        img.removeAttribute("loading");
+      }
       continue;
     }
 
@@ -3003,7 +3300,8 @@ function feGetArchiveTreeMirrorBudget(liveEl) {
 function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
   try {
     if (!srcEl || !dstEl) return;
-    const cs = window.getComputedStyle?.(srcEl);
+    const view = srcEl?.ownerDocument?.defaultView ?? window;
+    const cs = view.getComputedStyle?.(srcEl);
     if (!cs) return;
     for (const prop of propNames) {
       const value = cs.getPropertyValue?.(prop);
@@ -3029,8 +3327,10 @@ function feSelectScoped(root, selector) {
 function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80, propNames = FE_ARCHIVE_TREE_STYLE_PROPS } = {}) {
   try {
     if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
-    const liveWalker = document.createTreeWalker(liveEl, NodeFilter.SHOW_ELEMENT);
-    const cloneWalker = cloneEl.ownerDocument.createTreeWalker(cloneEl, NodeFilter.SHOW_ELEMENT);
+    const liveDoc = liveEl.ownerDocument ?? document;
+    const cloneDoc = cloneEl.ownerDocument ?? document;
+    const liveWalker = liveDoc.createTreeWalker(liveEl, NodeFilter.SHOW_ELEMENT);
+    const cloneWalker = cloneDoc.createTreeWalker(cloneEl, NodeFilter.SHOW_ELEMENT);
 
     let liveNode = liveWalker.currentNode;
     let cloneNode = cloneWalker.currentNode;
@@ -3095,9 +3395,16 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
       sync(midiSelector, lean ? FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE : FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE);
     }
 
-    if (liveEl.classList?.contains?.("narrator-chat")) {
+    const isNarratorLike = !!(liveEl.classList?.contains?.("narrator-chat") || liveEl.classList?.contains?.("fe-narrator-chat"));
+    const isRoundMarkerLike = !!(
+      liveEl.classList?.contains?.("round-marker") ||
+      liveEl.classList?.contains?.("fe-round-marker-chat") ||
+      liveEl.dataset?.feIsRoundMarker === "1" ||
+      liveEl.querySelector?.(".round-marker")
+    );
+    if (isNarratorLike || isRoundMarkerLike) {
       sync(":scope, :scope > .message-header, :scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-      sync(":scope .message-content", FE_ARCHIVE_TEXT_STYLE_PROPS);
+      sync(":scope .message-content, :scope .round-marker", FE_ARCHIVE_TEXT_STYLE_PROPS);
     }
   } catch {
     /* no-op */
@@ -3444,6 +3751,14 @@ function feBuildLiveChatMessageElementMap() {
         if (id) map.set(String(id), el);
       }
     }
+
+    // When the user is not viewing the Chat tab in FVTT v13, recent lines can still exist
+    // in the notifications tray. Use them as a fidelity backup, but only for ids not already
+    // backed by a real chat-log entry.
+    for (const el of Array.from(document.querySelectorAll?.("#chat-notifications > .message") ?? [])) {
+      const id = feGetMessageIdFromElement?.(el);
+      if (id && !map.has(String(id))) map.set(String(id), el);
+    }
   } catch {
     /* no-op */
   }
@@ -3459,7 +3774,7 @@ function feCloneChatMessageElement(el) {
   }
 }
 
-async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80 } = {}) {
+async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, timeBudgetMs = 0, progress = null } = {}) {
   const cloneMap = new Map();
   let orderedIds = [];
   try {
@@ -3509,10 +3824,23 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80 } 
     let prevFirst = '';
     let prevCount = -1;
     let stablePasses = 0;
+    const startedAt = Date.now();
+    let timedOut = false;
     for (let i = 0; i < maxIterations; i += 1) {
+      if (timeBudgetMs > 0 && (Date.now() - startedAt) >= timeBudgetMs) {
+        timedOut = true;
+        break;
+      }
+
       const before = harvestOnce();
       const beforeFirst = before[0] || '';
       const beforeCount = before.length;
+
+      try {
+        if (typeof progress === "function") progress({ iteration: i + 1, maxIterations, collected: cloneMap.size, total: orderedIds.length || beforeCount, timedOut: false });
+      } catch {
+        /* no-op */
+      }
 
       for (const st of logStates) {
         try {
@@ -3523,7 +3851,20 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80 } 
       await feMaybeYieldForUI(window);
 
       try {
-        await chat.renderBatch(batchSize);
+        const remaining = timeBudgetMs > 0 ? Math.max(250, timeBudgetMs - (Date.now() - startedAt)) : 0;
+        if (remaining > 0) {
+          let expired = false;
+          await Promise.race([
+            Promise.resolve(chat.renderBatch(batchSize)),
+            new Promise((resolve) => setTimeout(() => { expired = true; resolve(null); }, remaining)),
+          ]);
+          if (expired) {
+            timedOut = true;
+            break;
+          }
+        } else {
+          await chat.renderBatch(batchSize);
+        }
       } catch {
         break;
       }
@@ -3545,6 +3886,11 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80 } 
     }
 
     harvestOnce();
+    try {
+      if (typeof progress === "function") progress({ collected: cloneMap.size, total: orderedIds.length || cloneMap.size, timedOut });
+    } catch {
+      /* no-op */
+    }
 
     for (const st of logStates) {
       try {
@@ -3565,7 +3911,7 @@ function feArchiveMessageLooksComplex(msg, liveEl = null) {
   try {
     const content = String(msg?.content ?? '');
     if (!content) return false;
-    return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img|<video|<table|<blockquote|<pre|<iframe)/i.test(content);
+    return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img\b|<video\b|<table\b|<blockquote\b|<pre\b|<iframe\b)/i.test(content);
   } catch {
     return false;
   }
@@ -3658,7 +4004,12 @@ function feFallbackRenderChatMessage(doc, msg) {
   }
   sender.appendChild(wrap);
 
-  const hideSender = !!feIsRoundMarkerMessage(msg, null);
+  const isNarratorMessage = !!feIsNarratorToolsMessage(msg, null);
+  const isRoundMarkerMessage = !!feIsRoundMarkerMessage(msg, null);
+  if (isNarratorMessage) li.classList.add("narrator-chat", "fe-narrator-chat");
+  if (isRoundMarkerMessage) li.classList.add("round-marker", "fe-round-marker-chat");
+
+  const hideSender = isRoundMarkerMessage;
   if (hideSender) sender.style.setProperty("display", "none", "important");
 
   const meta = doc.createElement("span");

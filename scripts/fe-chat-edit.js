@@ -9,7 +9,6 @@ import {
   feGetChatLogs,
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
-  feCaptureMessageRenderFlagsOnPreUpdate,
 } from "./fe-chat-enhance.js";
 
 function feEnsureMessageEditControl(message, messageEl) {
@@ -516,13 +515,8 @@ Hooks.once("ready", () => {
   feInstallEditHandlers();
 });
 
-Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
+Hooks.on("preUpdateChatMessage", (_message, changed, _options, _userId) => {
   feApplyRawEditPreUpdate(changed);
-  try {
-    feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
-  } catch {
-    /* no-op */
-  }
 });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {

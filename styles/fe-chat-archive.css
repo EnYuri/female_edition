@@ -11,6 +11,13 @@
   min-inline-size: 0 !important;
 }
 
+#fe-chat-export-container,
+#fe-chat-export-container #fe-chat-export-sidebar,
+#fe-chat-export-container #fe-chat-export-chat,
+#fe-chat-export-container :is(#fe-chat-export-log, #chat-log, .chat-log, ol.chat-log) {
+  --chat-message-spacing: var(--fe-chat-message-spacing) !important;
+}
+
 
 :root { --fe-chat-header-meta-reserve: 64px; }
 
@@ -547,34 +554,34 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
 
-#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) :is(.message-header, .message-content,
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) :is(.message-header, .message-content,
   .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
   color: var(--color-text-dark-primary, #191813);
 }
 
-#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) .message-metadata {
+#fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) .message-metadata {
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
 
-#fe-chat-export-container .chat-message.fe-round-marker-chat {
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
   background: #4b4843 !important;
   background-image: none !important;
   box-shadow: none !important;
   color: #f2efe8 !important;
 }
 
-#fe-chat-export-container .chat-message.fe-round-marker-chat .message-sender,
-#fe-chat-export-container .chat-message.fe-round-marker-chat .message-sender .name-stacked,
-#fe-chat-export-container .chat-message.fe-round-marker-chat .message-sender .title,
-#fe-chat-export-container .chat-message.fe-round-marker-chat .message-sender .subtitle {
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender,
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .name-stacked,
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .title,
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .subtitle {
   display: none !important;
 }
 
-#fe-chat-export-container .chat-message.fe-round-marker-chat :is(.message-header, .message-content, .message-metadata, .round-marker) {
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker) {
   color: #f2efe8 !important;
 }
 
-#fe-chat-export-container .chat-message.fe-round-marker-chat .message-metadata {
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-metadata {
   color: rgb(242 239 232 / 0.72) !important;
 }
 

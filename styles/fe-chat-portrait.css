@@ -208,14 +208,19 @@ body.fe-hide-chat-portrait-wrap .combat-tracker img.token-image.fe-combat-portra
 
 
 /* Round-marker system messages keep only the marker/flavor UI. */
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header .message-metadata,
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header .message-sender,
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header img.fe-chat-portrait,
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header .fe-chat-portrait-wrap {
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-metadata,
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-sender,
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header img.fe-chat-portrait,
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .fe-chat-portrait-wrap,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-metadata,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-sender,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header img.fe-chat-portrait,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .fe-chat-portrait-wrap {
   display: none !important;
 }
 
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header {
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header {
   min-height: 0 !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -223,20 +228,25 @@ li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header {
 
 
 /* Round markers: keep only the marker/flavor line, no portrait or metadata. */
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header {
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header {
   display: block !important;
   min-height: 0 !important;
   padding: 0 !important;
   margin: 0 0 2px 0 !important;
 }
 
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header > img.fe-chat-portrait,
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header .message-sender,
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header .message-metadata {
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header > img.fe-chat-portrait,
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-sender,
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-metadata,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header > img.fe-chat-portrait,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-sender,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .message-metadata {
   display: none !important;
 }
 
-li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
+li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]),
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
   display: block !important;
   width: 100% !important;
   margin: 0 !important;
@@ -245,7 +255,7 @@ li.chat-message:is(.round-marker, .fe-round-marker-chat) > .message-header :is(.
 
 
 /* CSS-only round marker normalization so older/lazy-loaded messages match freshly-rendered ones. */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, :has(.round-marker)) > .message-header img.fe-chat-portrait,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, :has(.round-marker)) > .message-header .fe-chat-portrait-wrap {
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header img.fe-chat-portrait,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) li.chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header .fe-chat-portrait-wrap {
   display: none !important;
 }

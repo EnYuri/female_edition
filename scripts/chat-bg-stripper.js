@@ -83,15 +83,15 @@ function applyPortraitSetting(hide) {
 }
 
 function sanitizeAllExisting() {
-  document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .chat-message").forEach(processMessageRoot);
+  document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .chat-message, #chat-notifications > .message").forEach(processMessageRoot);
 }
 
 function restoreAllExisting() {
   // Restore any elements we modified.
   // We mark modified elements with .fe-bg-sanitized and/or .fe-pseudo-sanitized
   const root = document;
-  root.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .fe-bg-sanitized").forEach(restoreElement);
-  root.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .fe-pseudo-sanitized").forEach(restoreElement);
+  root.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .fe-bg-sanitized, #chat-notifications > .fe-bg-sanitized").forEach(restoreElement);
+  root.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log) .fe-pseudo-sanitized, #chat-notifications > .fe-pseudo-sanitized").forEach(restoreElement);
 }
 
 function applyTextureSetting(enabled) {
@@ -335,15 +335,17 @@ function processMessageRoot(root) {
 
 function extractChatMessage(node) {
   if (!(node instanceof Element)) return null;
+  const inNotifications = !!node.closest?.("#chat-notifications");
   if (node.classList.contains("chat-message")) return node;
-  return node.closest?.(".chat-message") || null;
+  if (inNotifications && node.classList.contains("message")) return node;
+  return node.closest?.("li.chat-message, #chat-notifications .message") || null;
 }
 
 function processNode(node) {
   if (!STATE.stripTextures) return;
   const msg = extractChatMessage(node);
   if (msg) processMessageRoot(msg);
-  else if (node instanceof Element) node.querySelectorAll?.(".chat-message").forEach(processMessageRoot);
+  else if (node instanceof Element) node.querySelectorAll?.(".chat-message, #chat-notifications .message").forEach(processMessageRoot);
 }
 
 const observedLogs = new WeakSet();
@@ -355,19 +357,19 @@ function attachToChatLog(log) {
 
   // Existing messages only. Live updates are handled via renderChatMessageHTML/renderChatLog hooks
   // to avoid repeated MutationObserver-driven reprocessing and scroll jank.
-  log.querySelectorAll(".chat-message").forEach(processMessageRoot);
+  log.querySelectorAll(":scope > li.chat-message, :scope > .chat-message, :scope > .message").forEach(processMessageRoot);
 }
 
 function attachAllChatLogs() {
-  document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log)").forEach(attachToChatLog);
+  document.querySelectorAll(":is(#chat-log, .chat-log, ol.chat-log, #chat-notifications)").forEach(attachToChatLog);
 }
 
 function processChatLogRoot(rootLike) {
   const root = extractHTMLElement(rootLike) || rootLike?.element?.[0] || rootLike || null;
   if (!(root instanceof Element)) return;
-  const log = root.matches?.(":is(#chat-log, .chat-log, ol.chat-log)")
+  const log = root.matches?.(":is(#chat-log, .chat-log, ol.chat-log, #chat-notifications)")
     ? root
-    : root.querySelector?.(":is(#chat-log, .chat-log, ol.chat-log)") || null;
+    : root.querySelector?.(":is(#chat-log, .chat-log, ol.chat-log, #chat-notifications)") || null;
   if (!log) return;
   attachToChatLog(log);
 }

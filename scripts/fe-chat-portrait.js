@@ -94,9 +94,20 @@ function cpIsMergeEnabled() {
   }
 }
 
+function cpIsNotificationMessageElement(messageEl) {
+  try {
+    if (!messageEl) return false;
+    if (messageEl.matches?.("#chat-notifications > .message, #chat-notifications .message")) return true;
+    return !!messageEl.closest?.("#chat-notifications .message");
+  } catch {
+    return false;
+  }
+}
+
 function cpShouldRenderPortraitForMessageElement(messageEl) {
   try {
     if (!messageEl) return true;
+    if (cpIsNotificationMessageElement(messageEl)) return true;
 
     // If FE merge is enabled and this is a follow-up message (mid/end), mimic chat-portrait behavior:
     // - only show portraits on follow-ups when the merge follow mode is "portrait".
@@ -134,10 +145,10 @@ function cpExtractChatMessageElement(html) {
   // Foundry v13 hook passes an HTMLElement for the *message*.
   // Be defensive: some wrappers/modules may pass a child node.
   try {
-    if (el.matches?.("li.chat-message")) return el;
-    const closest = el.closest?.("li.chat-message");
+    if (el.matches?.("li.chat-message, #chat-notifications .message")) return el;
+    const closest = el.closest?.("li.chat-message, #chat-notifications .message");
     if (closest) return closest;
-    const found = el.querySelector?.("li.chat-message");
+    const found = el.querySelector?.("li.chat-message, #chat-notifications .message");
     if (found) return found;
   } catch {
     /* fall through */
@@ -156,17 +167,22 @@ function cpWarnIfChatPortraitModuleActive() {
   );
 }
 
-function cpSetRootVars() {
-  const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
-  document.documentElement.style.setProperty("--fe-chat-portrait-size", `${size}px`);
+function cpSetRootVars(doc = document) {
+  try {
+    const targetDoc = doc?.documentElement ? doc : (doc?.ownerDocument ?? document);
+    if (!targetDoc?.documentElement) return;
 
-  const enabled = !!cpGet(CP.ENABLED);
-  document.documentElement.classList.toggle("fe-chat-portrait-enabled", enabled);
+    const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
+    targetDoc.documentElement.style.setProperty("--fe-chat-portrait-size", `${size}px`);
 
-  const hideWrap = !!cpGet(CP.HIDE_WRAP);
-  document.body.classList.toggle("fe-hide-chat-portrait-wrap", hideWrap);
+    const enabled = !!cpGet(CP.ENABLED);
+    targetDoc.documentElement.classList.toggle("fe-chat-portrait-enabled", enabled);
 
-  cpApplyNameAlignClasses(document);
+    const hideWrap = !!cpGet(CP.HIDE_WRAP);
+    targetDoc.body?.classList?.toggle("fe-hide-chat-portrait-wrap", hideWrap);
+
+    cpApplyNameAlignClasses(targetDoc);
+  } catch {}
 }
 
 function cpIsChatPortraitModuleActive() {
@@ -1035,8 +1051,8 @@ function cpUpsertPortrait(message, messageEl) {
   if (!messageEl) return;
 
   // Restrict to the actual chat message element.
-  if (!messageEl.matches?.("li.chat-message")) {
-    const closest = messageEl.closest?.("li.chat-message");
+  if (!messageEl.matches?.("li.chat-message, #chat-notifications .message")) {
+    const closest = messageEl.closest?.("li.chat-message, #chat-notifications .message");
     if (closest) messageEl = closest;
   }
 

@@ -45,14 +45,40 @@
  * These messages are intended to follow the UI theme and often use white text.
  * They must NOT inherit the per-user tint / parchment overlay logic, otherwise
  * the text can become unreadable.
+ *
+ * v13 surfaces chat messages outside the main chat tab as well (for example the
+ * notifications tray shown while browsing other sidebar tabs). Keep these
+ * selectors broad enough that round-marker / narrator styling still applies in
+ * those alternate chat surfaces.
  */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.narrator-chat.fe-has-user-color,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-round-marker-chat,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-round-marker-chat.fe-has-user-color {
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.narrator-chat, .fe-narrator-chat),
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.narrator-chat, .fe-narrator-chat).fe-has-user-color,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)),
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)).fe-has-user-color,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat),
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat).fe-has-user-color,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)),
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)).fe-has-user-color {
   background-image: none !important;
   background-blend-mode: normal !important;
   box-shadow: none !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)),
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
+  background: var(--fe-round-marker-bg, #4b4843) !important;
+  background-image: none !important;
+  color: var(--fe-round-marker-fg, #f2efe8) !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker),
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker) {
+  color: var(--fe-round-marker-fg, #f2efe8) !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-metadata,
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-metadata {
+  color: rgb(242 239 232 / 0.72) !important;
 }
 
 /* Let narrator-chat text color follow the active theme. */
@@ -171,19 +197,25 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 }
 
 
-/* Ensure theme/system pseudo textures do not bleed into Narrator messages */
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat::before,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat::after,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat .message-header::before,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat .message-header::after,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat .message-content::before,
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.narrator-chat .message-content::after {
+/* Ensure theme/system pseudo textures do not bleed into narrator/round-marker messages. */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))::before,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))::after,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-header::before,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-header::after,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-content::before,
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-content::after,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))::before,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))::after,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-header::before,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-header::after,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-content::before,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-content::after {
   content: none !important;
   background-image: none !important;
   display: none !important;

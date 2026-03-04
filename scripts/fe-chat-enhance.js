@@ -263,7 +263,10 @@ function feApplyStyleVarsFromSettings(doc = document) {
     root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), 12));
 
     // Chat layout
-    root.style.setProperty("--fe-chat-message-spacing", px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 4));
+    const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 4);
+    root.style.setProperty("--fe-chat-message-spacing", chatSpacing);
+    // Some archive / detached chat roots still read the core variable directly.
+    root.style.setProperty("--chat-message-spacing", chatSpacing);
 
     // Message background saturation (paper overlay alpha)
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
@@ -708,7 +711,7 @@ function feGetMessageFromElementOrCollection(elOrId) {
   try {
     if (elOrId && typeof elOrId === "object" && (elOrId.id || elOrId._id) && typeof elOrId.getFlag === "function") return elOrId;
     if (feIsElementNode(elOrId)) {
-      const direct = elOrId.__feMessage || elOrId.closest?.("li.chat-message")?.__feMessage;
+      const direct = elOrId.__feMessage || elOrId.closest?.("li.chat-message, #chat-notifications .message")?.__feMessage;
       if (direct) return direct;
       const id = feGetMessageIdFromElement(elOrId);
       return id ? game.messages?.get?.(id) ?? null : null;
@@ -728,6 +731,43 @@ function feExtractHTMLElement(html) {
   if (Array.isArray(html) && feIsElementNode(html[0])) return html[0];
   if (feIsElementNode(html[0])) return html[0];
   return null;
+}
+
+function feBindMessageToElement(message, messageEl) {
+  try {
+    const el = feExtractHTMLElement(messageEl);
+    const li = el?.closest?.("li.chat-message, #chat-notifications .message") ?? (el?.matches?.("li.chat-message, #chat-notifications .message") ? el : null);
+    if (!li || !message) return;
+    li.__feMessage = message;
+  } catch {
+    /* no-op */
+  }
+}
+
+function feIsNotificationMessageElement(messageEl) {
+  try {
+    const el = feExtractHTMLElement(messageEl) ?? messageEl;
+    if (!el) return false;
+    if (el.matches?.("#chat-notifications > .message, #chat-notifications .message")) return true;
+    return !!el.closest?.("#chat-notifications .message");
+  } catch {
+    return false;
+  }
+}
+
+function feClearMergeClassesFromMessageElement(messageEl) {
+  try {
+    const el = feExtractHTMLElement(messageEl) ?? messageEl;
+    const root = el?.closest?.("#chat-notifications .message, li.chat-message") ?? (el?.matches?.("#chat-notifications .message, li.chat-message") ? el : null);
+    if (!root?.classList) return;
+    for (const cls of FE_MERGE_CLASS_LIST) root.classList.remove(cls);
+    feMergeClassSignatureCache?.delete?.(root);
+    try { delete root.dataset.feMergeSig; } catch {
+      /* no-op */
+    }
+  } catch {
+    /* no-op */
+  }
 }
 
 function feDeferTask(fn) {
@@ -948,22 +988,23 @@ function feScheduleRenderedMessageRefresh(messageOrId, { delay = 16, allowNarrat
 
 function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = false } = {}) {
   try {
-    if (!feIsElementNode(logEl) || !feIsElementNode(anchorEl)) return [];
+    if (!feIsElementNode(logEl) || !feIsElementNode(anchorEl)) return { slice: [], firstIndex: 0, hasMissingDocs: false };
     const items = Array.from(logEl.querySelectorAll("li.chat-message"));
-    const idx = items.indexOf(anchorEl);
-    if (idx === -1) return [];
+    if (!items.length) return { slice: [], firstIndex: 0, hasMissingDocs: false };
 
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
-    const makeInfo = (el) => {
+    const makeInfo = (el, fallbackIndex = 0) => {
       const msgId = feGetMessageIdFromElement(el);
       const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game.messages?.get?.(msgId) : null);
-      const info = feMessageMergeInfo(msg, el);
+      if (msg) feBindMessageToElement(msg, el);
+      const info = feMessageMergeInfo(msg, el) ?? {};
       const hasStampedKey = !!info?.key;
       info.msgId = msgId;
       info.missing = !msg && !hasStampedKey;
       info.el = el;
-      info.order = feGetChatMessageElementOrder(el, 0);
-      info.key = info.key || (msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? Math.random()}`);
+      info.domIndex = fallbackIndex;
+      info.order = feGetChatMessageElementOrder(el, fallbackIndex);
+      info.key = info.key || (msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? fallbackIndex}`);
       if (!msg && !hasStampedKey) info.mergeableText = false;
       return info;
     };
@@ -976,16 +1017,43 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
       return true;
     };
 
-    const infos = items.map(makeInfo);
+    const infos = items
+      .map((el, i) => makeInfo(el, i))
+      .sort((a, b) => {
+        const ao = Number.isFinite(a?.order) ? a.order : a?.domIndex ?? 0;
+        const bo = Number.isFinite(b?.order) ? b.order : b?.domIndex ?? 0;
+        if (ao !== bo) return ao - bo;
+        return (a?.domIndex ?? 0) - (b?.domIndex ?? 0);
+      });
+
+    const idx = infos.findIndex((info) => info?.el === anchorEl);
+    if (idx === -1) return { slice: [], firstIndex: 0, hasMissingDocs: false };
+
     let start = idx;
     let end = idx;
     while (start > 0 && canMerge(infos[start - 1], infos[start])) start -= 1;
     while (end < infos.length - 1 && canMerge(infos[end], infos[end + 1])) end += 1;
-    start = Math.max(0, start - 1);
-    end = Math.min(infos.length - 1, end + 1);
-    return infos.slice(start, end + 1);
+
+    // Also include the *full* adjacent groups on both sides.
+    // If a new standalone message is inserted after a merged run, recomputing only the
+    // anchor and its immediate neighbor can clear the prior group's end/follow classes.
+    if (start > 0) {
+      start -= 1;
+      while (start > 0 && canMerge(infos[start - 1], infos[start])) start -= 1;
+    }
+    if (end < infos.length - 1) {
+      end += 1;
+      while (end < infos.length - 1 && canMerge(infos[end], infos[end + 1])) end += 1;
+    }
+
+    const slice = infos.slice(start, end + 1);
+    return {
+      slice,
+      firstIndex: start,
+      hasMissingDocs: slice.some((info) => !!info?.missing),
+    };
   } catch {
-    return [];
+    return { slice: [], firstIndex: 0, hasMissingDocs: false };
   }
 }
 
@@ -1004,23 +1072,30 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
       if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
       return true;
     };
+
+    const desiredMap = new Map();
     for (const info of infos) {
-      info?.el?.classList?.remove?.("fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before");
+      if (info?.el) desiredMap.set(info.el, new Set());
     }
+    const mark = (el, cls) => {
+      const set = desiredMap.get(el);
+      if (set) set.add(cls);
+    };
+
     const applyGroup = (startIndex, endIndexExclusive) => {
       const groupLen = endIndexExclusive - startIndex;
       if (groupLen <= 0) return;
       const first = infos[startIndex];
       if (!first?.el) return;
-      if (showDivider && (startOffset + startIndex) > 0) first.el.classList.add("fe-divider-before");
+      if (showDivider && (startOffset + startIndex) > 0) mark(first.el, "fe-divider-before");
       if (groupLen === 1) return;
       if (simpleMode) {
-        for (let i = startIndex + 1; i < endIndexExclusive; i += 1) infos[i]?.el?.classList?.add?.("fe-merge-follow");
+        for (let i = startIndex + 1; i < endIndexExclusive; i += 1) mark(infos[i]?.el, "fe-merge-follow");
         return;
       }
-      first.el.classList.add("fe-merge-start");
-      for (let i = startIndex + 1; i < endIndexExclusive - 1; i += 1) infos[i]?.el?.classList?.add?.("fe-merge-mid");
-      infos[endIndexExclusive - 1]?.el?.classList?.add?.("fe-merge-end");
+      mark(first.el, "fe-merge-start");
+      for (let i = startIndex + 1; i < endIndexExclusive - 1; i += 1) mark(infos[i]?.el, "fe-merge-mid");
+      mark(infos[endIndexExclusive - 1]?.el, "fe-merge-end");
     };
     let groupStart = 0;
     for (let i = 1; i < infos.length; i += 1) {
@@ -1030,6 +1105,8 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
       }
     }
     applyGroup(groupStart, infos.length);
+
+    for (const info of infos) feApplyMergeClassSetToElement(info?.el, desiredMap.get(info?.el) ?? null);
   } catch {
     /* no-op */
   }
@@ -1037,14 +1114,19 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
 
 function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false } = {}) {
   try {
+    if (feIsNotificationMessageElement(messageEl)) {
+      feClearMergeClassesFromMessageElement(messageEl);
+      return;
+    }
     const anchor = messageEl?.closest?.("li.chat-message") ?? messageEl;
     const log = anchor?.closest?.("ol.chat-log, #chat-log, #fe-chat-export-log");
     if (!feIsElementNode(anchor) || !feIsElementNode(log)) return;
-    const all = Array.from(log.querySelectorAll("li.chat-message"));
-    const slice = feCollectMergeNeighborhood(log, anchor, { allowNarratorMerge });
+    try { feDedupeChatMessagesInLog(log); } catch {}
+    const neighborhood = feCollectMergeNeighborhood(log, anchor, { allowNarratorMerge });
+    const slice = neighborhood?.slice ?? [];
     if (!slice.length) return;
-    const firstIndex = Math.max(0, all.indexOf(slice[0]?.el));
-    feApplyChatMergeSlice(slice, firstIndex, { allowNarratorMerge });
+    feApplyChatMergeSlice(slice, Math.max(0, Number(neighborhood?.firstIndex) || 0), { allowNarratorMerge });
+    if (neighborhood?.hasMissingDocs) feScheduleRenderedLogRefresh(log, { delay: 48, allowNarratorMerge });
   } catch {
     /* no-op */
   }
@@ -1055,6 +1137,8 @@ function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarrato
     void allowNarratorMerge;
     const el = feExtractHTMLElement(messageEl);
     if (!el) return;
+    feBindMessageToElement(message, el);
+    if (feIsNotificationMessageElement(el)) feClearMergeClassesFromMessageElement(el);
     // Do NOT mutate .message-content during normal live-chat refreshes.
     // Merge only relies on message classes/header visibility, and touching inline-roll DOM here
     // can cause visible churn when Foundry re-renders messages while scrolling.
@@ -1072,9 +1156,9 @@ function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
     const nodes = Array.from(logEl.querySelectorAll?.("li.chat-message") ?? []);
     for (const li of nodes) {
       const msgId = feGetMessageIdFromElement(li);
-      const msg = msgId ? game?.messages?.get?.(msgId) : null;
+      const msg = feGetMessageFromElementOrCollection(li) || (msgId ? game?.messages?.get?.(msgId) : null);
       if (!msg) continue;
-      feApplyUserColorBgToMessageElement(msg, li);
+      feApplyRenderedStateToMessageElement(msg, li, { allowNarratorMerge });
     }
     if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge });
   } catch {
@@ -1138,7 +1222,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
   try {
-    feApplyUserColorBgToMessageElement(message, el);
+    feApplyRenderedStateToMessageElement(message, el);
   } catch {
     /* no-op */
   }
@@ -1152,6 +1236,7 @@ Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
     feHydrateRenderStateOverride(message, null, userId);
     feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
+    feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));
   } catch {
     /* no-op */
   }
@@ -2119,21 +2204,24 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
 function feApplyUserColorBgToAllLogs(doc = document) {
   try {
     const enabled = !!feSetting(S.USE_USER_COLOR_BG);
-    const root = doc?.querySelector?.("#chat-log, ol.chat-log, #fe-chat-export-log") ?? doc;
-    if (!root?.querySelectorAll) return;
-    const nodes = root.querySelectorAll("li.chat-message");
+    const queryRoot = doc?.querySelectorAll ? doc : document;
+    const roots = Array.from(queryRoot.querySelectorAll?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications") ?? []);
+    if (queryRoot?.matches?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications")) roots.unshift(queryRoot);
 
-    for (const li of nodes) {
-      if (!enabled) {
-        li.classList.remove("fe-has-user-color");
-        li.style?.removeProperty?.("--fe-user-color-rgb");
-        continue;
+    for (const root of roots) {
+      const nodes = root.querySelectorAll(":scope > li.chat-message, :scope > .message");
+      for (const li of nodes) {
+        if (!enabled) {
+          li.classList.remove("fe-has-user-color");
+          li.style?.removeProperty?.("--fe-user-color-rgb");
+          continue;
+        }
+        const msgId = feGetMessageIdFromElement(li);
+        if (!msgId) continue;
+        const msg = game?.messages?.get?.(msgId);
+        if (!msg) continue;
+        feApplyUserColorBgToMessageElement(msg, li);
       }
-      const msgId = feGetMessageIdFromElement(li);
-      if (!msgId) continue;
-      const msg = game?.messages?.get?.(msgId);
-      if (!msg) continue;
-      feApplyUserColorBgToMessageElement(msg, li);
     }
   } catch {
     /* noop */
@@ -2146,7 +2234,7 @@ function feApplyUserColorBgToLog(logEl, doc = document) {
     if (!enabled) return;
     if (!logEl?.querySelectorAll) return;
 
-    const nodes = logEl.querySelectorAll("li.chat-message");
+    const nodes = logEl.querySelectorAll(":scope > li.chat-message, :scope > .message");
     for (const li of nodes) {
       const msgId = feGetMessageIdFromElement(li);
       if (!msgId) continue;
@@ -2283,7 +2371,7 @@ function feNormalizeChatMessageId(id) {
 }
 
 function feGetMessageIdFromElement(el) {
-  const li = el?.closest?.("li.chat-message") ?? el;
+  const li = el?.closest?.("li.chat-message, #chat-notifications .message") ?? el;
   const id =
     li?.dataset?.messageId ||
     li?.dataset?.documentId ||
@@ -2556,6 +2644,7 @@ function feMergeKey(info) {
 
 
 const feMergeClassSignatureCache = new WeakMap();
+const FE_MERGE_CLASS_LIST = ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"];
 
 function feBuildMergeClassSignature(desiredSet) {
   try {
@@ -2566,29 +2655,53 @@ function feBuildMergeClassSignature(desiredSet) {
   }
 }
 
+function feReadActualMergeClassSignature(el) {
+  try {
+    if (!el?.classList) return "";
+    const actual = new Set();
+    for (const cls of FE_MERGE_CLASS_LIST) {
+      if (el.classList.contains(cls)) actual.add(cls);
+    }
+    return feBuildMergeClassSignature(actual);
+  } catch {
+    return "";
+  }
+}
+
+function feApplyMergeClassSetToElement(el, desired = null) {
+  try {
+    if (!el?.classList) return;
+    const signature = feBuildMergeClassSignature(desired);
+    const cached = feMergeClassSignatureCache.get(el) ?? null;
+    const actual = feReadActualMergeClassSignature(el);
+    if (cached === signature && actual === signature) return;
+    for (const cls of FE_MERGE_CLASS_LIST) {
+      const shouldHave = desired ? desired.has(cls) : false;
+      if (shouldHave) el.classList.add(cls);
+      else el.classList.remove(cls);
+    }
+    feMergeClassSignatureCache.set(el, signature);
+    try {
+      if (signature) el.dataset.feMergeSig = signature;
+      else delete el.dataset.feMergeSig;
+    } catch {
+      /* no-op */
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   if (!feIsElementNode(logEl)) return;
+  try { feDedupeChatMessagesInLog(logEl); } catch {}
 
-  const mergeClasses = ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"];
   const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
 
   const applyDesiredClasses = (desiredMap) => {
     for (const el of msgs) {
       const desired = desiredMap.get(el) ?? null;
-      const signature = feBuildMergeClassSignature(desired);
-      if (feMergeClassSignatureCache.get(el) === signature) continue;
-      for (const cls of mergeClasses) {
-        const shouldHave = desired ? desired.has(cls) : false;
-        if (shouldHave) el.classList.add(cls);
-        else el.classList.remove(cls);
-      }
-      feMergeClassSignatureCache.set(el, signature);
-      try {
-        if (signature) el.dataset.feMergeSig = signature;
-        else delete el.dataset.feMergeSig;
-      } catch {
-        /* no-op */
-      }
+      feApplyMergeClassSetToElement(el, desired);
     }
   };
 
