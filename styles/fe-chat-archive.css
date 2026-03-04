@@ -137,7 +137,7 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
 }
 
 body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message {
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--fe-chat-message-spacing, var(--chat-message-spacing, 4px)) 0;
 }
 
 @media print {
@@ -559,30 +559,100 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   color: var(--color-text-dark-primary, #191813);
 }
 
+#fe-chat-export-container {
+  --fe-export-narrator-bg: #3f3d39;
+  --fe-export-narrator-fg: #f2efe8;
+  --fe-export-round-marker-bg: #4b4843;
+  --fe-export-round-marker-fg: #f2efe8;
+  --fe-export-system-fallback:
+    "Noto Sans KR",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif,
+    var(--fe-symbol-fallback, "Segoe UI Symbol", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji");
+  --fe-font-geurimilgi: var(--fe-export-system-fallback);
+  --fe-font-light: var(--fe-export-system-fallback);
+}
+
 #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) .message-metadata {
   color: var(--color-text-dark-secondary, #6b6a66) !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
-  background: #4b4843 !important;
+#fe-chat-export-container .chat-message:is(.narrator-chat, .fe-narrator-chat) {
+  background: var(--fe-export-narrator-bg, #3f3d39) !important;
   background-image: none !important;
   box-shadow: none !important;
-  color: #f2efe8 !important;
+  color: var(--fe-export-narrator-fg, #f2efe8) !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender,
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .name-stacked,
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .title,
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-sender .subtitle {
+#fe-chat-export-container .chat-message:is(.narrator-chat, .fe-narrator-chat) > :is(.message-header, .message-content) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+#fe-chat-export-container .chat-message:is(.narrator-chat, .fe-narrator-chat) :is(.message-header, .message-content, .message-metadata, .message-flavor, .flavor-text) {
+  color: var(--fe-export-narrator-fg, #f2efe8) !important;
+}
+
+#fe-chat-export-container .chat-message:is(.narrator-chat, .fe-narrator-chat) .message-metadata {
+  color: rgb(242 239 232 / 0.74) !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
+  background: var(--fe-export-round-marker-bg, #4b4843) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--fe-export-round-marker-fg, #f2efe8) !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > :is(.message-header, .message-content, .round-marker) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header {
+  display: block !important;
+  min-height: 0 !important;
+  margin: 0 0 2px 0 !important;
+  padding: 0 !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)).fe-round-marker-empty-content > .message-header {
+  margin-bottom: 0 !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)).fe-round-marker-empty-content > .message-content,
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-content:empty {
+  display: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-sender, .message-sender .name-stacked, .message-sender .title, .message-sender .subtitle, .message-metadata, img.fe-chat-portrait, .fe-chat-portrait-wrap) {
   display: none !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker) {
-  color: #f2efe8 !important;
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .round-marker, .message-flavor, .flavor-text) {
+  color: var(--fe-export-round-marker-fg, #f2efe8) !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) .message-metadata {
-  color: rgb(242 239 232 / 0.72) !important;
+#fe-chat-export-container .chat-message :is(.chat-card button, .midi-chat-card button, .dnd5e.chat-card button, .dnd5e2.chat-card button, button.pill, .pill, .tag) {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--color-text-dark-primary, #191813) !important;
+  border: 1px solid var(--color-border-light-2, #b5b3a4) !important;
+  box-shadow: none !important;
+}
+
+#fe-chat-export-container .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.chat-card button, .midi-chat-card button, .dnd5e.chat-card button, .dnd5e2.chat-card button, button.pill, .pill, .tag) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--fe-export-round-marker-fg, #f2efe8) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
 }
 
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
@@ -627,7 +697,7 @@ body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-con
  */
 body.fe-export-optimized.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
   :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log)
-  .chat-message.fe-has-user-color {
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
 }
 
@@ -705,6 +775,20 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
   flex-basis: auto !important;
   align-self: stretch !important;
   justify-self: stretch !important;
+}
+
+#fe-chat-export-container :is(#chat-log, #fe-chat-export-log) {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message {
+  margin: 0 0 var(--fe-chat-message-spacing, var(--chat-message-spacing, 4px)) 0;
+}
+
+#fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message:last-child {
+  margin-bottom: 0;
 }
 
 

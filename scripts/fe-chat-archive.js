@@ -722,12 +722,35 @@ function feStampArchiveMessageIdentity(node, msg) {
   }
 }
 
-async function feTryFoundryRenderMessage(_msg) {
-  // Intentionally disabled in export/archive.
-  // Calling ChatLog.renderMessage / ChatMessage.renderHTML for every archived message
-  // triggers Foundry's backwards-compatibility path for deprecated renderChatMessage hooks
-  // in third-party modules. For export we prefer: live DOM clone -> custom fallback.
-  return null;
+async function feTryFoundryRenderMessage(msg) {
+  try {
+    if (!msg) return null;
+
+    if (typeof msg?.renderHTML === "function") {
+      const rendered = await msg.renderHTML();
+      if (feIsElement(rendered)) return feCoerceChatMessageElement(rendered);
+      if (typeof rendered === "string") {
+        const shell = document.createElement("template");
+        shell.innerHTML = rendered.trim();
+        const el = shell.content.firstElementChild;
+        if (feIsElement(el)) return feCoerceChatMessageElement(el);
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    const renderFn =
+      ui?.chat?.constructor?.renderMessage ||
+      foundry?.applications?.sidebar?.tabs?.ChatLog?.renderMessage ||
+      globalThis?.ChatLog?.renderMessage;
+    if (typeof renderFn !== "function") return null;
+    const rendered = await renderFn.call(ui?.chat?.constructor || null, msg, {});
+    return feCoerceChatMessageElement(rendered);
+  } catch {
+    return null;
+  }
 }
 
 
@@ -873,6 +896,75 @@ function feHasPortraitMarkup(rootEl) {
     return !!rootEl?.querySelector?.(FE_EXPORT_PORTRAIT_MARKER_SELECTOR);
   } catch {
     return false;
+  }
+}
+
+function feArchiveMessageContentLooksEmpty(node) {
+  try {
+    const content = node?.querySelector?.(':scope > .message-content');
+    if (!content) return true;
+    if (content.querySelector?.('.round-marker, img, video, audio, canvas, svg, table, iframe, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, blockquote, pre, hr, ul, ol')) {
+      return false;
+    }
+    const text = String(content.textContent ?? '').replace(/ /g, ' ').trim();
+    return !text;
+  } catch {
+    return false;
+  }
+}
+
+function feFinalizeArchiveSpecialMessageState(node, msg, liveEl = null) {
+  try {
+    if (!feIsElement(node)) return;
+
+    const isNarrator = !!(
+      feIsNarratorToolsMessage(msg, node) ||
+      liveEl?.classList?.contains?.('narrator-chat') ||
+      liveEl?.classList?.contains?.('fe-narrator-chat')
+    );
+
+    const isRoundMarker = !!(
+      feIsRoundMarkerMessage(msg, node) ||
+      liveEl?.classList?.contains?.('round-marker') ||
+      liveEl?.classList?.contains?.('fe-round-marker-chat') ||
+      liveEl?.dataset?.feIsRoundMarker === '1' ||
+      liveEl?.querySelector?.('.round-marker')
+    );
+
+    node.classList.toggle('narrator-chat', isNarrator);
+    node.classList.toggle('fe-narrator-chat', isNarrator);
+    node.classList.toggle('round-marker', isRoundMarker);
+    node.classList.toggle('fe-round-marker-chat', isRoundMarker);
+
+    if (isRoundMarker) {
+      node.dataset.feIsRoundMarker = '1';
+      node.setAttribute?.('data-fe-is-round-marker', '1');
+    } else {
+      delete node.dataset.feIsRoundMarker;
+      node.removeAttribute?.('data-fe-is-round-marker');
+    }
+
+    if (isNarrator || isRoundMarker) {
+      node.classList.remove('fe-has-user-color');
+      node.style?.removeProperty?.('--fe-user-color-rgb');
+    }
+
+    if (!isRoundMarker) {
+      node.classList.remove('fe-round-marker-empty-content');
+      return;
+    }
+
+    const header = node.querySelector?.(':scope > .message-header');
+    const sender = header?.querySelector?.('.message-sender');
+    const metadata = header?.querySelector?.('.message-metadata');
+    const portrait = header?.querySelector?.('img.fe-chat-portrait, .fe-chat-portrait-wrap');
+    try { sender?.style?.setProperty?.('display', 'none', 'important'); } catch {}
+    try { metadata?.style?.setProperty?.('display', 'none', 'important'); } catch {}
+    try { portrait?.style?.setProperty?.('display', 'none', 'important'); } catch {}
+
+    node.classList.toggle('fe-round-marker-empty-content', feArchiveMessageContentLooksEmpty(node));
+  } catch {
+    /* no-op */
   }
 }
 
@@ -1146,6 +1238,18 @@ function feArchiveShouldPreferLiveClone(msg, liveEl = null, renderProfile = null
   return false;
 }
 
+function feArchiveShouldTrySystemRender(msg, liveEl = null, renderProfile = null) {
+  try {
+    void renderProfile;
+    if (!msg) return false;
+    if (feIsNarratorToolsMessage(msg, liveEl) || feIsRoundMarkerMessage(msg, liveEl)) return true;
+    if (feArchiveMessageLooksComplex(msg, liveEl)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, renderProfile = null } = {}) {
   let node = null;
   const shouldCloneLive = feArchiveShouldPreferLiveClone(msg, liveEl, renderProfile);
@@ -1154,6 +1258,16 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
   } catch {
     node = null;
   }
+
+  if (!feIsElement(node) && feArchiveShouldTrySystemRender(msg, liveEl, renderProfile)) {
+    try {
+      const rendered = await feTryFoundryRenderMessage(msg);
+      if (feIsElement(rendered)) node = targetDoc.importNode(rendered, true);
+    } catch {
+      node = null;
+    }
+  }
+
   if (!feIsElement(node)) {
     try {
       node = feFallbackRenderChatMessage(targetDoc || document, msg);
@@ -1175,6 +1289,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
       node = feNormalizeArchiveMessageRoot(targetDoc || document, node) || node;
       node.__feMessage = msg || node.__feMessage || null;
       feStampArchiveMessageIdentity(node, msg || { id: feGetMessageIdFromElement(liveEl) || undefined });
+      feFinalizeArchiveSpecialMessageState(node, msg, liveEl);
       feMarkPlainArchiveMessage(node, msg, liveEl);
     } catch {}
   }
@@ -1851,9 +1966,9 @@ async function feArchivePrint(win) {
         dprCap: mildDownscale ? (isElectron ? 1.2 : 1.75) : (isElectron ? 1 : 1.5),
         webpQuality: mildDownscale ? (isElectron ? 0.80 : 0.88) : (isElectron ? 0.72 : 0.82),
         jpegQuality: mildDownscale ? (isElectron ? 0.86 : 0.91) : (isElectron ? 0.78 : 0.85),
-        avatarDprCap: mildDownscale ? (isElectron ? 2 : 2.25) : (isElectron ? 1.75 : 2),
-        avatarWebpQuality: mildDownscale ? (isElectron ? 0.90 : 0.95) : (isElectron ? 0.86 : 0.92),
-        avatarJpegQuality: mildDownscale ? (isElectron ? 0.92 : 0.96) : (isElectron ? 0.88 : 0.94),
+        avatarDprCap: mildDownscale ? (isElectron ? 2.25 : 2.5) : (isElectron ? 2 : 2.25),
+        avatarWebpQuality: mildDownscale ? (isElectron ? 0.93 : 0.97) : (isElectron ? 0.91 : 0.95),
+        avatarJpegQuality: mildDownscale ? (isElectron ? 0.95 : 0.98) : (isElectron ? 0.93 : 0.96),
         maxSide: mildDownscale ? (isElectron ? 2048 : 2304) : 1600,
       });
     } catch (err) {
@@ -2035,9 +2150,9 @@ async function feDownscaleImagesForPrint(
     webpQuality = 0.82,
     jpegQuality = 0.85,
     // Avatars/portraits: preserve quality (they are small but visually important)
-    avatarDprCap = 2,
-    avatarWebpQuality = 0.92,
-    avatarJpegQuality = 0.94,
+    avatarDprCap = 2.25,
+    avatarWebpQuality = 0.95,
+    avatarJpegQuality = 0.96,
     maxSide = 1600,
   } = {}
 ) {
@@ -2720,31 +2835,27 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Secondary stack (Geurimilgi) */
+  /* Archive/export fallback for the large Geurimilgi face: use readable
+   * system UI fonts instead of forcing another decorative font in offline HTML.
+   */
   --fe-font-geurimilgi:
-    "FE Geurimilgi Embedded",
-    "FE Geurimilgi",
-    "FE CookieRun Embedded",
-    "FE CookieRun",
-    "Signika",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Segoe UI",
     system-ui,
     -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
     sans-serif,
     var(--fe-symbol-fallback);
 
   /* Secondary stack for small text / chat-card descriptions */
   --fe-font-light:
-    "FE Geurimilgi Embedded",
-    "FE Geurimilgi",
-    "FE CookieRun Embedded",
-    "FE CookieRun",
-    "Signika",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Segoe UI",
     system-ui,
     -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
     sans-serif,
     var(--fe-symbol-fallback);
 
@@ -3040,8 +3151,8 @@ function fePatchInlineFontFamiliesForExport(root) {
       if (!ff) continue;
 
       let next = ff;
-      if (/FE\s+Geurimilgi/i.test(next) && !/FE\s+Geurimilgi\s+Embedded/i.test(next)) {
-        next = next.replace(/FE\s+Geurimilgi/gi, '"FE Geurimilgi Embedded", "FE Geurimilgi"');
+      if (/FE\s+Geurimilgi/i.test(next)) {
+        next = next.replace(/"?FE\s+Geurimilgi(?:\s+Embedded)?"?/gi, '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, sans-serif');
       }
       if (/FE\s+CookieRun/i.test(next) && !/FE\s+CookieRun\s+Embedded/i.test(next)) {
         next = next.replace(/FE\s+CookieRun/gi, '"FE CookieRun Embedded", "FE CookieRun"');

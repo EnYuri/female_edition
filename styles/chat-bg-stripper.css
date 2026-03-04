@@ -157,7 +157,7 @@ body.fe-chatcard-custom-font
  */
 body.fe-msg-bg-usercolor
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color {
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
   background-blend-mode: screen !important;
 }
@@ -200,19 +200,19 @@ body.fe-msg-bg-usercolor
  */
 body.fe-msg-bg-usercolor.fe-userbg-base-white
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color {
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   --fe-user-bg-base-rgb: 255 255 255;
 }
 
 body.fe-msg-bg-usercolor.fe-userbg-base-black
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color {
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   --fe-user-bg-base-rgb: 0 0 0;
 }
 
 body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color {
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   /* Solid base */
   background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
   /* Tint overlay */

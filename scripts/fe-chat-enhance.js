@@ -1479,6 +1479,62 @@ function feIsNarratorMessageElementInWindow(win, msgEl) {
   }
 }
 
+function feLooksLikeRoundMarkerFlavor(flavor = "", content = "") {
+  try {
+    const f = String(flavor ?? "").replace(/\s+/g, " ").trim();
+    if (f && /^(?:round\s*(?:start|end|\d+)|start of round|end of round|combat\s*round\s*\d+|라운드\s*(?:시작|종료|끝|\d+)|전투\s*라운드\s*\d+)/i.test(f)) {
+      return true;
+    }
+  } catch {
+    /* no-op */
+  }
+
+  try {
+    const c = String(content ?? "");
+    if (/<[^>]*\bround-marker\b/i.test(c)) return true;
+  } catch {
+    /* no-op */
+  }
+
+  return false;
+}
+
+function feGetRoundMarkerFlagValue(source) {
+  try {
+    const flags = source?.flags ?? source ?? {};
+    const namespaces = ["monks-combat-details", "monks-little-details", MODULE_ID];
+    const directCandidates = [
+      "roundmarker",
+      "roundMarker",
+      "round-message",
+      "roundMessage",
+      "roundmessage",
+      "combatRoundMessage",
+      "combatroundmessage",
+      "isRoundMarker",
+    ];
+
+    for (const ns of namespaces) {
+      const data = flags?.[ns];
+      if (!data || typeof data !== "object") continue;
+      for (const key of directCandidates) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+        const value = data[key];
+        if (value === true || String(value) === "true") return true;
+        if (value && typeof value !== "object") return value;
+      }
+      for (const [key, value] of Object.entries(data)) {
+        if (!/round[-_ ]?(?:marker|message)|combat[-_ ]?round/i.test(String(key))) continue;
+        if (value === true || String(value) === "true") return true;
+        if (value && typeof value !== "object") return value;
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
+}
+
 function feIsRoundMarkerMessageElementInWindow(win, msgEl) {
   try {
     if (!win || !msgEl || !(msgEl instanceof win.Element)) return false;
@@ -1494,10 +1550,11 @@ function feIsRoundMarkerMessageElementInWindow(win, msgEl) {
     if (!msgId) return false;
 
     const msg = feGetMessageFromElementOrCollection(msgEl) || game.messages?.get?.(msgId);
-    const flag = msg?.flags?.["monks-little-details"]?.roundmarker;
+    const flag = feGetRoundMarkerFlagValue(msg);
     if (flag === true || String(flag) === "true") return true;
     const content = String(msg?.content ?? "");
-    return /\bround-marker\b/i.test(content);
+    if (/\bround-marker\b/i.test(content)) return true;
+    return feLooksLikeRoundMarkerFlavor(msg?.flavor ?? "", content);
   } catch {
     return false;
   }
@@ -1989,7 +2046,7 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
       flags?.[MODULE_ID]?.isNarrator ||
       message?.getFlag?.("narrator-tools", "type")
     );
-    const roundFlag = flags?.["monks-little-details"]?.roundmarker;
+    const roundFlag = feGetRoundMarkerFlagValue(flags) ?? feGetRoundMarkerFlagValue(message);
     const content = String(data?.content ?? message?.content ?? "");
     const isRoundMarker = !!(
       flags?.[MODULE_ID]?.isRoundMarker ||
@@ -2135,13 +2192,14 @@ function feIsRoundMarkerMessage(message, messageEl) {
   } catch {}
 
   try {
-    const flag = message?.flags?.["monks-little-details"]?.roundmarker;
+    const flag = feGetRoundMarkerFlagValue(message);
     if (flag === true || String(flag) === "true") return true;
   } catch {}
 
   try {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
+    if (feLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
   } catch {}
 
   return false;

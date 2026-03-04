@@ -327,6 +327,42 @@ function cpIsDfChatEnhancementsMerged(messageEl) {
   }
 }
 
+function cpLooksLikeRoundMarkerFlavor(flavor = "", content = "") {
+  try {
+    const f = String(flavor ?? "").replace(/\s+/g, " ").trim();
+    if (f && /^(?:round\s*(?:start|end|\d+)|start of round|end of round|combat\s*round\s*\d+|라운드\s*(?:시작|종료|끝|\d+)|전투\s*라운드\s*\d+)/i.test(f)) return true;
+  } catch {
+    /* no-op */
+  }
+
+  try {
+    const c = String(content ?? "");
+    if (/<[^>]*\bround-marker\b/i.test(c)) return true;
+  } catch {
+    /* no-op */
+  }
+
+  return false;
+}
+
+function cpGetRoundMarkerFlagValue(source) {
+  try {
+    const flags = source?.flags ?? source ?? {};
+    for (const ns of ["monks-combat-details", "monks-little-details", MODULE_ID]) {
+      const data = flags?.[ns];
+      if (!data || typeof data !== "object") continue;
+      for (const [key, value] of Object.entries(data)) {
+        if (!/round[-_ ]?(?:marker|message)|combat[-_ ]?round/i.test(String(key))) continue;
+        if (value === true || String(value) === "true") return true;
+        if (value && typeof value !== "object") return value;
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
+}
+
 function cpIsRoundMarkerMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
@@ -335,8 +371,7 @@ function cpIsRoundMarkerMessage(message, messageEl) {
   }
 
   try {
-    // monks-little-details round marker
-    const flag = message?.flags?.["monks-little-details"]?.roundmarker;
+    const flag = cpGetRoundMarkerFlagValue(message);
     if (flag === true || String(flag) === "true") return true;
   } catch {
     /* ignore */
@@ -352,6 +387,7 @@ function cpIsRoundMarkerMessage(message, messageEl) {
   try {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
+    if (cpLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
   } catch {
     /* ignore */
   }
@@ -799,11 +835,13 @@ function cpShouldUseHQResample(img) {
     const body = img?.ownerDocument?.body;
     if (!body?.classList) return true;
 
-    // Archive/export documents can contain thousands of repeated portraits.
-    // Replacing each one with a cached data: URL dramatically increases memory usage,
-    // so prefer the original source there and let CSS handle downscaling.
-    if (body.classList.contains("fe-chat-archive")) return false;
+    // Keep print/PDF documents on the original sources to avoid a large number of
+    // extra data: URLs during final export.
     if (body.classList.contains("fe-print-chatlog")) return false;
+
+    // Archive windows benefit from one-time high-quality resampling, especially for
+    // low-resolution PC portraits. Repeated portraits still share a cached result.
+    if (body.classList.contains("fe-chat-archive")) return true;
   } catch {
     /* fall through */
   }
