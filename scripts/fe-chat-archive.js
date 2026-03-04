@@ -1963,13 +1963,15 @@ async function feArchivePrint(win) {
       restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
-        dprCap: mildDownscale ? (isElectron ? 1.2 : 1.75) : (isElectron ? 1 : 1.5),
-        webpQuality: mildDownscale ? (isElectron ? 0.80 : 0.88) : (isElectron ? 0.72 : 0.82),
-        jpegQuality: mildDownscale ? (isElectron ? 0.86 : 0.91) : (isElectron ? 0.78 : 0.85),
-        avatarDprCap: mildDownscale ? (isElectron ? 2.25 : 2.5) : (isElectron ? 2 : 2.25),
-        avatarWebpQuality: mildDownscale ? (isElectron ? 0.93 : 0.97) : (isElectron ? 0.91 : 0.95),
-        avatarJpegQuality: mildDownscale ? (isElectron ? 0.95 : 0.98) : (isElectron ? 0.93 : 0.96),
-        maxSide: mildDownscale ? (isElectron ? 2048 : 2304) : 1600,
+        dprCap: mildDownscale ? (isElectron ? 1.9 : 2.25) : (isElectron ? 1.35 : 1.65),
+        minDpr: mildDownscale ? (isElectron ? 1.35 : 1.5) : (isElectron ? 1.1 : 1.25),
+        webpQuality: mildDownscale ? (isElectron ? 0.90 : 0.93) : (isElectron ? 0.85 : 0.88),
+        jpegQuality: mildDownscale ? (isElectron ? 0.92 : 0.95) : (isElectron ? 0.88 : 0.90),
+        avatarDprCap: mildDownscale ? (isElectron ? 2.75 : 3.0) : (isElectron ? 2.2 : 2.5),
+        avatarMinDpr: mildDownscale ? (isElectron ? 2.0 : 2.25) : (isElectron ? 1.6 : 1.85),
+        avatarWebpQuality: mildDownscale ? (isElectron ? 0.97 : 0.985) : (isElectron ? 0.94 : 0.96),
+        avatarJpegQuality: mildDownscale ? (isElectron ? 0.98 : 0.995) : (isElectron ? 0.96 : 0.98),
+        maxSide: mildDownscale ? (isElectron ? 2560 : 3072) : (isElectron ? 1792 : 2048),
       });
     } catch (err) {
       console.warn("female_edition | print downscale failed", err);
@@ -2140,6 +2142,76 @@ function feFreezeMessageBackgroundsForPrint(win, logEl) {
   };
 }
 
+function feCreateArchiveCanvas(doc, width, height) {
+  const canvas = doc.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width) || 1);
+  canvas.height = Math.max(1, Math.round(height) || 1);
+  return canvas;
+}
+
+function feEnableHighQualitySmoothing(ctx) {
+  if (!ctx) return;
+  try {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+  } catch {
+    // ignore
+  }
+}
+
+function feProgressiveResampleCanvas(win, img, spec, outW, outH, { maxIntermediateSide = 2048 } = {}) {
+  const doc = win?.document;
+  if (!doc || !img) return null;
+
+  const srcW = Math.max(1, Math.round(spec?.sw || img.naturalWidth || outW));
+  const srcH = Math.max(1, Math.round(spec?.sh || img.naturalHeight || outH));
+  const scaledEnough = srcW <= outW * 1.2 && srcH <= outH * 1.2;
+
+  const out = feCreateArchiveCanvas(doc, outW, outH);
+  const octx = out.getContext("2d", { alpha: true });
+  if (!octx) return out;
+  feEnableHighQualitySmoothing(octx);
+
+  if (scaledEnough) {
+    octx.clearRect(0, 0, outW, outH);
+    octx.drawImage(img, spec.sx, spec.sy, spec.sw, spec.sh, spec.dx, spec.dy, spec.dw, spec.dh);
+    return out;
+  }
+
+  const maxSide = Math.max(outW, outH);
+  const minSeed = Math.max(maxSide * 4, 512);
+  const seedScale = Math.min(1, Math.max(minSeed, Math.min(Number(maxIntermediateSide) || 2048, 4096)) / Math.max(srcW, srcH));
+  const seedW = Math.max(outW, Math.round(srcW * seedScale));
+  const seedH = Math.max(outH, Math.round(srcH * seedScale));
+
+  let work = feCreateArchiveCanvas(doc, seedW, seedH);
+  let wctx = work.getContext("2d", { alpha: true });
+  if (!wctx) return out;
+  feEnableHighQualitySmoothing(wctx);
+  wctx.clearRect(0, 0, seedW, seedH);
+  wctx.drawImage(img, spec.sx, spec.sy, spec.sw, spec.sh, 0, 0, seedW, seedH);
+
+  while (work.width / 2 >= outW * 1.1 && work.height / 2 >= outH * 1.1) {
+    const nextW = Math.max(outW, Math.round(work.width / 2));
+    const nextH = Math.max(outH, Math.round(work.height / 2));
+    const next = feCreateArchiveCanvas(doc, nextW, nextH);
+    const nctx = next.getContext("2d", { alpha: true });
+    if (!nctx) break;
+    feEnableHighQualitySmoothing(nctx);
+    nctx.clearRect(0, 0, nextW, nextH);
+    nctx.drawImage(work, 0, 0, work.width, work.height, 0, 0, nextW, nextH);
+    work.width = 0;
+    work.height = 0;
+    work = next;
+  }
+
+  octx.clearRect(0, 0, outW, outH);
+  octx.drawImage(work, 0, 0, work.width, work.height, spec.dx, spec.dy, spec.dw, spec.dh);
+  work.width = 0;
+  work.height = 0;
+  return out;
+}
+
 async function feDownscaleImagesForPrint(
   win,
   rootEl,
@@ -2147,10 +2219,12 @@ async function feDownscaleImagesForPrint(
     meta,
     excludeAvatars = false,
     dprCap = 1.5,
+    minDpr = 1,
     webpQuality = 0.82,
     jpegQuality = 0.85,
     // Avatars/portraits: preserve quality (they are small but visually important)
     avatarDprCap = 2.25,
+    avatarMinDpr = 1.5,
     avatarWebpQuality = 0.95,
     avatarJpegQuality = 0.96,
     maxSide = 1600,
@@ -2176,8 +2250,9 @@ async function feDownscaleImagesForPrint(
 
   if (excludeAvatars) imgs = imgs.filter((img) => !isAvatarImage(img));
 
-  const dpr = Math.max(1, Math.min(dprCap, win.devicePixelRatio || 1));
-  const avatarDpr = Math.max(1, Math.min(avatarDprCap, win.devicePixelRatio || 1));
+  const screenDpr = Math.max(1, Number(win.devicePixelRatio) || 1);
+  const dpr = Math.max(1, Math.min(dprCap, Math.max(screenDpr, Number(minDpr) || 1)));
+  const avatarDpr = Math.max(1, Math.min(avatarDprCap, Math.max(screenDpr, Number(avatarMinDpr) || 1.5)));
   const groups = new Map();
   const MAX_SIDE = Math.max(256, Number(maxSide) || 1600);
 
@@ -2313,19 +2388,11 @@ async function feDownscaleImagesForPrint(
       if (!rep) continue;
       const outW = Math.max(1, Math.min(g.maxW, Math.round(g.maxW)));
       const outH = Math.max(1, Math.min(g.maxH, Math.round(g.maxH)));
-      const canvas = win.document.createElement("canvas");
-      canvas.width = outW;
-      canvas.height = outH;
-      const ctx = canvas.getContext("2d", { alpha: true });
-      if (!ctx) continue;
-      try {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-      } catch {}
-
       const spec = computeDrawSpec(rep, outW, outH);
-      ctx.clearRect(0, 0, outW, outH);
-      ctx.drawImage(rep, spec.sx, spec.sy, spec.sw, spec.sh, spec.dx, spec.dy, spec.dw, spec.dh);
+      const canvas = feProgressiveResampleCanvas(win, rep, spec, outW, outH, {
+        maxIntermediateSide: g.isAvatar ? Math.max(2048, Math.min(MAX_SIDE, 3072)) : Math.max(1536, Math.min(MAX_SIDE, 2560)),
+      });
+      if (!canvas) continue;
 
       const dataUrl = await feCanvasToDataURL(canvas, {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
