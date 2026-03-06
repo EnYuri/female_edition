@@ -9,7 +9,8 @@ import {
   feGetChatLogs,
   feApplyStyleVarsFromSettings,
   feStripChatTexturesInWindow,
-  feApplyUserColorBgToMessageElement,
+  feApplyRenderedStateToMessageElement,
+  feApplyRenderedStateToLog,
   feSetChatCardFontClass,
   feSetChatFontChoiceClass,
   feSetUiFontClass,
@@ -1171,7 +1172,7 @@ async function feRenderMessagesIntoLog({
       loading: renderProfile?.normalizeImageLoading,
       decoding: renderProfile?.normalizeImageDecoding,
     });
-    if (msg) feApplyUserColorBgToMessageElement(msg, node);
+    if (msg) feApplyRenderedStateToMessageElement(msg, node, { allowNarratorMerge: feArchiveMergeOptions().allowNarratorMerge });
 
     if (!deferPortraits) {
       try {
@@ -3343,7 +3344,8 @@ function feApplyChatMergeInWindow(win) {
     if (!logEl) return;
 
     feSyncArchiveMergeBodyClasses(win.document);
-    feApplyChatMerge(logEl, feArchiveMergeOptions());
+    feApplyRenderedStateToLog(logEl, feArchiveMergeOptions());
+    if (!feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, feArchiveMergeOptions());
     feRefreshPortraitsForLog(logEl);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);

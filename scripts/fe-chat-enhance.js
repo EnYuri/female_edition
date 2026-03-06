@@ -22,6 +22,7 @@ const S = {
   // Merge
   MERGE_ENABLED: "ceMergeEnabled",
   MERGE_ONLY_TEXT: "ceMergeOnlyText",
+  MERGE_INCLUDE_ROLL_MESSAGES: "ceMergeIncludeRollMessages",
   MERGE_DIVIDER: "ceMergeDivider",
   MERGE_MODE: "ceMergeMode", // standard | simple
   MERGE_FOLLOW_HEADER_STYLE: "ceMergeFollowHeaderStyle", // hide | name | portrait
@@ -74,6 +75,7 @@ const FE_DEFAULTS = {
   // Merge
   [S.MERGE_ENABLED]: true,
   [S.MERGE_ONLY_TEXT]: true,
+  [S.MERGE_INCLUDE_ROLL_MESSAGES]: false,
   [S.MERGE_DIVIDER]: true,
   [S.MERGE_MODE]: "standard",
   [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
@@ -337,12 +339,22 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.MERGE_ONLY_TEXT, {
     name: "채팅 병합: 텍스트 메시지만",
-    hint: "주사위/채팅 카드(아이템/주문 등) 메시지는 병합하지 않습니다.",
+    hint: "인라인 롤이 섞인 일반 텍스트는 병합할 수 있습니다. 전용 주사위 결과 카드 병합은 아래 옵션으로 켤 수 있으며, midi/dnd5e 채팅 카드는 기본적으로 병합하지 않습니다.",
     scope: "client",
     config: true,
     type: Boolean,
     default: true,
     onChange: () => feApplyChatMergeToAllLogs(),
+  });
+
+  game.settings.register(MODULE_ID, S.MERGE_INCLUDE_ROLL_MESSAGES, {
+    name: "채팅 병합: 주사위 결과 메시지도 포함",
+    hint: "끄면 .dice-roll / .dice-result / ChatMessage.rolls 메시지는 병합에서 제외합니다. 켜면 같은 화자의 연속 주사위 결과 메시지도 병합할 수 있습니다. midi/dnd5e 채팅 카드는 계속 제외됩니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
   });
 
   game.settings.register(MODULE_ID, S.MERGE_DIVIDER, {
@@ -690,17 +702,223 @@ Hooks.once("ready", async () => {
 //  - Re-apply user-color tint after the message is inserted into the DOM
 //  - Schedule a dedupe + merge recompute for the affected chat log
 // See: Foundry core issue #13067 (duplicate render when update races render).
-let feInlineRollSnapshots = null;
-let feInlineRollSnapshotPersistTimer = null;
-// Inline-roll snapshotting was used by older post-processing passes.
-// The current pipeline freezes new inline rolls at preCreate/preUpdate time instead,
-// so these helpers are kept as no-op shims to avoid extra session churn while preserving call sites.
-function feClearInlineRollSnapshot(_messageId) {
-  /* no-op */
+const feInlineRollSnapshots = new Map();
+const FE_INLINE_ROLL_SNAPSHOT_FLAG = "inlineRollSnapshot";
+const FE_INLINE_ROLL_SNAPSHOT_VERSION = 1;
+
+function feGetInlineRollSnapshotKey(message) {
+  try {
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (!id) return null;
+    const content = String(message?.content ?? "");
+    return `${id}::${content}`;
+  } catch {
+    return null;
+  }
 }
 
-function feSnapshotOrRestoreInlineRolls(_message, _rootEl) {
-  /* no-op */
+function feContentHasRawInlineRollSyntax(content) {
+  try {
+    const src = String(content ?? "");
+    return !!src && src.includes("[[") && !/class=["'][^"']*\binline-roll\b/i.test(src);
+  } catch {
+    return false;
+  }
+}
+
+function feInlineRollSnapshotSourceHash(content) {
+  try {
+    return feStableHash(String(content ?? ""));
+  } catch {
+    return "";
+  }
+}
+
+function feNormalizeInlineRollSnapshotPayload(payload, expectedHash = null) {
+  try {
+    if (!payload || typeof payload !== "object") return null;
+    const anchors = Array.isArray(payload.anchors)
+      ? payload.anchors.map((html) => String(html ?? "").trim()).filter(Boolean)
+      : [];
+    const sourceHash = String(payload.sourceHash ?? "").trim();
+    if (!anchors.length || !sourceHash) return null;
+    if (expectedHash && sourceHash !== expectedHash) return null;
+    return {
+      v: Number(payload.v ?? FE_INLINE_ROLL_SNAPSHOT_VERSION) || FE_INLINE_ROLL_SNAPSHOT_VERSION,
+      sourceHash,
+      anchors,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function feBuildInlineRollSnapshotPayload(content, { message = null, data = null } = {}) {
+  try {
+    const src = String(content ?? "");
+    if (!feContentHasRawInlineRollSyntax(src)) return null;
+    const frozen = feFreezeInlineRollSyntax(src, { message, data });
+    if (!frozen || frozen === src) return null;
+    const scratch = document.createElement("div");
+    scratch.innerHTML = frozen;
+    const anchors = Array.from(scratch.querySelectorAll?.("a.inline-roll.inline-result, a.inline-roll[data-roll]") ?? []).map((a) => a.outerHTML);
+    return feNormalizeInlineRollSnapshotPayload({
+      v: FE_INLINE_ROLL_SNAPSHOT_VERSION,
+      sourceHash: feInlineRollSnapshotSourceHash(src),
+      anchors,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function feStoreInlineRollSnapshot(message, anchorsOrPayload = []) {
+  try {
+    const key = feGetInlineRollSnapshotKey(message);
+    if (!key) return null;
+    const expectedHash = feInlineRollSnapshotSourceHash(message?.content ?? "");
+    const payload = Array.isArray(anchorsOrPayload)
+      ? feNormalizeInlineRollSnapshotPayload({
+          v: FE_INLINE_ROLL_SNAPSHOT_VERSION,
+          sourceHash: expectedHash,
+          anchors: anchorsOrPayload,
+        }, expectedHash)
+      : feNormalizeInlineRollSnapshotPayload(anchorsOrPayload, expectedHash);
+    if (!payload) return null;
+    const stored = { key, ...payload };
+    feInlineRollSnapshots.set(key, stored);
+    return stored;
+  } catch {
+    return null;
+  }
+}
+
+function feGetStoredInlineRollSnapshotFlag(message) {
+  try {
+    const expectedHash = feInlineRollSnapshotSourceHash(message?.content ?? "");
+    return feNormalizeInlineRollSnapshotPayload(message?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null, expectedHash);
+  } catch {
+    return null;
+  }
+}
+
+function feGetInlineRollSnapshot(message) {
+  try {
+    const key = feGetInlineRollSnapshotKey(message);
+    if (!key) return null;
+    const current = feInlineRollSnapshots.get(key) ?? null;
+    if (current?.anchors?.length) return current;
+    const storedFlag = feGetStoredInlineRollSnapshotFlag(message);
+    if (!storedFlag) return null;
+    const payload = { key, ...storedFlag };
+    feInlineRollSnapshots.set(key, payload);
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function feAttachInlineRollSnapshotFlag(flags, content, { message = null, data = null } = {}) {
+  try {
+    const nextFlags = foundry.utils.deepClone(flags ?? {});
+    const snapshot = feBuildInlineRollSnapshotPayload(content, { message, data });
+    const existing = nextFlags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null;
+    if (!snapshot && existing == null) return nextFlags;
+    nextFlags[MODULE_ID] = foundry.utils.mergeObject(nextFlags[MODULE_ID] ?? {}, {
+      [FE_INLINE_ROLL_SNAPSHOT_FLAG]: snapshot ?? null,
+    });
+    return nextFlags;
+  } catch {
+    return foundry.utils.deepClone(flags ?? {});
+  }
+}
+
+function fePrepareInlineRollSnapshotOnPreCreate(message, data = {}, userId = null) {
+  try {
+    if (userId !== game.user.id) return false;
+    const content = String(data?.content ?? message?.content ?? "");
+    const existing = data?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? message?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null;
+    if (!feContentHasRawInlineRollSyntax(content) && existing == null) return false;
+    const flags = feAttachInlineRollSnapshotFlag(data?.flags ?? message?.flags ?? {}, content, { message, data });
+    message.updateSource({ flags });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fePrepareInlineRollSnapshotOnPreUpdate(message, changed = {}, userId = null) {
+  try {
+    if (userId !== game.user.id) return false;
+    const modFlags = changed?.flags?.[MODULE_ID] ?? null;
+    const touchesRaw = !!(modFlags && typeof modFlags === "object" && (
+      Object.prototype.hasOwnProperty.call(modFlags, "raw") ||
+      Object.prototype.hasOwnProperty.call(modFlags, "plain")
+    ));
+    if (!touchesRaw && !feChangeTouchesInlineRollSnapshot(changed)) return false;
+    const merged = foundry.utils.mergeObject(foundry.utils.deepClone(message?.toObject?.() ?? {}), changed ?? {}, {
+      inplace: true,
+      recursive: true,
+    });
+    const content = String(merged?.content ?? message?.content ?? "");
+    changed.flags = feAttachInlineRollSnapshotFlag(merged?.flags ?? message?.flags ?? {}, content, { message, data: merged });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function feCreateElementFromHTML(doc, html) {
+  try {
+    const owner = doc ?? document;
+    const tpl = owner.createElement("template");
+    tpl.innerHTML = String(html ?? "").trim();
+    return tpl.content?.firstElementChild ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function feClearInlineRollSnapshot(messageId) {
+  try {
+    const id = feNormalizeChatMessageId(messageId);
+    if (!id) return;
+    for (const key of Array.from(feInlineRollSnapshots.keys())) {
+      if (String(key).startsWith(`${id}::`)) feInlineRollSnapshots.delete(key);
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feSnapshotOrRestoreInlineRolls(message, rootEl) {
+  try {
+    const root = feExtractHTMLElement(rootEl);
+    if (!root || !message) return;
+    const content = String(message?.content ?? "");
+    const hasRawInlineRolls = feContentHasRawInlineRollSyntax(content);
+    const current = Array.from(root.querySelectorAll?.("a.inline-roll.inline-result, a.inline-roll[data-roll]") ?? []);
+
+    let snapshot = feGetInlineRollSnapshot(message);
+    if (!snapshot && current.length && hasRawInlineRolls) {
+      snapshot = feStoreInlineRollSnapshot(message, current.map((a) => a.outerHTML));
+    }
+    if (!snapshot && hasRawInlineRolls) {
+      snapshot = feStoreInlineRollSnapshot(message, feBuildInlineRollSnapshotPayload(content, { message }));
+    }
+
+    if (!snapshot?.anchors?.length || !current.length) return;
+    if (snapshot.anchors.length !== current.length) return;
+
+    const doc = root.ownerDocument ?? document;
+    for (let i = 0; i < current.length; i += 1) {
+      const replacement = feCreateElementFromHTML(doc, snapshot.anchors[i]);
+      if (!replacement) continue;
+      current[i].replaceWith(replacement);
+    }
+  } catch {
+    /* no-op */
+  }
 }
 
 function feIsElementNode(node) {
@@ -1222,6 +1440,11 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
   try {
+    feSnapshotOrRestoreInlineRolls(message, el);
+  } catch {
+    /* no-op */
+  }
+  try {
     feApplyRenderedStateToMessageElement(message, el);
   } catch {
     /* no-op */
@@ -1276,10 +1499,11 @@ function feEscapeHTML(str) {
     .replaceAll("'", "&#039;");
 }
 
-function feFreezeInlineRollSyntax(content) {
+function feFreezeInlineRollSyntax(content, { message = null, data = null } = {}) {
   try {
     const src = String(content ?? "");
     if (!src || !src.includes("[[") || /class=["']inline-roll\b/i.test(src)) return src;
+    const rollData = feGetInlineRollData(message, data ?? {});
     return src.replace(/\[\[([\s\S]+?)\]\]/g, (match, rawExpr) => {
       try {
         let expr = String(rawExpr ?? "").trim();
@@ -1287,16 +1511,32 @@ function feFreezeInlineRollSyntax(content) {
         expr = expr.replace(/^\/(?:r|roll|gmroll|blindroll|selfroll|publicroll|pr|br|sr)\s+/i, "").trim();
         if (!expr) return match;
         let roll = null;
-        try { roll = Roll.create ? Roll.create(expr) : new Roll(expr); } catch { roll = new Roll(expr); }
+        try { roll = Roll.create ? Roll.create(expr, rollData) : new Roll(expr, rollData); } catch { roll = new Roll(expr, rollData); }
         if (!roll) return match;
-        if (typeof roll.evaluateSync === "function") roll = roll.evaluateSync({ strict: false });
-        else if (typeof roll.evaluate === "function") roll = roll.evaluate({ async: false, strict: false });
-        const total = roll?.total ?? "";
-        const json = typeof roll?.toJSON === "function" ? roll.toJSON() : roll;
-        const dataRoll = encodeURIComponent(JSON.stringify(json));
-        const title = feEscapeHTML(expr);
-        const label = feEscapeHTML(String(total ?? ""));
-        return `<a class="inline-roll inline-result" data-roll="${dataRoll}" data-tooltip="${title}" title="${title}"><i class="fas fa-dice-d20"></i>${label}</a>`;
+        if (typeof roll.evaluateSync === "function") roll = roll.evaluateSync({ strict: false, allowStrings: true });
+        else if (typeof roll.evaluate === "function") {
+          const evaluated = roll.evaluate({ async: false, strict: false, allowStrings: true });
+          if (evaluated && typeof evaluated.then === "function") return match;
+          roll = evaluated ?? roll;
+        }
+
+        const total = roll?.total;
+        const label = total == null ? String(roll?.result ?? "") : String(total);
+        const tooltip = feEscapeHTML(expr);
+
+        if (typeof roll?.toAnchor === "function") {
+          const anchor = roll.toAnchor({ label });
+          try {
+            anchor?.setAttribute?.("title", expr);
+            if (anchor?.dataset && !anchor.dataset.tooltip) anchor.dataset.tooltip = expr;
+          } catch {
+            /* no-op */
+          }
+          return anchor?.outerHTML || match;
+        }
+
+        const json = typeof roll?.toJSON === "function" ? JSON.stringify(roll.toJSON()) : JSON.stringify(roll);
+        return `<a class="inline-roll inline-result" data-roll='${feEscapeHTML(json)}' data-tooltip="${tooltip}" title="${tooltip}"><i class="fas fa-dice-d20"></i>${feEscapeHTML(label)}</a>`;
       } catch {
         return match;
       }
@@ -1810,8 +2050,7 @@ function feApplyMarkdownOnPreCreate(message, data = {}, userId = null) {
       /* noop */
     }
 
-    let html = feMarkdownToHTML(content);
-    html = feFreezeInlineRollSyntax(html);
+    const html = feMarkdownToHTML(content);
 
     const flags = foundry.utils.deepClone(data?.flags ?? message?.flags ?? {});
     flags[MODULE_ID] = foundry.utils.mergeObject(flags[MODULE_ID] ?? {}, {
@@ -1821,22 +2060,6 @@ function feApplyMarkdownOnPreCreate(message, data = {}, userId = null) {
 
     message.updateSource({ content: html, flags });
     return true;
-  } catch {
-    return false;
-  }
-}
-
-function feMaybeFreezeInlineRollContentOnPreCreate(message, data = {}, userId = null) {
-  try {
-    if (userId !== game.user.id) return false;
-    const content = String(data?.content ?? message?.content ?? "");
-    if (!content || !content.includes("[[") || /class=["']inline-roll\b/i.test(content)) return false;
-    const frozen = feFreezeInlineRollSyntax(content);
-    if (frozen && frozen !== content) {
-      message.updateSource({ content: frozen });
-      return true;
-    }
-    return false;
   } catch {
     return false;
   }
@@ -1859,7 +2082,7 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
     feApplyMarkdownOnPreCreate(message, data, userId);
-    feMaybeFreezeInlineRollContentOnPreCreate(message, data, userId);
+    fePrepareInlineRollSnapshotOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
     feCaptureMessageRenderFlagsOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
   } catch {
     /* no-op */
@@ -1869,9 +2092,13 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
 Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
-    if (typeof changed?.content === "string" && changed.content.includes("[[") && !/class=["']inline-roll\b/i.test(changed.content)) {
-      changed.content = feFreezeInlineRollSyntax(changed.content);
-    }
+    const modFlags = changed?.flags?.[MODULE_ID] ?? null;
+    const rawEditPending = !!(modFlags && typeof modFlags === "object" && (
+      Object.prototype.hasOwnProperty.call(modFlags, "raw") ||
+      Object.prototype.hasOwnProperty.call(modFlags, "plain")
+    ));
+    if (rawEditPending) return;
+    fePrepareInlineRollSnapshotOnPreUpdate(message, changed, userId);
     feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
   } catch {
     /* no-op */
@@ -1986,7 +2213,7 @@ function feGetMessageUserColor(message) {
 const FE_RENDER_STATE_FLAG = "renderState";
 const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
 const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
-const FE_RENDER_STATE_VERSION = 1;
+const FE_RENDER_STATE_VERSION = 3;
 const feMessageRenderStateOverrides = new Map();
 
 function feGetSpeakerActorFromLike(message, data = {}) {
@@ -2001,16 +2228,69 @@ function feGetSpeakerActorFromLike(message, data = {}) {
   }
 }
 
-function feMessageHasDynamicRollContent(content, message = null, el = null) {
+function feGetInlineRollData(message, data = {}) {
+  try {
+    const actor = feGetSpeakerActorFromLike(message, data) ?? feGetSpeakerActorFromMessage(message) ?? null;
+    const raw = typeof actor?.getRollData === "function" ? actor.getRollData() : {};
+    return raw && typeof raw === "object" ? foundry.utils.deepClone(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function feShouldMergeRollMessages() {
+  try {
+    return !!feSetting(S.MERGE_INCLUDE_ROLL_MESSAGES);
+  } catch {
+    return false;
+  }
+}
+
+function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");
-    if (/class=["'][^"']*\binline-roll\b[^"']*["']/i.test(src)) return true;
-    if (/class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/i.test(src)) return true;
     if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/i.test(src)) return true;
-    if (/\[\[[\s\S]+?\]\]/.test(src)) return true;
-    if ((Array.isArray(message?.rolls) && message.rolls.length > 0)) return true;
-    if (el?.querySelector?.('.inline-roll.inline-result, .dice-roll, .dice-result, .chat-card, .midi-chat-card')) return true;
+    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card')) return true;
     return false;
+  } catch {
+    return false;
+  }
+}
+
+function feMessageHasDiceCardContent(content, message = null, el = null) {
+  try {
+    const src = String(content ?? "");
+    if (/class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b|\bdice-formula\b|\bdice-tooltip\b)[^"']*["']/i.test(src)) return true;
+    if (Array.isArray(message?.rolls) && message.rolls.length > 0) return true;
+    if (el?.querySelector?.('.dice-roll, .dice-result, .dice-formula, .dice-tooltip')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function feComputeMergeRuntimeBehavior({
+  isNarrator = false,
+  isRoundMarker = false,
+  hasChatCard = false,
+  hasDice = false,
+  hasRolls = false,
+} = {}) {
+  const includeRollMessages = feShouldMergeRollMessages();
+  const hasRollMessage = !!(hasDice || hasRolls);
+  const mergeableText = !hasChatCard && (includeRollMessages || !hasRollMessage);
+  const noMerge = !!isNarrator || !!isRoundMarker || !!hasChatCard || (!includeRollMessages && hasRollMessage);
+  return {
+    includeRollMessages,
+    hasRollMessage,
+    mergeableText,
+    noMerge,
+  };
+}
+
+function feMessageHasDynamicRollContent(content, message = null, el = null) {
+  try {
+    return feMessageHasChatCardContent(content, el) || feMessageHasDiceCardContent(content, message, el);
   } catch {
     return false;
   }
@@ -2063,10 +2343,15 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
     const style = String(data?.style ?? data?.type ?? message?.style ?? message?.type ?? "");
     const rolls = Array.isArray(data?.rolls) ? data.rolls : (Array.isArray(message?.rolls) ? message.rolls : []);
     const hasRolls = rolls.length > 0;
-    const hasChatCard = /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/.test(content);
-    const hasDice = /class=["'][^"']*(?:\bdice-roll\b|\bdice-result\b)[^"']*["']/.test(content);
-    const hasDynamicRoll = feMessageHasDynamicRollContent(content, message, null) || hasRolls;
-    const mergeableText = !hasDynamicRoll && !hasChatCard && !hasDice;
+    const hasChatCard = feMessageHasChatCardContent(content, null);
+    const hasDice = feMessageHasDiceCardContent(content, null, null);
+    const mergeRuntime = feComputeMergeRuntimeBehavior({
+      isNarrator: narrator,
+      isRoundMarker,
+      hasChatCard,
+      hasDice,
+      hasRolls,
+    });
     const speakerKey = [
       speaker?.scene ?? "",
       speaker?.token ?? "",
@@ -2090,11 +2375,14 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
         blind,
         rollMode,
         style,
-        mergeableText,
-        hasDynamicRoll,
+        mergeableText: mergeRuntime.mergeableText,
+        hasDynamicRoll: mergeRuntime.hasRollMessage || hasChatCard,
+        hasChatCard,
+        hasDice,
+        hasRolls,
         isNarrator: narrator,
         isRoundMarker,
-        noMerge: narrator || isRoundMarker,
+        noMerge: mergeRuntime.noMerge,
       },
     };
   } catch {
@@ -2454,7 +2742,10 @@ function feReadStampedMergeInfoFromElement(el) {
       Object.prototype.hasOwnProperty.call(ds, "feMergeKey") ||
       Object.prototype.hasOwnProperty.call(ds, "feNoMerge") ||
       Object.prototype.hasOwnProperty.call(ds, "feIsNarrator") ||
-      Object.prototype.hasOwnProperty.call(ds, "feIsRoundMarker");
+      Object.prototype.hasOwnProperty.call(ds, "feIsRoundMarker") ||
+      Object.prototype.hasOwnProperty.call(ds, "feHasChatCard") ||
+      Object.prototype.hasOwnProperty.call(ds, "feHasDice") ||
+      Object.prototype.hasOwnProperty.call(ds, "feHasRolls");
     if (!hasAny) return null;
 
     const key = String(ds.feMergeKey ?? "").trim();
@@ -2464,6 +2755,9 @@ function feReadStampedMergeInfoFromElement(el) {
       isNarrator: ds.feIsNarrator === "1",
       isRoundMarker: ds.feIsRoundMarker === "1",
       noMerge: ds.feNoMerge === "1",
+      hasChatCard: ds.feHasChatCard === "1",
+      hasDice: ds.feHasDice === "1",
+      hasRolls: ds.feHasRolls === "1",
     };
   } catch {
     return null;
@@ -2477,7 +2771,7 @@ function feStampRenderedStateAttributes(message, messageEl) {
     if (!el?.classList || !ds || !message) return;
 
     const state = feGetStoredRenderState(message);
-    const storedHint = state?.merge ?? message?.flags?.[MODULE_ID]?.[FE_RENDER_MERGE_HINT_FLAG] ?? null;
+    const storedHint = state?.merge ?? null;
     const isNarratorTools = typeof state?.isNarrator === "boolean"
       ? state.isNarrator
       : feIsNarratorToolsMessage(message, el);
@@ -2487,6 +2781,23 @@ function feStampRenderedStateAttributes(message, messageEl) {
 
     const speaker = message?.speaker ?? {};
     const whisper = Array.isArray(message?.whisper) ? message.whisper : [];
+    const content = String(message?.content ?? "");
+    const hasChatCard = typeof storedHint?.hasChatCard === "boolean"
+      ? storedHint.hasChatCard
+      : feMessageHasChatCardContent(content, el);
+    const hasRolls = typeof storedHint?.hasRolls === "boolean"
+      ? storedHint.hasRolls
+      : (Array.isArray(message?.rolls) && message.rolls.length > 0);
+    const hasDice = typeof storedHint?.hasDice === "boolean"
+      ? storedHint.hasDice
+      : feMessageHasDiceCardContent(content, message, el);
+    const mergeRuntime = feComputeMergeRuntimeBehavior({
+      isNarrator: isNarratorTools,
+      isRoundMarker,
+      hasChatCard,
+      hasDice,
+      hasRolls,
+    });
     const mergeInfo = {
       authorId: storedHint?.authorId ?? message?.author?.id ?? message?.user?.id ?? message?.user ?? "",
       speakerKey: storedHint?.speakerKey ?? ([
@@ -2499,14 +2810,10 @@ function feStampRenderedStateAttributes(message, messageEl) {
       blind: typeof storedHint?.blind === "boolean" ? storedHint.blind : !!message?.blind,
       rollMode: storedHint?.rollMode ?? message?.rollMode ?? "",
       style: storedHint?.style ?? message?.style ?? message?.type ?? null,
-      mergeableText: typeof storedHint?.mergeableText === "boolean"
-        ? storedHint.mergeableText
-        : !feMessageHasDynamicRollContent(String(message?.content ?? ""), message, el),
+      mergeableText: mergeRuntime.mergeableText,
       isNarrator: isNarratorTools,
       isRoundMarker,
-      noMerge: typeof storedHint?.noMerge === "boolean"
-        ? storedHint.noMerge
-        : (isNarratorTools || isRoundMarker),
+      noMerge: mergeRuntime.noMerge,
     };
 
     const mergeKey = feMergeKey(mergeInfo);
@@ -2517,6 +2824,9 @@ function feStampRenderedStateAttributes(message, messageEl) {
     ds.feNoMerge = mergeInfo.noMerge ? "1" : "0";
     ds.feIsNarrator = isNarratorTools ? "1" : "0";
     ds.feIsRoundMarker = isRoundMarker ? "1" : "0";
+    ds.feHasChatCard = hasChatCard ? "1" : "0";
+    ds.feHasDice = hasDice ? "1" : "0";
+    ds.feHasRolls = hasRolls ? "1" : "0";
   } catch {
     /* no-op */
   }
@@ -2525,7 +2835,7 @@ function feStampRenderedStateAttributes(message, messageEl) {
 function feMessageMergeInfo(msg, el) {
   const stamped = feReadStampedMergeInfoFromElement(el);
   const storedState = feGetStoredRenderState(msg);
-  const storedHint = storedState?.merge ?? msg?.flags?.[MODULE_ID]?.[FE_RENDER_MERGE_HINT_FLAG] ?? null;
+  const storedHint = storedState?.merge ?? null;
 
   // NOTE: v13+: ChatMessage#user is deprecated -> use ChatMessage#author
   // Some automation modules may still populate legacy fields during rapid updates, so keep fallbacks.
@@ -2556,22 +2866,23 @@ function feMessageMergeInfo(msg, el) {
   // ChatMessage#style exists in v13+ (ChatMessage#type was renamed)
   const style = storedHint?.style ?? msg?.style ?? msg?.type ?? null;
 
-  // Rolls are defined in ChatMessage#rolls in v13+
-  const hasRolls = Array.isArray(msg?.rolls) && msg.rolls.length > 0;
-
   const content = String(msg?.content ?? "");
-  const hasDynamicRoll = typeof storedHint?.hasDynamicRoll === "boolean"
-    ? storedHint.hasDynamicRoll
-    : feMessageHasDynamicRollContent(content, msg, el) || hasRolls;
-
-  // "Merge only text" should merge plain text lines, but avoid inline rolls / dice rolls / chat cards.
-  const mergeableText = typeof storedHint?.mergeableText === "boolean"
-    ? storedHint.mergeableText
-    : (typeof stamped?.mergeableText === "boolean" ? stamped.mergeableText : !hasDynamicRoll);
-
-  const noMerge = typeof storedHint?.noMerge === "boolean"
-    ? storedHint.noMerge
-    : (typeof stamped?.noMerge === "boolean" ? stamped.noMerge : (isNarratorTools || isRoundMarker));
+  const hasChatCard = typeof storedHint?.hasChatCard === "boolean"
+    ? storedHint.hasChatCard
+    : (typeof stamped?.hasChatCard === "boolean" ? stamped.hasChatCard : feMessageHasChatCardContent(content, el));
+  const hasRolls = typeof storedHint?.hasRolls === "boolean"
+    ? storedHint.hasRolls
+    : (typeof stamped?.hasRolls === "boolean" ? stamped.hasRolls : (Array.isArray(msg?.rolls) && msg.rolls.length > 0));
+  const hasDice = typeof storedHint?.hasDice === "boolean"
+    ? storedHint.hasDice
+    : (typeof stamped?.hasDice === "boolean" ? stamped.hasDice : feMessageHasDiceCardContent(content, msg, el));
+  const mergeRuntime = feComputeMergeRuntimeBehavior({
+    isNarrator: isNarratorTools,
+    isRoundMarker,
+    hasChatCard,
+    hasDice,
+    hasRolls,
+  });
 
   return {
     authorId,
@@ -2580,12 +2891,13 @@ function feMessageMergeInfo(msg, el) {
     blind,
     rollMode,
     style,
-    mergeableText,
+    mergeableText: mergeRuntime.mergeableText,
     key: stamped?.key ?? null,
     isNarrator: isNarratorTools,
     isRoundMarker,
-    // Keep narrator/round-marker lines standalone in live chat; inline-roll / dice messages can also opt out.
-    noMerge,
+    // Keep narrator/round-marker lines standalone in live chat; chat cards stay standalone,
+    // while dedicated roll result messages can opt in via the merge setting.
+    noMerge: mergeRuntime.noMerge,
   };
 }
 
@@ -2885,12 +3197,16 @@ export {
 
   feGetChatLogs,
   feMarkdownToHTML,
+  feFreezeInlineRollSyntax,
+  feBuildInlineRollSnapshotPayload,
+  fePrepareInlineRollSnapshotOnPreUpdate,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
 
   feApplyStyleVarsFromSettings,
   feStripChatTexturesInWindow,
   feApplyUserColorBgToMessageElement,
+  feApplyRenderedStateToMessageElement,
   feApplyRenderedStateToLog,
   feApplyRenderedStateToAllLogs,
   feScheduleRenderedStateRefreshForAllLogs,

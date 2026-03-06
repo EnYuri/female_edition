@@ -6,6 +6,8 @@ import {
   S,
   feSetting,
   feMarkdownToHTML,
+  fePrepareInlineRollSnapshotOnPreUpdate,
+  feCaptureMessageRenderFlagsOnPreUpdate,
   feGetChatLogs,
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
@@ -216,15 +218,16 @@ function feCancelInlineEdit() {
 
 function feBuildEditUpdate(rawText) {
   const raw = (rawText ?? "").toString();
+  const html = feMarkdownToHTML(raw);
   return {
-    content: feMarkdownToHTML(raw),
+    content: html,
     [`flags.${MODULE_ID}.raw`]: raw,
     [`flags.${MODULE_ID}.plain`]: raw,
     [`flags.${MODULE_ID}.markdown`]: true,
   };
 }
 
-function feApplyRawEditPreUpdate(changed) {
+function feApplyRawEditPreUpdate(message, changed, userId = null) {
   try {
     if (!changed || typeof changed !== "object") return;
     const modFlags = changed.flags?.[MODULE_ID] ?? null;
@@ -232,15 +235,36 @@ function feApplyRawEditPreUpdate(changed) {
     const hasPlain = !!(modFlags && Object.prototype.hasOwnProperty.call(modFlags, "plain"));
     if (!hasRaw && !hasPlain) return;
 
-    const raw = String((hasRaw ? modFlags.raw : modFlags.plain) ?? "");
-    const html = feMarkdownToHTML(raw);
+    const nextRaw = String((hasRaw ? modFlags.raw : modFlags.plain) ?? "");
+    const currentRaw = String(
+      message?.getFlag?.(MODULE_ID, "raw") ??
+      message?.getFlag?.(MODULE_ID, "plain") ??
+      message?.flags?.[MODULE_ID]?.raw ??
+      message?.flags?.[MODULE_ID]?.plain ??
+      ""
+    );
+
+    const rawChanged = nextRaw !== currentRaw;
+    if (!rawChanged) {
+      if (!changed.flags || typeof changed.flags !== "object") changed.flags = {};
+      if (!changed.flags[MODULE_ID] || typeof changed.flags[MODULE_ID] !== "object") changed.flags[MODULE_ID] = {};
+      changed.flags[MODULE_ID].raw = currentRaw;
+      changed.flags[MODULE_ID].plain = currentRaw;
+      changed.flags[MODULE_ID].markdown = true;
+      return;
+    }
+
+    const html = feMarkdownToHTML(nextRaw);
     changed.content = html;
 
     if (!changed.flags || typeof changed.flags !== "object") changed.flags = {};
     if (!changed.flags[MODULE_ID] || typeof changed.flags[MODULE_ID] !== "object") changed.flags[MODULE_ID] = {};
-    changed.flags[MODULE_ID].raw = raw;
-    changed.flags[MODULE_ID].plain = raw;
+    changed.flags[MODULE_ID].raw = nextRaw;
+    changed.flags[MODULE_ID].plain = nextRaw;
     changed.flags[MODULE_ID].markdown = true;
+
+    fePrepareInlineRollSnapshotOnPreUpdate(message, changed, userId ?? game?.user?.id ?? null);
+    feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId ?? game?.user?.id ?? null);
   } catch (err) {
     console.warn(`[${MODULE_ID}] failed to prepare raw edit update`, err);
   }
@@ -515,8 +539,8 @@ Hooks.once("ready", () => {
   feInstallEditHandlers();
 });
 
-Hooks.on("preUpdateChatMessage", (_message, changed, _options, _userId) => {
-  feApplyRawEditPreUpdate(changed);
+Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
+  feApplyRawEditPreUpdate(message, changed, userId);
 });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
