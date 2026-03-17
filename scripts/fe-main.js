@@ -1,5 +1,13 @@
-// Female-cupwhi entrypoint
-// Loads feature modules in a controlled order.
+// Female-cupwhi entrypoint — REFERENCE ONLY, NOT LOADED BY module.json
+//
+// This file is intentionally excluded from the `esmodules` list in module.json.
+// Each script is registered individually in module.json so Foundry loads them
+// directly as ES modules. Listing fe-main.js in module.json AND having it
+// re-import all sibling scripts would cause every script to execute twice,
+// doubling hook registrations and settings.
+//
+// This file is kept as a human-readable load-order reference only.
+// DO NOT add fe-main.js to module.json esmodules.
 
 import "./chat-bg-stripper.js";
 import "./fe-chat-enhance.js";

@@ -2,9 +2,8 @@
  *
  * Features:
  *  - Chat merge (visual grouping; no document edits)
- *  - Player typing indicator (optional)
  *  - Chat log export to PDF (prints current log; no popup windows)
- *  - Standard Markdown in chat input (headings, quotes, links, images, bold/italic/strike)
+ *  - Standard Markdown in chat input (headings, quotes, links, images, bold/italic/strike/hr)
  *  - Edit existing chat message (with Markdown support)
  *
  * Notes:
@@ -27,8 +26,8 @@ const S = {
   MERGE_MODE: "ceMergeMode", // standard | simple
   MERGE_FOLLOW_HEADER_STYLE: "ceMergeFollowHeaderStyle", // hide | name | portrait
 
-  // Typing indicator
-  TYPING_ENABLED: "ceTypingEnabled",
+  // Merge: speaker grouping basis
+  MERGE_SPEAKER_BASIS: "ceMergeSpeakerBasis", // token | actor | author
 
   // Export
   EXPORT_ENABLED: "ceExportEnabled",
@@ -79,9 +78,7 @@ const FE_DEFAULTS = {
   [S.MERGE_DIVIDER]: true,
   [S.MERGE_MODE]: "standard",
   [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
-
-  // Typing indicator
-  [S.TYPING_ENABLED]: true,
+  [S.MERGE_SPEAKER_BASIS]: "token",
 
   // Export
   [S.EXPORT_ENABLED]: true,
@@ -117,12 +114,178 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
 };
 
+const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
+let feSyncingLocalGmPrioritySettings = false;
+
+function feGetRegisteredSettingConfig(key) {
+  try {
+    return game?.settings?.settings?.get?.(`${MODULE_ID}.${String(key ?? "")}`) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function feIsGmPrioritySettingKey(key) {
+  try {
+    if (!key || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    const cfg = feGetRegisteredSettingConfig(key);
+    if (!cfg) return false;
+    if (String(cfg.scope ?? "") !== "client") return false;
+    return !!cfg.range;
+  } catch {
+    return false;
+  }
+}
+
+function feGetGmPriorityOverrides() {
+  try {
+    const data = game.settings.get(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+function feHasOwn(obj, key) {
+  return !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function feValuesEqual(a, b) {
+  try {
+    if (Object.is(a, b)) return true;
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
+function feGetGmPriorityOverrideValue(key) {
+  try {
+    if (!feIsGmPrioritySettingKey(key)) return undefined;
+    const overrides = feGetGmPriorityOverrides();
+    if (!feHasOwn(overrides, key)) return undefined;
+    return overrides[key];
+  } catch {
+    return undefined;
+  }
+}
+
+function feHasGmPriorityOverride(key) {
+  try {
+    return feGetGmPriorityOverrideValue(key) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+function feApplyGmPriorityUiRefresh(doc = document) {
+  try {
+    feApplyStyleVarsFromSettings(doc);
+  } catch {
+    /* no-op */
+  }
+  try {
+    feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
+  } catch {
+    /* no-op */
+  }
+}
+
+async function feSetGmPriorityOverrides(partial = {}) {
+  try {
+    if (!game.user?.isGM) return false;
+    const current = foundry.utils.deepClone(feGetGmPriorityOverrides());
+    let changed = false;
+    for (const [key, value] of Object.entries(partial ?? {})) {
+      if (!feIsGmPrioritySettingKey(key)) continue;
+      if (feHasOwn(current, key) && feValuesEqual(current[key], value)) continue;
+      current[key] = value;
+      changed = true;
+    }
+    if (!changed) return false;
+    await game.settings.set(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, current);
+    return true;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to update GM-priority overrides`, err);
+    return false;
+  }
+}
+
+async function feMirrorGmPrioritySetting(key, value) {
+  try {
+    if (!game.user?.isGM) return false;
+    if (!feIsGmPrioritySettingKey(key)) return false;
+    return await feSetGmPriorityOverrides({ [key]: value });
+  } catch {
+    return false;
+  }
+}
+
+async function feSeedGmPriorityOverridesFromLocal() {
+  try {
+    if (!game.user?.isGM) return false;
+    const existing = feGetGmPriorityOverrides();
+    const partial = {};
+    for (const [fullKey, cfg] of game.settings.settings ?? []) {
+      if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
+      const key = String(fullKey).slice(MODULE_ID.length + 1);
+      if (!cfg?.range || String(cfg.scope ?? "") !== "client") continue;
+      if (feHasOwn(existing, key)) continue;
+      partial[key] = game.settings.get(MODULE_ID, key);
+    }
+    if (!Object.keys(partial).length) return false;
+    return await feSetGmPriorityOverrides(partial);
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to seed GM-priority overrides`, err);
+    return false;
+  }
+}
+
+async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
+  try {
+    if (game.user?.isGM) return false;
+    const overrides = feGetGmPriorityOverrides();
+    const wanted = Array.isArray(keys)
+      ? keys.filter((key) => feIsGmPrioritySettingKey(key) && feHasOwn(overrides, key))
+      : Object.keys(overrides).filter((key) => feIsGmPrioritySettingKey(key));
+    if (!wanted.length) return false;
+
+    feSyncingLocalGmPrioritySettings = true;
+    let changed = false;
+    for (const key of wanted) {
+      const target = overrides[key];
+      let current;
+      try {
+        current = game.settings.get(MODULE_ID, key);
+      } catch {
+        continue;
+      }
+      if (feValuesEqual(current, target)) continue;
+      await game.settings.set(MODULE_ID, key, target);
+      changed = true;
+    }
+    return changed;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to sync local GM-priority settings`, err);
+    return false;
+  } finally {
+    feSyncingLocalGmPrioritySettings = false;
+  }
+}
+
 function feFireChatUiUpdated(payload = null) {
   Hooks.callAll(`${MODULE_ID}.chatUiUpdated`, payload);
 }
 
 
 function feSetting(key) {
+  try {
+    const override = feGetGmPriorityOverrideValue(key);
+    if (override !== undefined) return override;
+  } catch {
+    /* no-op */
+  }
   try {
     return game.settings.get(MODULE_ID, key);
   } catch {
@@ -170,10 +333,6 @@ function feEnsureStyleTag(id, cssText, doc = document) {
   }
   el.textContent = String(cssText ?? "");
   return el;
-}
-
-function feGetTextEditor() {
-  return foundry?.applications?.ux?.TextEditor?.implementation;
 }
 
 function feSetBodyMergeClasses() {
@@ -315,12 +474,25 @@ async function feMigrateLegacySettings() {
   await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "geurimilgi"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
   await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
   await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
+  await feNormalizeChoiceSetting(S.MERGE_SPEAKER_BASIS, ["token", "actor", "author"], FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
   await feNormalizeChoiceSetting(S.USER_COLOR_BG_BASE, ["white", "black", "none"], FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
   await feNormalizeChoiceSetting(S.EXPORT_PRINT_IMAGE_MODE, Object.keys(FE_EXPORT_PRINT_IMAGE_MODE_CHOICES), FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
   await feNormalizeChoiceSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE, ["off", "button", "auto"], FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]);
 }
 
 Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, {
+    name: "(internal) GM-priority range overrides",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => {
+      feApplyGmPriorityUiRefresh(document);
+      if (!game.user?.isGM) void feSyncLocalGmPrioritySettings();
+    },
+  });
+
   // -------------------------
   // Settings
   // -------------------------
@@ -402,14 +574,24 @@ Hooks.once("init", () => {
     },
   });
 
-  game.settings.register(MODULE_ID, S.TYPING_ENABLED, {
-    name: "채팅 입력 중 표시(타이핑 인디케이터)",
-    hint: "다른 플레이어가 채팅 입력 중일 때 표시합니다.",
+  game.settings.register(MODULE_ID, S.MERGE_SPEAKER_BASIS, {
+    name: "채팅 병합: 화자 그룹 기준",
+    hint: [
+      "연속 메시지를 묶을 때 '같은 화자'를 어떻게 판단할지 결정합니다.",
+      "토큰(기본): 씬에 배치된 토큰 단위로 구분 — GM이 같은 액터를 다른 토큰으로 운용하면 별도 그룹.",
+      "액터: 액터 단위 — 같은 액터라면 다른 토큰이어도 병합.",
+      "플레이어(작성자): 작성 유저 단위 — 같은 플레이어가 보낸 메시지는 화자에 무관하게 병합.",
+    ].join(" / "),
     scope: "client",
     config: true,
-    type: Boolean,
-    default: true,
-    onChange: () => feSetupTypingIndicator(),
+    type: String,
+    choices: {
+      token:  "토큰(기본) — 토큰+액터+씬 모두 일치해야 병합",
+      actor:  "액터 — 같은 액터면 병합 (토큰 무시)",
+      author: "플레이어(작성자) — 같은 유저면 병합",
+    },
+    default: "token",
+    onChange: () => feApplyChatMergeToAllLogs(),
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_ENABLED, {
@@ -671,15 +853,33 @@ Hooks.once("init", () => {
         log: log ?? null,
         document: (root?.ownerDocument ?? log?.ownerDocument ?? document),
       });
-      feRenderTypingIndicator();
     } catch {
       /* no-op */
     }
   });
 });
 
+Hooks.on("clientSettingChanged", (fullKey, value) => {
+  try {
+    if (feSyncingLocalGmPrioritySettings) return;
+    const keyPath = String(fullKey ?? "").trim();
+    if (!keyPath.startsWith(`${MODULE_ID}.`)) return;
+    const key = keyPath.slice(MODULE_ID.length + 1);
+    if (!feIsGmPrioritySettingKey(key)) return;
+    if (game.user?.isGM) void feMirrorGmPrioritySetting(key, value);
+    else if (feHasGmPriorityOverride(key)) {
+      feApplyGmPriorityUiRefresh(document);
+      void feSyncLocalGmPrioritySettings({ keys: [key] });
+    }
+  } catch {
+    /* no-op */
+  }
+});
+
 Hooks.once("ready", async () => {
   await feMigrateLegacySettings();
+  if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal();
+  else await feSyncLocalGmPrioritySettings();
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);
@@ -689,8 +889,6 @@ Hooks.once("ready", async () => {
   feSetUserColorBgBaseClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
-  feRenderTypingIndicator();
-  feSetupTypingIndicator();
 });
 
 // Extra safety: apply user-color background as soon as each message is rendered.
@@ -833,14 +1031,67 @@ function feAttachInlineRollSnapshotFlag(flags, content, { message = null, data =
   }
 }
 
+function feHasEditableSourceFlag(flags) {
+  try {
+    const data = flags?.[MODULE_ID] ?? null;
+    if (!data || typeof data !== "object") return false;
+    return Object.prototype.hasOwnProperty.call(data, "raw") || Object.prototype.hasOwnProperty.call(data, "plain");
+  } catch {
+    return false;
+  }
+}
+
+function feEnsureFrozenInlineRollSourceFlags(flags, sourceText) {
+  try {
+    const nextFlags = foundry.utils.deepClone(flags ?? {});
+    if (feHasEditableSourceFlag(nextFlags)) return nextFlags;
+    nextFlags[MODULE_ID] = foundry.utils.mergeObject(nextFlags[MODULE_ID] ?? {}, {
+      plain: String(sourceText ?? ""),
+    });
+    return nextFlags;
+  } catch {
+    return foundry.utils.deepClone(flags ?? {});
+  }
+}
+
+function feFinalizeInlineRollFreeze(content, flags, { message = null, data = null } = {}) {
+  try {
+    const src = String(content ?? "");
+    let nextFlags = feAttachInlineRollSnapshotFlag(flags ?? {}, src, { message, data });
+    if (!feContentHasRawInlineRollSyntax(src)) return { content: src, flags: nextFlags, changed: false };
+
+    const frozen = feFreezeInlineRollSyntax(src, { message, data });
+    if (!frozen || frozen === src) return { content: src, flags: nextFlags, changed: false };
+
+    nextFlags = feEnsureFrozenInlineRollSourceFlags(nextFlags, src);
+    return { content: frozen, flags: nextFlags, changed: true };
+  } catch {
+    return {
+      content: String(content ?? ""),
+      flags: foundry.utils.deepClone(flags ?? {}),
+      changed: false,
+    };
+  }
+}
+
 function fePrepareInlineRollSnapshotOnPreCreate(message, data = {}, userId = null) {
   try {
     if (userId !== game.user.id) return false;
     const content = String(data?.content ?? message?.content ?? "");
     const existing = data?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? message?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null;
     if (!feContentHasRawInlineRollSyntax(content) && existing == null) return false;
-    const flags = feAttachInlineRollSnapshotFlag(data?.flags ?? message?.flags ?? {}, content, { message, data });
-    message.updateSource({ flags });
+    // Skip freezing when Foundry has already evaluated rolls (dnd5e chat cards, dedicated
+    // roll messages). Trying to re-evaluate those synchronously produces wrong values and
+    // corrupts the snapshot stored in message flags.
+    const hasEvaluatedRolls =
+      (Array.isArray(data?.rolls) && data.rolls.length > 0) ||
+      (Array.isArray(message?.rolls) && message.rolls.length > 0);
+    if (hasEvaluatedRolls) return false;
+    // Also skip for chat-card messages — dnd5e 5.x embeds @-variable roll formulas in
+    // card HTML that are not meant to be re-evaluated here.
+    if (feMessageHasChatCardContent(content, null)) return false;
+    const prepared = feFinalizeInlineRollFreeze(content, data?.flags ?? message?.flags ?? {}, { message, data });
+    message.updateSource({ content: prepared.content, flags: prepared.flags });
     return true;
   } catch {
     return false;
@@ -861,7 +1112,9 @@ function fePrepareInlineRollSnapshotOnPreUpdate(message, changed = {}, userId = 
       recursive: true,
     });
     const content = String(merged?.content ?? message?.content ?? "");
-    changed.flags = feAttachInlineRollSnapshotFlag(merged?.flags ?? message?.flags ?? {}, content, { message, data: merged });
+    const prepared = feFinalizeInlineRollFreeze(content, merged?.flags ?? message?.flags ?? {}, { message, data: merged });
+    changed.flags = prepared.flags;
+    if (prepared.changed) changed.content = prepared.content;
     return true;
   } catch {
     return false;
@@ -901,14 +1154,22 @@ function feSnapshotOrRestoreInlineRolls(message, rootEl) {
 
     let snapshot = feGetInlineRollSnapshot(message);
     if (!snapshot && current.length && hasRawInlineRolls) {
+      // First render: Foundry already evaluated the rolls correctly.
+      // Capture the anchor HTML so subsequent re-renders can restore it
+      // instead of re-evaluating (which would lose actor context / roll data).
       snapshot = feStoreInlineRollSnapshot(message, current.map((a) => a.outerHTML));
-    }
-    if (!snapshot && hasRawInlineRolls) {
-      snapshot = feStoreInlineRollSnapshot(message, feBuildInlineRollSnapshotPayload(content, { message }));
+      // Snapshot was just captured from the current DOM — no restore needed.
+      return;
     }
 
     if (!snapshot?.anchors?.length || !current.length) return;
     if (snapshot.anchors.length !== current.length) return;
+
+    // Optimisation: if the current DOM already matches the snapshot exactly,
+    // skip the replace to avoid unnecessary DOM mutations (and the micro-flash
+    // they can cause when merge classes are recomputed immediately after).
+    const allMatch = current.every((a, i) => a.outerHTML === snapshot.anchors[i]);
+    if (allMatch) return;
 
     const doc = root.ownerDocument ?? document;
     for (let i = 0; i < current.length; i += 1) {
@@ -1211,6 +1472,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
     if (!items.length) return { slice: [], firstIndex: 0, hasMissingDocs: false };
 
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
+    const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
     const makeInfo = (el, fallbackIndex = 0) => {
       const msgId = feGetMessageIdFromElement(el);
       const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game.messages?.get?.(msgId) : null);
@@ -1222,7 +1484,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
       info.el = el;
       info.domIndex = fallbackIndex;
       info.order = feGetChatMessageElementOrder(el, fallbackIndex);
-      info.key = info.key || (msg ? feMergeKey(info) : `__fe_missing__||${msgId ?? fallbackIndex}`);
+      info.key = info.key || (msg ? feMergeKey(info, speakerBasis) : `__fe_missing__||${msgId ?? fallbackIndex}`);
       if (!msg && !hasStampedKey) info.mergeableText = false;
       return info;
     };
@@ -1441,6 +1703,13 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   if (!el) return;
   try {
     feSnapshotOrRestoreInlineRolls(message, el);
+    // NOTE: TextEditor.activateListeners is intentionally NOT called here.
+    // In v13, inline-roll tooltip/click behaviour is driven by:
+    //   - data-tooltip attribute  → Foundry's TooltipManager (delegation, no per-element binding)
+    //   - click to show breakdown → event delegation on #chat-log / ol.chat-log
+    // Calling activateListeners on every renderChatMessageHTML would stack duplicate
+    // event handlers each time the message is re-rendered (automation, updates), causing
+    // the tooltip popup to appear repeatedly and become impossible to dismiss.
   } catch {
     /* no-op */
   }
@@ -1449,16 +1718,17 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   } catch {
     /* no-op */
   }
-  // The message element is not yet inserted into the ChatLog at this point.
-  // Schedule one debounced, message-targeted log pass for the next tick instead of mutating the
-  // neighborhood immediately; this keeps merge display stable and avoids touching message-content.
   feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
 });
 
 Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
     feHydrateRenderStateOverride(message, null, userId);
-    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
+    // renderChatMessageHTML already schedules an 18ms merge pass for this message.
+    // Only schedule the broader log-level safety refresh (42ms) here to handle
+    // cases where the element wasn't in the DOM when the first pass ran.
+    // Adding another 18ms pass here would trigger merge twice per new message,
+    // causing a visible double-flash of merge classes.
     feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));
   } catch {
     /* no-op */
@@ -1504,14 +1774,26 @@ function feFreezeInlineRollSyntax(content, { message = null, data = null } = {})
     const src = String(content ?? "");
     if (!src || !src.includes("[[") || /class=["']inline-roll\b/i.test(src)) return src;
     const rollData = feGetInlineRollData(message, data ?? {});
-    return src.replace(/\[\[([\s\S]+?)\]\]/g, (match, rawExpr) => {
+    // If rollData is empty (actor not resolved yet, or no actor), skip any expression
+    // that references @ variables — they would evaluate to 0/NaN and corrupt the snapshot.
+    const rollDataIsEmpty = !rollData || Object.keys(rollData).length === 0;
+    const inlineRollRe = /\[\[([\s\S]+?)\]\](?:\{([^{}]*)\})?/g;
+    return src.replace(inlineRollRe, (match, rawExpr, rawLabel) => {
       try {
         let expr = String(rawExpr ?? "").trim();
+        const customLabel = rawLabel == null ? "" : String(rawLabel).trim();
         if (!expr) return match;
         expr = expr.replace(/^\/(?:r|roll|gmroll|blindroll|selfroll|publicroll|pr|br|sr)\s+/i, "").trim();
         if (!expr) return match;
+        // Skip freezing expressions with @-variable references when we have no roll data.
+        // This prevents poisoning the snapshot with wrong values (0/NaN for @mod, @prof, etc.)
+        if (rollDataIsEmpty && /@[a-zA-Z_]/.test(expr)) return match;
         let roll = null;
-        try { roll = Roll.create ? Roll.create(expr, rollData) : new Roll(expr, rollData); } catch { roll = new Roll(expr, rollData); }
+        try {
+          roll = Roll.create ? Roll.create(expr, rollData) : new Roll(expr, rollData);
+        } catch {
+          roll = new Roll(expr, rollData);
+        }
         if (!roll) return match;
         if (typeof roll.evaluateSync === "function") roll = roll.evaluateSync({ strict: false, allowStrings: true });
         else if (typeof roll.evaluate === "function") {
@@ -1521,7 +1803,8 @@ function feFreezeInlineRollSyntax(content, { message = null, data = null } = {})
         }
 
         const total = roll?.total;
-        const label = total == null ? String(roll?.result ?? "") : String(total);
+        const fallbackLabel = total == null ? String(roll?.result ?? expr) : String(total);
+        const label = customLabel || fallbackLabel;
         const tooltip = feEscapeHTML(expr);
 
         if (typeof roll?.toAnchor === "function") {
@@ -1887,16 +2170,20 @@ function feInlineFormat(text) {
     return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
   });
 
-  // Strikethrough
-  text = text.replace(/~~([^~]+)~~/g, "<s>$1</s>");
+  // Strikethrough (lazy match so ~~a~~ text ~~b~~ gives two separate <s> tags)
+  text = text.replace(/~~(.+?)~~/gs, "<s>$1</s>");
 
-  // Bold (**text**)
-  text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  text = text.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  // Bold+italic combined (*** or ___) — must come before bold and italic alone
+  text = text.replace(/\*\*\*(.+?)\*\*\*/gs, "<strong><em>$1</em></strong>");
+  text = text.replace(/___(.+?)___/gs, "<strong><em>$1</em></strong>");
 
-  // Italic (*text*)
-  text = text.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
-  text = text.replace(/(^|[^_])_([^_]+)_(?!_)/g, "$1<em>$2</em>");
+  // Bold (**text** or __text__)
+  text = text.replace(/\*\*(.+?)\*\*/gs, "<strong>$1</strong>");
+  text = text.replace(/__(.+?)__/gs, "<strong>$1</strong>");
+
+  // Italic (*text* or _text_) — only when not bordering another * or _
+  text = text.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/gm, "$1<em>$2</em>");
+  text = text.replace(/(^|[^_])_([^_\n]+?)_(?!_)/gm, "$1<em>$2</em>");
 
   // Restore inline code
   for (let i = 0; i < codeSpans.length; i++) {
@@ -1959,6 +2246,13 @@ function feMarkdownToHTML(md) {
       continue;
     }
 
+    // Horizontal rule: --- / *** / ___ (3+ chars, optional spaces between)
+    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      blocks.push("<hr>");
+      i++;
+      continue;
+    }
+
     // Blockquote (>)
     if (line.trim().startsWith(">")) {
       const quoteLines = [];
@@ -2013,6 +2307,7 @@ function feMarkdownToHTML(md) {
       // stop if next block starts
       if (lines[i].trim().startsWith("```")) break;
       if (/^(#{1,6})\s+/.test(lines[i])) break;
+      if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i])) break;
       if (lines[i].trim().startsWith(">")) break;
       if (/^\s*[-*]\s+/.test(lines[i])) break;
       if (/^\s*\d+\.\s+/.test(lines[i])) break;
@@ -2593,122 +2888,6 @@ function feApplyUserColorBgToLog(logEl, doc = document) {
   }
 }
 
-// -------------------------------------
-// Typing indicator (socket-based, lightweight)
-// -------------------------------------
-
-let feTypingInitialized = false;
-let feTypingTimeout = null;
-let feTypingActive = false;
-const feTypingUsers = new Map(); // userId -> lastSeen (ms)
-
-function feEnsureTypingIndicatorElement() {
-  const chatForm = document.querySelector("#chat-form");
-  if (!chatForm) return null;
-
-  let el = chatForm.querySelector(".fe-typing-indicator");
-  if (!el) {
-    el = document.createElement("div");
-    el.className = "fe-typing-indicator";
-    el.style.display = "none";
-    chatForm.appendChild(el);
-  }
-  return el;
-}
-
-function feRenderTypingIndicator() {
-  const el = feEnsureTypingIndicatorElement();
-  if (!el) return;
-
-  const now = Date.now();
-  // expire entries older than 5s
-  for (const [uid, ts] of feTypingUsers.entries()) {
-    if (now - ts > 5000) feTypingUsers.delete(uid);
-  }
-
-  const names = [...feTypingUsers.keys()]
-    .filter((uid) => uid !== game.user.id)
-    .map((uid) => game.users.get(uid)?.name)
-    .filter(Boolean);
-
-  if (!names.length) {
-    el.style.display = "none";
-    el.textContent = "";
-    return;
-  }
-
-  el.style.display = "";
-  el.textContent = `${names.join(", ")} 입력 중...`;
-}
-
-function feSetupTypingIndicator() {
-  const enabled = !!feSetting(S.TYPING_ENABLED);
-
-  // Always render current state (might hide)
-  feRenderTypingIndicator();
-  if (!enabled) return;
-
-  // Socket receiver (register once)
-  if (!feTypingInitialized) {
-    feTypingInitialized = true;
-
-    game.socket.on(`module.${MODULE_ID}`, (payload) => {
-      if (!payload || payload.type !== "typing") return;
-      if (!payload.userId) return;
-      if (payload.userId === game.user.id) return;
-
-      if (payload.active) feTypingUsers.set(payload.userId, Date.now());
-      else feTypingUsers.delete(payload.userId);
-
-      feRenderTypingIndicator();
-    });
-
-    // periodic cleanup
-    setInterval(() => feRenderTypingIndicator(), 1500);
-  }
-
-  // Local input listeners
-  const textarea =
-    document.querySelector('#chat-form textarea[name="message"]') ||
-    document.querySelector("#chat-message") ||
-    document.querySelector("#chat-form textarea");
-
-  if (!textarea) return;
-
-  if (!textarea.dataset.feTypingBound) {
-    textarea.dataset.feTypingBound = "1";
-
-    const send = (active) => {
-      game.socket.emit(`module.${MODULE_ID}`, { type: "typing", userId: game.user.id, active: !!active });
-    };
-
-    textarea.addEventListener("input", () => {
-      if (!feSetting(S.TYPING_ENABLED)) return;
-
-      if (!feTypingActive) {
-        feTypingActive = true;
-        send(true);
-      }
-
-      if (feTypingTimeout) clearTimeout(feTypingTimeout);
-      feTypingTimeout = setTimeout(() => {
-        feTypingActive = false;
-        send(false);
-      }, 1200);
-    });
-
-    textarea.addEventListener("blur", () => {
-      if (!feSetting(S.TYPING_ENABLED)) return;
-      if (feTypingTimeout) clearTimeout(feTypingTimeout);
-      feTypingTimeout = null;
-      if (feTypingActive) {
-        feTypingActive = false;
-        send(false);
-      }
-    });
-  }
-}
-
 
 function feNormalizeChatMessageId(id) {
   if (!id) return null;
@@ -2999,15 +3178,41 @@ function feScheduleMergeRetry(logEl, delay = 80) {
   }
 }
 
-function feMergeKey(info) {
+function feMergeKey(info, basisOverride) {
   if (info?.precomputedKey) return String(info.precomputedKey);
   const author = info?.authorId ?? "";
-  const speaker = info?.speakerKey ?? "";
   const whisper = info?.whisperKey ?? "";
   const blind = info?.blind ? "1" : "0";
   const rollMode = info?.rollMode ?? "";
   const style = info?.style ?? "";
-  return [author, speaker, whisper, blind, rollMode, style].join("||");
+
+  // Build the speaker component according to the user-configured basis.
+  // "token"  (default): scene|token|actor|alias — all four must match.
+  // "actor":  only the actor id must match; token/scene differences are ignored.
+  // "author": ignore speaker entirely; group by the message author (userId).
+  //
+  // basisOverride allows callers that loop over many messages to read the setting
+  // once outside the loop and pass it in, avoiding repeated game.settings.get calls.
+  const basis = basisOverride != null
+    ? String(basisOverride)
+    : String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+
+  let speakerComponent;
+  if (basis === "author") {
+    speakerComponent = "";
+  } else if (basis === "actor") {
+    const raw = info?.speakerKey ?? "";
+    const parts = raw.split("|");
+    // speakerKey format: scene|token|actor|alias[|special...]
+    const actorId = parts[2] ?? "";
+    const alias   = parts[3] ?? "";
+    const special = parts.slice(4).join("|");
+    speakerComponent = [actorId, alias, special].join("|");
+  } else {
+    speakerComponent = info?.speakerKey ?? "";
+  }
+
+  return [author, speakerComponent, whisper, blind, rollMode, style].join("||");
 }
 
 
@@ -3085,6 +3290,8 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
   const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
   const simpleMode = mergeMode === "simple";
+  // Read once here so feMergeKey doesn't call feSetting for every message in the loop.
+  const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
 
   const infos = [];
   let idx = 0;
@@ -3114,7 +3321,7 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
       info.mergeableText = false;
       continue;
     }
-    info.key = feMergeKey(info);
+    info.key = feMergeKey(info, speakerBasis);
   }
   if (hasMissingDocs) feScheduleMergeRetry(logEl);
 

@@ -36,8 +36,32 @@ const CP = Object.freeze({
 // ChatMessage flag key (stable portrait src, similar to chat-portrait module's flags.chat-portrait.src)
 const FE_FLAG_PORTRAIT_SRC = "portraitSrc";
 
-// Cache for high-quality downscaled portraits (per src+size+fit)
+// Maximum number of entries kept in the HQ-resample cache.
+// Each entry holds a data: URL (~5–30 KB for a 64px portrait), so 200 entries
+// caps memory at roughly 1–6 MB — safe even in long sessions with many actors.
+const CP_RESAMPLE_CACHE_MAX = 200;
+
+// Cache for high-quality downscaled portraits (per src+size+fit) — LRU-capped.
+// Implemented as an insertion-order Map; on overflow the oldest entry is evicted.
 const _cpResampleCache = new Map();
+
+function cpResampleCacheSet(key, value) {
+  if (_cpResampleCache.has(key)) _cpResampleCache.delete(key); // refresh position
+  _cpResampleCache.set(key, value);
+  if (_cpResampleCache.size > CP_RESAMPLE_CACHE_MAX) {
+    // Evict the oldest (first) entry.
+    _cpResampleCache.delete(_cpResampleCache.keys().next().value);
+  }
+}
+
+function cpResampleCacheGet(key) {
+  const value = _cpResampleCache.get(key);
+  if (value === undefined) return undefined;
+  // Move to end (most-recently-used).
+  _cpResampleCache.delete(key);
+  _cpResampleCache.set(key, value);
+  return value;
+}
 
 // Track in-flight resample promises to avoid duplicating work
 const _cpResampleInflight = new Map();
@@ -56,7 +80,7 @@ function cpIsImageElement(node) {
 
 
 function cpGet(key) {
-  return game.settings.get(MODULE_ID, key);
+  return feSetting(key);
 }
 
 function cpGetNameAlign() {
@@ -797,7 +821,7 @@ function cpMaybeApplyHQResample(img, size, shape) {
     if (!origSrc || !key) return;
     if (!cpIsSafeCanvasSource(origSrc)) return;
 
-    const cached = _cpResampleCache.get(key);
+    const cached = cpResampleCacheGet(key);
     if (cached) {
       if (img.src !== cached) img.src = cached;
       return;
@@ -817,7 +841,7 @@ function cpMaybeApplyHQResample(img, size, shape) {
     p.then((dataUrl) => {
       _cpResampleInflight.delete(key);
       if (!dataUrl) return;
-      _cpResampleCache.set(key, dataUrl);
+      cpResampleCacheSet(key, dataUrl);
       // Only apply if this image still refers to the same request.
       if (img.dataset?.fePortraitResampleKey === key) {
         img.src = dataUrl;
@@ -975,7 +999,7 @@ function cpApplyCombatPortraitStyling(combatant, img) {
         const fit = shape === "none" ? "contain" : "cover";
         const key = `${img.dataset.fePortraitOrigSrc}@@${size}@@${fit}`;
         img.dataset.fePortraitResampleKey = key;
-        const cached = _cpResampleCache.get(key);
+        const cached = cpResampleCacheGet(key);
         if (cached && img.src !== cached) img.src = cached;
       }
     } catch {}
@@ -1208,7 +1232,7 @@ function cpUpsertPortrait(message, messageEl) {
   const key = `${src}@@${size}@@${fit}`;
 
   const allowHQResample = cpShouldUseHQResample(img);
-  const cached = allowHQResample ? _cpResampleCache.get(key) : null;
+  const cached = allowHQResample ? cpResampleCacheGet(key) : null;
   const prevKey = img.dataset?.fePortraitResampleKey;
   const prevOrig = img.dataset?.fePortraitOrigSrc;
 

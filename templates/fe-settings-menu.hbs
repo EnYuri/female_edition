@@ -156,9 +156,26 @@
     </div>
 
     <div class="form-group">
+      <label>채팅 병합: 주사위 결과 메시지도 포함</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMergeIncludeRollMessages" data-dtype="Boolean" {{checked values.ceMergeIncludeRollMessages}} />
+      </div>
+      <p class="notes">끄면 전용 주사위 결과 카드는 병합에서 제외합니다.</p>
+    </div>
+
+    <div class="form-group">
       <label>채팅 병합: 그룹 구분선 표시</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMergeDivider" data-dtype="Boolean" {{checked values.ceMergeDivider}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합 방식</label>
+      <div class="form-fields">
+        <select name="ceMergeMode" data-dtype="String">
+          {{selectOptions choices.mergeMode selected=values.ceMergeMode}}
+        </select>
       </div>
     </div>
 
@@ -172,10 +189,13 @@
     </div>
 
     <div class="form-group">
-      <label>채팅 입력 중 표시(타이핑 인디케이터)</label>
+      <label>채팅 병합: 화자 그룹 기준</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceTypingEnabled" data-dtype="Boolean" {{checked values.ceTypingEnabled}} />
+        <select name="ceMergeSpeakerBasis" data-dtype="String">
+          {{selectOptions choices.mergeSpeakerBasis selected=values.ceMergeSpeakerBasis}}
+        </select>
       </div>
+      <p class="notes">토큰: 씬+토큰+액터 모두 일치 / 액터: 액터 id만 일치 / 플레이어: 같은 유저면 병합</p>
     </div>
 
     <div class="form-group">
@@ -281,7 +301,7 @@
     <div class="form-group">
       <label>포트레이트 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="1" min="16" max="256" />
+        <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="1" min="16" max="128" />
       </div>
     </div>
 

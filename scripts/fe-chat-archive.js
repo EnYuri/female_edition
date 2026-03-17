@@ -780,7 +780,14 @@ async function feFetchAllChatMessagesFromDatabase() {
     const docClass = game?.messages?.documentClass || CONFIG?.ChatMessage?.documentClass || foundry?.documents?.ChatMessage || globalThis.ChatMessage?.implementation || globalThis.ChatMessage;
     const backend = docClass?.database;
     if (!docClass || !backend?.get) return [];
-    const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, game?.user);
+    // v13 changed the third argument of ClientBackend.get() from a User document
+    // to a plain context object { userId: string }. Passing the User object directly
+    // caused context.id to be undefined in v13's permission checks, leading to
+    // silent message filtering / empty archive results.
+    // Build the context object that works for both v12 (accepts User) and v13 (wants { userId }).
+    const userId = game?.user?.id ?? null;
+    const backendContext = userId ? { userId } : (game?.user ?? {});
+    const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, backendContext);
     if (!Array.isArray(rows)) return [];
     return rows.map((row) => {
       if (!row) return null;

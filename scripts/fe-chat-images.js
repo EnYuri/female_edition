@@ -543,7 +543,8 @@ async function ciSendPending(root = document) {
     await ChatMessage.create({
       content: ciBuildMessageHtml(resolved, note),
       style: ciGetMessageStyleOOC(),
-      user: game.user?.id,
+      // v13+: author replaces the deprecated user field. Keep user as fallback for v12.
+      author: game.user?.id,
     });
 
     if (textarea) textarea.value = "";

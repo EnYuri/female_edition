@@ -70,12 +70,14 @@ class FemaleEditionSettingsMenu extends FormApplication {
       // Chat enhancements
       [S.MERGE_ENABLED]: feGetSettingSafe(S.MERGE_ENABLED, FE_DEFAULTS[S.MERGE_ENABLED]),
       [S.MERGE_ONLY_TEXT]: feGetSettingSafe(S.MERGE_ONLY_TEXT, FE_DEFAULTS[S.MERGE_ONLY_TEXT]),
+      [S.MERGE_INCLUDE_ROLL_MESSAGES]: feGetSettingSafe(S.MERGE_INCLUDE_ROLL_MESSAGES, FE_DEFAULTS[S.MERGE_INCLUDE_ROLL_MESSAGES]),
       [S.MERGE_DIVIDER]: feGetSettingSafe(S.MERGE_DIVIDER, FE_DEFAULTS[S.MERGE_DIVIDER]),
+      [S.MERGE_MODE]: feGetSettingSafe(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]),
       [S.MERGE_FOLLOW_HEADER_STYLE]: feGetSettingSafe(
         S.MERGE_FOLLOW_HEADER_STYLE,
         FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]
       ),
-      [S.TYPING_ENABLED]: feGetSettingSafe(S.TYPING_ENABLED, FE_DEFAULTS[S.TYPING_ENABLED]),
+      [S.MERGE_SPEAKER_BASIS]: feGetSettingSafe(S.MERGE_SPEAKER_BASIS, FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]),
 
       // Export
       [S.EXPORT_ENABLED]: feGetSettingSafe(S.EXPORT_ENABLED, FE_DEFAULTS[S.EXPORT_ENABLED]),
@@ -143,10 +145,19 @@ class FemaleEditionSettingsMenu extends FormApplication {
     };
 
     const choices = {
+      mergeMode: {
+        standard: "표준(경계/간격까지 묶기)",
+        simple: "간소화(후속 헤더만 숨김)",
+      },
       mergeFollowHeaderStyle: {
         hide: "헤더 완전 숨김",
         name: "이름만 남김",
         portrait: "포트레이트만 남김",
+      },
+      mergeSpeakerBasis: {
+        token:  "토큰(기본) — 토큰+액터+씬 모두 일치",
+        actor:  "액터 — 같은 액터면 병합",
+        author: "플레이어(작성자) — 같은 유저면 병합",
       },
       exportPrintImageMode: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
       exportDesktopExternalMode: {
@@ -217,12 +228,14 @@ class FemaleEditionSettingsMenu extends FormApplication {
       await setBool(BG.HIDE_BASE_PORTRAITS);
       await setBool(BG.STRIP_TEXTURES);
 
-      // Merge/typing
+      // Merge
       await setBool(S.MERGE_ENABLED);
       await setBool(S.MERGE_ONLY_TEXT);
+      await setBool(S.MERGE_INCLUDE_ROLL_MESSAGES);
       await setBool(S.MERGE_DIVIDER);
+      await setStr(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]);
       await setStr(S.MERGE_FOLLOW_HEADER_STYLE, FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
-      await setBool(S.TYPING_ENABLED);
+      await setStr(S.MERGE_SPEAKER_BASIS, FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
 
       // Markdown/Edit
       await setBool(S.MARKDOWN_ENABLED);

@@ -1,17 +1,6 @@
 /* female_edition: Chat Enhancements (FVTT v13) */
 
 /* --------------------------- */
-/* Typing indicator            */
-/* --------------------------- */
-#chat-form .fe-typing-indicator {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.2;
-  opacity: 0.8;
-  user-select: none;
-}
-
-/* --------------------------- */
 /* Markdown: readability        */
 /* --------------------------- */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content img {
@@ -24,6 +13,13 @@
   padding: 0.15em 0.75em;
   border-left: 3px solid var(--color-border-light-2);
   opacity: 0.95;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border-light-2);
+  margin: 0.5em 0;
+  opacity: 0.6;
 }
 
 

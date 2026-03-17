@@ -543,6 +543,18 @@ Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
   feApplyRawEditPreUpdate(message, changed, userId);
 });
 
+// If the message currently being edited is deleted by anyone (GM, automation, etc.),
+// close the inline editor immediately so it does not remain open as a stale orphan.
+Hooks.on("deleteChatMessage", (message) => {
+  try {
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (!id || id !== FE_EDITING_MESSAGE_ID) return;
+    feCancelInlineEdit();
+  } catch {
+    /* no-op */
+  }
+});
+
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
   try {
     const reason = payload?.reason ?? null;
