@@ -494,3 +494,37 @@ button.clear-remaining.icon.fa-solid::after {
   font-size: var(--fe-chat-subtitle-size) !important;
   line-height: 1.05;
 }
+
+/* -------------------------------
+ * 6) Inline rolls + dice UI font
+ * ------------------------------- */
+
+/* Inline-roll anchors: apply the chat font so [[1d6]] results match the
+ * surrounding message text. FA icons inside the anchor inherit automatically.
+ */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message
+  a.inline-roll {
+  font-family: var(--fe-chat-font-family) !important;
+}
+
+/* Dice-roll card (full roll block inside chat-card) */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message
+  :is(.dice-roll, .dice-result, .dice-formula, .dice-total) {
+  font-family: var(--fe-chat-font-family) !important;
+}
+
+/* Dice tooltip popup (shown on hover/click over inline-roll) */
+#tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip,
+             .dice-total, .dice-flavor) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* Chat-card formula text (e.g. dnd5e roll formula displayed in card header) */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  .dice-formula {
+  font-family: var(--fe-chat-font-family) !important;
+}

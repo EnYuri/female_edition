@@ -880,8 +880,16 @@ Hooks.once("ready", async () => {
 // Inline-roll snapshot: in-memory cache keyed by message id.
 // Snapshots are captured from Foundry's first-render DOM on renderChatMessageHTML
 // and restored on every subsequent re-render to prevent enrichHTML from re-rolling.
-// No persistence to message.flags — page reload triggers a fresh Foundry roll and
-// a new capture, which is acceptable (inline rolls are not persistent values).
+//
+// Persistence strategy: "freeze" — on first render, if message.content still contains
+// [[formula]] syntax, update message.content to store the evaluated anchor HTML directly.
+// After the freeze, enrichHTML sees only anchor tags (no [[...]]) and leaves them alone,
+// so all clients and page reloads naturally produce the same value with no extra logic.
+//
+// Loop safety: the freeze update triggers updateChatMessage with a content change.
+// feChangeTouchesInlineRollSnapshot detects content → clears the in-memory snapshot.
+// On the next renderChatMessageHTML the content has anchors (no [[...]]),
+// feContentHasFreezeTarget returns false → no second freeze → loop terminated.
 const feInlineRollSnapshots = new Map(); // messageId → { anchors: string[] }
 
 function feStoreInlineRollSnapshot(message, anchors) {
@@ -904,6 +912,42 @@ function feGetInlineRollSnapshot(message) {
     return feInlineRollSnapshots.get(id) ?? null;
   } catch {
     return null;
+  }
+}
+
+// Returns true if message.content still has [[formula]] syntax that needs freezing.
+function feContentHasFreezeTarget(message) {
+  try {
+    return /\[\[/.test(String(message?.content ?? ""));
+  } catch {
+    return false;
+  }
+}
+
+// Freeze inline roll results into message.content by replacing [[formula]] patterns
+// with the evaluated anchor HTML from the first render.
+// Fire-and-forget: called from renderChatMessageHTML, must not block.
+// Only the message author or GM may update content.
+async function feFreezInlineRollsIntoContent(message, anchors) {
+  try {
+    if (!message || !Array.isArray(anchors) || !anchors.length) return;
+    if (!feContentHasFreezeTarget(message)) return;
+    if (!message.canUserModify?.(game.user, "update")) return;
+
+    // Replace [[...]] patterns in content with the evaluated anchor HTML, in order.
+    let anchorIdx = 0;
+    const frozen = String(message.content ?? "").replace(/\[\[[\s\S]*?\]\]/g, () => {
+      const anchor = anchors[anchorIdx++];
+      return anchor ?? "";
+    });
+
+    // Only update if the replacement consumed exactly all anchors and content changed.
+    if (anchorIdx !== anchors.length) return;
+    if (frozen === message.content) return;
+
+    await message.update({ content: frozen });
+  } catch {
+    /* no-op: fire-and-forget */
   }
 }
 
@@ -951,9 +995,15 @@ function feSnapshotOrRestoreInlineRolls(message, rootEl) {
     const snapshot = feGetInlineRollSnapshot(message);
 
     if (!snapshot) {
-      // First render: capture Foundry's enrichHTML output so subsequent re-renders
-      // restore the original roll value instead of re-rolling.
-      feStoreInlineRollSnapshot(message, current.map((a) => a.outerHTML));
+      // First render: capture Foundry's enrichHTML output.
+      const anchors = current.map((a) => a.outerHTML);
+      feStoreInlineRollSnapshot(message, anchors);
+
+      // If content still has [[formula]], freeze the evaluated result into
+      // message.content so all clients and page reloads see the same value.
+      if (feContentHasFreezeTarget(message)) {
+        void feFreezInlineRollsIntoContent(message, anchors);
+      }
       return;
     }
 
@@ -1196,6 +1246,32 @@ function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, all
   }
 }
 
+// Returns the effective scroll container for a chat log element.
+// Foundry v13: ol#chat-log may itself be scrollable, or its parent wrapper is.
+function feGetChatScrollContainer(logEl) {
+  try {
+    if (!logEl) return null;
+    if (logEl.scrollHeight > logEl.clientHeight) return logEl;
+    const parent = logEl.parentElement;
+    if (parent && parent.scrollHeight > parent.clientHeight) return parent;
+    return logEl;
+  } catch {
+    return logEl;
+  }
+}
+
+// Returns true if the scroll container is at (or very near) the bottom.
+// Uses a generous threshold to account for sub-pixel rounding.
+const FE_SCROLL_BOTTOM_THRESHOLD = 40;
+function feIsScrolledToBottom(el) {
+  try {
+    if (!el) return false;
+    return el.scrollTop + el.clientHeight >= el.scrollHeight - FE_SCROLL_BOTTOM_THRESHOLD;
+  } catch {
+    return false;
+  }
+}
+
 function feFlushQueuedRenderedMessageRefreshes() {
   try {
     const ids = Array.from(feQueuedRenderedMessageIds);
@@ -1210,6 +1286,19 @@ function feFlushQueuedRenderedMessageRefreshes() {
 
     const logs = feGetChatLogs();
     let missing = false;
+
+    // Snapshot which scroll containers were at the bottom BEFORE merge processing.
+    // Merge changes header visibility → scrollHeight changes → scroll position drifts.
+    // Only restore scroll for containers that were already pinned to the bottom —
+    // users reading older messages (scrolled up) must not be interrupted.
+    const scrollerState = new Map(); // scroller → wasAtBottom
+    for (const log of logs) {
+      if (!feIsElementNode(log)) continue;
+      const scroller = feGetChatScrollContainer(log);
+      if (scroller && !scrollerState.has(scroller))
+        scrollerState.set(scroller, feIsScrolledToBottom(scroller));
+    }
+
     for (const log of logs) {
       if (!feIsElementNode(log)) continue;
       try { feDedupeChatMessagesInLog(log); } catch {}
@@ -1227,6 +1316,12 @@ function feFlushQueuedRenderedMessageRefreshes() {
         feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
         if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
       }
+    }
+
+    // Restore bottom scroll only for containers that were already there.
+    for (const [scroller, wasPinned] of scrollerState) {
+      if (!wasPinned) continue;
+      try { scroller.scrollTop = scroller.scrollHeight; } catch {}
     }
 
     if (missing && feQueuedRenderedMessagePass < 2) {
