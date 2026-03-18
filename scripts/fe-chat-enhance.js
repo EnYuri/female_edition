@@ -928,11 +928,49 @@ function feContentHasFreezeTarget(message) {
 // with the evaluated anchor HTML from the first render.
 // Fire-and-forget: called from renderChatMessageHTML, must not block.
 // Only the message author or GM may update content.
+// Returns true if an inline-roll anchor HTML contains an unresolved @ variable.
+// When enrichHTML cannot resolve @combat.round (e.g. no active combat, wrong context),
+// the Roll formula still contains the @ token and should not be frozen.
+function feAnchorHasUnresolvedVariable(anchorHtml) {
+  try {
+    const doc = new DOMParser().parseFromString(anchorHtml, "text/html");
+    const a = doc.querySelector("a.inline-roll");
+    if (!a) return false;
+
+    // Check data-roll (base64 encoded Roll JSON) for unresolved @ variables.
+    const dataRoll = a.getAttribute("data-roll");
+    if (dataRoll) {
+      try {
+        const json = JSON.parse(atob(dataRoll));
+        const formula = json?.formula ?? json?._formula ?? "";
+        if (/@\w/.test(formula)) return true;
+      } catch {
+        // If we can't parse it, check for @ in the raw base64 decoded string.
+        try {
+          if (/@\w/.test(atob(dataRoll))) return true;
+        } catch {}
+      }
+    }
+
+    // Fallback: check aria-label or title.
+    const label = a.getAttribute("aria-label") ?? a.getAttribute("title") ?? "";
+    if (/@\w/.test(label)) return true;
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
 async function feFreezInlineRollsIntoContent(message, anchors) {
   try {
     if (!message || !Array.isArray(anchors) || !anchors.length) return;
     if (!feContentHasFreezeTarget(message)) return;
     if (!message.canUserModify?.(game.user, "update")) return;
+
+    // Skip freeze if any anchor contains an unresolved @ variable.
+    // This happens when enrichHTML evaluates @combat.round without a live combat
+    // or without the correct actor context, producing 0 / NaN instead of the real value.
+    if (anchors.some(feAnchorHasUnresolvedVariable)) return;
 
     // Replace [[...]] patterns in content with the evaluated anchor HTML, in order.
     let anchorIdx = 0;
