@@ -134,7 +134,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
       [CP.ENABLED]: feGetSettingSafe(CP.ENABLED, true),
       [CP.HIDE_WRAP]: feGetSettingSafe(CP.HIDE_WRAP, false),
       [CP.USE_TOKEN]: feGetSettingSafe(CP.USE_TOKEN, false),
-      [CP.SIZE]: feGetSettingSafe(CP.SIZE, 48),
+      [CP.SIZE]: feGetSettingSafe(CP.SIZE, 64),
       [CP.APPLY_COMBAT]: feGetSettingSafe(CP.APPLY_COMBAT, false),
       [CP.SHOW_IC]: feGetSettingSafe(CP.SHOW_IC, true),
       [CP.SHOW_OOC]: feGetSettingSafe(CP.SHOW_OOC, true),
@@ -223,62 +223,66 @@ class FemaleEditionSettingsMenu extends FormApplication {
     };
 
     try {
-      // Base
-      await setBool(BG.ENABLE_FONTS);
-      await setBool(BG.HIDE_BASE_PORTRAITS);
-      await setBool(BG.STRIP_TEXTURES);
+      // All settings are independent — save in parallel so the dialog closes
+      // in one round-trip instead of 41 sequential game.settings.set() calls.
+      await Promise.all([
+        // Base toggles
+        setBool(BG.ENABLE_FONTS),
+        setBool(BG.HIDE_BASE_PORTRAITS),
+        setBool(BG.STRIP_TEXTURES),
 
-      // Merge
-      await setBool(S.MERGE_ENABLED);
-      await setBool(S.MERGE_ONLY_TEXT);
-      await setBool(S.MERGE_INCLUDE_ROLL_MESSAGES);
-      await setBool(S.MERGE_DIVIDER);
-      await setStr(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]);
-      await setStr(S.MERGE_FOLLOW_HEADER_STYLE, FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
-      await setStr(S.MERGE_SPEAKER_BASIS, FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
+        // Merge
+        setBool(S.MERGE_ENABLED),
+        setBool(S.MERGE_ONLY_TEXT),
+        setBool(S.MERGE_INCLUDE_ROLL_MESSAGES),
+        setBool(S.MERGE_DIVIDER),
+        setStr(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]),
+        setStr(S.MERGE_FOLLOW_HEADER_STYLE, FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]),
+        setStr(S.MERGE_SPEAKER_BASIS, FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]),
 
-      // Markdown/Edit
-      await setBool(S.MARKDOWN_ENABLED);
-      await setBool(S.EDIT_ENABLED);
+        // Markdown / Edit
+        setBool(S.MARKDOWN_ENABLED),
+        setBool(S.EDIT_ENABLED),
 
-      // Export
-      await setBool(S.EXPORT_ENABLED);
-      await setBool(S.EXPORT_AUTO_PRINT);
-      await setBool(S.EXPORT_OPTIMIZE);
-      await setBool(S.EXPORT_EMBED_FONTS);
-      await setBool(S.EXPORT_EMBED_IMAGES);
-      await setStr(S.EXPORT_PRINT_IMAGE_MODE, FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
-      await setStr(S.EXPORT_DESKTOP_EXTERNAL_MODE, FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]);
+        // Export
+        setBool(S.EXPORT_ENABLED),
+        setBool(S.EXPORT_AUTO_PRINT),
+        setBool(S.EXPORT_OPTIMIZE),
+        setBool(S.EXPORT_EMBED_FONTS),
+        setBool(S.EXPORT_EMBED_IMAGES),
+        setStr(S.EXPORT_PRINT_IMAGE_MODE, FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]),
+        setStr(S.EXPORT_DESKTOP_EXTERNAL_MODE, FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]),
 
-      // Fonts
-      await setStr(S.CHAT_FONT_CHOICE, FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
-      await setBool(S.UI_USE_GEURIMILGI);
-      await setBool(S.CHATCARD_USE_CUSTOM_FONT);
+        // Fonts
+        setStr(S.CHAT_FONT_CHOICE, FE_DEFAULTS[S.CHAT_FONT_CHOICE]),
+        setBool(S.UI_USE_GEURIMILGI),
+        setBool(S.CHATCARD_USE_CUSTOM_FONT),
 
-      // Style
-      await setNum(S.STYLE_CHAT_MESSAGE_SPACING, FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING]);
-      await setNum(S.STYLE_BG_SATURATION, FE_DEFAULTS[S.STYLE_BG_SATURATION]);
-      await setNum(S.STYLE_ACTOR_NAME_SIZE, FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]);
-      await setNum(S.STYLE_PLAYER_NAME_SIZE, FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE]);
-      await setNum(S.STYLE_MESSAGE_TEXT_SIZE, FE_DEFAULTS[S.STYLE_MESSAGE_TEXT_SIZE]);
-      await setNum(S.STYLE_CHATCARD_TEXT_SIZE, FE_DEFAULTS[S.STYLE_CHATCARD_TEXT_SIZE]);
+        // Style
+        setNum(S.STYLE_CHAT_MESSAGE_SPACING, FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING]),
+        setNum(S.STYLE_BG_SATURATION, FE_DEFAULTS[S.STYLE_BG_SATURATION]),
+        setNum(S.STYLE_ACTOR_NAME_SIZE, FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]),
+        setNum(S.STYLE_PLAYER_NAME_SIZE, FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE]),
+        setNum(S.STYLE_MESSAGE_TEXT_SIZE, FE_DEFAULTS[S.STYLE_MESSAGE_TEXT_SIZE]),
+        setNum(S.STYLE_CHATCARD_TEXT_SIZE, FE_DEFAULTS[S.STYLE_CHATCARD_TEXT_SIZE]),
 
-      // User color bg
-      await setBool(S.USE_USER_COLOR_BG);
-      await setStr(S.USER_COLOR_BG_BASE, FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
+        // User-color background
+        setBool(S.USE_USER_COLOR_BG),
+        setStr(S.USER_COLOR_BG_BASE, FE_DEFAULTS[S.USER_COLOR_BG_BASE]),
 
-      // Portrait
-      await setBool(CP.ENABLED);
-      await setBool(CP.HIDE_WRAP);
-      await setBool(CP.USE_TOKEN);
-      await setNum(CP.SIZE, 48);
-      await setBool(CP.APPLY_COMBAT);
-      await setBool(CP.SHOW_IC);
-      await setBool(CP.SHOW_OOC);
-      await setBool(CP.SHOW_EMOTE);
-      await setBool(CP.SHOW_WHISPER);
-      await setBool(CP.SHOW_ROLL);
-      await setBool(CP.SHOW_OTHER);
+        // Portrait
+        setBool(CP.ENABLED),
+        setBool(CP.HIDE_WRAP),
+        setBool(CP.USE_TOKEN),
+        setNum(CP.SIZE, 64),
+        setBool(CP.APPLY_COMBAT),
+        setBool(CP.SHOW_IC),
+        setBool(CP.SHOW_OOC),
+        setBool(CP.SHOW_EMOTE),
+        setBool(CP.SHOW_WHISPER),
+        setBool(CP.SHOW_ROLL),
+        setBool(CP.SHOW_OTHER),
+      ]);
     } catch (err) {
       console.error(`[${MODULE_ID}] settings save failed`, err);
       ui.notifications?.error("설정 저장 중 오류가 발생했습니다. 콘솔을 확인하세요.");

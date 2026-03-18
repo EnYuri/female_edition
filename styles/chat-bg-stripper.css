@@ -15,8 +15,8 @@
    * Chat typography (tunable)
    * ------------------------------- */
   /* Chat header sizes */
-  --fe-chat-title-size: 18px;     /* actor name */
-  --fe-chat-subtitle-size: 12px;  /* player name */
+  --fe-chat-title-size: 22px;     /* actor name — matches ui-font.css and JS default */
+  --fe-chat-subtitle-size: 14px;  /* player name — matches ui-font.css and JS default */
 
   /* Normal chat message text size */
   --fe-chat-message-font-size: 14px;
@@ -171,27 +171,7 @@ body.fe-msg-bg-usercolor
  *
  * Force an opaque (theme-neutral) background for the *description/details* region only.
  */
- 
- 
- /*
-body.fe-msg-bg-usercolor
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-has-user-color
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dnd5e.chat-card)
-  :is(
-    section.details.card-content,
-    .details.card-content,
-    .details.collapsible-content.card-content,
-    .collapsible-content.card-content,
-    section.card-content.description,
-    .card-content.description
-  ) {
 
-  background-color: var(--color-bg-option, rgb(255 255 255 / 0.92)) !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-*/
 
 /* Optional: opaque base layer under the user-color tint (readability)
  * - Keeps the page/map/background from bleeding through.
@@ -221,24 +201,7 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black)
   background-blend-mode: normal !important;
 }
 
-/* Keep description blocks consistent (avoid nested tag overrides making text “들쭉날쭉”) 
-:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  :is(
-    section.details.card-content,
-    .details.card-content,
-    .details.collapsible-content.card-content,
-    .collapsible-content.card-content,
-    .collapsible-content,
-    .card-content
-  )
-  .wrapper :is(p, li, span, div, a, em, code) {
-  font-size: inherit !important;
-  font-weight: inherit !important;
-  line-height: inherit !important;
-}
-*/
+
 /* Paragraph spacing inside the wrapper */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message

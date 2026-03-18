@@ -308,20 +308,6 @@ function feClampInt(value, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-/**
- * Stable small hash for cache-busting family names.
- * FNV-1a 32-bit -> hex.
- */
-function feStableHash(str) {
-  let h = 0x811c9dc5;
-  const s = String(str);
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    // FNV prime 16777619
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
-}
 
 /** Create or update a <style> tag by id. */
 function feEnsureStyleTag(id, cssText, doc = document) {
@@ -891,110 +877,21 @@ Hooks.once("ready", async () => {
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
 });
 
-// Extra safety: apply user-color background as soon as each message is rendered.
-// This helps when other modules rapidly create->update messages (automation), or when
-// the chat log is re-rendered without a full childList mutation.
-// Extra safety: chat rendering can race when other modules rapidly create->update the same ChatMessage
-// (common with automation like midi-qol). In those cases the same message can be rendered twice or re-rendered
-// after the message HTML has been produced. We defensively:
-//  - Re-apply user-color tint after the message is inserted into the DOM
-//  - Schedule a dedupe + merge recompute for the affected chat log
-// See: Foundry core issue #13067 (duplicate render when update races render).
-const feInlineRollSnapshots = new Map();
-const FE_INLINE_ROLL_SNAPSHOT_FLAG = "inlineRollSnapshot";
-const FE_INLINE_ROLL_SNAPSHOT_VERSION = 1;
+// Inline-roll snapshot: in-memory cache keyed by message id.
+// Snapshots are captured from Foundry's first-render DOM on renderChatMessageHTML
+// and restored on every subsequent re-render to prevent enrichHTML from re-rolling.
+// No persistence to message.flags — page reload triggers a fresh Foundry roll and
+// a new capture, which is acceptable (inline rolls are not persistent values).
+const feInlineRollSnapshots = new Map(); // messageId → { anchors: string[] }
 
-function feGetInlineRollSnapshotKey(message) {
+function feStoreInlineRollSnapshot(message, anchors) {
   try {
     const id = feNormalizeChatMessageId(message?.id ?? message?._id);
-    if (!id) return null;
-    const content = String(message?.content ?? "");
-    return `${id}::${content}`;
-  } catch {
-    return null;
-  }
-}
-
-function feContentHasRawInlineRollSyntax(content) {
-  try {
-    const src = String(content ?? "");
-    return !!src && src.includes("[[") && !/class=["'][^"']*\binline-roll\b/i.test(src);
-  } catch {
-    return false;
-  }
-}
-
-function feInlineRollSnapshotSourceHash(content) {
-  try {
-    return feStableHash(String(content ?? ""));
-  } catch {
-    return "";
-  }
-}
-
-function feNormalizeInlineRollSnapshotPayload(payload, expectedHash = null) {
-  try {
-    if (!payload || typeof payload !== "object") return null;
-    const anchors = Array.isArray(payload.anchors)
-      ? payload.anchors.map((html) => String(html ?? "").trim()).filter(Boolean)
-      : [];
-    const sourceHash = String(payload.sourceHash ?? "").trim();
-    if (!anchors.length || !sourceHash) return null;
-    if (expectedHash && sourceHash !== expectedHash) return null;
-    return {
-      v: Number(payload.v ?? FE_INLINE_ROLL_SNAPSHOT_VERSION) || FE_INLINE_ROLL_SNAPSHOT_VERSION,
-      sourceHash,
-      anchors,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function feBuildInlineRollSnapshotPayload(content, { message = null, data = null } = {}) {
-  try {
-    const src = String(content ?? "");
-    if (!feContentHasRawInlineRollSyntax(src)) return null;
-    const frozen = feFreezeInlineRollSyntax(src, { message, data });
-    if (!frozen || frozen === src) return null;
-    const scratch = document.createElement("div");
-    scratch.innerHTML = frozen;
-    const anchors = Array.from(scratch.querySelectorAll?.("a.inline-roll.inline-result, a.inline-roll[data-roll]") ?? []).map((a) => a.outerHTML);
-    return feNormalizeInlineRollSnapshotPayload({
-      v: FE_INLINE_ROLL_SNAPSHOT_VERSION,
-      sourceHash: feInlineRollSnapshotSourceHash(src),
-      anchors,
-    });
-  } catch {
-    return null;
-  }
-}
-
-function feStoreInlineRollSnapshot(message, anchorsOrPayload = []) {
-  try {
-    const key = feGetInlineRollSnapshotKey(message);
-    if (!key) return null;
-    const expectedHash = feInlineRollSnapshotSourceHash(message?.content ?? "");
-    const payload = Array.isArray(anchorsOrPayload)
-      ? feNormalizeInlineRollSnapshotPayload({
-          v: FE_INLINE_ROLL_SNAPSHOT_VERSION,
-          sourceHash: expectedHash,
-          anchors: anchorsOrPayload,
-        }, expectedHash)
-      : feNormalizeInlineRollSnapshotPayload(anchorsOrPayload, expectedHash);
-    if (!payload) return null;
-    const stored = { key, ...payload };
-    feInlineRollSnapshots.set(key, stored);
+    if (!id || !Array.isArray(anchors) || !anchors.length) return null;
+    const stored = { anchors: anchors.map((h) => String(h ?? "").trim()).filter(Boolean) };
+    if (!stored.anchors.length) return null;
+    feInlineRollSnapshots.set(id, stored);
     return stored;
-  } catch {
-    return null;
-  }
-}
-
-function feGetStoredInlineRollSnapshotFlag(message) {
-  try {
-    const expectedHash = feInlineRollSnapshotSourceHash(message?.content ?? "");
-    return feNormalizeInlineRollSnapshotPayload(message?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null, expectedHash);
   } catch {
     return null;
   }
@@ -1002,124 +899,25 @@ function feGetStoredInlineRollSnapshotFlag(message) {
 
 function feGetInlineRollSnapshot(message) {
   try {
-    const key = feGetInlineRollSnapshotKey(message);
-    if (!key) return null;
-    const current = feInlineRollSnapshots.get(key) ?? null;
-    if (current?.anchors?.length) return current;
-    const storedFlag = feGetStoredInlineRollSnapshotFlag(message);
-    if (!storedFlag) return null;
-    const payload = { key, ...storedFlag };
-    feInlineRollSnapshots.set(key, payload);
-    return payload;
+    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (!id) return null;
+    return feInlineRollSnapshots.get(id) ?? null;
   } catch {
     return null;
   }
 }
 
-function feAttachInlineRollSnapshotFlag(flags, content, { message = null, data = null } = {}) {
-  try {
-    const nextFlags = foundry.utils.deepClone(flags ?? {});
-    const snapshot = feBuildInlineRollSnapshotPayload(content, { message, data });
-    const existing = nextFlags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null;
-    if (!snapshot && existing == null) return nextFlags;
-    nextFlags[MODULE_ID] = foundry.utils.mergeObject(nextFlags[MODULE_ID] ?? {}, {
-      [FE_INLINE_ROLL_SNAPSHOT_FLAG]: snapshot ?? null,
-    });
-    return nextFlags;
-  } catch {
-    return foundry.utils.deepClone(flags ?? {});
-  }
-}
+// feAttachInlineRollSnapshotFlag removed — only used in removed freeze-before-storage flow.
 
-function feHasEditableSourceFlag(flags) {
-  try {
-    const data = flags?.[MODULE_ID] ?? null;
-    if (!data || typeof data !== "object") return false;
-    return Object.prototype.hasOwnProperty.call(data, "raw") || Object.prototype.hasOwnProperty.call(data, "plain");
-  } catch {
-    return false;
-  }
-}
+// feHasEditableSourceFlag removed — only used in removed freeze-before-storage flow.
 
-function feEnsureFrozenInlineRollSourceFlags(flags, sourceText) {
-  try {
-    const nextFlags = foundry.utils.deepClone(flags ?? {});
-    if (feHasEditableSourceFlag(nextFlags)) return nextFlags;
-    nextFlags[MODULE_ID] = foundry.utils.mergeObject(nextFlags[MODULE_ID] ?? {}, {
-      plain: String(sourceText ?? ""),
-    });
-    return nextFlags;
-  } catch {
-    return foundry.utils.deepClone(flags ?? {});
-  }
-}
+// feEnsureFrozenInlineRollSourceFlags removed — only used in removed freeze-before-storage flow.
 
-function feFinalizeInlineRollFreeze(content, flags, { message = null, data = null } = {}) {
-  try {
-    const src = String(content ?? "");
-    let nextFlags = feAttachInlineRollSnapshotFlag(flags ?? {}, src, { message, data });
-    if (!feContentHasRawInlineRollSyntax(src)) return { content: src, flags: nextFlags, changed: false };
+// feFinalizeInlineRollFreeze removed — only used in removed freeze-before-storage flow.
 
-    const frozen = feFreezeInlineRollSyntax(src, { message, data });
-    if (!frozen || frozen === src) return { content: src, flags: nextFlags, changed: false };
+// fePrepareInlineRollSnapshotOnPreCreate removed — see preCreateChatMessage hook comment.
 
-    nextFlags = feEnsureFrozenInlineRollSourceFlags(nextFlags, src);
-    return { content: frozen, flags: nextFlags, changed: true };
-  } catch {
-    return {
-      content: String(content ?? ""),
-      flags: foundry.utils.deepClone(flags ?? {}),
-      changed: false,
-    };
-  }
-}
-
-function fePrepareInlineRollSnapshotOnPreCreate(message, data = {}, userId = null) {
-  try {
-    if (userId !== game.user.id) return false;
-    const content = String(data?.content ?? message?.content ?? "");
-    const existing = data?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? message?.flags?.[MODULE_ID]?.[FE_INLINE_ROLL_SNAPSHOT_FLAG] ?? null;
-    if (!feContentHasRawInlineRollSyntax(content) && existing == null) return false;
-    // Skip freezing when Foundry has already evaluated rolls (dnd5e chat cards, dedicated
-    // roll messages). Trying to re-evaluate those synchronously produces wrong values and
-    // corrupts the snapshot stored in message flags.
-    const hasEvaluatedRolls =
-      (Array.isArray(data?.rolls) && data.rolls.length > 0) ||
-      (Array.isArray(message?.rolls) && message.rolls.length > 0);
-    if (hasEvaluatedRolls) return false;
-    // Also skip for chat-card messages — dnd5e 5.x embeds @-variable roll formulas in
-    // card HTML that are not meant to be re-evaluated here.
-    if (feMessageHasChatCardContent(content, null)) return false;
-    const prepared = feFinalizeInlineRollFreeze(content, data?.flags ?? message?.flags ?? {}, { message, data });
-    message.updateSource({ content: prepared.content, flags: prepared.flags });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function fePrepareInlineRollSnapshotOnPreUpdate(message, changed = {}, userId = null) {
-  try {
-    if (userId !== game.user.id) return false;
-    const modFlags = changed?.flags?.[MODULE_ID] ?? null;
-    const touchesRaw = !!(modFlags && typeof modFlags === "object" && (
-      Object.prototype.hasOwnProperty.call(modFlags, "raw") ||
-      Object.prototype.hasOwnProperty.call(modFlags, "plain")
-    ));
-    if (!touchesRaw && !feChangeTouchesInlineRollSnapshot(changed)) return false;
-    const merged = foundry.utils.mergeObject(foundry.utils.deepClone(message?.toObject?.() ?? {}), changed ?? {}, {
-      inplace: true,
-      recursive: true,
-    });
-    const content = String(merged?.content ?? message?.content ?? "");
-    const prepared = feFinalizeInlineRollFreeze(content, merged?.flags ?? message?.flags ?? {}, { message, data: merged });
-    changed.flags = prepared.flags;
-    if (prepared.changed) changed.content = prepared.content;
-    return true;
-  } catch {
-    return false;
-  }
-}
+// fePrepareInlineRollSnapshotOnPreUpdate removed — same freeze-before-storage issue as PreCreate.
 
 function feCreateElementFromHTML(doc, html) {
   try {
@@ -1136,9 +934,7 @@ function feClearInlineRollSnapshot(messageId) {
   try {
     const id = feNormalizeChatMessageId(messageId);
     if (!id) return;
-    for (const key of Array.from(feInlineRollSnapshots.keys())) {
-      if (String(key).startsWith(`${id}::`)) feInlineRollSnapshots.delete(key);
-    }
+    feInlineRollSnapshots.delete(id);
   } catch {
     /* no-op */
   }
@@ -1148,29 +944,26 @@ function feSnapshotOrRestoreInlineRolls(message, rootEl) {
   try {
     const root = feExtractHTMLElement(rootEl);
     if (!root || !message) return;
-    const content = String(message?.content ?? "");
-    const hasRawInlineRolls = feContentHasRawInlineRollSyntax(content);
-    const current = Array.from(root.querySelectorAll?.("a.inline-roll.inline-result, a.inline-roll[data-roll]") ?? []);
 
-    let snapshot = feGetInlineRollSnapshot(message);
-    if (!snapshot && current.length && hasRawInlineRolls) {
-      // First render: Foundry already evaluated the rolls correctly.
-      // Capture the anchor HTML so subsequent re-renders can restore it
-      // instead of re-evaluating (which would lose actor context / roll data).
-      snapshot = feStoreInlineRollSnapshot(message, current.map((a) => a.outerHTML));
-      // Snapshot was just captured from the current DOM — no restore needed.
+    const current = Array.from(root.querySelectorAll?.("a.inline-roll.inline-result, a.inline-roll[data-roll]") ?? []);
+    if (!current.length) return;
+
+    const snapshot = feGetInlineRollSnapshot(message);
+
+    if (!snapshot) {
+      // First render: capture Foundry's enrichHTML output so subsequent re-renders
+      // restore the original roll value instead of re-rolling.
+      feStoreInlineRollSnapshot(message, current.map((a) => a.outerHTML));
       return;
     }
 
-    if (!snapshot?.anchors?.length || !current.length) return;
     if (snapshot.anchors.length !== current.length) return;
 
-    // Optimisation: if the current DOM already matches the snapshot exactly,
-    // skip the replace to avoid unnecessary DOM mutations (and the micro-flash
-    // they can cause when merge classes are recomputed immediately after).
+    // Already showing the captured value — nothing to do.
     const allMatch = current.every((a, i) => a.outerHTML === snapshot.anchors[i]);
     if (allMatch) return;
 
+    // Re-render produced a new roll value — restore the original.
     const doc = root.ownerDocument ?? document;
     for (let i = 0; i < current.length; i += 1) {
       const replacement = feCreateElementFromHTML(doc, snapshot.anchors[i]);
@@ -1432,7 +1225,7 @@ function feFlushQueuedRenderedMessageRefreshes() {
       for (const el of anchors) {
         const msg = feGetMessageFromElementOrCollection(el);
         feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
-        if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+        if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
       }
     }
 
@@ -1488,14 +1281,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
       if (!msg && !hasStampedKey) info.mergeableText = false;
       return info;
     };
-    const canMerge = (a, b) => {
-      if (!a || !b) return false;
-      const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
-      if ((a.noMerge || b.noMerge) && !narratorPair) return false;
-      if (a.key !== b.key) return false;
-      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
-      return true;
-    };
+    const canMerge = (a, b) => feCanMergePair(a, b, { onlyText, allowNarratorMerge });
 
     const infos = items
       .map((el, i) => makeInfo(el, i))
@@ -1544,14 +1330,7 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
     const showDivider = !!feSetting(S.MERGE_DIVIDER);
     const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
     const simpleMode = mergeMode === "simple";
-    const canMerge = (a, b) => {
-      if (!a || !b) return false;
-      const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
-      if ((a.noMerge || b.noMerge) && !narratorPair) return false;
-      if (a.key !== b.key) return false;
-      if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
-      return true;
-    };
+    const canMerge = (a, b) => feCanMergePair(a, b, { onlyText, allowNarratorMerge });
 
     const desiredMap = new Map();
     for (const info of infos) {
@@ -1592,7 +1371,7 @@ function feApplyChatMergeSlice(infos, startOffset = 0, { allowNarratorMerge = fa
   }
 }
 
-function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false } = {}) {
+function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false, skipDedup = false } = {}) {
   try {
     if (feIsNotificationMessageElement(messageEl)) {
       feClearMergeClassesFromMessageElement(messageEl);
@@ -1601,7 +1380,9 @@ function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false }
     const anchor = messageEl?.closest?.("li.chat-message") ?? messageEl;
     const log = anchor?.closest?.("ol.chat-log, #chat-log, #fe-chat-export-log");
     if (!feIsElementNode(anchor) || !feIsElementNode(log)) return;
-    try { feDedupeChatMessagesInLog(log); } catch {}
+    // Skip dedup when the caller (e.g. feFlushQueuedRenderedMessageRefreshes) has
+    // already run it once for the whole log this flush cycle.
+    if (!skipDedup) { try { feDedupeChatMessagesInLog(log); } catch {} }
     const neighborhood = feCollectMergeNeighborhood(log, anchor, { allowNarratorMerge });
     const slice = neighborhood?.slice ?? [];
     if (!slice.length) return;
@@ -1654,20 +1435,6 @@ function feApplyRenderedStateToAllLogs() {
   }
 }
 
-function feRefreshRenderedMessageById(message) {
-  try {
-    const id = feNormalizeChatMessageId(message?.id ?? message?._id);
-    if (!id) return;
-    for (const log of feGetChatLogs()) {
-      const sel = `li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`;
-      const el = log?.querySelector?.(sel);
-      if (!el) continue;
-      feApplyRenderedStateToMessageElement(message, el);
-    }
-  } catch {
-    /* no-op */
-  }
-}
 
 function feChangeTouchesRenderState(change) {
   try {
@@ -1769,111 +1536,9 @@ function feEscapeHTML(str) {
     .replaceAll("'", "&#039;");
 }
 
-function feFreezeInlineRollSyntax(content, { message = null, data = null } = {}) {
-  try {
-    const src = String(content ?? "");
-    if (!src || !src.includes("[[") || /class=["']inline-roll\b/i.test(src)) return src;
-    const rollData = feGetInlineRollData(message, data ?? {});
-    // If rollData is empty (actor not resolved yet, or no actor), skip any expression
-    // that references @ variables — they would evaluate to 0/NaN and corrupt the snapshot.
-    const rollDataIsEmpty = !rollData || Object.keys(rollData).length === 0;
-    const inlineRollRe = /\[\[([\s\S]+?)\]\](?:\{([^{}]*)\})?/g;
-    return src.replace(inlineRollRe, (match, rawExpr, rawLabel) => {
-      try {
-        let expr = String(rawExpr ?? "").trim();
-        const customLabel = rawLabel == null ? "" : String(rawLabel).trim();
-        if (!expr) return match;
-        expr = expr.replace(/^\/(?:r|roll|gmroll|blindroll|selfroll|publicroll|pr|br|sr)\s+/i, "").trim();
-        if (!expr) return match;
-        // Skip freezing expressions with @-variable references when we have no roll data.
-        // This prevents poisoning the snapshot with wrong values (0/NaN for @mod, @prof, etc.)
-        if (rollDataIsEmpty && /@[a-zA-Z_]/.test(expr)) return match;
-        let roll = null;
-        try {
-          roll = Roll.create ? Roll.create(expr, rollData) : new Roll(expr, rollData);
-        } catch {
-          roll = new Roll(expr, rollData);
-        }
-        if (!roll) return match;
-        if (typeof roll.evaluateSync === "function") roll = roll.evaluateSync({ strict: false, allowStrings: true });
-        else if (typeof roll.evaluate === "function") {
-          const evaluated = roll.evaluate({ async: false, strict: false, allowStrings: true });
-          if (evaluated && typeof evaluated.then === "function") return match;
-          roll = evaluated ?? roll;
-        }
+// feFreezeInlineRollSyntax removed — no callers remain after freeze-before-storage cleanup.
 
-        const total = roll?.total;
-        const fallbackLabel = total == null ? String(roll?.result ?? expr) : String(total);
-        const label = customLabel || fallbackLabel;
-        const tooltip = feEscapeHTML(expr);
 
-        if (typeof roll?.toAnchor === "function") {
-          const anchor = roll.toAnchor({ label });
-          try {
-            anchor?.setAttribute?.("title", expr);
-            if (anchor?.dataset && !anchor.dataset.tooltip) anchor.dataset.tooltip = expr;
-          } catch {
-            /* no-op */
-          }
-          return anchor?.outerHTML || match;
-        }
-
-        const json = typeof roll?.toJSON === "function" ? JSON.stringify(roll.toJSON()) : JSON.stringify(roll);
-        return `<a class="inline-roll inline-result" data-roll='${feEscapeHTML(json)}' data-tooltip="${tooltip}" title="${tooltip}"><i class="fas fa-dice-d20"></i>${feEscapeHTML(label)}</a>`;
-      } catch {
-        return match;
-      }
-    });
-  } catch {
-    return String(content ?? "");
-  }
-}
-
-function feRewriteCSSAssetURLs(cssText, baseUrl) {
-  // When exporting to a standalone file:// HTML, any relative URLs inside *inlined* CSS
-  // (url(...), @import ...) would otherwise resolve against the local file path and break.
-  // Rebase them to absolute URLs using the original stylesheet URL as the base.
-  if (!cssText) return "";
-  let out = String(cssText);
-  const base = String(baseUrl || "");
-
-  const isAbsoluteLike = (u) => /^(data:|blob:|https?:|file:|chrome-extension:|about:)/i.test(u);
-
-  const safeResolve = (u) => {
-    try {
-      return new URL(u, base).href;
-    } catch {
-      return null;
-    }
-  };
-
-  // url(...)
-  out = out.replace(/url\(\s*(['"]?)([^'\")]+)\1\s*\)/g, (m, _q, raw) => {
-    const u = String(raw || "").trim();
-    if (!u) return m;
-    if (isAbsoluteLike(u) || u.startsWith("#")) return m;
-    const resolved = safeResolve(u);
-    if (!resolved) return m;
-    return `url("${resolved}")`;
-  });
-
-  // @import "...";  /  @import url(... ) screen;
-  out = out.replace(
-    /@import\s+(url\(\s*)?(['"]?)(\/[^'\")\s;]+|[^'\")\s;]+)\2\s*\)?\s*([^;]*);/g,
-    (m, urlPrefix, _q, raw, mediaTail) => {
-      const u = String(raw || "").trim();
-      if (!u) return m;
-      if (isAbsoluteLike(u)) return m;
-      const resolved = safeResolve(u);
-      if (!resolved) return m;
-      const media = String(mediaTail ?? "").trim();
-      if (urlPrefix) return `@import url("${resolved}")${media ? " " + media : ""};`;
-      return `@import "${resolved}"${media ? " " + media : ""};`;
-    }
-  );
-
-  return out;
-}
 
 // -------------------------------------
 // Export helper: Chat texture stripping (archive/html)
@@ -2153,7 +1818,8 @@ function feInlineFormat(text) {
   const codeSpans = [];
   text = text.replace(/`([^`]+)`/g, (_m, code) => {
     const idx = codeSpans.push(code) - 1;
-    return `@@FE_CODE_${idx}@@`;
+    // Placeholder must not contain _ or * to avoid matching bold/italic regexes.
+    return `FECODE${idx}`;
   });
 
   // Images: ![alt](url)
@@ -2188,7 +1854,7 @@ function feInlineFormat(text) {
   // Restore inline code
   for (let i = 0; i < codeSpans.length; i++) {
     const safe = feEscapeHTML(codeSpans[i]);
-    text = text.replaceAll(`@@FE_CODE_${i}@@`, `<code>${safe}</code>`);
+    text = text.replaceAll(`FECODE${i}`, `<code>${safe}</code>`);
   }
 
   return text;
@@ -2377,7 +2043,23 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
     feApplyMarkdownOnPreCreate(message, data, userId);
-    fePrepareInlineRollSnapshotOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
+    // NOTE: fePrepareInlineRollSnapshotOnPreCreate was intentionally removed.
+    //
+    // The old approach froze [[formula]] → <a class="inline-roll"> in message.content
+    // BEFORE storage, replacing the raw syntax with an anchor HTML string. This caused:
+    //
+    //   1. message.content in DB = "<p><a class='inline-roll'>7</a></p>" (anchor)
+    //   2. feGetStoredInlineRollSnapshotFlag computed expectedHash from the anchor content
+    //   3. The snapshot flag stored sourceHash from the original "[[1d12]]" content
+    //   4. Hash mismatch → snapshot permanently inaccessible → system dead
+    //   5. feFreezeInlineRollSyntax was also called TWICE (once in feAttachInlineRollSnapshotFlag,
+    //      once in feFinalizeInlineRollFreeze) → double roll evaluation
+    //
+    // Correct approach: leave [[formula]] in message.content.
+    // Foundry's TextEditor.enrichHTML() evaluates it during rendering (correct result,
+    // with full actor roll data). feSnapshotOrRestoreInlineRolls captures the Foundry-
+    // evaluated anchor on first render and restores it on subsequent re-renders,
+    // preventing the roll value from changing when merge/refresh triggers a re-render.
     feCaptureMessageRenderFlagsOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
   } catch {
     /* no-op */
@@ -2392,9 +2074,14 @@ Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
       Object.prototype.hasOwnProperty.call(modFlags, "raw") ||
       Object.prototype.hasOwnProperty.call(modFlags, "plain")
     ));
-    if (rawEditPending) return;
-    fePrepareInlineRollSnapshotOnPreUpdate(message, changed, userId);
-    feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
+    // fePrepareInlineRollSnapshotOnPreUpdate is still called from fe-chat-edit.js when
+    // the user explicitly edits a message (rawEditPending=true path handled there).
+    // We skip it here: same freeze-before-storage design flaw applies for automated updates.
+    // When content changes, feClearInlineRollSnapshot in updateChatMessage will clear the
+    // stale snapshot so feSnapshotOrRestoreInlineRolls re-captures on next render.
+    if (!rawEditPending) {
+      feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId);
+    }
   } catch {
     /* no-op */
   }
@@ -2523,15 +2210,6 @@ function feGetSpeakerActorFromLike(message, data = {}) {
   }
 }
 
-function feGetInlineRollData(message, data = {}) {
-  try {
-    const actor = feGetSpeakerActorFromLike(message, data) ?? feGetSpeakerActorFromMessage(message) ?? null;
-    const raw = typeof actor?.getRollData === "function" ? actor.getRollData() : {};
-    return raw && typeof raw === "object" ? foundry.utils.deepClone(raw) : {};
-  } catch {
-    return {};
-  }
-}
 
 function feShouldMergeRollMessages() {
   try {
@@ -2583,13 +2261,6 @@ function feComputeMergeRuntimeBehavior({
   };
 }
 
-function feMessageHasDynamicRollContent(content, message = null, el = null) {
-  try {
-    return feMessageHasChatCardContent(content, el) || feMessageHasDiceCardContent(content, message, el);
-  } catch {
-    return false;
-  }
-}
 
 function feGetMessageUserColorForData(message, data = {}, userId = null) {
   try {
@@ -2996,6 +2667,21 @@ function feStampRenderedStateAttributes(message, messageEl) {
     };
 
     const mergeKey = feMergeKey(mergeInfo);
+    // Build a compact stamp of all merge-relevant attributes.
+    // If it matches what's already in the DOM, skip all 7 dataset writes.
+    const stamp = [
+      mergeKey ?? "",
+      mergeInfo.mergeableText ? "1" : "0",
+      mergeInfo.noMerge       ? "1" : "0",
+      isNarratorTools         ? "1" : "0",
+      isRoundMarker           ? "1" : "0",
+      hasChatCard             ? "1" : "0",
+      hasDice                 ? "1" : "0",
+      hasRolls                ? "1" : "0",
+    ].join(",");
+    if (ds.feStamp === stamp) return;
+    ds.feStamp = stamp;
+
     if (mergeKey) ds.feMergeKey = mergeKey;
     else delete ds.feMergeKey;
 
@@ -3221,35 +2907,29 @@ function feMergeKey(info, basisOverride) {
 const feMergeClassSignatureCache = new WeakMap();
 const FE_MERGE_CLASS_LIST = ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"];
 
-function feBuildMergeClassSignature(desiredSet) {
-  try {
-    if (!desiredSet || !desiredSet.size) return "";
-    return Array.from(desiredSet).sort().join("|");
-  } catch {
-    return "";
-  }
-}
+// FE_MERGE_CLASS_LIST in fixed sorted order for O(1) signature building.
+const FE_MERGE_CLASS_SORTED = ["fe-divider-before", "fe-merge-end", "fe-merge-follow", "fe-merge-mid", "fe-merge-start"];
 
-function feReadActualMergeClassSignature(el) {
-  try {
-    if (!el?.classList) return "";
-    const actual = new Set();
-    for (const cls of FE_MERGE_CLASS_LIST) {
-      if (el.classList.contains(cls)) actual.add(cls);
-    }
-    return feBuildMergeClassSignature(actual);
-  } catch {
-    return "";
+function feBuildMergeClassSignature(desiredSet) {
+  // Build a deterministic signature from a fixed-order class list.
+  // Avoids Array.from + sort + join on every element every merge pass.
+  if (!desiredSet || !desiredSet.size) return "";
+  let sig = "";
+  for (const cls of FE_MERGE_CLASS_SORTED) {
+    if (desiredSet.has(cls)) sig += (sig ? "|" : "") + cls;
   }
+  return sig;
 }
 
 function feApplyMergeClassSetToElement(el, desired = null) {
   try {
     if (!el?.classList) return;
     const signature = feBuildMergeClassSignature(desired);
+    // Check WeakMap cache first — skip DOM read entirely on a hit.
+    // Only fall back to reading the DOM when the cache says things should change,
+    // which handles external mutations (e.g. another module removing a class).
     const cached = feMergeClassSignatureCache.get(el) ?? null;
-    const actual = feReadActualMergeClassSignature(el);
-    if (cached === signature && actual === signature) return;
+    if (cached === signature) return;
     for (const cls of FE_MERGE_CLASS_LIST) {
       const shouldHave = desired ? desired.has(cls) : false;
       if (shouldHave) el.classList.add(cls);
@@ -3325,14 +3005,7 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
   }
   if (hasMissingDocs) feScheduleMergeRetry(logEl);
 
-  const canMerge = (a, b) => {
-    if (!a || !b) return false;
-    const narratorPair = !!allowNarratorMerge && !!a.isNarrator && !!b.isNarrator;
-    if ((a.noMerge || b.noMerge) && !narratorPair) return false;
-    if (a.key !== b.key) return false;
-    if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
-    return true;
-  };
+  const canMerge = (a, b) => feCanMergePair(a, b, { onlyText, allowNarratorMerge });
 
   const desiredMap = new Map();
   for (const info of infos) desiredMap.set(info.el, new Set());
@@ -3377,19 +3050,19 @@ function feApplyChatMergeToAllLogs() {
   }
 }
 
+/** Shared merge-eligibility predicate — replaces the three identical inline closures. */
+function feCanMergePair(a, b, { onlyText = false, allowNarratorMerge = false } = {}) {
+  if (!a || !b) return false;
+  if ((a.noMerge || b.noMerge) && !(allowNarratorMerge && a.isNarrator && b.isNarrator)) return false;
+  if (a.key !== b.key) return false;
+  if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+  return true;
+}
+
 
 // Legacy observer-based chat log passes were removed in favor of
 // preCreate/preUpdate/create/renderChatMessageHTML-driven rendering.
 // Keep a tiny compatibility shim so older internal call sites remain harmless.
-function feObserveChatLogs() {
-  try {
-    if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
-    feFireChatUiUpdated();
-    feRenderTypingIndicator();
-  } catch {
-    /* no-op */
-  }
-}
 
 export {
   MODULE_ID,
@@ -3404,9 +3077,6 @@ export {
 
   feGetChatLogs,
   feMarkdownToHTML,
-  feFreezeInlineRollSyntax,
-  feBuildInlineRollSnapshotPayload,
-  fePrepareInlineRollSnapshotOnPreUpdate,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
 

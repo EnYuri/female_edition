@@ -1,12 +1,8 @@
 // Tidy 5e Sheet overrides (split)
 // This file intentionally stays light: most of the work is CSS-only.
-
-import { MODULE_ID } from "./fe-chat-enhance.js";
+// Adds a document class when Tidy5e is active so CSS can scope safely if needed.
 
 Hooks.once("ready", () => {
-  // If tidy sheet is not installed, do nothing.
-  if (!game?.modules?.get?.("tidy5e-sheet")?.active && !document.querySelector(".tidy5e-sheet")) return;
-
-  // Mark the document so CSS can scope more safely if needed.
-  document.documentElement?.classList?.add(`${MODULE_ID}--tidy-ready`);
+  if (!game?.modules?.get?.("tidy5e-sheet")?.active) return;
+  document.documentElement?.classList?.add("female_edition--tidy-ready");
 });

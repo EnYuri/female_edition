@@ -1152,6 +1152,8 @@ async function feRenderMessagesIntoLog({
   const concurrency = Math.max(1, Number(renderProfile?.renderConcurrency) || FE_EXPORT_RENDER_CONCURRENCY);
   const deferPortraits = !!renderProfile?.deferPortraits;
   const imageRegistry = renderProfile?.collapseDuplicateImages ? new Map() : null;
+  // Cache once outside renderOne — feArchiveMergeOptions() returns a constant object.
+  const mergeOpts = feArchiveMergeOptions();
   let renderedCount = 0;
   let frag = targetDoc.createDocumentFragment();
   let fragCount = 0;
@@ -1179,7 +1181,7 @@ async function feRenderMessagesIntoLog({
       loading: renderProfile?.normalizeImageLoading,
       decoding: renderProfile?.normalizeImageDecoding,
     });
-    if (msg) feApplyRenderedStateToMessageElement(msg, node, { allowNarratorMerge: feArchiveMergeOptions().allowNarratorMerge });
+    if (msg) feApplyRenderedStateToMessageElement(msg, node, { allowNarratorMerge: mergeOpts.allowNarratorMerge });
 
     if (!deferPortraits) {
       try {
@@ -2788,6 +2790,8 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
   feEmbeddedFontCssPromise = (async () => {
   // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
+  // On any uncaught error, record an empty string so subsequent calls skip retrying.
+  try {
   // If files are not present, returns an empty string.
   //
   // IMPORTANT: Base64 embedding multi-megabyte fonts can easily crash Chromium/Electron
@@ -2986,6 +2990,10 @@ html, body {
 
     feEmbeddedFontCssValue = css;
     return css;
+  } catch {
+    feEmbeddedFontCssValue = "";
+    return "";
+  }
   })();
 
   try {
@@ -3964,12 +3972,15 @@ function feCloneChatMessageElement(el) {
 async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, timeBudgetMs = 0, progress = null } = {}) {
   const cloneMap = new Map();
   let orderedIds = [];
+  // Declared outside try so the finally block can always restore scroll positions,
+  // even if an error is thrown before or during the harvest loop.
+  let logStates = null;
   try {
     const chat = game?.messages?.directory || ui?.chat;
     const logs = feGetChatLogs?.() ?? [];
     if (!chat?.renderBatch || !logs.length) return { cloneMap, orderedIds };
 
-    const logStates = logs.map((log) => ({
+    logStates = logs.map((log) => ({
       log,
       top: Number(log?.scrollTop ?? 0),
       height: Number(log?.scrollHeight ?? 0),
@@ -4079,13 +4090,13 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, t
       /* no-op */
     }
 
-    for (const st of logStates) {
-      try {
-        st.log.scrollTop = st.top;
-      } catch {}
-    }
   } catch {
     // swallow and return best-effort partial history
+  } finally {
+    // Always restore scroll positions — even if an error interrupted the harvest loop.
+    for (const st of logStates ?? []) {
+      try { st.log.scrollTop = st.top; } catch {}
+    }
   }
   return { cloneMap, orderedIds };
 }

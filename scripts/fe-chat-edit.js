@@ -6,7 +6,6 @@ import {
   S,
   feSetting,
   feMarkdownToHTML,
-  fePrepareInlineRollSnapshotOnPreUpdate,
   feCaptureMessageRenderFlagsOnPreUpdate,
   feGetChatLogs,
   feNormalizeChatMessageId,
@@ -76,21 +75,34 @@ function feCanEditMessage(msg) {
   }
 }
 
-function feIsMsgEditable(msg) {
-  return feCanEditMessage(msg);
-}
-
 function feGetEditableRaw(msg) {
-  return (
-    msg?.getFlag?.(MODULE_ID, "raw") ??
-    msg?.getFlag?.(MODULE_ID, "plain") ??
-    (msg?.content ?? "")
+  const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
+  if (stored != null) return String(stored);
+
+  // Fallback: strip HTML from rendered content using DOMParser so attribute values
+  // containing ">" (e.g. data-x="1>2") are handled correctly by the browser parser,
+  // unlike a naive <[^>]+> regex which would truncate at the first >.
+  try {
+    const html = String(msg?.content ?? "");
+    if (!html) return "";
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    // Preserve paragraph / line-break structure as newlines.
+    for (const br of doc.querySelectorAll("br")) br.replaceWith("\n");
+    const parts = [];
+    for (const p of doc.querySelectorAll("p")) {
+      parts.push(p.textContent ?? "");
+    }
+    if (parts.length) return parts.join("\n").trim();
+    return (doc.body?.textContent ?? "").trim();
+  } catch {
+    // Last-resort plain regex strip (cross-origin sandbox or test environment).
+    return String(msg?.content ?? "")
       .replace(/<br\s*\/?\s*>/gi, "\n")
       .replace(/<\/p>\s*<p>/gi, "\n")
       .replace(/<\/?p[^>]*>/gi, "")
       .replace(/<[^>]+>/g, "")
-      .trim()
-  );
+      .trim();
+  }
 }
 
 function feEnsureInlineEditorUI() {
@@ -245,14 +257,9 @@ function feApplyRawEditPreUpdate(message, changed, userId = null) {
     );
 
     const rawChanged = nextRaw !== currentRaw;
-    if (!rawChanged) {
-      if (!changed.flags || typeof changed.flags !== "object") changed.flags = {};
-      if (!changed.flags[MODULE_ID] || typeof changed.flags[MODULE_ID] !== "object") changed.flags[MODULE_ID] = {};
-      changed.flags[MODULE_ID].raw = currentRaw;
-      changed.flags[MODULE_ID].plain = currentRaw;
-      changed.flags[MODULE_ID].markdown = true;
-      return;
-    }
+    // If the raw text hasn't changed, the caller's payload already has the correct
+    // flags. No need to rewrite them — just leave the changed object untouched.
+    if (!rawChanged) return;
 
     const html = feMarkdownToHTML(nextRaw);
     changed.content = html;
@@ -263,8 +270,11 @@ function feApplyRawEditPreUpdate(message, changed, userId = null) {
     changed.flags[MODULE_ID].plain = nextRaw;
     changed.flags[MODULE_ID].markdown = true;
 
-    fePrepareInlineRollSnapshotOnPreUpdate(message, changed, userId ?? game?.user?.id ?? null);
     feCaptureMessageRenderFlagsOnPreUpdate(message, changed, userId ?? game?.user?.id ?? null);
+    // NOTE: fePrepareInlineRollSnapshotOnPreUpdate was intentionally removed.
+    // Freezing [[formula]] → anchor HTML in message.content before storage causes the same
+    // hash-mismatch issue as in preCreate. Leave [[formula]] as-is; Foundry's enrichHTML
+    // evaluates it on next render, and feSnapshotOrRestoreInlineRolls captures that result.
   } catch (err) {
     console.warn(`[${MODULE_ID}] failed to prepare raw edit update`, err);
   }
@@ -347,7 +357,7 @@ function feInstallEditContextMenuEarly() {
       icon: '<i class="fa-solid fa-pen-to-square"></i>',
       condition: (target) => {
         const msg = feMessageFromContextLI(target);
-        return feIsMsgEditable(msg);
+        return feCanEditMessage(msg);
       },
       callback: (target) => {
         const msg = feMessageFromContextLI(target);
@@ -389,7 +399,7 @@ function feInstallEditHandlers() {
         if (!msgId) return;
 
         const msg = game.messages?.get?.(msgId);
-        if (!feIsMsgEditable(msg)) return;
+        if (!feCanEditMessage(msg)) return;
 
         ev.preventDefault();
         ev.stopPropagation();

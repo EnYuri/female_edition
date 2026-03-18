@@ -277,11 +277,16 @@ function ciOpenImagePopout(src) {
   try {
     const Popout = ciGetImagePopoutClass();
     if (!Popout) return;
-    if (foundry?.applications?.apps?.ImagePopout) {
+    // v13 ApplicationV2 ImagePopout takes an options object as its first argument.
+    // Legacy (v11/v12) ImagePopout takes (src, options).
+    // ciGetImagePopoutClass() returns the v13 class when available, so we can
+    // distinguish by checking whether the class lives in the new apps namespace.
+    const isAppV2 = !!foundry?.applications?.apps?.ImagePopout;
+    if (isAppV2) {
       new Popout({ src, editable: false, shareable: true }).render(true);
-      return;
+    } else {
+      new Popout(src, { editable: false, shareable: true }).render(true);
     }
-    new Popout(src, { editable: false, shareable: true }).render(true);
   } catch {}
 }
 
@@ -431,8 +436,18 @@ function ciEnsureUploadArea(root = document) {
 
   const strip = ciGetPendingStrip(root);
   if (strip) {
-    strip.textContent = "";
-    for (const item of ciGetPendingItems()) ciAddPendingTile(item, root);
+    // Only rebuild if the strip's tiles don't match the current pending list.
+    // ciRefreshUi is called on every renderChatLog (= every new message), so rebuilding
+    // unconditionally would destroy and recreate all tiles for every chat message received.
+    const pendingIds = ciGetPendingItems().map((p) => String(p.id));
+    const domIds = Array.from(strip.querySelectorAll("[data-ci-pending-id]"))
+      .map((el) => String(el.dataset.ciPendingId ?? ""));
+    const alreadyInSync = pendingIds.length === domIds.length
+      && pendingIds.every((id, i) => id === domIds[i]);
+    if (!alreadyInSync) {
+      strip.textContent = "";
+      for (const item of ciGetPendingItems()) ciAddPendingTile(item, root);
+    }
   }
   ciSetAreaVisibility(root);
   return area;
@@ -706,7 +721,11 @@ Hooks.on("renderChatMessageHTML", (_message, html) => {
 Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   if (!ciEnabled()) return;
   try {
-    const current = String(data?.content ?? message?.content ?? "");
+    // Prefer message.content over data.content: feApplyMarkdownOnPreCreate (which runs
+    // in an earlier preCreateChatMessage hook in fe-chat-enhance.js) writes its result
+    // via message.updateSource(), which updates message.content but NOT data.content.
+    // Reading data.content would discard markdown formatting entirely.
+    const current = String(message?.content ?? data?.content ?? "");
     const next = ciShortcodeToHtml(current);
     if (next !== current) {
       if (typeof message?.updateSource === "function") message.updateSource({ content: next });

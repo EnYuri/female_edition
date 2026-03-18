@@ -872,125 +872,97 @@ function cpShouldUseHQResample(img) {
   return true;
 }
 
-function cpApplyPortraitStyling(message, img) {
+
+/**
+ * Apply size/shape/border/quality styles to a portrait <img>.
+ * Shared by chat-message portraits and combat-tracker portraits.
+ * @param {HTMLImageElement} img
+ * @param {{ size, shape, borderMode, borderWidth, borderColor, color }} opts
+ *   color — pre-resolved border color (user/actor color, or fallback)
+ */
+function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color = null }) {
+  try {
+    img.width = size;
+    img.height = size;
+    img.style.setProperty("width",  `${size}px`, "important");
+    img.style.setProperty("height", `${size}px`, "important");
+    img.style.setProperty("flex",   `0 0 ${size}px`, "important");
+  } catch {}
+
+  if (shape === "none") {
+    img.style.setProperty("border-radius",   "0",            "important");
+    img.style.setProperty("object-fit",      "contain",      "important");
+    img.style.setProperty("object-position", "left center",  "important");
+    img.style.setProperty("border",          "none",         "important");
+    img.style.setProperty("clip-path",       "none",         "important");
+  } else {
+    img.style.setProperty("border-radius",   shape === "square" ? "0" : "50%", "important");
+    img.style.setProperty("object-fit",      "cover",         "important");
+    img.style.setProperty("object-position", "center center", "important");
+    img.style.setProperty("clip-path",
+      shape === "circle" ? "circle(50% at 50% 50%)" : "none", "important");
+  }
+
+  img.style.setProperty("display",          "block",  "important");
+  img.style.setProperty("image-rendering",  "auto",   "important");
+  img.style.setProperty("image-rendering",  "smooth", "important");
+
+  // Border (only when shape is not "none")
+  if (shape === "none") return;
+  if (borderMode === "theme") { img.style.removeProperty("border"); return; }
+  if (borderMode === "none")  { img.style.setProperty("border", "none", "important"); return; }
+
+  const resolvedColor = color || borderColor || "#000000";
+  img.style.setProperty("border", `${borderWidth}px solid ${resolvedColor}`, "important");
+}
+
+
+function cpApplyPortraitStyling(message, img, { size: sizeHint, shape: shapeHint } = {}) {
   try {
     if (!cpIsImageElement(img)) return;
 
-    const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
-    // Match chat-portrait's behavior (use width/height attributes) for broader theme compatibility.
-    try {
-      img.width = size;
-      img.height = size;
-      img.style.setProperty("width", `${size}px`, "important");
-      img.style.setProperty("height", `${size}px`, "important");
-      img.style.setProperty("flex", `0 0 ${size}px`, "important");
-    } catch {}
+    // Accept pre-read values from cpUpsertPortrait to avoid a second settings read per message.
+    const size       = sizeHint  != null ? sizeHint  : Math.max(16, Number(cpGet(CP.SIZE)) || 64);
+    const shape      = shapeHint != null ? shapeHint : String(cpGet(CP.SHAPE) ?? "circle");
+    const borderMode = String(cpGet(CP.BORDER_MODE) ?? "theme");
+    const borderWidth = Math.max(0, Number(cpGet(CP.BORDER_WIDTH) ?? 2) || 0);
+    const borderColor = String(cpGet(CP.BORDER_COLOR) ?? "#000000");
 
-    // Shape (cropping)
-    const shape = String(cpGet(CP.SHAPE) ?? "circle");
-
-    if (shape === "none") {
-      // No border/crop: only size adjustment.
-      img.style.setProperty("border-radius", "0", "important");
-      img.style.setProperty("object-fit", "contain", "important");
-      // Keep the visible content aligned to the left so any extra letterboxing
-      // space stays on the right (requested behavior).
-      img.style.setProperty("object-position", "left center", "important");
-      img.style.setProperty("border", "none", "important");
-      img.style.setProperty("clip-path", "none", "important");
-    } else {
-      img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
-      img.style.setProperty("object-fit", "cover", "important");
-      img.style.setProperty("object-position", "center center", "important");
-
-      // Some Chromium/Electron builds can render border-radius edges slightly jagged.
-      // clip-path can produce smoother results for circles.
-      if (shape === "circle") {
-        img.style.setProperty("clip-path", "circle(50% at 50% 50%)", "important");
-      } else {
-        img.style.setProperty("clip-path", "none", "important");
-      }
-    }
-
-    // Quality: override any global pixelated rules so downscaling looks smooth.
-    // (Some themes/modules set image-rendering: pixelated for sidebar images.)
-    img.style.setProperty("display", "block", "important");
-    img.style.setProperty("image-rendering", "auto", "important");
-    // Prefer "smooth" if supported.
-    img.style.setProperty("image-rendering", "smooth", "important");
-
-    // Attempt a high-quality resample for small portrait sizes to avoid pixelated downscaling.
-    // (Best-effort; safely no-ops for cross-origin images.)
-    cpMaybeApplyHQResample(img, size, shape);
-
-    // Border
-    if (shape === "none") return;
-
-    const mode = String(cpGet(CP.BORDER_MODE) ?? "theme");
-    if (mode === "theme") {
-      // Do not override theme/module styling
-      img.style.removeProperty("border");
-      return;
-    }
-
-    if (mode === "none") {
-      img.style.setProperty("border", "none", "important");
-      return;
-    }
-
-    const width = Math.max(0, Number(cpGet(CP.BORDER_WIDTH) ?? 2) || 0);
-    const fallbackColor = String(cpGet(CP.BORDER_COLOR) ?? "#000000");
-
-    let color = fallbackColor;
-    if (mode === "user") {
-      // Prefer the same "message user color" logic used by FE's background tint
-      // (GM-authored on behalf of a player-owned actor -> prefer player owner color).
+    let color = borderColor;
+    if (borderMode === "user") {
       const msgColor = feGetMessageUserColor?.(message);
-      color = msgColor || fallbackColor;
+      color = msgColor || borderColor;
     }
 
-    img.style.setProperty("border", `${width}px solid ${color}`, "important");
+    cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color });
+
+    // Attempt high-quality resample (safe no-op for cross-origin images).
+    cpMaybeApplyHQResample(img, size, shape);
   } catch {
     /* no-op */
   }
 }
 
+
 function cpApplyCombatPortraitStyling(combatant, img) {
   try {
     if (!cpIsImageElement(img)) return;
 
-    const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
-    try {
-      img.width = size;
-      img.height = size;
-      img.style.setProperty("width", `${size}px`, "important");
-      img.style.setProperty("height", `${size}px`, "important");
-      img.style.setProperty("flex", `0 0 ${size}px`, "important");
-    } catch {}
+    const size       = Math.max(16, Number(cpGet(CP.SIZE)) || 64);
+    const shape      = String(cpGet(CP.SHAPE) ?? "circle");
+    const borderMode = String(cpGet(CP.BORDER_MODE) ?? "theme");
+    const borderWidth = Math.max(0, Number(cpGet(CP.BORDER_WIDTH) ?? 2) || 0);
+    const borderColor = String(cpGet(CP.BORDER_COLOR) ?? "#000000");
 
-    const shape = String(cpGet(CP.SHAPE) ?? "circle");
-    if (shape === "none") {
-      img.style.setProperty("border-radius", "0", "important");
-      img.style.setProperty("object-fit", "contain", "important");
-      img.style.setProperty("object-position", "left center", "important");
-      img.style.setProperty("border", "none", "important");
-      img.style.setProperty("clip-path", "none", "important");
-    } else {
-      img.style.setProperty("border-radius", shape === "square" ? "0" : "50%", "important");
-      img.style.setProperty("object-fit", "cover", "important");
-      img.style.setProperty("object-position", "center center", "important");
-      if (shape === "circle") {
-        img.style.setProperty("clip-path", "circle(50% at 50% 50%)", "important");
-      } else {
-        img.style.setProperty("clip-path", "none", "important");
-      }
+    let color = borderColor;
+    if (borderMode === "user") {
+      const actorColor = cpPickActorOwnerColor(combatant?.actor);
+      color = actorColor || borderColor;
     }
 
-    img.style.setProperty("display", "block", "important");
-    img.style.setProperty("image-rendering", "auto", "important");
-    img.style.setProperty("image-rendering", "smooth", "important");
+    cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color });
 
-    // Seed the same HQ-resample cache key used by chat portraits.
+    // Seed HQ-resample cache key (combat tracker images don't go through cpUpsertPortrait).
     try {
       const candidate = img.dataset?.fePortraitOrigSrc || img.currentSrc || img.getAttribute?.("src") || img.src || "";
       const isData = String(candidate).startsWith("data:") || String(candidate).startsWith("blob:");
@@ -1005,30 +977,6 @@ function cpApplyCombatPortraitStyling(combatant, img) {
     } catch {}
 
     cpMaybeApplyHQResample(img, size, shape);
-
-    if (shape === "none") return;
-
-    const mode = String(cpGet(CP.BORDER_MODE) ?? "theme");
-    if (mode === "theme") {
-      img.style.removeProperty("border");
-      return;
-    }
-
-    if (mode === "none") {
-      img.style.setProperty("border", "none", "important");
-      return;
-    }
-
-    const width = Math.max(0, Number(cpGet(CP.BORDER_WIDTH) ?? 2) || 0);
-    const fallbackColor = String(cpGet(CP.BORDER_COLOR) ?? "#000000");
-
-    let color = fallbackColor;
-    if (mode === "user") {
-      const actorColor = cpPickActorOwnerColor(combatant?.actor);
-      color = actorColor || fallbackColor;
-    }
-
-    img.style.setProperty("border", `${width}px solid ${color}`, "important");
   } catch {
     /* no-op */
   }
@@ -1154,8 +1102,9 @@ function cpUpsertPortrait(message, messageEl) {
     return;
   }
 
-  // Compatibility: skip known "round marker" / merged-message variants from other modules.
-  if (cpIsDfChatEnhancementsMerged(messageEl) || cpIsRoundMarkerMessage(message, messageEl)) {
+  // Compatibility: skip known merged-message variants from other modules.
+  // cpIsRoundMarkerMessage was already evaluated above (isRoundMarkerSpecial); do not call again.
+  if (cpIsDfChatEnhancementsMerged(messageEl)) {
     cpRemovePortrait(messageEl);
     return;
   }
@@ -1249,7 +1198,7 @@ function cpUpsertPortrait(message, messageEl) {
   img.alt = cpGetPortraitAlt(message);
   img.title = img.alt;
 
-  cpApplyPortraitStyling(message, img);
+  cpApplyPortraitStyling(message, img, { size, shape });
 
   // Resize common dnd5e/midi chat-card icons to avoid huge portraits inside message content.
   cpApplyChatCardIconSizing(messageEl);
@@ -1258,23 +1207,8 @@ function cpUpsertPortrait(message, messageEl) {
 }
 
 function cpApplyVarsToDocument(doc) {
-  if (!doc?.documentElement) return;
-  const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
-  try {
-    doc.documentElement.style.setProperty("--fe-chat-portrait-size", `${size}px`);
-  } catch {}
-
-  const enabled = !!cpGet(CP.ENABLED);
-  try {
-    doc.documentElement.classList.toggle("fe-chat-portrait-enabled", enabled);
-  } catch {}
-
-  const hideWrap = !!cpGet(CP.HIDE_WRAP);
-  try {
-    doc.body?.classList?.toggle?.("fe-hide-chat-portrait-wrap", hideWrap);
-  } catch {}
-
-  cpApplyNameAlignClasses(doc);
+  // Delegates to cpSetRootVars which performs the same work with doc normalization.
+  cpSetRootVars(doc);
 }
 
 function cpRefreshMessagesInRoot(rootLike = document) {
@@ -1284,9 +1218,7 @@ function cpRefreshMessagesInRoot(rootLike = document) {
 
     const messages = root.matches?.("li.chat-message")
       ? [root]
-      : root.matches?.("#chat-log, ol.chat-log, .chat-log")
-        ? root.querySelectorAll("li.chat-message")
-        : root.querySelectorAll("li.chat-message");
+      : root.querySelectorAll("li.chat-message");
 
     for (const li of messages) {
       const id = li?.dataset?.messageId || li?.dataset?.documentId || li?.getAttribute?.("data-message-id") || li?.getAttribute?.("data-document-id");
