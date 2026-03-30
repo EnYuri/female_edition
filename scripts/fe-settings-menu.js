@@ -101,6 +101,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         FE_DEFAULTS[S.CHATCARD_USE_CUSTOM_FONT]
       ),
       [S.UI_USE_GEURIMILGI]: feGetSettingSafe(S.UI_USE_GEURIMILGI, FE_DEFAULTS[S.UI_USE_GEURIMILGI]),
+      [S.UI_OVERRIDE_FONT_H1_COOKIE]: feGetSettingSafe(S.UI_OVERRIDE_FONT_H1_COOKIE, FE_DEFAULTS[S.UI_OVERRIDE_FONT_H1_COOKIE]),
 
       // Style vars
       [S.STYLE_CHAT_MESSAGE_SPACING]: feGetSettingSafe(
@@ -129,6 +130,9 @@ class FemaleEditionSettingsMenu extends FormApplication {
       // Markdown/edit
       [S.MARKDOWN_ENABLED]: feGetSettingSafe(S.MARKDOWN_ENABLED, FE_DEFAULTS[S.MARKDOWN_ENABLED]),
       [S.EDIT_ENABLED]: feGetSettingSafe(S.EDIT_ENABLED, FE_DEFAULTS[S.EDIT_ENABLED]),
+
+      // GM priority
+      [S.GM_PRIORITY_ENABLED]: feGetSettingSafe(S.GM_PRIORITY_ENABLED, FE_DEFAULTS[S.GM_PRIORITY_ENABLED]),
 
       // Chat portrait (ported)
       [CP.ENABLED]: feGetSettingSafe(CP.ENABLED, true),
@@ -244,6 +248,9 @@ class FemaleEditionSettingsMenu extends FormApplication {
         setBool(S.MARKDOWN_ENABLED),
         setBool(S.EDIT_ENABLED),
 
+        // GM priority
+        setBool(S.GM_PRIORITY_ENABLED),
+
         // Export
         setBool(S.EXPORT_ENABLED),
         setBool(S.EXPORT_AUTO_PRINT),
@@ -256,6 +263,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // Fonts
         setStr(S.CHAT_FONT_CHOICE, FE_DEFAULTS[S.CHAT_FONT_CHOICE]),
         setBool(S.UI_USE_GEURIMILGI),
+        setBool(S.UI_OVERRIDE_FONT_H1_COOKIE),
         setBool(S.CHATCARD_USE_CUSTOM_FONT),
 
         // Style

@@ -185,5 +185,5 @@ span.flex-row.align-items-center.extra-small-gap {
   .item-summary
   :is(p, li, span, div, a, em, strong, b, u, small, label) {
   font-family: var(--fe-font-secondary) !important;
-  font-weight: var(--fe-font-weight-normal) !important;
+  font-weight: var(--fe-font-weight-body) !important;
 }

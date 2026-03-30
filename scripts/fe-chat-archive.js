@@ -52,6 +52,93 @@ const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
 
+// -------------------------------------------------------
+// Archive range selection dialog
+// -------------------------------------------------------
+
+// Asks the user which message index range to archive.
+// Returns { mode: "all"|"range", from, to } or null if cancelled.
+// from/to are 1-based indices (inclusive).
+async function feShowArchiveRangeDialog(totalCount = 0) {
+  try {
+    const content = `
+<div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;">
+  <p style="margin:0;font-size:0.95em;">
+    총 메시지 수: <strong>${totalCount.toLocaleString()}개</strong>
+  </p>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="radio" name="fe-range-mode" value="all" checked style="margin:0;">
+      전체 저장
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="radio" name="fe-range-mode" value="range" style="margin:0;">
+      범위 지정:
+      <input type="number" id="fe-range-from" value="1" min="1" max="${totalCount || 99999}"
+        style="width:80px;margin:0 4px;text-align:right;"> 번째
+      ~
+      <input type="number" id="fe-range-to" value="${totalCount || 99999}" min="1" max="${totalCount || 99999}"
+        style="width:80px;margin:0 4px;text-align:right;"> 번째
+    </label>
+  </div>
+  <p style="margin:0;font-size:0.82em;color:var(--color-text-secondary,#888);">
+    메시지는 오래된 순서로 번호가 매겨집니다. (1 = 가장 오래된 메시지)
+  </p>
+</div>`;
+
+    return await foundry.applications.api.DialogV2.prompt({
+      window: { title: "채팅 아카이브 — 범위 선택" },
+      content,
+      ok: {
+        label: "저장 시작",
+        callback: (event, button, dialog) => {
+          const form = button.form ?? dialog.element.querySelector("form") ?? dialog.element;
+          const mode = form.querySelector?.("input[name='fe-range-mode']:checked")?.value ?? "all";
+          const from = Math.max(1, parseInt(form.querySelector?.("#fe-range-from")?.value ?? "1", 10) || 1);
+          const to = Math.max(from, parseInt(form.querySelector?.("#fe-range-to")?.value ?? String(totalCount), 10) || totalCount);
+          return { mode, from, to };
+        },
+      },
+      rejectClose: false,
+      render: (event, dialog) => {
+        try {
+          const el = dialog.element;
+          // Clicking either number input switches to range mode
+          ["#fe-range-from", "#fe-range-to"].forEach((sel) => {
+            const inp = el.querySelector(sel);
+            if (inp) inp.addEventListener("focus", () => {
+              const r = el.querySelector("input[value='range']");
+              if (r) r.checked = true;
+            });
+          });
+        } catch {
+          /* no-op */
+        }
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Apply a range spec returned by feShowArchiveRangeDialog to a sorted items array.
+// items: array of { msg, id, liveEl, key } sorted oldest-first.
+// from/to are 1-based inclusive indices.
+function feApplyMessageRange(items, rangeSpec) {
+  try {
+    if (!rangeSpec || rangeSpec.mode === "all" || !Array.isArray(items)) return items;
+
+    if (rangeSpec.mode === "range") {
+      const from = Math.max(1, Number(rangeSpec.from) || 1);
+      const to = Math.min(items.length, Math.max(from, Number(rangeSpec.to) || items.length));
+      return items.slice(from - 1, to); // convert to 0-based
+    }
+  } catch {
+    /* no-op */
+  }
+  return items;
+}
+
 function feGetArchiveRenderProfile(messageCount = 0) {
   const count = Math.max(0, Number(messageCount) || 0);
   const large = count >= FE_ARCHIVE_LARGE_LOG_THRESHOLD;
@@ -364,7 +451,8 @@ async function feExportChatLogToPDFInline() {
 
     // Wait for images (portraits, item icons) to load so they actually print
     metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
-    await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+    const inlineImgTimeout = await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+    if (inlineImgTimeout > 0) console.warn(`female_edition | inline export: ${inlineImgTimeout} image(s) did not load within timeout`);
 
     // IMPORTANT: Force a paginatable layout.
     // If any part of the export UI remains a fixed/scroll container, Chromium printing will
@@ -755,25 +843,6 @@ async function feTryFoundryRenderMessage(msg) {
 }
 
 
-async function feEnsureAllChatHistoryRendered() {
-  try {
-    const chat = ui?.chat;
-    const log = chat?.element?.querySelector?.("ol.chat-log, #chat-log") || document.querySelector?.("ol.chat-log, #chat-log");
-    if (!chat?.renderBatch || !log) return;
-
-    let iterations = 0;
-    while (iterations < 40) {
-      const beforeCount = log.querySelectorAll?.("li.chat-message")?.length ?? 0;
-      const beforeFirst = feGetMessageIdFromElement?.(log.querySelector?.("li.chat-message")) || "";
-      await chat.renderBatch(100);
-      await feMaybeYieldForUI(window);
-      const afterCount = log.querySelectorAll?.("li.chat-message")?.length ?? 0;
-      const afterFirst = feGetMessageIdFromElement?.(log.querySelector?.("li.chat-message")) || "";
-      iterations += 1;
-      if (afterCount === beforeCount && afterFirst === beforeFirst) break;
-    }
-  } catch {}
-}
 
 async function feFetchAllChatMessagesFromDatabase() {
   try {
@@ -822,9 +891,13 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
   try {
     report("메시지 DB 확인 중…");
     const dbAll = await feFetchAllChatMessagesFromDatabase();
-    if (dbAll.length > all.length) all = dbAll;
-  } catch {
-    /* no-op */
+    if (dbAll.length > all.length) {
+      all = dbAll;
+    } else if (dbAll.length === 0 && all.length > 0) {
+      console.warn("female_edition | archive: DB query returned 0 messages — falling back to in-memory messages. Some older messages may be missing.");
+    }
+  } catch (err) {
+    console.warn("female_edition | archive: DB query failed — falling back to in-memory messages. Some older messages may be missing.", err);
   }
 
   const collectProfile = feGetArchiveRenderProfile(all.length);
@@ -1066,26 +1139,6 @@ function feArchiveShouldCollapseDuplicateImage(img, renderProfile = null) {
   }
 }
 
-function feCreateArchiveImageReference(doc, src, img, occurrence = 2) {
-  const parentAnchor = !!img?.parentElement?.matches?.('a[href]');
-  const ref = doc.createElement(parentAnchor ? "span" : "a");
-  ref.className = "fe-archive-image-reference";
-  ref.dataset.feOriginalSrc = src;
-  if (!parentAnchor) {
-    ref.href = src;
-    ref.target = "_blank";
-    ref.rel = "noopener noreferrer";
-  } else {
-    ref.dataset.feInlineLink = "1";
-  }
-
-  const label = String(img?.getAttribute?.("alt") || img?.getAttribute?.("title") || "").trim();
-  const text = occurrence > 1 ? `동일 이미지 링크 ×${occurrence}` : "동일 이미지 링크";
-  ref.textContent = text;
-  ref.setAttribute("title", label ? `${label} — ${src}` : src);
-  ref.setAttribute("aria-label", label ? `${label}: ${src}` : src);
-  return ref;
-}
 
 function fePrepareArchiveSharedImage(img, src, occurrence = 2) {
   try {
@@ -1152,8 +1205,6 @@ async function feRenderMessagesIntoLog({
   const concurrency = Math.max(1, Number(renderProfile?.renderConcurrency) || FE_EXPORT_RENDER_CONCURRENCY);
   const deferPortraits = !!renderProfile?.deferPortraits;
   const imageRegistry = renderProfile?.collapseDuplicateImages ? new Map() : null;
-  // Cache once outside renderOne — feArchiveMergeOptions() returns a constant object.
-  const mergeOpts = feArchiveMergeOptions();
   let renderedCount = 0;
   let frag = targetDoc.createDocumentFragment();
   let fragCount = 0;
@@ -1181,7 +1232,7 @@ async function feRenderMessagesIntoLog({
       loading: renderProfile?.normalizeImageLoading,
       decoding: renderProfile?.normalizeImageDecoding,
     });
-    if (msg) feApplyRenderedStateToMessageElement(msg, node, { allowNarratorMerge: mergeOpts.allowNarratorMerge });
+    if (msg) feApplyRenderedStateToMessageElement(msg, node);
 
     if (!deferPortraits) {
       try {
@@ -1248,9 +1299,8 @@ function feArchiveShouldPreferLiveClone(msg, liveEl = null, renderProfile = null
   return false;
 }
 
-function feArchiveShouldTrySystemRender(msg, liveEl = null, renderProfile = null) {
+function feArchiveShouldTrySystemRender(msg, liveEl = null) {
   try {
-    void renderProfile;
     if (!msg) return false;
     if (feIsNarratorToolsMessage(msg, liveEl) || feIsRoundMarkerMessage(msg, liveEl)) return true;
     if (feArchiveMessageLooksComplex(msg, liveEl)) return true;
@@ -1269,7 +1319,7 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     node = null;
   }
 
-  if (!feIsElement(node) && feArchiveShouldTrySystemRender(msg, liveEl, renderProfile)) {
+  if (!feIsElement(node) && feArchiveShouldTrySystemRender(msg, liveEl)) {
     try {
       const rendered = await feTryFoundryRenderMessage(msg);
       if (feIsElement(rendered)) node = targetDoc.importNode(rendered, true);
@@ -1717,14 +1767,24 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // Let the popup paint its shell before heavy collection/harvesting starts.
   await feMaybeYieldForUI(win);
 
-  // Collect messages after the shell exists so the user sees progress instead of a blank about:blank window.
+  // Collect ALL messages first (including DB query) so the range dialog can show the true total.
   const liveMessageMap = feBuildLiveChatMessageElementMap();
-  const messages = await feCollectVisibleChatMessages(game.user, {
+  const allMessages = await feCollectVisibleChatMessages(game.user, {
     liveMessageMap,
     progress: (text) => {
       setStatus(text);
     },
   });
+
+  // Show the range selection dialog now that we know the real message count.
+  const rangeSpec = await feShowArchiveRangeDialog(allMessages.length);
+  if (rangeSpec === null) {
+    // User cancelled — close the archive window and abort.
+    try { win.close(); } catch {}
+    return;
+  }
+
+  const messages = feApplyMessageRange(allMessages, rangeSpec);
   const renderProfile = feGetArchiveRenderProfile(messages.length);
 
   try {
@@ -1792,7 +1852,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
   // Wait for images so avatars/icons actually show up.
   if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
-  await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+  const imgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+  if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) did not load within timeout`);
 
   if (metaEl) metaEl.textContent = "Loading fonts…";
   await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
@@ -1969,18 +2030,24 @@ async function feArchivePrint(win) {
       const mildDownscale = mode === "downscaleLite";
       setMeta(mildDownscale ? "Loading images… (품질 우선)" : "Loading images…");
       fePrepareArchiveImagesForOutput(logEl);
-      await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.min(FE_EXPORT_WAIT_IMAGES_MAX, Math.max(160, renderProfile.initialImageWaitMax * 4)) });
+      const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.min(FE_EXPORT_WAIT_IMAGES_MAX, Math.max(160, renderProfile.initialImageWaitMax * 4)) });
+      if (printImgTimeout > 0) console.warn(`female_edition | print: ${printImgTimeout} image(s) did not load within timeout`);
       restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
+        // General images: same as before
         dprCap: mildDownscale ? (isElectron ? 1.9 : 2.25) : (isElectron ? 1.35 : 1.65),
         minDpr: mildDownscale ? (isElectron ? 1.35 : 1.5) : (isElectron ? 1.1 : 1.25),
         webpQuality: mildDownscale ? (isElectron ? 0.90 : 0.93) : (isElectron ? 0.85 : 0.88),
         jpegQuality: mildDownscale ? (isElectron ? 0.92 : 0.95) : (isElectron ? 0.88 : 0.90),
-        avatarDprCap: mildDownscale ? (isElectron ? 2.75 : 3.0) : (isElectron ? 2.2 : 2.5),
-        avatarMinDpr: mildDownscale ? (isElectron ? 2.0 : 2.25) : (isElectron ? 1.6 : 1.85),
-        avatarWebpQuality: mildDownscale ? (isElectron ? 0.97 : 0.985) : (isElectron ? 0.94 : 0.96),
-        avatarJpegQuality: mildDownscale ? (isElectron ? 0.98 : 0.995) : (isElectron ? 0.96 : 0.98),
+        // Avatars/portraits (mildDownscale = "display-size only"):
+        // Clamp to exactly the rendered CSS size × devicePixelRatio.
+        // A portrait shown at 64 CSS-px on a 2× display → stored at 128px.
+        // No quality loss: we store at the exact rendered pixel budget, lossless if small enough.
+        avatarDprCap: mildDownscale ? (isElectron ? 2.0 : 2.0) : (isElectron ? 2.2 : 2.5),
+        avatarMinDpr: mildDownscale ? 1.0 : (isElectron ? 1.6 : 1.85),
+        avatarWebpQuality: mildDownscale ? 1.0 : (isElectron ? 0.94 : 0.96),
+        avatarJpegQuality: mildDownscale ? 1.0 : (isElectron ? 0.96 : 0.98),
         maxSide: mildDownscale ? (isElectron ? 2560 : 3072) : (isElectron ? 1792 : 2048),
       });
     } catch (err) {
@@ -3878,13 +3945,15 @@ function feNextTick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+// Returns a Promise that resolves to the number of images that failed to load
+// within the timeout (0 = all loaded successfully, >0 = some timed out or errored).
 function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } = {}) {
   try {
-    if (!rootEl?.querySelectorAll) return Promise.resolve();
+    if (!rootEl?.querySelectorAll) return Promise.resolve(0);
 
     // Avoid materializing a giant array for huge chat logs.
     const nodeList = rootEl.querySelectorAll("img[src]");
-    if (!nodeList?.length) return Promise.resolve();
+    if (!nodeList?.length) return Promise.resolve(0);
 
     // Hard cap: waiting on thousands of images can allocate too many listeners and stall.
     const imgs = [];
@@ -3895,24 +3964,25 @@ function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } = {}) {
       if (count >= maxImages) break;
     }
 
-    if (!imgs.length) return Promise.resolve();
+    if (!imgs.length) return Promise.resolve(0);
 
     return new Promise((resolve) => {
       let done = false;
+      let remaining = imgs.length;
+
       const timer = setTimeout(() => {
         if (done) return;
         done = true;
-        resolve();
+        resolve(remaining); // return count of images still waiting
       }, timeoutMs);
 
-      let remaining = imgs.length;
       const onOne = () => {
         remaining--;
         if (remaining > 0) return;
         if (done) return;
         done = true;
         clearTimeout(timer);
-        resolve();
+        resolve(0);
       };
 
       for (const img of imgs) {
@@ -3931,7 +4001,7 @@ function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } = {}) {
       }
     });
   } catch {
-    return Promise.resolve();
+    return Promise.resolve(0);
   }
 }
 

@@ -474,7 +474,6 @@ function feMessageFromContextLI(target) {
 }
 
 
-
 function feRemoveMessageDeleteControl(messageEl) {
   try {
     const el0 = messageEl?.[0] ?? messageEl;
@@ -510,7 +509,6 @@ function feGetChatMessagesInRoot(rootLike = document) {
     const root = rootLike?.[0] ?? rootLike ?? document;
     if (!root?.querySelectorAll) return document.querySelectorAll("#chat-log li.chat-message, ol.chat-log li.chat-message");
     if (root.matches?.("li.chat-message")) return [root];
-    if (root.matches?.("#chat-log, ol.chat-log, .chat-log")) return root.querySelectorAll("li.chat-message");
     return root.querySelectorAll("li.chat-message");
   } catch {
     return document.querySelectorAll("#chat-log li.chat-message, ol.chat-log li.chat-message");

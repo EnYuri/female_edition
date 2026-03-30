@@ -318,6 +318,11 @@ function ciGetMessageStyleOOC() {
   return styles?.OOC ?? 1;
 }
 
+// Maximum file size allowed for data URL embedding (fallback when upload is unavailable).
+// Large data URLs bloat ChatMessage content stored in DB and sent to all clients.
+// Users with files exceeding this limit should use the archive downscale feature instead.
+const CI_MAX_DATAURL_BYTES = 17 * 1024 * 1024; // 17 MB
+
 async function ciFileToDataUrl(file) {
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -354,6 +359,16 @@ async function ciResolvePendingSource(item) {
   }
 
   // Fallback: embed as data URL so players without upload permission can still send images.
+  // Guard against excessively large files — they bloat the DB and every client's network traffic.
+  if ((item.file.size ?? 0) > CI_MAX_DATAURL_BYTES) {
+    const mb = (item.file.size / 1024 / 1024).toFixed(1);
+    ui?.notifications?.error?.(
+      `이미지 "${item.name || "image"}" (${mb} MB)가 너무 큽니다. 최대 ${CI_MAX_DATAURL_BYTES / 1024 / 1024} MB까지 허용됩니다.`,
+      { permanent: false }
+    );
+    return "";
+  }
+
   try {
     return await ciFileToDataUrl(item.file);
   } catch {

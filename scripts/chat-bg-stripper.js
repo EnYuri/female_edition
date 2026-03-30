@@ -20,7 +20,7 @@
 //   - background-blend-mode (screen)
 //   - --fe-parchment-overlay (flat desaturation overlay)
 
-const MODULE_ID = "female_edition";
+import { MODULE_ID, feSetting } from "./fe-chat-enhance.js";
 
 const SETTINGS = {
   ENABLE_FONTS:    "enableFonts",
@@ -33,7 +33,7 @@ const SETTINGS = {
 // --------------------------------
 
 function safeGetSetting(key, fallback) {
-  try { return game?.settings?.get(MODULE_ID, key); }
+  try { return feSetting(key) ?? fallback; }
   catch { return fallback; }
 }
 
@@ -49,16 +49,21 @@ function toggleModuleStylesheet(relPath, enabled) {
   return matched.length;
 }
 
+let _fontRetryTimer = null;
+
 function applyFontSetting(enabled) {
+  // Cancel any in-progress retry before starting a new one.
+  if (_fontRetryTimer !== null) { clearInterval(_fontRetryTimer); _fontRetryTimer = null; }
+
   const count = toggleModuleStylesheet("styles/ui-font.css", !!enabled);
 
   // The stylesheet link may appear slightly later on some setups; retry briefly.
   if (!count) {
     let tries = 0;
-    const id = setInterval(() => {
+    _fontRetryTimer = setInterval(() => {
       tries++;
       const c = toggleModuleStylesheet("styles/ui-font.css", !!enabled);
-      if (c || tries >= 20) clearInterval(id);
+      if (c || tries >= 20) { clearInterval(_fontRetryTimer); _fontRetryTimer = null; }
     }, 100);
   }
 }

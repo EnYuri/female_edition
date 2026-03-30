@@ -59,6 +59,9 @@ const S = {
 
   // Edit
   EDIT_ENABLED: "ceEditEnabled",
+
+  // GM priority enforcement
+  GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
 };
 
 // Default values (used as a safe fallback before settings are registered)
@@ -112,6 +115,9 @@ const FE_DEFAULTS = {
 
   // Edit
   [S.EDIT_ENABLED]: true,
+
+  // GM priority enforcement
+  [S.GM_PRIORITY_ENABLED]: true,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -125,13 +131,35 @@ function feGetRegisteredSettingConfig(key) {
   }
 }
 
+// Settings excluded from GM priority enforcement:
+// - Export settings: archive behavior is personal preference
+// - GM_PRIORITY_ENABLED itself and the internal overrides key
+const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
+  "ceExportEnabled",
+  "ceExportAutoPrint",
+  "ceExportOptimize",
+  "ceExportEmbedFonts",
+  "ceExportEmbedImages",
+  "ceExportPrintImageMode",
+  "ceExportDesktopExternalMode",
+  S.GM_PRIORITY_ENABLED,
+]);
+
+function feIsGmPriorityEnabled() {
+  try {
+    return !!game.settings.get(MODULE_ID, S.GM_PRIORITY_ENABLED);
+  } catch {
+    return true; // default on
+  }
+}
+
 function feIsGmPrioritySettingKey(key) {
   try {
     if (!key || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    if (FE_GM_PRIORITY_EXCLUDED_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
-    if (String(cfg.scope ?? "") !== "client") return false;
-    return !!cfg.range;
+    return String(cfg.scope ?? "") === "client";
   } catch {
     return false;
   }
@@ -230,7 +258,7 @@ async function feSeedGmPriorityOverridesFromLocal() {
     for (const [fullKey, cfg] of game.settings.settings ?? []) {
       if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
       const key = String(fullKey).slice(MODULE_ID.length + 1);
-      if (!cfg?.range || String(cfg.scope ?? "") !== "client") continue;
+      if (!feIsGmPrioritySettingKey(key)) continue;
       if (feHasOwn(existing, key)) continue;
       partial[key] = game.settings.get(MODULE_ID, key);
     }
@@ -281,8 +309,10 @@ function feFireChatUiUpdated(payload = null) {
 
 function feSetting(key) {
   try {
-    const override = feGetGmPriorityOverrideValue(key);
-    if (override !== undefined) return override;
+    if (feIsGmPriorityEnabled()) {
+      const override = feGetGmPriorityOverrideValue(key);
+      if (override !== undefined) return override;
+    }
   } catch {
     /* no-op */
   }
@@ -822,6 +852,20 @@ Hooks.once("init", () => {
     onChange: () => feFireChatUiUpdated({ reason: "edit-settings", document }),
   });
 
+  game.settings.register(MODULE_ID, S.GM_PRIORITY_ENABLED, {
+    name: "GM 설정 전역 강제",
+    hint: "활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다. 아카이브/편집 설정은 개인 설정을 유지합니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true,
+    onChange: () => {
+      feApplyGmPriorityUiRefresh(document);
+      if (!game.user?.isGM) void feSyncLocalGmPrioritySettings();
+    },
+  });
+
   // Install chat-log level refreshes on the supported v13 render hook.
   Hooks.on("renderChatLog", (_app, html) => {
     try {
@@ -989,17 +1033,6 @@ async function feFreezInlineRollsIntoContent(message, anchors) {
   }
 }
 
-// feAttachInlineRollSnapshotFlag removed — only used in removed freeze-before-storage flow.
-
-// feHasEditableSourceFlag removed — only used in removed freeze-before-storage flow.
-
-// feEnsureFrozenInlineRollSourceFlags removed — only used in removed freeze-before-storage flow.
-
-// feFinalizeInlineRollFreeze removed — only used in removed freeze-before-storage flow.
-
-// fePrepareInlineRollSnapshotOnPreCreate removed — see preCreateChatMessage hook comment.
-
-// fePrepareInlineRollSnapshotOnPreUpdate removed — same freeze-before-storage issue as PreCreate.
 
 function feCreateElementFromHTML(doc, html) {
   try {
@@ -1144,9 +1177,31 @@ const fePendingRenderedLogOptions = new WeakMap();
 const fePendingRenderedLogFrames = new Map();
 
 const feQueuedRenderedMessageIds = new Set();
-let feQueuedRenderedMessageTimer = null;
+let feQueuedRenderedMessageTimer = null;    // setTimeout handle (updateChatMessage 등)
+let feQueuedRenderedMessageRAF = null;      // rAF handle (renderChatMessageHTML — 페인트 전 실행)
 let feQueuedRenderedMessagePass = 0;
 let feQueuedRenderedMessageNarratorMerge = false;
+
+// Called from renderChatMessageHTML: schedules merge via requestAnimationFrame so it
+// fires BEFORE the browser paints the new element, eliminating the flicker caused by
+// merge classes (header visibility / height) changing after first paint.
+function feQueueMergeForRAF(messageOrId, { allowNarratorMerge = false } = {}) {
+  try {
+    const id = feNormalizeChatMessageId(messageOrId?.id ?? messageOrId?._id ?? messageOrId);
+    if (!id) return;
+    feQueuedRenderedMessageIds.add(id);
+    feQueuedRenderedMessageNarratorMerge = feQueuedRenderedMessageNarratorMerge || !!allowNarratorMerge;
+    // If a setTimeout pass is already pending, piggyback on it (don't need rAF too).
+    if (feQueuedRenderedMessageTimer || feQueuedRenderedMessageRAF) return;
+    feQueuedRenderedMessageRAF = requestAnimationFrame(() => {
+      feQueuedRenderedMessageRAF = null;
+      feFlushQueuedRenderedMessageRefreshes();
+    });
+  } catch {
+    // rAF not available — fall back to immediate setTimeout.
+    feDeferTask(() => feScheduleRenderedMessageRefresh(messageOrId, { delay: 0, allowNarratorMerge }));
+  }
+}
 
 function feWindowRequestFrame(win, fn) {
   try {
@@ -1284,31 +1339,6 @@ function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, all
   }
 }
 
-// Returns the effective scroll container for a chat log element.
-// Foundry v13: ol#chat-log may itself be scrollable, or its parent wrapper is.
-function feGetChatScrollContainer(logEl) {
-  try {
-    if (!logEl) return null;
-    if (logEl.scrollHeight > logEl.clientHeight) return logEl;
-    const parent = logEl.parentElement;
-    if (parent && parent.scrollHeight > parent.clientHeight) return parent;
-    return logEl;
-  } catch {
-    return logEl;
-  }
-}
-
-// Returns true if the scroll container is at (or very near) the bottom.
-// Uses a generous threshold to account for sub-pixel rounding.
-const FE_SCROLL_BOTTOM_THRESHOLD = 40;
-function feIsScrolledToBottom(el) {
-  try {
-    if (!el) return false;
-    return el.scrollTop + el.clientHeight >= el.scrollHeight - FE_SCROLL_BOTTOM_THRESHOLD;
-  } catch {
-    return false;
-  }
-}
 
 function feFlushQueuedRenderedMessageRefreshes() {
   try {
@@ -1324,19 +1354,6 @@ function feFlushQueuedRenderedMessageRefreshes() {
 
     const logs = feGetChatLogs();
     let missing = false;
-
-    // Snapshot which scroll containers were at the bottom BEFORE merge processing.
-    // Merge changes header visibility → scrollHeight changes → scroll position drifts.
-    // Only restore scroll for containers that were already pinned to the bottom —
-    // users reading older messages (scrolled up) must not be interrupted.
-    const scrollerState = new Map(); // scroller → wasAtBottom
-    for (const log of logs) {
-      if (!feIsElementNode(log)) continue;
-      const scroller = feGetChatScrollContainer(log);
-      if (scroller && !scrollerState.has(scroller))
-        scrollerState.set(scroller, feIsScrolledToBottom(scroller));
-    }
-
     for (const log of logs) {
       if (!feIsElementNode(log)) continue;
       try { feDedupeChatMessagesInLog(log); } catch {}
@@ -1354,12 +1371,6 @@ function feFlushQueuedRenderedMessageRefreshes() {
         feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
         if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
       }
-    }
-
-    // Restore bottom scroll only for containers that were already there.
-    for (const [scroller, wasPinned] of scrollerState) {
-      if (!wasPinned) continue;
-      try { scroller.scrollTop = scroller.scrollHeight; } catch {}
     }
 
     if (missing && feQueuedRenderedMessagePass < 2) {
@@ -1528,7 +1539,6 @@ function feApplyChatMergeAroundElement(messageEl, { allowNarratorMerge = false, 
 
 function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarratorMerge = false } = {}) {
   try {
-    void allowNarratorMerge;
     const el = feExtractHTMLElement(messageEl);
     if (!el) return;
     feBindMessageToElement(message, el);
@@ -1598,18 +1608,60 @@ function feHydrateRenderStateOverride(message, data = null, userId = null) {
   }
 }
 
+// Pre-apply a lightweight merge hint to a message element BEFORE it is inserted
+// into the DOM. This eliminates the visible flicker that occurs when the element
+// first renders without merge classes and then gets them 18ms later.
+//
+// Strategy: check the LAST message already in every known chat log.
+// If its merge key matches this message's key, this message will become a follow-up
+// → pre-apply fe-merge-follow so the header is hidden from the very first paint.
+//
+// The 18ms deferred pass will still run and apply the correct fe-merge-start/mid/end
+// distribution to all affected neighbours, but the common case (new bottom message
+// from the same speaker) will no longer flash a header before hiding it.
+function fePreApplyMergeHint(message, el) {
+  try {
+    if (!feSetting(S.MERGE_ENABLED)) return;
+    if (!feIsElementNode(el)) return;
+
+    const thisInfo = feMessageMergeInfo(message, el);
+    if (!thisInfo || thisInfo.noMerge) return;
+
+    const speakerBasis = feSetting(S.MERGE_SPEAKER_BASIS);
+    const thisKey = feMergeKey(thisInfo, speakerBasis);
+    if (!thisKey) return;
+
+    for (const log of feGetChatLogs()) {
+      if (!feIsElementNode(log)) continue;
+      // Get the last rendered message in this log.
+      const items = log.querySelectorAll?.("li.chat-message");
+      if (!items?.length) continue;
+      const lastEl = items[items.length - 1];
+      const lastId = feGetMessageIdFromElement(lastEl);
+      const lastMsg = lastId ? game.messages?.get?.(lastId) : null;
+      if (!lastMsg) continue;
+
+      const lastInfo = feMessageMergeInfo(lastMsg, lastEl);
+      if (!lastInfo) continue;
+      const lastKey = feMergeKey(lastInfo, speakerBasis);
+      if (!lastKey) continue;
+
+      if (feCanMergePair({ key: lastKey }, { key: thisKey, noMerge: thisInfo.noMerge, isNarrator: thisInfo.isNarrator, mergeableText: thisInfo.mergeableText }, { allowNarratorMerge: false })) {
+        // This message will follow the last one — hide its header immediately.
+        el.classList.add("fe-merge-follow");
+      }
+      break; // only need to check the primary (first) log
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
   try {
     feSnapshotOrRestoreInlineRolls(message, el);
-    // NOTE: TextEditor.activateListeners is intentionally NOT called here.
-    // In v13, inline-roll tooltip/click behaviour is driven by:
-    //   - data-tooltip attribute  → Foundry's TooltipManager (delegation, no per-element binding)
-    //   - click to show breakdown → event delegation on #chat-log / ol.chat-log
-    // Calling activateListeners on every renderChatMessageHTML would stack duplicate
-    // event handlers each time the message is re-rendered (automation, updates), causing
-    // the tooltip popup to appear repeatedly and become impossible to dismiss.
   } catch {
     /* no-op */
   }
@@ -1618,17 +1670,21 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   } catch {
     /* no-op */
   }
-  feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
+  try {
+    fePreApplyMergeHint(message, el);
+  } catch {
+    /* no-op */
+  }
+  feQueueMergeForRAF(message?.id ?? message?._id);
 });
 
 Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
+    // Compute and cache render state at creation time so renderChatMessageHTML
+    // can use it immediately without re-computing from scratch.
     feHydrateRenderStateOverride(message, null, userId);
-    // renderChatMessageHTML already schedules an 18ms merge pass for this message.
-    // Only schedule the broader log-level safety refresh (42ms) here to handle
-    // cases where the element wasn't in the DOM when the first pass ran.
-    // Adding another 18ms pass here would trigger merge twice per new message,
-    // causing a visible double-flash of merge classes.
+    // Safety refresh: handles cases where the element wasn't yet in the DOM
+    // when feQueueMergeForRAF fired (e.g. rapid create→update races).
     feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));
   } catch {
     /* no-op */
@@ -1649,7 +1705,7 @@ Hooks.on("updateChatMessage", (message, change, _options, userId) => {
   try {
     if (feChangeTouchesInlineRollSnapshot(change)) feClearInlineRollSnapshot(message?.id ?? message?._id);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
-    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 18 }));
+    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 0 }));
   } catch {
     /* no-op */
   }
@@ -1670,7 +1726,6 @@ function feEscapeHTML(str) {
 }
 
 // feFreezeInlineRollSyntax removed — no callers remain after freeze-before-storage cleanup.
-
 
 
 // -------------------------------------
@@ -2900,8 +2955,6 @@ function feMessageMergeInfo(msg, el) {
 }
 
 
-
-
 function feGetChatLogs() {
   // Sidebar + any chat popouts / adopted chat roots in other windows.
   const logs = new Set();
@@ -3033,8 +3086,6 @@ function feMergeKey(info, basisOverride) {
 
   return [author, speakerComponent, whisper, blind, rollMode, style].join("||");
 }
-
-
 
 
 const feMergeClassSignatureCache = new WeakMap();

@@ -1,38 +1,30 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
- * v10 changes:
- *  - CookieRun + Geurimilgi stacks. Wider coverage via Foundry + dnd5e font vars.
- *  - Fix broken Font Awesome icons that are BUTTON/A/etc with .fa-* classes,
- *    including the specific selectors you provided (header-control, tokenbar, breaktime).
- *  - Keep symbol/emoji fallbacks so special characters never tofu.
- *  - Chat actor/player name sizes kept reduced (≈2/3 of old).
+ * 구조:
+ *  1) @font-face 등록
+ *  2) CSS 변수 선언
+ *  3) 전역 UI 폰트 적용
+ *  4) 채팅 폰트 적용
+ *  5) dnd5e 시트 폰트 적용
+ *  6) Font Awesome 아이콘 수정
+ *  7) 예외 / 패치
  *
- * NOTE: Custom CookieRun faces are limited via unicode-range (Korean + basic Latin + Latin-1).
- *       Other glyphs fall back to system/Foundry fonts (symbols/emoji).
+ * NOTE: CookieRun/Geurimilgi는 unicode-range로 KR + Latin 범위만 담당.
+ *       그 외 문자(기호, 이모지 등)는 fallback 스택으로 자동 처리됨.
  */
 
-/* -------------------------------
- * 1) Font faces (CookieRun)
- * ------------------------------- */
+/* ===================================================
+ * 1) @font-face 등록
+ * =================================================== */
 
-/* Hakgyoansim Geurimilgi (user-provided)
- *
- * Per request we now use:
- *  - Hakgyoansim Geurimilgi TTF R.ttf
- *
- * Path:
- *  - /modules/female_edition/font/HakgyoansimGeurimilgi-R.ttf
- */
 @font-face {
   font-family: "FE Geurimilgi";
   src: url("../font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  /* Keep the same coverage strategy as CookieRun: KR + basic Latin + Latin-1 */
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
-
 
 @font-face {
   font-family: "FE CookieRun";
@@ -44,6 +36,7 @@
   font-display: swap;
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
+
 @font-face {
   font-family: "FE CookieRun";
   src:
@@ -54,6 +47,7 @@
   font-display: swap;
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
+
 @font-face {
   font-family: "FE CookieRun";
   src:
@@ -65,19 +59,21 @@
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 
-/* -------------------------------
- * 2) Stacks + variables (coverage)
- * ------------------------------- */
+/* ===================================================
+ * 2) CSS 변수 선언
+ * =================================================== */
 
 :root {
-  /* Symbol/emoji fallbacks so special characters never tofu */
+  /* --- 폰트 스택 --- */
+
+  /* 이모지/기호 fallback — 커스텀 폰트가 커버 못하는 문자가 tofu가 되지 않도록 */
   --fe-symbol-fallback:
     "Segoe UI Symbol",
     "Segoe UI Emoji",
     "Apple Color Emoji",
     "Noto Color Emoji";
 
-  /* Primary stack (CookieRun) */
+  /* 기본 폰트 (CookieRun) */
   --fe-font-primary:
     "FE CookieRun",
     "Signika",
@@ -88,11 +84,9 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Secondary stack (Hakgyoansim Geurimilgi) */
-  --fe-geurimilgi-face: "FE Geurimilgi";
-
+  /* 보조 폰트 (Geurimilgi → CookieRun → 시스템) */
   --fe-font-geurimilgi:
-    var(--fe-geurimilgi-face),
+    "FE Geurimilgi",
     "FE CookieRun",
     "Signika",
     system-ui,
@@ -102,77 +96,70 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Convenience alias for small/body text */
+  /* 별칭 */
   --fe-font-secondary: var(--fe-font-geurimilgi);
 
-  /* Chat font choice (default: CookieRun). Controlled via body class. */
-  --fe-chat-font-family: var(--fe-font-primary);
-
-  /* UI/능력치 라벨 글꼴(옵션으로 보조 글꼴 전환) */
-  --fe-ui-font-family: var(--fe-font-primary);
+  /* 적용 대상별 변수 — body 클래스로 전환됨 (JS feSetXxxClass) */
+  --fe-ui-font-family:        var(--fe-font-primary);
+  --fe-chat-font-family:      var(--fe-font-primary);
   --fe-dnd5e-label-font-family: var(--fe-font-primary);
 
-  /* Foundry global vars */
+  /* --- Foundry 전역 폰트 변수 재정의 --- */
   --font-primary: var(--fe-font-primary);
-  --font-sans: var(--fe-font-primary);
-  --font-serif: var(--fe-font-primary);
+  --font-sans:    var(--fe-font-primary);
+  --font-serif:   var(--fe-font-primary);
 
-  /* dnd5e v5.2.x font vars (best-effort) */
-  --dnd5e-font-roboto: var(--fe-font-primary);
+  /* --- dnd5e 폰트 변수 재정의 (best-effort, 버전마다 달라질 수 있음) --- */
+  --dnd5e-font-roboto:      var(--fe-font-primary);
   --dnd5e-font-roboto-slab: var(--fe-font-primary);
-  --dnd5e-font-signika: var(--fe-font-primary);
-  --dnd5e-font-modesto: var(--fe-font-primary);
+  --dnd5e-font-signika:     var(--fe-font-primary);
+  --dnd5e-font-modesto:     var(--fe-font-primary);
 
-  /* Chat header sizes (reduced) */
-  --fe-chat-title-size: 22px;     /* actor name */
-  --fe-chat-subtitle-size: 14px;  /* player name */
+  /* --- Font Awesome 변수 --- */
+  --fe-fa-classic: var(--fa-style-family-classic, "Font Awesome 6 Pro");
+  --fe-fa-brands:  var(--fa-style-family-brands,  "Font Awesome 6 Brands");
 
-  /* Weight guidance */
+  /* --- UI 크기 / 레이아웃 (JS feApplyStyleVarsFromSettings로 덮어씌워짐) --- */
+  --fe-chat-title-size:    22px;
+  --fe-chat-subtitle-size: 14px;
+  --fe-chat-meta-size:          12px;
+  --fe-chat-header-icon-size:   14px;
+  --fe-chat-header-icon-hit:    18px;
+  --fe-chat-meta-gap:           1px;
+  --fe-inline-leading:  2px;
+  --fe-inline-pad-y:    1px;
+
+  /* --- Weight / synthesis --- */
   --fe-font-weight-title: 700;
-  --fe-font-weight-body: 400;
+  --fe-font-weight-body:  400;
   --fe-font-weight-small: 400;
 
-  /* Inline layout helpers for small chips/buttons (prevents glyph clipping) */
-  --fe-inline-leading: 2px;
-  --fe-inline-pad-y: 1px;
-
-  /* Chat header meta/icon sizing
-   * (Avoid inheriting huge font sizes from chat portrait / system styles.)
-   */
-  --fe-chat-meta-size: 12px;
-  --fe-chat-header-icon-size: 14px;
-  --fe-chat-header-icon-hit: 18px;
-  --fe-chat-meta-gap: 1px;
-
-  /* Allow synthetic bold when the chosen font has no real bold face.
-   * We'll still selectively allow italic only on <em> tags (Markdown).
-   */
+  /* 쿠키런/그림일기는 별도 italic 서체가 없어 synthetic bold만 허용 */
   font-synthesis: weight;
 }
 
-/* Chat font selection (module setting) */
-body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
+/* 채팅 폰트 선택 (모듈 설정) */
+body.fe-chat-font-cookie     { --fe-chat-font-family: var(--fe-font-primary); }
 body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
 
-/* dnd5e may override its font variables inside .dnd5e/.dnd5e2 scopes.
- * Re-assert them with !important so the sheet remains consistent.
- */
-:is(.dnd5e, .dnd5e2) {
-  --dnd5e-font-roboto: var(--fe-font-primary) !important;
-  --dnd5e-font-roboto-slab: var(--fe-font-primary) !important;
-  --dnd5e-font-signika: var(--fe-font-primary) !important;
-  --dnd5e-font-modesto: var(--fe-font-primary) !important;
-}
-
-/* UI/능력치 라벨: 쿠키런 대신 그림일기 사용(옵션) */
+/* UI 폰트를 그림일기로 전환 (모듈 설정) */
 body.fe-ui-font-geurimilgi {
-  --fe-ui-font-family: var(--fe-font-geurimilgi);
+  --fe-ui-font-family:          var(--fe-font-geurimilgi);
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
 }
 
-/* -------------------------------
- * 3) Apply CookieRun broadly
- * ------------------------------- */
+/* dnd5e가 .dnd5e/.dnd5e2 스코프에서 폰트 변수를 재정의할 수 있으므로
+ * !important로 재어설트 */
+:is(.dnd5e, .dnd5e2) {
+  --dnd5e-font-roboto:      var(--fe-font-primary) !important;
+  --dnd5e-font-roboto-slab: var(--fe-font-primary) !important;
+  --dnd5e-font-signika:     var(--fe-font-primary) !important;
+  --dnd5e-font-modesto:     var(--fe-font-primary) !important;
+}
+
+/* ===================================================
+ * 3) 전역 UI 폰트 적용
+ * =================================================== */
 
 html, body,
 #interface,
@@ -187,138 +174,42 @@ html, body,
 .dnd5e2.app {
   font-family: var(--fe-ui-font-family) !important;
   font-synthesis: weight;
-  /* NOTE: optimizeLegibility can look rough on Windows/Electron at small sizes.
-   * Keep the browser default rasterization.
-   */
   text-rendering: auto;
-  /* Do NOT force grayscale anti-aliasing; keep system defaults (subpixel where available). */
   -webkit-font-smoothing: auto;
   -moz-osx-font-smoothing: auto;
 }
 
-/* dnd5e actor sheet: ensure key large labels use the custom font */
-:is(.dnd5e, .dnd5e2)
-  :is(
-    .sheet-header,
-    .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
-    .header,
-    .header :is(.document-name, .name, .charname),
-    .attributes,
-    .attributes :is(.attribute, .ability, .ability-score, .ability, .score),
-    .attributes :is(.label, label, .title, .name),
-    .ability-scores :is(.label, label, .title, .name),
-    .abilities :is(.label, label, .title, .name)
-  ) {
-  font-family: var(--fe-font-primary) !important;
-}
-
-
-/* Option: ability/abilities labels use Geurimilgi instead of CookieRun */
-:is(.dnd5e, .dnd5e2) .sheet.actor :is(
-  .ability-scores,
-  .ability-scores :is(.label, label, .title, .name),
-  .abilities,
-  .abilities :is(.label, label, .title, .name)
-) {
-  font-family: var(--fe-dnd5e-label-font-family) !important;
-}
-
-/* Chat meta/timestamps: use the lighter face to avoid the “too-bold” look in small sizes.
- * IMPORTANT: set an explicit size so we do NOT inherit the (sometimes huge) sender font size.
- */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata {
-  font-family: var(--fe-font-secondary) !important;
-  font-weight: var(--fe-font-weight-small) !important;
-  font-size: var(--fe-chat-meta-size) !important;
-  line-height: 1 !important;
-
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: var(--fe-chat-meta-gap) !important;
-}
-
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  :is(.message-timestamp, time) {
-  order: 0;
-  font-family: var(--fe-font-secondary) !important;
-  font-size: var(--fe-chat-meta-size) !important;
-  font-weight: var(--fe-font-weight-small) !important;
-}
-
-/* Timestamp glyph width: visually condense to ~75% (does not affect layout flow) */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  :is(time.message-timestamp, .message-timestamp) {
-  display: inline-block !important;
-  transform: scaleX(0.75);
-  transform-origin: right center;
-}
-
-/* Edit + ellipsis icons: keep them compact and aligned */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  a.message-edit {
-  order: 1;
-}
-
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  a.chat-control {
-  order: 2;
-}
-
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  :is(a.message-edit, a.chat-control) {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: var(--fe-chat-header-icon-hit) !important;
-  height: var(--fe-chat-header-icon-hit) !important;
-  line-height: var(--fe-chat-header-icon-hit) !important;
-  font-size: var(--fe-chat-header-icon-size) !important;
-}
-
-/* Ensure the <i> glyph inherits size (some themes override it) */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-metadata
-  :is(a.message-edit, a.chat-control)
-  i {
-  font-size: inherit !important;
-}
-
-/* Keep other small UI text at regular weight, but do not force the light face globally. */
-:is(#interface, #ui, #sidebar, .window-app, .application)
-  :is(
-    .hint,
-    .notes,
-    .form-fields,
-    .tags,
-    .pill
-  ) {
-  font-weight: var(--fe-font-weight-small) !important;
-}
-
-/* Window titles/subtitles (actor name, item name, etc.) */
-.window-app .window-header .window-title,
-.window-app .window-header .window-subtitle,
-.application .window-header .window-title,
-.application .window-header .window-subtitle,
+/* 윈도우 타이틀 */
+.window-app .window-header :is(.window-title, .window-subtitle),
+.application .window-header :is(.window-title, .window-subtitle),
 .window-app .sheet-header :is(h1, h2, .document-name, .name),
 .dnd5e2 .sheet-header :is(h1, h2, .document-name, .name) {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* Chat & chat cards */
+/* ProseMirror 에디터 */
+.prosemirror, .ProseMirror {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* 폼 컨트롤 — 부모 상속 */
+#interface :is(button, input, textarea, select),
+.window-app :is(button, input, textarea, select),
+.application :is(button, input, textarea, select) {
+  font-family: inherit !important;
+}
+
+/* 작은 UI 텍스트 weight */
+:is(#interface, #ui, #sidebar, .window-app, .application)
+  :is(.hint, .notes, .form-fields, .tags, .pill) {
+  font-weight: var(--fe-font-weight-small) !important;
+}
+
+/* ===================================================
+ * 4) 채팅 폰트 적용
+ * =================================================== */
+
+/* 채팅 로그 전체 */
 #sidebar #chat,
 #sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
 #sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
@@ -333,59 +224,134 @@ html, body,
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* Markdown italic visibility
- * CookieRun/Geurimilgi do not ship dedicated italic faces.
- * Keep global synthesis OFF (crisper), but allow synthetic italic ONLY for <em>.
- */
+/* 채팅 헤더 (액터명 / 플레이어명) */
+:is(#sidebar #chat, #chat-notifications)
+  .chat-message .message-sender :is(.name-stacked .title, .title) {
+  font-family: var(--fe-font-primary) !important;
+  font-size: var(--fe-chat-title-size) !important;
+  line-height: 1.05;
+}
+
+:is(#sidebar #chat, #chat-notifications)
+  .chat-message .message-sender :is(.name-stacked .subtitle, .subtitle) {
+  font-family: var(--fe-font-primary) !important;
+  font-size: var(--fe-chat-subtitle-size) !important;
+  line-height: 1.05;
+}
+
+/* 채팅 메타 (타임스탬프, 편집 버튼) — 가는 그림일기 폰트 */
 :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  .message-content em,
+  .chat-message .message-metadata {
+  font-family: var(--fe-font-secondary) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+  font-size: var(--fe-chat-meta-size) !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--fe-chat-meta-gap) !important;
+}
+
 :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
-  em {
+  .chat-message .message-metadata :is(.message-timestamp, time) {
+  order: 0;
+  font-family: var(--fe-font-secondary) !important;
+  font-size: var(--fe-chat-meta-size) !important;
+  font-weight: var(--fe-font-weight-small) !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message .message-metadata :is(time.message-timestamp, .message-timestamp) {
+  display: inline-block !important;
+  transform: scaleX(0.75);
+  transform-origin: right center;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message .message-metadata a.message-edit { order: 1; }
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message .message-metadata a.chat-control { order: 2; }
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message .message-metadata :is(a.message-edit, a.chat-control) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--fe-chat-header-icon-hit) !important;
+  height: var(--fe-chat-header-icon-hit) !important;
+  line-height: var(--fe-chat-header-icon-hit) !important;
+  font-size: var(--fe-chat-header-icon-size) !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message .message-metadata :is(a.message-edit, a.chat-control) i {
+  font-size: inherit !important;
+}
+
+/* 인라인 롤 앵커 */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message a.inline-roll {
+  font-family: var(--fe-chat-font-family) !important;
+}
+
+/* 주사위 결과 블록 */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message :is(.dice-roll, .dice-result, .dice-formula, .dice-total) {
+  font-family: var(--fe-chat-font-family) !important;
+}
+
+/* 주사위 툴팁 팝업 */
+#tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor) {
+  font-family: var(--fe-font-primary) !important;
+}
+
+/* 채팅카드 수식 텍스트 */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
+  .dice-formula {
+  font-family: var(--fe-chat-font-family) !important;
+}
+
+/* Markdown <em> — 전용 italic 서체가 없어 synthetic italic 허용 */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message :is(.message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) em {
   font-style: italic !important;
   font-synthesis: style;
 }
 
-/* ProseMirror editors */
-.prosemirror, .ProseMirror {
+/* ===================================================
+ * 5) dnd5e 시트 폰트 적용
+ * =================================================== */
+
+/* 시트 주요 라벨 */
+:is(.dnd5e, .dnd5e2) :is(
+  .sheet-header,
+  .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
+  .header,
+  .header :is(.document-name, .name, .charname),
+  .attributes :is(.attribute, .ability, .ability-score, .score),
+  .attributes :is(.label, label, .title, .name),
+  .ability-scores :is(.label, label, .title, .name),
+  .abilities :is(.label, label, .title, .name)
+) {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* Form controls inherit */
-#interface :is(button, input, textarea, select),
-.window-app :is(button, input, textarea, select),
-.application :is(button, input, textarea, select) {
-  font-family: inherit !important;
+/* 능력치 라벨 — 그림일기 사용 옵션 */
+:is(.dnd5e, .dnd5e2) .sheet.actor :is(
+  .ability-scores,
+  .ability-scores :is(.label, label, .title, .name),
+  .abilities,
+  .abilities :is(.label, label, .title, .name)
+) {
+  font-family: var(--fe-dnd5e-label-font-family) !important;
 }
 
-/* Monospace zones */
-code, pre, .monospace {
-  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace !important;
-}
+/* ===================================================
+ * 6) Font Awesome 아이콘 수정
+ * =================================================== */
 
-
-
-/* ve-night-mode heading contrast fix (white backgrounds) */
-.ve-night-mode .rd__h--3 {
-  /* Do not force a specific color; inherit from theme.
-   * Also neutralize any module/base color rules.
-   */
-  color: inherit !important;
-  font-weight: 900 !important;
-  font-style: normal !important;
-}
-/* -------------------------------
- * 4) Font Awesome icon fix (GLOBAL, covers button/a/div with fa-* classes)
- * ------------------------------- */
-
-:root {
-  --fe-fa-classic: var(--fa-style-family-classic, "Font Awesome 6 Pro");
-  --fe-fa-brands: var(--fa-style-family-brands, "Font Awesome 6 Brands");
-}
-
-/* Any element with FA classes anywhere */
+/* 모든 FA 클래스 요소 */
 :is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
@@ -400,7 +366,6 @@ code, pre, .monospace {
   text-transform: none !important;
 }
 
-/* Pseudo elements hold the glyph; force family explicitly */
 :is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
@@ -421,55 +386,30 @@ code, pre, .monospace {
   font-style: normal !important;
 }
 
-/* Weight mapping */
-:is(.fa-solid, .fas, .fa-sharp-solid, .fass) { font-weight: 900 !important; }
-:is(.fa-regular, .far, .fa-sharp-regular, .fasr) { font-weight: 400 !important; }
-/* Best-effort for Pro light/thin */
-:is(.fa-light, .fal, .fa-sharp-light, .fasl) { font-weight: 300 !important; }
-:is(.fa-thin, .fat, .fa-sharp-thin, .fast) { font-weight: 100 !important; }
+/* Weight 매핑 */
+:is(.fa-solid, .fas, .fa-sharp-solid, .fass)         { font-weight: 900 !important; }
+:is(.fa-regular, .far, .fa-sharp-regular, .fasr)      { font-weight: 400 !important; }
+:is(.fa-light, .fal, .fa-sharp-light, .fasl)          { font-weight: 300 !important; }
+:is(.fa-thin, .fat, .fa-sharp-thin, .fast)            { font-weight: 100 !important; }
 
-/* Brands family */
-:is(.fa-brands, .fab) {
-  font-family: var(--fe-fa-brands) !important;
-  font-weight: 400 !important;
-}
+/* Brands */
+:is(.fa-brands, .fab),
 :is(.fa-brands, .fab)::before,
 :is(.fa-brands, .fab)::after {
   font-family: var(--fe-fa-brands) !important;
 }
+:is(.fa-brands, .fab) { font-weight: 400 !important; }
 
-/* -------------------------------
- * 4b) HIGH-specificity fixes for the exact broken selectors you posted
- * ------------------------------- */
-
-/* Window header controls (item/actor sheet top-right) */
+/* High-specificity 패치 — 특정 모듈 요소가 FA 클래스 매칭을 방해하는 경우 */
 header.window-header button.header-control.icon.fa-solid,
 header.window-header button.header-control.icon.fa-solid::before,
-header.window-header button.header-control.icon.fa-solid::after {
-  font-family: var(--fe-fa-classic) !important;
-  font-weight: 900 !important;
-}
-
-/* Tokenbar buttons (bottom-left module UI) */
-section.button-group[data-application-part="buttons"] .tokenbar-buttons
-button.inline-control.icon.fa-solid,
-section.button-group[data-application-part="buttons"] .tokenbar-buttons
-button.inline-control.icon.fa-solid::before,
-section.button-group[data-application-part="buttons"] .tokenbar-buttons
-button.inline-control.icon.fa-solid::after {
-  font-family: var(--fe-fa-classic) !important;
-  font-weight: 900 !important;
-}
-
-/* Tokenbar collapse caret */
+header.window-header button.header-control.icon.fa-solid::after,
+section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid,
+section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::before,
+section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::after,
 button.tokenbar-header-button.fa-solid.icon,
 button.tokenbar-header-button.fa-solid.icon::before,
-button.tokenbar-header-button.fa-solid.icon::after {
-  font-family: var(--fe-fa-classic) !important;
-  font-weight: 900 !important;
-}
-
-/* Breaktime clear-remaining trash */
+button.tokenbar-header-button.fa-solid.icon::after,
 button.clear-remaining.icon.fa-solid,
 button.clear-remaining.icon.fa-solid::before,
 button.clear-remaining.icon.fa-solid::after {
@@ -477,54 +417,18 @@ button.clear-remaining.icon.fa-solid::after {
   font-weight: 900 !important;
 }
 
-/* -------------------------------
- * 5) Chat header font sizes (Actor + Player name)
- * ------------------------------- */
+/* ===================================================
+ * 7) 예외 / 패치
+ * =================================================== */
 
-:is(#sidebar #chat, #chat-notifications) :is(.chat-message .message-sender .name-stacked .title,
-                   .chat-message .message-sender .title) {
-  font-family: var(--fe-font-primary) !important;
-  font-size: var(--fe-chat-title-size) !important;
-  line-height: 1.05;
+/* 모노스페이스 영역 — 커스텀 폰트 적용 제외 */
+code, pre, .monospace {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace !important;
 }
 
-:is(#sidebar #chat, #chat-notifications) :is(.chat-message .message-sender .name-stacked .subtitle,
-                   .chat-message .message-sender .subtitle) {
-  font-family: var(--fe-font-primary) !important;
-  font-size: var(--fe-chat-subtitle-size) !important;
-  line-height: 1.05;
-}
-
-/* -------------------------------
- * 6) Inline rolls + dice UI font
- * ------------------------------- */
-
-/* Inline-roll anchors: apply the chat font so [[1d6]] results match the
- * surrounding message text. FA icons inside the anchor inherit automatically.
- */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  a.inline-roll {
-  font-family: var(--fe-chat-font-family) !important;
-}
-
-/* Dice-roll card (full roll block inside chat-card) */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  :is(.dice-roll, .dice-result, .dice-formula, .dice-total) {
-  font-family: var(--fe-chat-font-family) !important;
-}
-
-/* Dice tooltip popup (shown on hover/click over inline-roll) */
-#tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip,
-             .dice-total, .dice-flavor) {
-  font-family: var(--fe-font-primary) !important;
-}
-
-/* Chat-card formula text (e.g. dnd5e roll formula displayed in card header) */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
-  .dice-formula {
-  font-family: var(--fe-chat-font-family) !important;
+/* ve-night-mode 헤딩 대비 수정 (흰 배경에서 색상 깨짐 방지) */
+.ve-night-mode .rd__h--3 {
+  color: inherit !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
 }

@@ -54,6 +54,14 @@
       </div>
       <p class="notes">주문/아이템/피처 설명 박스(Details/Description)에도 커스텀 폰트를 적용합니다.</p>
     </div>
+
+    <div class="form-group">
+      <label>헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceUiOverrideFontH1Cookie" data-dtype="Boolean" {{checked values.ceUiOverrideFontH1Cookie}} />
+      </div>
+      <p class="notes">Foundry/테마가 사용하는 CSS 변수 --font-h1 값을 쿠키런 폰트로 덮어씌웁니다. 일부 테마의 제목/헤딩 글꼴이 바뀔 수 있습니다.</p>
+    </div>
   </details>
 
   <details>
@@ -322,6 +330,21 @@
         <label class="checkbox"><input type="checkbox" name="chatPortraitShowRoll" data-dtype="Boolean" {{checked values.chatPortraitShowRoll}} /> Roll</label>
         <label class="checkbox"><input type="checkbox" name="chatPortraitShowOther" data-dtype="Boolean" {{checked values.chatPortraitShowOther}} /> Other</label>
       </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>GM 설정 강제</summary>
+
+    <div class="form-group">
+      <label>GM 설정 전역 강제 활성화</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceGmPriorityEnabled" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} />
+      </div>
+      <p class="notes">
+        활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다.
+        아카이브/편집 설정은 플레이어 개인 설정을 유지합니다.
+      </p>
     </div>
   </details>
 
