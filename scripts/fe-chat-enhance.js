@@ -76,10 +76,10 @@ const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
 const FE_DEFAULTS = {
   // Merge
   [S.MERGE_ENABLED]: true,
-  [S.MERGE_ONLY_TEXT]: true,
-  [S.MERGE_INCLUDE_ROLL_MESSAGES]: false,
-  [S.MERGE_DIVIDER]: true,
-  [S.MERGE_MODE]: "standard",
+  [S.MERGE_ONLY_TEXT]: false,
+  [S.MERGE_INCLUDE_ROLL_MESSAGES]: true,
+  [S.MERGE_DIVIDER]: false,
+  [S.MERGE_MODE]: "simple",
   [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
   [S.MERGE_SPEAKER_BASIS]: "token",
 
@@ -89,26 +89,26 @@ const FE_DEFAULTS = {
   [S.EXPORT_OPTIMIZE]: true,
   // Embedding multi-megabyte fonts as base64 can easily OOM in Chromium.
   // Keep default off for reliability.
-  [S.EXPORT_EMBED_FONTS]: false,
-  [S.EXPORT_EMBED_IMAGES]: false,
-  [S.EXPORT_PRINT_IMAGE_MODE]: "hideAvatars",
+  [S.EXPORT_EMBED_FONTS]: true,
+  [S.EXPORT_EMBED_IMAGES]: true,
+  [S.EXPORT_PRINT_IMAGE_MODE]: "downscaleLite",
   [S.EXPORT_DESKTOP_EXTERNAL_MODE]: "button",
 
   // Typography
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
-  [S.UI_USE_GEURIMILGI]: false,
-  [S.UI_OVERRIDE_FONT_H1_COOKIE]: false,
-  [S.USE_USER_COLOR_BG]: false,
+  [S.UI_USE_GEURIMILGI]: true,
+  [S.UI_OVERRIDE_FONT_H1_COOKIE]: true,
+  [S.USE_USER_COLOR_BG]: true,
   [S.USER_COLOR_BG_BASE]: "white",
 
   // Style
-  [S.STYLE_ACTOR_NAME_SIZE]: 22,
-  [S.STYLE_PLAYER_NAME_SIZE]: 14,
+  [S.STYLE_ACTOR_NAME_SIZE]: 18,
+  [S.STYLE_PLAYER_NAME_SIZE]: 12,
   [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
   [S.STYLE_CHATCARD_TEXT_SIZE]: 12,
-  [S.STYLE_BG_SATURATION]: 0.42,
-  [S.STYLE_CHAT_MESSAGE_SPACING]: 4,
+  [S.STYLE_BG_SATURATION]: 0.05,
+  [S.STYLE_CHAT_MESSAGE_SPACING]: 0,
 
   // Markdown
   [S.MARKDOWN_ENABLED]: true,
@@ -272,7 +272,6 @@ async function feSeedGmPriorityOverridesFromLocal() {
 
 async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
   try {
-    if (game.user?.isGM) return false;
     const overrides = feGetGmPriorityOverrides();
     const wanted = Array.isArray(keys)
       ? keys.filter((key) => feIsGmPrioritySettingKey(key) && feHasOwn(overrides, key))
@@ -505,7 +504,8 @@ Hooks.once("init", () => {
     default: {},
     onChange: () => {
       feApplyGmPriorityUiRefresh(document);
-      if (!game.user?.isGM) void feSyncLocalGmPrioritySettings();
+      // Sync for all users including GM so onChange callbacks (applyFontSetting etc.) fire.
+      void feSyncLocalGmPrioritySettings();
     },
   });
 
@@ -788,7 +788,7 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, LEGACY_UI_FONT_KEY, {
     name: "(legacy) UI font toggle",
     scope: "client",
-    config: false,
+    config: true,
     type: Boolean,
     default: false,
   });
@@ -856,13 +856,14 @@ Hooks.once("init", () => {
     name: "GM 설정 전역 강제",
     hint: "활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다. 아카이브/편집 설정은 개인 설정을 유지합니다.",
     scope: "world",
-    config: false,
+    config: true,
     restricted: true,
     type: Boolean,
     default: true,
     onChange: () => {
       feApplyGmPriorityUiRefresh(document);
-      if (!game.user?.isGM) void feSyncLocalGmPrioritySettings();
+      // Sync for all users including GM so onChange callbacks (applyFontSetting etc.) fire.
+      void feSyncLocalGmPrioritySettings();
     },
   });
 
@@ -909,7 +910,8 @@ Hooks.on("clientSettingChanged", (fullKey, value) => {
 Hooks.once("ready", async () => {
   await feMigrateLegacySettings();
   if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal();
-  else await feSyncLocalGmPrioritySettings();
+  // Sync overrides to local for all users (including GM) so onChange callbacks fire correctly.
+  await feSyncLocalGmPrioritySettings();
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);

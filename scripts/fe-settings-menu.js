@@ -1,7 +1,7 @@
 // Female-cupwhi: Unified settings menu (collapsible sections)
 // This dialog is the primary UI because individual settings are hidden from core Module Settings.
 
-import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES } from "./fe-chat-enhance.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting } from "./fe-chat-enhance.js";
 
 // Settings keys owned by other split modules
 const BG = Object.freeze({
@@ -29,7 +29,7 @@ const MENU_KEY = "settingsMenu";
 
 function feGetSettingSafe(key, fallback) {
   try {
-    return game.settings.get(MODULE_ID, key);
+    return feSetting(key) ?? fallback;
   } catch {
     return fallback;
   }
