@@ -1,5 +1,15 @@
 /* female_edition: Chat Enhancements (FVTT v13) */
 
+/* ------------------------------------------------------------------
+ * Chat message spacing
+ * Foundry v13 defines --chat-message-spacing inside a chat-sidebar scope,
+ * so overriding :root alone loses to that specificity.
+ * Force the gap directly on the log element using our own variable.
+ * ------------------------------------------------------------------ */
+:is(#chat-log, .chat-log, ol.chat-log) {
+  gap: var(--fe-chat-message-spacing, 4px) !important;
+}
+
 /* --------------------------- */
 /* Markdown: readability        */
 /* --------------------------- */
@@ -172,6 +182,16 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
 }
 
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-top-width: 0 !important;
+}
+
+/* fe-merge-follow is pre-applied by fePreApplyMergeHint before the deferred pass
+ * converts it to fe-merge-start/mid/end. During that brief window, apply the same
+ * margin collapse as fe-merge-end so there's no visual gap. */
+body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow {
   margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;

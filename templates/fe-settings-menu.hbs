@@ -314,6 +314,63 @@
     </div>
 
     <div class="form-group">
+      <label>채팅 카드 아이콘 크기(px)</label>
+      <div class="form-fields">
+        <input type="number" name="chatPortraitCardIconSize" data-dtype="Number" value="{{values.chatPortraitCardIconSize}}" step="1" min="0" max="128" />
+      </div>
+      <p class="notes">midi-qol/dnd5e 채팅 카드 안의 아이콘 크기를 강제 조정합니다. 0이면 비활성화.</p>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 모양</label>
+      <div class="form-fields">
+        <select name="chatPortraitShape" data-dtype="String">
+          <option value="circle" {{#if (eq values.chatPortraitShape "circle")}}selected{{/if}}>원형</option>
+          <option value="square" {{#if (eq values.chatPortraitShape "square")}}selected{{/if}}>사각형</option>
+          <option value="none" {{#if (eq values.chatPortraitShape "none")}}selected{{/if}}>미적용(자르지 않음)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 테두리 모드</label>
+      <div class="form-fields">
+        <select name="chatPortraitBorderMode" data-dtype="String">
+          <option value="theme" {{#if (eq values.chatPortraitBorderMode "theme")}}selected{{/if}}>테마/기본값</option>
+          <option value="none" {{#if (eq values.chatPortraitBorderMode "none")}}selected{{/if}}>없음</option>
+          <option value="user" {{#if (eq values.chatPortraitBorderMode "user")}}selected{{/if}}>플레이어 색상</option>
+          <option value="custom" {{#if (eq values.chatPortraitBorderMode "custom")}}selected{{/if}}>사용자 지정</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 테두리 두께(px)</label>
+      <div class="form-fields">
+        <input type="number" name="chatPortraitBorderWidth" data-dtype="Number" value="{{values.chatPortraitBorderWidth}}" step="1" min="0" max="12" />
+      </div>
+      <p class="notes">테두리 모드가 '플레이어 색상' 또는 '사용자 지정'일 때 적용됩니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>포트레이트 테두리 색상</label>
+      <div class="form-fields">
+        <input type="text" name="chatPortraitBorderColor" data-dtype="String" value="{{values.chatPortraitBorderColor}}" placeholder="#000000" />
+      </div>
+      <p class="notes">테두리 모드가 '사용자 지정'일 때 사용합니다. 예) #ff0000</p>
+    </div>
+
+    <div class="form-group">
+      <label>이름 정렬</label>
+      <div class="form-fields">
+        <select name="chatPortraitNameAlign" data-dtype="String">
+          <option value="center" {{#if (eq values.chatPortraitNameAlign "center")}}selected{{/if}}>가운데</option>
+          <option value="left" {{#if (eq values.chatPortraitNameAlign "left")}}selected{{/if}}>좌측</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
       <label>컴뱃 트래커에 포트레이트 적용</label>
       <div class="form-fields">
         <input type="checkbox" name="chatPortraitApplyCombatTracker" data-dtype="Boolean" {{checked values.chatPortraitApplyCombatTracker}} />

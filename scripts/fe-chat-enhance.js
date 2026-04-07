@@ -522,6 +522,9 @@ Hooks.once("init", () => {
     onChange: () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
+      // Retry after a short delay: messages not yet in game.messages at the time
+      // of the first pass get their merge classes corrected once docs are available.
+      setTimeout(() => feApplyChatMergeToAllLogs(), 200);
     },
   });
 
@@ -569,6 +572,7 @@ Hooks.once("init", () => {
     onChange: () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
+      setTimeout(() => feApplyChatMergeToAllLogs(), 200);
     },
   });
 
@@ -587,6 +591,7 @@ Hooks.once("init", () => {
     onChange: () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
+      setTimeout(() => feApplyChatMergeToAllLogs(), 200);
     },
   });
 
