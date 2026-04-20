@@ -334,7 +334,30 @@ function feEnsurePrintCSSOverrides() {
  *  2) If popups are blocked, fall back to the in-document export container.
  */
 async function feExportChatLogToPDF() {
-  // Prefer a separate archive window for reliable multi-page printing.
+  // Step 1: Collect messages BEFORE opening the popup window,
+  // so the range dialog appears on its own without the archive window behind it.
+  let preCollectedMessages = null;
+  let preRangeSpec = null;
+  try {
+    const liveMessageMap = feBuildLiveChatMessageElementMap();
+    ui.notifications?.info("female_edition | 메시지 수집 중…", { permanent: false, console: false });
+    preCollectedMessages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
+
+    if (!preCollectedMessages.length) {
+      ui.notifications?.warn("female_edition | 아카이브할 메시지가 없습니다.");
+      return;
+    }
+
+    // Step 2: Show range dialog before opening the popup.
+    preRangeSpec = await feShowArchiveRangeDialog(preCollectedMessages.length);
+    if (preRangeSpec == null) return; // cancelled
+  } catch (err) {
+    console.warn("female_edition | pre-collection failed, falling through", err);
+    preCollectedMessages = null;
+    preRangeSpec = null;
+  }
+
+  // Step 3: Now open the archive popup window.
   const win = feOpenChatArchiveWindow();
   if (win) {
     try {
@@ -348,6 +371,8 @@ async function feExportChatLogToPDF() {
       await feRenderChatArchiveWindow(win, {
         autoPrint: wantsExternalAuto ? false : !!feSetting(S.EXPORT_AUTO_PRINT),
         optimize,
+        preCollectedMessages,
+        preRangeSpec,
       });
 
       if (wantsExternalAuto) {
@@ -528,7 +553,10 @@ function feOpenChatArchiveWindow() {
     ].join(",");
 
     const win = window.open("", "fe-chat-archive", features);
-    if (!win || win.closed) return null;
+    if (!win || win.closed) {
+      ui.notifications?.warn("채팅 아카이브 팝업이 차단됐습니다. 브라우저 팝업 차단을 해제해 주세요.");
+      return null;
+    }
 
     try {
       win.focus();
@@ -1400,7 +1428,7 @@ function feTryRequire(moduleName) {
   }
 }
 
-async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = false } = {}) {
+async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = false, preCollectedMessages = null, preRangeSpec = null } = {}) {
   if (!win || win.closed) throw new Error("Archive window is not available.");
 
   // Treat the chat-bg-stripper's "채팅 카드 텍스쳐 제거" setting as an implicit
@@ -1768,20 +1796,40 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   await feMaybeYieldForUI(win);
 
   // Collect ALL messages first (including DB query) so the range dialog can show the true total.
+  // Skip if messages were pre-collected outside (before the popup opened) to preserve dialog order.
   const liveMessageMap = feBuildLiveChatMessageElementMap();
-  const allMessages = await feCollectVisibleChatMessages(game.user, {
-    liveMessageMap,
-    progress: (text) => {
-      setStatus(text);
-    },
-  });
+  let allMessages;
+  if (Array.isArray(preCollectedMessages) && preCollectedMessages.length > 0) {
+    allMessages = preCollectedMessages;
+    setStatus(`메시지 ${allMessages.length}개 준비 완료`);
+  } else {
+    allMessages = await feCollectVisibleChatMessages(game.user, {
+      liveMessageMap,
+      progress: (text) => {
+        setStatus(text);
+      },
+    });
+  }
 
   // Show the range selection dialog now that we know the real message count.
-  const rangeSpec = await feShowArchiveRangeDialog(allMessages.length);
-  if (rangeSpec === null) {
-    // User cancelled — close the archive window and abort.
-    try { win.close(); } catch {}
+  // Skip if a range was already selected before the popup opened.
+  if (!allMessages.length) {
+    setStatus("수집된 메시지가 없습니다.");
+    ui.notifications?.warn("female_edition | 아카이브할 메시지가 없습니다.");
     return;
+  }
+
+  let rangeSpec;
+  if (preRangeSpec != null) {
+    rangeSpec = preRangeSpec;
+  } else {
+    rangeSpec = await feShowArchiveRangeDialog(allMessages.length);
+    // rejectClose:false → ESC/X 닫기 시 undefined 반환, OK 취소 시 null 가능
+    if (rangeSpec == null) {
+      // User cancelled — close the archive window and abort.
+      try { win.close(); } catch {}
+      return;
+    }
   }
 
   const messages = feApplyMessageRange(allMessages, rangeSpec);

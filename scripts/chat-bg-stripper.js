@@ -37,35 +37,13 @@ function safeGetSetting(key, fallback) {
   catch { return fallback; }
 }
 
-function toggleModuleStylesheet(relPath, enabled) {
-  const needle = `/modules/${MODULE_ID}/${relPath}`;
-  const links = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
-  const matched = links.filter(l => {
-    const href = l.getAttribute("href") || "";
-    const abs  = l.href || "";
-    return href.includes(needle) || abs.includes(needle);
-  });
-  for (const l of matched) l.disabled = !enabled;
-  return matched.length;
-}
-
-let _fontRetryTimer = null;
-
 function applyFontSetting(enabled) {
-  // Cancel any in-progress retry before starting a new one.
-  if (_fontRetryTimer !== null) { clearInterval(_fontRetryTimer); _fontRetryTimer = null; }
-
-  const count = toggleModuleStylesheet("styles/ui-font.css", !!enabled);
-
-  // The stylesheet link may appear slightly later on some setups; retry briefly.
-  if (!count) {
-    let tries = 0;
-    _fontRetryTimer = setInterval(() => {
-      tries++;
-      const c = toggleModuleStylesheet("styles/ui-font.css", !!enabled);
-      if (c || tries >= 20) { clearInterval(_fontRetryTimer); _fontRetryTimer = null; }
-    }, 100);
-  }
+  // Toggle body class instead of disabling the stylesheet link.
+  // This is more reliable: link.disabled can be reset when Foundry re-injects
+  // stylesheets, but a body class persists until explicitly removed.
+  try {
+    document.body.classList.toggle("fe-fonts-enabled", !!enabled);
+  } catch { /* no-op */ }
 }
 
 function applyPortraitSetting(hide) {
@@ -142,6 +120,13 @@ Hooks.once("init", () => {
     default: true,
     onChange: value => applyTextureSetting(value),
   });
+
+  // Apply fe-fonts-enabled as early as possible (init) to prevent FOUC.
+  // The ready hook will re-apply with the final feSetting() value (GM priority aware).
+  try {
+    const fontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, true);
+    document.body?.classList?.toggle("fe-fonts-enabled", !!fontsEnabled);
+  } catch { /* no-op */ }
 });
 
 Hooks.once("ready", () => {
@@ -155,4 +140,16 @@ Hooks.once("ready", () => {
   try { document.body?.classList?.toggle("fe-strip-chat-textures", !!stripTextures); } catch {}
   // Remove any inline overrides left by pre-v0.3.91 builds.
   restoreAllExisting();
+
+  // Re-assert local font preference after every GM priority sync.
+  // enableFonts is excluded from GM priority (players control it personally),
+  // but feApplyStyleVarsFromSettings is called during sync and may reset font-related
+  // inline styles. Re-applying here ensures the player's choice always wins.
+  Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
+    try {
+      if (payload?.reason !== "gm-priority-overrides") return;
+      const localFontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, true);
+      applyFontSetting(localFontsEnabled);
+    } catch { /* no-op */ }
+  });
 });

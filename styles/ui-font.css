@@ -1,20 +1,23 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
  * 구조:
- *  1) @font-face 등록
- *  2) CSS 변수 선언
- *  3) 전역 UI 폰트 적용
- *  4) 채팅 폰트 적용
- *  5) dnd5e 시트 폰트 적용
- *  6) Font Awesome 아이콘 수정
- *  7) 예외 / 패치
+ *  1) @font-face 등록 (항상 로드 — 폰트 설정과 무관)
+ *  2) CSS 변수 선언 (fe-* 내부 변수: 항상, Foundry/dnd5e 재정의: fe-fonts-enabled 조건)
+ *  3) 전역 UI 폰트 적용      (body.fe-fonts-enabled 조건)
+ *  4) 채팅 폰트 적용         (body.fe-fonts-enabled 조건)
+ *  5) dnd5e 시트 폰트 적용   (body.fe-fonts-enabled 조건)
+ *  6) Font Awesome 아이콘 수정 (body.fe-fonts-enabled 조건)
+ *  7) 예외 / 패치            (body.fe-fonts-enabled 조건)
  *
  * NOTE: CookieRun/Geurimilgi는 unicode-range로 KR + Latin 범위만 담당.
  *       그 외 문자(기호, 이모지 등)는 fallback 스택으로 자동 처리됨.
+ *
+ * 폰트 on/off: JS에서 document.body.classList.toggle("fe-fonts-enabled", enabled)
+ *              @font-face는 항상 등록되어 있으나 fe-fonts-enabled 없이는 적용 안 됨.
  */
 
 /* ===================================================
- * 1) @font-face 등록
+ * 1) @font-face 등록 (항상 로드)
  * =================================================== */
 
 @font-face {
@@ -60,20 +63,19 @@
 }
 
 /* ===================================================
- * 2) CSS 변수 선언
+ * 2-a) CSS 변수 선언 — fe-* 내부 변수 (항상 정의)
+ *       레이아웃/크기 변수는 폰트 on/off와 무관하게 유지
  * =================================================== */
 
 :root {
-  /* --- 폰트 스택 --- */
-
-  /* 이모지/기호 fallback — 커스텀 폰트가 커버 못하는 문자가 tofu가 되지 않도록 */
+  /* 이모지/기호 fallback */
   --fe-symbol-fallback:
     "Segoe UI Symbol",
     "Segoe UI Emoji",
     "Apple Color Emoji",
     "Noto Color Emoji";
 
-  /* 기본 폰트 (CookieRun) */
+  /* 폰트 스택 정의 (fe-fonts-enabled 없이도 변수는 존재, 단 적용 안 됨) */
   --fe-font-primary:
     "FE CookieRun",
     "Signika",
@@ -84,7 +86,6 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* 보조 폰트 (Geurimilgi → CookieRun → 시스템) */
   --fe-font-geurimilgi:
     "FE Geurimilgi",
     "FE CookieRun",
@@ -96,61 +97,70 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* 별칭 */
   --fe-font-secondary: var(--fe-font-geurimilgi);
 
-  /* 적용 대상별 변수 — body 클래스로 전환됨 (JS feSetXxxClass) */
-  --fe-ui-font-family:        var(--fe-font-primary);
-  --fe-chat-font-family:      var(--fe-font-primary);
-  --fe-dnd5e-label-font-family: var(--fe-font-primary);
+  /* 적용 대상별 변수 기본값 (fe-fonts-enabled 없을 때 inherit 방지) */
+  --fe-ui-font-family:          inherit;
+  --fe-chat-font-family:        inherit;
+  --fe-dnd5e-label-font-family: inherit;
 
-  /* --- Foundry 전역 폰트 변수 재정의 --- */
-  --font-primary: var(--fe-font-primary);
-  --font-sans:    var(--fe-font-primary);
-  --font-serif:   var(--fe-font-primary);
-
-  /* --- dnd5e 폰트 변수 재정의 (best-effort, 버전마다 달라질 수 있음) --- */
-  --dnd5e-font-roboto:      var(--fe-font-primary);
-  --dnd5e-font-roboto-slab: var(--fe-font-primary);
-  --dnd5e-font-signika:     var(--fe-font-primary);
-  --dnd5e-font-modesto:     var(--fe-font-primary);
-
-  /* --- Font Awesome 변수 --- */
+  /* Font Awesome 변수 */
   --fe-fa-classic: var(--fa-style-family-classic, "Font Awesome 6 Pro");
   --fe-fa-brands:  var(--fa-style-family-brands,  "Font Awesome 6 Brands");
 
-  /* --- UI 크기 / 레이아웃 (JS feApplyStyleVarsFromSettings로 덮어씌워짐) --- */
-  --fe-chat-title-size:    22px;
-  --fe-chat-subtitle-size: 14px;
+  /* UI 크기 / 레이아웃 (JS feApplyStyleVarsFromSettings로 덮어씌워짐) */
+  --fe-chat-title-size:         22px;
+  --fe-chat-subtitle-size:      14px;
   --fe-chat-meta-size:          12px;
   --fe-chat-header-icon-size:   14px;
   --fe-chat-header-icon-hit:    18px;
   --fe-chat-meta-gap:           1px;
-  --fe-inline-leading:  2px;
-  --fe-inline-pad-y:    1px;
+  --fe-inline-leading:          2px;
+  --fe-inline-pad-y:            1px;
 
-  /* --- Weight / synthesis --- */
+  /* Weight / synthesis */
   --fe-font-weight-title: 700;
   --fe-font-weight-body:  400;
   --fe-font-weight-small: 400;
 
-  /* 쿠키런/그림일기는 별도 italic 서체가 없어 synthetic bold만 허용 */
   font-synthesis: weight;
 }
 
-/* 채팅 폰트 선택 (모듈 설정) */
-body.fe-chat-font-cookie     { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
+/* ===================================================
+ * 2-b) CSS 변수 선언 — Foundry/dnd5e 재정의
+ *       body.fe-fonts-enabled 일 때만 적용
+ * =================================================== */
 
-/* UI 폰트를 그림일기로 전환 (모듈 설정) */
-body.fe-ui-font-geurimilgi {
+body.fe-fonts-enabled {
+  /* 적용 대상별 변수 활성화 */
+  --fe-ui-font-family:          var(--fe-font-primary);
+  --fe-chat-font-family:        var(--fe-font-primary);
+  --fe-dnd5e-label-font-family: var(--fe-font-primary);
+
+  /* Foundry 전역 폰트 변수 재정의 */
+  --font-primary: var(--fe-font-primary);
+  --font-sans:    var(--fe-font-primary);
+  --font-serif:   var(--fe-font-primary);
+
+  /* dnd5e 폰트 변수 재정의 */
+  --dnd5e-font-roboto:      var(--fe-font-primary);
+  --dnd5e-font-roboto-slab: var(--fe-font-primary);
+  --dnd5e-font-signika:     var(--fe-font-primary);
+  --dnd5e-font-modesto:     var(--fe-font-primary);
+}
+
+/* 채팅 폰트 선택 (모듈 설정) */
+body.fe-fonts-enabled.fe-chat-font-cookie     { --fe-chat-font-family: var(--fe-font-primary); }
+body.fe-fonts-enabled.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
+
+/* UI 폰트를 그림일기로 전환 */
+body.fe-fonts-enabled.fe-ui-font-geurimilgi {
   --fe-ui-font-family:          var(--fe-font-geurimilgi);
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
 }
 
-/* dnd5e가 .dnd5e/.dnd5e2 스코프에서 폰트 변수를 재정의할 수 있으므로
- * !important로 재어설트 */
-:is(.dnd5e, .dnd5e2) {
+/* dnd5e 스코프 재어설트 */
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) {
   --dnd5e-font-roboto:      var(--fe-font-primary) !important;
   --dnd5e-font-roboto-slab: var(--fe-font-primary) !important;
   --dnd5e-font-signika:     var(--fe-font-primary) !important;
@@ -161,17 +171,17 @@ body.fe-ui-font-geurimilgi {
  * 3) 전역 UI 폰트 적용
  * =================================================== */
 
-html, body,
-#interface,
-#ui,
-#sidebar,
-.window-app,
-.application,
-.dnd5e2,
-.dnd5e2 .window-content,
-.dnd5e2.sheet,
-.dnd5e2.application,
-.dnd5e2.app {
+body.fe-fonts-enabled,
+body.fe-fonts-enabled #interface,
+body.fe-fonts-enabled #ui,
+body.fe-fonts-enabled #sidebar,
+body.fe-fonts-enabled .window-app,
+body.fe-fonts-enabled .application,
+body.fe-fonts-enabled .dnd5e2,
+body.fe-fonts-enabled .dnd5e2 .window-content,
+body.fe-fonts-enabled .dnd5e2.sheet,
+body.fe-fonts-enabled .dnd5e2.application,
+body.fe-fonts-enabled .dnd5e2.app {
   font-family: var(--fe-ui-font-family) !important;
   font-synthesis: weight;
   text-rendering: auto;
@@ -179,28 +189,25 @@ html, body,
   -moz-osx-font-smoothing: auto;
 }
 
-/* 윈도우 타이틀 */
-.window-app .window-header :is(.window-title, .window-subtitle),
-.application .window-header :is(.window-title, .window-subtitle),
-.window-app .sheet-header :is(h1, h2, .document-name, .name),
-.dnd5e2 .sheet-header :is(h1, h2, .document-name, .name) {
+body.fe-fonts-enabled .window-app .window-header :is(.window-title, .window-subtitle),
+body.fe-fonts-enabled .application .window-header :is(.window-title, .window-subtitle),
+body.fe-fonts-enabled .window-app .sheet-header :is(h1, h2, .document-name, .name),
+body.fe-fonts-enabled .dnd5e2 .sheet-header :is(h1, h2, .document-name, .name) {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* ProseMirror 에디터 */
-.prosemirror, .ProseMirror {
+body.fe-fonts-enabled .prosemirror,
+body.fe-fonts-enabled .ProseMirror {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 폼 컨트롤 — 부모 상속 */
-#interface :is(button, input, textarea, select),
-.window-app :is(button, input, textarea, select),
-.application :is(button, input, textarea, select) {
+body.fe-fonts-enabled #interface :is(button, input, textarea, select),
+body.fe-fonts-enabled .window-app :is(button, input, textarea, select),
+body.fe-fonts-enabled .application :is(button, input, textarea, select) {
   font-family: inherit !important;
 }
 
-/* 작은 UI 텍스트 weight */
-:is(#interface, #ui, #sidebar, .window-app, .application)
+body.fe-fonts-enabled :is(#interface, #ui, #sidebar, .window-app, .application)
   :is(.hint, .notes, .form-fields, .tags, .pill) {
   font-weight: var(--fe-font-weight-small) !important;
 }
@@ -209,38 +216,35 @@ html, body,
  * 4) 채팅 폰트 적용
  * =================================================== */
 
-/* 채팅 로그 전체 */
-#sidebar #chat,
-#sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
-#sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
-#sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
-#chat-notifications,
-#chat-notifications :is(.chat-message, .message-header, .message-content, .flavor-text),
-#chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
-.chat-popout #chat,
-.chat-popout #chat :is(.chat-log, #chat-log, ol.chat-log),
-.chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
-.chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card) {
+body.fe-fonts-enabled #sidebar #chat,
+body.fe-fonts-enabled #sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
+body.fe-fonts-enabled #sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
+body.fe-fonts-enabled #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
+body.fe-fonts-enabled #chat-notifications,
+body.fe-fonts-enabled #chat-notifications :is(.chat-message, .message-header, .message-content, .flavor-text),
+body.fe-fonts-enabled #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
+body.fe-fonts-enabled .chat-popout #chat,
+body.fe-fonts-enabled .chat-popout #chat :is(.chat-log, #chat-log, ol.chat-log),
+body.fe-fonts-enabled .chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
+body.fe-fonts-enabled .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card) {
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 채팅 헤더 (액터명 / 플레이어명) */
-:is(#sidebar #chat, #chat-notifications)
+body.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications)
   .chat-message .message-sender :is(.name-stacked .title, .title) {
   font-family: var(--fe-font-primary) !important;
   font-size: var(--fe-chat-title-size) !important;
   line-height: 1.05;
 }
 
-:is(#sidebar #chat, #chat-notifications)
+body.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications)
   .chat-message .message-sender :is(.name-stacked .subtitle, .subtitle) {
   font-family: var(--fe-font-primary) !important;
   font-size: var(--fe-chat-subtitle-size) !important;
   line-height: 1.05;
 }
 
-/* 채팅 메타 (타임스탬프, 편집 버튼) — 가는 그림일기 폰트 */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata {
   font-family: var(--fe-font-secondary) !important;
   font-weight: var(--fe-font-weight-small) !important;
@@ -251,7 +255,7 @@ html, body,
   gap: var(--fe-chat-meta-gap) !important;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata :is(.message-timestamp, time) {
   order: 0;
   font-family: var(--fe-font-secondary) !important;
@@ -259,20 +263,20 @@ html, body,
   font-weight: var(--fe-font-weight-small) !important;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata :is(time.message-timestamp, .message-timestamp) {
   display: inline-block !important;
   transform: scaleX(0.75);
   transform-origin: right center;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata a.message-edit { order: 1; }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata a.chat-control { order: 2; }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata :is(a.message-edit, a.chat-control) {
   display: inline-flex !important;
   align-items: center !important;
@@ -283,37 +287,32 @@ html, body,
   font-size: var(--fe-chat-header-icon-size) !important;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-metadata :is(a.message-edit, a.chat-control) i {
   font-size: inherit !important;
 }
 
-/* 인라인 롤 앵커 */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message a.inline-roll {
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 주사위 결과 블록 */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message :is(.dice-roll, .dice-result, .dice-formula, .dice-total) {
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 주사위 툴팁 팝업 */
-#tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor) {
+body.fe-fonts-enabled #tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor) {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 채팅카드 수식 텍스트 */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   .dice-formula {
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* Markdown <em> — 전용 italic 서체가 없어 synthetic italic 허용 */
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message :is(.message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) em {
   font-style: italic !important;
   font-synthesis: style;
@@ -323,8 +322,7 @@ html, body,
  * 5) dnd5e 시트 폰트 적용
  * =================================================== */
 
-/* 시트 주요 라벨 */
-:is(.dnd5e, .dnd5e2) :is(
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) :is(
   .sheet-header,
   .sheet-header :is(h1, h2, .document-name, .name, .charname, input[name="name"]),
   .header,
@@ -337,8 +335,7 @@ html, body,
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 능력치 라벨 — 그림일기 사용 옵션 */
-:is(.dnd5e, .dnd5e2) .sheet.actor :is(
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) .sheet.actor :is(
   .ability-scores,
   .ability-scores :is(.label, label, .title, .name),
   .abilities,
@@ -351,8 +348,7 @@ html, body,
  * 6) Font Awesome 아이콘 수정
  * =================================================== */
 
-/* 모든 FA 클래스 요소 */
-:is(
+body.fe-fonts-enabled :is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -366,7 +362,7 @@ html, body,
   text-transform: none !important;
 }
 
-:is(
+body.fe-fonts-enabled :is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -374,7 +370,7 @@ html, body,
   .fa-sharp, .fa-sharp-solid, .fa-sharp-regular, .fa-sharp-light, .fa-sharp-thin,
   .fass, .fasr, .fasl, .fast
 )::before,
-:is(
+body.fe-fonts-enabled :is(
   .fa, .fas, .far, .fab,
   .fa-solid, .fa-regular, .fa-brands,
   .fa-light, .fal, .fa-thin, .fat,
@@ -386,33 +382,30 @@ html, body,
   font-style: normal !important;
 }
 
-/* Weight 매핑 */
-:is(.fa-solid, .fas, .fa-sharp-solid, .fass)         { font-weight: 900 !important; }
-:is(.fa-regular, .far, .fa-sharp-regular, .fasr)      { font-weight: 400 !important; }
-:is(.fa-light, .fal, .fa-sharp-light, .fasl)          { font-weight: 300 !important; }
-:is(.fa-thin, .fat, .fa-sharp-thin, .fast)            { font-weight: 100 !important; }
+body.fe-fonts-enabled :is(.fa-solid, .fas, .fa-sharp-solid, .fass)         { font-weight: 900 !important; }
+body.fe-fonts-enabled :is(.fa-regular, .far, .fa-sharp-regular, .fasr)      { font-weight: 400 !important; }
+body.fe-fonts-enabled :is(.fa-light, .fal, .fa-sharp-light, .fasl)          { font-weight: 300 !important; }
+body.fe-fonts-enabled :is(.fa-thin, .fat, .fa-sharp-thin, .fast)            { font-weight: 100 !important; }
 
-/* Brands */
-:is(.fa-brands, .fab),
-:is(.fa-brands, .fab)::before,
-:is(.fa-brands, .fab)::after {
+body.fe-fonts-enabled :is(.fa-brands, .fab),
+body.fe-fonts-enabled :is(.fa-brands, .fab)::before,
+body.fe-fonts-enabled :is(.fa-brands, .fab)::after {
   font-family: var(--fe-fa-brands) !important;
 }
-:is(.fa-brands, .fab) { font-weight: 400 !important; }
+body.fe-fonts-enabled :is(.fa-brands, .fab) { font-weight: 400 !important; }
 
-/* High-specificity 패치 — 특정 모듈 요소가 FA 클래스 매칭을 방해하는 경우 */
-header.window-header button.header-control.icon.fa-solid,
-header.window-header button.header-control.icon.fa-solid::before,
-header.window-header button.header-control.icon.fa-solid::after,
-section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid,
-section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::before,
-section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::after,
-button.tokenbar-header-button.fa-solid.icon,
-button.tokenbar-header-button.fa-solid.icon::before,
-button.tokenbar-header-button.fa-solid.icon::after,
-button.clear-remaining.icon.fa-solid,
-button.clear-remaining.icon.fa-solid::before,
-button.clear-remaining.icon.fa-solid::after {
+body.fe-fonts-enabled header.window-header button.header-control.icon.fa-solid,
+body.fe-fonts-enabled header.window-header button.header-control.icon.fa-solid::before,
+body.fe-fonts-enabled header.window-header button.header-control.icon.fa-solid::after,
+body.fe-fonts-enabled section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid,
+body.fe-fonts-enabled section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::before,
+body.fe-fonts-enabled section.button-group[data-application-part="buttons"] .tokenbar-buttons button.inline-control.icon.fa-solid::after,
+body.fe-fonts-enabled button.tokenbar-header-button.fa-solid.icon,
+body.fe-fonts-enabled button.tokenbar-header-button.fa-solid.icon::before,
+body.fe-fonts-enabled button.tokenbar-header-button.fa-solid.icon::after,
+body.fe-fonts-enabled button.clear-remaining.icon.fa-solid,
+body.fe-fonts-enabled button.clear-remaining.icon.fa-solid::before,
+body.fe-fonts-enabled button.clear-remaining.icon.fa-solid::after {
   font-family: var(--fe-fa-classic) !important;
   font-weight: 900 !important;
 }
@@ -421,13 +414,13 @@ button.clear-remaining.icon.fa-solid::after {
  * 7) 예외 / 패치
  * =================================================== */
 
-/* 모노스페이스 영역 — 커스텀 폰트 적용 제외 */
-code, pre, .monospace {
+body.fe-fonts-enabled code,
+body.fe-fonts-enabled pre,
+body.fe-fonts-enabled .monospace {
   font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace !important;
 }
 
-/* ve-night-mode 헤딩 대비 수정 (흰 배경에서 색상 깨짐 방지) */
-.ve-night-mode .rd__h--3 {
+body.fe-fonts-enabled .ve-night-mode .rd__h--3 {
   color: inherit !important;
   font-weight: 900 !important;
   font-style: normal !important;

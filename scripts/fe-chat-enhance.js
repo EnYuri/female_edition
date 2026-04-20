@@ -62,6 +62,9 @@ const S = {
 
   // GM priority enforcement
   GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
+
+  // GM speaks as self (not as PC token)
+  GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
 };
 
 // Default values (used as a safe fallback before settings are registered)
@@ -118,6 +121,9 @@ const FE_DEFAULTS = {
 
   // GM priority enforcement
   [S.GM_PRIORITY_ENABLED]: true,
+
+  // GM speaks as self
+  [S.GM_SPEAK_AS_SELF]: false,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -142,7 +148,9 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   "ceExportEmbedImages",
   "ceExportPrintImageMode",
   "ceExportDesktopExternalMode",
+  "enableFonts",           // 플레이어 개인 글꼴 on/off 선택 허용
   S.GM_PRIORITY_ENABLED,
+  S.GM_SPEAK_AS_SELF,
 ]);
 
 function feIsGmPriorityEnabled() {
@@ -448,7 +456,12 @@ function feApplyStyleVarsFromSettings(doc = document) {
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
     // Optional: override Foundry's heading font variable
-    const h1Cookie = !!feSetting(S.UI_OVERRIDE_FONT_H1_COOKIE);
+    // Only apply when the player has custom fonts enabled (enableFonts is excluded from
+    // GM priority so each player controls this independently).
+    const fontsEnabled = (() => {
+      try { return !!game.settings.get(MODULE_ID, "enableFonts"); } catch { return true; }
+    })();
+    const h1Cookie = fontsEnabled && !!feSetting(S.UI_OVERRIDE_FONT_H1_COOKIE);
     if (h1Cookie) root.style.setProperty("--font-h1", "var(--fe-font-primary)");
     else root.style.removeProperty("--font-h1");
   } catch (err) {
@@ -872,6 +885,16 @@ Hooks.once("init", () => {
     },
   });
 
+  game.settings.register(MODULE_ID, S.GM_SPEAK_AS_SELF, {
+    name: "GM: PC 토큰 선택 시 본인 이름으로 채팅",
+    hint: "활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.",
+    scope: "client",
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  });
+
   // Install chat-log level refreshes on the supported v13 render hook.
   Hooks.on("renderChatLog", (_app, html) => {
     try {
@@ -1178,6 +1201,42 @@ function feDeferTask(fn) {
   }
 }
 
+/**
+ * Snapshot the bottom-pinned state of all chat logs before DOM mutations,
+ * and return a restore function that scrolls them back to the bottom afterwards.
+ * Also sets Foundry's _scrollBottom flag if it exists, matched per-app.
+ *
+ * Tolerance: 2px (Foundry's own _onScrollLog uses <= 1px + 1px sub-pixel margin).
+ */
+function feSnapshotAndRestoreStickyScroll() {
+  // Build a map of log → app so we can update _scrollBottom per-app correctly.
+  const apps = [ui?.chat, game?.messages?.directory].filter(Boolean);
+  const logToApp = new Map();
+  for (const app of apps) {
+    try {
+      const appLog = app.element?.querySelector?.("ol.chat-log, #chat-log");
+      if (appLog) logToApp.set(appLog, app);
+    } catch { /* no-op */ }
+  }
+
+  const states = feGetChatLogs().map((log) => {
+    if (!feIsElementNode(log)) return null;
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 2;
+    return { log, atBottom, app: logToApp.get(log) ?? null };
+  }).filter(Boolean);
+
+  return function feRestoreStickyScroll() {
+    for (const { log, atBottom, app } of states) {
+      if (!atBottom) continue;
+      try { log.scrollTop = log.scrollHeight; } catch { /* no-op */ }
+      // Update the matched app's _scrollBottom flag only, not all apps.
+      try {
+        if (app && typeof app._scrollBottom === "boolean") app._scrollBottom = true;
+      } catch { /* no-op */ }
+    }
+  };
+}
+
 
 const fePendingRenderedLogs = new Set();
 const fePendingRenderedLogOptions = new WeakMap();
@@ -1234,6 +1293,7 @@ function feWindowCancelFrame(win, handle) {
 }
 
 function feFlushRenderedLogsForWindow(win = window) {
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
   try {
     const pending = Array.from(fePendingRenderedLogs).filter((log) => (log?.ownerDocument?.defaultView ?? window) === win);
     for (const log of pending) {
@@ -1243,11 +1303,10 @@ function feFlushRenderedLogsForWindow(win = window) {
       try {
         feDedupeChatMessagesInLog(log);
         feApplyRenderedStateToLog(log, opts);
-      } catch {
-        /* no-op */
-      }
+      } catch { /* no-op */ }
     }
   } finally {
+    restoreStickyScroll();
     fePendingRenderedLogFrames.delete(win);
   }
 }
@@ -1359,25 +1418,30 @@ function feFlushQueuedRenderedMessageRefreshes() {
       return;
     }
 
+    // Snapshot which logs are pinned to the bottom BEFORE we mutate the DOM.
+    // merge class changes alter scrollHeight; if Foundry already decided not to
+    // auto-scroll (because it saw the pre-mutation height), we need to restore.
+    const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
     const logs = feGetChatLogs();
     let missing = false;
-    for (const log of logs) {
-      if (!feIsElementNode(log)) continue;
-      try { feDedupeChatMessagesInLog(log); } catch {}
-      const anchors = new Set();
-      for (const id of ids) {
-        const el = log.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
-        if (!el) {
-          missing = true;
-          continue;
+    try {
+      for (const log of logs) {
+        if (!feIsElementNode(log)) continue;
+        try { feDedupeChatMessagesInLog(log); } catch {}
+        const anchors = new Set();
+        for (const id of ids) {
+          const el = log.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
+          if (!el) { missing = true; continue; }
+          anchors.add(el);
         }
-        anchors.add(el);
+        for (const el of anchors) {
+          const msg = feGetMessageFromElementOrCollection(el);
+          feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+          if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
+        }
       }
-      for (const el of anchors) {
-        const msg = feGetMessageFromElementOrCollection(el);
-        feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
-        if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
-      }
+    } finally {
+      restoreStickyScroll();
     }
 
     if (missing && feQueuedRenderedMessagePass < 2) {
@@ -1571,7 +1635,7 @@ function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
       if (!msg) continue;
       feApplyRenderedStateToMessageElement(msg, li, { allowNarratorMerge });
     }
-    if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge });
+    if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge, preNodes: nodes });
   } catch {
     /* no-op */
   }
@@ -2237,24 +2301,49 @@ function feGetPendingMessageSource(message, data = {}) {
 Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
+
+    // GM speak-as-self: if GM has a PC-owned token selected, reset speaker to GM.
+    if (game.user?.isGM && feSetting(S.GM_SPEAK_AS_SELF)) {
+      try {
+        const speaker = data?.speaker ?? message?.speaker ?? {};
+        const OWNER = 3; // DOCUMENT_OWNERSHIP_LEVELS.OWNER
+
+        // Resolve actor: linked actors via speaker.actor, unlinked via speaker.token
+        let actor = null;
+        if (speaker?.actor) {
+          actor = game.actors?.get(speaker.actor) ?? null;
+        }
+        if (!actor && speaker?.token && speaker?.scene) {
+          const scene = game.scenes?.get(speaker.scene);
+          const tokenDoc = scene?.tokens?.get(speaker.token);
+          actor = tokenDoc?.actor ?? null;
+        }
+
+        if (actor) {
+          const ownership = actor.ownership ?? {};
+          const hasPlayerOwner = Object.entries(ownership).some(([uid, level]) => {
+            if (uid === "default") return false;
+            const user = game.users?.get(uid);
+            return user && !user.isGM && level >= OWNER;
+          });
+
+          if (hasPlayerOwner) {
+            // Build a GM-only speaker: clear token/actor, keep user name as alias.
+            const gmSpeaker = {
+              scene: null,
+              actor: null,
+              token: null,
+              alias: game.user.name,
+            };
+            message.updateSource({ speaker: gmSpeaker });
+          }
+        }
+      } catch {
+        /* no-op */
+      }
+    }
+
     feApplyMarkdownOnPreCreate(message, data, userId);
-    // NOTE: fePrepareInlineRollSnapshotOnPreCreate was intentionally removed.
-    //
-    // The old approach froze [[formula]] → <a class="inline-roll"> in message.content
-    // BEFORE storage, replacing the raw syntax with an anchor HTML string. This caused:
-    //
-    //   1. message.content in DB = "<p><a class='inline-roll'>7</a></p>" (anchor)
-    //   2. feGetStoredInlineRollSnapshotFlag computed expectedHash from the anchor content
-    //   3. The snapshot flag stored sourceHash from the original "[[1d12]]" content
-    //   4. Hash mismatch → snapshot permanently inaccessible → system dead
-    //   5. feFreezeInlineRollSyntax was also called TWICE (once in feAttachInlineRollSnapshotFlag,
-    //      once in feFinalizeInlineRollFreeze) → double roll evaluation
-    //
-    // Correct approach: leave [[formula]] in message.content.
-    // Foundry's TextEditor.enrichHTML() evaluates it during rendering (correct result,
-    // with full actor roll data). feSnapshotOrRestoreInlineRolls captures the Foundry-
-    // evaluated anchor on first render and restores it on subsequent re-renders,
-    // preventing the roll value from changing when merge/refresh triggers a re-render.
     feCaptureMessageRenderFlagsOnPreCreate(message, feGetPendingMessageSource(message, data), userId);
   } catch {
     /* no-op */
@@ -3042,12 +3131,13 @@ function feScheduleMergeRetry(logEl, delay = 80) {
 
     const t = setTimeout(() => {
       feMergeRetryTimers.delete(logEl);
+      const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
       try {
         feDedupeChatMessagesInLog(logEl);
         feApplyChatMerge(logEl);
         if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToLog(logEl, logEl?.ownerDocument ?? document);
-      } catch {
-        /* no-op */
+      } finally {
+        restoreStickyScroll();
       }
     }, delay);
 
@@ -3138,11 +3228,16 @@ function feApplyMergeClassSetToElement(el, desired = null) {
   }
 }
 
-function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
+function feApplyChatMerge(logEl, { allowNarratorMerge = false, preNodes = null } = {}) {
   if (!feIsElementNode(logEl)) return;
   try { feDedupeChatMessagesInLog(logEl); } catch {}
 
-  const msgs = Array.from(logEl.querySelectorAll("li.chat-message"));
+  // Use pre-collected node list when provided by the caller to avoid a redundant
+  // querySelectorAll. The caller (feApplyRenderedStateToLog) already holds the same
+  // live NodeList snapshot and performs no element removals before this call.
+  const msgs = Array.isArray(preNodes) && preNodes.length > 0
+    ? preNodes
+    : Array.from(logEl.querySelectorAll("li.chat-message"));
 
   const applyDesiredClasses = (desiredMap) => {
     for (const el of msgs) {
@@ -3236,8 +3331,13 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false } = {}) {
 
 
 function feApplyChatMergeToAllLogs() {
-  for (const log of feGetChatLogs()) {
-    feApplyChatMerge(log);
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+  try {
+    for (const log of feGetChatLogs()) {
+      feApplyChatMerge(log);
+    }
+  } finally {
+    restoreStickyScroll();
   }
 }
 
