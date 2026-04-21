@@ -174,7 +174,7 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
 }
 
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-mid {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
   margin-bottom: 0 !important;
   border-radius: 0 !important;
   border-top-width: 0 !important;
@@ -182,7 +182,7 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
 }
 
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top-width: 0 !important;
@@ -192,7 +192,7 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
  * converts it to fe-merge-start/mid/end. During that brief window, apply the same
  * margin collapse as fe-merge-end so there's no visual gap. */
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -0.5) !important;
+  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top-width: 0 !important;

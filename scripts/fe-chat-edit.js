@@ -212,6 +212,7 @@ async function feCommitInlineEdit() {
   } catch (err) {
     console.error("[female_edition] edit update failed", err);
     ui?.notifications?.error("메시지 수정에 실패했습니다. 콘솔을 확인하세요.");
+    return;
   }
 
   feCancelInlineEdit();

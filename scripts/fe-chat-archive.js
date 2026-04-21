@@ -3475,7 +3475,6 @@ function feApplyChatMergeInWindow(win) {
 
     feSyncArchiveMergeBodyClasses(win.document);
     feApplyRenderedStateToLog(logEl, feArchiveMergeOptions());
-    if (!feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, feArchiveMergeOptions());
     feRefreshPortraitsForLog(logEl);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
@@ -4254,7 +4253,7 @@ function feMarkPlainArchiveMessage(node, msg, liveEl = null) {
 function feFallbackRenderChatMessage(doc, msg) {
   if (!doc) throw new Error("No document provided");
   const li = doc.createElement("li");
-  li.className = "chat-message message flexcol dnd5e2 fe-pseudo-sanitized";
+  li.className = "chat-message message flexcol fe-pseudo-sanitized";
 
   try {
     const id = msg?.id ?? msg?._id;

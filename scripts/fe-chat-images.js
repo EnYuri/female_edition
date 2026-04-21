@@ -568,7 +568,10 @@ async function ciSendPending(root = document) {
       if (!src) continue;
       resolved.push({ ...item, src });
     }
-    if (!resolved.length) return false;
+    if (!resolved.length) {
+      ui?.notifications?.warn?.("전송할 수 있는 이미지가 없습니다. 업로드에 실패했거나 파일이 너무 클 수 있습니다.");
+      return false;
+    }
 
     await ChatMessage.create({
       content: ciBuildMessageHtml(resolved, note),

@@ -260,8 +260,8 @@ class FemaleEditionSettingsMenu extends FormApplication {
         setBool(S.MARKDOWN_ENABLED),
         setBool(S.EDIT_ENABLED),
 
-        // GM priority
-        setBool(S.GM_PRIORITY_ENABLED),
+        // GM priority (world-scoped — non-GMs lack write permission)
+        ...(game.user?.isGM ? [setBool(S.GM_PRIORITY_ENABLED)] : []),
 
         // Export
         setBool(S.EXPORT_ENABLED),

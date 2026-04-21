@@ -8,15 +8,7 @@
       "flags": {}
     }
   ],
-  "relationships": {
-    "systems": [
-      {
-        "id": "dnd5e",
-        "type": "system",
-        "compatibility": {}
-      }
-    ]
-  },
+  "relationships": {},
   "esmodules": [
     "scripts/chat-bg-stripper.js",
     "scripts/fe-chat-enhance.js",
