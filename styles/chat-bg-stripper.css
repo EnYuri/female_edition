@@ -324,21 +324,6 @@ body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img[class*="chat
 }
 
 
-/* System texture stripping must apply equally to newly rendered and lazily-loaded old messages.
- * dnd5e uses .message::before with ui/texture-gray1.webp; override it at CSS level.
- */
-body.fe-strip-chat-textures :is(.chat-popout, #chat-log, .chat-log, ol.chat-log) .message::before {
-  background-image: none !important;
-  background: transparent !important;
-}
-
-
-body.fe-hide-portraits #chat-notifications .chat-message .message-header img.fe-chat-portrait,
-body.fe-hide-portraits #chat-notifications .chat-message .message-header .fe-chat-portrait-wrap {
-  display: none !important;
-}
-
-
 /* --------------------------------
  * 2c) CSS-first dnd5e texture stripping (v0.3.91+)
  * --------------------------------

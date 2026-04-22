@@ -81,7 +81,7 @@ function feApplyStyleVarsFromSettings(doc = document) {
     root.style.setProperty("--fe-chat-message-font-size", px(feSetting(S.STYLE_MESSAGE_TEXT_SIZE), 14));
     root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), 12));
 
-    const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 4);
+    const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 2);
     root.style.setProperty("--fe-chat-message-spacing", chatSpacing);
     root.style.setProperty("--chat-message-spacing", chatSpacing);
 

@@ -53,7 +53,7 @@ import {
   feGetMessageUserColor, feGetSpeakerActorFromMessage,
 } from "./fe-render-state.js";
 
-import { feSnapshotOrRestoreInlineRolls, feClearInlineRollSnapshot } from "./fe-inline-rolls.js";
+import { feSnapshotOrRestoreInlineRolls, feClearInlineRollSnapshot, feIsMessageFreezeInProgress } from "./fe-inline-rolls.js";
 
 import {
   feClearMergeClassesFromMessageElement,
@@ -169,7 +169,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: false,
     onChange: () => feApplyChatMergeToAllLogs(),
   });
 
@@ -179,7 +179,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: true,
     onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
   });
 
@@ -189,7 +189,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: false,
     onChange: () => feApplyChatMergeToAllLogs(),
   });
 
@@ -203,7 +203,7 @@ Hooks.once("init", () => {
       standard: "표준(경계/간격까지 묶기)",
       simple: "간소화(후속 헤더만 숨김)",
     },
-    default: "standard",
+    default: "simple",
     onChange: () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
@@ -835,9 +835,14 @@ Hooks.on("deleteChatMessage", (message) => {
 
 Hooks.on("updateChatMessage", (message, change, _options, userId) => {
   try {
-    if (feChangeTouchesInlineRollSnapshot(change)) feClearInlineRollSnapshot(message?.id ?? message?._id);
+    const msgId = message?.id ?? message?._id;
+    // Skip clearing the snapshot when this update was triggered by the module's own
+    // freeze operation — the snapshot must survive into the re-render so it can
+    // restore the original roll value if enrichHTML re-evaluates the frozen anchor.
+    if (feChangeTouchesInlineRollSnapshot(change) && !feIsMessageFreezeInProgress(msgId))
+      feClearInlineRollSnapshot(msgId);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
-    feDeferTask(() => feScheduleRenderedMessageRefresh(message?.id ?? message?._id, { delay: 0 }));
+    feDeferTask(() => feScheduleRenderedMessageRefresh(msgId, { delay: 0 }));
   } catch {
     /* no-op */
   }

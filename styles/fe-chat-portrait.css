@@ -151,6 +151,9 @@ body.fe-chat-portrait-name-align-left li.chat-message.fe-has-chat-portrait > .me
       "portrait sender"
       "portrait flavor" !important;
   }
+  li.chat-message.fe-has-chat-portrait > .message-header .message-metadata {
+    display: none !important;
+  }
 }
 
 /* Legacy wrapper-based injection (<=0.3.49) */

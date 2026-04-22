@@ -26,6 +26,38 @@
   background: rgba(0, 0, 0, 0.05);
 }
 
+#fe-chat-inline-editor .fe-chat-inline-editor-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+#fe-chat-inline-editor .fe-edit-mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+#fe-chat-inline-editor .fe-edit-mode-btn {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 0.75em;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-light-6);
+  cursor: pointer;
+  line-height: 22px;
+}
+
+#fe-chat-inline-editor .fe-edit-mode-btn.active {
+  background: var(--color-bg-btn, rgba(255, 255, 255, 0.18));
+  color: var(--color-text-light-highlight, #fff);
+  font-weight: 600;
+}
+
 #fe-chat-inline-editor .fe-chat-inline-editor-row textarea.fe-chat-inline-editor-text {
   width: 100%;
   resize: vertical;

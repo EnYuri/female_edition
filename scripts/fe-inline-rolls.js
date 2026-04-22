@@ -3,6 +3,20 @@ import { feNormalizeChatMessageId, feExtractHTMLElement, feCreateElementFromHTML
 const feInlineRollSnapshots = new Map(); // messageId → { anchors: string[] }
 const FE_INLINE_ROLL_SNAPSHOT_MAX = 400; // 세션 내 최대 보관 메시지 수
 
+// Messages currently being frozen by feFreezeInlineRollsIntoContent.
+// While a message is in this set, updateChatMessage must NOT clear its snapshot —
+// the snapshot must survive the freeze-triggered re-render so it can restore the original value.
+const feFreezingInProgress = new Set();
+
+function feIsMessageFreezeInProgress(messageId) {
+  try {
+    const id = feNormalizeChatMessageId(messageId);
+    return id ? feFreezingInProgress.has(id) : false;
+  } catch {
+    return false;
+  }
+}
+
 function feStoreInlineRollSnapshot(message, anchors) {
   try {
     const id = feNormalizeChatMessageId(message?.id ?? message?._id);
@@ -99,7 +113,17 @@ async function feFreezeInlineRollsIntoContent(message, anchors) {
     if (anchorIdx !== anchors.length) return;
     if (frozen === message.content) return;
 
-    await message.update({ content: frozen });
+    // Mark this message as freeze-in-progress so the updateChatMessage hook
+    // does not clear the snapshot when this update lands.  The snapshot must
+    // survive into the re-render triggered by the update so it can restore
+    // the original roll value if enrichHTML re-evaluates the frozen anchor.
+    const msgId = feNormalizeChatMessageId(message?.id ?? message?._id);
+    if (msgId) feFreezingInProgress.add(msgId);
+    try {
+      await message.update({ content: frozen });
+    } finally {
+      if (msgId) feFreezingInProgress.delete(msgId);
+    }
   } catch {
     /* no-op: fire-and-forget */
   }
@@ -147,7 +171,6 @@ function feSnapshotOrRestoreInlineRolls(message, rootEl) {
 }
 
 export {
-  feInlineRollSnapshots,
   feStoreInlineRollSnapshot,
   feGetInlineRollSnapshot,
   feClearInlineRollSnapshot,
@@ -155,4 +178,5 @@ export {
   feAnchorHasUnresolvedVariable,
   feFreezeInlineRollsIntoContent,
   feSnapshotOrRestoreInlineRolls,
+  feIsMessageFreezeInProgress,
 };

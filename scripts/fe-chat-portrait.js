@@ -199,9 +199,6 @@ function cpSetRootVars(doc = document) {
     const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
     targetDoc.documentElement.style.setProperty("--fe-chat-portrait-size", `${size}px`);
 
-    const enabled = !!cpGet(CP.ENABLED);
-    targetDoc.documentElement.classList.toggle("fe-chat-portrait-enabled", enabled);
-
     const hideWrap = !!cpGet(CP.HIDE_WRAP);
     targetDoc.body?.classList?.toggle("fe-hide-chat-portrait-wrap", hideWrap);
 

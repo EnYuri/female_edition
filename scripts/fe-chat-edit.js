@@ -66,6 +66,8 @@ function feEnsureMessageEditControl(message, messageEl) {
 // -------------------------------------
 
 let FE_EDITING_MESSAGE_ID = null;
+// "markdown" | "html"
+let FE_EDIT_MODE = "markdown";
 
 function feCanEditMessage(msg) {
   try {
@@ -120,6 +122,12 @@ function feEnsureInlineEditorUI() {
   wrap.id = "fe-chat-inline-editor";
   wrap.className = "fe-chat-inline-editor";
   wrap.innerHTML = `
+    <div class="fe-chat-inline-editor-header">
+      <div class="fe-edit-mode-toggle">
+        <button type="button" class="fe-edit-mode-btn active" data-mode="markdown">마크다운</button>
+        <button type="button" class="fe-edit-mode-btn" data-mode="html">HTML</button>
+      </div>
+    </div>
     <div class="fe-chat-inline-editor-row">
       <textarea class="fe-chat-inline-editor-text" rows="3" spellcheck="false"></textarea>
     </div>
@@ -143,6 +151,10 @@ function feEnsureInlineEditorUI() {
 
   btnSave.addEventListener("click", () => feCommitInlineEdit());
   btnCancel.addEventListener("click", () => feCancelInlineEdit());
+
+  wrap.querySelectorAll(".fe-edit-mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => feSetEditMode(wrap, btn.dataset.mode));
+  });
 
   textarea.addEventListener("keydown", (ev) => {
     // Ctrl+Enter => save
@@ -172,6 +184,29 @@ function feSetChatInputDisabled(disabled) {
   input.classList.toggle("fe-chat-input-disabled", disabled);
 }
 
+function feSetEditMode(wrap, newMode) {
+  if (!wrap || newMode === FE_EDIT_MODE) return;
+
+  const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
+  const msg = FE_EDITING_MESSAGE_ID ? game?.messages?.get?.(FE_EDITING_MESSAGE_ID) : null;
+
+  if (newMode === "html") {
+    // Show the stored HTML content directly
+    if (textarea && msg) textarea.value = String(msg.content ?? "");
+  } else {
+    // Show raw markdown (or stripped text if no raw flag)
+    if (textarea && msg) textarea.value = feGetEditableRaw(msg);
+  }
+
+  FE_EDIT_MODE = newMode;
+
+  wrap.querySelectorAll(".fe-edit-mode-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mode === newMode);
+  });
+
+  textarea?.focus();
+}
+
 function feStartInlineEdit(msg) {
   if (!feCanEditMessage(msg)) {
     ui?.notifications?.warn("이 메시지를 수정할 권한이 없습니다.");
@@ -182,8 +217,18 @@ function feStartInlineEdit(msg) {
 
   FE_EDITING_MESSAGE_ID = msg.id;
 
+  // Default to markdown mode if raw flag exists, otherwise HTML mode
+  const hasRaw = !!(msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain"));
+  const initialMode = hasRaw ? "markdown" : "html";
+  FE_EDIT_MODE = initialMode;
+
   const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
-  textarea.value = feGetEditableRaw(msg);
+  textarea.value = initialMode === "html" ? String(msg.content ?? "") : feGetEditableRaw(msg);
+
+  // Sync toggle button active state
+  wrap.querySelectorAll(".fe-edit-mode-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mode === initialMode);
+  });
 
   wrap.style.display = "";
   feSetChatInputDisabled(true);
@@ -208,7 +253,11 @@ async function feCommitInlineEdit() {
   }
 
   try {
-    await feUpdateMessageFromRaw(msg, raw);
+    if (FE_EDIT_MODE === "html") {
+      await feUpdateMessageFromHTML(msg, raw);
+    } else {
+      await feUpdateMessageFromRaw(msg, raw);
+    }
   } catch (err) {
     console.error("[female_edition] edit update failed", err);
     ui?.notifications?.error("메시지 수정에 실패했습니다. 콘솔을 확인하세요.");
@@ -284,6 +333,12 @@ function feApplyRawEditPreUpdate(message, changed, userId = null) {
 async function feUpdateMessageFromRaw(msg, rawText) {
   const payload = feBuildEditUpdate(rawText);
   await msg.update(payload);
+}
+
+// HTML mode: save content as-is, no markdown flags touched.
+// feApplyRawEditPreUpdate skips payloads without raw/plain flags, so no conflict.
+async function feUpdateMessageFromHTML(msg, htmlText) {
+  await msg.update({ content: (htmlText ?? "").toString() });
 }
 
 function fePatchChatContextOptions(inject) {

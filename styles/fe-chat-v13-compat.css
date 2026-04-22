@@ -17,7 +17,6 @@
 #chat-notifications,
 #chat-notifications :is(.message, .message-header, .message-content, .flavor-text, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card),
 .chat-popout #chat :is(.message, .message-header, .message-content, .flavor-text),
-.chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card),
 .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
   font-family: var(--fe-chat-font-family, var(--fe-font-primary), var(--font-primary), Signika, sans-serif) !important;
 }

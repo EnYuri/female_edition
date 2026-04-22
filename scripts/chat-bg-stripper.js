@@ -1,4 +1,4 @@
-// female_edition: FVTT v13 + dnd5e 5.2.5
+// female_edition: FVTT v13+
 // Chat message/card texture stripper — settings + CSS-class driver only.
 //
 // v0.3.91+: Texture stripping is CSS-first.
@@ -113,7 +113,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, SETTINGS.STRIP_TEXTURES, {
     name: "채팅 카드 텍스쳐 제거",
-    hint: "dnd5e 기본 parchment/texture 배경만 제거하고, 색상 오버레이(채도 약화)는 유지합니다.",
+    hint: "채팅 카드의 parchment/texture 배경 이미지를 제거하고, 색상 오버레이(채도 약화)는 유지합니다.",
     scope: "client",
     config: true,
     type: Boolean,
