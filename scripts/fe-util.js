@@ -221,29 +221,83 @@ function feWindowCancelFrame(win, handle) {
   clearTimeout(handle);
 }
 
+// Pixel tolerance for pixel-gap fallback. v13's _onScrollLog uses the top 1%
+// of the scrollable range; we use a tight 2px gap so a small user scroll-up
+// is not misclassified as "at bottom".
+const FE_STICKY_PIXEL_TOLERANCE = 2;
+
+// In v13 the ChatLog DOM is:
+//   <div class="chat-scroll">  ← actual scroll container (overflow-y: auto)
+//     <ol class="chat-log">    ← non-scrollable; scrollHeight ≈ clientHeight
+//   </div>
+// feGetChatLogs() returns the inner <ol>, so any pixel-gap measurement on it
+// is meaningless (always ~0). Walk up to find the real scroll container.
+function feFindScrollContainer(el) {
+  try {
+    if (!feIsElementNode(el)) return el;
+    const win = el.ownerDocument?.defaultView ?? globalThis;
+    const direct = el.closest?.(".chat-scroll");
+    if (direct) return direct;
+    let cur = el.parentElement;
+    const root = el.ownerDocument?.documentElement ?? null;
+    while (cur && cur !== root) {
+      // Either CSS opts the element into scrolling, or layout tells us it
+      // does scroll. Either is sufficient evidence.
+      const overflowY = win.getComputedStyle?.(cur)?.overflowY;
+      if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return cur;
+      if (cur.scrollHeight > cur.clientHeight + 1) return cur;
+      cur = cur.parentElement;
+    }
+  } catch { /* no-op */ }
+  return el;
+}
+
 function feSnapshotAndRestoreStickyScroll() {
-  const apps = [ui?.chat, game?.messages?.directory].filter(Boolean);
   const logToApp = new Map();
-  for (const app of apps) {
+  const registerApp = (app) => {
+    if (!app) return;
     try {
-      const appLog = app.element?.querySelector?.("ol.chat-log, #chat-log");
-      if (appLog) logToApp.set(appLog, app);
+      const root = app.element?.[0] ?? app.element ?? null;
+      const appLog = root?.querySelector?.("ol.chat-log, #chat-log")
+        ?? app.element?.querySelector?.("ol.chat-log, #chat-log");
+      if (appLog && !logToApp.has(appLog)) logToApp.set(appLog, app);
     } catch { /* no-op */ }
-  }
+  };
+  registerApp(ui?.chat);
+  registerApp(game?.messages?.directory);
+  try {
+    for (const app of Object.values(ui?.windows ?? {})) {
+      if (!app) continue;
+      // ChatLog popouts expose scrollBottom() — that is our duck-type signal.
+      if (typeof app.scrollBottom === "function") registerApp(app);
+    }
+  } catch { /* no-op */ }
 
   const states = feGetChatLogs().map((log) => {
     if (!feIsElementNode(log)) return null;
-    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 2;
-    return { log, atBottom, app: logToApp.get(log) ?? null };
+    const app = logToApp.get(log) ?? null;
+    const scrollEl = feFindScrollContainer(log);
+    // Trust the app's isAtBottom getter when available — Foundry updates it
+    // synchronously in _onScrollLog from `pct = scrollTop / (scrollHeight -
+    // clientHeight); isAtBottom = pct > 0.99 || isNaN(pct)`. The pixel-gap
+    // fallback below is only for unregistered logs (archive/detached views).
+    if (app && typeof app.isAtBottom === "boolean") {
+      return { log, scrollEl, atBottom: app.isAtBottom, app };
+    }
+    const pixelGap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+    return { log, scrollEl, atBottom: pixelGap < FE_STICKY_PIXEL_TOLERANCE, app };
   }).filter(Boolean);
 
   return function feRestoreStickyScroll() {
-    for (const { log, atBottom, app } of states) {
+    for (const { scrollEl, atBottom, app } of states) {
       if (!atBottom) continue;
-      try { log.scrollTop = log.scrollHeight; } catch { /* no-op */ }
-      try {
-        if (app && typeof app._scrollBottom === "boolean") app._scrollBottom = true;
-      } catch { /* no-op */ }
+      // Set scrollTop on the actual scroll container (.chat-scroll in v13),
+      // not the inner <ol> which is non-scrollable.
+      try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch { /* no-op */ }
+      // v13 ChatLog tracks sticky state in a real ES private (#isAtBottom).
+      // The public scrollBottom() method is the only supported way to nudge
+      // Foundry's internal flag back to "at bottom" after our DOM mutations.
+      try { app?.scrollBottom?.(); } catch { /* no-op */ }
     }
   };
 }

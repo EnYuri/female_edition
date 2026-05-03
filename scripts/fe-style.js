@@ -87,9 +87,9 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
-    // enableFonts is excluded from GM priority so each player controls it independently.
+    // UI_ENABLE_FONTS is excluded from GM priority so each player controls it independently.
     const fontsEnabled = (() => {
-      try { return !!game.settings.get(MODULE_ID, "enableFonts"); } catch { return true; }
+      try { return !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS); } catch { return true; }
     })();
     const h1Cookie = fontsEnabled && !!feSetting(S.UI_OVERRIDE_FONT_H1_COOKIE);
     if (h1Cookie) root.style.setProperty("--font-h1", "var(--fe-font-primary)");

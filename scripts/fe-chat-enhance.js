@@ -284,26 +284,26 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: true,
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_EMBED_IMAGES, {
-    name: "HTML 저장: 이미지 포함(용량 증가)",
-    hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 로그가 크면 저장 시간이 늘고 용량이 커질 수 있습니다.",
+    name: "HTML 저장: 이미지 포함",
+    hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 같은 이미지가 반복되면 자동으로 중복을 제거하여 용량을 절약합니다.",
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: true,
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_PRINT_IMAGE_MODE, {
     name: "PDF/인쇄: 이미지 처리",
-    hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나(권장) 다운스케일할 수 있습니다.",
+    hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나 다운스케일할 수 있습니다.",
     scope: "client",
     config: true,
     type: String,
     choices: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
-    default: "hideAvatars",
+    default: "downscaleLite",
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_DESKTOP_EXTERNAL_MODE, {
@@ -328,7 +328,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Number,
-    default: 22,
+    default: FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE],
     range: { min: 10, max: 40, step: 1 },
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
@@ -339,7 +339,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Number,
-    default: 14,
+    default: FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE],
     range: { min: 8, max: 28, step: 1 },
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
@@ -372,7 +372,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Number,
-    default: 4,
+    default: FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING],
     range: { min: 0, max: 24, step: 1 },
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
@@ -407,7 +407,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: FE_DEFAULTS[S.UI_USE_GEURIMILGI],
     onChange: () => feSetUiFontClass(document),
   });
 
@@ -417,14 +417,16 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: FE_DEFAULTS[S.UI_OVERRIDE_FONT_H1_COOKIE],
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
+  // Migration-only flag (read by feMigrateLegacySettings, then reset to false).
+  // Hidden from the user-facing settings panel.
   game.settings.register(MODULE_ID, LEGACY_UI_FONT_KEY, {
     name: "(legacy) UI font toggle",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
   });
@@ -435,7 +437,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: false,
+    default: FE_DEFAULTS[S.USE_USER_COLOR_BG],
     onChange: () => {
       feSetUserColorBgClass(document);
       feApplyUserColorBgToAllLogs(document);
@@ -463,7 +465,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Number,
-    default: 0.42,
+    default: FE_DEFAULTS[S.STYLE_BG_SATURATION],
     range: { min: 0.05, max: 1.0, step: 0.01 },
     onChange: () => feApplyStyleVarsFromSettings(document),
   });

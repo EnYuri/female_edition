@@ -150,10 +150,30 @@ function feLooksLikeHTML(text) {
   return /<\s*[a-zA-Z][\s\S]*?>/.test(text);
 }
 
+// Theatre Inserts (module id "theatre") aborts its stage textbox animation in
+// `createChatMessage` when message content starts with "<" or contains a <div>
+// block. If we convert plain text to <p>...</p> during preCreateChatMessage
+// while the user is speaking-as a stage character, Theatre treats the message
+// as pre-formatted HTML and the stage animation never plays. Detect that case
+// and let Theatre handle the message untouched.
+function feIsTheatreStageMessageForCurrentUser() {
+  try {
+    if (!game.modules?.get?.("theatre")?.active) return false;
+    const T = globalThis.Theatre?.instance;
+    if (!T) return false;
+    const uid = game.user?.id;
+    if (!uid) return false;
+    return !!(T.speakingAs && T.usersTyping?.[uid]?.theatreId);
+  } catch {
+    return false;
+  }
+}
+
 function feApplyMarkdownOnPreCreate(message, data = {}, userId = null) {
   try {
     if (!feSetting(S.MARKDOWN_ENABLED)) return false;
     if (userId !== game.user.id) return false;
+    if (feIsTheatreStageMessageForCurrentUser()) return false;
 
     const content = String(data?.content ?? message?.content ?? "");
     const trimmed = content.trim();
@@ -190,5 +210,6 @@ export {
   feInlineFormat,
   feMarkdownToHTML,
   feLooksLikeHTML,
+  feIsTheatreStageMessageForCurrentUser,
   feApplyMarkdownOnPreCreate,
 };

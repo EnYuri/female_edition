@@ -3,11 +3,11 @@
 
 import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting } from "./fe-chat-enhance.js";
 
-// Settings keys owned by other split modules
+// Settings keys owned by other split modules (kept as alias for clarity).
 const BG = Object.freeze({
-  ENABLE_FONTS: "enableFonts",
-  HIDE_BASE_PORTRAITS: "hideChatPortraits",
-  STRIP_TEXTURES: "stripChatTextures",
+  ENABLE_FONTS: S.UI_ENABLE_FONTS,
+  HIDE_BASE_PORTRAITS: S.UI_HIDE_PORTRAITS,
+  STRIP_TEXTURES: S.UI_STRIP_TEXTURES,
 });
 
 const CP = Object.freeze({

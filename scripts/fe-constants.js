@@ -21,6 +21,11 @@ const S = {
   CHAT_FONT_CHOICE: "ceChatFontChoice",
   UI_USE_GEURIMILGI: "ceUiUseGeurimilgi",
   UI_OVERRIDE_FONT_H1_COOKIE: "ceUiOverrideFontH1Cookie",
+  // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
+  // for backwards compatibility with already-saved user settings.
+  UI_ENABLE_FONTS: "enableFonts",
+  UI_HIDE_PORTRAITS: "hideChatPortraits",
+  UI_STRIP_TEXTURES: "stripChatTextures",
   USE_USER_COLOR_BG: "ceUseUserColorBg",
   USER_COLOR_BG_BASE: "ceUserColorBgBase",
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
@@ -62,6 +67,9 @@ const FE_DEFAULTS = {
   [S.CHAT_FONT_CHOICE]: "cookie",
   [S.UI_USE_GEURIMILGI]: true,
   [S.UI_OVERRIDE_FONT_H1_COOKIE]: true,
+  [S.UI_ENABLE_FONTS]: true,
+  [S.UI_HIDE_PORTRAITS]: true,
+  [S.UI_STRIP_TEXTURES]: true,
   [S.USE_USER_COLOR_BG]: true,
   [S.USER_COLOR_BG_BASE]: "white",
   [S.STYLE_ACTOR_NAME_SIZE]: 18,
@@ -79,14 +87,14 @@ const FE_DEFAULTS = {
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
 
 const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
-  "ceExportEnabled",
-  "ceExportAutoPrint",
-  "ceExportOptimize",
-  "ceExportEmbedFonts",
-  "ceExportEmbedImages",
-  "ceExportPrintImageMode",
-  "ceExportDesktopExternalMode",
-  "enableFonts",
+  S.EXPORT_ENABLED,
+  S.EXPORT_AUTO_PRINT,
+  S.EXPORT_OPTIMIZE,
+  S.EXPORT_EMBED_FONTS,
+  S.EXPORT_EMBED_IMAGES,
+  S.EXPORT_PRINT_IMAGE_MODE,
+  S.EXPORT_DESKTOP_EXTERNAL_MODE,
+  S.UI_ENABLE_FONTS,
   S.GM_PRIORITY_ENABLED,
   S.GM_SPEAK_AS_SELF,
 ]);

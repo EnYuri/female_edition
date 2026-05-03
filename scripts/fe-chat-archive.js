@@ -56,7 +56,6 @@ const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 2;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 40;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
 const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
-const FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE = 96;
 const FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT = 4500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
@@ -169,8 +168,8 @@ function feGetArchiveRenderProfile(messageCount = 0) {
     normalizeImageDecoding: large ? "async" : "sync",
     deferPortraits: true,
     restoreOriginalPortraitSources: true,
-    collapseDuplicateImages: large,
-    collapseDuplicateImagesAggressive: huge,
+    collapseDuplicateImages: true,
+    collapseDuplicateImagesAggressive: large,
     bodyClass: huge ? " fe-archive-huge fe-archive-lean" : large ? " fe-archive-lean" : "",
     statusLabel: large ? "메모리 절약 모드" : "",
   };
@@ -705,7 +704,7 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
     // chat-bg-stripper.js controls the ui-font.css <link> using HTMLLinkElement.disabled.
     let enableFonts = true;
     try {
-      enableFonts = !!game.settings.get(MODULE_ID, "enableFonts");
+      enableFonts = !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS);
     } catch {
       enableFonts = true;
     }
@@ -747,13 +746,13 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
 
     // Mirror body class toggles used by stylesheet-driven chat UI features.
     try {
-      const hidePortraits = !!game.settings.get(MODULE_ID, "hideChatPortraits");
+      const hidePortraits = !!game.settings.get(MODULE_ID, S.UI_HIDE_PORTRAITS);
       doc.body?.classList?.toggle?.("fe-hide-portraits", hidePortraits);
     } catch {
       /* no-op */
     }
     try {
-      const stripTextures = !!game.settings.get(MODULE_ID, "stripChatTextures");
+      const stripTextures = !!game.settings.get(MODULE_ID, S.UI_STRIP_TEXTURES);
       doc.body?.classList?.toggle?.("fe-strip-chat-textures", stripTextures);
     } catch {
       /* no-op */
@@ -981,6 +980,10 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
         for (const [id, el] of harvested.cloneMap.entries()) {
           if (!liveMap.has(id)) liveMap.set(id, el);
         }
+        // Release the harvest-side references — the clones now live in liveMap only.
+        // Without this, both maps pin the same nodes and they can't be GC'd as render
+        // progressively drops them from liveMap.
+        harvested.cloneMap.clear();
       }
     } catch {
       harvested = null;
@@ -1168,15 +1171,11 @@ function feArchiveGetImageSourceKey(img, baseHref = null) {
 function feArchiveIsProtectedImage(img) {
   try {
     if (!img) return true;
-    if (img.classList?.contains("avatar")) return true;
-    if (img.matches?.('img.fe-chat-portrait, img.chat-portrait-message-portrait, img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return true;
-    if (img.closest?.('.message-header, .message-sender, .chat-portrait-container')) return true;
+    // dnd5e item card header icons only — small UI ornaments inside card frames.
+    // Avatars, portraits, and small images are no longer protected: A-1/A-2
+    // dedup now handles them across messages and small icons benefit the most
+    // from collapsing.
     if (img.closest?.('.chat-card .card-header, .midi-chat-card .card-header, .dnd5e.chat-card .card-header, .dnd5e2.chat-card .card-header')) return true;
-
-    const width = Number(img.getAttribute?.("width") || img.width || 0);
-    const height = Number(img.getAttribute?.("height") || img.height || 0);
-    if ((width && width <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE) && (!height || height <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE)) return true;
-    if ((height && height <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE) && (!width || width <= FE_ARCHIVE_DUPLICATE_IMAGE_SMALL_EDGE)) return true;
   } catch {
     /* no-op */
   }
@@ -1319,10 +1318,18 @@ async function feRenderMessagesIntoLog({
       }
 
       const node = nodes[i];
-      if (!feIsElement(node)) continue;
-      feOptimizeArchiveNodeImages(node, { targetDoc, renderProfile, imageRegistry });
-      frag.appendChild(node);
-      fragCount += 1;
+      const item = slice[i];
+      const itemId = String(item?.id ?? item?.msg?.id ?? item?.msg?._id ?? "");
+      if (feIsElement(node)) {
+        feOptimizeArchiveNodeImages(node, { targetDoc, renderProfile, imageRegistry });
+        frag.appendChild(node);
+        fragCount += 1;
+      }
+      // Release the live element reference now — the imported clone in archive doc
+      // no longer needs it. For harvested clones, this lets the original be GC'd
+      // progressively instead of pinning the entire history until render completes.
+      if (item) item.liveEl = null;
+      if (itemId) liveMessageMap?.delete?.(itemId);
     }
 
     if (fragCount >= flushEvery) await flush();
@@ -1481,7 +1488,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // live chat appearance.
   const stripTexturesSetting = (() => {
     try {
-      return !!game.settings.get(MODULE_ID, "stripChatTextures");
+      return !!game.settings.get(MODULE_ID, S.UI_STRIP_TEXTURES);
     } catch {
       return false;
     }
@@ -1505,7 +1512,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     : "";
 
   // Print/PDF image handling (Chrome/Electron can freeze on image-heavy pages)
-  const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "hideAvatars");
+  const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
   const printImgClass =
     printImgMode === "hideAll"
       ? " fe-print-hide-all"
@@ -2012,7 +2019,7 @@ async function feArchivePrint(win) {
     }
   })();
 
-  const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "hideAvatars");
+  const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
   const isElectron = feIsElectron();
   let mode = requested;
 
@@ -2132,19 +2139,23 @@ async function feArchivePrint(win) {
       restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
-        // downscaleLite: resize to exact rendered CSS size × screenDPR, no quality loss.
-        // dprCap=Infinity → uses exactly screenDpr (no artificial cap).
-        dprCap: mildDownscale ? Infinity : (isElectron ? 1.35 : 1.65),
-        minDpr: mildDownscale ? 1 : (isElectron ? 1.1 : 1.25),
-        webpQuality: mildDownscale ? 1.0 : (isElectron ? 0.85 : 0.88),
-        jpegQuality: mildDownscale ? 1.0 : (isElectron ? 0.88 : 0.90),
-        avatarDprCap: mildDownscale ? Infinity : (isElectron ? 2.2 : 2.5),
-        avatarMinDpr: mildDownscale ? 1 : (isElectron ? 1.6 : 1.85),
-        avatarWebpQuality: mildDownscale ? 1.0 : (isElectron ? 0.94 : 0.96),
-        avatarJpegQuality: mildDownscale ? 1.0 : (isElectron ? 0.96 : 0.98),
-        maxSide: mildDownscale ? 4096 : (isElectron ? 1792 : 2048),
-        forceLossless: mildDownscale,
+        // downscaleLite: visually-lossless WebP/JPEG (~q0.95) sized for print.
+        // PNG forcing was causing 5–10× PDF bloat with no perceivable benefit
+        // for photo-like chat content (portraits, item icons).
+        dprCap: mildDownscale ? 2.0 : (isElectron ? 1.35 : 1.65),
+        minDpr: mildDownscale ? 1.25 : (isElectron ? 1.1 : 1.25),
+        webpQuality: mildDownscale ? 0.95 : (isElectron ? 0.85 : 0.88),
+        jpegQuality: mildDownscale ? 0.95 : (isElectron ? 0.88 : 0.90),
+        avatarDprCap: mildDownscale ? 2.0 : (isElectron ? 1.5 : 1.6),
+        avatarMinDpr: mildDownscale ? 1.25 : 1.0,
+        avatarWebpQuality: mildDownscale ? 0.92 : (isElectron ? 0.82 : 0.84),
+        avatarJpegQuality: mildDownscale ? 0.92 : (isElectron ? 0.84 : 0.86),
+        maxSide: mildDownscale ? 2560 : (isElectron ? 1792 : 2048),
+        forceLossless: false,
         minOutSide: mildDownscale ? 256 : 1,
+        // Print path only — restore() revokes blob URLs on afterprint.
+        // Saves ~33% memory plus V8 string overhead vs data: URLs.
+        useBlobURL: true,
       });
     } catch (err) {
       console.warn("female_edition | print downscale failed", err);
@@ -2244,7 +2255,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   try {
     const enableFonts = (() => {
       try {
-        return !!game.settings.get(MODULE_ID, "enableFonts");
+        return !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS);
       } catch {
         return true;
       }
@@ -2282,7 +2293,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // ---
   // Body snapshot
   // ---
-  let bodyHTML = "";
+  let bodyParts = [""];
   const embedFonts = !!feSetting(S.EXPORT_EMBED_FONTS);
   const liveLogEl = doc.getElementById("fe-chat-export-log") || doc.getElementById("chat-log") || doc.querySelector("ol.chat-log");
   const restoreBg = feFreezeMessageBackgroundsForPrint(win, liveLogEl);
@@ -2290,22 +2301,26 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   const restoreLayout = feNormalizeArchiveMessageLayout(doc.body, { restore: true });
   try {
     if (feSetting(S.EXPORT_EMBED_IMAGES)) {
-      // Image embedding requires mutating src/srcset to data: URLs.
-      // Do it on a cloned <body> so the archive window stays visually unchanged.
+      // Image embedding mutates img src/srcset to data: URLs. Apply in-place + revert
+      // afterwards instead of cloning the entire body (cloning a large log doubles
+      // the DOM tree in V8 heap right when we're about to allocate a giant outerHTML
+      // string and a Blob).
       try {
         setMeta("Embedding images…");
-        const bodyClone = doc.body.cloneNode(true);
-        feRestoreOriginalPortraitSources(bodyClone);
-        feNormalizeArchiveMessageLayout(bodyClone);
-        if (embedFonts) fePatchInlineFontFamiliesForExport(bodyClone);
-        await feEmbedImagesInNode(bodyClone, { meta: setMeta });
-        bodyHTML = bodyClone.outerHTML;
+        const prepRestore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+        const embedRestore = await feEmbedImagesInNode(doc.body, { meta: setMeta });
+        try {
+          bodyParts = feSerializeBodyToParts(doc.body);
+        } finally {
+          try { embedRestore?.(); } catch {}
+          try { prepRestore?.(); } catch {}
+        }
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed images", err);
         // Fallback: still produce a valid snapshot.
         const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
         try {
-          bodyHTML = doc.body.outerHTML;
+          bodyParts = feSerializeBodyToParts(doc.body);
         } finally {
           try { restore(); } catch {}
         }
@@ -2313,7 +2328,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
     } else {
       const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
       try {
-        bodyHTML = doc.body.outerHTML;
+        bodyParts = feSerializeBodyToParts(doc.body);
       } finally {
         try { restore(); } catch {}
       }
@@ -2342,7 +2357,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   })();
 
   return new Blob(
-    ["<!doctype html>\n", `<html${htmlAttrs}>`, "\n", headClone.outerHTML, "\n", bodyHTML, "\n</html>"],
+    ["<!doctype html>\n", `<html${htmlAttrs}>`, "\n", headClone.outerHTML, "\n", ...bodyParts, "\n</html>"],
     { type: "text/html;charset=utf-8" }
   );
 }
@@ -2764,8 +2779,44 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
 async function feEmbedImagesInNode(root, { meta } = {}) {
   const setMeta = typeof meta === "function" ? meta : () => {};
 
-  const imgs = Array.from(root.querySelectorAll("img"));
-  if (!imgs.length) return;
+  // Track per-img mutations so the caller can restore the live DOM after serialization.
+  // Allocated up-front and captured by the restore closure so a partial-failure path
+  // (any throw mid-loop) still hands the caller a valid restore.
+  const changed = [];
+  const recordBeforeMutate = (img) => {
+    try {
+      changed.push({
+        img,
+        src: img.getAttribute("src"),
+        srcset: img.getAttribute("srcset"),
+        loading: img.getAttribute("loading"),
+      });
+    } catch {}
+  };
+  let dedupRestore = null;
+
+  const restore = () => {
+    try { dedupRestore?.(); } catch {}
+    for (let k = changed.length - 1; k >= 0; k -= 1) {
+      const it = changed[k];
+      try {
+        if (it.src == null) it.img.removeAttribute("src");
+        else it.img.setAttribute("src", it.src);
+        if (it.srcset == null) it.img.removeAttribute("srcset");
+        else it.img.setAttribute("srcset", it.srcset);
+        if (it.loading == null) it.img.removeAttribute("loading");
+        else it.img.setAttribute("loading", it.loading);
+      } catch {}
+    }
+  };
+
+  let imgs;
+  try {
+    imgs = Array.from(root?.querySelectorAll?.("img") ?? []);
+  } catch {
+    return restore;
+  }
+  if (!imgs.length) return restore;
 
   // Hard safety limits:
   // Single-file HTML + embedded images can easily crash Chromium/Electron (STATUS_BREAKPOINT / OOM)
@@ -2775,86 +2826,206 @@ async function feEmbedImagesInNode(root, { meta } = {}) {
   const MAX_PER_IMAGE = 800_000;      // ~0.8MB per image
 
   const cache = new Map();
-  let embeddedCount = 0;
-  let embeddedBytes = 0;
 
-  let i = 0;
-  for (const img of imgs) {
-    i++;
-    const src = img.getAttribute("src") || img.src;
-    if (!src || src.startsWith("data:")) continue;
+  try {
+    let embeddedCount = 0;
+    let embeddedBytes = 0;
+    let i = 0;
+    for (const img of imgs) {
+      i++;
+      const src = img.getAttribute("src") || img.src;
+      if (!src || src.startsWith("data:")) continue;
 
-    // Stop when reaching limits
-    if (embeddedCount >= MAX_IMAGES || embeddedBytes >= MAX_TOTAL_BYTES) {
-      setMeta(
-        `Embedding images… stopped (limit reached: ${embeddedCount} images, ${(
-          embeddedBytes /
-          1024 /
-          1024
-        ).toFixed(1)}MB)`
-      );
-      break;
-    }
+      // Stop when reaching limits
+      if (embeddedCount >= MAX_IMAGES || embeddedBytes >= MAX_TOTAL_BYTES) {
+        setMeta(
+          `Embedding images… stopped (limit reached: ${embeddedCount} images, ${(
+            embeddedBytes /
+            1024 /
+            1024
+          ).toFixed(1)}MB)`
+        );
+        break;
+      }
 
-    // Resolve URL
-    let abs;
-    try {
-      abs = new URL(src, window.location.href).href;
-    } catch {
-      continue;
-    }
+      // Resolve URL
+      let abs;
+      try {
+        abs = new URL(src, window.location.href).href;
+      } catch {
+        continue;
+      }
 
-    // Only embed same-origin resources (avoid CORS failures).
-    try {
-      const u = new URL(abs);
-      if (u.origin !== window.location.origin) continue;
-    } catch {
-      continue;
-    }
+      // Only embed same-origin resources (avoid CORS failures).
+      try {
+        const u = new URL(abs);
+        if (u.origin !== window.location.origin) continue;
+      } catch {
+        continue;
+      }
 
-    if (cache.has(abs)) {
-      // For duplicate archive images, keep the original absolute src instead of repeating
-      // the same large data: URL over and over in saved HTML.
-      if (img.dataset?.feArchiveSharedImage === "1") {
-        img.setAttribute("src", abs);
-        img.removeAttribute("srcset");
-        if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
-      } else {
-        img.setAttribute("src", cache.get(abs));
+      if (cache.has(abs)) {
+        // For duplicate archive images, keep the original absolute src instead of repeating
+        // the same large data: URL over and over in saved HTML.
+        try {
+          recordBeforeMutate(img);
+          if (img.dataset?.feArchiveSharedImage === "1") {
+            img.setAttribute("src", abs);
+            img.removeAttribute("srcset");
+            if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
+          } else {
+            img.setAttribute("src", cache.get(abs));
+            img.removeAttribute("srcset");
+            img.removeAttribute("loading");
+          }
+        } catch {}
+        continue;
+      }
+
+      setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i}/${imgs.length})`);
+
+      try {
+        const res = await fetch(abs, { credentials: "include" });
+        if (!res.ok) continue;
+        const blob = await res.blob();
+
+        // Per-image limit
+        if (blob.size > MAX_PER_IMAGE) continue;
+
+        // Total limit
+        if (embeddedBytes + blob.size > MAX_TOTAL_BYTES) continue;
+
+        const dataUrl = await feBlobToDataURL(blob);
+        cache.set(abs, dataUrl);
+
+        recordBeforeMutate(img);
+        img.setAttribute("src", dataUrl);
         img.removeAttribute("srcset");
         img.removeAttribute("loading");
+
+        embeddedCount++;
+        embeddedBytes += blob.size;
+      } catch (err) {
+        console.warn("female_edition | HTML export: failed to embed image", abs, err);
       }
-      continue;
+
+      // Yield periodically so Chromium doesn't freeze.
+      if (i % 10 === 0) await feNextTick();
     }
 
-    setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i}/${imgs.length})`);
+    // Final pass: deduplicate identical inline data: URLs across the serialized HTML.
+    // Each repeated <img src="data:..."> is reduced to a marker; a small bootstrap
+    // script restores src at view time. Avoids N× base64 bloat for repeated avatars/portraits.
+    dedupRestore = feDeduplicateInlineDataUrlsInNode(root, setMeta);
+  } catch (err) {
+    // The caller still gets `restore` with whatever's been recorded so far,
+    // so the live archive window can recover from partial mutation.
+    console.warn("female_edition | HTML export: embed pass aborted", err);
+  }
 
+  return restore;
+}
+
+function feDeduplicateInlineDataUrlsInNode(root, setMeta = () => {}) {
+  const refsAdded = [];
+  const srcRemoved = [];
+  let scriptEl = null;
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    const doc = root.ownerDocument || document;
+    const groups = new Map();
+    let n = 0;
+    let dedupCount = 0;
+    let savedBytes = 0;
+    for (const img of root.querySelectorAll('img[src^="data:"]')) {
+      const url = img.getAttribute("src");
+      // Skip tiny inline images — bootstrap overhead outweighs the saving.
+      if (!url || url.length < 256) continue;
+      let entry = groups.get(url);
+      if (!entry) {
+        entry = { id: `fei${++n}` };
+        groups.set(url, entry);
+        img.setAttribute("data-fe-img-ref", entry.id);
+        refsAdded.push(img);
+        continue;
+      }
+      img.setAttribute("data-fe-img-ref", entry.id);
+      refsAdded.push(img);
+      const removedSrc = img.getAttribute("src");
+      img.removeAttribute("src");
+      srcRemoved.push({ img, src: removedSrc });
+      dedupCount += 1;
+      savedBytes += url.length;
+    }
+    if (dedupCount > 0) {
+      scriptEl = doc.createElement("script");
+      scriptEl.id = "fe-archive-img-dedup";
+      // The script auto-executes the moment it gets inserted into a connected
+      // document. In the in-place embed flow this would re-fill `src` on the
+      // duplicates we just stripped, undoing the dedup. The skip flag turns
+      // that one execution into a no-op; we strip the flag right after so the
+      // copy that ends up in saved HTML still runs when the file is later opened.
+      scriptEl.setAttribute("data-fe-skip-bootstrap", "1");
+      scriptEl.textContent = '(function(){var cs=document.currentScript;if(cs&&cs.hasAttribute("data-fe-skip-bootstrap"))return;try{var m={};document.querySelectorAll(\'img[data-fe-img-ref][src^="data:"]\').forEach(function(el){var k=el.getAttribute("data-fe-img-ref");if(k&&!m[k])m[k]=el.getAttribute("src");});document.querySelectorAll("img[data-fe-img-ref]:not([src])").forEach(function(el){var s=m[el.getAttribute("data-fe-img-ref")];if(s)el.setAttribute("src",s);});}catch(_e){}})();';
+      root.appendChild(scriptEl);
+      scriptEl.removeAttribute("data-fe-skip-bootstrap");
+      try { setMeta(`Deduplicated ${dedupCount} inline image(s) (~${(savedBytes / 1024 / 1024).toFixed(1)}MB saved)`); } catch {}
+    }
+  } catch (err) {
+    console.warn("female_edition | HTML export: image dedup pass failed", err);
+  }
+  return () => {
+    try { scriptEl?.remove(); } catch {}
+    for (const it of srcRemoved) {
+      try {
+        if (it.src != null) it.img.setAttribute("src", it.src);
+      } catch {}
+    }
+    for (const img of refsAdded) {
+      try { img.removeAttribute("data-fe-img-ref"); } catch {}
+    }
+  };
+}
+
+// Splits the body's outerHTML into [shell-before-log-open, ...messages, shell-after-log-open]
+// so the caller can pass an array of small strings to `new Blob()` instead of allocating
+// one giant outerHTML and then re-copying it into the Blob. Avoids the V8 peak-memory hit
+// for large logs (~50MB single string → many small strings).
+function feSerializeBodyToParts(body) {
+  try {
+    const log = body?.querySelector?.("#fe-chat-export-log, ol.chat-log");
+    if (!log?.children?.length) return [body?.outerHTML || ""];
+
+    // Detach messages, snapshot the now-empty shell, re-attach. This narrows the
+    // body.outerHTML allocation to "everything except the messages", which is small.
+    const messages = Array.from(log.children);
+    for (const m of messages) m.remove();
+    let shellHTML;
+    let emptyLogHTML;
     try {
-      const res = await fetch(abs, { credentials: "include" });
-      if (!res.ok) continue;
-      const blob = await res.blob();
-
-      // Per-image limit
-      if (blob.size > MAX_PER_IMAGE) continue;
-
-      // Total limit
-      if (embeddedBytes + blob.size > MAX_TOTAL_BYTES) continue;
-
-      const dataUrl = await feBlobToDataURL(blob);
-      cache.set(abs, dataUrl);
-
-      img.setAttribute("src", dataUrl);
-      img.removeAttribute("srcset");
-      img.removeAttribute("loading");
-
-      embeddedCount++;
-      embeddedBytes += blob.size;
-    } catch (err) {
-      console.warn("female_edition | HTML export: failed to embed image", abs, err);
+      emptyLogHTML = log.outerHTML;
+      shellHTML = body.outerHTML;
+    } finally {
+      // Always re-insert in original order, even if a serialization step throws.
+      log.append(...messages);
     }
 
-    // Yield periodically so Chromium doesn't freeze.
-    if (i % 10 === 0) await feNextTick();
+    const logIdx = shellHTML.indexOf(emptyLogHTML);
+    if (logIdx < 0) return [body.outerHTML];
+    // The empty log serializes as `<ol ...></ol>`. Split right after the open tag so
+    // messages get spliced in between open and close.
+    const closeTag = "</ol>";
+    const splitAt = logIdx + emptyLogHTML.length - closeTag.length;
+
+    const parts = [];
+    parts.push(shellHTML.slice(0, splitAt));
+    for (const m of messages) {
+      try { parts.push(m.outerHTML); } catch {}
+    }
+    parts.push(shellHTML.slice(splitAt));
+    return parts;
+  } catch {
+    try { return [body?.outerHTML || ""]; } catch { return [""]; }
   }
 }
 
@@ -2862,6 +3033,12 @@ function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false } = {}) {
   const restores = [];
   try {
     restores.push(feRestoreOriginalPortraitSources(root));
+  } catch {}
+  try {
+    // Revert any blob: URLs left over from in-flight print downscale so they
+    // don't end up in the saved HTML (where they'd be invalid once the popup
+    // closes or `afterprint` revokes them).
+    restores.push(feRestorePrintBlobSources(root));
   } catch {}
   if (embedFonts) {
     try {
@@ -2904,6 +3081,37 @@ function feRestoreOriginalPortraitSources(root) {
         else it.img.setAttribute('srcset', it.prevSrcset);
         if (it.prevLoading == null) it.img.removeAttribute('loading');
         else it.img.setAttribute('loading', it.prevLoading);
+      } catch {}
+    }
+  };
+}
+
+// Reverts blob: URLs (set by feDownscaleImagesForPrint when useBlobURL=true) back to
+// the original src stashed on data-fe-print-orig-src. Used by HTML snapshot paths
+// so saved HTML never contains blob: URLs that would die with the popup window.
+function feRestorePrintBlobSources(root) {
+  const changed = [];
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    const imgs = root.querySelectorAll('img[data-fe-print-orig-src]');
+    for (const img of imgs) {
+      const orig = img.dataset?.fePrintOrigSrc || img.getAttribute?.('data-fe-print-orig-src') || '';
+      if (!orig) continue;
+      const prevSrc = img.getAttribute('src');
+      const prevSrcset = img.getAttribute('srcset');
+      if (prevSrc === orig && !prevSrcset) continue;
+      changed.push({ img, prevSrc, prevSrcset });
+      img.setAttribute('src', orig);
+      img.removeAttribute('srcset');
+    }
+  } catch {}
+  return () => {
+    for (const it of changed) {
+      try {
+        if (it.prevSrc == null) it.img.removeAttribute('src');
+        else it.img.setAttribute('src', it.prevSrc);
+        if (it.prevSrcset == null) it.img.removeAttribute('srcset');
+        else it.img.setAttribute('srcset', it.prevSrcset);
       } catch {}
     }
   };
@@ -3550,7 +3758,7 @@ async function feEnsureArchiveEmbeddedFonts(win) {
 
     let enableFonts = true;
     try {
-      enableFonts = !!game.settings.get(MODULE_ID, "enableFonts");
+      enableFonts = !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS);
     } catch {
       enableFonts = true;
     }

@@ -20,12 +20,12 @@
 //   - background-blend-mode (screen)
 //   - --fe-parchment-overlay (flat desaturation overlay)
 
-import { MODULE_ID, feSetting } from "./fe-chat-enhance.js";
+import { MODULE_ID, S, FE_DEFAULTS, feSetting } from "./fe-chat-enhance.js";
 
 const SETTINGS = {
-  ENABLE_FONTS:    "enableFonts",
-  HIDE_PORTRAITS:  "hideChatPortraits",
-  STRIP_TEXTURES:  "stripChatTextures",
+  ENABLE_FONTS:    S.UI_ENABLE_FONTS,
+  HIDE_PORTRAITS:  S.UI_HIDE_PORTRAITS,
+  STRIP_TEXTURES:  S.UI_STRIP_TEXTURES,
 };
 
 // --------------------------------
@@ -97,7 +97,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: FE_DEFAULTS[S.UI_ENABLE_FONTS],
     onChange: value => applyFontSetting(value),
   });
 
@@ -107,7 +107,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: FE_DEFAULTS[S.UI_HIDE_PORTRAITS],
     onChange: value => applyPortraitSetting(value),
   });
 
@@ -117,22 +117,22 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Boolean,
-    default: true,
+    default: FE_DEFAULTS[S.UI_STRIP_TEXTURES],
     onChange: value => applyTextureSetting(value),
   });
 
   // Apply fe-fonts-enabled as early as possible (init) to prevent FOUC.
   // The ready hook will re-apply with the final feSetting() value (GM priority aware).
   try {
-    const fontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, true);
+    const fontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, FE_DEFAULTS[S.UI_ENABLE_FONTS]);
     document.body?.classList?.toggle("fe-fonts-enabled", !!fontsEnabled);
   } catch { /* no-op */ }
 });
 
 Hooks.once("ready", () => {
-  const fontsEnabled   = safeGetSetting(SETTINGS.ENABLE_FONTS,   true);
-  const hidePortraits  = safeGetSetting(SETTINGS.HIDE_PORTRAITS,  true);
-  const stripTextures  = safeGetSetting(SETTINGS.STRIP_TEXTURES,  true);
+  const fontsEnabled   = safeGetSetting(SETTINGS.ENABLE_FONTS,   FE_DEFAULTS[S.UI_ENABLE_FONTS]);
+  const hidePortraits  = safeGetSetting(SETTINGS.HIDE_PORTRAITS, FE_DEFAULTS[S.UI_HIDE_PORTRAITS]);
+  const stripTextures  = safeGetSetting(SETTINGS.STRIP_TEXTURES, FE_DEFAULTS[S.UI_STRIP_TEXTURES]);
 
   applyFontSetting(fontsEnabled);
   applyPortraitSetting(hidePortraits);
@@ -148,7 +148,7 @@ Hooks.once("ready", () => {
   Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
     try {
       if (payload?.reason !== "gm-priority-overrides") return;
-      const localFontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, true);
+      const localFontsEnabled = safeGetSetting(SETTINGS.ENABLE_FONTS, FE_DEFAULTS[S.UI_ENABLE_FONTS]);
       applyFontSetting(localFontsEnabled);
     } catch { /* no-op */ }
   });

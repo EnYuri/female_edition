@@ -266,14 +266,20 @@ export async function feDownscaleImagesForPrint(
     minDpr = 1,
     webpQuality = 0.82,
     jpegQuality = 0.85,
-    // Avatars/portraits: preserve quality (they are small but visually important)
-    avatarDprCap = 2.25,
-    avatarMinDpr = 1.5,
-    avatarWebpQuality = 0.95,
-    avatarJpegQuality = 0.96,
+    // Avatars/portraits: small images don't need extreme quality. Higher caps
+    // and qualities here multiplied data size with little visible benefit.
+    avatarDprCap = 1.5,
+    avatarMinDpr = 1.0,
+    avatarWebpQuality = 0.80,
+    avatarJpegQuality = 0.82,
     maxSide = 1600,
     forceLossless = false,
     minOutSide = 1,
+    // When true, encoded image bytes are exposed as blob: URLs instead of
+    // data: URLs. Saves ~33% memory plus V8 string overhead — img.src holds
+    // a short blob: reference and the bytes live in the URL registry once.
+    // Caller must call the returned restore() to revoke the URLs.
+    useBlobURL = false,
   } = {}
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
@@ -363,12 +369,47 @@ export async function feDownscaleImagesForPrint(
     return { fit, position, sx: 0, sy: 0, sw: naturalW, sh: naturalH, dx: 0, dy: 0, dw: outW, dh: outH };
   };
 
+  // Snap a pixel size up to the next power of 2 (capped to MAX_SIDE). Used to
+  // bucket display sizes so minor render-size differences (47/49) collapse into
+  // the same group, while dramatically different sizes (48 vs 200) stay separate.
+  const bucketSize = (n) => {
+    const v = Math.max(1, Math.round(Number(n) || 1));
+    if (v <= 1) return 1;
+    const p = Math.ceil(Math.log2(v));
+    return Math.min(MAX_SIDE, 1 << p);
+  };
+
+  // Conservative ceiling-bucketing for non-avatar images. Catches near-duplicate
+  // render sizes (e.g., 47/48 from layout rounding) while keeping aspect drift
+  // bounded under ~4.6%. Step grows logarithmically with size; tiny icons (≤32px)
+  // stay exact since the dedup payoff is negligible vs distortion risk.
+  // Always rounds UP so canvas size ≥ rendered display size (no upscale blur).
+  const bucketSizeFine = (n) => {
+    const v = Math.max(1, Math.round(Number(n) || 1));
+    if (v <= 32) return v;
+    let step;
+    if (v <= 64) step = 2;          // 33-64: ≤3.0% drift
+    else if (v <= 256) step = 4;    // 65-256: ≤4.6% drift
+    else if (v <= 1024) step = 8;   // 257-1024: ≤2.7% drift
+    else step = 16;                  // >1024: ≤1.5% drift
+    return Math.min(MAX_SIDE, Math.ceil(v / step) * step);
+  };
+
   const getKey = (img, targetW, targetH) => {
     try {
       const src = img.currentSrc || img.src || img.getAttribute("src") || "";
       if (!src) return "";
       const spec = computeDrawSpec(img, targetW, targetH);
-      return [src, targetW, targetH, spec.fit, spec.position, isAvatarImage(img) ? "avatar" : "img"].join("@@");
+      if (isAvatarImage(img)) {
+        // Cross-message dedup with size bucketing: avatars sharing src + fit +
+        // position + size-bucket reuse one canvas. Keeps small instances small
+        // while a single large instance doesn't bloat all sibling instances.
+        return ["avatar", src, bucketSize(targetW), bucketSize(targetH), spec.fit, spec.position].join("@@");
+      }
+      // Non-avatar: fine-grained bucketing collapses near-identical sizes into
+      // shared encodings. g.maxW / g.maxH still uses raw targets so the canvas
+      // is sized to the largest actual member, never to the inflated bucket value.
+      return [src, bucketSizeFine(targetW), bucketSizeFine(targetH), spec.fit, spec.position, "img"].join("@@");
     } catch {
       return "";
     }
@@ -431,6 +472,8 @@ export async function feDownscaleImagesForPrint(
   const groupList = Array.from(groups.values());
   if (!groupList.length) return () => {};
   const cache = new Map();
+  const createdBlobURLs = useBlobURL ? new Set() : null;
+  const winURL = (win && win.URL) || URL;
   let gi = 0;
 
   for (const g of groupList) {
@@ -451,14 +494,25 @@ export async function feDownscaleImagesForPrint(
       });
       if (!canvas) continue;
 
-      const dataUrl = await feCanvasToDataURL(canvas, {
+      const encodeOpts = {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
         jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
-        preferLossless: forceLossless || g.isAvatar || Math.max(outW, outH) <= 224 || (outW * outH) <= 90_000,
+        preferLossless: forceLossless || (Math.max(outW, outH) <= 96 && (outW * outH) <= 9216),
         forcePng: forceLossless,
-      });
-      if (!dataUrl) continue;
-      cache.set(g.key, dataUrl);
+      };
+
+      let imageUrl = null;
+      if (useBlobURL) {
+        const blob = await feEncodeCanvasToBlob(canvas, encodeOpts);
+        if (blob) {
+          imageUrl = winURL.createObjectURL(blob);
+          createdBlobURLs.add(imageUrl);
+        }
+      } else {
+        imageUrl = await feCanvasToDataURL(canvas, encodeOpts);
+      }
+      if (!imageUrl) continue;
+      cache.set(g.key, imageUrl);
       canvas.width = 0;
       canvas.height = 0;
     } catch {
@@ -468,18 +522,26 @@ export async function feDownscaleImagesForPrint(
   }
 
   for (const g of groupList) {
-    const dataUrl = cache.get(g.key);
-    if (!dataUrl) continue;
+    const imageUrl = cache.get(g.key);
+    if (!imageUrl) continue;
     for (const img of g.imgs) {
       try {
+        const origSrc = img.getAttribute("src");
         changed.push({
           img,
-          src: img.getAttribute("src"),
+          src: origSrc,
           srcset: img.getAttribute("srcset"),
           loading: img.getAttribute("loading"),
         });
+        // Stash the original src on a dataset attribute so the HTML snapshot
+        // path (which can run while blob: URLs are still live) can revert
+        // before serialization. The closure's `changed` array is not visible
+        // to that path; the dataset is.
+        if (useBlobURL && origSrc != null) {
+          try { img.dataset.fePrintOrigSrc = origSrc; } catch {}
+        }
         img.removeAttribute("srcset");
-        img.setAttribute("src", dataUrl);
+        img.setAttribute("src", imageUrl);
       } catch {}
     }
   }
@@ -494,7 +556,15 @@ export async function feDownscaleImagesForPrint(
         else it.img.setAttribute("srcset", it.srcset);
         if (it.loading == null) it.img.removeAttribute("loading");
         else it.img.setAttribute("loading", it.loading);
+        try { delete it.img.dataset.fePrintOrigSrc; } catch {}
       } catch {}
+    }
+    // Revoke after src has been reverted so no img is referencing a stale URL.
+    if (createdBlobURLs) {
+      for (const url of createdBlobURLs) {
+        try { winURL.revokeObjectURL(url); } catch {}
+      }
+      createdBlobURLs.clear();
     }
   };
 }
@@ -503,7 +573,7 @@ export async function feDownscaleImagesForPrint(
 // Canvas → data-URL encoding
 // ===========================================================================
 
-async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.85, preferLossless = false, forcePng = false } = {}) {
+async function feEncodeCanvasToBlob(canvas, { webpQuality = 0.82, jpegQuality = 0.85, preferLossless = false, forcePng = false } = {}) {
   const toBlob = async (type, quality) => {
     try {
       return await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
@@ -514,24 +584,16 @@ async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.8
 
   // forcePng: lossless only — never fall back to lossy formats.
   if (forcePng) {
-    try {
-      const pngBlob = await toBlob("image/png", 1.0);
-      if (pngBlob) return await feBlobToDataURL(pngBlob);
-    } catch { /* no-op */ }
-    try {
-      const webpBlob = await toBlob("image/webp", 1.0);
-      if (webpBlob) return await feBlobToDataURL(webpBlob);
-    } catch { /* no-op */ }
+    const pngBlob = await toBlob("image/png", 1.0);
+    if (pngBlob) return pngBlob;
+    const webpBlob = await toBlob("image/webp", 1.0);
+    if (webpBlob) return webpBlob;
     return null;
   }
 
   if (preferLossless) {
-    try {
-      const pngBlob = await toBlob("image/png", 1.0);
-      if (pngBlob && pngBlob.size <= 650_000) return await feBlobToDataURL(pngBlob);
-    } catch {
-      /* no-op */
-    }
+    const pngBlob = await toBlob("image/png", 1.0);
+    if (pngBlob && pngBlob.size <= 650_000) return pngBlob;
   }
 
   // Prefer webp for normal content, but keep quality high in the "품질 우선" path.
@@ -548,11 +610,18 @@ async function feCanvasToDataURL(canvas, { webpQuality = 0.82, jpegQuality = 0.8
       ];
 
   for (const t of tryTypes) {
-    try {
-      const blob = await toBlob(t.type, t.quality);
-      if (!blob) continue;
-      return await feBlobToDataURL(blob);
-    } catch {}
+    const blob = await toBlob(t.type, t.quality);
+    if (blob) return blob;
   }
   return null;
+}
+
+async function feCanvasToDataURL(canvas, options) {
+  try {
+    const blob = await feEncodeCanvasToBlob(canvas, options);
+    if (!blob) return null;
+    return await feBlobToDataURL(blob);
+  } catch {
+    return null;
+  }
 }
