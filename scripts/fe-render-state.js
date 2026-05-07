@@ -738,7 +738,6 @@ export {
   feStoreRenderStateOverride,
   feHydrateRenderStateOverride,
   feChangeTouchesRenderState,
-  feChangeTouchesInlineRollSnapshot,
   feGetPendingMessageSource,
   feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,

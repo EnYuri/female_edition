@@ -43,7 +43,7 @@ import {
 
 import {
   feGetStoredRenderState, feStoreRenderStateOverride, feHydrateRenderStateOverride,
-  feChangeTouchesRenderState, feChangeTouchesInlineRollSnapshot,
+  feChangeTouchesRenderState,
   feCaptureMessageRenderFlagsOnPreCreate, feCaptureMessageRenderFlagsOnPreUpdate,
   feGetPendingMessageSource,
   feIsNarratorToolsMessage, feIsRoundMarkerMessage, feIsUntouchedSpecialMessage,
@@ -838,10 +838,13 @@ Hooks.on("deleteChatMessage", (message) => {
 Hooks.on("updateChatMessage", (message, change, _options, userId) => {
   try {
     const msgId = message?.id ?? message?._id;
-    // Skip clearing the snapshot when this update was triggered by the module's own
-    // freeze operation — the snapshot must survive into the re-render so it can
-    // restore the original roll value if enrichHTML re-evaluates the frozen anchor.
-    if (feChangeTouchesInlineRollSnapshot(change) && !feIsMessageFreezeInProgress(msgId))
+    // Protect the snapshot only when this update is our own freeze (content-only, no rolls).
+    // Any other update — including midi-qol updating rolls or flags — must clear the
+    // snapshot so stale advantage/normal anchors are not restored on re-render.
+    const isOurFreezeContentUpdate = feIsMessageFreezeInProgress(msgId)
+      && Object.prototype.hasOwnProperty.call(change ?? {}, "content")
+      && !Object.prototype.hasOwnProperty.call(change ?? {}, "rolls");
+    if (!isOurFreezeContentUpdate)
       feClearInlineRollSnapshot(msgId);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
     feDeferTask(() => feScheduleRenderedMessageRefresh(msgId, { delay: 0 }));
