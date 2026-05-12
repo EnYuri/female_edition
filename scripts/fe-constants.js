@@ -40,6 +40,7 @@ const S = {
   EDIT_ENABLED: "ceEditEnabled",
   GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
   GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
+  DX3RD_RUI_PORTRAIT_WIDTH: "ceDx3rdRuiPortraitWidth",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -87,6 +88,7 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
   [S.GM_PRIORITY_ENABLED]: true,
   [S.GM_SPEAK_AS_SELF]: false,
+  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 64,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -102,6 +104,7 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.UI_ENABLE_FONTS,
   S.GM_PRIORITY_ENABLED,
   S.GM_SPEAK_AS_SELF,
+  S.DX3RD_RUI_PORTRAIT_WIDTH,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";
