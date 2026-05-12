@@ -2170,7 +2170,14 @@ async function feArchivePrint(win) {
 
   try {
     setMeta("Loading fonts…");
-    await feEnsureArchiveEmbeddedFonts(win);
+    // feEnsureArchiveEmbeddedFonts is intentionally NOT called here.
+    // It is designed for offline HTML export (file:// CORS workaround) and
+    // injects !important font overrides + variable resets that break live fonts:
+    //   - resets --fe-font-geurimilgi to system fonts (breaks Geurimilgi chat font)
+    //   - overrides .chat-message * font-family, clobbering icon fonts (FA → □)
+    //   - triggers a full text re-layout just before win.print(), so Chromium
+    //     may capture the document mid-reflow (garbled text, broken rendering)
+    // The archive popup already has all fonts loaded via <link> stylesheets.
     await feWaitForFonts(doc, FE_EXPORT_WAIT_FONTS_TIMEOUT);
   } catch {}
 
@@ -2179,6 +2186,20 @@ async function feArchivePrint(win) {
   } catch {}
   try {
     void doc.body.offsetHeight;
+  } catch {}
+
+  // Wait for two paint frames so any pending layout/style changes (background
+  // freeze, image src swaps) are fully composited before the print engine
+  // captures the document. A single offsetHeight reflow is not enough when
+  // style mutations queue micro-task paint work.
+  try {
+    await new Promise((resolve) => {
+      try {
+        win.requestAnimationFrame(() => win.requestAnimationFrame(resolve));
+      } catch {
+        setTimeout(resolve, 50);
+      }
+    });
   } catch {}
 
   try {

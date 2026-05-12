@@ -221,10 +221,15 @@ function feWindowCancelFrame(win, handle) {
   clearTimeout(handle);
 }
 
-// Pixel tolerance for pixel-gap fallback. v13's _onScrollLog uses the top 1%
-// of the scrollable range; we use a tight 2px gap so a small user scroll-up
-// is not misclassified as "at bottom".
+// Tight tolerance for unregistered logs (archive/detached): 2px so a small
+// intentional scroll-up is not misclassified as "at bottom".
 const FE_STICKY_PIXEL_TOLERANCE = 2;
+
+// Looser tolerance used as a safety net when app.isAtBottom reads false but
+// the scroll position is visually at the bottom. Third-party typing-indicator
+// modules can shift scrollHeight by ~5-8px, flipping Foundry's #isAtBottom to
+// false before the scroll event fires. 16px covers that range with margin.
+const FE_STICKY_PIXEL_TOLERANCE_SAFETY = 16;
 
 // In v13 the ChatLog DOM is:
 //   <div class="chat-scroll">  ← actual scroll container (overflow-y: auto)
@@ -277,15 +282,16 @@ function feSnapshotAndRestoreStickyScroll() {
     if (!feIsElementNode(log)) return null;
     const app = logToApp.get(log) ?? null;
     const scrollEl = feFindScrollContainer(log);
-    // Trust the app's isAtBottom getter when available — Foundry updates it
-    // synchronously in _onScrollLog from `pct = scrollTop / (scrollHeight -
-    // clientHeight); isAtBottom = pct > 0.99 || isNaN(pct)`. The pixel-gap
-    // fallback below is only for unregistered logs (archive/detached views).
-    if (app && typeof app.isAtBottom === "boolean") {
-      return { log, scrollEl, atBottom: app.isAtBottom, app };
-    }
+    // app.isAtBottom is the primary signal (Foundry updates it synchronously in
+    // _onScrollLog). However it can transiently read false between a DOM resize
+    // and the next scroll event — so pixel-gap ≤ 2px acts as a safety net for
+    // that race window. For unregistered logs (archive/detached) only the
+    // pixel-gap path below is used.
     const pixelGap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
-    return { log, scrollEl, atBottom: pixelGap < FE_STICKY_PIXEL_TOLERANCE, app };
+    if (app && typeof app.isAtBottom === "boolean") {
+      return { log, scrollEl, atBottom: app.isAtBottom || pixelGap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY, app };
+    }
+    return { log, scrollEl, atBottom: pixelGap <= FE_STICKY_PIXEL_TOLERANCE, app };
   }).filter(Boolean);
 
   return function feRestoreStickyScroll() {

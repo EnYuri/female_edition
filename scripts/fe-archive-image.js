@@ -474,33 +474,30 @@ export async function feDownscaleImagesForPrint(
   const cache = new Map();
   const createdBlobURLs = useBlobURL ? new Set() : null;
   const winURL = (win && win.URL) || URL;
-  let gi = 0;
 
-  for (const g of groupList) {
-    gi += 1;
-    if (gi === 1 || gi % 10 === 0 || gi === groupList.length) {
-      setMeta(`Downscaling images… ${gi}/${groupList.length}`);
-    }
+  // Process groups in parallel batches so multiple canvas.toBlob() calls are
+  // in-flight simultaneously. Chromium encodes blobs on a worker thread, so
+  // N parallel encodes take roughly max(individual times) instead of sum.
+  const ENCODE_CONCURRENCY = 6;
+
+  const processGroup = async (g) => {
     try {
-      const shouldProcess = g.needsResample;
-      if (!shouldProcess) continue;
+      if (!g.needsResample) return;
       const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
-      if (!rep) continue;
+      if (!rep) return;
       const outW = Math.max(1, Math.min(g.maxW, Math.round(g.maxW)));
       const outH = Math.max(1, Math.min(g.maxH, Math.round(g.maxH)));
       const spec = computeDrawSpec(rep, outW, outH);
       const canvas = feProgressiveResampleCanvas(win, rep, spec, outW, outH, {
         maxIntermediateSide: g.isAvatar ? Math.max(2048, Math.min(MAX_SIDE, 3072)) : Math.max(1536, Math.min(MAX_SIDE, 2560)),
       });
-      if (!canvas) continue;
-
+      if (!canvas) return;
       const encodeOpts = {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
         jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
         preferLossless: forceLossless || (Math.max(outW, outH) <= 96 && (outW * outH) <= 9216),
         forcePng: forceLossless,
       };
-
       let imageUrl = null;
       if (useBlobURL) {
         const blob = await feEncodeCanvasToBlob(canvas, encodeOpts);
@@ -511,14 +508,21 @@ export async function feDownscaleImagesForPrint(
       } else {
         imageUrl = await feCanvasToDataURL(canvas, encodeOpts);
       }
-      if (!imageUrl) continue;
-      cache.set(g.key, imageUrl);
       canvas.width = 0;
       canvas.height = 0;
+      if (!imageUrl) return;
+      cache.set(g.key, imageUrl);
     } catch {
       // Ignore per-group failures.
     }
-    if (gi % 10 === 0) await feNextTick();
+  };
+
+  for (let start = 0; start < groupList.length; start += ENCODE_CONCURRENCY) {
+    const batch = groupList.slice(start, start + ENCODE_CONCURRENCY);
+    await Promise.all(batch.map(processGroup));
+    const gi = Math.min(start + ENCODE_CONCURRENCY, groupList.length);
+    setMeta(`Downscaling images… ${gi}/${groupList.length}`);
+    await feNextTick();
   }
 
   for (const g of groupList) {
