@@ -314,3 +314,73 @@ body.fe-dx3rd-pixel-theme
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
   border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 16  픽셀 체커보드 테두리
+ *        대상: 팝업 윈도우(캐릭터 시트 등), 우측 사이드바, 채팅 입력창
+ *
+ *  기법: ::after pseudo-element
+ *    · background = repeating-conic-gradient(accent / black) 2×2px 타일
+ *      → 1px 단위 체커보드 패턴
+ *    · mask punch-out 으로 내부를 투명하게 → 테두리 링(4px)만 노출
+ *
+ *  두께 조정: --fe-dx3rd-border-width (기본 4px)
+ *  색상 변경: --fe-dx3rd-accent (기본 흰색)
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-dx3rd-pixel-theme {
+  --fe-dx3rd-border-width: 4px;
+}
+
+/* 기존 솔리드 윈도우 테두리 → 픽셀 테두리(§16 pseudo)로 대체 */
+body.fe-dx3rd-pixel-theme :is(.window-app, .application) {
+  border: none !important;
+}
+
+/* 채팅 컨트롤: ::after 앵커 포지셔닝 */
+body.fe-dx3rd-pixel-theme :is(chat-controls, #chat-controls, .chat-controls) {
+  position: relative !important;
+}
+
+/* 체커보드 테두리 pseudo-element
+   .window-app / #sidebar 는 Foundry가 이미 position: absolute/fixed 적용됨 */
+body.fe-dx3rd-pixel-theme :is(
+  .window-app,
+  .application,
+  #sidebar,
+  chat-controls,
+  #chat-controls,
+  .chat-controls
+)::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 100 !important;
+  /* 2×2px repeating-conic → 1px 체커보드(accent / black) */
+  background:
+    repeating-conic-gradient(
+      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
+      #000000 25% 50%
+    ) 0 0 / 2px 2px !important;
+  /* mask: 내부(border-width 안쪽) punch-out → 테두리 링만 표시 */
+  -webkit-mask:
+    linear-gradient(#000 0 0)
+      var(--fe-dx3rd-border-width)
+      var(--fe-dx3rd-border-width) /
+      calc(100% - 2 * var(--fe-dx3rd-border-width))
+      calc(100% - 2 * var(--fe-dx3rd-border-width))
+      no-repeat,
+    linear-gradient(#000 0 0) !important;
+  -webkit-mask-composite: destination-out !important;
+  mask:
+    linear-gradient(#000 0 0)
+      var(--fe-dx3rd-border-width)
+      var(--fe-dx3rd-border-width) /
+      calc(100% - 2 * var(--fe-dx3rd-border-width))
+      calc(100% - 2 * var(--fe-dx3rd-border-width))
+      no-repeat,
+    linear-gradient(#000 0 0) !important;
+  mask-composite: exclude !important;
+}
