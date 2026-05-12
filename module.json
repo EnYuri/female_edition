@@ -18,7 +18,8 @@
     "scripts/fe-chat-portrait.js",
     "scripts/fe-chat-images.js",
     "scripts/inject-conditions.js",
-    "scripts/inject-damage-type.js"
+    "scripts/inject-damage-type.js",
+    "scripts/fe-dx3rd-resource-ui.js"
   ],
   "styles": [
     "styles/ui-font.css",

@@ -384,3 +384,112 @@ body.fe-dx3rd-pixel-theme :is(
     linear-gradient(#000 0 0) !important;
   mask-composite: exclude !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 17  픽셀 자원 UI (#fe-dx3rd-resource-ui)
+ *        좌상단 고정 — HP · 침식률 실시간 표시
+ *        JS: scripts/fe-dx3rd-resource-ui.js
+ *
+ *  HP 바:  빈 상태 = HP 최대, 채워질수록 HP 0에 가까움 (역방향)
+ *  침식률:  0 = 빈 바, 100 = 만 바 (시각 상한 100 고정)
+ * ══════════════════════════════════════════════════════════════ */
+
+#fe-dx3rd-resource-ui {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 300;
+  width: 160px;
+  background: #000000;
+  padding: 8px;
+  box-sizing: border-box;
+  /* overflow: visible 유지 → name-row가 상단 테두리 위에 걸칠 수 있게 */
+}
+
+/* 체커보드 테두리 (§16 동일 기법, 4px 고정) */
+#fe-dx3rd-resource-ui::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 100 !important;
+  background:
+    repeating-conic-gradient(
+      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
+      #000000 25% 50%
+    ) 0 0 / 2px 2px !important;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 4px 4px / calc(100% - 8px) calc(100% - 8px) no-repeat,
+    linear-gradient(#000 0 0) !important;
+  -webkit-mask-composite: destination-out !important;
+  mask:
+    linear-gradient(#000 0 0) 4px 4px / calc(100% - 8px) calc(100% - 8px) no-repeat,
+    linear-gradient(#000 0 0) !important;
+  mask-composite: exclude !important;
+}
+
+/* 액터 이름 — 상단 체커보드(4px) 중앙에 검정 배경 패치로 삽입 */
+#fe-dx3rd-resource-ui .fedr-name-row {
+  position: absolute;
+  top: 2px;           /* 4px 테두리의 수직 중앙 */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 101;       /* ::after(100)보다 위 */
+  background: #000000;
+  padding: 0 4px;
+  white-space: nowrap;
+  line-height: 1;
+  pointer-events: none;
+}
+
+#fe-dx3rd-resource-ui .fedr-name {
+  font-family: var(--fe-font-primary, monospace);
+  font-size: 10px;
+  color: var(--fe-dx3rd-accent, #ffffff);
+  line-height: 1;
+}
+
+/* 바 레이아웃 */
+#fe-dx3rd-resource-ui .fedr-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#fe-dx3rd-resource-ui .fedr-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 자원 바 박스 */
+#fe-dx3rd-resource-ui .fedr-bar {
+  width: 100%;
+  height: 12px;
+  background: #000000;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 채움 — accent 색상, JS inline style로 width 설정 */
+#fe-dx3rd-resource-ui .fedr-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--fe-dx3rd-accent, #ffffff);
+}
+
+/* 수치 라벨 8px */
+#fe-dx3rd-resource-ui .fedr-label {
+  font-family: var(--fe-font-primary, monospace);
+  font-size: 8px;
+  color: var(--fe-dx3rd-accent, #ffffff);
+  text-align: right;
+  line-height: 1;
+  padding-right: 1px;
+}
