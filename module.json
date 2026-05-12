@@ -30,7 +30,8 @@
     "styles/fe-tidy-override.css",
     "styles/fe-chat-portrait.css",
     "styles/conditions.css",
-    "styles/fe-chat-v13-compat.css"
+    "styles/fe-chat-v13-compat.css",
+    "styles/fe-dx3rd-compat.css"
   ],
   "languages": [
     {

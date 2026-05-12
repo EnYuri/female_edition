@@ -145,8 +145,8 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
 function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");
-    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/i.test(src)) return true;
-    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card')) return true;
+    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b)[^"']*["']/i.test(src)) return true;
+    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat')) return true;
     return false;
   } catch {
     return false;

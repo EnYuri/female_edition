@@ -37,7 +37,8 @@ import { feApplyMarkdownOnPreCreate } from "./fe-markdown.js";
 
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
-  feSetUiFontClass, feSetUserColorBgClass, feSetUserColorBgBaseClass,
+  feSetUiFontClass, feSetNeodgmModeClass, feSetDx3rdPixelThemeClass,
+  feSetUserColorBgClass, feSetUserColorBgBaseClass,
   feApplyStyleVarsFromSettings,
 } from "./fe-style.js";
 
@@ -411,6 +412,26 @@ Hooks.once("init", () => {
     onChange: () => feSetUiFontClass(document),
   });
 
+  game.settings.register(MODULE_ID, S.UI_NEODGM_MODE, {
+    name: "커스텀 폰트: NeoDGM 픽셀 폰트로 전체 교체",
+    hint: "CookieRun/그림일기 등 모든 커스텀 폰트를 NeoDGM(픽셀) 폰트 하나로 교체합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: FE_DEFAULTS[S.UI_NEODGM_MODE],
+    onChange: () => feSetNeodgmModeClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.UI_DX3RD_PIXEL_THEME, {
+    name: "[DX3rd] 픽셀 고대비 테마",
+    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. double-cross-3rd 시스템 전용 레이아웃 보정 포함. NeoDGM 폰트 모드와 함께 사용 권장.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME],
+    onChange: () => feSetDx3rdPixelThemeClass(document),
+  });
+
   game.settings.register(MODULE_ID, S.UI_OVERRIDE_FONT_H1_COOKIE, {
     name: "헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기",
     hint: "Foundry/테마가 사용하는 CSS 변수 --font-h1 값을 쿠키런 폰트로 덮어씌웁니다. 일부 테마의 제목/헤딩 글꼴이 바뀔 수 있습니다.",
@@ -561,6 +582,8 @@ Hooks.once("ready", async () => {
   feSetChatCardFontClass(document);
   feSetChatFontChoiceClass(document);
   feSetUiFontClass(document);
+  feSetNeodgmModeClass(document);
+  feSetDx3rdPixelThemeClass(document);
   feSetUserColorBgClass(document);
   feSetUserColorBgBaseClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
@@ -847,7 +870,16 @@ Hooks.on("updateChatMessage", (message, change, _options, userId) => {
     if (!isOurFreezeContentUpdate)
       feClearInlineRollSnapshot(msgId);
     if (feChangeTouchesRenderState(change)) feHydrateRenderStateOverride(message, null, userId);
-    feDeferTask(() => feScheduleRenderedMessageRefresh(msgId, { delay: 0 }));
+    // Skip re-render when the update only touches another module's flags (e.g. dx3rd button-
+    // completion flags). Those modules handle their own DOM updates via renderChatMessageHTML;
+    // triggering a full re-render here would cause unnecessary flicker and wasted cycles.
+    const onlyExternalFlags = (() => {
+      const keys = Object.keys(change ?? {}).filter(k => k !== "_id");
+      if (!keys.length || !keys.every(k => k === "flags")) return false;
+      const ns = Object.keys(change.flags ?? {});
+      return ns.length > 0 && !ns.includes(MODULE_ID);
+    })();
+    if (!onlyExternalFlags) feDeferTask(() => feScheduleRenderedMessageRefresh(msgId, { delay: 0 }));
   } catch {
     /* no-op */
   }
@@ -862,32 +894,39 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
         const speaker = data?.speaker ?? message?.speaker ?? {};
         const OWNER = 3;
 
-        let actor = null;
-        if (speaker?.actor) {
-          actor = game.actors?.get(speaker.actor) ?? null;
-        }
-        if (!actor && speaker?.token && speaker?.scene) {
-          const scene = game.scenes?.get(speaker.scene);
-          const tokenDoc = scene?.tokens?.get(speaker.token);
-          actor = tokenDoc?.actor ?? null;
-        }
+        // Skip for system-initiated roll messages that already carry an explicit actor
+        // speaker (e.g. dx3rd attack/damage rolls). The actor was set intentionally by
+        // the system; overriding it would break actor-id tracking and portraits.
+        const msgRolls = Array.isArray(data?.rolls) ? data.rolls
+          : (Array.isArray(message?.rolls) ? message.rolls : []);
+        if (!(msgRolls.length > 0 && speaker?.actor)) {
+          let actor = null;
+          if (speaker?.actor) {
+            actor = game.actors?.get(speaker.actor) ?? null;
+          }
+          if (!actor && speaker?.token && speaker?.scene) {
+            const scene = game.scenes?.get(speaker.scene);
+            const tokenDoc = scene?.tokens?.get(speaker.token);
+            actor = tokenDoc?.actor ?? null;
+          }
 
-        if (actor) {
-          const ownership = actor.ownership ?? {};
-          const hasPlayerOwner = Object.entries(ownership).some(([uid, level]) => {
-            if (uid === "default") return false;
-            const user = game.users?.get(uid);
-            return user && !user.isGM && level >= OWNER;
-          });
+          if (actor) {
+            const ownership = actor.ownership ?? {};
+            const hasPlayerOwner = Object.entries(ownership).some(([uid, level]) => {
+              if (uid === "default") return false;
+              const user = game.users?.get(uid);
+              return user && !user.isGM && level >= OWNER;
+            });
 
-          if (hasPlayerOwner) {
-            const gmSpeaker = {
-              scene: null,
-              actor: null,
-              token: null,
-              alias: game.user.name,
-            };
-            message.updateSource({ speaker: gmSpeaker });
+            if (hasPlayerOwner) {
+              const gmSpeaker = {
+                scene: null,
+                actor: null,
+                token: null,
+                alias: game.user.name,
+              };
+              message.updateSource({ speaker: gmSpeaker });
+            }
           }
         }
       } catch {
@@ -949,6 +988,8 @@ export {
   feSetChatFontChoiceClass,
   feSetChatCardFontClass,
   feSetUiFontClass,
+  feSetNeodgmModeClass,
+  feSetDx3rdPixelThemeClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
 

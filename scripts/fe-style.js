@@ -42,6 +42,20 @@ function feSetUiFontClass(doc = document) {
   }
 }
 
+function feSetNeodgmModeClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.UI_NEODGM_MODE);
+    doc?.body?.classList?.toggle("fe-neodgm-mode", enabled);
+  } catch {}
+}
+
+function feSetDx3rdPixelThemeClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.UI_DX3RD_PIXEL_THEME);
+    doc?.body?.classList?.toggle("fe-dx3rd-pixel-theme", enabled);
+  } catch {}
+}
+
 function feSetUserColorBgClass(doc = document) {
   try {
     const enabled = !!feSetting(S.USE_USER_COLOR_BG);
@@ -104,6 +118,8 @@ export {
   feSetChatCardFontClass,
   feSetChatFontChoiceClass,
   feSetUiFontClass,
+  feSetNeodgmModeClass,
+  feSetDx3rdPixelThemeClass,
   feSetUserColorBgClass,
   feSetUserColorBgBaseClass,
   feApplyStyleVarsFromSettings,

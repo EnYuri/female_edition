@@ -62,6 +62,14 @@
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 
+@font-face {
+  font-family: "FE NeoDGM";
+  src: url("../font/neodgm.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===================================================
  * 2-a) CSS 변수 선언 — fe-* 내부 변수 (항상 정의)
  *       레이아웃/크기 변수는 폰트 on/off와 무관하게 유지
@@ -157,6 +165,13 @@ body.fe-fonts-enabled.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-
 body.fe-fonts-enabled.fe-ui-font-geurimilgi {
   --fe-ui-font-family:          var(--fe-font-geurimilgi);
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
+}
+
+/* 모든 커스텀 폰트를 NeoDGM 픽셀 폰트로 전체 교체 */
+body.fe-fonts-enabled.fe-neodgm-mode {
+  --fe-font-primary:   "FE NeoDGM", monospace;
+  --fe-font-geurimilgi: "FE NeoDGM", monospace;
+  --fe-font-secondary: "FE NeoDGM", monospace;
 }
 
 /* dnd5e 스코프 재어설트 */
