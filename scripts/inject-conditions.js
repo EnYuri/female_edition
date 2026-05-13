@@ -5,10 +5,31 @@
  * Active Effect & HUD integration (v5+ behavior).
  *
  * Intentionally does NOT mutate CONFIG.statusEffects.
+ *
+ * Cross-version note (v13 + v14):
+ *   v14 migrated EffectChangeData#mode (numeric enum) → #type (string enum).
+ *   We emit BOTH on each change so whichever field dnd5e reads on the running
+ *   core version, the value is present and consistent. Adding the extra key
+ *   on v13 is harmless (the document schema simply ignores it).
  */
+
+const FE_AE_MODE_TO_TYPE = Object.freeze({
+  0: "CUSTOM",
+  1: "MULTIPLY",
+  2: "ADD",
+  3: "DOWNGRADE",
+  4: "UPGRADE",
+  5: "OVERRIDE",
+});
+
+function feBuildAEChange(key, modeNumber, value, priority = 20) {
+  const type = FE_AE_MODE_TO_TYPE[modeNumber] ?? "OVERRIDE";
+  return { key, mode: modeNumber, type, value, priority };
+}
 
 function feBuildConditions() {
   const overrideMode = CONST?.ACTIVE_EFFECT_MODES?.OVERRIDE ?? 5;
+  const mkOverride = (key, value) => feBuildAEChange(key, overrideMode, value, 20);
 
   return [
     {
@@ -17,15 +38,15 @@ function feBuildConditions() {
       img: "systems/dnd5e/icons/svg/statuses/charmed.svg",
       statuses: ["condfemalemating"],
       changes: [
-        { key: "system.attributes.movement.walk", mode: overrideMode, value: 0, priority: 20 },
-        { key: "system.attributes.movement.fly", mode: overrideMode, value: 0, priority: 20 },
-        { key: "system.attributes.movement.swim", mode: overrideMode, value: 0, priority: 20 },
-        { key: "system.attributes.movement.climb", mode: overrideMode, value: 0, priority: 20 },
-        { key: "system.attributes.movement.burrow", mode: overrideMode, value: 0, priority: 20 },
-        { key: "flags.midi-qol.disadvantage.attack.all", mode: overrideMode, value: 1, priority: 20 },
-        { key: "flags.midi-qol.disadvantage.ability.save.int", mode: overrideMode, value: 1, priority: 20 },
-        { key: "flags.midi-qol.disadvantage.ability.save.wis", mode: overrideMode, value: 1, priority: 20 },
-        { key: "flags.midi-qol.disadvantage.ability.save.cha", mode: overrideMode, value: 1, priority: 20 }
+        mkOverride("system.attributes.movement.walk", 0),
+        mkOverride("system.attributes.movement.fly", 0),
+        mkOverride("system.attributes.movement.swim", 0),
+        mkOverride("system.attributes.movement.climb", 0),
+        mkOverride("system.attributes.movement.burrow", 0),
+        mkOverride("flags.midi-qol.disadvantage.attack.all", 1),
+        mkOverride("flags.midi-qol.disadvantage.ability.save.int", 1),
+        mkOverride("flags.midi-qol.disadvantage.ability.save.wis", 1),
+        mkOverride("flags.midi-qol.disadvantage.ability.save.cha", 1),
       ]
     },
     {

@@ -121,11 +121,15 @@ async function feMigrateLegacySettings() {
 // -------------------------------------
 
 function feApplyGmPriorityUiRefresh(doc = document) {
-  try {
-    feApplyStyleVarsFromSettings(doc);
-  } catch {
-    /* no-op */
-  }
+  try { feApplyStyleVarsFromSettings(doc); } catch { /* no-op */ }
+  try { feSetBodyMergeClasses(); } catch { /* no-op */ }
+  try { feSetChatCardFontClass(doc); } catch { /* no-op */ }
+  try { feSetChatFontChoiceClass(doc); } catch { /* no-op */ }
+  try { feSetUiFontClass(doc); } catch { /* no-op */ }
+  try { feSetNeodgmModeClass(doc); } catch { /* no-op */ }
+  try { feSetDx3rdPixelThemeClass(doc); } catch { /* no-op */ }
+  try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
+  try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
   try {
     feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
   } catch {
@@ -429,14 +433,28 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME],
-    onChange: () => feSetDx3rdPixelThemeClass(document),
+    onChange: () => {
+      feSetDx3rdPixelThemeClass(document);
+      feFireChatUiUpdated({ reason: "dx3rd-theme", document });
+    },
+  });
+
+  game.settings.register(MODULE_ID, S.DX3RD_CARD_BORDER_ALPHA, {
+    name: "[DX3rd] 채팅 카드 테두리 투명도",
+    hint: "픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값입니다. 0 = 완전 투명, 1 = 완전 불투명.",
+    scope: "client",
+    config: true,
+    type: Number,
+    default: FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA],
+    range: { min: 0, max: 1, step: 0.05 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
   game.settings.register(MODULE_ID, S.UI_OVERRIDE_FONT_H1_COOKIE, {
     name: "헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기",
-    hint: "Foundry/테마가 사용하는 CSS 변수 --font-h1 값을 쿠키런 폰트로 덮어씌웁니다. 일부 테마의 제목/헤딩 글꼴이 바뀔 수 있습니다.",
+    hint: "현재 --font-h1/h2/h3/monospace 는 CSS(폰트 활성화 시 자동 적용)로 통합되었습니다. 이 설정은 더 이상 사용되지 않습니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.UI_OVERRIDE_FONT_H1_COOKIE],
     onChange: () => feApplyStyleVarsFromSettings(document),

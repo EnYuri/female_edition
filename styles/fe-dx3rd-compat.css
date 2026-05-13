@@ -54,6 +54,14 @@ body.fe-dx3rd-pixel-theme *::after {
   animation-delay:      0ms !important;
 }
 
+/* 일시정지 UI 회전 애니메이션 복원 — 위 1ms 규칙으로 기어가 과도하게 빠르게 회전함 */
+body.fe-dx3rd-pixel-theme :is(#pause, #pause *),
+body.fe-dx3rd-pixel-theme :is(#pause, #pause *)::before,
+body.fe-dx3rd-pixel-theme :is(#pause, #pause *)::after {
+  animation-duration: 3s !important;
+  animation-delay:    0s !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 4  소프트 그림자 전역 제거
@@ -211,6 +219,7 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd
 
 body.fe-dx3rd-pixel-theme {
   --fe-dx3rd-accent: #ffffff;
+  --fe-dx3rd-card-border-alpha: 1;
 }
 
 /* 채팅 사이드바 패널 + 스크롤 컨테이너 + 로그 영역 */
@@ -299,71 +308,80 @@ body.fe-dx3rd-pixel-theme
   background-color: transparent !important;
 }
 
-/* 유저 색상 있는 메시지 → 카드 테두리 = 유저 색상 */
+/* 유저 색상 있는 메시지 → 카드 테두리 = 유저 색상 + 알파 */
 body.fe-dx3rd-pixel-theme
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
-  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255)) !important;
+  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
-/* 유저 색상 없는 메시지 → 카드 테두리 = 액센트(흰색) */
+/* 유저 색상 없는 메시지 → 카드 테두리 = 액센트(흰색) + 알파 */
 body.fe-dx3rd-pixel-theme
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.fe-has-user-color)
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
-  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
 
 /* ══════════════════════════════════════════════════════════════
  * § 16  픽셀 체커보드 테두리
- *        대상: 팝업 윈도우(캐릭터 시트 등), 우측 사이드바, 채팅 입력창
+ *        대상: 팝업 윈도우(캐릭터 시트 등), 사이드바 콘텐츠, 사이드바 탭
  *
  *  기법: ::after pseudo-element
- *    · background = repeating-conic-gradient(accent / black) 2×2px 타일
- *      → 1px 단위 체커보드 패턴
- *    · mask punch-out 으로 내부를 투명하게 → 테두리 링(4px)만 노출
+ *    · background = repeating-conic-gradient(accent / black) 6×6px 타일
+ *      → 3×3px 셀 체커보드 패턴 (6px 테두리 안에 2줄 교차 → 레퍼런스 이미지 수준)
+ *    · mask punch-out 으로 내부를 투명하게 → 테두리 링(6px)만 노출
  *
- *  두께 조정: --fe-dx3rd-border-width (기본 4px)
+ *  두께 조정: --fe-dx3rd-border-width (기본 6px)
  *  색상 변경: --fe-dx3rd-accent (기본 흰색)
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme {
-  --fe-dx3rd-border-width: 4px;
+  --fe-dx3rd-border-width: 6px;
 }
 
 /* 기존 솔리드 윈도우 테두리 → 픽셀 테두리(§16 pseudo)로 대체 */
-body.fe-dx3rd-pixel-theme :is(.window-app, .application) {
+body.fe-dx3rd-pixel-theme .window-app {
   border: none !important;
 }
 
-/* 채팅 컨트롤: ::after 앵커 포지셔닝 */
-body.fe-dx3rd-pixel-theme :is(chat-controls, #chat-controls, .chat-controls) {
+/* stacking context + positioning context — ::after z-index가 자식 위로,
+   ::after position: absolute가 이 요소를 기준으로 배치되도록 보장 */
+body.fe-dx3rd-pixel-theme #sidebar {
+  isolation: isolate !important;
+}
+
+body.fe-dx3rd-pixel-theme #sidebar-content {
   position: relative !important;
+  isolation: isolate !important;
+}
+
+body.fe-dx3rd-pixel-theme nav.tabs.faded-ui {
+  position: relative !important;
+  isolation: isolate !important;
 }
 
 /* 체커보드 테두리 pseudo-element
-   .window-app / #sidebar 는 Foundry가 이미 position: absolute/fixed 적용됨 */
+   대상: 플로팅 윈도우(.window-app), 사이드바 콘텐츠(#sidebar-content), 사이드바 탭(nav.tabs.faded-ui)
+   .application / chat-sidebar 제거 — 불필요한 요소 매칭 방지 */
 body.fe-dx3rd-pixel-theme :is(
   .window-app,
-  .application,
-  #sidebar,
-  chat-controls,
-  #chat-controls,
-  .chat-controls
+  #sidebar-content,
+  nav.tabs.faded-ui
 )::after {
   content: '' !important;
   position: absolute !important;
   inset: 0 !important;
   pointer-events: none !important;
-  z-index: 100 !important;
-  /* 2×2px repeating-conic → 1px 체커보드(accent / black) */
+  z-index: 9999 !important;
+  /* 6×6px repeating-conic → 3×3px 셀 체커보드(accent / black) — 6px 테두리 안에 2줄 교차 */
   background:
     repeating-conic-gradient(
       var(--fe-dx3rd-accent, #ffffff) 0% 25%,
       #000000 25% 50%
-    ) 0 0 / 2px 2px !important;
+    ) 0 0 / 6px 6px !important;
   /* mask: 내부(border-width 안쪽) punch-out → 테두리 링만 표시 */
   -webkit-mask:
     linear-gradient(#000 0 0)
@@ -385,6 +403,17 @@ body.fe-dx3rd-pixel-theme :is(
   mask-composite: exclude !important;
 }
 
+/* #sidebar-content: 좌측 엣지 테두리만 — canvas와 사이드바 경계를 강조.
+   단일 레이어 마스크로 punch-out 없이 왼쪽 border-width 폭만 노출. */
+body.fe-dx3rd-pixel-theme #sidebar-content::after {
+  -webkit-mask:
+    linear-gradient(#000 0 0) 0 0 / var(--fe-dx3rd-border-width) 100% no-repeat !important;
+  -webkit-mask-composite: source-over !important;
+  mask:
+    linear-gradient(#000 0 0) 0 0 / var(--fe-dx3rd-border-width) 100% no-repeat !important;
+  mask-composite: add !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 17  픽셀 자원 UI (#fe-dx3rd-rui-container)
@@ -395,16 +424,57 @@ body.fe-dx3rd-pixel-theme :is(
  *  침식률:  0 = 빈 바, 100 = 만 바 (시각 상한 100 고정)
  * ══════════════════════════════════════════════════════════════ */
 
-/* 컨테이너: 좌상단 고정, 카드 세로 정렬 */
-#fe-dx3rd-rui-container {
+/* 컨테이너 공통: fixed, pointer-events 차단 (카드·핸들만 auto) */
+#fe-dx3rd-rui-container,
+#fe-dx3rd-rui-container-own {
   position: fixed;
-  top: 8px;
   left: 8px;
+  top: 8px;         /* JS가 저장된 위치로 덮어씀 */
   z-index: 300;
   display: flex;
-  flex-direction: column;
   gap: 10px;
   pointer-events: none;
+}
+
+/* 비소유 액터 컨테이너: 세로 정렬 */
+#fe-dx3rd-rui-container {
+  flex-direction: column;
+}
+
+/* 본인 소유 액터 컨테이너: 가로 정렬, 좌하단 기본 (JS가 실제 top 계산) */
+#fe-dx3rd-rui-container-own {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+/* 드래그 핸들 — 체커보드 패턴, 절반 투명 → hover 시 불투명 */
+.fedr-drag-handle {
+  pointer-events: auto;
+  cursor: grab;
+  flex-shrink: 0;
+  background:
+    repeating-conic-gradient(
+      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
+      #000000 25% 50%
+    ) 0 0 / 4px 4px;
+  opacity: 0.45;
+}
+
+.fedr-drag-handle:hover  { opacity: 1; }
+.fedr-drag-handle:active { cursor: grabbing !important; opacity: 1; }
+
+/* 세로 컨테이너의 핸들: 가로 바 (카드 위) */
+#fe-dx3rd-rui-container .fedr-drag-handle {
+  width: 100%;
+  height: 6px;
+  min-width: 40px;
+}
+
+/* 가로 컨테이너의 핸들: 세로 바 (카드 왼쪽) */
+#fe-dx3rd-rui-container-own .fedr-drag-handle {
+  width: 6px;
+  align-self: stretch;
+  min-height: 40px;
 }
 
 /* 개별 액터 카드: 포트레이트 + 패널 가로 배치 */
@@ -415,13 +485,13 @@ body.fe-dx3rd-pixel-theme :is(
   align-items: stretch;
   background: #000000;
   pointer-events: auto;
-  width: calc(var(--fedr-pw, 64px) + 120px);
-  height: var(--fedr-ph, 128px);
+  width: calc(var(--fedr-pw, 144px) + 120px);
+  height: var(--fedr-ph, 296px);
   overflow: visible;
   box-sizing: border-box;
 }
 
-/* 카드 체커보드 테두리 (§16 동일 기법) */
+/* 카드 체커보드 테두리 (§16 동일 기법 — 6×6px 타일, 3×3px 셀) */
 .fedr-actor-card::after {
   content: '' !important;
   position: absolute !important;
@@ -432,13 +502,13 @@ body.fe-dx3rd-pixel-theme :is(
     repeating-conic-gradient(
       var(--fe-dx3rd-accent, #ffffff) 0% 25%,
       #000000 25% 50%
-    ) 0 0 / 2px 2px !important;
+    ) 0 0 / 6px 6px !important;
   -webkit-mask:
-    linear-gradient(#000 0 0) 4px 4px / calc(100% - 8px) calc(100% - 8px) no-repeat,
+    linear-gradient(#000 0 0) 6px 6px / calc(100% - 12px) calc(100% - 12px) no-repeat,
     linear-gradient(#000 0 0) !important;
   -webkit-mask-composite: destination-out !important;
   mask:
-    linear-gradient(#000 0 0) 4px 4px / calc(100% - 8px) calc(100% - 8px) no-repeat,
+    linear-gradient(#000 0 0) 6px 6px / calc(100% - 12px) calc(100% - 12px) no-repeat,
     linear-gradient(#000 0 0) !important;
   mask-composite: exclude !important;
 }
@@ -446,8 +516,8 @@ body.fe-dx3rd-pixel-theme :is(
 /* 포트레이트 래퍼 */
 .fedr-portrait-wrap {
   flex-shrink: 0;
-  width: var(--fedr-pw, 64px);
-  height: var(--fedr-ph, 128px);
+  width: var(--fedr-pw, 144px);
+  height: var(--fedr-ph, 296px);
   overflow: hidden;
   border-right: 1px solid var(--fe-dx3rd-accent, #ffffff);
   box-sizing: border-box;
@@ -468,42 +538,50 @@ body.fe-dx3rd-pixel-theme :is(
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 14px 6px 6px;
+  padding: 10px 6px 6px;
   box-sizing: border-box;
   min-width: 0;
 }
 
 /* 이름 행 — 카드 상단 테두리(4px) 중앙에 삽입.
-   position: absolute → nearest positioned ancestor = .fedr-actor-card */
+   position: absolute → nearest positioned ancestor = .fedr-actor-card
+   컨테이너는 투명 — 실제 배경은 .fedr-name 스팬에만 적용되어
+   글자 너비만큼만 테두리를 가림. */
 .fedr-name-row {
   position: absolute;
-  top: 2px;                       /* 4px 테두리의 수직 중앙 */
-  left: var(--fedr-pw, 64px);     /* 포트레이트 너비 이후 */
+  top: 3px;                       /* 6px 테두리의 수직 중앙 */
+  left: var(--fedr-pw, 144px);    /* 포트레이트 너비 이후 */
   right: 0;
   transform: translateY(-50%);
   z-index: 101;                   /* ::after(100)보다 위 */
-  background: #000000;
-  padding: 0 4px;
+  background: transparent;
+  padding: 0;
   text-align: center;
   line-height: 1;
   pointer-events: none;
-  white-space: nowrap;
+  display: flex;
+  justify-content: center;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .fedr-name {
   font-family: var(--fe-font-primary, monospace);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--fe-dx3rd-accent, #ffffff);
   line-height: 1;
+  background: #000000;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* 바 레이아웃 */
 .fedr-bars {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
 }
 
@@ -516,7 +594,7 @@ body.fe-dx3rd-pixel-theme :is(
 /* 자원 바 박스 */
 .fedr-bar {
   width: 100%;
-  height: 12px;
+  height: 10px;
   background: #000000;
   border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
   position: relative;
@@ -534,14 +612,27 @@ body.fe-dx3rd-pixel-theme :is(
   background: var(--fe-dx3rd-accent, #ffffff);
 }
 
-/* 수치 라벨 8px */
+/* 수치 행 — 레이블 키(HP 등) 좌측, 수치 우측 */
+.fedr-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.fedr-label-key {
+  font-family: var(--fe-font-primary, monospace);
+  font-size: 10px;
+  color: var(--fe-dx3rd-accent, #ffffff);
+  line-height: 1;
+}
+
+/* 수치 라벨 */
 .fedr-label {
   font-family: var(--fe-font-primary, monospace);
-  font-size: 8px;
+  font-size: 10px;
   color: var(--fe-dx3rd-accent, #ffffff);
   text-align: right;
   line-height: 1;
-  padding-right: 1px;
 }
 
 /* ─── 채팅 컨트롤 토글 버튼 ─── */

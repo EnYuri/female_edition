@@ -101,13 +101,8 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
-    // UI_ENABLE_FONTS is excluded from GM priority so each player controls it independently.
-    const fontsEnabled = (() => {
-      try { return !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS); } catch { return true; }
-    })();
-    const h1Cookie = fontsEnabled && !!feSetting(S.UI_OVERRIDE_FONT_H1_COOKIE);
-    if (h1Cookie) root.style.setProperty("--font-h1", "var(--fe-font-primary)");
-    else root.style.removeProperty("--font-h1");
+    root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 1)));
+
   } catch (err) {
     console.warn("female_edition | failed to apply style vars", err);
   }

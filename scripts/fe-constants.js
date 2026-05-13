@@ -41,6 +41,7 @@ const S = {
   GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
   GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
   DX3RD_RUI_PORTRAIT_WIDTH: "ceDx3rdRuiPortraitWidth",
+  DX3RD_CARD_BORDER_ALPHA: "ceDx3rdCardBorderAlpha",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -88,7 +89,8 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
   [S.GM_PRIORITY_ENABLED]: true,
   [S.GM_SPEAK_AS_SELF]: false,
-  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 64,
+  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 144,
+  [S.DX3RD_CARD_BORDER_ALPHA]: 0.7,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";

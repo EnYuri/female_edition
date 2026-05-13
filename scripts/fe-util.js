@@ -58,6 +58,38 @@ function feGetChatMessageElementOrder(el, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// v13 stored every open Application in ui.windows (numeric ids → app).
+// v14 ApplicationV2 instances live in foundry.applications.instances (Map of id → app).
+// Iterate BOTH so popped-out chat logs are found on either core version.
+function feIterAllApps() {
+  const out = [];
+  try {
+    for (const app of Object.values(ui?.windows ?? {})) if (app) out.push(app);
+  } catch { /* no-op */ }
+  try {
+    const av2 = globalThis.foundry?.applications?.instances;
+    if (av2 && typeof av2.values === "function") {
+      for (const app of av2.values()) if (app) out.push(app);
+    } else if (av2 && typeof av2[Symbol.iterator] === "function") {
+      for (const app of av2) if (app) out.push(app);
+    }
+  } catch { /* no-op */ }
+  return out;
+}
+
+function feAppRootElement(app) {
+  try {
+    const el = app?.element;
+    if (!el) return null;
+    // jQuery wrapper (v1 Application)
+    if (el.jquery && feIsElementNode(el[0])) return el[0];
+    // Raw HTMLElement (ApplicationV2)
+    if (feIsElementNode(el)) return el;
+    if (feIsElementNode(el[0])) return el[0];
+  } catch { /* no-op */ }
+  return null;
+}
+
 function feGetChatLogs() {
   const logs = new Set();
   const scannedDocs = new Set();
@@ -78,8 +110,8 @@ function feGetChatLogs() {
   collect(document);
 
   try {
-    for (const app of Object.values(ui?.windows ?? {})) {
-      const root = app?.element?.[0] ?? app?.element ?? null;
+    for (const app of feIterAllApps()) {
+      const root = feAppRootElement(app);
       if (root) collect(root);
       const doc = root?.ownerDocument ?? app?.window?.document ?? null;
       if (doc && doc !== document) collect(doc);
@@ -262,7 +294,7 @@ function feSnapshotAndRestoreStickyScroll() {
   const registerApp = (app) => {
     if (!app) return;
     try {
-      const root = app.element?.[0] ?? app.element ?? null;
+      const root = feAppRootElement(app);
       const appLog = root?.querySelector?.("ol.chat-log, #chat-log")
         ?? app.element?.querySelector?.("ol.chat-log, #chat-log");
       if (appLog && !logToApp.has(appLog)) logToApp.set(appLog, app);
@@ -271,10 +303,10 @@ function feSnapshotAndRestoreStickyScroll() {
   registerApp(ui?.chat);
   registerApp(game?.messages?.directory);
   try {
-    for (const app of Object.values(ui?.windows ?? {})) {
-      if (!app) continue;
-      // ChatLog popouts expose scrollBottom() — that is our duck-type signal.
-      if (typeof app.scrollBottom === "function") registerApp(app);
+    // ChatLog popouts on v13 (ui.windows) and v14 (foundry.applications.instances)
+    // both expose scrollBottom() — that is our duck-type signal.
+    for (const app of feIterAllApps()) {
+      if (typeof app?.scrollBottom === "function") registerApp(app);
     }
   } catch { /* no-op */ }
 

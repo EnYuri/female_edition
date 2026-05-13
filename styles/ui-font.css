@@ -64,7 +64,7 @@
 
 @font-face {
   font-family: "FE NeoDGM";
-  src: url("../font/neodgm.ttf") format("truetype");
+  src: url("../font/NeoDunggeunmoPro-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -146,9 +146,13 @@ body.fe-fonts-enabled {
   --fe-dnd5e-label-font-family: var(--fe-font-primary);
 
   /* Foundry 전역 폰트 변수 재정의 */
-  --font-primary: var(--fe-font-primary);
-  --font-sans:    var(--fe-font-primary);
-  --font-serif:   var(--fe-font-primary);
+  --font-primary:   var(--fe-font-primary);
+  --font-sans:      var(--fe-font-primary);
+  --font-serif:     var(--fe-font-primary);
+  --font-h1:        var(--fe-font-primary);
+  --font-h2:        var(--fe-font-primary);
+  --font-h3:        var(--fe-font-primary);
+  --font-monospace: var(--fe-ui-font-family);
 
   /* dnd5e 폰트 변수 재정의 */
   --dnd5e-font-roboto:      var(--fe-font-primary);
@@ -172,6 +176,11 @@ body.fe-fonts-enabled.fe-neodgm-mode {
   --fe-font-primary:   "FE NeoDGM", monospace;
   --fe-font-geurimilgi: "FE NeoDGM", monospace;
   --fe-font-secondary: "FE NeoDGM", monospace;
+  font-feature-settings: "kern" 1, "frac" 1;
+}
+
+body.fe-fonts-enabled.fe-neodgm-mode * {
+  font-feature-settings: "kern" 1, "frac" 1;
 }
 
 /* dnd5e 스코프 재어설트 */

@@ -208,11 +208,37 @@ function feInjectExportButton(root = document) {
   controls.appendChild(a);
 }
 
+// Enumerate every open app across v13 (ui.windows) and v14 (foundry.applications.instances).
+function feIterAllApps() {
+  const out = [];
+  try {
+    for (const w of Object.values(ui?.windows ?? {})) if (w) out.push(w);
+  } catch { /* no-op */ }
+  try {
+    const av2 = globalThis.foundry?.applications?.instances;
+    if (av2 && typeof av2.values === "function") {
+      for (const app of av2.values()) if (app) out.push(app);
+    } else if (av2 && typeof av2[Symbol.iterator] === "function") {
+      for (const app of av2) if (app) out.push(app);
+    }
+  } catch { /* no-op */ }
+  return out;
+}
+
+function feAppRoot(app) {
+  const el = app?.element;
+  if (!el) return null;
+  if (el.jquery && el[0]?.nodeType === 1) return el[0];
+  if (el.nodeType === 1) return el;
+  if (el[0]?.nodeType === 1) return el[0];
+  return null;
+}
+
 function feInjectExportButtonsAll() {
   feInjectExportButton(document);
   // also for popped-out chat logs if present
-  for (const w of Object.values(ui.windows ?? {})) {
-    const root = w?.element?.[0] ?? w?.element ?? null;
+  for (const w of feIterAllApps()) {
+    const root = feAppRoot(w);
     if (root && typeof root.querySelector === "function") feInjectExportButton(root);
   }
 }
