@@ -669,6 +669,35 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   #fe-chat-export-container .chat-message :is(.message-header, .message-sender, .message-content) {
     text-shadow: none !important;
   }
+
+  /* Speed: normalize blend modes — the main source of PDF generation slowness in Chromium.
+   * Each element with a non-normal blend mode requires a separate compositor pass.
+   * background-blend-mode must also be reset: user-color tints use screen blend.
+   * ::before/::after are excluded from the * selector so they need explicit rules. */
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *,
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *::before,
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *::after {
+    mix-blend-mode: normal !important;
+    background-blend-mode: normal !important;
+    isolation: auto !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Speed: disable transitions/animations for a clean static PDF capture. */
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *,
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *::before,
+  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  /* Completeness: collapsible-content wrappers must not clip when printing. */
+  #fe-chat-export-container .collapsible-content > .wrapper {
+    overflow: visible !important;
+  }
 }
 
 /* --------------------------- */

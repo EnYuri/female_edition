@@ -19,7 +19,9 @@
     "scripts/fe-chat-images.js",
     "scripts/inject-conditions.js",
     "scripts/inject-damage-type.js",
-    "scripts/fe-dx3rd-resource-ui.js"
+    "scripts/fe-dx3rd-resource-ui.js",
+    "scripts/fe-image-hover.js",
+    "scripts/fe-theatre.js"
   ],
   "styles": [
     "styles/ui-font.css",
@@ -32,8 +34,11 @@
     "styles/fe-chat-portrait.css",
     "styles/conditions.css",
     "styles/fe-chat-v13-compat.css",
-    "styles/fe-dx3rd-compat.css"
+    "styles/fe-dx3rd-compat.css",
+    "styles/fe-image-hover.css",
+    "styles/fe-theatre.css"
   ],
+  "socket": true,
   "languages": [
     {
       "lang": "ko",

@@ -771,6 +771,8 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
     }
 
     // Mirror body class toggles used by stylesheet-driven chat UI features.
+    // fe-fonts-enabled gates all font rules in ui-font.css — must be synced here.
+    doc.body?.classList?.toggle?.("fe-fonts-enabled", enableFonts);
     try {
       const hidePortraits = !!game.settings.get(MODULE_ID, S.UI_HIDE_PORTRAITS);
       doc.body?.classList?.toggle?.("fe-hide-portraits", hidePortraits);
@@ -1076,6 +1078,15 @@ function feArchiveMessageContentLooksEmpty(node) {
   } catch {
     return false;
   }
+}
+
+function feExpandCollapsedArchiveSections(node) {
+  try {
+    if (!feIsElement(node)) return;
+    for (const el of node.querySelectorAll?.(".collapsible.collapsed") ?? []) {
+      try { el.classList.remove("collapsed"); } catch {}
+    }
+  } catch {}
 }
 
 function feFinalizeArchiveSpecialMessageState(node, msg, liveEl = null) {
@@ -1462,6 +1473,12 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     } catch {}
   }
 
+  if (feIsElement(node)) {
+    try {
+      feExpandCollapsedArchiveSections(node);
+    } catch {}
+  }
+
   return feIsElement(node) ? node : null;
 }
 
@@ -1715,10 +1732,53 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         display: none !important;
       }
 
+      /* Expand all collapsed collapsible sections in the archive (dnd5e chat cards). */
+      #fe-chat-export-log .collapsible.collapsed .collapsible-content {
+        grid-template-rows: 1fr !important;
+      }
+      #fe-chat-export-log .chat-card .description.collapsed .details {
+        grid-template-rows: 1fr !important;
+        opacity: 1 !important;
+      }
+      #fe-chat-export-log .collapsible.collapsed > .fa-chevron-down,
+      #fe-chat-export-log .collapsible.collapsed > * > .fa-chevron-down,
+      #fe-chat-export-log .collapsible.collapsed .fa-caret-down {
+        transform: none !important;
+      }
+
       @media print {
         html, body {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
+        }
+
+        /* Speed: normalize blend modes — Chromium must composite each blend layer
+         * when generating PDFs, which is the largest single source of slowness.
+         * Normalizing to "normal" eliminates the compositor pass entirely.
+         * background-blend-mode must also be reset: user-color tints use screen blend. */
+        #fe-chat-export-log *,
+        #fe-chat-export-log *::before,
+        #fe-chat-export-log *::after {
+          mix-blend-mode: normal !important;
+          background-blend-mode: normal !important;
+          isolation: auto !important;
+          filter: none !important;
+          -webkit-filter: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+
+        /* Speed: disable transitions/animations so the PDF captures static state. */
+        #fe-chat-export-log *,
+        #fe-chat-export-log *::before,
+        #fe-chat-export-log *::after {
+          transition: none !important;
+          animation: none !important;
+        }
+
+        /* Completeness: content wrappers inside collapsible sections must not clip. */
+        #fe-chat-export-log .collapsible-content > .wrapper {
+          overflow: visible !important;
         }
 
         /* Hide the toolbar when printing (save as PDF). */
@@ -1841,7 +1901,46 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   if (btnPrint)
     btnPrint.addEventListener("click", async (ev) => {
       ev.preventDefault();
-      await feArchivePrint(win);
+      if (btnPrint.getAttribute("aria-disabled") === "true") return;
+      try { win.focus(); } catch {}
+      btnPrint.setAttribute("aria-disabled", "true");
+
+      const printMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
+
+      let restoreImages = () => {};
+      try {
+        const printLogEl =
+          win.document.getElementById("fe-chat-export-log") ||
+          win.document.getElementById("chat-log") ||
+          win.document.querySelector("ol.chat-log");
+        // hideAll: CSS already hides every image; skip JS downscale entirely.
+        if (printLogEl && printMode !== "hideAll") {
+          setStatus("이미지 최적화 중…");
+          restoreImages = await feDownscaleImagesForPrint(win, printLogEl, {
+            meta: (t) => setStatus(t),
+            useBlobURL: true,
+            // hideAvatars: CSS hides portrait/avatar elements; exclude them from downscale too.
+            excludeAvatars: printMode === "hideAvatars",
+          });
+        }
+      } catch (err) {
+        console.warn("female_edition | print image downscale failed", err);
+      }
+
+      let restored = false;
+      const onAfterPrint = () => {
+        if (restored) return;
+        restored = true;
+        try { restoreImages(); } catch {}
+        try { btnPrint.removeAttribute("aria-disabled"); } catch {}
+      };
+      try { win.addEventListener("afterprint", onAfterPrint, { once: true }); } catch {}
+      // Also clean up if the window is closed before afterprint fires.
+      try { win.addEventListener("unload", onAfterPrint, { once: true }); } catch {}
+      // Electron may not fire afterprint reliably — release after 60 s.
+      setTimeout(onAfterPrint, 60_000);
+
+      win.print();
     });
 
   if (btnDownload)

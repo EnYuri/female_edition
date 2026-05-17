@@ -27,9 +27,8 @@ function feSetChatFontChoiceClass(doc = document) {
     const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
     const body = doc?.body;
     if (!body) return;
-    const useCookie = choice === "cookie";
-    body.classList.toggle("fe-chat-font-cookie", useCookie);
-    body.classList.toggle("fe-chat-font-geurimilgi", !useCookie);
+    body.classList.toggle("fe-chat-font-cookie", choice === "cookie");
+    body.classList.toggle("fe-chat-font-geurimilgi", choice === "geurimilgi");
   } catch {}
 }
 
@@ -44,8 +43,8 @@ function feSetUiFontClass(doc = document) {
 
 function feSetNeodgmModeClass(doc = document) {
   try {
-    const enabled = !!feSetting(S.UI_NEODGM_MODE);
-    doc?.body?.classList?.toggle("fe-neodgm-mode", enabled);
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    doc?.body?.classList?.toggle("fe-neodgm-mode", choice === "neodgm");
   } catch {}
 }
 
@@ -101,7 +100,10 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
-    root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 1)));
+    root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
+
+    const accent = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff";
+    root.style.setProperty("--fe-dx3rd-accent", accent);
 
   } catch (err) {
     console.warn("female_edition | failed to apply style vars", err);

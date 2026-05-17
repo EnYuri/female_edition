@@ -96,7 +96,7 @@ body.fe-dx3rd-pixel-theme svg {
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme :focus-visible {
-  outline:        2px solid #ffffff !important;
+  outline:        2px solid var(--fe-dx3rd-accent, #ffffff) !important;
   outline-offset: 0px !important;
 }
 
@@ -111,14 +111,14 @@ body.fe-dx3rd-pixel-theme :focus:not(:focus-visible) {
 
 /* 인터랙티브 요소 hover: 소프트 ring 대신 1px 하드 outline */
 body.fe-dx3rd-pixel-theme :is(button, input, select, textarea):not([disabled]):hover {
-  outline:        1px solid rgba(255, 255, 255, 0.55) !important;
+  outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   outline-offset: 0 !important;
 }
 
 /* Foundry 윈도우 테두리 강화 */
 body.fe-dx3rd-pixel-theme .window-app,
 body.fe-dx3rd-pixel-theme .application {
-  border: 1px solid #555 !important;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
 
@@ -137,16 +137,16 @@ body.fe-dx3rd-pixel-theme :is(
   .dx3rd-sub-action-ui-timing-btn
 ):hover:not(:disabled) {
   transform:    skewX(-20deg) !important; /* scale 제거 */
-  border-color: #ffbb00 !important;
-  outline:      1px solid #ffbb00 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:      1px solid var(--fe-dx3rd-accent, #ffffff) !important;
   outline-offset: 0 !important;
   opacity:      1 !important;
 }
 
 /* active 조건 상태 — glow 없이 하드 컬러 테두리 */
 body.fe-dx3rd-pixel-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
-  border-color: #f44336 !important;
-  outline:      1px solid #f44336 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
+  outline:      1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
   outline-offset: 0 !important;
 }
 
@@ -157,12 +157,12 @@ body.fe-dx3rd-pixel-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-act
 
 /* 팝업 창 자체 — 하드 2px 엣지 */
 body.fe-dx3rd-pixel-theme .dx3rd-item-selection-window {
-  border: 2px solid #666 !important;
+  border: 2px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
 }
 
 body.fe-dx3rd-pixel-theme .dx3rd-item-selection-btn:hover {
-  border-color:   #999 !important;
-  outline:        1px solid #999 !important;
+  border-color:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
+  outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
   outline-offset: 0 !important;
 }
 
@@ -172,11 +172,11 @@ body.fe-dx3rd-pixel-theme .dx3rd-item-selection-btn:hover {
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme .dx3rd-item-chat {
-  border: 1px solid #555 !important;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
 body.fe-dx3rd-pixel-theme .dx3rd-item-chat button:not([disabled]):hover {
-  outline:        1px solid rgba(255, 255, 255, 0.55) !important;
+  outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   outline-offset: 0 !important;
 }
 
@@ -188,7 +188,7 @@ body.fe-dx3rd-pixel-theme .dx3rd-item-chat button:not([disabled]):hover {
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd :is(input, select, textarea):focus {
-  outline:        1px solid #888 !important;
+  outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.7) !important;
   outline-offset: 0 !important;
 }
 
@@ -198,13 +198,13 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd :is(input, select, textarea):focus {
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd .items-list[data-drop-zone].drag-over {
-  border:           2px solid #4CAF50 !important;
-  background-color: rgba(76, 175, 80, 0.1) !important;
+  border:           2px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
 }
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd
   .items-list[data-drop-zone="spells"]:empty::before {
-  border:      2px solid #666 !important; /* was dashed #ccc */
+  border:      2px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
   border-style: dashed !important;        /* 점선은 유지 (UX 힌트) */
 }
 
@@ -217,10 +217,9 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd
  *    document.documentElement.style.setProperty('--fe-dx3rd-accent','red')
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-dx3rd-pixel-theme {
-  --fe-dx3rd-accent: #ffffff;
-  --fe-dx3rd-card-border-alpha: 1;
-}
+/* --fe-dx3rd-accent, --fe-dx3rd-card-border-alpha 는 JS(feApplyStyleVarsFromSettings)가
+   document.documentElement 인라인 스타일로 설정한다. 여기서 body 규칙으로 선언하면
+   html 인라인 스타일의 상속보다 body 자체 선언이 우선하므로 JS 세팅이 무시됨 → 선언 없음. */
 
 /* 채팅 사이드바 패널 + 스크롤 컨테이너 + 로그 영역 */
 body.fe-dx3rd-pixel-theme :is(#sidebar #chat, .tab.chat, .chat-sidebar, chat-sidebar),
@@ -234,6 +233,9 @@ body.fe-dx3rd-pixel-theme :is(#chat-log, .chat-log, ol.chat-log) {
 /* ══════════════════════════════════════════════════════════════
  * § 14  채팅 메시지 — 검정 배경 · 액센트 테두리 · 액센트 글씨
  *        내레이터/라운드마커는 자체 배경 유지를 위해 제외.
+ *
+ *  .fe-has-user-color 메시지: 외곽선 = 유저 색 / 0.5 알파
+ *  유저 색상 없는 메시지:      외곽선 = 액센트(흰색) / 1.0
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme
@@ -243,6 +245,13 @@ body.fe-dx3rd-pixel-theme
   background-image: none    !important;
   border-color:     var(--fe-dx3rd-accent, #ffffff) !important;
   color:            var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* 유저 색상 있는 메시지 → 외곽선만 유저 색 / 0.5 알파로 오버라이드 */
+body.fe-dx3rd-pixel-theme
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  border-color: rgb(var(--fe-user-color-rgb) / 0.5) !important;
 }
 
 /* 메시지 헤더 · 콘텐츠 서브 영역 — 투명(검정 상속) */
@@ -326,29 +335,36 @@ body.fe-dx3rd-pixel-theme
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 16  픽셀 체커보드 테두리
- *        대상: 팝업 윈도우(캐릭터 시트 등), 사이드바 콘텐츠, 사이드바 탭
+ * § 16  픽셀 사선 슬래시 테두리 (게임 대사창 스타일)
+ *        대상: 팝업 윈도우(.window-app), 사이드바 좌측 엣지(#sidebar-content)
  *
- *  기법: ::after pseudo-element
- *    · background = repeating-conic-gradient(accent / black) 6×6px 타일
- *      → 3×3px 셀 체커보드 패턴 (6px 테두리 안에 2줄 교차 → 레퍼런스 이미지 수준)
- *    · mask punch-out 으로 내부를 투명하게 → 테두리 링(6px)만 노출
+ *  기법: border-image 9-슬라이스 (검정 배경 보존)
+ *    · pixel-border.png (52×52) — 4px 검정 패딩 + 6×6 흰 모서리 + 32px 슬래시 변
+ *    · 변 슬라이스 32px = 슬래시 주기 8px × 4 → 타일링 시 대각선 끊김 없음
+ *    · 원본 이미지 그대로 표시 (마스크 X) → 검정 배경 + 흰 패턴 모두 보존
+ *    · 사이드바는 pixel-border-side.png (6×8) 좌측 안쪽에 세로 반복
+ *      (Foundry #sidebar-content overflow:hidden 유지 위해 외각 X)
  *
- *  두께 조정: --fe-dx3rd-border-width (기본 6px)
- *  색상 변경: --fe-dx3rd-accent (기본 흰색)
+ *  외각 배치(.window-app/.application/.fe-stage-textbox/.fedr-actor-card):
+ *    inset: -10px + box-sizing: border-box → ::after 가 element 외각으로 10px 펼쳐짐
+ *    → 내부 UI 침범 X
+ *  슬라이스: 10px (4px 외측 검정 + 6px 패턴)
+ *  렌더 두께: 10px (1:1 픽셀, image-rendering: pixelated)
+ *  색상: 이미지 고정 (흑백). accent 변수 미적용.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-dx3rd-pixel-theme {
-  --fe-dx3rd-border-width: 6px;
+  --fe-dx3rd-border-width: 10px;
 }
 
-/* 기존 솔리드 윈도우 테두리 → 픽셀 테두리(§16 pseudo)로 대체 */
-body.fe-dx3rd-pixel-theme .window-app {
+/* 기존 솔리드 윈도우 테두리(§7) → 픽셀 테두리(§16 pseudo)로 대체
+   .application 포함 — v14 ApplicationV2 윈도우의 솔리드 보더도 제거 */
+body.fe-dx3rd-pixel-theme .window-app,
+body.fe-dx3rd-pixel-theme .application {
   border: none !important;
 }
 
-/* stacking context + positioning context — ::after z-index가 자식 위로,
-   ::after position: absolute가 이 요소를 기준으로 배치되도록 보장 */
+/* stacking context — ::after position:absolute 의 기준 컨텍스트 보장 */
 body.fe-dx3rd-pixel-theme #sidebar {
   isolation: isolate !important;
 }
@@ -356,67 +372,64 @@ body.fe-dx3rd-pixel-theme #sidebar {
 body.fe-dx3rd-pixel-theme #sidebar-content {
   position: relative !important;
   isolation: isolate !important;
+  /* overflow: hidden 유지 — Foundry 사이드바 collapse 애니메이션이 의존 */
 }
 
-body.fe-dx3rd-pixel-theme nav.tabs.faded-ui {
-  position: relative !important;
-  isolation: isolate !important;
+/* overflow: visible — inset:-10px ::after 가 잘리지 않도록 (기본값 visible 이지만 방어적) */
+body.fe-dx3rd-pixel-theme .window-app,
+body.fe-dx3rd-pixel-theme .application {
+  overflow: visible !important;
 }
 
-/* 체커보드 테두리 pseudo-element
-   대상: 플로팅 윈도우(.window-app), 사이드바 콘텐츠(#sidebar-content), 사이드바 탭(nav.tabs.faded-ui)
-   .application / chat-sidebar 제거 — 불필요한 요소 매칭 방지 */
-body.fe-dx3rd-pixel-theme :is(
-  .window-app,
-  #sidebar-content,
-  nav.tabs.faded-ui
-)::after {
+/* .window-app / .application: 9-슬라이스 테두리, 전체 외각 (inset -10px)
+   .application 포함 — v14 ApplicationV2 윈도우 커버 */
+body.fe-dx3rd-pixel-theme .window-app::after,
+body.fe-dx3rd-pixel-theme .application::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  border: 10px solid transparent !important;
+  border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  background: none !important;
+  background-color: transparent !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
+}
+
+/* #sidebar-content: 좌측 엣지 안쪽에 세로 반복 슬래시 (6px 폭)
+   inset:0 + background-size 6×8 + repeat-y → 좌측 6px만 패턴, 나머지는 자연 투명
+   (Foundry overflow:hidden 유지 위해 외각으로 안 펼침) */
+body.fe-dx3rd-pixel-theme #sidebar-content::after {
   content: '' !important;
   position: absolute !important;
   inset: 0 !important;
   pointer-events: none !important;
-  z-index: 9999 !important;
-  /* 6×6px repeating-conic → 3×3px 셀 체커보드(accent / black) — 6px 테두리 안에 2줄 교차 */
-  background:
-    repeating-conic-gradient(
-      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
-      #000000 25% 50%
-    ) 0 0 / 6px 6px !important;
-  /* mask: 내부(border-width 안쪽) punch-out → 테두리 링만 표시 */
-  -webkit-mask:
-    linear-gradient(#000 0 0)
-      var(--fe-dx3rd-border-width)
-      var(--fe-dx3rd-border-width) /
-      calc(100% - 2 * var(--fe-dx3rd-border-width))
-      calc(100% - 2 * var(--fe-dx3rd-border-width))
-      no-repeat,
-    linear-gradient(#000 0 0) !important;
-  -webkit-mask-composite: destination-out !important;
-  mask:
-    linear-gradient(#000 0 0)
-      var(--fe-dx3rd-border-width)
-      var(--fe-dx3rd-border-width) /
-      calc(100% - 2 * var(--fe-dx3rd-border-width))
-      calc(100% - 2 * var(--fe-dx3rd-border-width))
-      no-repeat,
-    linear-gradient(#000 0 0) !important;
-  mask-composite: exclude !important;
-}
-
-/* #sidebar-content: 좌측 엣지 테두리만 — canvas와 사이드바 경계를 강조.
-   단일 레이어 마스크로 punch-out 없이 왼쪽 border-width 폭만 노출. */
-body.fe-dx3rd-pixel-theme #sidebar-content::after {
-  -webkit-mask:
-    linear-gradient(#000 0 0) 0 0 / var(--fe-dx3rd-border-width) 100% no-repeat !important;
-  -webkit-mask-composite: source-over !important;
-  mask:
-    linear-gradient(#000 0 0) 0 0 / var(--fe-dx3rd-border-width) 100% no-repeat !important;
-  mask-composite: add !important;
+  z-index: 0 !important;
+  background-image: url('./assets/pixel-border-side.png') !important;
+  background-size: 6px 8px !important;
+  background-position: 0 0 !important;
+  background-repeat: repeat-y !important;
+  background-color: transparent !important;
+  image-rendering: pixelated !important;
+  border: none !important;
+  border-image: none !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-image: none !important;
+          mask-image: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
 }
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 17  픽셀 자원 UI (#fe-dx3rd-rui-container)
+ * § 17  픽셀 캐릭터 스테이터스 (#fe-dx3rd-rui-container)
  *        좌상단 고정 — 씬 내 가시 액터 HP · 침식률 실시간 표시
  *        JS: scripts/fe-dx3rd-resource-ui.js
  *
@@ -424,7 +437,7 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
  *  침식률:  0 = 빈 바, 100 = 만 바 (시각 상한 100 고정)
  * ══════════════════════════════════════════════════════════════ */
 
-/* 컨테이너 공통: fixed, pointer-events 차단 (카드·핸들만 auto) */
+/* 컨테이너 공통: fixed, pointer-events 차단 (카드만 auto) */
 #fe-dx3rd-rui-container,
 #fe-dx3rd-rui-container-own {
   position: fixed;
@@ -432,7 +445,7 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
   top: 8px;         /* JS가 저장된 위치로 덮어씀 */
   z-index: 300;
   display: flex;
-  gap: 10px;
+  gap: 0;           /* 카드 margin(10px)이 간격 담당 */
   pointer-events: none;
 }
 
@@ -447,77 +460,56 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
   align-items: flex-start;
 }
 
-/* 드래그 핸들 — 체커보드 패턴, 절반 투명 → hover 시 불투명 */
-.fedr-drag-handle {
-  pointer-events: auto;
-  cursor: grab;
-  flex-shrink: 0;
-  background:
-    repeating-conic-gradient(
-      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
-      #000000 25% 50%
-    ) 0 0 / 4px 4px;
-  opacity: 0.45;
-}
-
-.fedr-drag-handle:hover  { opacity: 1; }
-.fedr-drag-handle:active { cursor: grabbing !important; opacity: 1; }
-
-/* 세로 컨테이너의 핸들: 가로 바 (카드 위) */
-#fe-dx3rd-rui-container .fedr-drag-handle {
-  width: 100%;
-  height: 6px;
-  min-width: 40px;
-}
-
-/* 가로 컨테이너의 핸들: 세로 바 (카드 왼쪽) */
-#fe-dx3rd-rui-container-own .fedr-drag-handle {
-  width: 6px;
-  align-self: stretch;
-  min-height: 40px;
-}
-
-/* 개별 액터 카드: 포트레이트 + 패널 가로 배치 */
+/* 개별 액터 카드: name-row(절대 위치) + card-body(포트레이트+패널)
+   pointer-events: auto — 카드에서 mousedown이 컨테이너로 버블업 → 드래그 트리거
+   margin: 10px — ::after(inset:-10px) 바깥 테두리가 인접 카드와 겹치지 않게 */
 .fedr-actor-card {
   position: relative;
+  background: #000000;
+  pointer-events: auto;
+  cursor: grab;
+  width: calc(var(--fedr-pw, 82px) + 110px);
+  height: var(--fedr-ph, 82px);
+  overflow: visible;
+  box-sizing: border-box;
+  margin: 10px;
+}
+
+/* 카드 내부 레이아웃 컨테이너: overflow:hidden으로 포트레이트 하단 클리핑 보장 */
+.fedr-card-body {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  background: #000000;
-  pointer-events: auto;
-  width: calc(var(--fedr-pw, 144px) + 120px);
-  height: var(--fedr-ph, 296px);
-  overflow: visible;
-  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
-/* 카드 체커보드 테두리 (§16 동일 기법 — 6×6px 타일, 3×3px 셀) */
+/* 카드 테두리 — 9-슬라이스 (게임 대사창 패턴)
+   inset: -10px + box-sizing border-box → 10px 보더가 전부 카드 바깥, 콘텐츠 침범 X */
 .fedr-actor-card::after {
   content: '' !important;
   position: absolute !important;
-  inset: 0 !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
   pointer-events: none !important;
   z-index: 100 !important;
-  background:
-    repeating-conic-gradient(
-      var(--fe-dx3rd-accent, #ffffff) 0% 25%,
-      #000000 25% 50%
-    ) 0 0 / 6px 6px !important;
-  -webkit-mask:
-    linear-gradient(#000 0 0) 6px 6px / calc(100% - 12px) calc(100% - 12px) no-repeat,
-    linear-gradient(#000 0 0) !important;
-  -webkit-mask-composite: destination-out !important;
-  mask:
-    linear-gradient(#000 0 0) 6px 6px / calc(100% - 12px) calc(100% - 12px) no-repeat,
-    linear-gradient(#000 0 0) !important;
-  mask-composite: exclude !important;
+  border: 10px solid transparent !important;
+  border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  background: none !important;
+  background-color: transparent !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
 }
 
-/* 포트레이트 래퍼 */
+/* 포트레이트 래퍼: card-body의 flex stretch로 높이 채움, overflow:hidden으로 클리핑 */
 .fedr-portrait-wrap {
   flex-shrink: 0;
-  width: var(--fedr-pw, 144px);
-  height: var(--fedr-ph, 296px);
+  width: var(--fedr-pw, 82px);
+  height: 100%;
   overflow: hidden;
   border-right: 1px solid var(--fe-dx3rd-accent, #ffffff);
   box-sizing: border-box;
@@ -526,19 +518,19 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
 .fedr-portrait {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
   display: block;
   image-rendering: pixelated;
+  object-fit: cover;
+  object-position: top center;
 }
 
-/* 패널: 이름 + 바, position 없음 → name-row의 absolute가 카드 기준 */
+/* 패널: 바 영역, name-row는 카드 직계 자식으로 이동 */
 .fedr-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 10px 6px 6px;
+  padding: 6px;
   box-sizing: border-box;
   min-width: 0;
 }
@@ -549,9 +541,9 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
    글자 너비만큼만 테두리를 가림. */
 .fedr-name-row {
   position: absolute;
-  top: 3px;                       /* 6px 테두리의 수직 중앙 */
-  left: var(--fedr-pw, 144px);    /* 포트레이트 너비 이후 */
-  right: 0;
+  top: -5px;                     /* 테두리가 바깥(inset:-10px)으로 나갔으므로 카드 위 -5px = 상단 테두리 중앙 */
+  left: 0;
+  width: var(--fedr-pw, 82px);   /* 포트레이트 너비만큼 — 포트레이트 위에 위치 */
   transform: translateY(-50%);
   z-index: 101;                   /* ::after(100)보다 위 */
   background: transparent;
@@ -621,7 +613,7 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
 
 .fedr-label-key {
   font-family: var(--fe-font-primary, monospace);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fe-dx3rd-accent, #ffffff);
   line-height: 1;
 }
@@ -629,10 +621,42 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
 /* 수치 라벨 */
 .fedr-label {
   font-family: var(--fe-font-primary, monospace);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fe-dx3rd-accent, #ffffff);
   text-align: right;
   line-height: 1;
+}
+
+/* ─── 강조색 스와치 버튼 ─── */
+.fe-dx3rd-accent-btn {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35);
+  outline: 1px solid #000;
+  outline-offset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.fe-dx3rd-accent-btn:hover {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
+}
+
+/* 실제 <input type="color">: 완전히 덮어 클릭 영역 확보, 시각적으로 숨김 */
+.fe-dx3rd-accent-btn input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
 }
 
 /* ─── 채팅 컨트롤 토글 버튼 ─── */
@@ -640,7 +664,7 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
   background: none;
   border: none;
   padding: 2px 4px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4);
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
@@ -651,10 +675,675 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
 }
 
 .fe-dx3rd-rui-toggle:hover {
-  color: #ffffff !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-/* ─── 시트 헤더 숨김 토글 (.fedr-sheet-toggle) ─── */
+/* ══════════════════════════════════════════════════════════════
+ * § 18  드롭다운 · 컨텍스트 메뉴 · 툴팁 — 픽셀 외각선
+ *        검정 배경 + 액센트 1px 내선 + 검정 1px 외선
+ *        hover: 반전(흰 배경 + 검정 글씨)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── Foundry 컨텍스트 메뉴 컨테이너 ─────────────────────────── */
+
+body.fe-dx3rd-pixel-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu) {
+  background:     #000000 !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+/* 컨텍스트 메뉴 항목 기본 */
+body.fe-dx3rd-pixel-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li) {
+  color:      var(--fe-dx3rd-accent, #ffffff) !important;
+  background: transparent !important;
+  border:     none !important;
+}
+
+/* hover: 반전 */
+body.fe-dx3rd-pixel-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li):hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color:      #000000 !important;
+}
+
+body.fe-dx3rd-pixel-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li):hover * {
+  color: inherit !important;
+}
+
+/* ── <select> 요소 ───────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme select {
+  background:     #000000 !important;
+  color:          var(--fe-dx3rd-accent, #ffffff) !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+/* <option> — Firefox 적용됨; Chrome은 OS 네이티브가 우선 */
+body.fe-dx3rd-pixel-theme option {
+  background: #000000 !important;
+  color:      var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── Foundry 툴팁 ────────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme
+  :is(#tooltip, .tooltip, .toolclip, foundry-tooltip, [data-tooltip-content]) {
+  background:     #000000 !important;
+  color:          var(--fe-dx3rd-accent, #ffffff) !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+/* ── Theatre 이모트 피커 메뉴 ────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .fe-stage-emote-menu {
+  background:     #000000 !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+body.fe-dx3rd-pixel-theme .fe-stage-emote-item {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .fe-stage-emote-item:hover,
+body.fe-dx3rd-pixel-theme .fe-stage-emote-item.active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color:      #000000 !important;
+}
+
+/* ── Theatre 대사 박스 — 픽셀 테마 오버라이드 ─────────────────── */
+
+/* 대사창 테두리 → 9-슬라이스 border-image, 외각 배치 */
+body.fe-dx3rd-pixel-theme .fe-stage-textbox::before {
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  border: 10px solid transparent !important;
+  border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  image-rendering: pixelated !important;
+  /* fe-theatre.css의 기존 ring mask 제거 */
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
+}
+
+/* 액터 이름 레이블 색상 */
+body.fe-dx3rd-pixel-theme .fe-stage-textbox-name {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * § 19  DX3rd 시트 · 다이얼로그 내부 — 강조색 오버라이드
+ *        검정이 아닌 모든 색상 → 강조색(명도 조정)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── 시트: 탭 ────────────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .tabs .item {
+  background: #000000 !important;
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .tabs .item.active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  text-shadow: none !important;
+}
+
+/* ── 시트: 헤더·제목 텍스트 ─────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .progress-bar input {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item .sheet-header .header-fields input {
+  border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+}
+
+/* ── 시트: 이름박스·스탯리스트 테두리(#404040 bg는 유지) ────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .stat-box .stat-list::before {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
+}
+
+/* ── 시트: 다이아몬드 내링 + 그림자 ────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond {
+  box-shadow: 0 2px 8px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1),
+              0 0 0 2px var(--fe-dx3rd-accent, #ffffff) inset !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond:hover {
+  box-shadow: 0 2px 8px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25),
+              0 0 0 2px var(--fe-dx3rd-accent, #ffffff) inset !important;
+}
+
+/* ── 시트: 노란색 호버(#ffbb00) 모두 강조색으로 ─────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd
+  .sheet-wrapper .sheet-stat .main-grid .stat-box .skill-create:hover i,
+body.fe-dx3rd-pixel-theme .double-cross-3rd
+  .sheet-wrapper .sheet-stat .main-grid .skill-box .skill-edit:hover,
+body.fe-dx3rd-pixel-theme .double-cross-3rd
+  .sheet-attributes .plus-addon button:hover i {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── 시트: 인침식 바 ────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .encroachment-bar {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .enc-bar-blue {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+}
+
+body.fe-dx3rd-pixel-theme .enc-bar-red {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme .encroachment-value-text,
+body.fe-dx3rd-pixel-theme .encroachment-value-input {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── 시트: 주사위 색상(폭주/침식) ──────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .dice-term.ds .dice-face.fumble,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .chat-message .dice-face.fumble {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: 1px solid #2e7d32 !important;
+  outline-offset: 1px !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .dice-term.ds .dice-face.exploded,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .chat-message .dice-face.exploded,
+body.fe-dx3rd-pixel-theme .dice-rolls .dice.exploded {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: 1px solid #d32f2f !important;
+  outline-offset: 1px !important;
+}
+
+/* ── 시트: 소진 아이템(crimson) · titus ─────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item.item-exhausted {
+  outline: 1px solid #dc143c !important;
+  outline-offset: -1px !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item.item-exhausted .item-name .item-label,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item.item-exhausted .item-control {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .items-list .titus {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: 1px solid crimson !important;
+  outline-offset: -1px !important;
+}
+
+/* ── 시트: 드롭존 ─────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .items-list[data-drop-zone="spells"].drag-over {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .items-list[data-drop-zone="spells"]:empty::before {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+}
+
+/* ── 어빌리티·스킬 입력박스(rgba white bg) ──────────────────── */
+
+body.fe-dx3rd-pixel-theme .ability-input-box,
+body.fe-dx3rd-pixel-theme .skill-input-box {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .skill-input-box:disabled,
+body.fe-dx3rd-pixel-theme .skill-input-box[readonly] {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.04) !important;
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+/* ── 액션 UI: 타이틀·버튼 ───────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .dx3rd-action-ui-title {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-action-ui-btn,
+  .dx3rd-action-ui-skill-btn,
+  .dx3rd-sub-action-ui-skill-btn,
+  .dx3rd-sub-action-ui-condition-btn,
+  .dx3rd-sub-action-ui-spell-btn,
+  .dx3rd-sub-action-ui-item-btn,
+  .dx3rd-sub-action-ui-timing-btn,
+  .dx3rd-side-control-btn
+) {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-action-ui-btn,
+  .dx3rd-action-ui-skill-btn,
+  .dx3rd-sub-action-ui-skill-btn,
+  .dx3rd-sub-action-ui-condition-btn,
+  .dx3rd-sub-action-ui-spell-btn,
+  .dx3rd-sub-action-ui-item-btn,
+  .dx3rd-sub-action-ui-timing-btn
+):hover,
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-action-ui-btn[data-action],
+  .dx3rd-sub-action-ui-condition-btn
+):not(.dx3rd-condition-active):hover {
+  color: #000000 !important;
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 0 8px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-side-control-btn:hover {
+  color: #000000 !important;
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 0 0 1px rgba(68,68,68,0.6), 0 2px 8px rgba(0,0,0,0.4),
+              0 0 15px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: #f44336 !important;
+  box-shadow: 0 0 4px 2px rgba(244, 67, 54, 0.5) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-sub-action-ui-timing-btn:disabled {
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+/* ── 팝업 윈도우(아이템 선택/스탯-스킬/타이밍) ─────────────── */
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-window,
+  .dx3rd-stat-skill-window,
+  .dx3rd-timing-action-window
+) {
+  background: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: 1px solid #000000 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-header,
+  .dx3rd-stat-skill-header,
+  .dx3rd-timing-action-header
+) {
+  background: #000000 !important;
+  border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-header h3,
+  .dx3rd-stat-skill-header h3,
+  .dx3rd-timing-action-header h3
+) {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-close-btn,
+  .dx3rd-stat-skill-close-btn,
+  .dx3rd-timing-action-close-btn
+) {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-close-btn,
+  .dx3rd-stat-skill-close-btn,
+  .dx3rd-timing-action-close-btn
+):hover {
+  color: #000000 !important;
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-btn,
+  .dx3rd-stat-btn,
+  .dx3rd-skill-btn,
+  .dx3rd-timing-action-btn
+) {
+  background: #000000 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(
+  .dx3rd-item-selection-btn,
+  .dx3rd-stat-btn,
+  .dx3rd-skill-btn,
+  .dx3rd-timing-action-btn
+):hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-stat-divider {
+  border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
+}
+
+/* ── 마술 주사위 제거 다이얼로그 ─────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .spell-dice-remove-dialog {
+  background: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-remove-header {
+  background: #000000 !important;
+  border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-remove-header h3 {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-selection {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-face {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-item.overflow-dice .spell-dice-face {
+  border-color: #4caf50 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-item.selected .spell-dice-face,
+body.fe-dx3rd-pixel-theme .spell-dice-item.selected.overflow-dice .spell-dice-face {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
+  border-color: #f44336 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-item:not(.disabled):hover .spell-dice-face {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.7) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-item.overflow-dice:not(.disabled):hover .spell-dice-face {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  border-color: #66bb6a !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-selection-summary {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-selection-summary p {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-confirm-button {
+  background: #000000 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+}
+
+body.fe-dx3rd-pixel-theme .spell-dice-confirm-button:hover:not(:disabled) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── 장비 / 무기 선택 다이얼로그 ─────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme :is(.equipment-table, .weapon-table) thead th {
+  background: #000000 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.equipment-table, .weapon-table) tbody td {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.equipment-row, .weapon-row):hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.equipment-row, .weapon-row).currently-equipped {
+  background: transparent !important;
+  box-shadow: inset 3px 0 0 #4caf50 !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.equipment-row, .weapon-row).currently-equipped:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  box-shadow: inset 3px 0 0 #4caf50 !important;
+}
+
+body.fe-dx3rd-pixel-theme .equipment-row.newly-created {
+  background: transparent !important;
+  box-shadow: inset 3px 0 0 #ffc107 !important;
+}
+
+body.fe-dx3rd-pixel-theme .equipment-row.newly-created:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  box-shadow: inset 3px 0 0 #ffc107 !important;
+}
+
+body.fe-dx3rd-pixel-theme .equipment-row.selected {
+  background: transparent !important;
+  box-shadow: inset 3px 0 0 #2196f3 !important;
+}
+
+body.fe-dx3rd-pixel-theme .equipment-row.selected:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  box-shadow: inset 3px 0 0 #2196f3 !important;
+}
+
+body.fe-dx3rd-pixel-theme .equipment-row.already-owned,
+body.fe-dx3rd-pixel-theme .weapon-row.attack-exhausted td {
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.equipment-dialog-buttons, .weapon-dialog-buttons) button {
+  background: #000000 !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+}
+
+/* ── 스킬 설정 다이얼로그 ─────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .attribute-header {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skills-settings-form h4,
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-key {
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-row {
+  border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-name input,
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-key input[readonly] {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.05) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-key input.clickable-skill-key {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .skill-key input.clickable-skill-key:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .delete-skill {
+  color: #dc3545 !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .delete-skill.disabled,
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .delete-skill.disabled:hover {
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .add-skill {
+  color: #28a745 !important;
+}
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd.skills-settings-dialog .save-skills {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── 아이템 확장 다이얼로그 ─────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .top-tabs button {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .top-tabs button:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .top-tabs button.active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .sub-tabs {
+  border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .sub-tabs button {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .sub-tabs button:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .sub-tabs button.active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .sub-tab-content {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .form-label {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog input[type="text"],
+body.fe-dx3rd-pixel-theme .item-extend-dialog input[type="number"],
+body.fe-dx3rd-pixel-theme .item-extend-dialog select {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.05) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog input:focus,
+body.fe-dx3rd-pixel-theme .item-extend-dialog select:focus {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 0 3px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .form-buttons {
+  border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .form-buttons button {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .btn-primary {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .btn-primary:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.8) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog .btn-secondary {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
+}
+
+body.fe-dx3rd-pixel-theme .item-extend-dialog input.disabled,
+body.fe-dx3rd-pixel-theme .item-extend-dialog select.disabled,
+body.fe-dx3rd-pixel-theme .item-extend-dialog input[disabled],
+body.fe-dx3rd-pixel-theme .item-extend-dialog select[disabled] {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.04) !important;
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+/* ── 콤보 다이얼로그 ─────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .combo-dialog .info-table th,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .combo-dialog .info-table td {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
+}
+
+/* ── 어빌리티 다이얼로그 제목 ────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .ability-title-box {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-dx3rd-pixel-theme .fe-stage-emote-item:hover *,
+body.fe-dx3rd-pixel-theme .fe-stage-emote-item.active * {
+  color: inherit !important;
+}
+
+/* ── 시트 헤더 숨김 토글 (.fedr-sheet-toggle) ─── */
 .fedr-sheet-toggle {
   display: flex;
   align-items: center;

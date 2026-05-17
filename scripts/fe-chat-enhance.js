@@ -107,7 +107,16 @@ async function feMigrateLegacySettings() {
     // ignore
   }
 
-  await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "geurimilgi"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
+  // Migrate UI_NEODGM_MODE → CHAT_FONT_CHOICE: "neodgm" (settings merged in v0.4+)
+  try {
+    const neodgmOn = Boolean(game.settings.get(MODULE_ID, S.UI_NEODGM_MODE));
+    const fontChoice = String(game.settings.get(MODULE_ID, S.CHAT_FONT_CHOICE) ?? "");
+    if (neodgmOn && fontChoice !== "neodgm") {
+      await game.settings.set(MODULE_ID, S.CHAT_FONT_CHOICE, "neodgm");
+    }
+  } catch { /* ignore */ }
+
+  await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "geurimilgi", "neodgm"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
   await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
   await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
   await feNormalizeChoiceSetting(S.MERGE_SPEAKER_BASIS, ["token", "actor", "author"], FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
@@ -172,7 +181,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 텍스트 메시지만",
     hint: "인라인 롤이 섞인 일반 텍스트는 병합할 수 있습니다. 전용 주사위 결과 카드 병합은 아래 옵션으로 켤 수 있으며, midi/dnd5e 채팅 카드는 기본적으로 병합하지 않습니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => feApplyChatMergeToAllLogs(),
@@ -182,7 +191,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 주사위 결과 메시지도 포함",
     hint: "끄면 .dice-roll / .dice-result / ChatMessage.rolls 메시지는 병합에서 제외합니다. 켜면 같은 화자의 연속 주사위 결과 메시지도 병합할 수 있습니다. midi/dnd5e 채팅 카드는 계속 제외됩니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
@@ -192,7 +201,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 그룹 구분선 표시",
     hint: "다른 화자의 새 그룹이 시작될 때 얇은 구분선을 표시합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => feApplyChatMergeToAllLogs(),
@@ -269,7 +278,7 @@ Hooks.once("init", () => {
     name: "PDF 버튼: 자동 인쇄창 열기",
     hint: "켜면 PDF 버튼 클릭 시 아카이브 창을 연 뒤 자동으로 인쇄(프린트) 다이얼로그를 엽니다. 끄면 아카이브만 열립니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
   });
@@ -278,7 +287,7 @@ Hooks.once("init", () => {
     name: "내보내기 최적화(용량/멈춤 방지)",
     hint: "아카이브/인쇄 시 parchment/texture 이미지와 그림자 등을 강제로 제거하여 PDF 용량과 메모리 사용량을 크게 줄입니다(권장).",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -287,7 +296,7 @@ Hooks.once("init", () => {
     name: "HTML 저장: 커스텀 폰트 포함",
     hint: "HTML로 저장할 때 CookieRun 폰트를 파일 안에 포함시켜(임베드) 나중에 단독으로 열어도 폰트가 유지되게 합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -296,7 +305,7 @@ Hooks.once("init", () => {
     name: "HTML 저장: 이미지 포함",
     hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 같은 이미지가 반복되면 자동으로 중복을 제거하여 용량을 절약합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -315,7 +324,7 @@ Hooks.once("init", () => {
     name: "FVTT 데스크톱: 외부 브라우저로 아카이브 열기",
     hint: "데스크톱(Electron) 앱에서 인쇄(PDF) 시 메모리/멈춤 문제가 있을 때, 아카이브를 HTML 파일로 만들어 시스템 기본 브라우저로 열 수 있습니다. (Electron/Node API 접근이 가능한 경우에만 동작)",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       off: "사용 안 함",
@@ -364,7 +373,7 @@ Hooks.once("init", () => {
     name: "채팅: 주문/아이템/피처 설명 글자 크기(px)",
     hint: "dnd5e 채팅 카드(주문/아이템/피처) 설명 영역의 기본 글자 크기입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: 12,
     range: { min: 9, max: 24, step: 1 },
@@ -386,24 +395,28 @@ Hooks.once("init", () => {
     name: "채팅 카드(설명) 커스텀 폰트 적용",
     hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/그림일기)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => feSetChatCardFontClass(),
   });
 
   game.settings.register(MODULE_ID, S.CHAT_FONT_CHOICE, {
-    name: "채팅 글꼴 선택",
-    hint: "채팅 메시지 본문/헤더에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    name: "채팅/UI 글꼴 선택",
+    hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
     config: true,
     type: String,
     choices: {
       cookie: "쿠키런",
       geurimilgi: "그림일기",
+      neodgm: "NeoDGM 픽셀",
     },
-    default: "cookie",
-    onChange: () => feSetChatFontChoiceClass(document),
+    default: FE_DEFAULTS[S.CHAT_FONT_CHOICE],
+    onChange: () => {
+      feSetChatFontChoiceClass(document);
+      feSetNeodgmModeClass(document);
+    },
   });
 
   game.settings.register(MODULE_ID, S.UI_USE_GEURIMILGI, {
@@ -417,10 +430,9 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.UI_NEODGM_MODE, {
-    name: "커스텀 폰트: NeoDGM 픽셀 폰트로 전체 교체",
-    hint: "CookieRun/그림일기 등 모든 커스텀 폰트를 NeoDGM(픽셀) 폰트 하나로 교체합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    name: "(숨김) NeoDGM 픽셀 폰트 — 채팅/UI 글꼴 선택으로 통합됨",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.UI_NEODGM_MODE],
     onChange: () => feSetNeodgmModeClass(document),
@@ -443,10 +455,20 @@ Hooks.once("init", () => {
     name: "[DX3rd] 채팅 카드 테두리 투명도",
     hint: "픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값입니다. 0 = 완전 투명, 1 = 완전 불투명.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA],
     range: { min: 0, max: 1, step: 0.05 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.DX3RD_PIXEL_ACCENT, {
+    name: "[DX3rd] 픽셀 테마 강조색",
+    hint: "픽셀 테마에서 테두리·글자·체커보드 무늬에 적용되는 강조 색상입니다. 채팅 컨트롤의 색상 스와치로 변경하세요.",
+    scope: "client",
+    config: false,
+    type: String,
+    default: FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT],
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
@@ -487,7 +509,7 @@ Hooks.once("init", () => {
     name: "채팅 메시지 배경: 유저 색상 하부 배경(불투명)",
     hint: "유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다. (유저 색상 배경이 켜져 있을 때만 의미가 있습니다)",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       white: "흰색(권장)",
@@ -502,7 +524,7 @@ Hooks.once("init", () => {
     name: "채팅: 배경 채도(페이퍼 오버레이 알파)",
     hint: "텍스쳐 제거 시 사용하는 '페이퍼 오버레이'의 알파 값입니다. 값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: FE_DEFAULTS[S.STYLE_BG_SATURATION],
     range: { min: 0.05, max: 1.0, step: 0.01 },
@@ -546,7 +568,7 @@ Hooks.once("init", () => {
     name: "GM: PC 토큰 선택 시 본인 이름으로 채팅",
     hint: "활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.",
     scope: "client",
-    config: true,
+    config: false,
     restricted: true,
     type: Boolean,
     default: false,

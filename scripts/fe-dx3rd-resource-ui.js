@@ -1,5 +1,5 @@
 // fe-dx3rd-resource-ui.js
-// 픽셀 테마 자원 UI — 씬 내 가시 토큰(액터) 전체를 고정 패널로 표시.
+// 픽셀 테마 캐릭터 스테이터스 — 씬 내 가시 토큰(액터) 전체를 고정 패널로 표시.
 // 조건: game.system.id === "double-cross-3rd" AND body.fe-dx3rd-pixel-theme
 //
 // 레이아웃:
@@ -12,6 +12,7 @@ import { MODULE_ID, S } from "./fe-constants.js";
 const CONTAINER_ID     = "fe-dx3rd-rui-container";
 const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
 const BTN_ID           = "fe-dx3rd-rui-toggle-btn";
+const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
 const HIDE_FLAG        = "hideResourceUi";
 const VISIBLE_KEY      = `${MODULE_ID}.ruiVisible`;
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
@@ -25,8 +26,8 @@ function _isGlobalOn()   { return localStorage.getItem(VISIBLE_KEY) !== "false";
 function _setGlobalOn(v) { localStorage.setItem(VISIBLE_KEY, String(v)); }
 
 function _portraitW() {
-  try { return Math.max(32, Number(game.settings.get(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH)) || 144); }
-  catch { return 144; }
+  try { return Math.max(32, Number(game.settings.get(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH)) || 82); }
+  catch { return 82; }
 }
 
 // ─── actor data ────────────────────────────────────────────────────────────
@@ -86,48 +87,68 @@ function _savePos(key, left, top) {
 }
 
 // ─── drag ──────────────────────────────────────────────────────────────────
+// 컨테이너 자체를 드래그 가능하게 만든다.
+// 카드에서 mousedown이 버블업되면 5px 임계값 이후 드래그로 전환.
+// 임계값 미만은 일반 클릭으로 처리 (카드 상호작용 보존).
 
 function _makeDraggable(container, posKey) {
-  const handle = container.querySelector(":scope > .fedr-drag-handle");
-  if (!handle) return;
+  let dragging = false;
+  let wasDragging = false;
 
-  handle.addEventListener("mousedown", e => {
+  container.addEventListener("mousedown", e => {
     if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
 
-    // bottom/right → top/left 절대 좌표로 전환 (drag 기준점 확정)
+    // mousedown 시점의 좌표를 기록 (drag 기준점)
     const rect = container.getBoundingClientRect();
-    container.style.left   = `${rect.left}px`;
-    container.style.top    = `${rect.top}px`;
-    container.style.bottom = "";
-    container.style.right  = "";
-
     const ox = e.clientX - rect.left;
     const oy = e.clientY - rect.top;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    dragging = false;
 
     const onMove = mv => {
-      const left = Math.max(0, Math.min(window.innerWidth  - 20, mv.clientX - ox));
-      const top  = Math.max(0, Math.min(window.innerHeight - 20, mv.clientY - oy));
-      container.style.left = `${left}px`;
-      container.style.top  = `${top}px`;
+      if (!dragging) {
+        if (Math.hypot(mv.clientX - startX, mv.clientY - startY) < 5) return;
+        // 임계값 초과 → 드래그 시작: bottom/right를 top/left로 확정
+        dragging = true;
+        container.style.left   = `${rect.left}px`;
+        container.style.top    = `${rect.top}px`;
+        container.style.bottom = "";
+        container.style.right  = "";
+        document.body.style.cursor = "grabbing";
+      }
+      mv.preventDefault();
+      mv.stopPropagation();
+      container.style.left = `${Math.max(0, Math.min(window.innerWidth  - 20, mv.clientX - ox))}px`;
+      container.style.top  = `${Math.max(0, Math.min(window.innerHeight - 20, mv.clientY - oy))}px`;
     };
 
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup",   onUp);
-      const r = container.getBoundingClientRect();
-      _savePos(posKey, Math.round(r.left), Math.round(r.top));
+    const onUp = up => {
+      document.removeEventListener("mousemove", onMove, true);
+      document.removeEventListener("mouseup",   onUp,   true);
+      document.body.style.cursor = "";
+      if (dragging) {
+        up.stopPropagation();
+        const r = container.getBoundingClientRect();
+        _savePos(posKey, Math.round(r.left), Math.round(r.top));
+        wasDragging = true;
+      }
+      dragging = false;
     };
 
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup",   onUp);
+    document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("mouseup",   onUp,   true);
   });
+
+  // 드래그 직후 발생하는 click 억제 (카드 클릭 오작동 방지)
+  container.addEventListener("click", e => {
+    if (wasDragging) { e.stopPropagation(); e.preventDefault(); wasDragging = false; }
+  }, true);
 }
 
 // ─── DOM ───────────────────────────────────────────────────────────────────
 
-function _portraitH(pw) { return Math.round(pw * 296 / 144); }
+function _portraitH(pw) { return Math.round(pw * 0.75); }
 
 function _buildCard(actor, pw) {
   const ph = _portraitH(pw);
@@ -138,24 +159,26 @@ function _buildCard(actor, pw) {
   card.style.setProperty("--fedr-ph", `${ph}px`);
 
   card.innerHTML =
-    `<div class="fedr-portrait-wrap">` +
-      `<img class="fedr-portrait" draggable="false">` +
-    `</div>` +
-    `<div class="fedr-panel">` +
-      `<div class="fedr-name-row"><span class="fedr-name"></span></div>` +
-      `<div class="fedr-bars">` +
-        `<div class="fedr-bar-group">` +
-          `<div class="fedr-bar fedr-hp"><div class="fedr-fill"></div></div>` +
-          `<div class="fedr-label-row">` +
-            `<span class="fedr-label-key">HP</span>` +
-            `<span class="fedr-label fedr-hp-lbl"></span>` +
+    `<div class="fedr-name-row"><span class="fedr-name"></span></div>` +
+    `<div class="fedr-card-body">` +
+      `<div class="fedr-portrait-wrap">` +
+        `<img class="fedr-portrait" draggable="false">` +
+      `</div>` +
+      `<div class="fedr-panel">` +
+        `<div class="fedr-bars">` +
+          `<div class="fedr-bar-group">` +
+            `<div class="fedr-bar fedr-hp"><div class="fedr-fill"></div></div>` +
+            `<div class="fedr-label-row">` +
+              `<span class="fedr-label-key">HP</span>` +
+              `<span class="fedr-label fedr-hp-lbl"></span>` +
+            `</div>` +
           `</div>` +
-        `</div>` +
-        `<div class="fedr-bar-group">` +
-          `<div class="fedr-bar fedr-enc"><div class="fedr-fill"></div></div>` +
-          `<div class="fedr-label-row">` +
-            `<span class="fedr-label-key">침식률</span>` +
-            `<span class="fedr-label fedr-enc-lbl"></span>` +
+          `<div class="fedr-bar-group">` +
+            `<div class="fedr-bar fedr-enc"><div class="fedr-fill"></div></div>` +
+            `<div class="fedr-label-row">` +
+              `<span class="fedr-label-key">침식률</span>` +
+              `<span class="fedr-label fedr-enc-lbl"></span>` +
+            `</div>` +
           `</div>` +
         `</div>` +
       `</div>` +
@@ -189,11 +212,6 @@ function _getOrCreateContainer(id, posKey, defaultLeft, defaultTop) {
   if (!el) {
     el = document.createElement("div");
     el.id = id;
-
-    const handle = document.createElement("div");
-    handle.className = "fedr-drag-handle";
-    el.appendChild(handle);
-
     document.body.appendChild(el);
 
     const pos = _loadPos(posKey);
@@ -265,6 +283,7 @@ function feUpdateDx3rdResourceUI(actorId) {
 
   if (actor.getFlag(MODULE_ID, HIDE_FLAG)) {
     cnt.querySelector(`.fedr-actor-card[data-actor-id="${actorId}"]`)?.remove();
+    if (!cnt.querySelector(".fedr-actor-card")) cnt.style.display = "none";
     return;
   }
   const hasToken = canvas?.tokens?.placeables?.some(
@@ -272,6 +291,7 @@ function feUpdateDx3rdResourceUI(actorId) {
   );
   if (!hasToken) {
     cnt.querySelector(`.fedr-actor-card[data-actor-id="${actorId}"]`)?.remove();
+    if (!cnt.querySelector(".fedr-actor-card")) cnt.style.display = "none";
     return;
   }
 
@@ -284,12 +304,55 @@ function feUpdateDx3rdResourceUI(actorId) {
   cnt.style.display = "";  // 카드 추가 시 숨겨진 컨테이너 복원
 }
 
+// ─── accent color button ────────────────────────────────────────────────────
+
+function _getAccent() {
+  try { return String(game.settings.get(MODULE_ID, S.DX3RD_PIXEL_ACCENT) || "#ffffff"); }
+  catch { return "#ffffff"; }
+}
+
+function _setAccent(color) {
+  document.documentElement.style.setProperty("--fe-dx3rd-accent", color);
+  try { game.settings.set(MODULE_ID, S.DX3RD_PIXEL_ACCENT, color); } catch {}
+}
+
+function _injectAccentBtn() {
+  if (!_isDx3rd() || !_isThemeOn()) return;
+  if (document.getElementById(ACCENT_BTN_ID)) return;
+
+  const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
+  if (!controls) return;
+
+  const color = _getAccent();
+
+  const label = document.createElement("label");
+  label.id        = ACCENT_BTN_ID;
+  label.className = "fe-dx3rd-accent-btn";
+  label.title     = "픽셀 테마 강조색";
+  label.style.background = color;
+
+  const input = document.createElement("input");
+  input.type  = "color";
+  input.value = color;
+
+  // real-time preview while dragging the picker
+  input.addEventListener("input", (e) => {
+    label.style.background = e.target.value;
+    document.documentElement.style.setProperty("--fe-dx3rd-accent", e.target.value);
+  });
+  // commit: persist to setting (triggers feApplyStyleVarsFromSettings via onChange)
+  input.addEventListener("change", (e) => _setAccent(e.target.value));
+
+  label.appendChild(input);
+  controls.prepend(label);
+}
+
 // ─── chat toggle button ────────────────────────────────────────────────────
 
 function _syncToggleBtn(ruiOn) {
   const btn = document.getElementById(BTN_ID);
   if (!btn) return;
-  btn.title = ruiOn ? "자원 UI 숨김 (DX3rd)" : "자원 UI 표시 (DX3rd)";
+  btn.title = ruiOn ? "캐릭터 스테이터스 숨김 (DX3rd)" : "캐릭터 스테이터스 표시 (DX3rd)";
   btn.classList.toggle("fe-dx3rd-rui-active", ruiOn);
   btn.querySelector("i")?.classList.toggle("fa-eye",       ruiOn);
   btn.querySelector("i")?.classList.toggle("fa-eye-slash", !ruiOn);
@@ -307,7 +370,7 @@ function _injectChatBtn() {
   btn.type      = "button";
   btn.className = "fe-dx3rd-rui-toggle";
   const on = _isGlobalOn();
-  btn.title     = on ? "자원 UI 숨김 (DX3rd)" : "자원 UI 표시 (DX3rd)";
+  btn.title     = on ? "캐릭터 스테이터스 숨김 (DX3rd)" : "캐릭터 스테이터스 표시 (DX3rd)";
   btn.classList.toggle("fe-dx3rd-rui-active", on);
   btn.innerHTML = `<i class="fas ${on ? "fa-eye" : "fa-eye-slash"}"></i>`;
   btn.addEventListener("click", () => {
@@ -331,9 +394,9 @@ Hooks.on("renderActorSheet", (app, html) => {
   const isHidden = !!actor.getFlag(MODULE_ID, HIDE_FLAG);
   const wrap = document.createElement("label");
   wrap.className = "fedr-sheet-toggle";
-  wrap.title = "자원 UI 숨김 여부";
+  wrap.title = "캐릭터 스테이터스 숨김 여부";
   wrap.innerHTML =
-    `<input type="checkbox" class="fedr-hide-cb"${isHidden ? " checked" : ""}> 자원UI 숨김`;
+    `<input type="checkbox" class="fedr-hide-cb"${isHidden ? " checked" : ""}> 스테이터스 숨김`;
   wrap.querySelector(".fedr-hide-cb").addEventListener("change", (e) => {
     actor.setFlag(MODULE_ID, HIDE_FLAG, e.target.checked).then(feRebuildDx3rdResourceUI);
   });
@@ -345,10 +408,10 @@ Hooks.on("renderActorSheet", (app, html) => {
 Hooks.on("init", () => {
   if (!_isDx3rd()) return;
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
-    name: "[DX3rd] 자원 UI 포트레이트 너비(px)",
-    hint: "포트레이트 너비. 높이는 너비×296/144 비율로 자동 계산. 기본 144.",
+    name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
+    hint: "포트레이트 너비. 높이는 너비×0.75 비율(가로형, 얼굴 중심 클리핑). 기본 82.",
     scope: "client", config: true, type: Number,
-    default: 144,
+    default: 82,
     range: { min: 32, max: 256, step: 8 },
     onChange: feRebuildDx3rdResourceUI,
   });
@@ -359,6 +422,7 @@ Hooks.on("init", () => {
 Hooks.on("ready", () => {
   if (!_isDx3rd()) return;
   _injectChatBtn();
+  _injectAccentBtn();
   feRebuildDx3rdResourceUI();
 });
 
@@ -382,12 +446,13 @@ Hooks.on("updateActor", (actor) => {
   if (_isDx3rd()) feUpdateDx3rdResourceUI(actor.id);
 });
 
-Hooks.on("renderChatLog", () => _injectChatBtn());
-Hooks.on("renderSidebar",  () => _injectChatBtn());
+Hooks.on("renderChatLog", () => { _injectChatBtn(); _injectAccentBtn(); });
+Hooks.on("renderSidebar",  () => { _injectChatBtn(); _injectAccentBtn(); });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
   if (!_isDx3rd()) return;
   _injectChatBtn();
+  _injectAccentBtn();
   feRebuildDx3rdResourceUI();
 });
 

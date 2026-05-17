@@ -162,9 +162,10 @@ function feEnsureInlineEditorUI() {
       ev.preventDefault();
       feCommitInlineEdit();
     }
-    // Escape => cancel
+    // Escape => cancel (stopPropagation: ESC가 Foundry 게임 메뉴로 버블링되지 않도록)
     if (ev.key === "Escape") {
       ev.preventDefault();
+      ev.stopPropagation();
       feCancelInlineEdit();
     }
   });

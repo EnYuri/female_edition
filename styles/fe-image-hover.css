@@ -1,0 +1,20 @@
+/* fe-image-hover — token hover art overlay */
+
+.fe-image-hover-hud {
+  position: absolute;
+  pointer-events: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  /* Remove any default ApplicationV2 window chrome */
+  box-shadow: none;
+}
+
+.fe-image-hover-hud img,
+.fe-image-hover-hud video {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+}

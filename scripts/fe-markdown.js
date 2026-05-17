@@ -74,7 +74,8 @@ function feMarkdownToHTML(md) {
       }
       if (i < lines.length && lines[i].trim().startsWith("```")) i++;
       const code = feEscapeHTML(codeLines.join("\n"));
-      const langClass = lang ? ` class="language-${feEscapeHTML(lang)}"` : "";
+      const safeLang = lang ? lang.trim().replace(/[^a-zA-Z0-9_-]/g, "") : "";
+      const langClass = safeLang ? ` class="language-${safeLang}"` : "";
       blocks.push(`<pre><code${langClass}>${code}</code></pre>`);
       continue;
     }

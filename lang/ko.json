@@ -1,12 +1,4 @@
 {
-    "MYDMG.FemalePoison": "최음",
-    "MYDMG.FemalePsychic": "암컷 사이오닉",
-    "MYDMG.FemaleBludgeoning": "교배",
-	"MYDMG.FemaleThunder": "진동",
-	"MYDMG.FemaleLightning": "암컷 전류",
-	"MYDMG.FemaleForce": "암컷 에너지",
-	"MYDMG.FemaleRadiant": "쾌락",
-	"MYDMG.FemaleFire": "발정",
 	"MYCOND.CondFemaleMating": "교미 중",
 	"MYCOND.Mark": "표식",
 	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>"

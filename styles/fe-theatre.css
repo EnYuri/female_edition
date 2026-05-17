@@ -1,0 +1,446 @@
+/* ═══════════════════════════════════════════════════════════════
+   fe-theatre.css — Portrait stage & speech bubble
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Portrait dock (fixed overlay at screen bottom) ─────────── */
+
+#fe-stage-dock {
+  --fet-portrait-height: 350px;
+
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--fet-portrait-height);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 12px;
+  pointer-events: none;  /* transparent except on inserts themselves */
+  z-index: 200;          /* above canvas and Foundry UI panels */
+  overflow: visible;
+}
+
+/* ── Individual insert ────────────────────────────────────────── */
+
+.fe-stage-insert {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  pointer-events: all;
+  /* Enter animation */
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.fe-stage-insert--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* "Pop" pulse on message send */
+.fe-stage-insert--pop {
+  animation: fet-pop 0.28s ease;
+}
+
+@keyframes fet-pop {
+  0%  { transform: scale(1); }
+  45% { transform: scale(1.045); }
+  100%{ transform: scale(1); }
+}
+
+/* ── Portrait image ───────────────────────────────────────────── */
+
+.fe-stage-portrait-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fe-stage-portrait {
+  display: block;
+  height: var(--fet-portrait-height, 350px);
+  width: auto;
+  max-width: 280px;
+  object-fit: contain;
+  object-position: bottom center;
+  cursor: pointer;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
+  transition: filter 0.25s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Glowing outline when this actor is the current speaker */
+.fe-stage-insert--speaking .fe-stage-portrait {
+  filter: drop-shadow(0 0 8px var(--fet-speaker-color, rgba(180, 210, 255, 0.9)))
+          drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
+}
+
+/* Subtle highlight for the last actor who spoke */
+.fe-stage-insert--last-speaking .fe-stage-portrait {
+  filter: brightness(1.08)
+          drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
+}
+
+/* ── Name label (floating over portrait) ──────────────────────── */
+
+.fe-stage-label {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* ── Emote picker button (top-right of portrait, hover-only) ──── */
+
+.fe-stage-emote-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ccc;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.18s ease, color 0.18s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.fe-stage-portrait-wrap:hover .fe-stage-emote-btn {
+  opacity: 1;
+}
+
+.fe-stage-emote-btn:hover {
+  color: #fff;
+  background: rgba(80, 120, 200, 0.75);
+}
+
+/* ── Speech bubble (textbox) ──────────────────────────────────── */
+
+.fe-stage-textbox {
+  position: absolute;
+  /* Float above the portrait */
+  bottom: calc(var(--fet-portrait-height, 350px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 230px;
+  background: rgba(8, 8, 12, 0.92);
+  padding: 14px 11px 8px; /* extra top room for name label */
+  color: #f0f0f0;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow: visible; /* let name label float above the border */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+  z-index: 1;
+}
+
+/* Diagonal stripe border (pixel-theme aesthetic) */
+.fe-stage-textbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--fet-speaker-color, rgba(140, 170, 255, 0.55)) 0,
+    var(--fet-speaker-color, rgba(140, 170, 255, 0.55)) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) 3px 3px / calc(100% - 6px) calc(100% - 6px) no-repeat,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: destination-out;
+  mask:
+    linear-gradient(#000 0 0) 3px 3px / calc(100% - 6px) calc(100% - 6px) no-repeat,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.fe-stage-textbox--visible {
+  opacity: 1;
+}
+
+/* Triangle tail pointing down toward portrait */
+.fe-stage-textbox::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 9px solid transparent;
+  border-top-color: rgba(8, 8, 12, 0.92);
+  border-bottom: none;
+}
+
+/* Actor name — overlaps the top-left border of the textbox */
+.fe-stage-textbox-name {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  transform: translateY(-50%);
+  background: #000;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fet-speaker-color, #9bc4ff);
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.4;
+  z-index: 2;
+}
+
+.fe-stage-textbox-content {
+  overflow-y: auto;
+  max-height: 120px;
+  word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/* ── Nav bar (above chat input) ───────────────────────────────── */
+
+#fe-stage-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  min-height: 38px;
+}
+
+/* Empty nav bar: collapse to minimal height */
+#fe-stage-nav:not(:has(.fe-stage-nav-item)) {
+  padding: 2px 6px;
+  min-height: 28px;
+}
+
+.fe-stage-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.fe-stage-nav-item:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.fe-stage-nav-item.active {
+  background: rgba(90, 140, 255, 0.18);
+  border-color: rgba(90, 140, 255, 0.45);
+}
+
+.fe-stage-nav-item img {
+  width: 26px;
+  height: 26px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.fe-stage-nav-item span {
+  font-size: 12px;
+  color: #d8d8d8;
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fe-stage-nav-item.active span {
+  color: #b0caff;
+}
+
+.fe-stage-nav-remove {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 0 1px;
+  font-size: 9px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.fe-stage-nav-remove:hover {
+  color: #f77;
+}
+
+/* OOC button (self/out-of-character) */
+.fe-stage-nav-ooc {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #888;
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 13px;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.fe-stage-nav-ooc:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #bbb;
+}
+
+.fe-stage-nav-ooc.active {
+  background: rgba(80, 200, 100, 0.18);
+  border-color: rgba(80, 200, 100, 0.4);
+  color: #8de88d;
+}
+
+/* ── Emote picker popup ───────────────────────────────────────── */
+
+.fe-stage-emote-menu {
+  position: fixed;
+  background: rgba(16, 16, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  padding: 5px;
+  z-index: 9999;
+  min-width: 130px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+.fe-stage-emote-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #d0d0d0;
+  font-size: 13px;
+  transition: background 0.12s ease;
+}
+
+.fe-stage-emote-item:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.fe-stage-emote-item.active {
+  background: rgba(90, 140, 255, 0.18);
+  color: #9bbcff;
+}
+
+.fe-stage-emote-item img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ── Actor config dialog ──────────────────────────────────────── */
+
+.fe-stage-config-form .form-group-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fe-stage-config-form .form-group-stacked > label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.fe-config-emotes-list {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  scrollbar-width: thin;
+}
+
+.fe-config-emote-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.fe-config-emote-row input {
+  flex: 1 1 80px;
+  min-width: 0;
+}
+
+.fe-config-emote-row .form-fields {
+  flex: 2 1 120px;
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fe-config-emote-row .form-fields input {
+  flex: 1;
+}
+
+.fe-add-emote {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.fe-remove-emote {
+  flex-shrink: 0;
+  color: #888;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  transition: color 0.15s;
+}
+
+.fe-remove-emote:hover {
+  color: #f77;
+}

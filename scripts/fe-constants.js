@@ -42,6 +42,7 @@ const S = {
   GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
   DX3RD_RUI_PORTRAIT_WIDTH: "ceDx3rdRuiPortraitWidth",
   DX3RD_CARD_BORDER_ALPHA: "ceDx3rdCardBorderAlpha",
+  DX3RD_PIXEL_ACCENT: "ceDx3rdPixelAccent",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -73,8 +74,8 @@ const FE_DEFAULTS = {
   [S.UI_USE_GEURIMILGI]: true,
   [S.UI_OVERRIDE_FONT_H1_COOKIE]: true,
   [S.UI_ENABLE_FONTS]: true,
-  [S.UI_NEODGM_MODE]: true,
-  [S.UI_DX3RD_PIXEL_THEME]: true,
+  [S.UI_NEODGM_MODE]: false,
+  [S.UI_DX3RD_PIXEL_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,
   [S.UI_STRIP_TEXTURES]: true,
   [S.USE_USER_COLOR_BG]: false,
@@ -89,8 +90,9 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
   [S.GM_PRIORITY_ENABLED]: true,
   [S.GM_SPEAK_AS_SELF]: false,
-  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 144,
-  [S.DX3RD_CARD_BORDER_ALPHA]: 0.7,
+  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 82,
+  [S.DX3RD_CARD_BORDER_ALPHA]: 0.5,
+  [S.DX3RD_PIXEL_ACCENT]: "#ffffff",
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
