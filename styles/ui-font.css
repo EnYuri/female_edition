@@ -173,14 +173,22 @@ body.fe-fonts-enabled.fe-ui-font-geurimilgi {
 
 /* 모든 커스텀 폰트를 NeoDGM 픽셀 폰트로 전체 교체 */
 body.fe-fonts-enabled.fe-neodgm-mode {
-  --fe-font-primary:   "FE NeoDGM", monospace;
+  --fe-font-primary:    "FE NeoDGM", monospace;
   --fe-font-geurimilgi: "FE NeoDGM", monospace;
-  --fe-font-secondary: "FE NeoDGM", monospace;
-  font-feature-settings: "kern" 1, "frac" 1;
+  --fe-font-secondary:  "FE NeoDGM", monospace;
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
 }
 
 body.fe-fonts-enabled.fe-neodgm-mode * {
-  font-feature-settings: "kern" 1, "frac" 1;
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: auto !important;
+  font-smooth: never !important;
+  text-rendering: optimizeSpeed !important;
 }
 
 /* dnd5e 스코프 재어설트 */

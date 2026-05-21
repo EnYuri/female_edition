@@ -1,0 +1,118 @@
+/* ============================================================
+   fe-chat-controls-menu.css
+   Hamburger dropdown for #chat-controls items.
+   ============================================================ */
+
+/* Hide raw controls the moment the menu-active class is applied,
+   preventing any flash of the un-collapsed bar.
+   #fe-stage-nav is exempt — it stays permanently visible outside the panel. */
+#chat-controls.fe-ctrl-menu-active > *:not(#fe-ctrl-menu-wrapper):not(#ci-upload-image-hidden-input):not(#fe-stage-nav):not(#fe-dx3rd-accent-btn) {
+  display: none !important;
+}
+
+/* Safety net: hide .fe-export-pdf anywhere in the active controls, not just direct children.
+   Catches cases where the button lands outside #chat-controls (e.g. in the parent form).
+   Specificity (1,2,0). */
+#chat-controls.fe-ctrl-menu-active .fe-export-pdf {
+  display: none !important;
+}
+/* Also hide a .fe-export-pdf that was injected as a direct child of form.chat-form by the
+   last-resort fallback in fe-chat-archive.js. Only applies when the hamburger is active
+   (i.e. the panel is present and holds the canonical button). */
+form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
+  display: none !important;
+}
+/* Re-enable inside the panel. Two IDs give specificity (2,1,0) > (1,2,0), so this wins. */
+#fe-ctrl-menu-wrapper #fe-ctrl-menu-panel .fe-export-pdf {
+  display: inline-flex !important;
+}
+
+/* ── Wrapper ─────────────────────────────────────────────── */
+#fe-ctrl-menu-wrapper {
+  /* No position:relative — panel uses position:fixed anchored by JS coords. */
+  display: flex;
+  align-items: center;
+}
+
+/* ── Toggle button ───────────────────────────────────────── */
+/* Inherits Foundry's .ui-control.icon sizing/border/hover.   */
+#fe-ctrl-menu-toggle {
+  /* nothing extra needed */
+}
+
+/* ── Dropdown panel ──────────────────────────────────────── */
+/* bottom/right are set in JS when the panel opens, so the panel always
+   anchors to the actual toggle-button coords regardless of how tall the
+   wrapper or #chat-controls happens to be in different Foundry versions. */
+#fe-ctrl-menu-panel {
+  position: fixed;
+  z-index: 200;
+
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+
+  background: var(--color-bg, #f0f0e0);
+  border: 1px solid var(--color-border-light-primary, #9f9275);
+  border-radius: 4px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
+  max-width: min(90vw, 480px);
+}
+
+#fe-ctrl-menu-panel[hidden] {
+  display: none;
+}
+
+/* ── Content inside panel ────────────────────────────────── */
+
+/* Reset Foundry's vertical writing-mode (added in notification mode). */
+#fe-ctrl-menu-panel #message-modes.vertical,
+#fe-ctrl-menu-panel #message-modes.vertical .ui-control {
+  writing-mode: initial;
+}
+
+/* Ensure control-buttons are a horizontal row inside the panel. */
+#fe-ctrl-menu-panel .control-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+}
+
+/* Separate message-modes from action buttons with a visual divider. */
+#fe-ctrl-menu-panel #message-modes {
+  padding-inline-end: 4px;
+  margin-inline-end: 2px;
+  border-inline-end: 1px solid var(--color-border-light-primary, #9f9275);
+}
+
+/* Remove the extra right-margin the export button normally has. */
+#fe-ctrl-menu-panel .fe-export-pdf {
+  margin-right: 0 !important;
+}
+
+/* dx3rd accent swatch and RUI toggle inside the panel. */
+#fe-ctrl-menu-panel .fe-dx3rd-accent-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#fe-ctrl-menu-panel .fe-dx3rd-rui-toggle {
+  flex-shrink: 0;
+}
+
+/* ── dx3rd pixel theme override ──────────────────────────── */
+body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel {
+  background: var(--dx3rd-bg, #1a1a2e);
+  border-color: var(--dx3rd-border, #4a4a6a);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+}
+
+body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel #message-modes {
+  border-inline-end-color: var(--dx3rd-border, #4a4a6a);
+}

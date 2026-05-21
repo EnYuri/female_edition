@@ -720,6 +720,11 @@ Hooks.on("renderChatLog", (app, html) => {
   ciScheduleRefreshUi(app?.element || html || document, 0);
 });
 
+// v14: fires when the shared chat-input/controls block is created or reparented.
+Hooks.on("renderChatInput", () => {
+  ciScheduleRefreshUi(document, 0);
+});
+
 Hooks.on("activateChatLog", (app) => {
   ciScheduleRefreshUi(app?.element || document, 0);
 });

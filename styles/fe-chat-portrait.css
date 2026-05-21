@@ -18,7 +18,7 @@ li.chat-message.fe-has-chat-portrait > .message-header {
   column-gap: 8px !important;
   row-gap: 0 !important;
   padding: 0 !important;
-  margin: 0 0 2px 0 !important;
+  margin: 0 0 var(--fe-header-content-gap, 4px) 0 !important;
   border: none !important;
 }
 

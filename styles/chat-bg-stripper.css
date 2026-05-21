@@ -24,10 +24,7 @@
   /* dnd5e/midi chat-card description text size */
   --fe-chat-card-font-size: 13px;
 
-  /* Foundry chat layout: spacing between message cards inside chat-sidebar.
-   * Mirrors Foundry's own variable: chat-sidebar { --chat-message-spacing: 3px; }
-   * Controlled via module setting.
-   */
+  /* Gap between message cards in the chat log. Applied via gap: on ol.chat-log in fe-chat-enhance.css. */
   --fe-chat-message-spacing: 3px;
   /* NOTE:
    * Chat cards (item/spell/feature descriptions) often look too bold when using
@@ -58,11 +55,6 @@
   --fe-chat-desc-bg: #f0f0f0;
 }
 
-/* Propagate the module-controlled spacing into Foundry's chat sidebar. */
-chat-sidebar,
-.chat-sidebar {
-  --chat-message-spacing: var(--fe-chat-message-spacing) !important;
-}
 
 /* When chat-card custom font is enabled, reduce the default “readability boost” weights. */
 body.fe-chatcard-custom-font {

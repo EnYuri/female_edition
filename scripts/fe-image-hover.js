@@ -199,53 +199,46 @@ function _ihCacheToken(url, applyToScreen) {
 }
 
 /**
- * Convert scene-space image dimensions to CSS position/size values.
- * The HeadsUpDisplayContainer uses the scene coordinate space, so returned
- * values are applied directly as CSS px to position elements within it.
+ * Compute image position in CSS viewport pixels (position: fixed coordinate space).
+ * Using viewport pixels avoids any scene-coordinate / canvas-zoom mismatch
+ * that would occur when the browser or OS zoom level changes.
  *
  * @param {number} imageWidth  Original image/video width in pixels
  * @param {number} imageHeight Original image/video height in pixels
- * @returns {[number, number, number]} [left, top, width] in scene-space px
+ * @returns {[number, number, number]} [left, top, width] in CSS viewport px
  */
 function _ihComputePosition(imageWidth, imageHeight) {
-  const view = canvas.scene._viewPosition;
-  const scale = view.scale;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
 
-  let w = window.innerWidth / (_ihSize * scale);
+  let w = W / _ihSize;
   let h = w * (imageHeight / imageWidth);
-  const winW = window.innerWidth / scale;
-  const winH = window.innerHeight / scale;
 
   // Clamp height to viewport
-  if (h > winH) {
-    w = (winH / h) * w;
-    h = winH;
+  if (h > H) {
+    w = (H / h) * w;
+    h = H;
   }
-
-  let y = _ihPosition.includes("Bottom")
-    ? view.y + winH / 2 - h
-    : view.y - winH / 2;
 
   const sidebar = document.getElementById("sidebar");
   const collapsed = sidebar?.classList.contains("collapsed") ?? true;
 
   if (_ihPosition === "Centre") {
-    const offset = collapsed ? 0 : (sidebar?.offsetWidth ?? 0) / scale / 3;
-    return [view.x - w / 2 - offset, view.y - h / 2, w];
+    const sidebarOffset = collapsed ? 0 : (sidebar?.offsetWidth ?? 0) / 2;
+    return [W / 2 - w / 2 - sidebarOffset, H / 2 - h / 2, w];
   }
+
+  const y = _ihPosition.includes("Bottom") ? H - h : 0;
 
   let x;
   if (_ihPosition.includes("right")) {
-    if (_ihPosition.includes("Bottom") && collapsed) {
-      x = view.x + winW / 2 - w;
-    } else {
-      const marginRight =
-        parseFloat(sidebar ? window.getComputedStyle(sidebar).marginRight : "0") || 0;
-      const sidebarW = ((sidebar?.offsetWidth ?? 0) + marginRight) / scale;
-      x = view.x + winW / 2 - w - sidebarW;
-    }
+    const marginRight = sidebar
+      ? parseFloat(window.getComputedStyle(sidebar).marginRight) || 0
+      : 0;
+    const sidebarW = collapsed ? 0 : (sidebar?.offsetWidth ?? 0) + marginRight;
+    x = W - w - sidebarW;
   } else {
-    x = view.x - winW / 2;
+    x = 0;
   }
 
   return [x, y, w];
@@ -295,6 +288,11 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     data.url = image;
     if (_IH_VIDEO_EXTS.has(_ihFileExt(image))) data.isVideo = true;
     return data;
+  }
+
+  /** Render to document.body so position: fixed coordinates map 1:1 to viewport pixels. */
+  _insertElement(element) {
+    document.body.appendChild(element);
   }
 
   /** Override: position is managed entirely by _ihComputePosition. */
@@ -503,12 +501,6 @@ Hooks.on("deleteToken",    _ihClearArt);
 Hooks.on("closeActorSheet",    _ihClearArt);
 Hooks.on("closeSettingsConfig", _ihClearArt);
 Hooks.on("closeApplication",   _ihClearArt);
-
-/** Reposition art on camera pan or zoom. */
-Hooks.on("canvasPan", () => {
-  if (!canvas.hud.imageHover?.object) return;
-  canvas.hud.imageHover._updatePosition();
-});
 
 /** Discard dimension cache on scene change — prevents unbounded memory growth. */
 Hooks.on("canvasReady", () => { _ihCache = {}; });

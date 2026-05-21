@@ -12,9 +12,9 @@
 import "./chat-bg-stripper.js";
 import "./fe-chat-enhance.js";
 
-// Settings are exposed directly in Foundry's standard Module Settings UI (config: true)
-// so that tools like Force Client Settings can lock/sync client settings.
-// The previous custom popup settings menu is intentionally not loaded.
+// Settings in fe-chat-enhance / chat-bg-stripper / fe-chat-portrait are config: false
+// — managed exclusively through the unified settings panel (fe-settings-menu.js).
+// fe-chat-images / fe-image-hover / fe-theatre keep config: true (no unified-menu section).
 
 // Feature splits
 import "./fe-chat-edit.js";

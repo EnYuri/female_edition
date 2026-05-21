@@ -49,6 +49,14 @@ function feIsChatPortraitModuleActive() {
   }
 }
 
+function feIsDx3rdSystem() {
+  try {
+    return game?.system?.id === "double-cross-3rd";
+  } catch {
+    return false;
+  }
+}
+
 class FemaleEditionSettingsMenu extends FormApplication {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -78,6 +86,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
       [S.MERGE_ONLY_TEXT]: feGetSettingSafe(S.MERGE_ONLY_TEXT, FE_DEFAULTS[S.MERGE_ONLY_TEXT]),
       [S.MERGE_INCLUDE_ROLL_MESSAGES]: feGetSettingSafe(S.MERGE_INCLUDE_ROLL_MESSAGES, FE_DEFAULTS[S.MERGE_INCLUDE_ROLL_MESSAGES]),
       [S.MERGE_DIVIDER]: feGetSettingSafe(S.MERGE_DIVIDER, FE_DEFAULTS[S.MERGE_DIVIDER]),
+      [S.MERGE_GROUP_SPACING]: feGetSettingSafe(S.MERGE_GROUP_SPACING, FE_DEFAULTS[S.MERGE_GROUP_SPACING]),
       [S.MERGE_MODE]: feGetSettingSafe(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]),
       [S.MERGE_FOLLOW_HEADER_STYLE]: feGetSettingSafe(
         S.MERGE_FOLLOW_HEADER_STYLE,
@@ -107,13 +116,14 @@ class FemaleEditionSettingsMenu extends FormApplication {
         FE_DEFAULTS[S.CHATCARD_USE_CUSTOM_FONT]
       ),
       [S.UI_USE_GEURIMILGI]: feGetSettingSafe(S.UI_USE_GEURIMILGI, FE_DEFAULTS[S.UI_USE_GEURIMILGI]),
-      [S.UI_OVERRIDE_FONT_H1_COOKIE]: feGetSettingSafe(S.UI_OVERRIDE_FONT_H1_COOKIE, FE_DEFAULTS[S.UI_OVERRIDE_FONT_H1_COOKIE]),
 
       // Style vars
       [S.STYLE_CHAT_MESSAGE_SPACING]: feGetSettingSafe(
         S.STYLE_CHAT_MESSAGE_SPACING,
         FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING]
       ),
+      [S.STYLE_HEADER_CONTENT_GAP]: feGetSettingSafe(S.STYLE_HEADER_CONTENT_GAP, FE_DEFAULTS[S.STYLE_HEADER_CONTENT_GAP]),
+      [S.MERGE_INNER_GAP]: feGetSettingSafe(S.MERGE_INNER_GAP, FE_DEFAULTS[S.MERGE_INNER_GAP]),
       [S.STYLE_BG_SATURATION]: feGetSettingSafe(S.STYLE_BG_SATURATION, FE_DEFAULTS[S.STYLE_BG_SATURATION]),
       [S.STYLE_ACTOR_NAME_SIZE]: feGetSettingSafe(S.STYLE_ACTOR_NAME_SIZE, FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]),
       [S.STYLE_PLAYER_NAME_SIZE]: feGetSettingSafe(
@@ -139,6 +149,14 @@ class FemaleEditionSettingsMenu extends FormApplication {
 
       // GM priority
       [S.GM_PRIORITY_ENABLED]: feGetSettingSafe(S.GM_PRIORITY_ENABLED, FE_DEFAULTS[S.GM_PRIORITY_ENABLED]),
+      [S.GM_SPEAK_AS_SELF]: feGetSettingSafe(S.GM_SPEAK_AS_SELF, FE_DEFAULTS[S.GM_SPEAK_AS_SELF]),
+
+      // DX3rd
+      [S.UI_DX3RD_PIXEL_THEME]: feGetSettingSafe(S.UI_DX3RD_PIXEL_THEME, FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME]),
+      [S.DX3RD_CARD_BORDER_ALPHA]: feGetSettingSafe(S.DX3RD_CARD_BORDER_ALPHA, FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA]),
+      [S.DX3RD_RUI_PORTRAIT_WIDTH]: feGetSettingSafe(S.DX3RD_RUI_PORTRAIT_WIDTH, FE_DEFAULTS[S.DX3RD_RUI_PORTRAIT_WIDTH]),
+      [S.DX3RD_RUI_PANEL_WIDTH]: feGetSettingSafe(S.DX3RD_RUI_PANEL_WIDTH, FE_DEFAULTS[S.DX3RD_RUI_PANEL_WIDTH]),
+      [S.DX3RD_RUI_CARD_HEIGHT]: feGetSettingSafe(S.DX3RD_RUI_CARD_HEIGHT, FE_DEFAULTS[S.DX3RD_RUI_CARD_HEIGHT]),
 
       // Chat portrait (ported)
       [CP.ENABLED]: feGetSettingSafe(CP.ENABLED, true),
@@ -184,11 +202,27 @@ class FemaleEditionSettingsMenu extends FormApplication {
       chatFontChoice: {
         cookie: "쿠키런",
         geurimilgi: "그림일기",
+        neodgm: "NeoDGM 픽셀",
       },
       userColorBgBase: {
         white: "흰색(권장)",
         black: "검정",
         none: "사용 안 함(기존 방식)",
+      },
+      portraitShape: {
+        circle: "원형",
+        square: "사각형",
+        none: "미적용(자르지 않음)",
+      },
+      portraitBorderMode: {
+        theme: "테마/기본값",
+        none: "없음",
+        user: "플레이어 색상",
+        custom: "사용자 지정",
+      },
+      portraitNameAlign: {
+        center: "가운데",
+        left: "좌측",
       },
     };
 
@@ -201,6 +235,8 @@ class FemaleEditionSettingsMenu extends FormApplication {
       values,
       choices,
       warnings,
+      isGM: !!game.user?.isGM,
+      isDx3rd: feIsDx3rdSystem(),
     };
   }
 
@@ -252,6 +288,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         setBool(S.MERGE_ONLY_TEXT),
         setBool(S.MERGE_INCLUDE_ROLL_MESSAGES),
         setBool(S.MERGE_DIVIDER),
+        setNum(S.MERGE_GROUP_SPACING, FE_DEFAULTS[S.MERGE_GROUP_SPACING]),
         setStr(S.MERGE_MODE, FE_DEFAULTS[S.MERGE_MODE]),
         setStr(S.MERGE_FOLLOW_HEADER_STYLE, FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]),
         setStr(S.MERGE_SPEAKER_BASIS, FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]),
@@ -261,7 +298,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         setBool(S.EDIT_ENABLED),
 
         // GM priority (world-scoped — non-GMs lack write permission)
-        ...(game.user?.isGM ? [setBool(S.GM_PRIORITY_ENABLED)] : []),
+        ...(game.user?.isGM ? [setBool(S.GM_PRIORITY_ENABLED), setBool(S.GM_SPEAK_AS_SELF)] : []),
 
         // Export
         setBool(S.EXPORT_ENABLED),
@@ -275,11 +312,12 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // Fonts
         setStr(S.CHAT_FONT_CHOICE, FE_DEFAULTS[S.CHAT_FONT_CHOICE]),
         setBool(S.UI_USE_GEURIMILGI),
-        setBool(S.UI_OVERRIDE_FONT_H1_COOKIE),
         setBool(S.CHATCARD_USE_CUSTOM_FONT),
 
         // Style
         setNum(S.STYLE_CHAT_MESSAGE_SPACING, FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING]),
+        setNum(S.STYLE_HEADER_CONTENT_GAP, FE_DEFAULTS[S.STYLE_HEADER_CONTENT_GAP]),
+        setNum(S.MERGE_INNER_GAP, FE_DEFAULTS[S.MERGE_INNER_GAP]),
         setNum(S.STYLE_BG_SATURATION, FE_DEFAULTS[S.STYLE_BG_SATURATION]),
         setNum(S.STYLE_ACTOR_NAME_SIZE, FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]),
         setNum(S.STYLE_PLAYER_NAME_SIZE, FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE]),
@@ -289,6 +327,16 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // User-color background
         setBool(S.USE_USER_COLOR_BG),
         setStr(S.USER_COLOR_BG_BASE, FE_DEFAULTS[S.USER_COLOR_BG_BASE]),
+
+        // DX3rd (only save when in DX3rd system — fields are hidden otherwise,
+        // so data[key] would be undefined and overwrite existing DX3rd preferences)
+        ...(feIsDx3rdSystem() ? [
+          setBool(S.UI_DX3RD_PIXEL_THEME),
+          setNum(S.DX3RD_CARD_BORDER_ALPHA, FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA]),
+          setNum(S.DX3RD_RUI_PORTRAIT_WIDTH, FE_DEFAULTS[S.DX3RD_RUI_PORTRAIT_WIDTH]),
+          setNum(S.DX3RD_RUI_PANEL_WIDTH, FE_DEFAULTS[S.DX3RD_RUI_PANEL_WIDTH]),
+          setNum(S.DX3RD_RUI_CARD_HEIGHT, FE_DEFAULTS[S.DX3RD_RUI_CARD_HEIGHT]),
+        ] : []),
 
         // Portrait
         setBool(CP.ENABLED),

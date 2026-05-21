@@ -2,7 +2,7 @@ import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
 function feEscapeHTML(str) {
-  return String(str)
+  return String(str ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -151,6 +151,33 @@ function feLooksLikeHTML(text) {
   return /<\s*[a-zA-Z][\s\S]*?>/.test(text);
 }
 
+// v14: ProseMirror chat input wraps all text in <p>…</p> before firing
+// preCreateChatMessage. If the content is ONLY <p>/<br> (no real HTML elements),
+// extract the plain text so markdown can still be applied.
+// Returns the unwrapped plain text, or null if the HTML contains real elements.
+function feUnwrapProseMirrorHTML(html) {
+  const trimmed = html.trim();
+  if (!trimmed.startsWith("<p>")) return null;
+  // Reject if any tag other than <p>, </p>, <br>, <br/> exists
+  if (/<(?!\/?p>|br\s*\/?>)[a-zA-Z]/.test(trimmed)) return null;
+
+  let text = trimmed
+    .replace(/<\/p>\s*<p>/g, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?p>/g, "");
+
+  // Decode HTML entities the ProseMirror serializer may have encoded
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#039;/g, "'");
+
+  return text.trim() || null;
+}
+
 // Theatre Inserts (module id "theatre") aborts its stage textbox animation in
 // `createChatMessage` when message content starts with "<" or contains a <div>
 // block. If we convert plain text to <p>...</p> during preCreateChatMessage
@@ -176,11 +203,21 @@ function feApplyMarkdownOnPreCreate(message, data = {}, userId = null) {
     if (userId !== game.user.id) return false;
     if (feIsTheatreStageMessageForCurrentUser()) return false;
 
-    const content = String(data?.content ?? message?.content ?? "");
-    const trimmed = content.trim();
+    let content = String(data?.content ?? message?.content ?? "");
+    let trimmed = content.trim();
     if (!trimmed) return false;
     if (trimmed.startsWith("/")) return false;
-    if (feLooksLikeHTML(content)) return false;
+
+    // v14: ProseMirror wraps all chat input in <p>…</p>.
+    // Unwrap pure paragraph output so markdown still fires.
+    // Real HTML (macros, system cards, etc.) is left untouched.
+    if (feLooksLikeHTML(trimmed)) {
+      const plain = feUnwrapProseMirrorHTML(trimmed);
+      if (plain === null) return false;
+      content = plain;
+      trimmed = content.trim();
+      if (!trimmed || trimmed.startsWith("/")) return false;
+    }
 
     try {
       const hasRolls =
@@ -211,6 +248,7 @@ export {
   feInlineFormat,
   feMarkdownToHTML,
   feLooksLikeHTML,
+  feUnwrapProseMirrorHTML,
   feIsTheatreStageMessageForCurrentUser,
   feApplyMarkdownOnPreCreate,
 };

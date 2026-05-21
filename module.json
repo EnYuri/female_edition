@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "0.7.5",
+  "version": "1.2.6",
   "authors": [
     {
       "name": "nayuri",
@@ -21,7 +21,9 @@
     "scripts/inject-damage-type.js",
     "scripts/fe-dx3rd-resource-ui.js",
     "scripts/fe-image-hover.js",
-    "scripts/fe-theatre.js"
+    "scripts/fe-theatre.js",
+    "scripts/fe-chat-controls-menu.js",
+    "scripts/fe-settings-menu.js"
   ],
   "styles": [
     "styles/ui-font.css",
@@ -36,7 +38,8 @@
     "styles/fe-chat-v13-compat.css",
     "styles/fe-dx3rd-compat.css",
     "styles/fe-image-hover.css",
-    "styles/fe-theatre.css"
+    "styles/fe-theatre.css",
+    "styles/fe-chat-controls-menu.css"
   ],
   "socket": true,
   "languages": [

@@ -55,13 +55,6 @@
       <p class="notes">주문/아이템/피처 설명 박스(Details/Description)에도 커스텀 폰트를 적용합니다.</p>
     </div>
 
-    <div class="form-group">
-      <label>헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기</label>
-      <div class="form-fields">
-        <input type="checkbox" name="ceUiOverrideFontH1Cookie" data-dtype="Boolean" {{checked values.ceUiOverrideFontH1Cookie}} />
-      </div>
-      <p class="notes">Foundry/테마가 사용하는 CSS 변수 --font-h1 값을 쿠키런 폰트로 덮어씌웁니다. 일부 테마의 제목/헤딩 글꼴이 바뀔 수 있습니다.</p>
-    </div>
   </details>
 
   <details>
@@ -115,6 +108,14 @@
         <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="1" min="0" max="24" />
       </div>
       <p class="notes">Foundry 기본 변수 <code>--chat-message-spacing</code> 값을 덮어씁니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 헤더-콘텐츠 간격(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceHeaderContentGap" data-dtype="Number" value="{{values.ceHeaderContentGap}}" step="1" min="0" max="20" />
+      </div>
+      <p class="notes">액터 이름·포트레이트 헤더와 메시지 내용 사이의 세로 여백입니다.</p>
     </div>
 
     <div class="form-group">
@@ -176,6 +177,22 @@
       <div class="form-fields">
         <input type="checkbox" name="ceMergeDivider" data-dtype="Boolean" {{checked values.ceMergeDivider}} />
       </div>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합: 그룹 간 간격(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceMergeGroupSpacing" data-dtype="Number" value="{{values.ceMergeGroupSpacing}}" step="1" min="0" max="40" />
+      </div>
+      <p class="notes">병합 그룹 사이 여백(px)입니다. 채팅카드 메시지 전후에도 동일하게 적용됩니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 병합: 연속 메시지 간격(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="1" min="0" max="20" />
+      </div>
+      <p class="notes">같은 화자의 연속 병합 메시지 사이 세로 여백(px)입니다. 0이면 완전히 붙습니다.</p>
     </div>
 
     <div class="form-group">
@@ -325,9 +342,7 @@
       <label>포트레이트 모양</label>
       <div class="form-fields">
         <select name="chatPortraitShape" data-dtype="String">
-          <option value="circle" {{#if (eq values.chatPortraitShape "circle")}}selected{{/if}}>원형</option>
-          <option value="square" {{#if (eq values.chatPortraitShape "square")}}selected{{/if}}>사각형</option>
-          <option value="none" {{#if (eq values.chatPortraitShape "none")}}selected{{/if}}>미적용(자르지 않음)</option>
+          {{selectOptions choices.portraitShape selected=values.chatPortraitShape}}
         </select>
       </div>
     </div>
@@ -336,10 +351,7 @@
       <label>포트레이트 테두리 모드</label>
       <div class="form-fields">
         <select name="chatPortraitBorderMode" data-dtype="String">
-          <option value="theme" {{#if (eq values.chatPortraitBorderMode "theme")}}selected{{/if}}>테마/기본값</option>
-          <option value="none" {{#if (eq values.chatPortraitBorderMode "none")}}selected{{/if}}>없음</option>
-          <option value="user" {{#if (eq values.chatPortraitBorderMode "user")}}selected{{/if}}>플레이어 색상</option>
-          <option value="custom" {{#if (eq values.chatPortraitBorderMode "custom")}}selected{{/if}}>사용자 지정</option>
+          {{selectOptions choices.portraitBorderMode selected=values.chatPortraitBorderMode}}
         </select>
       </div>
     </div>
@@ -364,8 +376,7 @@
       <label>이름 정렬</label>
       <div class="form-fields">
         <select name="chatPortraitNameAlign" data-dtype="String">
-          <option value="center" {{#if (eq values.chatPortraitNameAlign "center")}}selected{{/if}}>가운데</option>
-          <option value="left" {{#if (eq values.chatPortraitNameAlign "left")}}selected{{/if}}>좌측</option>
+          {{selectOptions choices.portraitNameAlign selected=values.chatPortraitNameAlign}}
         </select>
       </div>
     </div>
@@ -390,6 +401,52 @@
     </div>
   </details>
 
+  {{#if isDx3rd}}
+  <details>
+    <summary>[DX3rd] 픽셀 테마</summary>
+
+    <div class="form-group">
+      <label>픽셀 고대비 테마</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceUiDx3rdPixelTheme" data-dtype="Boolean" {{checked values.ceUiDx3rdPixelTheme}} />
+      </div>
+      <p class="notes">모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. NeoDGM 폰트 모드와 함께 사용 권장.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅 카드 테두리 투명도</label>
+      <div class="form-fields">
+        <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="0.05" min="0" max="1" />
+      </div>
+      <p class="notes">픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값. 0 = 완전 투명, 1 = 완전 불투명.</p>
+    </div>
+
+    <div class="form-group">
+      <label>캐릭터 스테이터스 포트레이트 너비(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceDx3rdRuiPortraitWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPortraitWidth}}" step="4" min="32" max="256" />
+      </div>
+      <p class="notes">포트레이트 이미지 영역의 너비. 기본 98.</p>
+    </div>
+
+    <div class="form-group">
+      <label>캐릭터 스테이터스 자원 칸 너비(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceDx3rdRuiPanelWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPanelWidth}}" step="4" min="60" max="300" />
+      </div>
+      <p class="notes">HP·침식률 바가 표시되는 패널의 너비. 기본 110.</p>
+    </div>
+
+    <div class="form-group">
+      <label>캐릭터 스테이터스 카드 높이(px)</label>
+      <div class="form-fields">
+        <input type="number" name="ceDx3rdRuiCardHeight" data-dtype="Number" value="{{values.ceDx3rdRuiCardHeight}}" step="4" min="32" max="200" />
+      </div>
+      <p class="notes">카드 전체 높이. 기본 80.</p>
+    </div>
+  </details>
+  {{/if}}
+
   <details>
     <summary>GM 설정 강제</summary>
 
@@ -403,6 +460,16 @@
         아카이브/편집 설정은 플레이어 개인 설정을 유지합니다.
       </p>
     </div>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>GM: PC 토큰 선택 시 본인 이름으로 채팅</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceGmSpeakAsSelf" data-dtype="Boolean" {{checked values.ceGmSpeakAsSelf}} />
+      </div>
+      <p class="notes">활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.</p>
+    </div>
+    {{/if}}
   </details>
 
   <footer class="sheet-footer flexrow">

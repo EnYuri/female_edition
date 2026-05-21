@@ -11,13 +11,6 @@
   min-inline-size: 0 !important;
 }
 
-#fe-chat-export-container,
-#fe-chat-export-container #fe-chat-export-sidebar,
-#fe-chat-export-container #fe-chat-export-chat,
-#fe-chat-export-container :is(#fe-chat-export-log, #chat-log, .chat-log, ol.chat-log) {
-  --chat-message-spacing: var(--fe-chat-message-spacing) !important;
-}
-
 
 :root { --fe-chat-header-meta-reserve: 64px; }
 
@@ -137,7 +130,7 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
 }
 
 body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message {
-  margin: 0 0 var(--fe-chat-message-spacing, var(--chat-message-spacing, 4px)) 0;
+  margin: 0 0 var(--fe-chat-message-spacing, 4px) 0;
 }
 
 @media print {
@@ -771,6 +764,196 @@ body.fe-chat-archive #fe-chat-export-container :is(#fe-chat-export-log, #chat-lo
   background: #fff !important;
 }
 
+/* ── Pixel theme: restore dark background in archive / inline-print mode ──────
+ *
+ * Selectors intentionally mirror the forced-white block above, with
+ * .fe-dx3rd-pixel-theme added to increase specificity by exactly one class,
+ * so these rules win over the white overrides for all matched elements.
+ *
+ * Specificity guide (same stylesheet, both !important → higher wins):
+ *   forced-white container:  body.fe-chat-archive #fe-chat-export-container          = (1,1,1)
+ *   pixel override container: body.fe-dx3rd-pixel-theme.fe-chat-archive #…container  = (1,2,1) ✓
+ *
+ *   forced-white sidebar:    body.fe-chat-archive #container #sidebar                = (2,1,1)
+ *   pixel override sidebar:  body.fe-dx3rd-pixel-theme.fe-chat-archive #… #sidebar   = (2,2,1) ✓
+ *
+ * The archive popup's inline <style> also has #id{background:#fff !important}
+ * (specificity 1,0,0) — beaten by (1,2,1) and (2,2,1) above.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+body.fe-dx3rd-pixel-theme.fe-chat-archive,
+body.fe-dx3rd-pixel-theme.fe-print-chatlog {
+  background: #000000 !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container,
+body.fe-dx3rd-pixel-theme.fe-print-chatlog #fe-chat-export-container {
+  background: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container #fe-chat-export-sidebar,
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container #fe-chat-export-chat,
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container #fe-chat-export-log,
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container #chat-log {
+  background: #000000 !important;
+  background-image: none !important;
+}
+
+/* Toolbar / status UI readable against black */
+body.fe-dx3rd-pixel-theme #fe-chat-export-title,
+body.fe-dx3rd-pixel-theme #fe-chat-export-meta {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-dx3rd-pixel-theme #fe-chat-export-status {
+  background: #000000 !important;
+  color: var(--fe-ac-90) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
+}
+
+body.fe-dx3rd-pixel-theme .fe-chat-export-action {
+  color: var(--fe-ac-90) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+  background: #000000 !important;
+}
+
+body.fe-dx3rd-pixel-theme .fe-chat-export-action:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
+}
+
+/* Antialiasing helper text-shadow added by the archive inline <style> (alpha 0.01).
+   Pixel theme intentionally disables all text-shadow. */
+@media screen {
+  body.fe-dx3rd-pixel-theme #fe-chat-export-container :is(.chat-message, .chat-message *) {
+    text-shadow: none !important;
+  }
+}
+
+@media print {
+  body.game.fe-print-chatlog.fe-dx3rd-pixel-theme {
+    background: #000000 !important;
+  }
+}
+
+/* ── Pixel theme: individual .chat-message backgrounds in the archive ───────
+ *
+ * fe-export-optimized sets background-image:var(--fe-parchment-overlay)!important
+ * on messages. System CSS (dx3rd, dnd5e) may also set their own backgrounds.
+ *
+ * Specificity budget:
+ *   fe-export-optimized rule: body.fe-export-optimized (0,1,1)
+ *     + :is(#fe-chat-export-container #fe-chat-export-log, ...) → 2 IDs (2,0,0)
+ *     + .chat-message:not(*4) (0,5,0) ≈ (2,6,1)
+ *
+ *   pixel rule below: body.fe-dx3rd-pixel-theme.fe-chat-archive (0,2,1)
+ *     + #fe-chat-export-container (1,0,0)
+ *     + .chat-message:not(*6) (0,7,0) ≈ (1,9,1)  ← loses to (2,6,1) on ID count
+ *
+ * FIX: add the log ID in the selector so the pixel rule also has 2 IDs.
+ *   #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) → (2,0,0)
+ *   Full pixel rule ≈ (2,9,1) → beats fe-export-optimized's (2,6,1) on class count. ✓
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Outer .chat-message element — base rule (covers non-optimized case, system CSS, etc.) */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  background:       #000000 !important;
+  background-color: #000000 !important;
+  background-image: none    !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* Outer .chat-message element — high-specificity rule (2,9,1) that beats fe-export-optimized's
+ * parchment background-image (2,6,1). Needed when fe-export-optimized is also on body. */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  background:       #000000 !important;
+  background-color: #000000 !important;
+  background-image: none    !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* Pseudo-element texture layers */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message::before,
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message::after,
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message::before,
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message::after {
+  background:       transparent none !important;
+  background-image: none !important;
+}
+
+/* Sub-regions: message-header / message-content */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message :is(.message-header, .message-content),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message :is(.message-header, .message-content) {
+  background:       transparent !important;
+  background-image: none !important;
+}
+
+/* Chat cards (dnd5e, dx3rd, midi) */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  background:       #000000 !important;
+  background-color: #000000 !important;
+  background-image: none    !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* Card sub-sections: header/content/description */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
+  :is(header, section, footer, .card-header, .card-content, .collapsible-content),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
+  :is(header, section, footer, .card-header, .card-content, .collapsible-content) {
+  background:       transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Text colours inside cards / sender areas */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat) {
+  color: var(--fe-ac-90) !important;
+}
+
+/* Pixel theme: actor name / player subtitle / metadata colors
+ *
+ * The archive CSS directly sets these with !important at the following specificitiies
+ * that beat a simple inherited color:
+ *   .title / .subtitle  → (1,4,0)!important  (uses :is() with .name-stacked .title etc.)
+ *   .message-metadata   → (1,8,0)!important  (uses 6× :not() on .chat-message)
+ *
+ * Fix: mirror those selectors prefixed with body.fe-dx3rd-pixel-theme.fe-chat-archive
+ * to add (0,2,1) to each, guaranteeing the pixel colour wins.
+ *   .title / .subtitle fix  → (1,6,1)!important ✓
+ *   .message-metadata fix   → (1,10,1)!important ✓
+ */
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message
+  :is(.message-sender .name-stacked .title, .message-sender .title, .name-stacked .title),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
+  :is(.message-sender .name-stacked .title, .message-sender .title, .name-stacked .title) {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message
+  :is(.message-sender .name-stacked .subtitle, .message-sender .subtitle, .name-stacked .subtitle),
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
+  :is(.message-sender .name-stacked .subtitle, .message-sender .subtitle, .name-stacked .subtitle) {
+  color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.6) !important;
+}
+
+body.fe-dx3rd-pixel-theme.fe-chat-archive #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) .message-metadata,
+body.fe-dx3rd-pixel-theme.fe-print-chatlog  #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) .message-metadata {
+  color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.6) !important;
+}
+
 
 
 
@@ -813,7 +996,7 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
 }
 
 #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message {
-  margin: 0 0 var(--fe-chat-message-spacing, var(--chat-message-spacing, 4px)) 0;
+  margin: 0 0 var(--fe-chat-message-spacing, 4px) 0;
 }
 
 #fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message:last-child {

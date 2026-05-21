@@ -11,6 +11,9 @@ function feNextTick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+const clampByte = (v) => Math.max(0, Math.min(255, v));
+const clampAlpha = (v) => Math.max(0, Math.min(1, v));
+
 // ===========================================================================
 // Blob → data-URL
 // ===========================================================================
@@ -43,10 +46,10 @@ function feParseRGBAFromCSS(cssColor) {
   );
   if (!m) return null;
 
-  const r = Math.max(0, Math.min(255, Number(m[1])));
-  const g = Math.max(0, Math.min(255, Number(m[2])));
-  const b = Math.max(0, Math.min(255, Number(m[3])));
-  const a = m[4] == null ? 1 : Math.max(0, Math.min(1, Number(m[4])));
+  const r = clampByte(Number(m[1]));
+  const g = clampByte(Number(m[2]));
+  const b = clampByte(Number(m[3]));
+  const a = m[4] == null ? 1 : clampAlpha(Number(m[4]));
 
   if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b) || !Number.isFinite(a)) return null;
   return { r, g, b, a };
@@ -63,9 +66,9 @@ function feParseRGBTriplet(raw) {
     const [r, g, b] = parts;
     if (![r, g, b].every((v) => Number.isFinite(v))) return null;
     return {
-      r: Math.max(0, Math.min(255, r)),
-      g: Math.max(0, Math.min(255, g)),
-      b: Math.max(0, Math.min(255, b)),
+      r: clampByte(r),
+      g: clampByte(g),
+      b: clampByte(b),
     };
   } catch {
     return null;
@@ -93,13 +96,13 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
   const paperRGBRaw = String(rootCS.getPropertyValue("--fe-paper-rgb") || "245 239 229").trim();
   const paperParts = paperRGBRaw.split(/\s+/).map((x) => Number(x));
   const paper = {
-    r: Number.isFinite(paperParts[0]) ? Math.max(0, Math.min(255, paperParts[0])) : 245,
-    g: Number.isFinite(paperParts[1]) ? Math.max(0, Math.min(255, paperParts[1])) : 239,
-    b: Number.isFinite(paperParts[2]) ? Math.max(0, Math.min(255, paperParts[2])) : 229,
+    r: Number.isFinite(paperParts[0]) ? clampByte(paperParts[0]) : 245,
+    g: Number.isFinite(paperParts[1]) ? clampByte(paperParts[1]) : 239,
+    b: Number.isFinite(paperParts[2]) ? clampByte(paperParts[2]) : 229,
   };
   const paperAlpha = (() => {
     const a = Number(String(rootCS.getPropertyValue("--fe-paper-alpha") || "0.42").trim());
-    return Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0.42;
+    return Number.isFinite(a) ? clampAlpha(a) : 0.42;
   })();
 
   const msgs = Array.from(logEl.querySelectorAll(".chat-message"));
@@ -128,7 +131,7 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
       if (hasUserColor && hasUserBase && el.classList?.contains?.("fe-has-user-color")) {
         const tint = feParseRGBTriplet(cs.getPropertyValue("--fe-user-color-rgb"));
         const alphaRaw = Number(String(cs.getPropertyValue("--fe-user-color-alpha") || rootCS.getPropertyValue("--fe-user-color-alpha") || "0.22").trim());
-        const tintAlpha = Number.isFinite(alphaRaw) ? Math.max(0, Math.min(1, alphaRaw)) : 0.22;
+        const tintAlpha = Number.isFinite(alphaRaw) ? clampAlpha(alphaRaw) : 0.22;
         if (tint) {
           outR = Math.round(bg.r * (1 - tintAlpha) + tint.r * tintAlpha);
           outG = Math.round(bg.g * (1 - tintAlpha) + tint.g * tintAlpha);

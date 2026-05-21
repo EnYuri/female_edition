@@ -62,7 +62,7 @@ import {
   fePreApplyMergeHint, feSetMergeScheduleCallback,
 } from "./fe-merge.js";
 
-import { feMarkdownToHTML } from "./fe-markdown.js";
+import { feMarkdownToHTML, feEscapeHTML } from "./fe-markdown.js";
 import { feStripChatTexturesInWindow } from "./fe-texture.js";
 
 // Wire the merge retry back-reference so fe-merge.js can call feScheduleRenderedLogRefresh
@@ -106,15 +106,6 @@ async function feMigrateLegacySettings() {
   } catch (err) {
     // ignore
   }
-
-  // Migrate UI_NEODGM_MODE → CHAT_FONT_CHOICE: "neodgm" (settings merged in v0.4+)
-  try {
-    const neodgmOn = Boolean(game.settings.get(MODULE_ID, S.UI_NEODGM_MODE));
-    const fontChoice = String(game.settings.get(MODULE_ID, S.CHAT_FONT_CHOICE) ?? "");
-    if (neodgmOn && fontChoice !== "neodgm") {
-      await game.settings.set(MODULE_ID, S.CHAT_FONT_CHOICE, "neodgm");
-    }
-  } catch { /* ignore */ }
 
   await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "geurimilgi", "neodgm"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
   await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
@@ -167,7 +158,7 @@ Hooks.once("init", () => {
     name: "채팅 병합(연속 메시지 시각적 묶기)",
     hint: "같은 화자/유저의 연속 메시지를 하나처럼 보이도록 묶습니다(문서 편집 없음).",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => {
@@ -207,11 +198,22 @@ Hooks.once("init", () => {
     onChange: () => feApplyChatMergeToAllLogs(),
   });
 
+  game.settings.register(MODULE_ID, S.MERGE_GROUP_SPACING, {
+    name: "채팅 병합: 그룹 간 간격(px)",
+    hint: "병합 그룹 사이의 추가 여백(px)입니다. 채팅카드가 있는 메시지에도 동일하게 적용됩니다.",
+    scope: "client",
+    config: false,
+    type: Number,
+    default: FE_DEFAULTS[S.MERGE_GROUP_SPACING],
+    range: { min: 0, max: 40, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
   game.settings.register(MODULE_ID, S.MERGE_MODE, {
     name: "채팅 병합 방식",
     hint: "표준은 메시지 박스 경계까지 붙여 묶고, 간소화는 같은 화자의 후속 메시지에서 헤더만 숨깁니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       standard: "표준(경계/간격까지 묶기)",
@@ -229,7 +231,7 @@ Hooks.once("init", () => {
     name: "채팅 병합: 후속 메시지 헤더 표시 방식",
     hint: "같은 화자의 연속 메시지(두 번째부터)의 헤더 표시를 설정합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       hide: "헤더 완전 숨김",
@@ -253,7 +255,7 @@ Hooks.once("init", () => {
       "플레이어(작성자): 작성 유저 단위 — 같은 플레이어가 보낸 메시지는 화자에 무관하게 병합.",
     ].join(" / "),
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       token:  "토큰(기본) — 토큰+액터+씬 모두 일치해야 병합",
@@ -268,7 +270,7 @@ Hooks.once("init", () => {
     name: "채팅 로그 PDF 내보내기 버튼",
     hint: "채팅 입력창 옆에 PDF(인쇄) 버튼을 추가합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => feFireChatUiUpdated({ reason: "export-settings", document }),
@@ -314,7 +316,7 @@ Hooks.once("init", () => {
     name: "PDF/인쇄: 이미지 처리",
     hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나 다운스케일할 수 있습니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
     default: "downscaleLite",
@@ -340,7 +342,7 @@ Hooks.once("init", () => {
     name: "채팅: 액터 이름 크기(px)",
     hint: "채팅 메시지 헤더의 액터(캐릭터) 이름 글자 크기입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE],
     range: { min: 10, max: 40, step: 1 },
@@ -351,7 +353,7 @@ Hooks.once("init", () => {
     name: "채팅: 플레이어 이름 크기(px)",
     hint: "채팅 메시지 헤더의 플레이어 이름(서브타이틀) 글자 크기입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE],
     range: { min: 8, max: 28, step: 1 },
@@ -362,7 +364,7 @@ Hooks.once("init", () => {
     name: "채팅: 메시지 글자 크기(px)",
     hint: "일반 채팅 텍스트(메시지 내용)의 글자 크기입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: 14,
     range: { min: 9, max: 24, step: 1 },
@@ -384,10 +386,32 @@ Hooks.once("init", () => {
     name: "채팅: 메시지 카드 간격(px)",
     hint: "Foundry 기본 변수 chat-sidebar { --chat-message-spacing } 값을 덮어씁니다. 메시지 카드 사이 간격을 조절합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     default: FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING],
     range: { min: 0, max: 24, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.STYLE_HEADER_CONTENT_GAP, {
+    name: "채팅: 헤더-콘텐츠 간격(px)",
+    hint: "메시지 헤더(액터 이름·포트레이트)와 메시지 내용 사이의 세로 여백입니다.",
+    scope: "client",
+    config: false,
+    type: Number,
+    default: FE_DEFAULTS[S.STYLE_HEADER_CONTENT_GAP],
+    range: { min: 0, max: 20, step: 1 },
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.MERGE_INNER_GAP, {
+    name: "채팅 병합: 연속 메시지 간격(px)",
+    hint: "같은 화자의 연속 병합 메시지 사이의 세로 여백(px)입니다. 표준 모드에서는 이 값이 간격 전체를 단독으로 제어합니다.",
+    scope: "client",
+    config: false,
+    type: Number,
+    default: FE_DEFAULTS[S.MERGE_INNER_GAP],
+    range: { min: 0, max: 40, step: 1 },
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
@@ -405,7 +429,7 @@ Hooks.once("init", () => {
     name: "채팅/UI 글꼴 선택",
     hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     choices: {
       cookie: "쿠키런",
@@ -423,26 +447,17 @@ Hooks.once("init", () => {
     name: "UI/시트 기본 글꼴: 그림일기 사용(쿠키런 대체)",
     hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 그림일기 폰트로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.UI_USE_GEURIMILGI],
     onChange: () => feSetUiFontClass(document),
-  });
-
-  game.settings.register(MODULE_ID, S.UI_NEODGM_MODE, {
-    name: "(숨김) NeoDGM 픽셀 폰트 — 채팅/UI 글꼴 선택으로 통합됨",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_NEODGM_MODE],
-    onChange: () => feSetNeodgmModeClass(document),
   });
 
   game.settings.register(MODULE_ID, S.UI_DX3RD_PIXEL_THEME, {
     name: "[DX3rd] 픽셀 고대비 테마",
     hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. double-cross-3rd 시스템 전용 레이아웃 보정 포함. NeoDGM 폰트 모드와 함께 사용 권장.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME],
     onChange: () => {
@@ -469,17 +484,12 @@ Hooks.once("init", () => {
     config: false,
     type: String,
     default: FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT],
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
-
-  game.settings.register(MODULE_ID, S.UI_OVERRIDE_FONT_H1_COOKIE, {
-    name: "헤딩 글꼴(--font-h1): 쿠키런으로 덮어쓰기",
-    hint: "현재 --font-h1/h2/h3/monospace 는 CSS(폰트 활성화 시 자동 적용)로 통합되었습니다. 이 설정은 더 이상 사용되지 않습니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_OVERRIDE_FONT_H1_COOKIE],
-    onChange: () => feApplyStyleVarsFromSettings(document),
+    onChange: async (value) => {
+      // GM priority override를 먼저 갱신해야 feSetting()이 새 값을 반환.
+      // 갱신 전 feApplyStyleVarsFromSettings를 호출하면 낡은 override 값으로 accent-h가 덮어써짐.
+      await feMirrorGmPrioritySetting(S.DX3RD_PIXEL_ACCENT, value);
+      feApplyStyleVarsFromSettings(document);
+    },
   });
 
   // Migration-only flag (read by feMigrateLegacySettings, then reset to false).
@@ -496,7 +506,7 @@ Hooks.once("init", () => {
     name: "채팅 메시지 배경: 유저 색상 적용(Chat Portrait 스타일)",
     hint: "각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.USE_USER_COLOR_BG],
     onChange: () => {
@@ -535,7 +545,7 @@ Hooks.once("init", () => {
     name: "채팅 입력 마크다운 지원",
     hint: "채팅 입력 텍스트를 마크다운으로 처리합니다(이미지/링크/제목/굵게/기울임/취소선/인용구).",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -544,7 +554,7 @@ Hooks.once("init", () => {
     name: "채팅 수정(편집) 다이얼로그",
     hint: "메시지 수정 버튼 클릭 시 마크다운 기반 편집 다이얼로그를 사용합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => feFireChatUiUpdated({ reason: "edit-settings", document }),
@@ -554,7 +564,7 @@ Hooks.once("init", () => {
     name: "GM 설정 전역 강제",
     hint: "활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다. 아카이브/편집 설정은 개인 설정을 유지합니다.",
     scope: "world",
-    config: true,
+    config: false,
     restricted: true,
     type: Boolean,
     default: true,
@@ -931,41 +941,46 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
 
     if (game.user?.isGM && feSetting(S.GM_SPEAK_AS_SELF)) {
       try {
-        const speaker = data?.speaker ?? message?.speaker ?? {};
-        const OWNER = 3;
+        // Theatre stage hook (registered later in module load order) takes priority.
+        // Skip speaker reset when stage dropdown has an actor selected.
+        const stageActive = !!(document.querySelector("#fe-stage-nav select.fe-stage-select")?.value);
+        if (!stageActive) {
+          const speaker = data?.speaker ?? message?.speaker ?? {};
+          const OWNER = 3;
 
-        // Skip for system-initiated roll messages that already carry an explicit actor
-        // speaker (e.g. dx3rd attack/damage rolls). The actor was set intentionally by
-        // the system; overriding it would break actor-id tracking and portraits.
-        const msgRolls = Array.isArray(data?.rolls) ? data.rolls
-          : (Array.isArray(message?.rolls) ? message.rolls : []);
-        if (!(msgRolls.length > 0 && speaker?.actor)) {
-          let actor = null;
-          if (speaker?.actor) {
-            actor = game.actors?.get(speaker.actor) ?? null;
-          }
-          if (!actor && speaker?.token && speaker?.scene) {
-            const scene = game.scenes?.get(speaker.scene);
-            const tokenDoc = scene?.tokens?.get(speaker.token);
-            actor = tokenDoc?.actor ?? null;
-          }
+          // Skip for system-initiated roll messages that already carry an explicit actor
+          // speaker (e.g. dx3rd attack/damage rolls). The actor was set intentionally by
+          // the system; overriding it would break actor-id tracking and portraits.
+          const msgRolls = Array.isArray(data?.rolls) ? data.rolls
+            : (Array.isArray(message?.rolls) ? message.rolls : []);
+          if (!(msgRolls.length > 0 && speaker?.actor)) {
+            let actor = null;
+            if (speaker?.actor) {
+              actor = game.actors?.get(speaker.actor) ?? null;
+            }
+            if (!actor && speaker?.token && speaker?.scene) {
+              const scene = game.scenes?.get(speaker.scene);
+              const tokenDoc = scene?.tokens?.get(speaker.token);
+              actor = tokenDoc?.actor ?? null;
+            }
 
-          if (actor) {
-            const ownership = actor.ownership ?? {};
-            const hasPlayerOwner = Object.entries(ownership).some(([uid, level]) => {
-              if (uid === "default") return false;
-              const user = game.users?.get(uid);
-              return user && !user.isGM && level >= OWNER;
-            });
+            if (actor) {
+              const ownership = actor.ownership ?? {};
+              const hasPlayerOwner = Object.entries(ownership).some(([uid, level]) => {
+                if (uid === "default") return false;
+                const user = game.users?.get(uid);
+                return user && !user.isGM && level >= OWNER;
+              });
 
-            if (hasPlayerOwner) {
-              const gmSpeaker = {
-                scene: null,
-                actor: null,
-                token: null,
-                alias: game.user.name,
-              };
-              message.updateSource({ speaker: gmSpeaker });
+              if (hasPlayerOwner) {
+                const gmSpeaker = {
+                  scene: null,
+                  actor: null,
+                  token: null,
+                  alias: game.user.name,
+                };
+                message.updateSource({ speaker: gmSpeaker });
+              }
             }
           }
         }
@@ -1014,6 +1029,7 @@ export {
 
   feGetChatLogs,
   feMarkdownToHTML,
+  feEscapeHTML,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
 

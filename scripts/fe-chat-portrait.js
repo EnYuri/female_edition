@@ -1364,7 +1364,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 사용",
     hint: "채팅 메시지 카드에 액터(또는 토큰) 이미지를 삽입합니다. (chat-portrait 모듈이 활성화되어 있으면 포트레이트가 중복될 수 있으며, 콘솔에 경고만 표시합니다.)",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => {
@@ -1378,7 +1378,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트(삽입) 숨김",
     hint: "이 모듈이 채팅 카드 헤더에 삽입하는 포트레이트(이미지)를 숨깁니다. 기존 '채팅 기본 포트레이트 숨김(내부/기본)' 옵션과 별개입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => {
@@ -1391,7 +1391,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트에 토큰 이미지 사용",
     hint: "활성화 시 액터 포트레이트 대신 토큰 이미지를 사용합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => {
@@ -1404,7 +1404,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 크기(px)",
     hint: "포트레이트 이미지의 가로/세로 크기(px)입니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     range: { min: 16, max: 128, step: 1 },
     default: 64,
@@ -1419,7 +1419,7 @@ function cpRegisterSettings() {
     name: "채팅 카드 아이콘 크기(px)",
     hint: "midi-qol/dnd5e 채팅 카드 안의 큰 이미지(아이콘/포트레이트)가 과도하게 크게 보이는 경우를 방지하기 위해, 카드 헤더 이미지 크기를 강제로 조정합니다. 0으로 설정하면 비활성화됩니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     range: { min: 0, max: 128, step: 1 },
     default: 36,
@@ -1434,7 +1434,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 모양",
     hint: "포트레이트 모양/자르기 방식을 설정합니다. '미적용'은 보더/자르기 없이 크기만 조절합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     default: "circle",
     choices: {
@@ -1452,7 +1452,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 테두리(보더) 모드",
     hint: "포트레이트 이미지 테두리 스타일을 설정합니다. '테마/기본값'은 다른 테마/모듈의 스타일을 그대로 사용합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     default: "theme",
     choices: {
@@ -1471,7 +1471,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 테두리 두께(px)",
     hint: "테두리 모드가 '플레이어 색상' 또는 '사용자 지정'일 때 적용됩니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Number,
     range: { min: 0, max: 12, step: 1 },
     default: 2,
@@ -1485,7 +1485,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 테두리 색상(HEX)",
     hint: "테두리 모드가 '사용자 지정'일 때 사용합니다. 예) #000000",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     default: "#000000",
     onChange: () => {
@@ -1498,7 +1498,7 @@ function cpRegisterSettings() {
     name: "채팅 포트레이트 이름 정렬",
     hint: "헤더의 액터 이름/플레이어 이름을 가운데 정렬 또는 좌측 정렬로 표시합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: String,
     default: "center",
     choices: {
@@ -1516,7 +1516,7 @@ function cpRegisterSettings() {
     name: "컴뱃 트래커에 포트레이트 적용",
     hint: "컴뱃 트래커의 토큰 이미지에 동일한 규칙(토큰/포트레이트)을 적용합니다.",
     scope: "client",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => feFireChatUiUpdated({ reason: "portrait-settings", document }),
@@ -1527,7 +1527,7 @@ function cpRegisterSettings() {
     game.settings.register(MODULE_ID, key, {
       name,
       scope: "client",
-      config: true,
+      config: false,
       type: Boolean,
       default: def,
       onChange: () => {

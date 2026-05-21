@@ -1,6 +1,28 @@
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
+// accent hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0으로 고정.
+function feAccentToHs(hex) {
+  hex = String(hex).replace(/^#/, "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return { h: 0, s: 0 };
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0 };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  switch (max) {
+    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+    case g: h = ((b - r) / d + 2) / 6; break;
+    case b: h = ((r - g) / d + 4) / 6; break;
+  }
+  return { h: h * 360, s };
+}
+
 function feSetBodyMergeClasses() {
   const enabled = !!feSetting(S.MERGE_ENABLED);
   document.body.classList.toggle("fe-chat-merge", enabled);
@@ -96,7 +118,13 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 2);
     root.style.setProperty("--fe-chat-message-spacing", chatSpacing);
-    root.style.setProperty("--chat-message-spacing", chatSpacing);
+    // Do NOT set --chat-message-spacing on :root — Foundry v14 uses this variable
+    // for layout beyond just message gap (causes sidebar spacing side-effects).
+    // chat-bg-stripper.css scopes it correctly inside chat-sidebar.
+
+    root.style.setProperty("--fe-merge-group-spacing", px(feSetting(S.MERGE_GROUP_SPACING), 14));
+    root.style.setProperty("--fe-header-content-gap", px(feSetting(S.STYLE_HEADER_CONTENT_GAP), 4));
+    root.style.setProperty("--fe-merge-inner-gap", px(feSetting(S.MERGE_INNER_GAP), 8));
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
@@ -104,6 +132,11 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     const accent = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff";
     root.style.setProperty("--fe-dx3rd-accent", accent);
+
+    // H/S만 분해 — §20 CSS가 고정 명도와 조합해 사용 (명도 오염 방지)
+    const { h, s } = feAccentToHs(accent);
+    root.style.setProperty("--fe-dx3rd-accent-h", `${Math.round(h)}deg`);
+    root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
 
   } catch (err) {
     console.warn("female_edition | failed to apply style vars", err);

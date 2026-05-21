@@ -16,10 +16,13 @@ import {
   feSetUiFontClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
+  feSetDx3rdPixelThemeClass,
+  feSetNeodgmModeClass,
   feApplyChatMerge,
   feGetMessageIdFromElement,
   feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,
+  feEscapeHTML,
 } from "./fe-chat-enhance.js";
 
 // Chat portrait: ensure exported/archive-rendered messages receive the same portrait injection.
@@ -61,6 +64,15 @@ const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
+
+function feSanitizeExportFilename(name, fallback = "chat-log") {
+  return (
+    String(name || "")
+      .replaceAll(/[^a-zA-Z0-9ㄱ-힝\-_. ]+/g, "_")
+      .trim()
+      .slice(0, 80) || fallback
+  );
+}
 
 // ===========================================================================
 // Range Selection Dialog
@@ -179,33 +191,53 @@ function feGetArchiveRenderProfile(messageCount = 0) {
 // Export Entry Points  (button injection, PDF popup, inline print)
 // ===========================================================================
 
-function feInjectExportButton(root = document) {
-  if (!feSetting(S.EXPORT_ENABLED)) return;
-
-  const controls =
-    root.querySelector("#chat-controls") ||
-    root.querySelector("#sidebar #chat #chat-controls") ||
-    root.querySelector("#sidebar #chat .chat-controls") ||
-    root.querySelector("#sidebar #chat .chat-control-icons") ||
-    root.querySelector("#sidebar #chat .control-buttons") ||
-    root.querySelector("#sidebar #chat form.chat-form");
-
-  if (!controls) return;
-  if (controls.querySelector(".fe-export-pdf")) return;
-
+function _feCreateExportAnchor() {
   const a = document.createElement("a");
   a.className = "control-icon fe-export-pdf";
   a.dataset.tooltip = "채팅 로그 내보내기(PDF/HTML)";
   a.ariaLabel = "채팅 로그 내보내기(PDF/HTML)";
   a.innerHTML = '<i class="fa-solid fa-file-pdf"></i>';
-
   a.addEventListener("click", async (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     await feExportChatLogToPDF();
   });
+  return a;
+}
 
-  controls.appendChild(a);
+function feInjectExportButton(root = document) {
+  if (!feSetting(S.EXPORT_ENABLED)) return;
+
+  // Primary: inject directly into the hamburger panel when it exists.
+  // This avoids the inject-into-controls → move-to-panel race condition.
+  const panel = document.getElementById("fe-ctrl-menu-panel");
+  if (panel) {
+    // Remove any orphan .fe-export-pdf buttons outside the panel (e.g. stale
+    // buttons injected into form.chat-form by the last-resort fallback below).
+    document.querySelectorAll(".fe-export-pdf").forEach(el => {
+      if (!panel.contains(el)) el.remove();
+    });
+    if (!panel.querySelector(".fe-export-pdf")) {
+      panel.appendChild(_feCreateExportAnchor());
+    }
+    return;
+  }
+
+  // Fallback (panel not yet built): inject into #chat-controls so that
+  // feRebuildCtrlMenu can collect and move it when the panel is created.
+  // Note: form.chat-form is intentionally excluded — injecting directly into the
+  // form caused orphan buttons that appeared outside the hamburger panel.
+  const controls =
+    root.querySelector("#chat-controls") ||
+    root.querySelector("#sidebar #chat #chat-controls") ||
+    root.querySelector("#sidebar #chat .chat-controls") ||
+    root.querySelector("#sidebar #chat .chat-control-icons") ||
+    root.querySelector("#sidebar #chat .control-buttons");
+
+  if (!controls) return;
+  if (controls.querySelector(".fe-export-pdf")) return;
+
+  controls.appendChild(_feCreateExportAnchor());
 }
 
 // Enumerate every open app across v13 (ui.windows) and v14 (foundry.applications.instances).
@@ -840,14 +872,6 @@ function feEscapeAttr(str) {
     .replaceAll(">", "&gt;");
 }
 
-function feEscapeHTML(str) {
-  return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 
 function feCoerceElement(node) {
@@ -1570,6 +1594,9 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
   const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive fe-chat-archive-window${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
+  const feArchivePixelTheme = !!feSetting(S.UI_DX3RD_PIXEL_THEME);
+  const feArchiveBg = feArchivePixelTheme ? "#000000" : "#ffffff";
+
   win.document.open();
   win.document.write(`<!doctype html>
 <html>
@@ -1590,7 +1617,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         min-height: 0 !important;
         overflow: visible !important;
         width: auto !important;
-        background: #fff !important;
+        background: ${feArchiveBg} !important;
       }
 
       /* Keep the export container in normal flow. */
@@ -1629,12 +1656,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         max-height: none !important;
         overflow: visible !important;
         flex: 0 0 auto !important;
-        background: #fff !important;
+        background: ${feArchiveBg} !important;
         border: 0 !important;
       }
       #fe-chat-export-container #fe-chat-export-chat {
         position: static !important;
-        background: #fff !important;
+        background: ${feArchiveBg} !important;
         width: 100% !important;
         min-width: 0 !important;
         max-width: none !important;
@@ -1645,7 +1672,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       }
       #fe-chat-export-container #fe-chat-export-log {
         position: static !important;
-        background: #fff !important;
+        background: ${feArchiveBg} !important;
         padding: 0 !important;
         margin: 0 !important;
         width: 100% !important;
@@ -1811,6 +1838,73 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         @page { margin: 10mm; }
       }
     </style>
+    ${feArchivePixelTheme ? `<style data-fe-pixel-archive="1">
+      /* Pixel theme: inline fallback — guaranteed present regardless of <link> load order */
+      html, body,
+      #fe-chat-export-container,
+      #fe-chat-export-sidebar,
+      #fe-chat-export-chat,
+      #fe-chat-export-log {
+        background: #000000 !important;
+        background-image: none !important;
+        color: rgba(230,230,230,0.82) !important;
+      }
+      .fe-chat-export-status {
+        background: #000000 !important;
+        color: rgba(230,230,230,0.82) !important;
+      }
+      .fe-chat-export-action {
+        background: #000000 !important;
+        color: rgba(230,230,230,0.82) !important;
+      }
+      #fe-chat-export-log .chat-message {
+        background: #000000 !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        color: rgba(230,230,230,0.82) !important;
+        border-color: rgba(255,255,255,0.7) !important;
+      }
+      #fe-chat-export-log .chat-message::before,
+      #fe-chat-export-log .chat-message::after {
+        background: transparent none !important;
+        background-image: none !important;
+      }
+      #fe-chat-export-log .chat-message .message-header,
+      #fe-chat-export-log .chat-message .message-content {
+        background: transparent !important;
+        background-image: none !important;
+        color: rgba(230,230,230,0.82) !important;
+      }
+      #fe-chat-export-log .chat-message .message-header *,
+      #fe-chat-export-log .chat-message .message-sender,
+      #fe-chat-export-log .chat-message .message-sender *,
+      #fe-chat-export-log .chat-message .name-stacked,
+      #fe-chat-export-log .chat-message .name-stacked .title,
+      #fe-chat-export-log .chat-message .name-stacked .subtitle,
+      #fe-chat-export-log .chat-message .message-flavor,
+      #fe-chat-export-log .chat-message .flavor-text,
+      #fe-chat-export-log .chat-message .message-metadata {
+        color: rgba(230,230,230,0.82) !important;
+      }
+      #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat
+      ) {
+        background: #000000 !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        color: rgba(230,230,230,0.82) !important;
+        border-color: rgba(255,255,255,0.7) !important;
+      }
+      #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat
+      ) :is(header, section, footer, .card-header, .card-content, .collapsible-content,
+            .details, .wrapper) {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        color: rgba(230,230,230,0.82) !important;
+      }
+    </style>` : ""}
   </head>
   <body class="${feEscapeAttr(bodyClass)}">
     <div id="fe-chat-export-container">
@@ -1860,6 +1954,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetUiFontClass(win.document);
   feSetUserColorBgClass(win.document);
   feSetUserColorBgBaseClass(win.document);
+  feSetDx3rdPixelThemeClass(win.document);
+  feSetNeodgmModeClass(win.document);
   feSyncArchiveMergeBodyClasses(win.document);
   // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
   try {
@@ -2519,11 +2615,7 @@ async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
     }
   })();
 
-  const safeName =
-    String(titleText || "chat-log")
-      .replaceAll(/[^a-zA-Z0-9\u3131-\uD79D\-_. ]+/g, "_")
-      .trim()
-      .slice(0, 80) || "chat-log";
+  const safeName = feSanitizeExportFilename(titleText);
 
   const filename = `${safeName}.html`;
 
@@ -3357,10 +3449,7 @@ function feDownloadExportHTMLFromCurrentDocument() {
     const html = "<!doctype html>\n" + docEl.outerHTML;
 
     const worldName = game.world?.title ?? game.world?.name ?? "chat-log";
-    const safeName = String(worldName)
-      .replaceAll(/[^a-zA-Z0-9\u3131-\uD79D\-_. ]+/g, "_")
-      .trim()
-      .slice(0, 80) || "chat-log";
+    const safeName = feSanitizeExportFilename(worldName);
     const filename = `Chat Log - ${safeName}.html`;
 
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });

@@ -1,7 +1,7 @@
 /* fe-image-hover — token hover art overlay */
 
 .fe-image-hover-hud {
-  position: absolute;
+  position: fixed;
   pointer-events: none;
   border: none;
   background: transparent;
@@ -9,6 +9,7 @@
   margin: 0;
   /* Remove any default ApplicationV2 window chrome */
   box-shadow: none;
+  z-index: 9999;
 }
 
 .fe-image-hover-hud img,

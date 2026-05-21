@@ -8,6 +8,22 @@
  * ------------------------------------------------------------------ */
 :is(#chat-log, .chat-log, ol.chat-log) {
   gap: var(--fe-chat-message-spacing, 4px) !important;
+  /* Foundry core adds padding-left: 2em when ol has 100+ li children (nth-of-type(100)). Override. */
+  padding-left: 0 !important;
+}
+
+/* ------------------------------------------------------------------
+ * Header ↔ content gap within a single chat message
+ * ------------------------------------------------------------------
+ * Portrait messages: fe-chat-portrait.css uses margin-bottom on
+ *   .message-header (margin: 0 0 var(--fe-header-content-gap) 0 !important).
+ * Non-portrait messages: no portrait CSS controls the gap, so we add
+ *   padding-bottom here. Narrator/round-marker messages are excluded
+ *   because fe-chat-portrait.css resets their padding to 0 !important.
+ * ------------------------------------------------------------------ */
+:is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message:not(.fe-has-chat-portrait) > .message-header {
+  padding-bottom: var(--fe-header-content-gap, 4px) !important;
 }
 
 /* --------------------------- */
@@ -148,14 +164,14 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .
   position: absolute;
   left: 6px;
   right: 6px;
-  top: -7px;
+  top: calc(var(--fe-merge-group-spacing, 14px) / -2);
   border-top: 1px solid var(--color-border-light-2);
   opacity: 0.55;
 }
 
 body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-divider-before {
   position: relative;
-  margin-top: 14px !important;
+  margin-top: var(--fe-merge-group-spacing, 14px) !important;
 }
 
 /* Chrome parity: avoid a darker "header strip" only on the first message of a merged group */
@@ -166,23 +182,33 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
   filter: none !important;
 }
 
+/* Standard merge mode: boxes always TOUCH (margin-top = -spacing cancels the flex gap exactly).
+ * Internal spacing between merged content areas = inner-gap (bottom) + inner-gap (top) = 2×inner-gap.
+ * Both sides change symmetrically with --fe-merge-inner-gap. No inter-box gap → no background break.
+ *
+ * At --fe-merge-inner-gap: 0  → content areas touch inside the fused block
+ * At --fe-merge-inner-gap: 8  → 16px between content areas (8+8) */
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-start {
   margin-bottom: 0 !important;
+  padding-bottom: var(--fe-merge-inner-gap, 8px) !important;
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
   border-bottom-width: 0 !important;
 }
 
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-mid {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
+  margin-top: calc(0px - var(--fe-chat-message-spacing, 4px)) !important;
   margin-bottom: 0 !important;
+  padding-top: var(--fe-merge-inner-gap, 8px) !important;
+  padding-bottom: var(--fe-merge-inner-gap, 8px) !important;
   border-radius: 0 !important;
   border-top-width: 0 !important;
   border-bottom-width: 0 !important;
 }
 
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-end {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
+  margin-top: calc(0px - var(--fe-chat-message-spacing, 4px)) !important;
+  padding-top: var(--fe-merge-inner-gap, 8px) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top-width: 0 !important;
@@ -190,16 +216,44 @@ body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log,
 
 /* fe-merge-follow is pre-applied by fePreApplyMergeHint before the deferred pass
  * converts it to fe-merge-start/mid/end. During that brief window, apply the same
- * margin collapse as fe-merge-end so there's no visual gap. */
+ * touch-collapse as fe-merge-end so there's no visual gap. */
 body.fe-chat-merge.fe-merge-mode-standard :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow {
-  margin-top: calc(var(--fe-chat-message-spacing, 4px) * -1) !important;
+  margin-top: calc(0px - var(--fe-chat-message-spacing, 4px)) !important;
+  padding-top: var(--fe-merge-inner-gap, 8px) !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top-width: 0 !important;
 }
 
 
-/* Simple merge mode: keep message boxes intact, only collapse follow-up headers. */
+/* Chat card messages (actor portrait/name header at top): always get group-divider-level
+   spacing before and after, independent of the showDivider setting.
+   Uses data-fe-has-chat-card="1" set by feComputeMessageRenderState. */
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message[data-fe-has-chat-card="1"],
+body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message[data-fe-has-chat-card="1"] + .chat-message {
+  margin-top: var(--fe-merge-group-spacing, 14px) !important;
+}
+
+
+/* Simple merge mode: keep message boxes intact, only collapse follow-up headers.
+ *
+ * Inter-box gap = flex-gap + margin-top(follow) = spacing + (inner-gap - spacing) = inner-gap.
+ * padding-bottom on start/follow and padding-top on follow add extra visual space inside boxes.
+ * Total content-to-content = padding-bottom(start) + inner-gap + padding-top(follow) = 3×inner-gap.
+ * Note: start has natural padding-top (header area) — this is intentional; only padding-bottom
+ * of start responds to inner-gap, creating slight asymmetry within the start box by design. */
+body.fe-chat-merge.fe-merge-mode-simple :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-start {
+  padding-bottom: var(--fe-merge-inner-gap, 8px) !important;
+}
+
+body.fe-chat-merge.fe-merge-mode-simple :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow {
+  padding-top: var(--fe-merge-inner-gap, 8px) !important;
+  padding-bottom: var(--fe-merge-inner-gap, 8px) !important;
+  margin-top: calc(var(--fe-merge-inner-gap, 8px) - var(--fe-chat-message-spacing, 4px)) !important;
+}
+
 body.fe-chat-merge.fe-merge-mode-simple :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-merge-follow > .message-header {
   background: transparent !important;
   background-image: none !important;
