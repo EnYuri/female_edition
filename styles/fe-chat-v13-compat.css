@@ -258,158 +258,7 @@ body.fe-chatcard-custom-font
 }
 
 /* ------------------------------------------------------------------
- * 3) Notification tray support for portrait / hide-portrait settings
- * ------------------------------------------------------------------ */
-#chat-notifications .message.fe-has-chat-portrait > .message-header {
-  position: relative !important;
-  display: grid !important;
-  grid-template-columns: var(--fe-chat-portrait-size, 64px) minmax(0, 1fr) !important;
-  grid-template-rows: var(--fe-chat-header-meta-strip, 18px) minmax(calc(var(--fe-chat-portrait-size, 64px) - var(--fe-chat-header-meta-strip, 18px)), auto) auto !important;
-  grid-template-areas:
-    "portrait metadata"
-    "portrait sender"
-    "portrait flavor" !important;
-  align-items: stretch !important;
-  column-gap: 8px !important;
-  row-gap: 0 !important;
-  padding: 0 !important;
-  margin: 0 0 var(--fe-header-content-gap, 4px) 0 !important;
-  border: none !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header > img.fe-chat-portrait {
-  grid-area: portrait;
-  align-self: stretch !important;
-  justify-self: start !important;
-  margin-bottom: 0 !important;
-  margin-right: 0 !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender {
-  grid-area: sender;
-  min-width: 0 !important;
-  min-inline-size: 0 !important;
-  width: 100% !important;
-  inline-size: 100% !important;
-  max-width: none !important;
-  max-inline-size: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-self: stretch !important;
-  justify-self: stretch !important;
-  justify-content: center !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  white-space: normal !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked {
-  display: grid !important;
-  grid-auto-flow: row;
-  align-items: center !important;
-  justify-items: stretch !important;
-  min-width: 0 !important;
-  min-inline-size: 0 !important;
-  max-width: none !important;
-  width: 100% !important;
-  inline-size: 100% !important;
-  flex: 1 1 auto !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked > span,
-#chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender :is(.title, .subtitle) {
-  display: block !important;
-  min-width: 0 !important;
-  min-inline-size: 0 !important;
-  max-width: none !important;
-  max-inline-size: none !important;
-  width: 100% !important;
-  inline-size: 100% !important;
-  flex: 1 1 auto !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
-  line-height: 1.05 !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
-  grid-area: flavor;
-  min-width: 0 !important;
-  min-inline-size: 0 !important;
-  width: 100% !important;
-  inline-size: 100% !important;
-  align-self: start !important;
-  justify-self: stretch !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text):empty {
-  display: none !important;
-}
-
-#chat-notifications .message.fe-has-chat-portrait > .message-header .message-metadata {
-  grid-area: metadata;
-  position: static !important;
-  top: auto !important;
-  right: auto !important;
-  left: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  width: 100% !important;
-  inline-size: 100% !important;
-  height: var(--fe-chat-header-meta-strip, 18px) !important;
-  min-height: var(--fe-chat-header-meta-strip, 18px) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: flex-end !important;
-  justify-self: stretch !important;
-  align-self: start !important;
-  text-align: right !important;
-}
-
-body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender,
-body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
-body.fe-chat-portrait-name-align-center #chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
-  text-align: center !important;
-  justify-content: center !important;
-  justify-items: stretch !important;
-}
-
-body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender,
-body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header .message-sender .name-stacked,
-body.fe-chat-portrait-name-align-left #chat-notifications .message.fe-has-chat-portrait > .message-header :is(.message-flavor, .flavor-text, [class*="chat-portrait-whisper-to-"]) {
-  text-align: left !important;
-  justify-content: start !important;
-  justify-items: stretch !important;
-}
-
-body.fe-hide-chat-portrait-wrap #chat-notifications .message .fe-chat-portrait-wrap,
-body.fe-hide-chat-portrait-wrap #chat-notifications .message img.fe-chat-portrait {
-  display: none !important;
-}
-
-#chat-notifications .message .fe-chat-portrait,
-#chat-notifications .message .fe-chat-card-icon {
-  image-rendering: auto !important;
-  image-rendering: smooth !important;
-}
-
-/* ------------------------------------------------------------------
- * 4) Notification tray support for texture stripping / portrait hiding
+ * 3) Notification tray support for texture stripping / portrait hiding
  * ------------------------------------------------------------------ */
 #chat-notifications .message.fe-pseudo-sanitized::before {
   background-image: var(--fe-before-bgimg) !important;
@@ -455,7 +304,7 @@ body.fe-hide-portraits #chat-notifications :is(img.chat-portrait-image-size-name
 }
 
 /* ------------------------------------------------------------------
- * 5) User-color background parity for notification tray
+ * 4) User-color background parity for notification tray
  * ------------------------------------------------------------------ */
 body.fe-msg-bg-usercolor #chat-notifications .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)) !important;
@@ -477,7 +326,7 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black) #chat-
 }
 
 /* ------------------------------------------------------------------
- * 6) Notification tray intentionally opts out of FE chat merge
+ * 5) Notification tray intentionally opts out of FE chat merge
  * ------------------------------------------------------------------ */
 #chat-notifications > .message.fe-divider-before::before {
   content: none !important;

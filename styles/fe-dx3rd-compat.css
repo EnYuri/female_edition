@@ -192,9 +192,10 @@ body.fe-dx3rd-pixel-theme .dx3rd-item-chat .item-name-toggle:hover {
     0 0 10px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
 }
 
-/* dx3rd 오류 메시지 — 순수 적색 + 노란 윤곽(inline style color도 override) */
-.dx3rd-item-chat .dx3rd-error,
-.dx3rd-item-chat .dx3rd-error strong {
+/* dx3rd 오류 메시지 — 순수 적색 + 노란 윤곽(inline style color도 override)
+   §4의 text-shadow:none(명시도 0,1,1)보다 이 규칙(0,3,0)이 우위이므로 shadow가 의도적으로 유지됨. */
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .dx3rd-error,
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .dx3rd-error strong {
   color:       #ff0000 !important;
   text-shadow: 1px  1px 0 #ffee00,
               -1px  1px 0 #ffee00,

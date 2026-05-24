@@ -67,25 +67,11 @@
   object-fit: contain;
   object-position: bottom center;
   cursor: pointer;
- /* filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));  */
   transition: filter 0.25s ease;
   user-select: none;
   -webkit-user-drag: none;
 }
 
-/* Glowing outline when this actor is the current speaker 
-.fe-stage-insert--speaking .fe-stage-portrait {
-  filter: drop-shadow(0 0 8px var(--fet-speaker-color, rgba(180, 210, 255, 0.9)))
-          drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
-}
- */
-
-/* Subtle highlight for the last actor who spoke
-.fe-stage-insert--last-speaking .fe-stage-portrait {
-  filter: brightness(1.08)
-          drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
-}
- */
 /* ── Name label (floating over portrait) ──────────────────────── */
 
 .fe-stage-label {
