@@ -36,7 +36,18 @@ Hooks.once("init", () => {
   const config = CONFIG?.DND5E;
   if (!config) return;
 
-  // 1. Register settings first so get() works immediately after.
+  game.settings.register(_MOD, "injectCustomDamageTypes", {
+    name: "[DND5e] 커스텀 피해 타입 주입 활성화",
+    hint: "이 모듈의 커스텀 피해 타입 8종을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true,
+    requiresReload: true,
+  });
+
+  // 1. Register label settings first so get() works immediately after.
   for (const { key, idx } of _DMG_ENTRIES) {
     game.settings.register(_MOD, _settingKey(idx), {
       name: `[DND5e] 커스텀 피해 타입 ${idx} 이름`,
@@ -50,7 +61,8 @@ Hooks.once("init", () => {
     });
   }
 
-  // 2. Register damage types into all CONFIG.DND5E tables using stored names.
+  // 2. Register damage types into all CONFIG.DND5E tables using stored names (guarded).
+  if (!game.settings.get(_MOD, "injectCustomDamageTypes")) return;
   for (const { key, idx, icon } of _DMG_ENTRIES) {
     const stored = game.settings.get(_MOD, _settingKey(idx));
     const label  = (stored ?? "").trim() || String(idx);

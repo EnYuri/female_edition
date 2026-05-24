@@ -85,13 +85,15 @@ body.fe-dx3rd-pixel-theme svg {
 
 /* SVG 내부 <image> 요소(액터 초상 등) — 일반 보간 복원 */
 body.fe-dx3rd-pixel-theme svg image {
-  image-rendering: auto;
-  shape-rendering:  auto;
+  image-rendering: auto !important;
+  shape-rendering:  auto !important;
 }
 
-/* <img> 태그 전체 — 포트레이트·토큰·저널 이미지 보호 */
+/* <img> 태그 전체 — 포트레이트·토큰·저널 이미지 보호
+   !important: border-image 의 image-rendering: pixelated 가 일부 Chromium 버전에서
+   실제 img 엘리먼트까지 영향을 줄 수 있으므로 명시적으로 차단 */
 body.fe-dx3rd-pixel-theme img {
-  image-rendering: auto;
+  image-rendering: auto !important;
 }
 
 
@@ -607,7 +609,7 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
   width: 100%;
   height: 100%;
   display: block;
-  image-rendering: auto;
+  image-rendering: auto !important;
   object-fit: cover;
   object-position: top center;
 }
@@ -902,23 +904,56 @@ body.fe-dx3rd-pixel-theme .fe-stage-emote-item.active {
 /* ── Theatre 대사 박스 — 픽셀 테마 오버라이드 ─────────────────── */
 
 /* overflow:hidden이 inset:-10px 확장을 잘라내지 않도록 visible로 전환.
-   flex 자식(.fe-stage-textbox-content)은 자체 overflow-y:auto로 텍스트를 제한하므로
-   대사 내용이 대사창 밖으로 흘러나오지 않음. */
+   flex 자식(.fe-stage-textbox-content)은 자체 overflow-y:auto로 텍스트를 제한.
+   isolation: isolate — ::after mix-blend-mode multiply가 대사창 외부와 혼합되지 않도록. */
 body.fe-dx3rd-pixel-theme .fe-stage-textbox {
   overflow: visible !important;
+  isolation: isolate !important;
 }
 
-/* 대사창 테두리 → 9-슬라이스 border-image, 외각 배치 */
+/* 대사창 테두리 accent 백드롭 — ::after pixel-border mix-blend-mode: multiply의 배경색 공급.
+   .window-app::before / .fedr-actor-card::before 와 동일한 패턴.
+   기존 fe-theatre.css 사선 줄무늬(repeating-linear-gradient + ring mask)를 대체. */
 body.fe-dx3rd-pixel-theme .fe-stage-textbox::before {
+  content: '' !important;
+  position: absolute !important;
   inset: -10px !important;
   box-sizing: border-box !important;
+  pointer-events: none !important;
+  border: 10px solid var(--fe-dx3rd-accent, rgba(140, 170, 255, 0.55)) !important;
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
+}
+
+/* 대사창 테두리 — 9-슬라이스 pixel-border, 외각 배치.
+   mix-blend-mode: multiply — 흰 픽셀 × ::before accent = accent, 검정 픽셀 = 검정.
+   기존 삼각 꼬리(::after)를 픽셀 테두리로 교체 — 픽셀 테마에서 꼬리 제거. */
+body.fe-dx3rd-pixel-theme .fe-stage-textbox::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  /* 삼각 꼬리 속성 완전 초기화 */
   border: 10px solid transparent !important;
+  border-top: 10px solid transparent !important;
+  border-bottom: 10px solid transparent !important;
+  border-bottom-color: transparent !important;
+  left: auto !important;
+  transform: none !important;
+  /* 픽셀 패턴 */
   border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  mix-blend-mode: multiply !important;
   background: none !important;
   background-color: transparent !important;
   background-image: none !important;
-  image-rendering: pixelated !important;
-  /* fe-theatre.css의 기존 ring mask 제거 */
   -webkit-mask: none !important;
           mask: none !important;
   -webkit-mask-box-image: none !important;
@@ -2500,4 +2535,28 @@ body.fe-dx3rd-pixel-theme .fedr-name,
 body.fe-dx3rd-pixel-theme .dx3rd-action-ui-title,
 body.fe-dx3rd-pixel-theme .fe-stage-textbox-name {
   color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 32  인라인 롤 — 강조색 색조 적용
+ *        Foundry/시스템 CSS가 a.inline-roll에 자체 color·background를
+ *        설정하여 검정 배경에서 텍스트가 보이지 않는 문제 수정.
+ *        §14의 .message-content color 상속이 inline-roll에 도달하지
+ *        못하는 경우를 대비해 속성을 직접 적용.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-dx3rd-pixel-theme
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message a.inline-roll {
+  color:        var(--fe-ac-90) !important;
+  background:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
+}
+
+body.fe-dx3rd-pixel-theme
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message a.inline-roll:hover {
+  background:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
 }

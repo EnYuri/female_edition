@@ -24,13 +24,14 @@ const _FET_NONE        = "__none__";      // sentinel: theatre nav visible but n
 const _fet = {
   /** Map<theatreId, insertObj> — all actors currently on stage */
   inserts: new Map(),
-  /** local client: theatreId the current user is speaking as, or null */
-  speakingAs: null,
+  /** local client: theatreId the current user is speaking as, or null (자신으로 말하기), or _FET_NONE (없음) */
+  speakingAs: _FET_NONE,
   /** Map<userId, theatreId> — remote users' speaking selections */
   userSpeaking: new Map(),
 };
 
 // Settings cache — updated on init and on settings close
+let _fetEnabled       = false;
 let _fetHideMessages  = false;
 let _fetAutoDecay     = true;
 let _fetDecayTime     = 30000;
@@ -50,6 +51,31 @@ let _fetRootEl   = null;   // chat log root element (used for scoped querySelect
 // ── Settings ───────────────────────────────────────────────────────────────
 
 function _fetRegisterSettings() {
+  game.settings.register(_FET_MODULE, "stageEnabled", {
+    name: "무대(Stage) 기능 활성화",
+    hint: "활성화 시 채팅 컨트롤에 무대 UI가 표시되고 배우 컨텍스트 메뉴에 무대 항목이 추가됩니다.",
+    scope: "world",
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+    onChange: (v) => {
+      _fetEnabled = v;
+      if (!v) {
+        _fetClearAll(true);
+        document.getElementById("fe-stage-nav")?.remove();
+        _fetNavEl = null;
+        _fetSelectEl = null;
+        document.getElementById("fe-stage-dock")?.remove();
+        _fetDockEl = null;
+        _fetRefreshSheetHeaders();
+      } else {
+        _fetInjectUI();
+        _fetRefreshSheetHeaders();
+      }
+    },
+  });
+
   game.settings.register(_FET_MODULE, "stageHideMessages", {
     name: "무대 채팅: 채팅 로그에서 숨기기",
     hint: "무대(Stage)에서 발신된 메시지를 채팅 로그에 표시하지 않습니다.",
@@ -148,6 +174,7 @@ function _fetRegisterSettings() {
 }
 
 function _fetLoadSettings() {
+  _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled");
   _fetHideMessages   = game.settings.get(_FET_MODULE, "stageHideMessages");
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
   _fetDecayTime      = game.settings.get(_FET_MODULE, "stageDecayTime");
@@ -184,6 +211,7 @@ function _fetCanSpeakAs(actorId) {
  * (chat HTML is replaced on scene change, dock is appended to body so it persists).
  */
 function _fetInjectUI() {
+  if (!_fetEnabled) return;
   // Portrait dock — body-level, persists across scene changes
   if (!document.getElementById("fe-stage-dock")) {
     const dock = document.createElement("div");
@@ -578,7 +606,24 @@ function _fetTypewriter(el, text) {
 // validation) allows the check to pass. preCreateChatMessage then overwrites speaker and
 // style with the full theatre data as usual.
 Hooks.on("chatMessage", (_log, _message, chatData) => {
-  if (_fet.speakingAs === _FET_NONE) return;
+  if (!_fetEnabled) return;
+
+  // "없음" mode: theatre does not modify the message, but GM needs IC-mode bypass.
+  // v14 PaC validates speaker.actor in #processChatCommand before preCreateChatMessage.
+  // GMs without a canvas token selected have no actor → force OOC to bypass validation.
+  if (_fet.speakingAs === _FET_NONE) {
+    if (game.user.isGM && _fetNavEl) {
+      try {
+        if (game.settings.get("core", "messageMode") === "ic") {
+          if (!chatData.speaker?.actor && !chatData.speaker?.token) {
+            if (CONST.CHAT_MESSAGE_STYLES) chatData.style = CONST.CHAT_MESSAGE_STYLES.OOC;
+            else chatData.type = CONST.CHAT_MESSAGE_TYPES.OOC;
+          }
+        }
+      } catch { /* messageMode not registered on v13 — no-op */ }
+    }
+    return;
+  }
 
   if (!_fet.speakingAs) {
     // "자신으로 말하기": Foundry v14 PaC (ic mode) validates speaker.actor in
@@ -595,6 +640,16 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
           }
         } catch { /* messageMode not registered on v13 — no-op */ }
       }
+    } else if (game.user.isGM && _fetNavEl) {
+      // GM "자신으로 말하기": no character assigned → force OOC to bypass IC validation.
+      try {
+        if (game.settings.get("core", "messageMode") === "ic") {
+          if (!chatData.speaker?.actor && !chatData.speaker?.token) {
+            if (CONST.CHAT_MESSAGE_STYLES) chatData.style = CONST.CHAT_MESSAGE_STYLES.OOC;
+            else chatData.type = CONST.CHAT_MESSAGE_TYPES.OOC;
+          }
+        }
+      } catch { /* messageMode not registered on v13 — no-op */ }
     }
     return;
   }
@@ -607,6 +662,7 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
 });
 
 Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
+  if (!_fetEnabled) return;
   // Skip roll messages — cross-system compat rule mirrors fe-chat-enhance.js
   if (chatMessage.rolls?.length) return;
   // Only process messages created by the local user
@@ -670,6 +726,7 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
 });
 
 Hooks.on("createChatMessage", (chatMessage) => {
+  if (!_fetEnabled) return;
   const theatreId = chatMessage.flags?.[_FET_MODULE]?.stageId;
   if (!theatreId || !_fet.inserts.has(theatreId)) return;
 
@@ -688,7 +745,7 @@ Hooks.on("createChatMessage", (chatMessage) => {
 });
 
 Hooks.on("renderChatMessageHTML", (chatMessage, html) => {
-  if (!_fetHideMessages || !chatMessage.flags?.[_FET_MODULE]?.stageId) return;
+  if (!_fetEnabled || !_fetHideMessages || !chatMessage.flags?.[_FET_MODULE]?.stageId) return;
   const el = html instanceof jQuery ? html[0] : html;
   el.style.display = "none";
 });
@@ -700,7 +757,7 @@ function _fetSendEvent(event, data = {}) {
 }
 
 function _fetHandleSocket(payload) {
-  if (payload?.type !== _FET_SOCKET_TYPE) return;
+  if (!_fetEnabled || payload?.type !== _FET_SOCKET_TYPE) return;
   switch (payload.event) {
     case "enter":
       _fetInjectInsert(payload.theatreId, payload.actorId, payload.name, payload.src, payload.emotes, true);
@@ -896,6 +953,7 @@ function _fetGetActorIdFromLi(li) {
 }
 
 function _fetRegisterContextOptions(_html, options) {
+  if (!_fetEnabled) return;
   // Guard against both hooks firing simultaneously (V13 + V14 compat shim)
   if (options.some((o) => o.name === "무대에 추가")) return;
 
@@ -951,7 +1009,7 @@ Hooks.on("init", () => {
 Hooks.on("ready", () => {
   _fetLoadSettings();   // world-scoped settings are only reliable here
   _fetInjectUI();
-  if (!game.user.isGM) _fetSendEvent("resync");
+  if (_fetEnabled && !game.user.isGM) _fetSendEvent("resync");
 });
 
 Hooks.on("renderChatLog", (app, html) => {
@@ -976,6 +1034,7 @@ function _fetResolveEl(app, html) {
 }
 
 function _fetInjectSheetButtons(app, el) {
+  if (!_fetEnabled) return;
   const actor = app.actor ?? app.document;
   if (actor?.documentName !== "Actor") return;
 

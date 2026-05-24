@@ -120,7 +120,7 @@
   flex-direction: column;
   background: rgb(8, 8, 12);
   padding: 28px 16px 12px;
-  color: var(--fe-ac-90) !important;
+  color: var(--fe-ac-90, #e8e8e8) !important;
   font-size: var(--fet-text-size, 14px);
   line-height: 1.55;
   overflow: hidden;

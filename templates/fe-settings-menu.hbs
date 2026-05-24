@@ -107,7 +107,7 @@
       <div class="form-fields">
         <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="1" min="0" max="24" />
       </div>
-      <p class="notes">Foundry 기본 변수 <code>--chat-message-spacing</code> 값을 덮어씁니다.</p>
+      <p class="notes">모든 채팅 메시지 카드 사이의 기본 간격(flex gap)입니다. 병합 여부와 무관하게 적용됩니다.</p>
     </div>
 
     <div class="form-group">
@@ -184,15 +184,15 @@
       <div class="form-fields">
         <input type="number" name="ceMergeGroupSpacing" data-dtype="Number" value="{{values.ceMergeGroupSpacing}}" step="1" min="0" max="40" />
       </div>
-      <p class="notes">병합 그룹 사이 여백(px)입니다. 채팅카드 메시지 전후에도 동일하게 적용됩니다.</p>
+      <p class="notes">서로 다른 화자(그룹) 사이의 여백(px)입니다. 채팅카드(dnd5e 아이템/주문 등)처럼 병합 외 메시지 전후에도 동일하게 적용됩니다.</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 연속 메시지 간격(px)</label>
+      <label>채팅 병합: 연속 메시지 내부 간격(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="1" min="0" max="20" />
+        <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="1" min="0" max="40" />
       </div>
-      <p class="notes">같은 화자의 연속 병합 메시지 사이 세로 여백(px)입니다. 0이면 완전히 붙습니다.</p>
+      <p class="notes">같은 화자의 연속 병합 메시지 사이 세로 여백입니다. 표준 모드에서는 위아래 합산(×2)이 실제 간격이 됩니다.</p>
     </div>
 
     <div class="form-group">
@@ -400,6 +400,28 @@
       </div>
     </div>
   </details>
+
+  {{#if isDnd5e}}{{#if isGM}}
+  <details>
+    <summary>[DND5e] 커스텀 주입</summary>
+
+    <div class="form-group">
+      <label>커스텀 컨디션 주입 활성화</label>
+      <div class="form-fields">
+        <input type="checkbox" name="injectCustomConditions" data-dtype="Boolean" {{checked values.injectCustomConditions}} />
+      </div>
+      <p class="notes">짝짓기 금지·표식 등 커스텀 컨디션을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>커스텀 피해 타입 주입 활성화</label>
+      <div class="form-fields">
+        <input type="checkbox" name="injectCustomDamageTypes" data-dtype="Boolean" {{checked values.injectCustomDamageTypes}} />
+      </div>
+      <p class="notes">커스텀 피해 타입 8종을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.</p>
+    </div>
+  </details>
+  {{/if}}{{/if}}
 
   {{#if isDx3rd}}
   <details>

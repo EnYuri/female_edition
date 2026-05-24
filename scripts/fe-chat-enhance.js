@@ -200,7 +200,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.MERGE_GROUP_SPACING, {
     name: "채팅 병합: 그룹 간 간격(px)",
-    hint: "병합 그룹 사이의 추가 여백(px)입니다. 채팅카드가 있는 메시지에도 동일하게 적용됩니다.",
+    hint: "서로 다른 화자(그룹) 사이의 추가 여백(px)입니다. dnd5e 채팅카드처럼 병합에서 제외되는 메시지 전후에도 동일하게 적용됩니다.",
     scope: "client",
     config: false,
     type: Number,
@@ -384,7 +384,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.STYLE_CHAT_MESSAGE_SPACING, {
     name: "채팅: 메시지 카드 간격(px)",
-    hint: "Foundry 기본 변수 chat-sidebar { --chat-message-spacing } 값을 덮어씁니다. 메시지 카드 사이 간격을 조절합니다.",
+    hint: "모든 채팅 메시지 카드 사이의 기본 간격(flex gap)입니다. 병합 여부와 무관하게 적용됩니다. (v14 사이드바 부작용 방지를 위해 --fe-chat-message-spacing 변수로 관리합니다)",
     scope: "client",
     config: false,
     type: Number,
@@ -405,8 +405,8 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.MERGE_INNER_GAP, {
-    name: "채팅 병합: 연속 메시지 간격(px)",
-    hint: "같은 화자의 연속 병합 메시지 사이의 세로 여백(px)입니다. 표준 모드에서는 이 값이 간격 전체를 단독으로 제어합니다.",
+    name: "채팅 병합: 연속 메시지 내부 간격(px)",
+    hint: "같은 화자의 연속 병합 메시지 사이의 세로 여백(px)입니다. 간소화 모드: 박스 간 실질 간격 = 이 값. 표준 모드: 상하 패딩 합산(×2)이 컨텐츠 간 실질 간격이 됩니다.",
     scope: "client",
     config: false,
     type: Number,
@@ -942,8 +942,9 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
     if (game.user?.isGM && feSetting(S.GM_SPEAK_AS_SELF)) {
       try {
         // Theatre stage hook (registered later in module load order) takes priority.
-        // Skip speaker reset when stage dropdown has an actor selected.
-        const stageActive = !!(document.querySelector("#fe-stage-nav select.fe-stage-select")?.value);
+        // Skip speaker reset only when theatre has an actual actor selected (not "없음" or "자신으로 말하기").
+        const _stageVal = document.querySelector("#fe-stage-nav select.fe-stage-select")?.value;
+        const stageActive = !!_stageVal && _stageVal !== "__none__" && _stageVal !== "";
         if (!stageActive) {
           const speaker = data?.speaker ?? message?.speaker ?? {};
           const OWNER = 3;

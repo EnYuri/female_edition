@@ -57,6 +57,14 @@ function feIsDx3rdSystem() {
   }
 }
 
+function feIsDnd5eSystem() {
+  try {
+    return game?.system?.id === "dnd5e";
+  } catch {
+    return false;
+  }
+}
+
 class FemaleEditionSettingsMenu extends FormApplication {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
@@ -151,6 +159,10 @@ class FemaleEditionSettingsMenu extends FormApplication {
       [S.GM_PRIORITY_ENABLED]: feGetSettingSafe(S.GM_PRIORITY_ENABLED, FE_DEFAULTS[S.GM_PRIORITY_ENABLED]),
       [S.GM_SPEAK_AS_SELF]: feGetSettingSafe(S.GM_SPEAK_AS_SELF, FE_DEFAULTS[S.GM_SPEAK_AS_SELF]),
 
+      // DND5e injection
+      injectCustomConditions: feGetSettingSafe("injectCustomConditions", true),
+      injectCustomDamageTypes: feGetSettingSafe("injectCustomDamageTypes", true),
+
       // DX3rd
       [S.UI_DX3RD_PIXEL_THEME]: feGetSettingSafe(S.UI_DX3RD_PIXEL_THEME, FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME]),
       [S.DX3RD_CARD_BORDER_ALPHA]: feGetSettingSafe(S.DX3RD_CARD_BORDER_ALPHA, FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA]),
@@ -237,6 +249,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
       warnings,
       isGM: !!game.user?.isGM,
       isDx3rd: feIsDx3rdSystem(),
+      isDnd5e: feIsDnd5eSystem(),
     };
   }
 
@@ -327,6 +340,12 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // User-color background
         setBool(S.USE_USER_COLOR_BG),
         setStr(S.USER_COLOR_BG_BASE, FE_DEFAULTS[S.USER_COLOR_BG_BASE]),
+
+        // DND5e injection (world-scoped — only GM can set; fields are hidden for non-GMs)
+        ...(feIsDnd5eSystem() && game.user?.isGM ? [
+          setBool("injectCustomConditions"),
+          setBool("injectCustomDamageTypes"),
+        ] : []),
 
         // DX3rd (only save when in DX3rd system — fields are hidden otherwise,
         // so data[key] would be undefined and overwrite existing DX3rd preferences)
