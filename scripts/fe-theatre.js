@@ -26,8 +26,6 @@ const _fet = {
   inserts: new Map(),
   /** local client: theatreId the current user is speaking as, or null (자신으로 말하기), or _FET_NONE (없음) */
   speakingAs: _FET_NONE,
-  /** Map<userId, theatreId> — remote users' speaking selections */
-  userSpeaking: new Map(),
 };
 
 // Settings cache — updated on init and on settings close
@@ -750,6 +748,21 @@ Hooks.on("renderChatMessageHTML", (chatMessage, html) => {
   el.style.display = "none";
 });
 
+Hooks.on("updateActor", (actor, change) => {
+  if (!_fetEnabled) return;
+  if (!change?.flags?.[_FET_MODULE]?.[_FET_FLAG_KEY]) return;
+  const insert = _fet.inserts.get(_FET_ID_PREFIX + actor.id);
+  if (!insert) return;
+  const { name, src, emotes } = _fetGetActorStageData(actor);
+  insert.name    = name;
+  insert.emotes  = emotes;
+  insert.baseSrc = src;
+  insert.labelEl.textContent = name;
+  insert.nameEl.textContent  = name;
+  if (insert.opt) insert.opt.textContent = name;
+  if (!insert.emote) { insert.src = src; insert.imgEl.src = src; }
+});
+
 // ── Socket ─────────────────────────────────────────────────────────────────
 
 function _fetSendEvent(event, data = {}) {
@@ -766,7 +779,6 @@ function _fetHandleSocket(payload) {
       _fetRemoveInsert(payload.theatreId, true);
       break;
     case "speakas":
-      _fet.userSpeaking.set(payload.userId, payload.theatreId ?? null);
       break;
     case "emote":
       _fetSetEmote(payload.theatreId, payload.emoteName ?? null, true);
@@ -780,7 +792,6 @@ function _fetHandleSocket(payload) {
         _fetInjectInsert(ins.theatreId, ins.actorId, ins.name, ins.src, ins.emotes, true);
         if (ins.emote) _fetSetEmote(ins.theatreId, ins.emote, true);
       }
-      _fet.userSpeaking = new Map(Object.entries(payload.speakingBy ?? {}));
       break;
   }
 }
@@ -794,7 +805,6 @@ function _fetSendResyncData() {
     type: _FET_SOCKET_TYPE,
     event: "resyncdata",
     inserts,
-    speakingBy: Object.fromEntries(_fet.userSpeaking),
   });
 }
 
@@ -1013,8 +1023,8 @@ Hooks.on("ready", () => {
 });
 
 Hooks.on("renderChatLog", (app, html) => {
-  // Skip popout chat windows
-  if (app.options?.popOut === true || app.id === "chat-popout") return;
+  // Skip popout chat windows (v13: options.popOut, v14 AppV2: popOut getter, id fallback)
+  if (app.options?.popOut === true || app.popOut === true || app.id === "chat-popout") return;
 
   // v13: html is jQuery; v14 AppV2: html is raw HTMLElement
   const raw = html instanceof jQuery ? html[0] : (html?.element?.[0] ?? html ?? null);

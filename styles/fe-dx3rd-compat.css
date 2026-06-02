@@ -965,11 +965,6 @@ body.fe-dx3rd-pixel-theme .fe-stage-portrait-wrap {
   bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
 }
 
-/* 액터 이름 레이블 색상 */
-body.fe-dx3rd-pixel-theme .fe-stage-textbox-name {
-  color: hsl(from var(--fe-dx3rd-accent, #ffffff) h calc(s * 0.9) l) !important;
-}
-
 /* ══════════════════════════════════════════════════════════════
  * § 19  DX3rd 시트 · 다이얼로그 내부 — 강조색 오버라이드
  *        검정이 아닌 모든 색상 → 강조색(명도 조정)
@@ -2520,10 +2515,10 @@ body.fe-dx3rd-pixel-theme ::placeholder {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 31  주요 강조 텍스트 — 명도·채도 강조
+ * § 31  주요 강조 텍스트 — accent 직접 적용
  *        §4 의 text-shadow:none이 이미 적용되어 글로우 없음.
- *        · L=90% 계열(--fe-ac-90) 요소를 filter 로 L=70% 계열과 시각적으로 분리.
- *        · brightness로 명도 상향, saturate로 채도 강화.
+ *        · 채팅 발신자·창 제목 등 최상위 계층 텍스트를 accent 색상으로 직접 지정.
+ *        · --fe-ac-90(L=90%/α=0.82)보다 선명한 accent 원색으로 계층 최상위 표현.
  * ══════════════════════════════════════════════════════════════ */
 
 /* 채팅 발신자(캐릭터명) · 윈도우 제목 · 스테이터스 카드 이름 ·

@@ -828,7 +828,16 @@ function feFlushQueuedRenderedMessageRefreshes() {
           const msgId = feGetMessageIdFromElement(el);
           const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game?.messages?.get?.(msgId) : null);
           feApplyRenderedStateToMessageElement(msg, el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
-          if (feSetting(S.MERGE_ENABLED)) feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
+        }
+        if (feSetting(S.MERGE_ENABLED)) {
+          // anchors > 1: one full-log pass (1× querySelectorAll+sort) beats N neighborhood passes.
+          // anchors ≤ 1: targeted neighborhood is lighter — skip the full-log class-write sweep.
+          if (anchors.size > 1) {
+            feApplyChatMerge(log, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+          } else {
+            for (const el of anchors)
+              feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
+          }
         }
       }
     } finally {
