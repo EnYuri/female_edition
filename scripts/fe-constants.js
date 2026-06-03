@@ -46,6 +46,10 @@ const S = {
   DX3RD_RUI_CARD_HEIGHT: "ceDx3rdRuiCardHeight",
   DX3RD_CARD_BORDER_ALPHA: "ceDx3rdCardBorderAlpha",
   DX3RD_PIXEL_ACCENT: "ceDx3rdPixelAccent",
+  PRUNE_ENABLED: "cePruneEnabled",
+  PRUNE_MAX_MESSAGES: "cePruneMaxMessages",
+  TYPING_ENABLED: "ceTypingEnabled",
+  TYPING_SHOW_TO_PLAYERS: "ceTypingShowToPlayers",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -99,6 +103,10 @@ const FE_DEFAULTS = {
   [S.DX3RD_RUI_CARD_HEIGHT]: 80,
   [S.DX3RD_CARD_BORDER_ALPHA]: 0.5,
   [S.DX3RD_PIXEL_ACCENT]: "#ffffff",
+  [S.PRUNE_ENABLED]: true,
+  [S.PRUNE_MAX_MESSAGES]: 50,
+  [S.TYPING_ENABLED]: true,
+  [S.TYPING_SHOW_TO_PLAYERS]: true,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -114,6 +122,9 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.UI_ENABLE_FONTS,
   S.GM_PRIORITY_ENABLED,
   S.GM_SPEAK_AS_SELF,
+  S.PRUNE_ENABLED,
+  S.PRUNE_MAX_MESSAGES,
+  S.TYPING_ENABLED,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";

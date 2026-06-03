@@ -152,6 +152,13 @@ body.fe-fonts-enabled {
   --font-h1:        var(--fe-font-primary);
   --font-h2:        var(--fe-font-primary);
   --font-h3:        var(--fe-font-primary);
+  /* h4~h6 도 매핑 — Foundry 코어는 h4 { font-family: var(--font-h4) } 로
+     --font-h4 기본값 "Bruno Ace" 를 직접 지정한다(.window-app 의 상속 폰트가
+     아닌 h4 자신의 선언이 우선). 이를 빼면 DX3rd .sheet-main 의 h4 > span(.highlight)
+     같은 헤딩 하위 텍스트가 커스텀 폰트(NeoDGM 등) 대신 Bruno Ace 로 표시됨. */
+  --font-h4:        var(--fe-font-primary);
+  --font-h5:        var(--fe-font-primary);
+  --font-h6:        var(--fe-font-primary);
   --font-monospace: var(--fe-ui-font-family);
 
   /* dnd5e 폰트 변수 재정의 */

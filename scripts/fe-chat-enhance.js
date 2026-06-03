@@ -64,6 +64,7 @@ import {
 
 import { feMarkdownToHTML, feEscapeHTML } from "./fe-markdown.js";
 import { feStripChatTexturesInWindow } from "./fe-texture.js";
+import { feInstallChatLogPrune } from "./fe-chat-prune.js";
 
 // Wire the merge retry back-reference so fe-merge.js can call feScheduleRenderedLogRefresh
 // without a circular import.
@@ -142,6 +143,28 @@ function feApplyGmPriorityUiRefresh(doc = document) {
 // -------------------------------------
 
 Hooks.once("init", () => {
+  // DOM pruning must be registered and installed early in init so CONFIG.ui.chat
+  // is replaced before Foundry instantiates the ChatLog sidebar.
+  game.settings.register(MODULE_ID, S.PRUNE_ENABLED, {
+    name: "채팅 DOM 정리(성능 최적화)",
+    hint: "메시지가 많이 쌓이면 오래된 메시지를 DOM에서 제거하여 성능을 개선합니다. 위로 스크롤하면 이전 메시지를 다시 불러옵니다. (변경 후 새로고침 필요)",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: true,
+    requiresReload: true,
+  });
+  game.settings.register(MODULE_ID, S.PRUNE_MAX_MESSAGES, {
+    name: "채팅 DOM 정리: 최대 유지 메시지 수",
+    hint: "DOM에 동시에 유지할 최대 메시지 수입니다. 이 수를 초과하면 오래된 메시지를 제거합니다. 스크롤 1회에 이 값의 절반만큼 불러옵니다. (즉시 적용)",
+    scope: "client",
+    config: false,
+    type: Number,
+    default: FE_DEFAULTS[S.PRUNE_MAX_MESSAGES],
+    range: { min: 20, max: 200, step: 10 },
+  });
+  feInstallChatLogPrune();
+
   game.settings.register(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, {
     name: "(internal) GM-priority range overrides",
     scope: "world",

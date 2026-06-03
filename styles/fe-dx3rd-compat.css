@@ -5,6 +5,20 @@
  * 활성화: body.fe-dx3rd-pixel-theme
  *   NeoDGM 폰트 오버라이드(fe-neodgm-mode)와 함께 사용 권장.
  *
+ * ⚠️ CASCADE LAYER (필수): 이 파일은 module.json 에서
+ *      { "src": "...", "layer": "layouts" } 로 등록된다.
+ *    Foundry v13+ 는 @layer reset,…,layouts,system,modules,exceptions 순서를
+ *    foundry2.css 에서 선언한다. 매니페스트 styles 는 기본적으로 modules(9) 레이어에
+ *    주입되는데, DX3rd 시스템 CSS 는 system(8) 레이어에 들어간다.
+ *    !important 선언은 레이어 순서가 "역전" — 먼저 선언된 레이어가 이긴다.
+ *    따라서 modules(9) 의 !important 는 아무리 명시도가 높아도 system(8) 의
+ *    !important 에 진다(예: .sheet-main input { background:#404040 !important }).
+ *    이 파일을 system 보다 앞선 layouts(7) 레이어로 주입해야 !important 끼리의
+ *    싸움에서 우리가 이긴다. 아래 명시도 트릭(:not(), (0,6,2) 등)은 같은 레이어
+ *    내부의 형제 규칙 정렬용 보조 수단일 뿐, system 을 이기는 핵심은 레이어다.
+ *    경쟁 규칙은 전부 !important — 비-!important 규칙은 .fedr-*/#fe-dx3rd-rui-* 등
+ *    모듈 자체 요소뿐이라 레이어 이동에 따른 회귀 없음.
+ *
  * 원칙:
  *   · 모든 border-radius → 0 (각진 픽셀 형태)
  *   · -webkit-font-smoothing: none (안티에일리어싱 OFF)
@@ -334,10 +348,8 @@ body.fe-dx3rd-pixel-theme
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
-  background:       #000000 !important;
-  background-image: none    !important;
-  background-color: #000000 !important;
-  color:            var(--fe-ac-90) !important;
+  background: #000000 !important;
+  color:      var(--fe-ac-90) !important;
 }
 
 /* 채팅카드 내 서브 영역 — 투명(검정 상속).
@@ -348,9 +360,7 @@ body.fe-dx3rd-pixel-theme
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content,
       .card-header.description, .details.card-content, .collapsible-content.card-content) {
-  background:       transparent !important;
-  background-image: none        !important;
-  background-color: transparent !important;
+  background: transparent !important;
 }
 
 /* 유저 색상 있는 메시지 → 카드 테두리 = 유저 색상 + 알파 */
@@ -605,11 +615,27 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
   box-sizing: border-box;
 }
 
+/* 카드 서브트리 image-rendering 강제 auto — image-rendering 은 상속 속성이므로,
+   ::after 보더 장식(image-rendering: pixelated)과 무관하게 컨테이너→카드→래퍼까지
+   auto 로 못박아 포트레이트로 픽셀 렌더가 상속/전파되지 않게 한다.
+   보더 장식 자체(.fedr-actor-card::after)는 pixelated 유지 — 장식만 픽셀. */
+#fe-dx3rd-rui-container,
+#fe-dx3rd-rui-container-own,
+.fedr-actor-card,
+.fedr-card-body,
+.fedr-portrait-wrap {
+  image-rendering: auto !important;
+}
+
 .fedr-portrait {
   width: 100%;
   height: 100%;
   display: block;
   image-rendering: auto !important;
+  /* 독립 컴포지팅 레이어로 승격 — 인접 border-image(pixelated)의 레이어 단위
+     nearest-neighbor 래스터화가 포트레이트로 번지는 Chromium 동작 차단.
+     (overflow:hidden 클리핑은 transform 자식에도 그대로 적용되어 유지됨) */
+  transform: translateZ(0);
   object-fit: cover;
   object-position: top center;
 }
@@ -854,13 +880,24 @@ body.fe-dx3rd-pixel-theme
 }
 
 /* ── <select> 요소 ───────────────────────────────────────────── */
-
+/* appearance:none → 네이티브 크롬(화살표·배경) 완전 제거.
+   SVG 화살표: fill='currentColor' → color(=accent) 자동 상속 → 색조 오버라이드 전파.
+   background-color(단축이 아닌 개별 속성) 사용 — background 단축을 쓰는 상위 규칙이
+   background-image를 none으로 리셋하지 않도록, 화살표가 필요한 컨텍스트 규칙도
+   모두 background-color로 통일(§E, §dx3rd select, §stage-select). */
 body.fe-dx3rd-pixel-theme select {
-  background:     #000000 !important;
-  color:          var(--fe-dx3rd-accent, #ffffff) !important;
-  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline:        1px solid #000000 !important;
-  outline-offset: 0px !important;
+  appearance:          none !important;
+  -webkit-appearance:  none !important;
+  background-color:    #000000 !important;
+  background-image:    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4'%3E%3Cpath d='M0,0h7v1H0zM1,1h5v1H1zM2,2h3v1H2zM3,3h1v1H3z' fill='currentColor'/%3E%3C/svg%3E") !important;
+  background-repeat:   no-repeat !important;
+  background-position: right 6px center !important;
+  background-size:     7px 4px !important;
+  color:               var(--fe-dx3rd-accent, #ffffff) !important;
+  border:              1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:             1px solid #000000 !important;
+  outline-offset:      0px !important;
+  padding-right:       20px !important;
 }
 
 /* <option> — Firefox 적용됨; Chrome은 OS 네이티브가 우선 */
@@ -920,10 +957,8 @@ body.fe-dx3rd-pixel-theme .fe-stage-textbox::before {
   inset: -10px !important;
   box-sizing: border-box !important;
   pointer-events: none !important;
-  border: 10px solid var(--fe-dx3rd-accent, rgba(140, 170, 255, 0.55)) !important;
+  border: 10px solid var(--fe-dx3rd-accent, #ffffff) !important;
   background: transparent !important;
-  background-image: none !important;
-  background-color: transparent !important;
   -webkit-mask: none !important;
           mask: none !important;
   -webkit-mask-box-image: none !important;
@@ -952,8 +987,6 @@ body.fe-dx3rd-pixel-theme .fe-stage-textbox::after {
   image-rendering: pixelated !important;
   mix-blend-mode: multiply !important;
   background: none !important;
-  background-color: transparent !important;
-  background-image: none !important;
   -webkit-mask: none !important;
           mask: none !important;
   -webkit-mask-box-image: none !important;
@@ -969,21 +1002,6 @@ body.fe-dx3rd-pixel-theme .fe-stage-portrait-wrap {
  * § 19  DX3rd 시트 · 다이얼로그 내부 — 강조색 오버라이드
  *        검정이 아닌 모든 색상 → 강조색(명도 조정)
  * ══════════════════════════════════════════════════════════════ */
-
-/* ── 시트: 탭 ────────────────────────────────────────────────── */
-
-body.fe-dx3rd-pixel-theme .double-cross-3rd .tabs .item {
-  background: #000000 !important;
-  color: rgb(from var(--fe-ac-90) r g b / 0.5) !important;
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
-}
-
-body.fe-dx3rd-pixel-theme .double-cross-3rd .tabs .item.active {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  color: #000000 !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  text-shadow: none !important;
-}
 
 /* ── 시트: 헤더·제목 텍스트 ─────────────────────────────────── */
 
@@ -1003,18 +1021,6 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .stat-box
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
 }
 
-/* ── 시트: 다이아몬드 내링 + 그림자 ────────────────────────── */
-
-body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond {
-  box-shadow: 0 2px 8px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1),
-              0 0 0 2px var(--fe-dx3rd-accent, #ffffff) inset !important;
-}
-
-body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond:hover {
-  box-shadow: 0 2px 8px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25),
-              0 0 0 2px var(--fe-dx3rd-accent, #ffffff) inset !important;
-}
-
 /* ── 시트: 노란색 호버(#ffbb00) 모두 강조색으로 ─────────────── */
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd
@@ -1029,6 +1035,7 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd
 /* ── 시트: 인침식 바 ────────────────────────────────────────── */
 
 body.fe-dx3rd-pixel-theme .encroachment-bar {
+  background:   var(--fe-ac-12) !important;
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
@@ -1477,9 +1484,9 @@ body.fe-dx3rd-pixel-theme .item-extend-dialog .form-label {
 body.fe-dx3rd-pixel-theme .item-extend-dialog input[type="text"],
 body.fe-dx3rd-pixel-theme .item-extend-dialog input[type="number"],
 body.fe-dx3rd-pixel-theme .item-extend-dialog select {
-  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.05) !important;
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
-  color: var(--fe-ac-90) !important;
+  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.05) !important;
+  border-color:     rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+  color:            var(--fe-ac-90) !important;
 }
 
 body.fe-dx3rd-pixel-theme .item-extend-dialog input:focus,
@@ -1537,7 +1544,6 @@ body.fe-dx3rd-pixel-theme .fe-stage-emote-item:hover *,
 body.fe-dx3rd-pixel-theme .fe-stage-emote-item.active * {
   color: inherit !important;
 }
-
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -1826,9 +1832,9 @@ body.fe-dx3rd-pixel-theme .chat-controls {
 
 body.fe-dx3rd-pixel-theme .chat-control-bar :is(button, select),
 body.fe-dx3rd-pixel-theme .chat-controls :is(button, select) {
-  background:   #000 !important;
-  color:        var(--fe-ac-57) !important;
-  border-color: var(--fe-ac-22) !important;
+  background-color: #000 !important;
+  color:            var(--fe-ac-57) !important;
+  border-color:     var(--fe-ac-22) !important;
 }
 
 /* 채팅 전송 버튼 — 약간 돋보이도록 */
@@ -1849,9 +1855,9 @@ body.fe-dx3rd-pixel-theme .chat-controls :is([data-action="sendMessage"], .chat-
 /* ── E. 폼 요소 (비-DX3rd 윈도우) ──────────────────────────── */
 
 body.fe-dx3rd-pixel-theme :is(.window-app, .application):not(.double-cross-3rd) :is(input, select, textarea) {
-  background:   #000 !important;
-  color:        var(--fe-ac-90) !important;
-  border-color: var(--fe-ac-33) !important;
+  background-color: #000 !important;
+  color:            var(--fe-ac-90) !important;
+  border-color:     var(--fe-ac-33) !important;
 }
 
 body.fe-dx3rd-pixel-theme :is(.window-app, .application):not(.double-cross-3rd) button:not([disabled]):not(.window-header button) {
@@ -1929,10 +1935,13 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-gri
   border-color: var(--fe-ac-33) !important;
 }
 
-/* 스탯박스 입력 — 투명 배경으로 ::before 강조색 색조 노출 */
+/* 스탯박스 입력 — 투명 배경으로 ::before 강조색 색조 노출.
+   background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
+   padding-right 복원 — 전역 select 규칙의 20px 화살표 여백 불필요. */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat input,
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat select {
-  background: transparent !important;
+  background:    transparent !important;
+  padding-right: 0.5rem !important;
 }
 
 /* 다이아몬드 배경 (#404040 → 강조색 색조) */
@@ -1948,6 +1957,7 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .main-gri
 
 /* DX3rd 시트 탭 — 비활성(#bcc8de L≈80) · 활성(#fff L≈90) */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .tabs .item {
+  background:   #000000 !important;
   color:        var(--fe-ac-80) !important;
   border-color: var(--fe-ac-12) !important;
 }
@@ -1963,6 +1973,16 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd :is(label, td, th, p) {
   color: var(--fe-ac-80) !important;
 }
 
+/* .highlight — DX3rd { color:#19499b !important }(system 레이어) 고정 청색을
+   픽셀 테마 액센트 글씨로 되돌리고, 강조는 1px 밝은 파란색 아웃라인으로 대체.
+   layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다. */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .highlight {
+  color:          var(--fe-ac-90) !important;
+  font-weight:    bold !important;
+  outline:        1px solid #4a9eff !important;
+  outline-offset: 1px !important;
+}
+
 /* sheet-stat .title 텍스트 — DX3rd { color: white } (0,4,0) 일반 규칙 무력화
    stat-box·dice-info 내 skew 레이블 모두 포함 */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .title {
@@ -1972,9 +1992,9 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .title {
 /* DX3rd 입력 필드 전반 (일반 규칙, !important 없는 DX3rd 규칙 무력화) */
 body.fe-dx3rd-pixel-theme .double-cross-3rd input,
 body.fe-dx3rd-pixel-theme .double-cross-3rd select {
-  color:        var(--fe-ac-90) !important;
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
+  color:            var(--fe-ac-90) !important;
+  background-color: #000 !important;
+  border-color:     var(--fe-ac-22) !important;
 }
 
 /* .sheet-stat 입력 color — DX3rd 원본 !important 명시도 (0,5,1)/(0,3,1) 무력화
@@ -2030,11 +2050,12 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .backtr
   border-color: var(--fe-ac-70) !important;
 }
 
-/* ── sheet-header .select-box — DX3rd { color: white; background: black } (0,4,0) 무력화 */
+/* ── sheet-header .select-box — DX3rd { color: white; background: black } (0,4,0) 무력화.
+   background: #000(무채색) → var(--fe-ac-06)(색조 포함 극도 어두운 배경)으로 hue 오버라이드. */
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .select-box {
-  color:      var(--fe-ac-90) !important;
-  background: #000 !important;
+  color:            var(--fe-ac-90) !important;
+  background-color: var(--fe-ac-06) !important;
 }
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .select-box option {
@@ -2161,19 +2182,24 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-attributes .ce
  *        시스템 CSS 두 규칙을 모두 덮어써야 함:
  *          일반 상태  (0,5,1) !important → background:#404040
  *          :focus 상태(0,6,1) !important → background:#404040
+ *        ※ 이 !important 들을 이기는 핵심은 명시도가 아니라 레이어다(파일 상단 주석 참조).
+ *          layouts(7) < system(8) 이므로 우리 !important 가 우선. 명시도는 보조.
  *
  *        배경 명도를 L=20% 로 고정 — L=6%는 어떤 색조를 줘도
  *        육안으로 구분 불가능(진회색)하므로 색조 오버라이드 효과 없음.
  *        disabled는 L=10% 로 낮춰 비활성 상태를 시각적으로 구분.
  * ══════════════════════════════════════════════════════════════ */
 
+/* background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
+   padding-right 복원 — sheet-main은 좁은 입력칸이 많아 20px 화살표 여백 불필요. */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-main
   input:not([type="checkbox"]):not([type="radio"]),
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-main select,
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-main textarea {
-  background:   hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 20%) !important;
-  color:        var(--fe-ac-90) !important;
-  border-color: var(--fe-ac-22) !important;
+  background:    hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 20%) !important;
+  color:         var(--fe-ac-90) !important;
+  border-color:  var(--fe-ac-22) !important;
+  padding-right: 0.5rem !important;
 }
 
 /* :focus 상태 — 시스템 CSS (0,6,1) 대비 (0,7,2) 명시도로 완전 덮어씀 */
@@ -2206,9 +2232,9 @@ body.fe-dx3rd-pixel-theme #fe-stage-nav {
 
 /* speak-as 드롭다운 */
 body.fe-dx3rd-pixel-theme .fe-stage-select {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-  color:        var(--fe-ac-57) !important;
+  background-color: #000 !important;
+  border-color:     var(--fe-ac-22) !important;
+  color:            var(--fe-ac-57) !important;
 }
 
 body.fe-dx3rd-pixel-theme .fe-stage-select:focus {
@@ -2554,4 +2580,197 @@ body.fe-dx3rd-pixel-theme
   .chat-message a.inline-roll:hover {
   background:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 33  DX3rd 강조 텍스트 클래스 — 고정 색 → 액센트 교체
+ * ══════════════════════════════════════════════════════════════ */
+
+/* .highlight: 시스템 CSS { color: #19499b !important } 를 더 높은 명시도로 덮어씀 */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .highlight {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 34  DX3rd 아이템 시트 헤더 입력칸 — 흰 배경 제거
+ *        시스템 CSS가 flex-item input / level input 에
+ *        background:white; color:black 을 명시 → 흑색 배경 복원.
+ * ══════════════════════════════════════════════════════════════ */
+
+/* 아이템 시트 헤더 우측 플렉스 입력칸 (방어력·이동력 등 수치) */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item .sheet-header .flex-item input {
+  background: #000 !important;
+  color:      var(--fe-ac-90) !important;
+  border:     1px solid var(--fe-ac-45) !important;
+}
+
+/* 아이템 레벨 입력칸 */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item .sheet-header .header-fields .level input {
+  background: #000 !important;
+  color:      var(--fe-ac-90) !important;
+  border:     1px solid var(--fe-ac-22) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 35  레벨 배지(.level) — 흰 배경/검정 텍스트 → 액센트 반전
+ *        combo-item .item-name 안의 .level pill만 대상.
+ *        .header-fields .level 은 레이아웃 컨테이너 div이므로 제외.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-dx3rd-pixel-theme .double-cross-3rd .combo-item .item-name .level,
+body.fe-dx3rd-pixel-theme .combo-items-dialog .level {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color:      #000000 !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 36  dx3rd-item-chat 내부 구조 — 액센트 통합
+ *
+ *  (1) use-item / attack-roll / success 버튼 — 흰 배경 반전
+ *  (2) 내부 구분선 #AAA/#DDD → 액센트 계열
+ *  (3) combo-toggle-btn:hover — §10 item-name-toggle 패턴 적용
+ *  (4) item-type / protect-unequip 보조 요소
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── (1) 액션 버튼 (흰 배경 → 액센트 반전) ──────────────────── */
+
+body.fe-dx3rd-pixel-theme
+  .dx3rd-item-chat :is(.use-item-btn, .attack-roll-btn),
+body.fe-dx3rd-pixel-theme :is(.dx3rd-success-btn, .dx3rd-win-check-btn) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color:      #000000 !important;
+  border:     none !important;
+  outline:    1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline-offset: 0 !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .use-item-btn:hover,
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .attack-roll-btn:hover,
+body.fe-dx3rd-pixel-theme .dx3rd-success-btn:hover:not(:disabled),
+body.fe-dx3rd-pixel-theme .dx3rd-win-check-btn:hover:not(:disabled) {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
+}
+
+/* ── (2) 내부 구분선 · 섹션 테두리 ──────────────────────────── */
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .item-header {
+  border-bottom-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .effect-details {
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .effect-details .detail-row {
+  border-bottom-color: var(--fe-ac-12) !important;
+}
+
+/* detail-row 짝수 줄 배경 — 원본 rgba(0,0,0,0.05) 는 검정에서 불가시 → 미세 틴트 */
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .effect-details .detail-row:nth-child(even) {
+  background: var(--fe-ac-06) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .combo-section-header {
+  background:   var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .combo-items-list {
+  border-left-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .combo-item {
+  background:   var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .combo-item-header {
+  border-bottom-color: var(--fe-ac-12) !important;
+}
+
+/* ── (3) combo-toggle-btn:hover — item-name-toggle 패턴 ──────── */
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .combo-toggle-btn:hover {
+  color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
+}
+
+/* ── (4) 보조 텍스트 · 작은 버튼 ────────────────────────────── */
+
+/* item-type 소형 부제목 (#888 → t33) */
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .item-type {
+  color: var(--fe-ac-t33) !important;
+}
+
+/* protect-unequip — 비활성(회색) 소형 버튼 */
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .protect-unequip-btn {
+  border-color: var(--fe-ac-22) !important;
+  color:        var(--fe-ac-57) !important;
+}
+
+body.fe-dx3rd-pixel-theme .dx3rd-item-chat .protect-unequip-btn:hover:not(:disabled) {
+  border-color: var(--fe-ac-57) !important;
+  color:        var(--fe-ac-90) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 37  combo-items-dialog / book-spell-list-dialog
+ *        시스템 CSS의 #ddd 회색 테두리 → 액센트 계열
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-dx3rd-pixel-theme :is(.combo-items-dialog, .book-spell-list-dialog) .item {
+  background:   var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.combo-items-dialog, .book-spell-list-dialog) .info-table :is(th, td) {
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme :is(.combo-items-dialog, .book-spell-list-dialog) .info-table th {
+  background: var(--fe-ac-06) !important;
+  color:      var(--fe-ac-90) !important;
+}
+
+/* 마도서 소유 술식 — 위 th 규칙의 background/color 덮어씌우기를 복원.
+   시맨틱 빨강(이미 소유)은 의도적 색상 — 위 th 규칙(0,4,2)과 동일 명시도이지만
+   이 선언이 나중에 위치하므로 소스 순서로 우선됨. */
+body.fe-dx3rd-pixel-theme .book-spell-list-dialog .owned-spell .info-table :is(th, td) {
+  background: #000000 !important;
+  color:      red !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 38  어트리뷰트 목록 구분선 + sublimation + applied-effect 테이블
+ * ══════════════════════════════════════════════════════════════ */
+
+/* 어트리뷰트 헤더 (#AAA 테두리) */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .attributes-header {
+  background:   var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+/* 어트리뷰트 목록 항목 하단 구분선 (#AAA) */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .attributes-list li > * {
+  border-bottom-color: var(--fe-ac-12) !important;
+}
+
+/* 서브리메이션 액션 버튼 hover (원본 #e0e0e0 밝은 회색 → 액센트 반전) */
+body.fe-dx3rd-pixel-theme .sublimation-action-btn:hover {
+  background-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color:            #000000 !important;
+}
+
+/* applied-effect-table (#ccc 테두리) */
+body.fe-dx3rd-pixel-theme .applied-effect-table :is(th, td) {
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-dx3rd-pixel-theme .applied-effect-table th {
+  background: var(--fe-ac-06) !important;
 }

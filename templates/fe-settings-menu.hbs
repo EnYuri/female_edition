@@ -61,6 +61,40 @@
     <summary>채팅 외형</summary>
 
     <div class="form-group">
+      <label>채팅 DOM 정리(성능 최적화)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="cePruneEnabled" data-dtype="Boolean" {{checked values.cePruneEnabled}} />
+      </div>
+      <p class="notes">오래된 메시지를 DOM에서 제거해 성능을 개선합니다. 위로 스크롤하면 다시 불러옵니다. (변경 후 새로고침 필요)</p>
+    </div>
+
+    <div class="form-group">
+      <label>DOM 정리: 최대 유지 메시지 수</label>
+      <div class="form-fields">
+        <input type="number" name="cePruneMaxMessages" data-dtype="Number" value="{{values.cePruneMaxMessages}}" step="10" min="20" max="200" />
+      </div>
+      <p class="notes">이 수를 초과하면 오래된 메시지를 제거합니다. 스크롤 1회에 이 값의 절반만큼 불러옵니다. (즉시 적용, 기본값: 50)</p>
+    </div>
+
+    <div class="form-group">
+      <label>타이핑 인디케이터 표시('…님이 입력 중')</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTypingEnabled" data-dtype="Boolean" {{checked values.ceTypingEnabled}} />
+      </div>
+      <p class="notes">다른 사용자가 입력 중일 때 입력창 위에 표시합니다. CautiousGamemastersPack(CGMP)이 활성화되어 있으면 자동으로 비활성화되어 CGMP에 양보합니다.</p>
+    </div>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>타이핑 인디케이터: 플레이어에게도 표시</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTypingShowToPlayers" data-dtype="Boolean" {{checked values.ceTypingShowToPlayers}} />
+      </div>
+      <p class="notes">끄면 GM만 다른 사용자의 입력 중 표시를 볼 수 있습니다. (월드 설정 — GM 전용)</p>
+    </div>
+    {{/if}}
+
+    <div class="form-group">
       <label>채팅 카드 텍스쳐 제거</label>
       <div class="form-fields">
         <input type="checkbox" name="stripChatTextures" data-dtype="Boolean" {{checked values.stripChatTextures}} />

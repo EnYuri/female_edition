@@ -34,12 +34,6 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   align-items: center;
 }
 
-/* ── Toggle button ───────────────────────────────────────── */
-/* Inherits Foundry's .ui-control.icon sizing/border/hover.   */
-#fe-ctrl-menu-toggle {
-  /* nothing extra needed */
-}
-
 /* ── Dropdown panel ──────────────────────────────────────── */
 /* bottom/right are set in JS when the panel opens, so the panel always
    anchors to the actual toggle-button coords regardless of how tall the
@@ -106,13 +100,29 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   flex-shrink: 0;
 }
 
+/* ── Stage nav fills remaining width in #chat-controls ───── */
+/* Without flex:1, the stage select can't expand to fill the bar. */
+#chat-controls > #fe-stage-nav {
+  flex:      1;
+  min-width: 0;
+}
+
+/* Accent color button: vertically centered, never shrinks */
+#chat-controls > #fe-dx3rd-accent-btn {
+  flex-shrink: 0;
+  align-self:  center;
+}
+
 /* ── dx3rd pixel theme override ──────────────────────────── */
+/* --dx3rd-bg / --dx3rd-border are undefined in this system; explicit values required. */
 body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel {
-  background: var(--dx3rd-bg, #1a1a2e);
-  border-color: var(--dx3rd-border, #4a4a6a);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+  background:     #000000 !important;
+  border-color:   var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0 !important;
+  box-shadow:     none !important;
 }
 
 body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel #message-modes {
-  border-inline-end-color: var(--dx3rd-border, #4a4a6a);
+  border-inline-end-color: var(--fe-ac-22) !important;
 }

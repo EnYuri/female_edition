@@ -1,5 +1,8 @@
 {
 	"MYCOND.CondFemaleMating": "교미 중",
 	"MYCOND.Mark": "표식",
-	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>"
+	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>",
+	"FE.Typing.One": "{user} 님이 입력 중…",
+	"FE.Typing.Two": "{user1}, {user2} 님이 입력 중…",
+	"FE.Typing.Many": "{user1}, {user2} 외 {count}명이 입력 중…"
 }
