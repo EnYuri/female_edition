@@ -75,6 +75,14 @@ body.fe-dx3rd-pixel-theme :is(#pause, #pause *)::after {
   animation-delay:    0s !important;
 }
 
+/* 로딩 스피너류 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
+   "상태를 알리는" 무한 회전 스피너까지 1ms로 돌면 정지/뭉개짐처럼 보인다.
+   일시정지 기어와 동일한 예외 패턴으로 정상 회전 주기를 복원한다.
+   (Font Awesome .fa-spin 기본 2s / .fa-spin-pulse·.fa-pulse 1s) */
+body.fe-dx3rd-pixel-theme :is(.fa-spin, .fa-spin-pulse, .fa-pulse, .fa-spinner, .loading, #loading) {
+  animation-duration: 1.5s !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 4  소프트 그림자 전역 제거
@@ -1667,9 +1675,12 @@ body.fe-dx3rd-pixel-theme :is(.window-app, .application) header.window-header {
   color:               var(--fe-ac-57) !important;
 }
 
+/* 창 제목 — 최상위 강조 텍스트이므로 밝은 원색 accent(§31과 동일).
+   이 규칙(0,3,x)이 §31(0,2,x)보다 명시도가 높아 실제로 이기는 위치이므로
+   여기서 직접 accent를 지정한다(이전엔 ac-70이라 §31의 accent 의도가 무효였음). */
 body.fe-dx3rd-pixel-theme :is(.window-app, .application) .window-title,
 body.fe-dx3rd-pixel-theme :is(.window-app, .application) h1.window-title {
-  color: var(--fe-ac-70) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
 body.fe-dx3rd-pixel-theme :is(.window-app, .application) .window-content,
@@ -1974,13 +1985,23 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd :is(label, td, th, p) {
 }
 
 /* .highlight — DX3rd { color:#19499b !important }(system 레이어) 고정 청색을
-   픽셀 테마 액센트 글씨로 되돌리고, 강조는 1px 밝은 파란색 아웃라인으로 대체.
-   layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다. */
+   픽셀 테마 액센트 글씨로 되돌리고, 강조는 1px 밝은 파란색 글자 외곽선으로 대체.
+   layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다.
+
+   주의: outline/border 는 입력 필드 박스를 두르므로 텍스트가 아닌 네모가 생긴다.
+   글자(글리프) 자체에 1px 외곽선을 주려면 4방향 text-shadow 로 스트로크를 합성한다. */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .highlight {
-  color:          var(--fe-ac-90) !important;
-  font-weight:    bold !important;
-  outline:        1px solid #4a9eff !important;
-  outline-offset: 1px !important;
+  color:        var(--fe-ac-90) !important;
+  font-weight:  bold !important;
+  text-shadow:
+    -1px -1px 0 #4a9eff,
+     1px -1px 0 #4a9eff,
+    -1px  1px 0 #4a9eff,
+     1px  1px 0 #4a9eff,
+      0  -1px 0 #4a9eff,
+      0   1px 0 #4a9eff,
+    -1px   0  0 #4a9eff,
+     1px   0  0 #4a9eff !important;
 }
 
 /* sheet-stat .title 텍스트 — DX3rd { color: white } (0,4,0) 일반 규칙 무력화
@@ -2584,13 +2605,14 @@ body.fe-dx3rd-pixel-theme
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 33  DX3rd 강조 텍스트 클래스 — 고정 색 → 액센트 교체
+ * § 33  DX3rd 강조 텍스트 클래스
+ *        .highlight 처리는 §20(line ~1982)으로 일원화한다 —
+ *          color: var(--fe-ac-90) + bold + #4a9eff 글리프 stroke(text-shadow).
+ *        DX3rd { color:#19499b !important }(system 레이어)는 §20이
+ *        layouts 레이어 !important 로 이미 제압한다.
+ *        (이전엔 여기서 color 를 raw accent 로 다시 덮어써 §20 의 ac-90 이
+ *         무효화됐었음 — 동일 셀렉터·동일 명시도에서 소스 순서상 §33 우선.)
  * ══════════════════════════════════════════════════════════════ */
-
-/* .highlight: 시스템 CSS { color: #19499b !important } 를 더 높은 명시도로 덮어씀 */
-body.fe-dx3rd-pixel-theme .double-cross-3rd .highlight {
-  color: var(--fe-dx3rd-accent, #ffffff) !important;
-}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -2773,4 +2795,18 @@ body.fe-dx3rd-pixel-theme .applied-effect-table :is(th, td) {
 
 body.fe-dx3rd-pixel-theme .applied-effect-table th {
   background: var(--fe-ac-06) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 39  타이핑 인디케이터(#fe-typing-notify) — 강조색 색조 적용
+ *        기본 색(--color-text-dark-secondary #4b4a44)은 픽셀 테마의
+ *        검정 입력 영역 위에서 거의 안 보임 → 액센트 색조로 교체.
+ *        점 애니메이션은 background:currentColor 이므로 color 만 바꾸면
+ *        텍스트·점이 함께 따라온다.
+ *        layouts(7) 레이어 + !important — modules(9) 의 기본 규칙을 이김.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-dx3rd-pixel-theme #fe-typing-notify {
+  color: var(--fe-ac-80) !important;
 }

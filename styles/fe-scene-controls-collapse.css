@@ -1,0 +1,58 @@
+/* ============================================================
+   female_edition — Scene controls "dropdown" collapse
+   Driver class: body.fe-collapse-scene-controls (fe-scene-controls-collapse.js)
+   Open class:   .fe-sc-open on #scene-controls-layers / #scene-controls-tools
+
+   Collapsed (default): each control menu shows ONLY its active cell.
+   Open: the full column is shown; selecting an item re-collapses it.
+
+   The active cell is selected via aria-pressed, which Foundry keeps in sync
+   synchronously on activate, so the visible cell always tracks the selection.
+   ============================================================ */
+
+/* Collapsed: hide every item in each control menu … */
+body.fe-collapse-scene-controls #scene-controls-layers:not(.fe-sc-open) > li,
+body.fe-collapse-scene-controls #scene-controls-tools:not(.fe-sc-open) > li {
+  display: none !important;
+}
+
+/* … except the active one.
+   Layers: the pressed layer button.
+   Tools: the pressed NON-toggle tool (the actual active tool — toggles can also
+   be pressed, but we don't want them padding out the collapsed cell). */
+body.fe-collapse-scene-controls #scene-controls-layers:not(.fe-sc-open) > li:has(> button[aria-pressed="true"]),
+body.fe-collapse-scene-controls #scene-controls-tools:not(.fe-sc-open)  > li:has(> button[aria-pressed="true"]:not(.toggle)) {
+  display: flex !important;
+}
+
+/* Fallback: when nothing is active (e.g. a control with only button-type tools),
+   keep the first cell visible so there is always a target to expand from. */
+body.fe-collapse-scene-controls #scene-controls-layers:not(.fe-sc-open):not(:has(> li > button[aria-pressed="true"])) > li:first-child,
+body.fe-collapse-scene-controls #scene-controls-tools:not(.fe-sc-open):not(:has(> li > button[aria-pressed="true"]:not(.toggle))) > li:first-child {
+  display: flex !important;
+}
+
+/* Dropdown caret on the visible cell, signalling it expands on click. */
+body.fe-collapse-scene-controls :is(#scene-controls-layers, #scene-controls-tools):not(.fe-sc-open) > li > button {
+  position: relative;
+}
+body.fe-collapse-scene-controls :is(#scene-controls-layers, #scene-controls-tools):not(.fe-sc-open) > li > button::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Open: float the expanded column above neighbouring UI so it reads as a
+   dropdown overlay rather than reflowing the layout. */
+body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open,
+body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open {
+  z-index: calc(var(--z-index-app, 30) + 5);
+}

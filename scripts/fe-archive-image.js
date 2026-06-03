@@ -255,6 +255,52 @@ function feProgressiveResampleCanvas(win, img, spec, outW, outH, { maxIntermedia
   return out;
 }
 
+// P5: high-quality, off-thread resample via createImageBitmap.
+//   createImageBitmap(img, sx,sy,sw,sh, { resizeWidth, resizeHeight, resizeQuality })
+// crops the source rect then resamples to the destination size on a worker
+// thread, returning an ImageBitmap we draw once (1:1) at the destination offset
+// and close() immediately — deterministic memory release, no progressive canvas
+// chain, less main-thread jank. Honors the same {fit,position} draw spec:
+//   · contain → bitmap is dw×dh, drawn at (dx,dy) with transparent letterbox
+//   · cover   → source pre-cropped to (sx,sy,sw,sh), bitmap fills outW×outH
+//   · fill    → bitmap is outW×outH at (0,0)
+// Returns null when unsupported or on any failure (e.g. tainted cross-origin
+// sources, older engines) so the caller can fall back to the canvas path.
+async function feResampleViaImageBitmap(win, img, spec, outW, outH) {
+  const doc = win?.document;
+  if (!doc || !img || !spec) return null;
+  if (typeof win.createImageBitmap !== "function") return null;
+
+  const sx = Math.max(0, Math.round(spec.sx) || 0);
+  const sy = Math.max(0, Math.round(spec.sy) || 0);
+  const sw = Math.max(1, Math.round(spec.sw) || 1);
+  const sh = Math.max(1, Math.round(spec.sh) || 1);
+  const dw = Math.max(1, Math.round(spec.dw) || 1);
+  const dh = Math.max(1, Math.round(spec.dh) || 1);
+
+  let bitmap = null;
+  try {
+    bitmap = await win.createImageBitmap(img, sx, sy, sw, sh, {
+      resizeWidth: dw,
+      resizeHeight: dh,
+      resizeQuality: "high",
+    });
+    const out = feCreateArchiveCanvas(doc, outW, outH);
+    const octx = out.getContext("2d", { alpha: true });
+    if (!octx) return null;
+    feEnableHighQualitySmoothing(octx);
+    octx.clearRect(0, 0, outW, outH);
+    // Draw at the bitmap's natural size (dw×dh) at the destination offset — the
+    // resize already happened off-thread, so no further scaling here.
+    octx.drawImage(bitmap, Math.round(spec.dx) || 0, Math.round(spec.dy) || 0);
+    return out;
+  } catch {
+    return null;
+  } finally {
+    try { bitmap?.close?.(); } catch {}
+  }
+}
+
 // ===========================================================================
 // Image downscale  (main export — called by feArchivePrint)
 // ===========================================================================
@@ -283,6 +329,21 @@ export async function feDownscaleImagesForPrint(
     // a short blob: reference and the bytes live in the URL registry once.
     // Caller must call the returned restore() to revoke the URLs.
     useBlobURL = false,
+    // Parallel encode batch size. Each in-flight group holds a decoded source
+    // bitmap + output canvas (+ progressive intermediates), so lowering this
+    // for huge logs directly cuts peak downscale memory at a small time cost.
+    concurrency = 6,
+    // Upper bound for the progressive-resample seed canvas. 0 = use per-group
+    // defaults. Lowering it trims intermediate-canvas memory on huge logs.
+    intermediateCap = 0,
+    // Cap on total encoded output bytes. 0 = unlimited (print path). Used by the
+    // HTML-embed path so downscaled data: URLs can't balloon the saved file:
+    // once the budget is spent, remaining groups keep their original src.
+    maxTotalBytes = 0,
+    // Optional out-param object: on completion, `stats.bytesUsed` is set to the
+    // total encoded output bytes produced. Lets the HTML-embed caller charge the
+    // remaining embed budget against what downscaling already spent (shared cap).
+    stats = null,
   } = {}
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
@@ -453,7 +514,6 @@ export async function feDownscaleImagesForPrint(
       const spec = computeDrawSpec(img, targetW, targetH);
       const needsResample = !(img.naturalWidth <= targetW * 1.05 && img.naturalHeight <= targetH * 1.05);
       const g = groups.get(key) || {
-        key,
         imgs: [],
         maxW: 0,
         maxH: 0,
@@ -474,26 +534,63 @@ export async function feDownscaleImagesForPrint(
 
   const groupList = Array.from(groups.values());
   if (!groupList.length) return () => {};
-  const cache = new Map();
   const createdBlobURLs = useBlobURL ? new Set() : null;
   const winURL = (win && win.URL) || URL;
+  let totalEncodedBytes = 0;
+
+  // Swap a group's <img> elements to the downscaled URL immediately after that
+  // group is encoded — not in a final pass. Releasing each original src as soon
+  // as its replacement is ready lets Chromium free the full-resolution decoded
+  // bitmap progressively, so peak memory declines through the run instead of
+  // staying pinned at "all originals decoded" until the very end.
+  const swapGroup = (g, imageUrl) => {
+    for (const img of g.imgs) {
+      try {
+        const origSrc = img.getAttribute("src");
+        changed.push({
+          img,
+          src: origSrc,
+          srcset: img.getAttribute("srcset"),
+          loading: img.getAttribute("loading"),
+        });
+        // Stash the original src so the HTML-snapshot path (which can run while
+        // blob: URLs are still live) can revert before serialization — the
+        // closure's `changed` array is not visible to that path; the dataset is.
+        if (useBlobURL && origSrc != null) {
+          try { img.dataset.fePrintOrigSrc = origSrc; } catch {}
+        }
+        img.removeAttribute("srcset");
+        img.setAttribute("src", imageUrl);
+      } catch {}
+    }
+  };
 
   // Process groups in parallel batches so multiple canvas.toBlob() calls are
   // in-flight simultaneously. Chromium encodes blobs on a worker thread, so
   // N parallel encodes take roughly max(individual times) instead of sum.
-  const ENCODE_CONCURRENCY = 6;
+  // Caller may lower this for huge logs to cap peak memory.
+  const ENCODE_CONCURRENCY = Math.max(1, Number(concurrency) || 6);
 
   const processGroup = async (g) => {
     try {
       if (!g.needsResample) return;
       const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
       if (!rep) return;
+      // Budget spent (HTML-embed path) → skip before the (expensive) resample,
+      // leaving this group at its original src.
+      if (maxTotalBytes > 0 && totalEncodedBytes >= maxTotalBytes) return;
       const outW = Math.max(1, Math.min(g.maxW, Math.round(g.maxW)));
       const outH = Math.max(1, Math.min(g.maxH, Math.round(g.maxH)));
       const spec = computeDrawSpec(rep, outW, outH);
-      const canvas = feProgressiveResampleCanvas(win, rep, spec, outW, outH, {
-        maxIntermediateSide: g.isAvatar ? Math.max(2048, Math.min(MAX_SIDE, 3072)) : Math.max(1536, Math.min(MAX_SIDE, 2560)),
-      });
+      // P5: prefer createImageBitmap's off-thread high-quality resize; fall back
+      // to the progressive canvas halving when unavailable or on failure.
+      let canvas = await feResampleViaImageBitmap(win, rep, spec, outW, outH);
+      if (!canvas) {
+        const baseIntermediate = g.isAvatar ? Math.max(2048, Math.min(MAX_SIDE, 3072)) : Math.max(1536, Math.min(MAX_SIDE, 2560));
+        canvas = feProgressiveResampleCanvas(win, rep, spec, outW, outH, {
+          maxIntermediateSide: intermediateCap > 0 ? Math.min(baseIntermediate, intermediateCap) : baseIntermediate,
+        });
+      }
       if (!canvas) return;
       const encodeOpts = {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
@@ -502,19 +599,25 @@ export async function feDownscaleImagesForPrint(
         forcePng: forceLossless,
       };
       let imageUrl = null;
+      let approxBytes = 0;
       if (useBlobURL) {
         const blob = await feEncodeCanvasToBlob(canvas, encodeOpts);
         if (blob) {
           imageUrl = winURL.createObjectURL(blob);
           createdBlobURLs.add(imageUrl);
+          approxBytes = blob.size || 0;
         }
       } else {
         imageUrl = await feCanvasToDataURL(canvas, encodeOpts);
+        // base64 data: URL ≈ 4/3 of the binary it encodes.
+        approxBytes = imageUrl ? Math.ceil(imageUrl.length * 0.75) : 0;
       }
       canvas.width = 0;
       canvas.height = 0;
       if (!imageUrl) return;
-      cache.set(g.key, imageUrl);
+      totalEncodedBytes += approxBytes;
+      // Swap + release this group's originals right away (see swapGroup).
+      swapGroup(g, imageUrl);
     } catch {
       // Ignore per-group failures.
     }
@@ -528,30 +631,7 @@ export async function feDownscaleImagesForPrint(
     await feNextTick();
   }
 
-  for (const g of groupList) {
-    const imageUrl = cache.get(g.key);
-    if (!imageUrl) continue;
-    for (const img of g.imgs) {
-      try {
-        const origSrc = img.getAttribute("src");
-        changed.push({
-          img,
-          src: origSrc,
-          srcset: img.getAttribute("srcset"),
-          loading: img.getAttribute("loading"),
-        });
-        // Stash the original src on a dataset attribute so the HTML snapshot
-        // path (which can run while blob: URLs are still live) can revert
-        // before serialization. The closure's `changed` array is not visible
-        // to that path; the dataset is.
-        if (useBlobURL && origSrc != null) {
-          try { img.dataset.fePrintOrigSrc = origSrc; } catch {}
-        }
-        img.removeAttribute("srcset");
-        img.setAttribute("src", imageUrl);
-      } catch {}
-    }
-  }
+  if (stats) stats.bytesUsed = totalEncodedBytes;
 
   return () => {
     for (let i = changed.length - 1; i >= 0; i -= 1) {

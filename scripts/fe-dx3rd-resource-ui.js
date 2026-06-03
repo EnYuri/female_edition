@@ -6,7 +6,8 @@
 // 채팅 토글: 전체 가시성 on/off — 카드 DOM은 유지하고 display만 변경.
 //
 // 레이아웃:
-//   · PC 외 액터(enemy 등) → #fe-dx3rd-rui-container     : 좌상단 기본, 세로 정렬
+//   · PC 외 액터(enemy 등) → #fe-dx3rd-rui-container     : 좌측 기본(left:8px), 세로 정렬
+//        - 기본 top은 PC 스테이터스(우상단) 바로 아래 높이 (_npcDefaultTop), PC 없으면 nav 아래
 //   · PC 액터(character)   → #fe-dx3rd-rui-container-own : 우상단 기본, 가로 정렬
 //   · 두 컨테이너 모두 드래그로 이동 가능 (위치 localStorage 저장)
 
@@ -330,6 +331,22 @@ function _navBottom() {
   return nav ? Math.round(nav.getBoundingClientRect().bottom) + 8 : 8;
 }
 
+// NPC(적/기타) 컨테이너 기본 top.
+// 씬 컨트롤 접힘으로 좌상단이 비어, NPC 스테이터스를 PC 스테이터스(우상단 가로
+// 컨테이너) 바로 아래 높이까지 끌어올린다. 좌우(left)는 그대로 8px 유지.
+// PC 카드가 있을 때만 PC 하단에 맞추고, 없으면 기존 nav 아래로 폴백.
+function _npcDefaultTop() {
+  const pc = document.getElementById(CONTAINER_OWN_ID);
+  const hasPcCards = pc && pc.querySelector(".fedr-actor-card");
+  if (hasPcCards) {
+    const r = pc.getBoundingClientRect();
+    // 보이는 상태면 실제 하단을, 숨김(display:none)이면 기본 top(8) + 카드 높이로 추정.
+    if (r.height > 0) return Math.round(r.bottom) + 8;
+    return 8 + _cardH() + 44;
+  }
+  return _navBottom();
+}
+
 function _getOrCreateContainer(id, posKey) {
   let el = document.getElementById(id);
   const isNew = !el;
@@ -353,7 +370,7 @@ function _getOrCreateContainer(id, posKey) {
       el.style.top   = "8px";
     } else {
       el.style.left = "8px";
-      el.style.top  = `${_navBottom()}px`;
+      el.style.top  = `${_npcDefaultTop()}px`;
     }
     _makeDraggable(el, posKey);
   }
@@ -402,11 +419,13 @@ function feRebuildDx3rdResourceUI() {
   const panelW = _panelW();
   const ch = _cardH();
 
-  const cntEnemies = _getOrCreateContainer(CONTAINER_ID, POS_KEY);
-  _syncContainerCards(cntEnemies, enemies, pw, panelW, ch);
-
+  // PC(우상단) 컨테이너를 먼저 빌드/배치해야 NPC 컨테이너 기본 top을
+  // PC 스테이터스 바로 아래로 계산할 수 있다 (_npcDefaultTop이 PC rect를 측정).
   const cntPcs = _getOrCreateContainer(CONTAINER_OWN_ID, POS_OWN_KEY);
   _syncContainerCards(cntPcs, pcs, pw, panelW, ch);
+
+  const cntEnemies = _getOrCreateContainer(CONTAINER_ID, POS_KEY);
+  _syncContainerCards(cntEnemies, enemies, pw, panelW, ch);
 
   _syncToggleBtn(_isGlobalOn());
 }

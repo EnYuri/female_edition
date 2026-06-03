@@ -50,6 +50,7 @@ const S = {
   PRUNE_MAX_MESSAGES: "cePruneMaxMessages",
   TYPING_ENABLED: "ceTypingEnabled",
   TYPING_SHOW_TO_PLAYERS: "ceTypingShowToPlayers",
+  SC_COLLAPSE_ENABLED: "ceSceneControlsCollapse",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -107,6 +108,7 @@ const FE_DEFAULTS = {
   [S.PRUNE_MAX_MESSAGES]: 50,
   [S.TYPING_ENABLED]: true,
   [S.TYPING_SHOW_TO_PLAYERS]: true,
+  [S.SC_COLLAPSE_ENABLED]: true,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -125,6 +127,8 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.PRUNE_ENABLED,
   S.PRUNE_MAX_MESSAGES,
   S.TYPING_ENABLED,
+  // Personal toolbar preference — each player decides; never GM-forced.
+  S.SC_COLLAPSE_ENABLED,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";

@@ -148,6 +148,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
       [S.UI_ENABLE_FONTS]:   feRead(S.UI_ENABLE_FONTS),
       [S.UI_HIDE_PORTRAITS]: feRead(S.UI_HIDE_PORTRAITS),
       [S.UI_STRIP_TEXTURES]: feRead(S.UI_STRIP_TEXTURES),
+      [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
 
       // Merge
       [S.MERGE_ENABLED]:               feRead(S.MERGE_ENABLED),
@@ -261,6 +262,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // World-scoped (GM-only) typing visibility — non-GMs lack write permission
         ...(game.user?.isGM ? [bool(S.TYPING_SHOW_TO_PLAYERS)] : []),
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
+        bool(S.SC_COLLAPSE_ENABLED),
 
         // Merge
         bool(S.MERGE_ENABLED), bool(S.MERGE_ONLY_TEXT), bool(S.MERGE_INCLUDE_ROLL_MESSAGES),

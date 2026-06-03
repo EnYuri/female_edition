@@ -498,6 +498,29 @@ async function feExportChatLogToPDFInline() {
   logEl.id = "fe-chat-export-log";
   logEl.innerHTML = "";
 
+  // Idempotent restore of the LIVE document (this fallback path mutates the live
+  // DOM directly, unlike the popup path). Defined here — before the try — so the
+  // catch handler can also reach it. Callable from afterprint, the post-print
+  // tick, the close button, and the catch; whichever fires first wins.
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    try { container.remove(); } catch {}
+    document.body.classList.remove("fe-print-chatlog");
+    document.body.classList.remove("fe-export-optimized");
+    htmlEl.style.overflow = prevHtmlOverflow;
+    htmlEl.style.height = prevHtmlHeight;
+    document.body.style.overflow = prevBodyOverflow;
+    document.body.style.height = prevBodyHeight;
+  };
+  // The container's built-in ✕ does only a partial teardown (container + one
+  // class); ensure the full idempotent cleanup also runs so overflow/height are
+  // always restored.
+  try {
+    container.querySelector(".fe-chat-export-close")?.addEventListener("click", cleanup);
+  } catch {}
+
   try {
     const liveMessageMap = feBuildLiveChatMessageElementMap();
     const messages = await feCollectVisibleChatMessages(game.user, {
@@ -571,37 +594,18 @@ async function feExportChatLogToPDFInline() {
 
     metaEl.textContent = "Opening print dialog…";
 
-    // Cleanup after printing; keep a close button as a fallback.
-    const cleanup = () => {
-      try {
-        container.remove();
-      } catch {}
-      document.body.classList.remove("fe-print-chatlog");
-      document.body.classList.remove("fe-export-optimized");
-
-      // Restore document sizing
-      htmlEl.style.overflow = prevHtmlOverflow;
-      htmlEl.style.height = prevHtmlHeight;
-      document.body.style.overflow = prevBodyOverflow;
-      document.body.style.height = prevBodyHeight;
-    };
-
-    const afterPrint = () => cleanup();
-    window.addEventListener("afterprint", afterPrint, { once: true });
-
+    window.addEventListener("afterprint", cleanup, { once: true });
     window.print();
-
-    // Some environments (Electron) don't always fire afterprint reliably.
-    // The close button remains available; also attempt a delayed cleanup if print returns immediately.
-    setTimeout(() => {
-      if (document.body.classList.contains("fe-print-chatlog") && !document.getElementById("fe-chat-export-container")) {
-        document.body.classList.remove("fe-print-chatlog");
-        document.body.classList.remove("fe-export-optimized");
-      }
-    }, 0);
+    // window.print() blocks in browsers until the dialog closes; some Electron
+    // builds return immediately and don't fire afterprint reliably. cleanup is
+    // idempotent, so a post-print tick guarantees the live document is restored
+    // even when afterprint never arrives.
+    setTimeout(cleanup, 0);
   } catch (err) {
     console.error(err);
     ui.notifications?.error("Chat log PDF export failed. Check the console for details.");
+    // Restore the live document even if we failed mid-export.
+    try { cleanup(); } catch {}
   }
 }
 
@@ -2000,43 +2004,18 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
       if (btnPrint.getAttribute("aria-disabled") === "true") return;
       try { win.focus(); } catch {}
       btnPrint.setAttribute("aria-disabled", "true");
-
-      const printMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
-
-      let restoreImages = () => {};
+      // Single unified print path. feArchivePrint handles the print image-mode
+      // classes (hideAll/hideAvatars), background-color freeze, profile-aware
+      // resolution/memory caps, font + image waits, downscale (blob URLs), and
+      // afterprint restore. (Previously this handler ran a separate, simpler
+      // downscale that ignored modes/freeze/quality settings.)
       try {
-        const printLogEl =
-          win.document.getElementById("fe-chat-export-log") ||
-          win.document.getElementById("chat-log") ||
-          win.document.querySelector("ol.chat-log");
-        // hideAll: CSS already hides every image; skip JS downscale entirely.
-        if (printLogEl && printMode !== "hideAll") {
-          setStatus("이미지 최적화 중…");
-          restoreImages = await feDownscaleImagesForPrint(win, printLogEl, {
-            meta: (t) => setStatus(t),
-            useBlobURL: true,
-            // hideAvatars: CSS hides portrait/avatar elements; exclude them from downscale too.
-            excludeAvatars: printMode === "hideAvatars",
-          });
-        }
+        await feArchivePrint(win);
       } catch (err) {
-        console.warn("female_edition | print image downscale failed", err);
-      }
-
-      let restored = false;
-      const onAfterPrint = () => {
-        if (restored) return;
-        restored = true;
-        try { restoreImages(); } catch {}
+        console.warn("female_edition | print failed", err);
+      } finally {
         try { btnPrint.removeAttribute("aria-disabled"); } catch {}
-      };
-      try { win.addEventListener("afterprint", onAfterPrint, { once: true }); } catch {}
-      // Also clean up if the window is closed before afterprint fires.
-      try { win.addEventListener("unload", onAfterPrint, { once: true }); } catch {}
-      // Electron may not fire afterprint reliably — release after 60 s.
-      setTimeout(onAfterPrint, 60_000);
-
-      win.print();
+      }
     });
 
   if (btnDownload)
@@ -2329,9 +2308,18 @@ async function feArchivePrint(win) {
   if (mode === "hideAll") restoreImages = tempDisableImages(() => true);
   else if (mode === "hideAvatars") restoreImages = tempDisableImages((img) => isAvatarImage(img));
 
+  // P2: images that never finished loading (slow / 404) are skipped by the
+  // downscaler and would otherwise be decoded at full resolution by the print
+  // engine — the main residual OOM source on huge logs. Blank those stragglers
+  // right before print (restored on afterprint). Set after downscale.
+  let restoreStragglers = () => {};
+
   const restoreOnce = () => {
     try {
       restoreDownscaledImages();
+    } catch {}
+    try {
+      restoreStragglers();
     } catch {}
     try {
       restoreImages();
@@ -2354,24 +2342,46 @@ async function feArchivePrint(win) {
     try {
       const mildDownscale = mode === "downscaleLite";
       setMeta(mildDownscale ? "Loading images… (품질 우선)" : "Loading images…");
-      fePrepareArchiveImagesForOutput(logEl);
-      const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.min(FE_EXPORT_WAIT_IMAGES_MAX, Math.max(160, renderProfile.initialImageWaitMax * 4)) });
+      // Originals are about to be replaced by downscaled blobs — skip the
+      // sync-decode storm (async lets Chromium decode off-thread).
+      fePrepareArchiveImagesForOutput(logEl, { decoding: "async" });
+      // Wait for ALL images to finish loading (bytes) — not a small initial
+      // slice. The downscaler skips images that aren't `complete`, so anything
+      // unloaded by now would slip through to print at full resolution. The
+      // `load` wait only pulls encoded bytes (decode stays lazy → no decode
+      // storm); the per-group canvas pass below decodes them under the
+      // concurrency cap. The 20 s timeout bounds genuinely slow/dead images,
+      // which the straggler-blank pass then neutralizes.
+      const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
+      const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount) });
       if (printImgTimeout > 0) console.warn(`female_edition | print: ${printImgTimeout} image(s) did not load within timeout`);
+      // Large/huge logs: shrink resolution caps so the pixels Chromium must
+      // rasterize into the PDF (and the decoded bitmaps it holds during
+      // win.print()) stay within memory. Print-time OOM scales with total
+      // pixel count, so we scale dimensions — never encoder quality.
+      const sizeFactor = renderProfile.huge ? 0.55 : renderProfile.large ? 0.78 : 1.0;
+      const capSide = (n) => Math.max(640, Math.round(n * sizeFactor));
+      const capDpr  = (n) => renderProfile.huge ? Math.min(n, 1.25)
+                           : renderProfile.large ? Math.min(n, 1.5)
+                           : n;
       restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
         meta: setMeta,
         excludeAvatars: mode === "hideAvatars",
         // downscaleLite: visually-lossless WebP/JPEG (~q0.95) sized for print.
         // PNG forcing was causing 5–10× PDF bloat with no perceivable benefit
         // for photo-like chat content (portraits, item icons).
-        dprCap: mildDownscale ? 2.0 : (isElectron ? 1.35 : 1.65),
+        dprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.35 : 1.65)),
         minDpr: mildDownscale ? 1.25 : (isElectron ? 1.1 : 1.25),
         webpQuality: mildDownscale ? 0.95 : (isElectron ? 0.85 : 0.88),
         jpegQuality: mildDownscale ? 0.95 : (isElectron ? 0.88 : 0.90),
-        avatarDprCap: mildDownscale ? 2.0 : (isElectron ? 1.5 : 1.6),
+        avatarDprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.5 : 1.6)),
         avatarMinDpr: mildDownscale ? 1.25 : 1.0,
         avatarWebpQuality: mildDownscale ? 0.92 : (isElectron ? 0.82 : 0.84),
         avatarJpegQuality: mildDownscale ? 0.92 : (isElectron ? 0.84 : 0.86),
-        maxSide: mildDownscale ? 2560 : (isElectron ? 1792 : 2048),
+        maxSide: capSide(mildDownscale ? 2560 : (isElectron ? 1792 : 2048)),
+        // Fewer simultaneous canvases on big logs → lower peak memory.
+        concurrency: renderProfile.huge ? 3 : renderProfile.large ? 4 : 6,
+        intermediateCap: renderProfile.huge ? 1536 : renderProfile.large ? 2048 : 0,
         forceLossless: false,
         minOutSide: mildDownscale ? 256 : 1,
         // Print path only — restore() revokes blob URLs on afterprint.
@@ -2386,6 +2396,21 @@ async function feArchivePrint(win) {
   if (!shouldDownscale && logEl) {
     try {
       fePrepareArchiveImagesForOutput(logEl);
+    } catch {}
+  }
+
+  // P2: blank any image that STILL hasn't loaded so the print engine can't
+  // decode it at full resolution mid-rasterization. Downscaled images carry
+  // small blob:/data: sources (and may be transiently !complete right after the
+  // swap), so they are explicitly excluded — only unresolved remote sources are
+  // neutralized. Restored on afterprint via restoreStragglers.
+  if (logEl && mode !== "hideAll") {
+    try {
+      restoreStragglers = tempDisableImages((img) => {
+        if (img.complete) return false;
+        const s = img.getAttribute("src") || "";
+        return !(s.startsWith("blob:") || s.startsWith("data:"));
+      });
     } catch {}
   }
 
@@ -2550,11 +2575,49 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       try {
         setMeta("Embedding images…");
         const prepRestore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
-        const embedRestore = await feEmbedImagesInNode(doc.body, { meta: setMeta });
+        // P4: downscale images to small data: URLs BEFORE embedding. feEmbedImagesInNode
+        // skips anything already `data:`, so this both shrinks the embedded payload
+        // (far more images fit under the byte budget → better offline fidelity) and
+        // cuts the saved-file size. maxTotalBytes guards against ballooning the HTML;
+        // groups beyond the budget keep their original src and fall through to the
+        // remote/embed path below. useBlobURL:false → real data: URLs that serialize.
+        // Shared image-byte budget for the saved HTML. Pre-embed downscaling
+        // spends part of it (dsStats.bytesUsed); feEmbedImagesInNode gets only
+        // what's left so downscaled + leftover-embedded images never exceed it.
+        const HTML_EMBED_TOTAL_BYTES = 12_000_000;
+        const dsStats = {};
+        let downscaleRestore = () => {};
+        try {
+          const embedLogEl = doc.getElementById("fe-chat-export-log") || doc.getElementById("chat-log") || doc.querySelector("ol.chat-log");
+          if (embedLogEl) {
+            downscaleRestore = await feDownscaleImagesForPrint(win, embedLogEl, {
+              meta: setMeta,
+              useBlobURL: false,
+              maxTotalBytes: HTML_EMBED_TOTAL_BYTES,
+              stats: dsStats,
+              dprCap: 1.5,
+              minDpr: 1.0,
+              webpQuality: 0.85,
+              jpegQuality: 0.88,
+              avatarDprCap: 1.5,
+              avatarWebpQuality: 0.82,
+              avatarJpegQuality: 0.84,
+              maxSide: 1600,
+              concurrency: 4,
+            });
+          }
+        } catch (e) {
+          console.warn("female_edition | HTML export: pre-embed downscale failed", e);
+        }
+        const embedRestore = await feEmbedImagesInNode(doc.body, {
+          meta: setMeta,
+          maxTotalBytes: Math.max(0, HTML_EMBED_TOTAL_BYTES - (dsStats.bytesUsed || 0)),
+        });
         try {
           bodyParts = feSerializeBodyToParts(doc.body);
         } finally {
           try { embedRestore?.(); } catch {}
+          try { downscaleRestore?.(); } catch {}
           try { prepRestore?.(); } catch {}
         }
       } catch (err) {
@@ -3014,7 +3077,7 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
 //                                      font-family patch, font-ready bootstrap)
 // ===========================================================================
 
-async function feEmbedImagesInNode(root, { meta } = {}) {
+async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
   const setMeta = typeof meta === "function" ? meta : () => {};
 
   // Track per-img mutations so the caller can restore the live DOM after serialization.
@@ -3060,7 +3123,9 @@ async function feEmbedImagesInNode(root, { meta } = {}) {
   // Single-file HTML + embedded images can easily crash Chromium/Electron (STATUS_BREAKPOINT / OOM)
   // due to base64 expansion + JS string memory overhead.
   const MAX_IMAGES = 160;
-  const MAX_TOTAL_BYTES = 12_000_000; // ~12MB (binary) before base64/string expansion
+  // ~12MB (binary) before base64/string expansion. Caller may pass a smaller cap
+  // (shared budget) — e.g. after pre-embed downscaling already spent part of it.
+  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 12_000_000;
   const MAX_PER_IMAGE = 800_000;      // ~0.8MB per image
 
   const cache = new Map();
@@ -3849,7 +3914,7 @@ function feNormalizeArchiveShellLayout(doc, { restore = false } = {}) {
   };
 }
 
-function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true } = {}) {
+function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true, decoding = "sync" } = {}) {
   try {
     if (!rootEl?.querySelectorAll) return;
     if (restorePortraits) {
@@ -3857,11 +3922,21 @@ function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true } = {
         feRestoreOriginalPortraitSources(rootEl);
       } catch {}
     }
+    // decoding:
+    //  · "sync"  — originals will be printed as-is; force decode before win.print().
+    //  · "async" — originals are about to be replaced by downscaled blobs, so a
+    //              main-thread sync-decode storm is pure waste (and jank on large
+    //              logs). Let Chromium decode off-thread; canvas drawImage still
+    //              forces the decode it actually needs, one group at a time.
+    const wantSync = decoding !== "async";
     for (const img of rootEl.querySelectorAll("img")) {
       try {
         img.setAttribute("loading", "eager");
-        if (!img.getAttribute("decoding") || img.getAttribute("decoding") === "async") {
-          img.setAttribute("decoding", "sync");
+        const cur = img.getAttribute("decoding");
+        if (wantSync) {
+          if (!cur || cur === "async") img.setAttribute("decoding", "sync");
+        } else if (cur === "sync") {
+          img.setAttribute("decoding", "async");
         }
       } catch {
         /* no-op */

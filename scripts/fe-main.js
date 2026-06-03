@@ -26,3 +26,4 @@ import "./fe-chat-images.js";
 // Data injections
 import "./inject-conditions.js";
 import "./inject-damage-type.js";
+import "./fe-scene-controls-collapse.js";

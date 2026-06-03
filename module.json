@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "authors": [
     {
       "name": "nayuri",
@@ -24,6 +24,7 @@
     "scripts/fe-theatre.js",
     "scripts/fe-typing-indicator.js",
     "scripts/fe-chat-controls-menu.js",
+    "scripts/fe-scene-controls-collapse.js",
     "scripts/fe-settings-menu.js"
   ],
   "styles": [
@@ -41,7 +42,8 @@
     "styles/fe-image-hover.css",
     "styles/fe-theatre.css",
     "styles/fe-typing-indicator.css",
-    "styles/fe-chat-controls-menu.css"
+    "styles/fe-chat-controls-menu.css",
+    "styles/fe-scene-controls-collapse.css"
   ],
   "socket": true,
   "languages": [
