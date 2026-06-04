@@ -196,6 +196,59 @@
   scrollbar-color: rgba(255,255,255,0.12) transparent;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   비-픽셀(일반) 테마 — 원본 Theatre Inserts 풍 외형
+   · 대각 줄무늬 픽셀 테두리 제거 → 심플 둥근 어두운 말풍선
+   · 테두리에 걸친 이름 숨김 → 포트레이트 하단에 큰 이름
+   픽셀 테마(body.fe-dx3rd-pixel-theme)에는 미적용 = 기존 줄무늬 유지.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 줄무늬 테두리 제거 */
+body:not(.fe-dx3rd-pixel-theme) .fe-stage-textbox::before {
+  display: none;
+}
+
+/* 심플 둥근 어두운 말풍선 (이름이 테두리에 안 걸치므로 상단 패딩 축소) */
+body:not(.fe-dx3rd-pixel-theme) .fe-stage-textbox {
+  background: rgba(10, 11, 16, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 16px 18px 14px;
+}
+
+/* 위쪽 삼각 꼬리 — 말풍선 배경색에 맞춤 */
+body:not(.fe-dx3rd-pixel-theme) .fe-stage-textbox::after {
+  border-bottom-color: rgba(10, 11, 16, 0.92);
+}
+
+/* 테두리에 걸친 이름 숨김 */
+body:not(.fe-dx3rd-pixel-theme) .fe-stage-textbox-name {
+  display: none;
+}
+
+/* 포트레이트 하단에 큰 이름 (원본 Theatre Inserts 라벨 느낌) */
+body:not(.fe-dx3rd-pixel-theme) .fe-stage-label {
+  display: block;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 100%;
+  padding: 2px 12px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f4f4f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 3px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+  z-index: 3;
+}
+
 /* ── Nav bar (speak-as dropdown above chat input) ─────────────── */
 
 #fe-stage-nav {
@@ -213,6 +266,12 @@
   min-width: 0;
   height: 26px;
   padding: 2px 6px;
+  /* Foundry core foundry2.css sets `select { line-height: var(--input-height) }`
+     (= 32px). Left un-overridden, that 32px line box overflows this 26px-tall
+     control and the selected-value text sinks to the bottom in Chromium builds
+     that position the native select value by line-height. Reset to the control's
+     own metrics so the value stays vertically centered. */
+  line-height: normal;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 5px;

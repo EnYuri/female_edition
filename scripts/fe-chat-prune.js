@@ -58,6 +58,18 @@ export function feInstallChatLogPrune() {
 
     async scrollBottom(opts = {}) {
       if (!this.rendered) return;
+      // CRITICAL: if the newest tail was pruned (#fwdPruned), the DOM's last child
+      // is NOT the true newest message. Foundry calls scrollBottom for the
+      // jump-to-bottom button, auto-follow on new messages, sticky-scroll restore,
+      // etc. Naively scrolling the incomplete DOM (the old behavior) leaves an OLD
+      // message stuck at the bottom while the newest is missing — the reported
+      // "newest disappears, old message at the bottom" bug. Reconcile by reloading
+      // the newest contiguous window so "scroll to bottom" actually shows the latest.
+      // (#goLive resets #fwdPruned then calls scrollBottom again → normal path; no recursion.)
+      if (this.#fwdPruned && !this.#domTailIsNewest()) {
+        await this.#goLive();
+        return;
+      }
       // Record newest rendered ID before delegating to Foundry
       const last = this.element?.querySelector(".chat-log")?.lastElementChild;
       if (last?.dataset?.messageId) {
@@ -83,10 +95,68 @@ export function feInstallChatLogPrune() {
       await this.#sem.add(() => this.#doRenderBatchFwd(count ?? bs()));
     }
 
-    // Guard against updates for messages that are currently pruned from DOM
+    // Guard against updates for messages that are currently pruned from DOM.
+    // Core #updateMessage re-posts a message that is NOT in the DOM (e.g. one that
+    // just became visible) via #postOne with a `before` id. While the tail is
+    // forward-pruned, that `before` element may be absent → base falls back to
+    // `log.append`, recreating the same non-contiguous gap as postOne. If the
+    // message is already in the DOM this is just an in-place content edit (safe).
     async updateMessage(message, options = {}) {
       if (!this.element) return;
+      if (this.#fwdPruned && message?.visible && !this.#domTailIsNewest()) {
+        const inDom = this.element.querySelector(`.chat-log [data-message-id="${message.id}"]`);
+        if (!inDom) return; // skip the gap-creating re-post; forward-scroll renders it in order
+      }
       return super.updateMessage(message, options);
+    }
+
+    // Post a single new message. CRITICAL ordering guard.
+    //
+    // When the newest tail has been pruned from the DOM (user scrolled up →
+    // #pruneNewest set #fwdPruned, #newestId = M = some OLD boundary message),
+    // the DOM no longer contains the true latest messages. Foundry's base
+    // #postOne places an incoming message by timestamp relative to the DOM
+    // children: since the DOM tail M is older than the new message, it appends
+    // the new message right after M. That leaves the DOM NON-CONTIGUOUS — there
+    // is now a gap between M and the freshly-appended newest message.
+    //
+    // The forward-render path (#doRenderBatchFwd) assumes a contiguous
+    // [#firstId .. #newestId] window: it walks game.messages forward from
+    // #newestId (= M) and `log.append`s the in-between messages to the bottom.
+    // Because the new message already sits at the bottom (and was never recorded
+    // in #renderedIds), those older in-between messages get appended BELOW it and
+    // the new message is rendered a SECOND time → old-below-new reordering and
+    // duplicates. This is the "chat shuffling" regression.
+    //
+    // Fix: never let a new message land after the pruned boundary. If the user is
+    // following the bottom (or it's their own message), rebuild the newest
+    // contiguous window (#goLive). Otherwise keep their scrolled-up window intact
+    // and let the forward-render path render the message in order when they scroll
+    // down — only surfacing the unread notification now.
+    async postOne(message, options = {}) {
+      try {
+        if (this.#fwdPruned && message?.visible) {
+          if (this.#domTailIsNewest()) {
+            // Flag was stale (DOM tail is already the newest) — safe to append.
+            this.#fwdPruned = false;
+          } else {
+            const follow = this.isAtBottom || (message?.author?.id === game.user?.id);
+            if (follow) {
+              await this.#goLive();
+            } else {
+              try { this.notify(message, { newMessage: true }); } catch { /* no-op */ }
+              if (this.popout?.rendered) {
+                try { this.popout.postOne(message, { ...options, notify: false }); } catch { /* no-op */ }
+              }
+            }
+            return;
+          }
+        }
+        return super.postOne(message, options);
+      } catch (err) {
+        Hooks.onError?.("FeChatLogPrune.postOne", err, { msg: `Chat message ${message?.id} failed to post`, log: "error" });
+        try { return super.postOne(message, options); } catch { /* no-op */ }
+      }
     }
 
     // Extend the scroll listener to trigger forward re-render when at the bottom
@@ -308,6 +378,48 @@ export function feInstallChatLogPrune() {
     }
 
     // ── Private: utilities ───────────────────────────────────────────────────
+
+    // True when the DOM's last chat message is the newest visible message overall
+    // — i.e. there is NO forward gap, so a normal tail-append is safe. Used to
+    // detect a stale #fwdPruned flag in postOne.
+    #domTailIsNewest() {
+      try {
+        const log = this.element?.querySelector(".chat-log");
+        const lastId = log?.lastElementChild?.dataset?.messageId;
+        if (!lastId) return false;
+        const all = game.messages?.contents;
+        if (!all?.length) return false;
+        for (let i = all.length - 1; i >= 0; i--) {
+          if (all[i].visible) return all[i].id === lastId;
+        }
+        return false;
+      } catch { return false; }
+    }
+
+    // Discard the current (scrolled-up) window and repopulate from the newest end,
+    // then pin to the bottom. Used when a new message arrives while the tail is
+    // forward-pruned and the user is following live (at bottom / own message), so
+    // the message is shown in correct order without recreating a non-contiguous gap.
+    async #goLive() {
+      try {
+        const log = this.element?.querySelector(".chat-log");
+        if (!log) return;
+        // Bypass the per-direction busy guards (we are intentionally re-seeding).
+        this.#busyBack = false;
+        this.#busyFwd  = false;
+        // Reset state + clear + repopulate atomically inside the render semaphore so
+        // it cannot interleave with a concurrent backward/forward batch render.
+        await this.#sem.add(() => {
+          this.#renderedIds.clear();
+          this.#firstId   = undefined;   // → #doRenderBatch loads from the newest end
+          this.#newestId  = undefined;
+          this.#fwdPruned = false;
+          for (const el of Array.from(log.querySelectorAll("li.chat-message"))) el.remove();
+          return this.#doRenderBatch(bs());
+        });
+        await this.scrollBottom();
+      } catch { /* no-op */ }
+    }
 
     // True when there are visible messages after #newestId that are not in DOM
     #hasForwardMessages() {

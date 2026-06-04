@@ -160,12 +160,28 @@ body.fe-fonts-enabled {
   --font-h5:        var(--fe-font-primary);
   --font-h6:        var(--fe-font-primary);
   --font-monospace: var(--fe-ui-font-family);
+  /* blockquote — 코어가 --font-blockquote(기본 Signika/Palatino)를 blockquote 에
+     직접 지정하므로 이 변수를 빼면 인용문만 커스텀 폰트(그림일기/NeoDGM)가 안 먹는다. */
+  --font-blockquote: var(--fe-font-primary);
 
   /* dnd5e 폰트 변수 재정의 */
   --dnd5e-font-roboto:      var(--fe-font-primary);
   --dnd5e-font-roboto-slab: var(--fe-font-primary);
   --dnd5e-font-signika:     var(--fe-font-primary);
   --dnd5e-font-modesto:     var(--fe-font-primary);
+}
+
+/* Foundry 코어는 @layer variables.base 의 `body.game .app` 에서 --font-primary 를
+   Signika 로 다시 선언한다. 이 선언이 .app 요소 "자신"에 직접 걸리므로, 위의
+   body 레벨 오버라이드가 .app 내부 자손으로 상속되지 못하고 가려진다.
+   특히 코어 `body.game .app h1..h6 { font-family: var(--font-primary) }`(특정도
+   0,2,3)가 헤딩을 Signika 로 되돌려, DX3rd 시트의 h4 등이 커스텀 폰트 대신
+   Signika 로 표시됐다(--font-h4 는 코어가 .app 에서 재선언 안 해 NeoDGM 유지되지만,
+   헤딩 규칙이 --font-h4 가 아니라 --font-primary 를 쓰는 게 함정).
+   → .app/.application 스코프에도 재선언해 관통시킨다(특정도 0,3,0 > 코어 0,2,0,
+     ui-font.css 는 비-레이어라 일반 선언이 코어 레이어보다 우선). */
+body.fe-fonts-enabled :is(.app, .application) {
+  --font-primary: var(--fe-font-primary);
 }
 
 /* 채팅 폰트 선택 (모듈 설정) */

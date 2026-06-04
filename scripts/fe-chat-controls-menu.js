@@ -56,9 +56,53 @@ function feCtrlAddDocListener() {
   }, { capture: true });
 }
 
+// True when #chat-controls is currently relocated into the popped-out quick-reply
+// dock (#chat-notifications), shown when the sidebar is on a non-chat tab. In that
+// state we keep everything native and hide our injected widgets via CSS.
+function feControlsInNotifications(controls) {
+  return !!controls?.closest?.("#chat-notifications");
+}
+
+// Synchronously reconcile #chat-controls collapse state with its current location:
+//   sidebar      → collapse (hide raw controls; our hamburger menu shows)
+//   popped dock  → native (un-collapse; our widgets hidden by CSS)
+// Called from the render hooks so the state is correct immediately, before the
+// debounced rebuild runs (prevents a flash of the wrong layout).
+function feMarkActiveIfSidebar() {
+  const controls = document.querySelector("#chat-controls");
+  if (!controls) return;
+  if (feControlsInNotifications(controls)) feUncollapseCtrlMenu(controls);
+  else controls.classList.add(FE_CTRL_ACTIVE_CLS);
+}
+
+// Restore #chat-controls to its native (un-collapsed) state: drop the active class
+// and move the NATIVE controls (message-modes / control-buttons) collected into our
+// panel back into #chat-controls so the native quick-reply bar works. Our own widgets
+// (export, image upload, RUI toggle) stay in the hidden panel so the popped-out dock
+// isn't cluttered. Used when the block is relocated into the notification dock.
+function feUncollapseCtrlMenu(controls) {
+  controls.classList.remove(FE_CTRL_ACTIVE_CLS);
+  const panel = document.getElementById(FE_CTRL_PANEL_ID);
+  if (!panel) return;
+  const wrapper = document.getElementById(FE_CTRL_WRAPPER_ID);
+  const ref = (wrapper && wrapper.parentElement === controls) ? wrapper : null;
+  for (const el of Array.from(panel.children)) {
+    if (el.matches?.("#message-modes, .control-buttons")) {
+      try { controls.insertBefore(el, ref); } catch { /* no-op */ }
+    }
+  }
+}
+
 function feRebuildCtrlMenu() {
   const controls = document.querySelector("#chat-controls");
   if (!controls) return;
+
+  // Popped-out quick-reply dock (#chat-notifications): keep it fully native and let
+  // CSS hide our injected widgets. Our menu/panels operate only in the sidebar tab.
+  if (feControlsInNotifications(controls)) {
+    feUncollapseCtrlMenu(controls);
+    return;
+  }
 
   // Mark immediately so CSS hides the raw controls (prevents flash).
   controls.classList.add(FE_CTRL_ACTIVE_CLS);
@@ -133,21 +177,18 @@ function feScheduleCtrlMenuRebuild(delay = 80) {
 Hooks.on("renderChatInput", () => {
   // Add class synchronously to suppress the native controls via CSS immediately,
   // then rebuild after archive/images scripts have had time to inject their buttons.
-  const controls = document.querySelector("#chat-controls");
-  if (controls) controls.classList.add(FE_CTRL_ACTIVE_CLS);
+  feMarkActiveIfSidebar();
   feScheduleCtrlMenuRebuild(200);
 });
 
 // v13 / fallback: rebuild when chat log renders or sidebar activates.
 // Also suppress raw controls immediately (like renderChatInput does) to prevent PDF-button flash.
 Hooks.on("renderChatLog", () => {
-  const controls = document.querySelector("#chat-controls");
-  if (controls) controls.classList.add(FE_CTRL_ACTIVE_CLS);
+  feMarkActiveIfSidebar();
   feScheduleCtrlMenuRebuild(200);
 });
 Hooks.on("activateChatLog", () => {
-  const controls = document.querySelector("#chat-controls");
-  if (controls) controls.classList.add(FE_CTRL_ACTIVE_CLS);
+  feMarkActiveIfSidebar();
   feScheduleCtrlMenuRebuild(200);
 });
 
@@ -155,13 +196,11 @@ Hooks.on("activateChatLog", () => {
 // Apply the active class synchronously so CSS hides raw controls before inject timers fire.
 const _FE_CTRL_MENU_MODULE_ID = "female_edition";
 Hooks.on(`${_FE_CTRL_MENU_MODULE_ID}.chatUiUpdated`, () => {
-  const controls = document.querySelector("#chat-controls");
-  if (controls) controls.classList.add(FE_CTRL_ACTIVE_CLS);
+  feMarkActiveIfSidebar();
   feScheduleCtrlMenuRebuild(200);
 });
 
 Hooks.once("ready", () => {
-  const controls = document.querySelector("#chat-controls");
-  if (controls) controls.classList.add(FE_CTRL_ACTIVE_CLS);
+  feMarkActiveIfSidebar();
   feScheduleCtrlMenuRebuild(600);
 });

@@ -407,7 +407,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
 
 // 전체 재빌드 — 핀된 액터 목록 기준으로 양쪽 컨테이너 동기화.
 function feRebuildDx3rdResourceUI() {
-  if (!_isDx3rd() || !_isThemeOn()) {
+  if (!_isDx3rd()) {
     document.getElementById(CONTAINER_ID)?.remove();
     document.getElementById(CONTAINER_OWN_ID)?.remove();
     _syncToggleBtn(false);
@@ -432,7 +432,7 @@ function feRebuildDx3rdResourceUI() {
 
 // 단일 액터 데이터 갱신 — 핀된 액터의 HP·침식률 업데이트.
 function feUpdateDx3rdResourceUI(actorId) {
-  if (!_isDx3rd() || !_isThemeOn()) return;
+  if (!_isDx3rd()) return;
 
   const actor = game.actors?.get(actorId);
   if (!actor || !_isActorPinned(actor)) return;
@@ -454,7 +454,7 @@ function feUpdateDx3rdResourceUI(actorId) {
 // ─── per-actor pin toggle ──────────────────────────────────────────────────
 
 function _addActorCard(actor) {
-  if (!_isDx3rd() || !_isThemeOn()) return;
+  if (!_isDx3rd()) return;
   const posKey = _isPC(actor) ? POS_OWN_KEY : POS_KEY;
   const cntId  = _isPC(actor) ? CONTAINER_OWN_ID : CONTAINER_ID;
   const cnt    = _getOrCreateContainer(cntId, posKey);
@@ -513,7 +513,12 @@ function _setAccent(color) {
 }
 
 function _injectAccentBtn() {
-  if (!_isDx3rd() || !_isThemeOn() || !game.user?.isGM) return;
+  // 액센트 색 선택기는 픽셀 테마 전용(비-픽셀엔 액센트 오버라이드가 없음).
+  // 테마가 꺼졌으면 이미 주입된 버튼을 제거하고 빠진다.
+  if (!_isDx3rd() || !_isThemeOn() || !game.user?.isGM) {
+    document.getElementById(ACCENT_BTN_ID)?.remove();
+    return;
+  }
   if (document.getElementById(ACCENT_BTN_ID)) return;
 
   const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
@@ -569,7 +574,7 @@ function _applyVisibility(visible) {
 }
 
 function _injectChatBtn() {
-  if (!_isDx3rd() || !_isThemeOn()) return;
+  if (!_isDx3rd()) return;
   if (document.getElementById(BTN_ID)) return;
 
   const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
@@ -599,13 +604,14 @@ function _injectChatBtn() {
 function _ruiContextEntry(html, options) {
   if (!_isDx3rd()) return;
   if (options.some(o => o.name === "스테이터스 토글")) return;
-  options.push({
+  const item = {
     name: "스테이터스 토글",
     icon: '<i class="fas fa-eye"></i>',
     condition: li => {
       const el = li instanceof jQuery ? li[0] : li;
       const id = el?.dataset?.documentId ?? el?.dataset?.entryId ?? el?.dataset?.actorId;
-      return !!id;
+      // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+      return !!game.actors.get(id)?.isOwner;
     },
     callback: li => {
       const el = li instanceof jQuery ? li[0] : li;
@@ -613,7 +619,22 @@ function _ruiContextEntry(html, options) {
       const actor = id ? game.actors.get(id) : null;
       if (actor) _toggleActorPin(actor);
     },
-  });
+  };
+  // "편집"(SIDEBAR.Edit) 아래 무대 항목 그룹 끝에 합류시킨다(맨 아래 push 금지).
+  // 무대 항목(fe-theatre)이 이미 있으면 그 그룹 끝, 없으면(훅 실행 순서상 theatre
+  // 미실행) "편집" 바로 아래. 두 훅 중 무엇이 먼저 실행돼도 최종 순서는
+  // [편집, 무대에 추가/제거, 무대 설정, 스테이터스 토글] 으로 수렴한다.
+  let at = -1;
+  for (let i = 0; i < options.length; i++) {
+    if (typeof options[i]?.name === "string" && options[i].name.startsWith("무대")) at = i;
+  }
+  if (at < 0) {
+    const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+    at = options.findIndex(o =>
+      o?.label === "SIDEBAR.Edit" || o?.name === "SIDEBAR.Edit" ||
+      o?.label === editLabel       || o?.name === editLabel);
+  }
+  options.splice(at + 1, 0, item);
 }
 
 Hooks.on("getActorContextOptions",     _ruiContextEntry);

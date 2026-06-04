@@ -963,17 +963,25 @@ function _fetGetActorIdFromLi(li) {
 }
 
 function _fetRegisterContextOptions(_html, options) {
-  if (!_fetEnabled) return;
+  // 주의: 여기서 _fetEnabled 로 early-return 하면 안 된다. 디렉터리 컨텍스트
+  // 메뉴는 사이드바 최초 렌더(= ready 이전)에 "한 번만"(fixed) 빌드되는데,
+  // _fetEnabled 는 ready 의 _fetLoadSettings() 에서야 설정된다. 빌드 시점엔 아직
+  // false 라 early-return 하면 항목이 영영 메뉴에 안 들어간다(메뉴는 재빌드 X).
+  // → 활성 여부는 각 항목 condition(우클릭마다 재평가, ready 이후)에서 검사한다.
   // Guard against both hooks firing simultaneously (V13 + V14 compat shim)
   if (options.some((o) => o.name === "무대에 추가")) return;
 
-  options.push(
+  // 무대 추가/제거 — "편집"(SIDEBAR.Edit) 항목 바로 아래에 끼워 넣는다.
+  const stageItems = [
     {
       name: "무대에 추가",
       icon: '<i class="fas fa-theater-masks"></i>',
       condition: (li) => {
+        if (!_fetEnabled) return false;
         const id = _fetGetActorIdFromLi(li);
-        return !!id && !_fet.inserts.has(_FET_ID_PREFIX + id);
+        // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+        if (!id || !game.actors.get(id)?.isOwner) return false;
+        return !_fet.inserts.has(_FET_ID_PREFIX + id);
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
@@ -984,24 +992,38 @@ function _fetRegisterContextOptions(_html, options) {
       name: "무대에서 제거",
       icon: '<i class="fas fa-door-open"></i>',
       condition: (li) => {
+        if (!_fetEnabled) return false;
         const id = _fetGetActorIdFromLi(li);
-        return !!id && _fet.inserts.has(_FET_ID_PREFIX + id);
+        // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+        if (!id || !game.actors.get(id)?.isOwner) return false;
+        return _fet.inserts.has(_FET_ID_PREFIX + id);
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetRemoveInsert(_FET_ID_PREFIX + id);
       },
     },
+    // 무대 설정(GM 전용)도 무대 항목 그룹으로 묶어 "편집" 아래에 함께 배치.
     {
       name: "무대 설정",
       icon: '<i class="fas fa-cog"></i>',
-      condition: (li) => game.user.isGM && !!_fetGetActorIdFromLi(li),
+      condition: (li) => _fetEnabled && game.user.isGM && !!_fetGetActorIdFromLi(li),
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetOpenActorConfig(id);
       },
-    }
-  );
+    },
+  ];
+
+  // 코어 "편집" 항목의 인덱스를 찾는다. v14 코어는 `label: "SIDEBAR.Edit"`(미지역화
+  // 키), v13/일부 모듈은 `name`을 쓰고 훅 시점에 이미 지역화돼 있을 수 있어
+  // 키·지역화 문자열 양쪽을 모두 매칭한다. 못 찾으면 맨 위로 폴백.
+  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+  const isEdit = (o) =>
+    o?.label === "SIDEBAR.Edit" || o?.name === "SIDEBAR.Edit" ||
+    o?.label === editLabel       || o?.name === editLabel;
+  const editIdx = options.findIndex(isEdit);
+  options.splice(editIdx >= 0 ? editIdx + 1 : 0, 0, ...stageItems);
 }
 
 // V13 hook name

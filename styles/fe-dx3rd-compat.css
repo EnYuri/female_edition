@@ -847,6 +847,76 @@ body.fe-dx3rd-pixel-theme #sidebar-content::after {
 }
 
 /* ══════════════════════════════════════════════════════════════
+ * § 17-b  비-픽셀(일반) 테마 상태 UI — FVTT 네이티브 톤 · 둥근 패널
+ *
+ *  §17의 구조 규칙(position·flex·크기)은 그대로 공유하고, 여기서는
+ *  색·테두리·폰트·픽셀 장식만 재정의한다(override 방식 — 픽셀 규칙 무변).
+ *  --fe-ac-* 는 픽셀 테마 블록(§30) 전용이라 비-픽셀에선 미정의 →
+ *  이 블록은 FVTT 토큰 + 구체 폴백색만 사용해 깨진 var 가 없게 한다.
+ *  (컨테이너는 .app 바깥(body 직속)이라 FVTT 토큰이 상속 안 될 수 있어
+ *   폴백값이 곧 실제 적용색이 되도록 FVTT 팔레트에 맞춰 지정.)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* 픽셀 보더 장식(::before 액센트 백드롭 / ::after border-image) 제거 */
+body:not(.fe-dx3rd-pixel-theme) .fedr-actor-card::before,
+body:not(.fe-dx3rd-pixel-theme) .fedr-actor-card::after {
+  display: none !important;
+}
+
+/* 카드 — 둥근 어두운 패널 + 은은한 외곽선 */
+body:not(.fe-dx3rd-pixel-theme) .fedr-actor-card {
+  background:    rgba(20, 21, 26, 0.92);
+  border:        1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  box-shadow:    0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* 내부 본체 — 카드 곡률에 맞춰 포트레이트/패널 클립 (이미 overflow:hidden) */
+body:not(.fe-dx3rd-pixel-theme) .fedr-card-body {
+  border-radius: 7px;
+}
+
+/* 포트레이트 구분선 — 은은하게 */
+body:not(.fe-dx3rd-pixel-theme) .fedr-portrait-wrap {
+  border-right: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* 이름 — FVTT 밝은 텍스트색, 시스템 폰트, 반투명 backing */
+body:not(.fe-dx3rd-pixel-theme) .fedr-name {
+  color:         var(--color-text-light-highlight, #f0f0e0);
+  background:    rgba(16, 17, 22, 0.95);
+  font-family:   inherit;
+  border-radius: 3px;
+}
+
+/* 자원 바 트랙 */
+body:not(.fe-dx3rd-pixel-theme) .fedr-bar {
+  background:    rgba(0, 0, 0, 0.35);
+  border:        1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 3px;
+}
+
+/* 채움 — 저채도 의미색 (HP 감소 시 채워짐 = 적색, 침식률 상승 = 청보라) */
+body:not(.fe-dx3rd-pixel-theme) .fedr-hp  .fedr-fill { background: #b06a6a; }
+body:not(.fe-dx3rd-pixel-theme) .fedr-enc .fedr-fill { background: #6a7fb0; }
+
+/* 수치 텍스트 — FVTT 톤, 시스템 폰트 */
+body:not(.fe-dx3rd-pixel-theme) .fedr-label-key,
+body:not(.fe-dx3rd-pixel-theme) .fedr-label {
+  color:       var(--color-text-light-primary, #c9c7b8);
+  font-family: inherit;
+}
+
+/* "스테이터스" 토글 버튼 — 액센트 변수 대신 중립색 */
+body:not(.fe-dx3rd-pixel-theme) .fe-dx3rd-rui-toggle {
+  color: rgba(220, 220, 220, 0.45);
+}
+body:not(.fe-dx3rd-pixel-theme) .fe-dx3rd-rui-toggle.fe-dx3rd-rui-active,
+body:not(.fe-dx3rd-pixel-theme) .fe-dx3rd-rui-toggle:hover {
+  color: var(--color-text-light-highlight, #f0f0e0) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
  * § 18  드롭다운 · 컨텍스트 메뉴 · 툴팁 — 픽셀 외각선
  *        검정 배경 + 액센트 1px 내선 + 검정 1px 외선
  *        hover: 반전(흰 배경 + 검정 글씨)
@@ -983,12 +1053,17 @@ body.fe-dx3rd-pixel-theme .fe-stage-textbox::after {
   box-sizing: border-box !important;
   pointer-events: none !important;
   z-index: 0 !important;
-  /* 삼각 꼬리 속성 완전 초기화 */
+  /* 삼각 꼬리 속성 완전 초기화 — 단, left 는 inset:-10px 값을 다시 못박는다.
+     기존 삼각 꼬리 ::after 의 `left:70px` 를 풀려고 `left:auto` 를 쓰면, 같은
+     블록 내 뒤 선언이라 inset 의 left:-10px 를 덮어쓴다. content 가 빈 채로
+     left:auto + right:-10px 가 되면 ::after 가 border 폭(20px)으로 shrink-to-fit
+     되어 우측 20px 띠로 붕괴 → 픽셀 테두리가 오른쪽에만 보였다(나머지 3변은
+     ::before accent 백드롭만 노출). left 를 -10px 로 명시해 4변 전체 커버. */
   border: 10px solid transparent !important;
   border-top: 10px solid transparent !important;
   border-bottom: 10px solid transparent !important;
   border-bottom-color: transparent !important;
-  left: auto !important;
+  left: -10px !important;
   transform: none !important;
   /* 픽셀 패턴 */
   border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
@@ -1067,6 +1142,25 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .encroachment-value-input {
   background:  transparent !important;
   border:      none !important;
   text-shadow: 0 0 4px #000000, 0 0 4px #000000 !important;
+}
+
+/* 침식 다이스/레벨 애드온(.dice-addon)도 게이지 바 위에 위치 — 일반
+   input{background:#000} 규칙이 검정 박스를 만들어 게이지 채움을 가린다.
+   배경/테두리를 제거하고, 가독성은 글자 1px 하드 외곽선(4방향 text-shadow
+   스트로크)으로 확보. text-shadow 는 상속되므로 .dice-addon 에 한 번 걸면
+   라벨 아이콘·슬래시·입력 텍스트 전부에 동일한 외곽선이 적용된다.
+   글자색은 강조색(색조 오버라이드), 외곽선은 검정 1px 로 어떤 채움색 위에서도 판독. */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .encroachment-bar .dice-addon {
+  text-shadow:
+    -1px -1px 0 #000, 1px -1px 0 #000,
+    -1px  1px 0 #000, 1px  1px 0 #000,
+     0   -1px 0 #000,  0   1px 0 #000,
+    -1px  0   0 #000,  1px  0   0 #000 !important;
+}
+body.fe-dx3rd-pixel-theme .double-cross-3rd .encroachment-bar .dice-addon input {
+  background: transparent !important;
+  border:     none !important;
+  color:      var(--fe-ac-90) !important;
 }
 
 /* ── 시트: 주사위 색상(폭주/침식) ──────────────────────────── */
@@ -1984,24 +2078,25 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd :is(label, td, th, p) {
   color: var(--fe-ac-80) !important;
 }
 
+/* 아이템 이름/레이블 — 구조가 h4.item-name > span.item-label > span 이라
+   위 :is(label,td,th,p) 에 안 잡혀 코어 기본 회색으로 남았다. 액센트로 교체.
+   .item-name span 으로 중첩 span(실제 텍스트)까지 직접 덮는다.
+   (item-exhausted 의 색은 §… 별도 규칙이 더 높은 명시도로 유지됨) */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item-name,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item-label,
+body.fe-dx3rd-pixel-theme .double-cross-3rd .item-name span {
+  color: var(--fe-ac-90) !important;
+}
+
 /* .highlight — DX3rd { color:#19499b !important }(system 레이어) 고정 청색을
-   픽셀 테마 액센트 글씨로 되돌리고, 강조는 1px 밝은 파란색 글자 외곽선으로 대체.
+   픽셀 테마 액센트 글씨로 되돌린다.
    layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다.
 
-   주의: outline/border 는 입력 필드 박스를 두르므로 텍스트가 아닌 네모가 생긴다.
-   글자(글리프) 자체에 1px 외곽선을 주려면 4방향 text-shadow 로 스트로크를 합성한다. */
+   파란색 글자 외곽선(text-shadow 스트로크)은 제거됨 — 액센트 색 + bold 만 유지. */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .highlight {
   color:        var(--fe-ac-90) !important;
   font-weight:  bold !important;
-  text-shadow:
-    -1px -1px 0 #4a9eff,
-     1px -1px 0 #4a9eff,
-    -1px  1px 0 #4a9eff,
-     1px  1px 0 #4a9eff,
-      0  -1px 0 #4a9eff,
-      0   1px 0 #4a9eff,
-    -1px   0  0 #4a9eff,
-     1px   0  0 #4a9eff !important;
+  text-shadow:  none !important;
 }
 
 /* sheet-stat .title 텍스트 — DX3rd { color: white } (0,4,0) 일반 규칙 무력화
@@ -2069,6 +2164,16 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .backtr
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .backtrack-btn button:hover {
   background:   var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
+}
+
+/* sheet-header .select-box 세로 정렬 — 코어 foundry2.css 가 select 에
+   line-height: var(--input-height)(=2rem=32px) 를 걸어, select 값 텍스트가
+   박스 위쪽으로 떠 중앙에서 어긋난다(헤드리스 렌더로 확인: 2rem→상단, normal→중앙).
+   line-height: normal 로 라인박스를 글리프에 맞추면 UA 의 select 내부 center
+   정렬이 정확해진다. 테마 무관(픽셀/일반 공통) — layouts 레이어(7)라 코어
+   elements 레이어(3) 일반 선언을 이긴다(!important 불필요). */
+.double-cross-3rd .sheet-wrapper .sheet-header .select-box {
+  line-height: normal;
 }
 
 /* ── sheet-header .select-box — DX3rd { color: white; background: black } (0,4,0) 무력화.
@@ -2177,11 +2282,20 @@ body.fe-dx3rd-pixel-theme :is(.window-app, .application) .fet-stage-remove:hover
  *        다이스 영역 + 상태이상 셀 — 검정 배경에서 구분선 추가
  * ══════════════════════════════════════════════════════════════ */
 
-/* 다이스(Dice) 영역 박스 */
+/* 다이스(Dice) 영역 박스 — 직사각형 outline 은 제거한다. .dice-info 의 사각
+   경계는 시트 본래 영역 모양이 아니며, 안쪽 .title 의 치우친 사다리꼴(skew)
+   레이블과 어긋나 보인다. 강조 윤곽선은 아래에서 사다리꼴 ::before 에만 부여.
+   배경 틴트(L=6%)는 검정 바탕에서의 영역 구분용으로 유지. */
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .dice-info {
-  outline:          1px solid var(--fe-ac-33) !important;
-  outline-offset:   -1px !important;
   background:       var(--fe-ac-06) !important;
+}
+
+/* 다이스 레이블(.title)의 skew 사다리꼴 ::before 배경에 강조색 1px 윤곽선.
+   ::before 는 transform: skewX(342deg) 가 걸려 있으므로 border 가 그 변형을
+   따라 그려져 = 치우친 사각형(사다리꼴) 외곽선이 된다. 시스템(layer 8)의
+   .title::before { background:black } 를 이기려면 !important 필요(layouts layer 7). */
+body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-stat .dice-info .title::before {
+  border: 1px solid var(--fe-ac-57) !important;
 }
 
 /* 상태이상·기타 조건 셀 헤더(.cell--title) — 어두운 틴트 + 테두리 */
@@ -2346,9 +2460,18 @@ body.fe-dx3rd-pixel-theme #prosemirror-dropdown li.divider {
   border-bottom-color: var(--fe-ac-22) !important;
 }
 
-/* 에디터 툴바 menu 컨테이너 */
+/* 에디터 툴바 menu 위아래 여백 축소 — 코어 --menu-padding:8px(상하 8px) 가 과하다.
+   바 높이도 --menu-height = 버튼(26px) + --menu-padding*2 이므로 함께 28px 로 줄어든다.
+   --menu-height 계산은 .menu-container 에서 일어나므로 --menu-padding 은 그 조상
+   (.prosemirror)에 둬야 바 높이가 실제로 축소된다(헤드리스 확인: 42px→28px). */
+body.fe-dx3rd-pixel-theme :is(.prosemirror, prose-mirror) {
+  --menu-padding: 4px !important;
+}
+
+/* 에디터 툴바 menu 컨테이너 — 위아래 4px, 좌우 6px 유지 */
 body.fe-dx3rd-pixel-theme :is(.prosemirror, prose-mirror) menu {
   background: #000 !important;
+  padding: 4px 6px !important;
 }
 
 /* 툴바 버튼 */

@@ -126,3 +126,16 @@ body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel {
 body.fe-dx3rd-pixel-theme #fe-ctrl-menu-panel #message-modes {
   border-inline-end-color: var(--fe-ac-22) !important;
 }
+
+/* ── Popped-out quick-reply dock (#chat-notifications) ───────── */
+/* When the sidebar is on a non-chat tab, #chat-controls is relocated into the
+   bottom-right notification dock. There we keep only the native quick-reply
+   (feUncollapseCtrlMenu returns the native controls to #chat-controls) and hide
+   our injected widgets. Hiding the wrapper also hides the panel contents
+   (export / image-upload / RUI toggle) that stay parked inside it.
+   Our menu/panels operate only in the sidebar chat tab. */
+#chat-notifications #fe-ctrl-menu-wrapper,
+#chat-notifications #fe-stage-nav,
+#chat-notifications #fe-dx3rd-accent-btn {
+  display: none !important;
+}
