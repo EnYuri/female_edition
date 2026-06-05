@@ -51,6 +51,7 @@ const S = {
   TYPING_ENABLED: "ceTypingEnabled",
   TYPING_SHOW_TO_PLAYERS: "ceTypingShowToPlayers",
   SC_COLLAPSE_ENABLED: "ceSceneControlsCollapse",
+  SCREEN_PANEL_ENABLED: "ceScreenPanelEnabled",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -109,6 +110,7 @@ const FE_DEFAULTS = {
   [S.TYPING_ENABLED]: true,
   [S.TYPING_SHOW_TO_PLAYERS]: true,
   [S.SC_COLLAPSE_ENABLED]: true,
+  [S.SCREEN_PANEL_ENABLED]: true,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";

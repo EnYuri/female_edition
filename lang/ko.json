@@ -4,5 +4,38 @@
 	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>",
 	"FE.Typing.One": "{user} 님이 입력 중…",
 	"FE.Typing.Two": "{user1}, {user2} 님이 입력 중…",
-	"FE.Typing.Many": "{user1}, {user2} 외 {count}명이 입력 중…"
+	"FE.Typing.Many": "{user1}, {user2} 외 {count}명이 입력 중…",
+
+	"TYPES.Actor.female_edition.screenPanel": "스크린 패널",
+	"FESP.SheetLabel": "스크린 패널",
+
+	"FESP.Settings.EnableName": "스크린 패널 기능 사용",
+	"FESP.Settings.EnableHint": "코코포리아식 스크린 패널(액터 서브타입)을 씬 캔버스에 올리고 면 전환·표시/숨김·비활성화할 수 있게 합니다. 끄면 캔버스 상호작용이 비활성화됩니다(재시작 필요).",
+
+	"FESP.Sheet.Faces": "면(Face) 목록",
+	"FESP.Sheet.AddFace": "면 추가",
+	"FESP.Sheet.FaceN": "{n}면",
+	"FESP.Sheet.FaceNamePh": "면 이름(선택)",
+	"FESP.Sheet.DescPh": "마우스 호버 시 표시될 설명(선택)",
+	"FESP.Sheet.MoveUp": "위로",
+	"FESP.Sheet.MoveDown": "아래로",
+	"FESP.Sheet.RemoveFace": "면 삭제",
+	"FESP.Sheet.DefaultFace": "기본 면",
+	"FESP.Sheet.Width": "기본 너비(px)",
+	"FESP.Sheet.Height": "기본 높이(px)",
+	"FESP.Sheet.Locked": "잠금",
+	"FESP.Sheet.PlaceOnScene": "현재 씬에 올리기",
+
+	"FESP.Menu.Faces": "면 전환",
+	"FESP.Menu.Show": "표시",
+	"FESP.Menu.Hide": "숨김",
+	"FESP.Menu.Enable": "활성화",
+	"FESP.Menu.Disable": "비활성화(무권한자에게 숨김)",
+	"FESP.Menu.Remove": "스크린에서 빼기",
+	"FESP.Menu.Edit": "패널 설정 열기",
+	"FESP.Menu.NoGM": "GM이 접속해 있지 않아 변경할 수 없습니다.",
+	"FESP.Menu.PlaceOnScene": "현재 씬에 올리기",
+	"FESP.Menu.NoScene": "활성화된 씬이 없습니다.",
+	"FESP.Menu.NoPerm": "이 패널을 조작할 권한이 없습니다.",
+	"FESP.Menu.NoFaces": "면이 하나도 없습니다. 시트에서 먼저 면을 추가하세요."
 }

@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.3.4",
+  "version": "1.3.7",
   "authors": [
     {
       "name": "nayuri",
@@ -25,6 +25,7 @@
     "scripts/fe-typing-indicator.js",
     "scripts/fe-chat-controls-menu.js",
     "scripts/fe-scene-controls-collapse.js",
+    "scripts/fe-screen-panel.js",
     "scripts/fe-settings-menu.js"
   ],
   "styles": [
@@ -43,9 +44,15 @@
     "styles/fe-theatre.css",
     "styles/fe-typing-indicator.css",
     "styles/fe-chat-controls-menu.css",
-    "styles/fe-scene-controls-collapse.css"
+    "styles/fe-scene-controls-collapse.css",
+    "styles/fe-screen-panel.css"
   ],
   "socket": true,
+  "documentTypes": {
+    "Actor": {
+      "screenPanel": {}
+    }
+  },
   "languages": [
     {
       "lang": "ko",
@@ -59,6 +66,6 @@
     "verified": "14.363",
     "maximum": "14"
   },
-  "description": "",
+  "description": "Female-cupwhi's female edition. kawaiiiii",
   "flags": {}
 }

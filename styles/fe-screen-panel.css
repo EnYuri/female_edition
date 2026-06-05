@@ -1,0 +1,135 @@
+/* female_edition: Screen Panel — on-canvas menu / tooltip + sheet. */
+
+/* ----- Dropdown menu ----- */
+.fe-sp-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 184px;
+  max-width: 320px;
+  padding: 4px;
+  background: rgba(24, 22, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+  color: #f1eef7;
+  font-size: 13px;
+  display: none;
+}
+.fe-sp-menu.active { display: block; }
+
+.fe-sp-menu-section + .fe-sp-menu-section { margin-top: 4px; }
+.fe-sp-menu hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 4px 2px;
+}
+
+.fe-sp-menu-label {
+  padding: 4px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.fe-sp-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.fe-sp-menu-item i { width: 14px; text-align: center; opacity: 0.85; }
+.fe-sp-menu-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.fe-sp-menu-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.fe-sp-menu-item.active { background: rgba(140, 120, 220, 0.32); }
+.fe-sp-menu-item.danger:hover:not(:disabled) { background: rgba(200, 60, 60, 0.35); }
+.fe-sp-face-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fe-sp-menu-note {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #ffcaca;
+  opacity: 0.85;
+}
+
+/* ----- Hover tooltip ----- */
+.fe-sp-tooltip {
+  position: fixed;
+  z-index: 99;
+  max-width: 320px;
+  padding: 6px 10px;
+  background: rgba(20, 18, 26, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  color: #f4f1fa;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+.fe-sp-tooltip.active { display: block; }
+.fe-sp-tooltip :is(p, ul, ol) { margin: 0.2em 0; }
+.fe-sp-tooltip img { max-width: 100%; }
+
+/* ----- Sheet ----- */
+.fe-screen-panel-sheet .fe-sp-sheet { padding: 6px 8px; }
+.fe-screen-panel-sheet .fe-sp-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.fe-screen-panel-sheet .fe-sp-field { display: flex; flex-direction: column; gap: 3px; }
+.fe-screen-panel-sheet .fe-sp-field label { font-weight: 600; font-size: 12px; }
+.fe-screen-panel-sheet .fe-sp-field-checkbox { justify-content: end; }
+.fe-screen-panel-sheet .fe-sp-field-checkbox label { flex-direction: row; align-items: center; gap: 6px; }
+
+.fe-screen-panel-sheet .fe-sp-faces-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 0 4px;
+}
+.fe-screen-panel-sheet .fe-sp-faces-header h3 { margin: 0; }
+
+.fe-screen-panel-sheet .fe-sp-faces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fe-screen-panel-sheet .fe-sp-face {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.03);
+}
+.fe-screen-panel-sheet .fe-sp-face-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.fe-screen-panel-sheet .fe-sp-face-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.fe-screen-panel-sheet .fe-sp-face-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fe-screen-panel-sheet .fe-sp-face-row { display: flex; align-items: center; gap: 6px; }
+.fe-screen-panel-sheet .fe-sp-face-num { font-weight: 600; white-space: nowrap; opacity: 0.8; }
+.fe-screen-panel-sheet .fe-sp-face-actions { display: flex; gap: 6px; margin-left: auto; }
+.fe-screen-panel-sheet .fe-sp-face-actions a { cursor: pointer; opacity: 0.7; }
+.fe-screen-panel-sheet .fe-sp-face-actions a:hover { opacity: 1; }
+.fe-screen-panel-sheet .fe-sp-face textarea { resize: vertical; }
+
+.fe-screen-panel-sheet .fe-sp-footer { margin-top: 10px; display: flex; justify-content: flex-end; }
+.fe-screen-panel-sheet .fe-sp-btn { display: inline-flex; align-items: center; gap: 6px; }

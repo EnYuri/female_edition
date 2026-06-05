@@ -1,0 +1,75 @@
+<div class="fe-sp-sheet">
+  <section class="fe-sp-settings">
+    <div class="fe-sp-field">
+      <label>{{localize "FESP.Sheet.DefaultFace"}}</label>
+      <select name="system.defaultFace" {{#unless fe.editable}}disabled{{/unless}}>
+        {{#each fe.faces as |face|}}
+          <option value="{{face.index}}" {{#if (eq face.index ../fe.defaultFace)}}selected{{/if}}>
+            {{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}
+          </option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="fe-sp-field">
+      <label>{{localize "FESP.Sheet.Width"}}</label>
+      <input type="number" name="system.width" value="{{fe.width}}" min="1" step="1" {{#unless fe.editable}}disabled{{/unless}}>
+    </div>
+    <div class="fe-sp-field">
+      <label>{{localize "FESP.Sheet.Height"}}</label>
+      <input type="number" name="system.height" value="{{fe.height}}" min="1" step="1" {{#unless fe.editable}}disabled{{/unless}}>
+    </div>
+    <div class="fe-sp-field fe-sp-field-checkbox">
+      <label>
+        <input type="checkbox" name="system.locked" {{checked fe.locked}} {{#unless fe.editable}}disabled{{/unless}}>
+        {{localize "FESP.Sheet.Locked"}}
+      </label>
+    </div>
+  </section>
+
+  <header class="fe-sp-faces-header">
+    <h3>{{localize "FESP.Sheet.Faces"}}</h3>
+    {{#if fe.editable}}
+      <button type="button" class="fe-sp-btn" data-action="feAddFace">
+        <i class="fa-solid fa-plus"></i> {{localize "FESP.Sheet.AddFace"}}
+      </button>
+    {{/if}}
+  </header>
+
+  <ol class="fe-sp-faces">
+    {{#each fe.faces as |face|}}
+      <li class="fe-sp-face" data-index="{{face.index}}">
+        <div class="fe-sp-face-thumb">
+          {{#if face.img}}<img src="{{face.img}}" alt="">{{/if}}
+        </div>
+        <div class="fe-sp-face-body">
+          <div class="fe-sp-face-row">
+            <span class="fe-sp-face-num">{{localize "FESP.Sheet.FaceN" n=face.num}}</span>
+            <input type="text" name="system.faces.{{face.index}}.name"
+                   value="{{face.name}}" placeholder="{{localize "FESP.Sheet.FaceNamePh"}}"
+                   {{#unless ../fe.editable}}disabled{{/unless}}>
+            {{#if ../fe.editable}}
+              <span class="fe-sp-face-actions">
+                <a data-action="feMoveFaceUp" data-index="{{face.index}}" title="{{localize "FESP.Sheet.MoveUp"}}"><i class="fa-solid fa-arrow-up"></i></a>
+                <a data-action="feMoveFaceDown" data-index="{{face.index}}" title="{{localize "FESP.Sheet.MoveDown"}}"><i class="fa-solid fa-arrow-down"></i></a>
+                <a data-action="feRemoveFace" data-index="{{face.index}}" title="{{localize "FESP.Sheet.RemoveFace"}}"><i class="fa-solid fa-trash"></i></a>
+              </span>
+            {{/if}}
+          </div>
+          <file-picker name="system.faces.{{face.index}}.img" type="image" value="{{face.img}}"
+                       {{#unless ../fe.editable}}disabled{{/unless}}></file-picker>
+          <textarea name="system.faces.{{face.index}}.description" rows="2"
+                    placeholder="{{localize "FESP.Sheet.DescPh"}}"
+                    {{#unless ../fe.editable}}disabled{{/unless}}>{{face.description}}</textarea>
+        </div>
+      </li>
+    {{/each}}
+  </ol>
+
+  {{#if fe.editable}}
+    <footer class="fe-sp-footer">
+      <button type="button" class="fe-sp-btn fe-sp-place" data-action="fePlaceOnScene" {{#unless fe.faceCount}}disabled{{/unless}}>
+        <i class="fa-solid fa-image"></i> {{localize "FESP.Sheet.PlaceOnScene"}}
+      </button>
+    </footer>
+  {{/if}}
+</div>
