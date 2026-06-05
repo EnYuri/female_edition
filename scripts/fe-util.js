@@ -314,6 +314,14 @@ function feSnapshotAndRestoreStickyScroll() {
     if (!feIsElementNode(log)) return null;
     const app = logToApp.get(log) ?? null;
     const scrollEl = feFindScrollContainer(log);
+    // When the DOM-pruning ChatLog has forward-pruned its tail, the user is
+    // deliberately browsing history — the DOM's bottom is NOT the newest message.
+    // "At bottom of the shortened window" must therefore never be treated as
+    // "following live": pinning/scrollBottom here would snap the reader back to
+    // the latest message. The prune subclass exposes this via isBrowsingHistory.
+    if (app?.isBrowsingHistory === true) {
+      return { log, scrollEl, atBottom: false, app };
+    }
     // app.isAtBottom is the primary signal (Foundry updates it synchronously in
     // _onScrollLog). However it can transiently read false between a DOM resize
     // and the next scroll event — so pixel-gap ≤ 2px acts as a safety net for

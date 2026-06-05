@@ -13,6 +13,7 @@
 
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
+import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 
 // hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0.
 function _hexToHs(hex) {
@@ -38,6 +39,10 @@ function _hexToHs(hex) {
 
 const CONTAINER_ID     = "fe-dx3rd-rui-container";
 const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
+
+// 카드 줄바꿈(wrap) 한계 — 화면 밖으로 나가지 않도록.
+const PC_CARDS_PER_ROW    = 5; // 우상단 가로 컨테이너: 5개마다 다음 행
+const ENEMY_CARDS_PER_COL = 8; // 좌상단 세로 컨테이너: 8개마다 우측 새 열
 const BTN_ID           = "fe-dx3rd-rui-toggle-btn";
 const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
 const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → RUI에 표시 (토큰 무관)
@@ -283,7 +288,7 @@ function _buildCard(actor, pw, panelW, ch) {
         `</div>` +
       `</div>` +
     `</div>`;
-  card.querySelector(".fedr-portrait").setAttribute("src", actor.img ?? "");
+  feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
 
   card.addEventListener("contextmenu", e => {
     const a = game.actors?.get(card.dataset.actorId);
@@ -359,6 +364,24 @@ function _getOrCreateContainer(id, posKey) {
   el.style.flexDirection = id === CONTAINER_OWN_ID ? "row" : "column";
   el.style.alignItems    = id === CONTAINER_OWN_ID ? "flex-start" : "";
 
+  // 줄바꿈(wrap) — 주축 크기를 N개 카드 풋프린트로 제한해 다음 줄/열로 넘긴다.
+  //   카드 본체 = pw + panelW (또는 높이 ch), margin 10px*2 = 풋프린트 +20px.
+  //   PC(가로): 5개마다 아래 행, 우측 정렬 유지. enemy(세로): 8개마다 우측 새 열.
+  el.style.flexWrap = "wrap";
+  const footW = _portraitW() + _panelW() + 20;
+  const footH = _cardH() + 20;
+  if (id === CONTAINER_OWN_ID) {
+    el.style.maxWidth       = `${PC_CARDS_PER_ROW * footW + 4}px`;  // +4: 반올림으로 5번째가 일찍 줄바뀜 방지
+    el.style.maxHeight      = "";
+    el.style.justifyContent = "flex-end";    // 부분 행도 우측 정렬
+    el.style.alignContent   = "flex-start";
+  } else {
+    el.style.maxHeight      = `${ENEMY_CARDS_PER_COL * footH + 4}px`;
+    el.style.maxWidth       = "";
+    el.style.justifyContent = "";
+    el.style.alignContent   = "flex-start";  // 열들을 왼쪽부터 채움
+  }
+
   if (isNew) {
     const pos = _loadPos(posKey);
     if (pos) {
@@ -398,7 +421,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
       card.style.setProperty("--fedr-pw", `${pw}px`);
       card.style.setProperty("--fedr-panel-w", `${panelW}px`);
       card.style.setProperty("--fedr-ph", `${ch}px`);
-      card.querySelector(".fedr-portrait").src = actor.img ?? "";
+      feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
     }
     _updateCard(card, actor);
   }
@@ -470,7 +493,7 @@ function _addActorCard(actor) {
     card.style.setProperty("--fedr-pw", `${pw}px`);
     card.style.setProperty("--fedr-panel-w", `${panelW}px`);
     card.style.setProperty("--fedr-ph", `${ch}px`);
-    card.querySelector(".fedr-portrait").src = actor.img ?? "";
+    feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
   }
   _updateCard(card, actor);
   _applyContainerDisplay(cnt);

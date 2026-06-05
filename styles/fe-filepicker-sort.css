@@ -1,0 +1,22 @@
+/* fe-filepicker-sort.css — FilePicker 정렬 컨트롤 */
+
+.fe-fp-sort .form-fields {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.fe-fp-sort .fe-fp-sort-key {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fe-fp-sort .fe-fp-sort-dir {
+  flex: 0 0 auto;
+}
+
+/* 날짜·크기 정렬 시 메타데이터(HEAD) 로딩 중 살짝 흐리게 */
+.directory.files-list.fe-fp-sorting {
+  opacity: 0.6;
+  transition: opacity 0.1s;
+}

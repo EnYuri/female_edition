@@ -43,6 +43,10 @@ export function feInstallChatLogPrune() {
     #renderedIds = new Set();
     // True when newer messages have been pruned from DOM tail
     #fwdPruned = false;
+    // Last observed scrollTop on the scroll container — used to require a genuine
+    // downward gesture before forward-rendering (so a programmatic clamp does not
+    // bounce the reader back to live).
+    #lastScrollTop = 0;
     // Guards: prevent queuing more than one concurrent render task per direction
     #busyBack = false;
     #busyFwd  = false;
@@ -55,6 +59,13 @@ export function feInstallChatLogPrune() {
     #schedOverflow = foundry.utils.debounce(() => this.#updateOverflowClass(), 100);
 
     // ── Public overrides ────────────────────────────────────────────────────
+
+    // True while the newest tail is pruned from the DOM — i.e. the user is
+    // browsing history, not following live. feSnapshotAndRestoreStickyScroll()
+    // reads this to avoid pinning the reader to the (incomplete) DOM bottom.
+    get isBrowsingHistory() {
+      return this.#fwdPruned === true;
+    }
 
     async scrollBottom(opts = {}) {
       if (!this.rendered) return;
@@ -167,8 +178,19 @@ export function feInstallChatLogPrune() {
       scrollEl.addEventListener("scroll", () => {
         if (!this.rendered || fwdThrottle) return;
         if (!this.element?.querySelector(".chat-log")) return;
-        const pct = scrollEl.scrollTop / (scrollEl.scrollHeight - scrollEl.clientHeight);
-        if ((pct > 0.99 || isNaN(pct)) && this.#fwdPruned && this.#hasForwardMessages()) {
+        const prevTop = this.#lastScrollTop;
+        const curTop = scrollEl.scrollTop;
+        this.#lastScrollTop = curTop;
+        const denom = scrollEl.scrollHeight - scrollEl.clientHeight;
+        const pct = curTop / denom;
+        // Only forward-render on a GENUINE downward scroll that reaches the bottom.
+        // Excluding the isNaN/at-bottom auto-trigger (and requiring curTop >= prevTop)
+        // prevents the programmatic scrollTop clamp left by #pruneNewest from
+        // instantly bouncing the reader back to the newest message. To go live from
+        // a window that fully fits on screen (denom === 0), the jump-to-bottom button
+        // calls scrollBottom() → #goLive().
+        const reachedBottom = denom > 0 && pct > 0.99 && curTop >= prevTop;
+        if (reachedBottom && this.#fwdPruned && this.#hasForwardMessages()) {
           fwdThrottle = true;
           this.renderBatchForward(bs())
             .then(() => setTimeout(() => { fwdThrottle = false; }, 100));
@@ -229,9 +251,17 @@ export function feInstallChatLogPrune() {
       if (!log) return;
       const batchTarget = bs();
       if (log.children.length < maxMessages()) return;
-      // This runs while scrolled up (not at bottom), so the snapshot will read
-      // atBottom=false and leave scroll position untouched — but wrap anyway so
-      // the rare at-bottom case (large batch fills) stays pinned.
+      const scrollEl = this.element?.querySelector(".chat-scroll") ?? log;
+      // CRITICAL: only prune tail messages that sit fully BELOW the viewport (plus
+      // one screen of buffer). Pruning a message the user is currently looking at
+      // collapses the scroll region under them — the browser then clamps scrollTop
+      // and snaps them to the newest message (history browsing becomes impossible),
+      // and any forced repositioning to compensate makes the view jump. By keeping
+      // everything visible+buffer intact, scrollTop stays valid and the reader does
+      // not move at all. The kept tail messages become prunable later, once the user
+      // scrolls further up and pushes them off-screen.
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const keepBelowPx = scrollEl.clientHeight; // one viewport of look-ahead buffer
       const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
       let pruned = 0;
       try {
@@ -242,6 +272,11 @@ export function feInstallChatLogPrune() {
           // inject into .chat-form, not .chat-log, but guard defensively: if a
           // non-message element is ever the tail, stop rather than removing it.
           if (!el.matches?.("li.chat-message") || !el.dataset?.messageId) break;
+          // Stop as soon as the tail element is within the viewport (or its buffer):
+          // elTop is the element's top relative to the scroll container's visible top;
+          // clientHeight is the bottom of the viewport. Removing below this is safe.
+          const elTop = el.getBoundingClientRect().top - scrollRect.top;
+          if (elTop <= scrollEl.clientHeight + keepBelowPx) break;
           const id = el.dataset.messageId;
           this.#renderedIds.delete(id);
           if (!this.isPopout) {

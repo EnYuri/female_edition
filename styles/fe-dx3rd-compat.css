@@ -1086,6 +1086,16 @@ body.fe-dx3rd-pixel-theme .fe-stage-portrait-wrap {
  *        검정이 아닌 모든 색상 → 강조색(명도 조정)
  * ══════════════════════════════════════════════════════════════ */
 
+/* ── 액터 시트 포트레이트: 상단 기준 정렬 (아래쪽만 크롭) ─────────────
+   object-fit: cover 가 적용된 메인/심플 시트에서 상단(얼굴)을 보존하고
+   세로가 넘칠 때 하단만 잘라낸다. 인라인 style 에는 object-position 이 없으므로
+   적용되며, 픽셀 테마와 무관한 레이아웃 보정이라 테마 게이트 없이 둔다.
+   (fe-portrait-hq.js 의 고품질 축소본도 비율 보존 풀이미지라 동일하게 동작) */
+.double-cross-3rd .grid-img .profile-img,
+.double-cross-3rd .simple-sheet-portrait .profile-img {
+  object-position: top center !important;
+}
+
 /* ── 시트: 헤더·제목 텍스트 ─────────────────────────────────── */
 
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .progress-bar input {
@@ -2187,6 +2197,29 @@ body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .select
 body.fe-dx3rd-pixel-theme .double-cross-3rd .sheet-wrapper .sheet-header .select-box option {
   color:      var(--fe-ac-70) !important;
   background: #000 !important;
+}
+
+/* ── DX3rd 시트·다이얼로그 입력/셀렉트 텍스트 정렬 정상화 (테마 무관) ────────────
+   증상: 값 텍스트가 가운데 정렬인데 좌측으로 치우치고, 위/아래로 들쭉날쭉.
+
+   [가로 — input] 코어 input 패딩(1px 3px) + 시스템 우측 패딩(8px) 비대칭 → 중앙이 왼쪽으로.
+     좌우 패딩을 4px 대칭으로 통일해 진짜 중앙 정렬. layouts 레이어라 시스템(8) 을
+     이기려면 !important. 좌측정렬 필드(이름/코드네임 .name)는 제외 — 의도된 좌측 패딩 보존. */
+.double-cross-3rd input:not(.name):not([name="name"]):not([name="system.codeName"]) {
+  padding-left:  4px !important;
+  padding-right: 4px !important;
+}
+
+/* [세로 — select] 코어가 select 에 line-height: var(--input-height) 를 걸어 값이 위로 뜸
+     → normal 로 라인박스를 글리프에 맞춰 UA 의 select 내부 중앙 정렬을 정확히 한다.
+   주의(가로): input·select 의 우측 패딩(8~20px)은 코어/시스템이 매우 높은 우선순위
+     (:is(#…) 추정)로 박아둬 어떤 author 스타일시트 규칙으로도 못 이긴다(인라인 !important
+     만 가능). 그래서 가로 픽셀단위 중앙 정렬은 scripts/fe-dx3rd-input-align.js 가 렌더 시
+     인라인으로 마무리한다. 이 CSS 규칙들은 그 전 단계의 first-paint 베이스라인이다. */
+.double-cross-3rd select {
+  line-height:     normal !important;
+  text-align:      center !important;
+  text-align-last: center !important;
 }
 
 /* ── 채팅카드(.dx3rd-item-chat) 피쳐 설명 — gray 오버라이드 ── */

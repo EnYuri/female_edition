@@ -80,6 +80,25 @@ function feScreenBlendChannel(base, overlay) {
   return 255 - ((255 - base) * (255 - overlay)) / 255;
 }
 
+// Walk ancestors from `startEl` upward and return the first FULLY OPAQUE
+// background color — i.e. what is actually visible behind a (possibly
+// semi-transparent) chat message. Critical for dark/pixel themes where a
+// message sits on a black backdrop: baking the message color alone would
+// ignore that backdrop. Falls back to white (the default print paper).
+function feResolveBackdropColor(win, startEl) {
+  let el = startEl;
+  while (el && el.nodeType === 1) {
+    try {
+      const c = feParseRGBAFromCSS(win.getComputedStyle(el).backgroundColor);
+      if (c && c.a >= 0.999) return { r: c.r, g: c.g, b: c.b };
+    } catch {
+      // ignore
+    }
+    el = el.parentElement;
+  }
+  return { r: 255, g: 255, b: 255 };
+}
+
 // ===========================================================================
 // Background freeze  (read/write-batched to avoid layout thrashing)
 // ===========================================================================
@@ -117,6 +136,10 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
   // Read phase: collect all computed styles before any writes.
   // Separating reads from writes avoids layout thrashing — each write would otherwise
   // invalidate the layout and force a full recalculation on the next getComputedStyle call.
+  // Signature used to detect the parchment overlay inside a computed
+  // background-image (whitespace-stripped, e.g. "245,239,229").
+  const paperSig = `${paper.r},${paper.g},${paper.b}`;
+
   const plan = [];
   for (const el of msgs) {
     try {
@@ -140,13 +163,33 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
       }
 
       if (outR == null || outG == null || outB == null) {
-        const sr = feScreenBlendChannel(bg.r, paper.r);
-        const sg = feScreenBlendChannel(bg.g, paper.g);
-        const sb = feScreenBlendChannel(bg.b, paper.b);
+        // Composite the (possibly semi-transparent) message background over the
+        // first opaque ancestor so the baked solid matches what is actually
+        // visible — essential for dark/pixel themes sitting on a black backdrop.
+        const backdrop = feResolveBackdropColor(win, el.parentElement);
+        const baseR = bg.r * bg.a + backdrop.r * (1 - bg.a);
+        const baseG = bg.g * bg.a + backdrop.g * (1 - bg.a);
+        const baseB = bg.b * bg.a + backdrop.b * (1 - bg.a);
 
-        outR = Math.round(bg.r * (1 - paperAlpha) + sr * paperAlpha);
-        outG = Math.round(bg.g * (1 - paperAlpha) + sg * paperAlpha);
-        outB = Math.round(bg.b * (1 - paperAlpha) + sb * paperAlpha);
+        // Only bake the cream "paper" overlay when it is ACTUALLY part of the
+        // rendered background-image of this message. Applying it unconditionally
+        // (the old behavior) turned solid dark themes into cream-beige at print
+        // time even though the live archive rendered them correctly.
+        const bgImg = String(cs.backgroundImage || "");
+        const hasParchment = /gradient/i.test(bgImg) && bgImg.replace(/\s+/g, "").includes(paperSig);
+
+        if (hasParchment) {
+          const sr = feScreenBlendChannel(baseR, paper.r);
+          const sg = feScreenBlendChannel(baseG, paper.g);
+          const sb = feScreenBlendChannel(baseB, paper.b);
+          outR = Math.round(baseR * (1 - paperAlpha) + sr * paperAlpha);
+          outG = Math.round(baseG * (1 - paperAlpha) + sg * paperAlpha);
+          outB = Math.round(baseB * (1 - paperAlpha) + sb * paperAlpha);
+        } else {
+          outR = Math.round(baseR);
+          outG = Math.round(baseG);
+          outB = Math.round(baseB);
+        }
       }
 
       plan.push({ el, outR, outG, outB, prevStyle: el.getAttribute("style") });

@@ -26,7 +26,10 @@
     "scripts/fe-chat-controls-menu.js",
     "scripts/fe-scene-controls-collapse.js",
     "scripts/fe-screen-panel.js",
-    "scripts/fe-settings-menu.js"
+    "scripts/fe-settings-menu.js",
+    "scripts/fe-filepicker-sort.js",
+    "scripts/fe-playlist-name.js",
+    "scripts/fe-dx3rd-input-align.js"
   ],
   "styles": [
     "styles/ui-font.css",
@@ -45,7 +48,8 @@
     "styles/fe-typing-indicator.css",
     "styles/fe-chat-controls-menu.css",
     "styles/fe-scene-controls-collapse.css",
-    "styles/fe-screen-panel.css"
+    "styles/fe-screen-panel.css",
+    "styles/fe-filepicker-sort.css"
   ],
   "socket": true,
   "documentTypes": {
