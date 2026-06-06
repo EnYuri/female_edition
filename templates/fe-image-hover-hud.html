@@ -1,7 +1,5 @@
-<div id="{{id}}" class="{{classes}}">
-	{{#if isVideo}}
-		<video src="{{url}}" autoplay loop style="width:100%; border:0px"></video>
-	{{else}}
-		<img src="{{url}}" style="width:100%; border:0px">
-	{{/if}}
-</div>
+{{#if isVideo}}
+<video class="fe-image-hover-media" src="{{url}}" autoplay loop muted playsinline></video>
+{{else}}
+<img class="fe-image-hover-media" src="{{url}}" alt="">
+{{/if}}

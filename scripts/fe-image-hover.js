@@ -24,6 +24,16 @@ let _ihShowAll = false;
 /** True after X is pressed while hovering — cleared when mouse leaves the token */
 let _ihKeyToggled = false;
 
+// ── DOM portrait hover (status UI cards / character & item sheets) ────────────
+/** Standalone fixed overlay element for DOM-hovered portraits (non-token) */
+let _ihDomOverlay = null;
+/** True after X is pressed while hovering a DOM portrait — cleared on leave */
+let _ihDomToggled = false;
+/** Full-resolution art URL of the portrait currently under the cursor, or null */
+let _ihHoverArtUrl = null;
+/** setTimeout handle for DOM-portrait hover delay */
+let _ihDomDelayTimer;
+
 // Runtime settings cache (populated in init, refreshed on settings close)
 let _ihPermission = 0;
 let _ihEnabled = true;
@@ -102,14 +112,31 @@ function _ihRegisterSettings() {
     editable: [{ key: "KeyX" }],
     onDown: () => {
       const token = canvas.tokens?.hover;
-      if (!token) return;
-      if (_ihKeyToggled) {
-        // 이미 표시 중 → 취소
-        _ihKeyToggled = false;
-        if (!_ihShowAll) canvas.hud.imageHover?.close();
-      } else {
-        _ihKeyToggled = true;
-        canvas.hud.imageHover?.showArtworkRequirements(token, true, _ihDelay);
+      if (token) {
+        if (_ihKeyToggled) {
+          // 이미 표시 중 → 취소
+          _ihKeyToggled = false;
+          if (!_ihShowAll) canvas.hud.imageHover?.close();
+        } else {
+          _ihKeyToggled = true;
+          canvas.hud.imageHover?.showArtworkRequirements(token, true, _ihDelay);
+        }
+        return;
+      }
+
+      // 캔버스 토큰이 아니라 DOM 포트레이트(상태 UI / 캐릭터시트) 위일 때
+      if (_ihHoverArtUrl) {
+        if (_ihDomToggled) {
+          _ihHideDomArt();
+        } else {
+          _ihDomToggled = true;
+          const url = _ihHoverArtUrl;
+          clearTimeout(_ihDomDelayTimer);
+          _ihDomDelayTimer = setTimeout(() => {
+            // 지연 후 재검증: 같은 포트레이트를 계속 호버 중이어야 표시
+            if (_ihDomToggled && _ihHoverArtUrl === url) _ihShowDomArt(url);
+          }, _ihDelay);
+        }
       }
     },
     onUp: () => {
@@ -211,10 +238,12 @@ function _ihComputePosition(imageWidth, imageHeight) {
   const W = window.innerWidth;
   const H = window.innerHeight;
 
-  let w = W / _ihSize;
+  // Target width from the size setting, but never upscale past the image's
+  // native width — upscaling small art only makes it blurry.
+  let w = Math.min(W / _ihSize, imageWidth);
   let h = w * (imageHeight / imageWidth);
 
-  // Clamp height to viewport
+  // Clamp height to viewport (downscale only — keeps aspect ratio)
   if (h > H) {
     w = (H / h) * w;
     h = H;
@@ -247,6 +276,89 @@ function _ihComputePosition(imageWidth, imageHeight) {
 function _ihClearArt() {
   _ihKeyToggled = false;
   if (!_ihShowAll) canvas.hud.imageHover?.close();
+  _ihHideDomArt();
+}
+
+// ── DOM portrait hover helpers ───────────────────────────────────────────────
+
+/**
+ * Resolve the full-resolution art URL for a hovered DOM element, or null.
+ * Covers the dx3rd resource (status) UI cards and character/item sheet portraits.
+ */
+function _ihResolveHoverArt(target) {
+  if (!target?.closest) return null;
+
+  // Status UI portrait → owning card's actor.img (always the full-res original).
+  if (target.closest(".fedr-portrait")) {
+    const card = target.closest(".fedr-actor-card");
+    const actor = card?.dataset.actorId && game.actors?.get(card.dataset.actorId);
+    if (actor?.img) return actor.img;
+  }
+
+  // Sheet portrait <img>. feApplyHQPortrait may swap src to a downscaled data:
+  // URL, so prefer the preserved original in dataset.feHqSrc.
+  const img = target.closest("img.profile-img, img.profile, img[data-edit='img']");
+  if (img) {
+    const orig = img.dataset?.feHqSrc;
+    if (orig) return orig;
+    const src = img.getAttribute("src");
+    if (src && !src.startsWith("data:")) return src;
+  }
+  return null;
+}
+
+/** Build/update the overlay element and apply the computed position. */
+function _ihRenderDomOverlay(url) {
+  const dims = _ihCache[url];
+  if (!dims) return;
+  const [x, y, w] = _ihComputePosition(dims.width, dims.height);
+
+  if (!_ihDomOverlay) {
+    _ihDomOverlay = document.createElement("div");
+    _ihDomOverlay.className = "fe-image-hover-hud";
+    document.body.appendChild(_ihDomOverlay);
+  }
+
+  const isVideo = _IH_VIDEO_EXTS.has(_ihFileExt(url));
+  const tag = isVideo ? "video" : "img";
+  let media = _ihDomOverlay.firstElementChild;
+  if (!media || media.tagName.toLowerCase() !== tag) {
+    _ihDomOverlay.textContent = "";
+    media = document.createElement(tag);
+    media.className = "fe-image-hover-media";
+    if (isVideo) {
+      media.autoplay = true;
+      media.loop = true;
+      media.muted = true;
+      media.playsInline = true;
+    }
+    _ihDomOverlay.appendChild(media);
+  }
+  if (media.getAttribute("src") !== url) media.setAttribute("src", url);
+
+  _ihDomOverlay.style.width = `${w}px`;
+  _ihDomOverlay.style.left = `${x}px`;
+  _ihDomOverlay.style.top = `${y}px`;
+  _ihDomOverlay.style.display = "block";
+}
+
+/** Show DOM portrait art, caching its dimensions first if needed. */
+function _ihShowDomArt(url) {
+  if (!url || !_ihEnabled) return;
+  if (url in _ihCache) {
+    _ihRenderDomOverlay(url);
+  } else {
+    _ihLoadDimensions(url).then(({ width, height }) => {
+      _ihCache[url] = { width, height };
+      if (_ihDomToggled) _ihRenderDomOverlay(url);
+    }).catch(() => {});
+  }
+}
+
+function _ihHideDomArt() {
+  _ihDomToggled = false;
+  clearTimeout(_ihDomDelayTimer);
+  if (_ihDomOverlay) _ihDomOverlay.style.display = "none";
 }
 
 // ── HUD Class ──────────────────────────────────────────────────────────────
@@ -511,7 +623,24 @@ window.addEventListener("blur", () => {
     _ihKeyToggled = false;
     if (!_ihShowAll) canvas.hud?.imageHover?.close();
   }
+  _ihHideDomArt();
 });
+
+// Track which DOM portrait (status UI card / sheet) the cursor is over so the
+// X keybind can show it even when no canvas token is hovered.
+document.addEventListener("pointerover", (ev) => {
+  const url = _ihResolveHoverArt(ev.target);
+  if (url) _ihHoverArtUrl = url;
+}, { passive: true });
+
+document.addEventListener("pointerout", (ev) => {
+  const url = _ihResolveHoverArt(ev.target);
+  if (!url) return;
+  // Moving within the same portrait (e.g. card → child) — keep it.
+  if (ev.relatedTarget && _ihResolveHoverArt(ev.relatedTarget) === url) return;
+  if (_ihHoverArtUrl === url) _ihHoverArtUrl = null;
+  _ihHideDomArt();
+}, { passive: true });
 
 Hooks.on("init", () => {
   _ihRegisterSettings();

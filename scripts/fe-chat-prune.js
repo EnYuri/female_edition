@@ -60,11 +60,14 @@ export function feInstallChatLogPrune() {
 
     // ── Public overrides ────────────────────────────────────────────────────
 
-    // True while the newest tail is pruned from the DOM — i.e. the user is
-    // browsing history, not following live. feSnapshotAndRestoreStickyScroll()
+    // True while the user is browsing history: the newest tail is pruned AND the
+    // DOM's last child is NOT the true newest message. feSnapshotAndRestoreStickyScroll()
     // reads this to avoid pinning the reader to the (incomplete) DOM bottom.
+    // Mirrors the scrollBottom() guard so that once the reader has forward-rendered
+    // all the way back to the newest message — even if #fwdPruned lingers true until
+    // the next postOne — sticky auto-scroll resumes immediately.
     get isBrowsingHistory() {
-      return this.#fwdPruned === true;
+      return this.#fwdPruned === true && !this.#domTailIsNewest();
     }
 
     async scrollBottom(opts = {}) {

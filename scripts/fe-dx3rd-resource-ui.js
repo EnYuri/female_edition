@@ -54,6 +54,11 @@ const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 // ─── guards ────────────────────────────────────────────────────────────────
 
 function _isDx3rd()      { return game.system?.id === "double-cross-3rd"; }
+function _isDnd5e()      { return game.system?.id === "dnd5e"; }
+// Systems where this status panel is available. DX3rd shows HP + 침식률(encroachment);
+// dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
+// in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
+function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
 function _isThemeOn()    { return document.body.classList.contains("fe-dx3rd-pixel-theme"); }
 function _isGlobalOn()   { const v = localStorage.getItem(VISIBLE_KEY); return v === null ? false : v === "true"; }
 function _setGlobalOn(v) { localStorage.setItem(VISIBLE_KEY, String(v)); }
@@ -93,7 +98,11 @@ function _enc(actor) {
 // PlayerCharacter → 우상단 가로 컨테이너 / 그 외 → 좌상단 세로 컨테이너.
 
 function _isPC(actor) {
-  return actor.system?.actorType === "PlayerCharacter";
+  // DX3rd: system.actorType === "PlayerCharacter". Other systems (dnd5e): the
+  // document type "character" is the player-character analogue → top-right row;
+  // everything else (npc/vehicle/group…) → left vertical "enemy" container.
+  if (actor?.system?.actorType) return actor.system.actorType === "PlayerCharacter";
+  return actor?.type === "character";
 }
 
 // ─── pinned actors ─────────────────────────────────────────────────────────
@@ -202,7 +211,9 @@ function _showCardContextMenu(actor, e) {
 
   document.querySelector(".fedr-ctx-menu")?.remove();
 
-  const onStage = !!globalThis.fetIsOnStage?.(actor.id);
+  // Stage (fe-theatre) items only when the theatre API is present (DX3rd).
+  const hasStage = typeof globalThis.fetAddToStage === "function";
+  const onStage = hasStage && !!globalThis.fetIsOnStage?.(actor.id);
   const pinned  = _isActorPinned(actor);
   const masked  = _isMasked(actor);
 
@@ -212,13 +223,13 @@ function _showCardContextMenu(actor, e) {
       icon:   "fa-comment-dots",
       action: () => globalThis.fetSetSpeakingAs?.(actor.id),
     }] : []),
-    {
+    ...(hasStage ? [{
       label:  onStage ? "무대에서 제거" : "무대에 추가",
       icon:   "fa-theater-masks",
       action: () => onStage
         ? globalThis.fetRemoveFromStage?.(actor.id)
         : globalThis.fetAddToStage?.(actor),
-    },
+    }] : []),
     {
       label:  pinned ? "스테이터스에서 제거" : "스테이터스에 추가",
       icon:   "fa-eye",
@@ -317,11 +328,18 @@ function _updateCard(card, actor) {
     card.querySelector(".fedr-hp-lbl").textContent = masked ? "??" : `${hp.value}/${hp.max}`;
   }
 
+  // 침식률(encroachment) bar: present only on systems that have it (DX3rd).
+  // On dnd5e and any system without an encroachment attribute, hide the whole
+  // bar-group so the card shows the HP bar only.
+  const encGroup = card.querySelector(".fedr-enc")?.closest(".fedr-bar-group");
   const enc = _enc(actor);
   if (enc) {
     const pct = Math.max(0, Math.min(1, enc.value / enc.cap));
     card.querySelector(".fedr-enc .fedr-fill").style.width = `${pct * 100}%`;
     card.querySelector(".fedr-enc-lbl").textContent = masked ? "??" : `${enc.value}/${enc.cap}`;
+    if (encGroup) encGroup.style.display = "";
+  } else if (encGroup) {
+    encGroup.style.display = "none";
   }
 }
 
@@ -430,7 +448,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
 
 // 전체 재빌드 — 핀된 액터 목록 기준으로 양쪽 컨테이너 동기화.
 function feRebuildDx3rdResourceUI() {
-  if (!_isDx3rd()) {
+  if (!_isSupported()) {
     document.getElementById(CONTAINER_ID)?.remove();
     document.getElementById(CONTAINER_OWN_ID)?.remove();
     _syncToggleBtn(false);
@@ -455,7 +473,7 @@ function feRebuildDx3rdResourceUI() {
 
 // 단일 액터 데이터 갱신 — 핀된 액터의 HP·침식률 업데이트.
 function feUpdateDx3rdResourceUI(actorId) {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
 
   const actor = game.actors?.get(actorId);
   if (!actor || !_isActorPinned(actor)) return;
@@ -477,7 +495,7 @@ function feUpdateDx3rdResourceUI(actorId) {
 // ─── per-actor pin toggle ──────────────────────────────────────────────────
 
 function _addActorCard(actor) {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   const posKey = _isPC(actor) ? POS_OWN_KEY : POS_KEY;
   const cntId  = _isPC(actor) ? CONTAINER_OWN_ID : CONTAINER_ID;
   const cnt    = _getOrCreateContainer(cntId, posKey);
@@ -597,7 +615,7 @@ function _applyVisibility(visible) {
 }
 
 function _injectChatBtn() {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   if (document.getElementById(BTN_ID)) return;
 
   const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
@@ -625,7 +643,7 @@ function _injectChatBtn() {
 // 사이드바 액터 디렉터리 우클릭
 // v14: getActorContextOptions / v13: getActorContextMenuOptions
 function _ruiContextEntry(html, options) {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   if (options.some(o => o.name === "스테이터스 토글")) return;
   const item = {
     name: "스테이터스 토글",
@@ -670,7 +688,7 @@ Hooks.on("createActor", (actor) => {
 
 // 캔버스 토큰 우클릭 (v14: getTokenEntries)
 Hooks.on("getTokenEntries", (token, options) => {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   const actor = token.actor;
   if (!actor) return;
   options.push({
@@ -683,7 +701,7 @@ Hooks.on("getTokenEntries", (token, options) => {
 // ─── 액터 시트 헤더 버튼 ──────────────────────────────────────────────────────
 
 function _injectSheetStatusBtn(app, el) {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   const actor = app.actor ?? app.document;
   if (actor?.documentName !== "Actor") return;
 
@@ -724,18 +742,24 @@ function _injectSheetStatusBtn(app, el) {
   }
 }
 
-Hooks.on("renderActorSheet", (app, html) => {
-  if (!_isDx3rd()) return;
+function _onRenderActorSheet(app, html) {
+  if (!_isSupported()) return;
   const el = html instanceof HTMLElement ? html
     : (typeof jQuery !== "undefined" && html instanceof jQuery) ? html[0]
-    : html?.element?.[0] ?? null;
+    : html?.element?.[0] ?? app?.element ?? null;
   if (el instanceof HTMLElement) _injectSheetStatusBtn(app, el);
-});
+}
+
+// renderActorSheet: v1 sheets (DX3rd). renderActorSheetV2: ApplicationV2 sheets
+// (dnd5e 5.x and other modern systems). _injectSheetStatusBtn de-dupes its own
+// button, so firing both for a system that emits both is harmless.
+Hooks.on("renderActorSheet",   _onRenderActorSheet);
+Hooks.on("renderActorSheetV2", _onRenderActorSheet);
 
 // ─── settings ─────────────────────────────────────────────────────────────
 
 Hooks.on("init", () => {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
     name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
     hint: "포트레이트 이미지 영역의 너비. 기본 98.",
@@ -765,7 +789,7 @@ Hooks.on("init", () => {
 // ─── Foundry hooks ─────────────────────────────────────────────────────────
 
 Hooks.on("ready", () => {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   _injectChatBtn();
   _injectAccentBtn();
   feRebuildDx3rdResourceUI();
@@ -785,7 +809,7 @@ Hooks.on("ready", () => {
 });
 
 Hooks.on("updateActor", (actor, change) => {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   if (change.system?.actorType !== undefined || change.flags?.[MODULE_ID] !== undefined) {
     // actorType 변경 또는 SHOW_FLAG 변경 → 전체 재빌드 (모든 클라이언트에서 동기화)
     feRebuildDx3rdResourceUI();
@@ -800,7 +824,7 @@ Hooks.on("renderChatInput", () => { _injectChatBtn(); _injectAccentBtn(); });
 Hooks.on("renderSidebar",   () => { _injectChatBtn(); _injectAccentBtn(); });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
-  if (!_isDx3rd()) return;
+  if (!_isSupported()) return;
   _injectChatBtn();
   _injectAccentBtn();
   feRebuildDx3rdResourceUI();
