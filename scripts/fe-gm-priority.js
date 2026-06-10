@@ -1,7 +1,8 @@
-import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS } from "./fe-constants.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS } from "./fe-constants.js";
 import { feHasOwn, feValuesEqual } from "./fe-util.js";
 
 let feSyncingLocalGmPrioritySettings = false;
+let feHydratingWorldSettings = false;
 
 function feGetRegisteredSettingConfig(key) {
   try {
@@ -22,6 +23,7 @@ function feIsGmPriorityEnabled() {
 function feIsGmPrioritySettingKey(key) {
   try {
     if (!key || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    if (key === FE_WORLD_SETTINGS_KEY) return false;
     if (FE_GM_PRIORITY_EXCLUDED_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
@@ -141,6 +143,132 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
   }
 }
 
+// =====================================================================
+// Per-world settings
+//
+// Client settings live in localStorage per browser origin (no world id), so
+// they are shared across every world on the server. We re-namespace them by
+// world id in a single client-scope Object (FE_WORLD_SETTINGS_KEY):
+//   { [worldId]: { [settingKey]: value } }
+//
+// On world load we hydrate game.settings from this world's slice (or seed the
+// slice from the current values on first visit, so a world inherits whatever
+// the user already had). On settings-menu save we capture the current values
+// back into this world's slice. The map itself and GM-priority overrides are
+// never stored per-world.
+// =====================================================================
+
+function feGetWorldId() {
+  try {
+    return String(game?.world?.id ?? "");
+  } catch {
+    return "";
+  }
+}
+
+// A setting participates in per-world storage when it is a client-scope
+// female_edition setting that is not one of the infrastructure stores.
+function feIsPerWorldSettingKey(key) {
+  try {
+    if (!key) return false;
+    if (key === FE_WORLD_SETTINGS_KEY || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    const cfg = feGetRegisteredSettingConfig(key);
+    if (!cfg) return false;
+    return String(cfg.scope ?? "") === "client";
+  } catch {
+    return false;
+  }
+}
+
+function feGetAllWorldSettings() {
+  try {
+    const data = game.settings.get(MODULE_ID, FE_WORLD_SETTINGS_KEY);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+// Snapshot the current local values of every per-world key.
+function feSnapshotPerWorldSettings() {
+  const snap = {};
+  try {
+    for (const [fullKey] of game.settings.settings ?? []) {
+      if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
+      const key = String(fullKey).slice(MODULE_ID.length + 1);
+      if (!feIsPerWorldSettingKey(key)) continue;
+      try {
+        snap[key] = game.settings.get(MODULE_ID, key);
+      } catch {
+        /* skip */
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return snap;
+}
+
+// Persist the current values into this world's slice of the store.
+async function feCaptureWorldSettings() {
+  try {
+    if (feHydratingWorldSettings) return false;
+    const worldId = feGetWorldId();
+    if (!worldId) return false;
+    const all = foundry.utils.deepClone(feGetAllWorldSettings());
+    all[worldId] = feSnapshotPerWorldSettings();
+    await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
+    return true;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to capture per-world settings`, err);
+    return false;
+  }
+}
+
+// On world load: apply this world's saved slice into local game.settings.
+// First visit (no slice yet) seeds the slice from the current values, so the
+// world adopts whatever the user already had configured.
+async function feHydrateWorldSettings() {
+  const worldId = feGetWorldId();
+  if (!worldId) return false;
+  feHydratingWorldSettings = true;
+  try {
+    const all = feGetAllWorldSettings();
+    const slice = all[worldId];
+
+    if (!slice || typeof slice !== "object") {
+      // First visit — seed from current values without touching game.settings.
+      const seeded = foundry.utils.deepClone(all);
+      seeded[worldId] = feSnapshotPerWorldSettings();
+      await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, seeded);
+      return false;
+    }
+
+    // Apply only the keys whose stored value differs (avoids redundant
+    // onChange churn), mirroring feSyncLocalGmPrioritySettings.
+    let changed = false;
+    for (const [key, target] of Object.entries(slice)) {
+      if (!feIsPerWorldSettingKey(key)) continue;
+      let current;
+      try {
+        current = game.settings.get(MODULE_ID, key);
+      } catch {
+        continue;
+      }
+      if (feValuesEqual(current, target)) continue;
+      await game.settings.set(MODULE_ID, key, target);
+      changed = true;
+    }
+    return changed;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to hydrate per-world settings`, err);
+    return false;
+  } finally {
+    feHydratingWorldSettings = false;
+  }
+}
+
 function feFireChatUiUpdated(payload = null) {
   Hooks.callAll(`${MODULE_ID}.chatUiUpdated`, payload);
 }
@@ -173,6 +301,10 @@ export {
   feMirrorGmPrioritySetting,
   feSeedGmPriorityOverridesFromLocal,
   feSyncLocalGmPrioritySettings,
+  feIsPerWorldSettingKey,
+  feGetAllWorldSettings,
+  feCaptureWorldSettings,
+  feHydrateWorldSettings,
   feFireChatUiUpdated,
   feSetting,
 };

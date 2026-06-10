@@ -169,7 +169,7 @@ export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   });
 }
 
-// ─── 캐릭터 시트(.profile-img) 자동 처리 — double-cross-3rd 한정 ────────────────
+// ─── 캐릭터 시트 포트레이트 자동 처리 — 전 시스템 ──────────────────────────────
 
 function _rootEl(html) {
   // v13: jQuery 래퍼 / v14: HTMLElement
@@ -190,11 +190,31 @@ function _displaySize(imgEl) {
   return { w: Math.round(w) || 150, h: Math.round(h) || 200 };
 }
 
+// 액터 시트 포트레이트 셀렉터 (시스템별):
+//   dx3rd            → img.profile-img
+//   dnd5e Tidy5e     → img.actor-image
+//   dnd5e 기본(quadrone) → [data-action="showArtwork"] img (클래스 없음)
+//   범용 Foundry      → img.profile, [data-edit="img"], [data-action="showPortraitArtwork"] img
+// 작은 아이콘이 아닌 "큰 포트레이트/프로필 이미지"만 잡도록 고른 선택자다.
+const FE_SHEET_PORTRAIT_SELECTOR = [
+  "img.profile-img",
+  "img.actor-image",
+  "img.profile",
+  'img[data-edit="img"]',
+  // dnd5e 기본(quadrone) 시트는 data-action 이 <img> 자신에 붙는다(설명서·Tidy 와 다름).
+  'img[data-action="showArtwork"]',
+  'img[data-action="showPortraitArtwork"]',
+  '[data-action="showArtwork"] img',
+  '[data-action="showPortraitArtwork"] img',
+].join(", ");
+
 function _processSheetPortraits(html) {
-  if (game.system?.id !== "double-cross-3rd") return;
   const root = _rootEl(html);
   if (!root?.querySelectorAll) return;
-  for (const img of root.querySelectorAll("img.profile-img")) {
+  const seen = new Set();
+  for (const img of root.querySelectorAll(FE_SHEET_PORTRAIT_SELECTOR)) {
+    if (img.tagName !== "IMG" || seen.has(img)) continue;
+    seen.add(img);
     const url = img.getAttribute("src");
     if (!url || url.startsWith("data:")) continue;
     const { w, h } = _displaySize(img);

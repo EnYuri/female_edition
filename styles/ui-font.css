@@ -164,11 +164,15 @@ body.fe-fonts-enabled {
      직접 지정하므로 이 변수를 빼면 인용문만 커스텀 폰트(그림일기/NeoDGM)가 안 먹는다. */
   --font-blockquote: var(--fe-font-primary);
 
-  /* dnd5e 폰트 변수 재정의 */
-  --dnd5e-font-roboto:      var(--fe-font-primary);
-  --dnd5e-font-roboto-slab: var(--fe-font-primary);
-  --dnd5e-font-signika:     var(--fe-font-primary);
-  --dnd5e-font-modesto:     var(--fe-font-primary);
+  /* dnd5e 폰트 변수 재정의
+   * NOTE: roboto-condensed 는 dnd5e 신형(quadrone) 시트가 라벨/스킬명에 쓰는
+   *       별도 변수다. 이걸 빼면 신형 캐릭터 시트의 .roboto-condensed-upper,
+   *       a.skill-name 등이 커스텀 폰트 대신 "Roboto Condensed" 로 남는다. */
+  --dnd5e-font-roboto:           var(--fe-font-primary);
+  --dnd5e-font-roboto-slab:      var(--fe-font-primary);
+  --dnd5e-font-roboto-condensed: var(--fe-font-primary);
+  --dnd5e-font-signika:          var(--fe-font-primary);
+  --dnd5e-font-modesto:          var(--fe-font-primary);
 }
 
 /* Foundry 코어는 @layer variables.base 의 `body.game .app` 에서 --font-primary 를
@@ -216,10 +220,11 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
 
 /* dnd5e 스코프 재어설트 */
 body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) {
-  --dnd5e-font-roboto:      var(--fe-font-primary) !important;
-  --dnd5e-font-roboto-slab: var(--fe-font-primary) !important;
-  --dnd5e-font-signika:     var(--fe-font-primary) !important;
-  --dnd5e-font-modesto:     var(--fe-font-primary) !important;
+  --dnd5e-font-roboto:           var(--fe-font-primary) !important;
+  --dnd5e-font-roboto-slab:      var(--fe-font-primary) !important;
+  --dnd5e-font-roboto-condensed: var(--fe-font-primary) !important;
+  --dnd5e-font-signika:          var(--fe-font-primary) !important;
+  --dnd5e-font-modesto:          var(--fe-font-primary) !important;
 }
 
 /* ===================================================
@@ -479,4 +484,18 @@ body.fe-fonts-enabled .ve-night-mode .rd__h--3 {
   color: inherit !important;
   font-weight: 900 !important;
   font-style: normal !important;
+}
+
+/* 브라우저 확장(Grammarly류) 폰트 오염 무력화.
+ * 이런 확장은 편집/붙여넣기 시 텍스트를 <span style="font-family:'gg mono, ...'">
+ * 으로 감싸며, 그 값은 콤마 목록 전체가 한 따옴표에 들어간 무효값이다. 이 무효값은
+ * 부모의 상속을 끊으면서 정작 아무 폰트에도 매칭되지 않아 브라우저 기본 폰트로
+ * fallback → FE 폰트만 깨져 보인다. 게다가 이 span 은 액터 바이오/저널의 저장
+ * HTML 에 그대로 박혀 영구화된다.
+ *   → 오염의 시그니처 폰트("gg mono")만 표적해 inherit 로 되돌린다. 사용자가
+ *      에디터 폰트 드롭다운으로 직접 고른 정상 폰트(단일 유효 패밀리명)는
+ *      이 시그니처를 포함하지 않으므로 그대로 보존된다.
+ *      (오염 인라인 선언에는 !important 가 없어 스타일시트 !important 가 이긴다.) */
+body.fe-fonts-enabled [style*="gg mono"] {
+  font-family: inherit !important;
 }

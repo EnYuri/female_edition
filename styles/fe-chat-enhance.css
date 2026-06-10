@@ -237,6 +237,34 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
 }
 
 
+/* ── 병합 그룹 외곽선 (옵션: body.fe-chat-group-outline) ─────────────────────────
+ * 병합 그룹(또는 단일 메시지)을 외곽선으로 감싸 박스처럼 표시한다. 기본은 꺼짐.
+ *
+ * 동작 원리: 위 standard 병합 규칙들이 그룹 내부 경계의 border-width 를 이미 0 으로
+ *   만든다(start 하단 / mid 상·하 / end 상단, 명시도 0,5,0 의 !important). 따라서
+ *   "낮은 명시도(0,3,0)"의 기본 테두리를 모든 메시지에 깔면, 내부 경계는 병합 규칙이
+ *   이겨 0 으로 남고 그룹 바깥 둘레만 테두리가 그려진다 → 그룹 박스.
+ * 색상: 유저 색상(.fe-has-user-color) 우선, 없으면 액센트(흰색).
+ * transition:none — 레트로의 `* { transition: all 1ms }` 가 테두리 변경을 시작값에
+ *   고착시키는 문제(채팅 색조 틴트와 동일 원인)를 회피. */
+body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message {
+  --fe-group-outline-color: rgba(255, 255, 255, 0.45);
+  border: 3px solid var(--fe-group-outline-color) !important;
+  transition: none !important;
+}
+
+/* 유저 색상이 있으면 그 색으로 */
+body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color {
+  --fe-group-outline-color: rgb(var(--fe-user-color-rgb, 255 255 255) / 0.6);
+}
+
+/* 내레이터/라운드 마커 등 특수 메시지는 외곽선 제외 (기본보다 높은 명시도) */
+body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"]) {
+  border: 0 !important;
+}
+
+
 /* Simple merge mode: keep message boxes intact, only collapse follow-up headers.
  *
  * Inter-box gap = flex-gap + margin-top(follow) = spacing + (inner-gap - spacing) = inner-gap.

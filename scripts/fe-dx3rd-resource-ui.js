@@ -59,7 +59,7 @@ function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
-function _isThemeOn()    { return document.body.classList.contains("fe-dx3rd-pixel-theme"); }
+function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
 function _isGlobalOn()   { const v = localStorage.getItem(VISIBLE_KEY); return v === null ? false : v === "true"; }
 function _setGlobalOn(v) { localStorage.setItem(VISIBLE_KEY, String(v)); }
 
@@ -554,9 +554,11 @@ function _setAccent(color) {
 }
 
 function _injectAccentBtn() {
-  // 액센트 색 선택기는 픽셀 테마 전용(비-픽셀엔 액센트 오버라이드가 없음).
+  // 액센트 색 선택기는 레트로 테마 전용(비-레트로엔 액센트 오버라이드가 없음).
+  // 레트로 테마는 전 시스템 공용이므로 시스템 게이트 없이, 테마 ON + GM 이면 주입한다.
+  // (이전엔 _isDx3rd() 로 묶여 dnd5e 등에서 강조색 스와치가 안 보였다.)
   // 테마가 꺼졌으면 이미 주입된 버튼을 제거하고 빠진다.
-  if (!_isDx3rd() || !_isThemeOn() || !game.user?.isGM) {
+  if (!_isThemeOn() || !game.user?.isGM) {
     document.getElementById(ACCENT_BTN_ID)?.remove();
     return;
   }
@@ -736,7 +738,10 @@ function _injectSheetStatusBtn(app, el) {
     headerBtns.prepend(maskBtn);
     headerBtns.prepend(btn);
   } else {
-    const closeBtn = windowHeader.querySelector(".header-button.close, .header-control.close-window");
+    // AppV2 (dnd5e 5.x) close button is `button[data-action="close"]` (class
+    // .header-control), not `.header-button.close`/`.close-window`. Without matching
+    // it the buttons were appended AFTER close (to its right). Match all variants.
+    const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');
     closeBtn ? windowHeader.insertBefore(maskBtn, closeBtn) : windowHeader.appendChild(maskBtn);
     closeBtn ? windowHeader.insertBefore(btn, closeBtn) : windowHeader.appendChild(btn);
   }

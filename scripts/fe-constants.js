@@ -24,11 +24,16 @@ const S = {
   // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
   // for backwards compatibility with already-saved user settings.
   UI_ENABLE_FONTS: "enableFonts",
-  UI_DX3RD_PIXEL_THEME: "ceUiDx3rdPixelTheme",
+  // Retro (pixel high-contrast) theme. Storage key keeps its legacy
+  // "ceUiDx3rdPixelTheme" value so already-saved user toggles are preserved
+  // after the rename from the old DX3rd-specific name to a general theme.
+  UI_RETRO_THEME: "ceUiDx3rdPixelTheme",
   UI_HIDE_PORTRAITS: "hideChatPortraits",
   UI_STRIP_TEXTURES: "stripChatTextures",
   USE_USER_COLOR_BG: "ceUseUserColorBg",
   USER_COLOR_BG_BASE: "ceUserColorBgBase",
+  CHAT_GROUP_OUTLINE: "ceChatGroupOutline",
+  ACCENT_TEXT_OVERRIDE: "ceAccentTextOverride",
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
   STYLE_PLAYER_NAME_SIZE: "cePlayerNameSize",
   STYLE_MESSAGE_TEXT_SIZE: "ceMessageTextSize",
@@ -83,11 +88,13 @@ const FE_DEFAULTS = {
   [S.CHAT_FONT_CHOICE]: "cookie",
   [S.UI_USE_GEURIMILGI]: true,
   [S.UI_ENABLE_FONTS]: true,
-  [S.UI_DX3RD_PIXEL_THEME]: false,
+  [S.UI_RETRO_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,
   [S.UI_STRIP_TEXTURES]: true,
   [S.USE_USER_COLOR_BG]: false,
   [S.USER_COLOR_BG_BASE]: "white",
+  [S.CHAT_GROUP_OUTLINE]: false,
+  [S.ACCENT_TEXT_OVERRIDE]: true,
   [S.STYLE_ACTOR_NAME_SIZE]: 22,
   [S.STYLE_PLAYER_NAME_SIZE]: 14,
   [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
@@ -114,6 +121,13 @@ const FE_DEFAULTS = {
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
+
+// Per-world settings store. A single client-scope Object holding
+// { [worldId]: { [settingKey]: value } }. Client settings in Foundry are stored
+// in localStorage per browser origin WITHOUT a world id, so they are shared
+// across every world on the same server. This store re-namespaces them by world
+// id so each world keeps an independent copy of the user's preferences.
+const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 
 const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_ENABLED,
@@ -151,6 +165,7 @@ export {
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   FE_DEFAULTS,
   FE_GM_PRIORITY_OVERRIDES_KEY,
+  FE_WORLD_SETTINGS_KEY,
   FE_GM_PRIORITY_EXCLUDED_KEYS,
   FE_RENDER_STATE_FLAG,
   FE_RENDER_SPECIAL_KIND_FLAG,

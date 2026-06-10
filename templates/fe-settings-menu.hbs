@@ -1,4 +1,6 @@
-<form class="fe-settings" autocomplete="off">
+{{!-- Root <form> is provided by the ApplicationV2 frame (tag:"form"); do not nest one here.
+     A Handlebars part must render a SINGLE root element, so wrap everything in one div. --}}
+<div class="fe-settings">
   <div class="fe-settings__topbar flexrow">
     <div class="fe-settings__title">
       <h2>Female-cupwhi 설정</h2>
@@ -139,6 +141,14 @@
         </select>
       </div>
       <p class="notes">유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>채팅: 병합 그룹 외곽선</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceChatGroupOutline" data-dtype="Boolean" {{checked values.ceChatGroupOutline}} />
+      </div>
+      <p class="notes">병합된 메시지 그룹(또는 단일 메시지)을 외곽선(유저 색상)으로 감싸 박스처럼 표시합니다. 끄면 색조 배경만 사용합니다.</p>
     </div>
 
     <div class="form-group">
@@ -470,17 +480,29 @@
   </details>
   {{/if}}{{/if}}
 
-  {{#if isDx3rd}}
   <details>
-    <summary>[DX3rd] 픽셀 테마</summary>
+    <summary>레트로 테마</summary>
 
     <div class="form-group">
-      <label>픽셀 고대비 테마</label>
+      <label>레트로 테마 (픽셀 고대비)</label>
       <div class="form-fields">
         <input type="checkbox" name="ceUiDx3rdPixelTheme" data-dtype="Boolean" {{checked values.ceUiDx3rdPixelTheme}} />
       </div>
-      <p class="notes">모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. NeoDGM 폰트 모드와 함께 사용 권장.</p>
+      <p class="notes">모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용 가능. NeoDGM 폰트 모드와 함께 사용 권장.</p>
     </div>
+
+    <div class="form-group">
+      <label>텍스트 색조 오버라이드</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceAccentTextOverride" data-dtype="Boolean" {{checked values.ceAccentTextOverride}} />
+      </div>
+      <p class="notes">레트로 테마에서 dnd5e 시트·채팅의 텍스트를 강조색(픽셀 테마 강조색 스와치) 기반 톤으로 통일합니다. 끄면 기본 텍스트 색(흰/회색·유저 색상)을 사용합니다.</p>
+    </div>
+  </details>
+
+  {{#if isDx3rd}}
+  <details>
+    <summary>[DX3rd] 전용 설정</summary>
 
     <div class="form-group">
       <label>채팅 카드 테두리 투명도</label>
@@ -546,4 +568,4 @@
       <i class="far fa-save"></i> 저장
     </button>
   </footer>
-</form>
+</div>

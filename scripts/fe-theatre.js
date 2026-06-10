@@ -430,7 +430,7 @@ function _fetRemoveInsert(theatreId, remote = false) {
   _fet.inserts.delete(theatreId);
   _fetRefreshSheetHeaders();
 
-  if (_fet.speakingAs === theatreId) _fetSetSpeakingAs(null, true);
+  if (_fet.speakingAs === theatreId) _fetSetSpeakingAs(null);
   if (!remote) _fetSendEvent("exit", { theatreId });
 }
 
@@ -440,14 +440,15 @@ function _fetClearAll(remote = false) {
 
 // ── Speaking-as ────────────────────────────────────────────────────────────
 
-function _fetSetSpeakingAs(theatreId, localOnly = false) {
+// speakingAs is purely LOCAL client state — remote clients never need it (the
+// stageId travels with each chat message), so this intentionally does not emit.
+function _fetSetSpeakingAs(theatreId) {
   if (theatreId && theatreId !== _FET_NONE) {
     const insert = _fet.inserts.get(theatreId);
     if (insert && !_fetCanSpeakAs(insert.actorId)) return; // no owner permission
   }
   _fet.speakingAs = theatreId ?? null;
   _fetUpdateActiveStates();
-  if (!localOnly) _fetSendEvent("speakas", { theatreId, userId: game.user.id });
 }
 
 function _fetUpdateActiveStates() {
@@ -702,7 +703,7 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
 
   // Safety net: reset speak-as if user somehow lost owner permission
   if (!_fetCanSpeakAs(insert.actorId)) {
-    _fetSetSpeakingAs(null, true);
+    _fetSetSpeakingAs(null);
     return;
   }
 
@@ -731,14 +732,18 @@ Hooks.on("createChatMessage", (chatMessage) => {
   // Skip roll messages and slash commands; markdown-wrapped HTML is handled by text extraction below
   if (chatMessage.rolls?.length || chatMessage.content?.startsWith("/")) return;
 
-  // Strip HTML, decode entities
-  const tmp = document.createElement("div");
-  tmp.innerHTML = chatMessage.content ?? "";
-  const text = tmp.textContent?.trim() ?? "";
+  // Strip HTML → plain text for the speech bubble. Use DOMParser (inert document)
+  // rather than `div.innerHTML`: the latter loads resources even on a detached node,
+  // so a crafted stage message with `<img onerror=…>` would execute script on every
+  // client that receives it. A DOMParser document has no browsing context — images
+  // never load and inline error handlers never fire.
+  const text = new DOMParser()
+    .parseFromString(String(chatMessage.content ?? ""), "text/html")
+    .body.textContent?.trim() ?? "";
   if (!text) return;
 
-  const _u = game.users.get(chatMessage.author?.id ?? chatMessage.userId);
-  const color = _u?.color?.css ?? (typeof _u?.color === "string" ? _u.color : "") ?? "";
+  const _u = game.users.get(chatMessage.author?.id);
+  const color = _u?.color?.css ?? (typeof _u?.color === "string" ? _u.color : "");
   _fetShowText(theatreId, text, color);
 });
 
@@ -777,8 +782,6 @@ function _fetHandleSocket(payload) {
       break;
     case "exit":
       _fetRemoveInsert(payload.theatreId, true);
-      break;
-    case "speakas":
       break;
     case "emote":
       _fetSetEmote(payload.theatreId, payload.emoteName ?? null, true);
@@ -836,7 +839,7 @@ async function _fetOpenActorConfig(actorId) {
     .map(([k, v]) => buildEmoteRow(k, v)).join("");
 
   const content = `
-    <form class="fe-stage-config-form">
+    <div class="fe-stage-config-form">
       <div class="form-group">
         <label>표시 이름</label>
         <input type="text" name="stageName" value="${_fetEsc(flags.name ?? actor.name)}">
@@ -853,25 +856,32 @@ async function _fetOpenActorConfig(actorId) {
         <div class="fe-config-emotes-list">${existingRows}</div>
         <button type="button" class="fe-add-emote"><i class="fas fa-plus"></i> 감정 추가</button>
       </div>
-    </form>`;
+    </div>`;
 
-  new Dialog({
-    title: `${actor.name} — 무대 설정`,
+  // ApplicationV2 DialogV2 (v1 Dialog is deprecated and slated for removal in a
+  // future v14). Buttons are an array; callback is (event, button, dialog) and
+  // render is (event, dialog). We read inputs via dialog.element (descendant
+  // querySelector), so the DialogV2 form wrapper vs our content layout is irrelevant.
+  const { DialogV2 } = foundry.applications.api;
+  new DialogV2({
+    window: { title: `${actor.name} — 무대 설정` },
+    position: { width: 580 },
     content,
-    buttons: {
-      save: {
-        icon:  '<i class="fas fa-save"></i>',
+    buttons: [
+      {
+        action: "save",
+        icon: "fas fa-save",
         label: "저장",
-        callback: async (html) => {
-          const root = html instanceof jQuery ? html[0] : html;
-          await _fetSaveActorConfig(actorId, root);
+        default: true,
+        callback: async (_event, _button, dialog) => {
+          await _fetSaveActorConfig(actorId, dialog.element);
         },
       },
-      cancel: { icon: '<i class="fas fa-times"></i>', label: "취소" },
-    },
-    default: "save",
-    render: (html) => {
-      const root = html instanceof jQuery ? html[0] : html;
+      { action: "cancel", icon: "fas fa-times", label: "취소" },
+    ],
+    render: (_event, dialog) => {
+      const root = dialog.element;
+      if (!root) return;
 
       // File picker buttons
       root.addEventListener("click", (e) => {
@@ -879,7 +889,9 @@ async function _fetOpenActorConfig(actorId) {
         if (!btn) return;
         const name = btn.dataset.target;
         const input = btn.closest(".form-fields, .form-group")?.querySelector(`[name="${name}"]`);
-        const FPClass = foundry.applications.apps?.FilePicker ?? window.FilePicker;
+        const FPClass = foundry.applications.apps?.FilePicker?.implementation
+          ?? foundry.applications.apps?.FilePicker
+          ?? window.FilePicker;
         if (FPClass) new FPClass({ type: "imagevideo", callback: (path) => { if (input) input.value = path; } }).render(true);
       });
 
@@ -895,10 +907,10 @@ async function _fetOpenActorConfig(actorId) {
         const list = root.querySelector(".fe-config-emotes-list");
         const tmp = document.createElement("div");
         tmp.innerHTML = buildEmoteRow();
-        list.appendChild(tmp.firstElementChild);
+        if (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
       });
     },
-  }, { width: 580 }).render(true);
+  }).render({ force: true });
 }
 
 async function _fetSaveActorConfig(actorId, root) {
@@ -1118,7 +1130,10 @@ function _fetInjectSheetButtons(app, el) {
   } else {
     // Header fallback: insert before the close button (forward order, left → right).
     // Final order: [추가/전환] [제거] [설정] before [close]
-    const closeBtn = windowHeader.querySelector(".header-button.close, .header-control.close-window");
+    // AppV2 (dnd5e 5.x) close button is `button[data-action="close"]` (class
+    // .header-control), not `.header-button.close`/`.close-window`. Without matching
+    // it the buttons were appended AFTER close (to its right). Match all variants.
+    const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');
     const ins = (btn) => closeBtn ? windowHeader.insertBefore(btn, closeBtn) : windowHeader.appendChild(btn);
 
     if (onStage) {
@@ -1150,7 +1165,14 @@ function _fetRefreshSheetHeaders() {
   } catch { /* noop */ }
 }
 
-Hooks.on("renderActorSheet", (app, html) => {
+// renderActorSheet: v1 sheets (DX3rd). renderActorSheetV2: ApplicationV2 sheets
+// (dnd5e 5.x and other modern systems) — the `renderActorSheet` hook does NOT fire
+// for those (no `ActorSheet` class in the AppV2 prototype chain), so without the V2
+// hook theatre buttons only appeared after a state-change refresh. _fetInjectSheetButtons
+// de-dupes its own buttons, so firing both for a system that emits both is harmless.
+function _fetOnRenderActorSheet(app, html) {
   const el = _fetResolveEl(app, html);
   if (el instanceof HTMLElement) _fetInjectSheetButtons(app, el);
-});
+}
+Hooks.on("renderActorSheet",   _fetOnRenderActorSheet);
+Hooks.on("renderActorSheetV2", _fetOnRenderActorSheet);

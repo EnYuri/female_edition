@@ -4,6 +4,8 @@
  * Compatible with Foundry VTT v13 and v14 (ApplicationV2 + HandlebarsApplicationMixin).
  */
 
+import { feApplyHQPortrait } from "./fe-portrait-hq.js";
+
 const _IH_MODULE = "female_edition";
 const _IH_SOCKET_TYPE = "fe-image-hover";
 const _IH_DEFAULT_TOKEN = "icons/svg/mystery-man.svg";
@@ -238,9 +240,13 @@ function _ihComputePosition(imageWidth, imageHeight) {
   const W = window.innerWidth;
   const H = window.innerHeight;
 
-  // Target width from the size setting, but never upscale past the image's
-  // native width — upscaling small art only makes it blurry.
-  let w = Math.min(W / _ihSize, imageWidth);
+  // Target width from the size setting (W / size), matching the original
+  // image-hover. Do NOT cap at the image's native width: small portraits (e.g.
+  // 311px art with size=3 wanting 640px) would otherwise render at half the
+  // original's size. Users pick the size deliberately — honor it and upscale small
+  // art like the original. Large art is still HQ-downscaled by feApplyHQPortrait
+  // (so the sparkle/aliasing fix remains); only sub-display-size art is upscaled.
+  let w = W / _ihSize;
   let h = w * (imageHeight / imageWidth);
 
   // Clamp height to viewport (downscale only — keeps aspect ratio)
@@ -335,6 +341,9 @@ function _ihRenderDomOverlay(url) {
     _ihDomOverlay.appendChild(media);
   }
   if (media.getAttribute("src") !== url) media.setAttribute("src", url);
+
+  // HQ downscale for images (see _applyToCanvas / fe-portrait-hq.js).
+  if (!isVideo) feApplyHQPortrait(media, url, w, w * (dims.height / dims.width));
 
   _ihDomOverlay.style.width = `${w}px`;
   _ihDomOverlay.style.left = `${x}px`;
@@ -451,6 +460,13 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     el.style.width = `${w}px`;
     el.style.left  = `${x}px`;
     el.style.top   = `${y}px`;
+
+    // HQ downscale: on Foundry's GPU-composited page a raw <img> shrunk 5-15×
+    // gets a single bilinear sample → sparkle/aliasing. Route images through the
+    // module's stepped-halving downscaler (videos are left untouched). See
+    // fe-portrait-hq.js for the rationale.
+    const img = el.querySelector("img.fe-image-hover-media");
+    if (img) feApplyHQPortrait(img, url, w, w * (height / width));
   }
 
   /**

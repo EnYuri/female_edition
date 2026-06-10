@@ -70,10 +70,10 @@ function feSetNeodgmModeClass(doc = document) {
   } catch {}
 }
 
-function feSetDx3rdPixelThemeClass(doc = document) {
+function feSetRetroThemeClass(doc = document) {
   try {
-    const enabled = !!feSetting(S.UI_DX3RD_PIXEL_THEME);
-    doc?.body?.classList?.toggle("fe-dx3rd-pixel-theme", enabled);
+    const enabled = !!feSetting(S.UI_RETRO_THEME);
+    doc?.body?.classList?.toggle("fe-retro-theme", enabled);
   } catch {}
 }
 
@@ -81,6 +81,20 @@ function feSetUserColorBgClass(doc = document) {
   try {
     const enabled = !!feSetting(S.USE_USER_COLOR_BG);
     doc?.body?.classList?.toggle("fe-msg-bg-usercolor", enabled);
+  } catch {}
+}
+
+function feSetChatGroupOutlineClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.CHAT_GROUP_OUTLINE);
+    doc?.body?.classList?.toggle("fe-chat-group-outline", enabled);
+  } catch {}
+}
+
+function feSetAccentTextOverrideClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.ACCENT_TEXT_OVERRIDE);
+    doc?.body?.classList?.toggle("fe-accent-text-override", enabled);
   } catch {}
 }
 
@@ -149,8 +163,10 @@ export {
   feSetChatFontChoiceClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,
-  feSetDx3rdPixelThemeClass,
+  feSetRetroThemeClass,
   feSetUserColorBgClass,
   feSetUserColorBgBaseClass,
+  feSetChatGroupOutlineClass,
+  feSetAccentTextOverrideClass,
   feApplyStyleVarsFromSettings,
 };

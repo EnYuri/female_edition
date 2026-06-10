@@ -1,0 +1,131 @@
+/* ================================================================
+ * fe-dnd5e-compat.css
+ * female_edition — dnd5e readability fixes under dark backgrounds
+ *
+ * 활성화: 채팅 카드 가독성은 body.fe-retro-theme 전용(레트로만 카드 배경을 검정으로
+ *         강제). HP 미터 입력칸 투명화도 body.fe-retro-theme 전용.
+ *
+ * 문제:
+ *   dnd5e 채팅 카드(.chat-card / .dnd5e2.chat-card)는 밝은 양피지 배경을
+ *   전제로 본문 텍스트에 시스템 잉크색(#191813)과 회색 보조색(#666)을 쓴다.
+ *   레트로 테마(또는 검정 유저-컬러 배경)는 카드 배경을 검정으로 강제하므로
+ *   그 어두운 잉크가 검정 위에 얹혀 대비 ~0.09 로 사실상 안 보인다
+ *   (피쳐/주문 카드의 설명·보조설명·재료 텍스트 등).
+ *
+ * 해결:
+ *   카드 본문 텍스트를 읽기 가능한 밝은색(#e6e6e6, 헤더 제목과 동일 톤)으로
+ *   강제한다. 링크(a)·버튼·인라인 롤은 셀렉터에서 제외해 고유 색을 유지한다.
+ *
+ * ⚠️ CASCADE LAYER (필수): module.json 에서
+ *      { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" } 로 등록.
+ *    dnd5e 시스템 CSS 는 system(8) 레이어에 들어간다. modules(9) 레이어의
+ *    !important 는 레이어 역전 규칙상 system 의 !important 에 진다. 현재 dnd5e
+ *    잉크색은 !important 가 아니라 일반 상속이지만, 다크테마 변형이 !important 를
+ *    걸 가능성에 대비해 fe-dx3rd-compat.css 와 동일하게 layouts(7) 레이어에서
+ *    !important 로 확실히 이긴다.
+ * ================================================================ */
+
+/* 카드 컨테이너 기준색 — 명시적 색이 없는 모든 자손 텍스트가 상속받는 안전망.
+ * 레트로 테마일 때만 적용한다: 카드 배경을 검정으로 강제하는 건 fe-retro-theme
+ * 뿐이다(.chat-card{background:#000}). fe-userbg-base-black 은 메시지(li) 틴트의
+ * 하부 베이스일 뿐 카드 배경을 어둡게 하지 않으므로, 그 스코프로 글씨를 밝게 하면
+ * 레트로 OFF 시 "밝은 카드 위 밝은 글씨"로 사라진다. */
+body.fe-retro-theme :is(#sidebar #chat, #chat-notifications, .chat-popout #chat) .chat-card {
+  color: #e6e6e6 !important;
+}
+
+/* dnd5e 가 어두운 잉크/회색을 "직접" 지정하는 본문 요소들을 덮어쓴다.
+ * a / button / .inline-roll / [data-action] 등 상호작용·색상 요소는 제외. */
+body.fe-retro-theme :is(#sidebar #chat, #chat-notifications, .chat-popout #chat) .chat-card
+  :is(p, i, em, b, strong, u, s, small, li, td, th, dt, dd, label,
+      h1, h2, h3, h4, h5, h6,
+      .description, .card-content, .card-footer, .supplement,
+      blockquote, figcaption) {
+  color: #e6e6e6 !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * 캐릭터 시트 HP/리소스 미터 위에 겹쳐진 입력칸
+ *
+ * dnd5e/Tidy5e 시트는 HP·리소스 값 입력칸(input.resource-value 등)을
+ * 체력바(.bar, 초록 등) "위에" 겹쳐 배치한다(absolute 바 + relative 입력칸).
+ * 레트로 테마는 모든 input 배경을 검정으로 강제하므로, 이 입력칸의 검정
+ * 배경이 뒤의 색깔 바를 완전히 가린다(초록 체력바가 안 보임).
+ *   → 미터 오버레이 입력칸만 배경을 투명화해 바가 비치게 하고, 숫자는
+ *      어두운 텍스트섀도로 어느 바 색 위에서도 읽히게 한다.
+ *      (레트로의 전역 text-shadow:none 을 이 요소에서만 되살린다.)
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
+  :is(.portrait-hp, .meter, .progress, .resource) input,
+body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet) input.resource-value {
+  background: transparent !important;
+  text-shadow: 0 0 2px #000, 0 0 3px #000 !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * 채팅 굴림 결과값 박스(.dice-total) 가독성
+ *
+ * dnd5e 의 결과 숫자 박스(.dice-total)는 두 종류다:
+ *   · 일반 굴림        → 배경 rgba(0,0,0,0.05) (거의 투명) → 레트로 검정 카드 위
+ *                        에서는 사실상 검정 배경.        → 밝은 글씨여야 보인다.
+ *   · 크리티컬/펌블 강조 → 배경 연녹(rgb 204,215,197)/연적 등 밝은 파스텔.
+ *                                                        → 어두운 글씨여야 보인다.
+ * 레트로에서 기본 글씨가 밝은 회색이라 크리티컬 박스에선 "유백색 위 밝은 글씨"로
+ * 묻히고, 무턱대고 어둡게 하면 일반 박스가 "검정 위 검정"으로 사라진다.
+ *   → 기본은 밝은 글씨(일반 박스 대비), .critical/.fumble 만 어두운 글씨로 덮는다.
+ * transition:none — 레트로의 `* { transition: all 1ms }` 가 색/배경 전환을 시작값에
+ *   고착시켜 변경이 페인트되지 않는 문제를 회피(채팅 색조 틴트와 동일 원인). */
+body.fe-retro-theme :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
+  :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total) {
+  color: #e6e6e6 !important;
+  transition: none !important;
+}
+body.fe-retro-theme :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
+  :is(.dice-total.critical, .dice-total.fumble,
+      .dice-roll .dice-total.critical, .dice-roll .dice-total.fumble) {
+  color: #14130f !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * dnd5e 텍스트 — 강조색(--fe-ac-*) 기반으로 통일
+ *
+ * dx3rd 레트로는 텍스트가 강조색 톤인데 dnd5e 는 흰/회색이라 색조 오버라이드가
+ * dnd5e 에선 글자에 안 먹는 듯 보였다. dnd5e 시트/채팅의 본문 텍스트를 강조색
+ * 파생 톤(--fe-ac-90, 강조색 hue/sat 의 밝은 버전)으로 칠해 dx3rd 와 맞춘다.
+ *   제외: Font Awesome 아이콘(아이콘 폰트 글리프), 굴림 결과 박스(.dice-total —
+ *   위에서 가독성 기준으로 별도 처리), 콘텐츠 링크 색(.content-link 등 의미색 유지).
+ * 강조색 스와치(픽셀 테마 강조색)를 바꾸면 이 텍스트 색도 함께 바뀐다. */
+body.fe-retro-theme.fe-accent-text-override
+  :is(.dnd5e, .dnd5e2, .tidy5e-sheet,
+      #sidebar #chat, #chat-notifications, .chat-popout #chat, .chat-message, .chat-card)
+  :is(span, div, p, a, button, label, td, th, dt, dd, li, small, em, strong, b,
+      h1, h2, h3, h4, h5, h6, .label, .name, .title, .value, .mod,
+      .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link) {
+  color: var(--fe-ac-90, #e6e6e6) !important;
+  transition: none !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * Tidy5e 토글/활성·호버 글로우 복원
+ *
+ * 레트로의 전역 `* { box-shadow: none }` 이 Tidy 의 고양감(inspiration) 토글,
+ * 우선권/능력치(block-score) 버튼 등의 "활성/호버 글로우"를 없애, 켜짐 상태가
+ * 검정 사각 배경으로만 남아 꺼짐과 구별이 안 된다(비가시).
+ *   → 활성/호버 시 검정 배경 대신 강조색 글로우(box-shadow)를 복원한다.
+ *   transition:none — 레트로 transition 고착으로 글로우가 페인트 안 되는 문제 회피. */
+body.fe-retro-theme .tidy5e-sheet .inspiration.inspiration-1 :is(label, label i, .checkbox),
+body.fe-retro-theme .tidy5e-sheet :is(
+  .block-score-wrapper button, .block-score button,
+  .inspiration label, .exhaustion, button.transparent-button.rollable, .rollable
+):hover {
+  background: transparent !important;
+  box-shadow:
+    0 0 6px 1px hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 98%) 58% / 0.9),
+    0 0 2px 0 hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 98%) 70% / 0.95)
+    !important;
+  transition: none !important;
+}

@@ -1,5 +1,11 @@
 /* Female-cupwhi: Settings Menu */
 
+/* 통합 설정 패널 스크롤 — AppV2 form 창의 window-content 가 overflow-y:hidden 이라
+ * 내용이 뷰포트보다 길면 아래 항목이 잘려 접근 불가했다. 세로 스크롤 허용. */
+.fe-settings-menu .window-content {
+  overflow-y: auto;
+}
+
 .fe-settings-menu .fe-settings__topbar {
   align-items: flex-start;
   justify-content: space-between;

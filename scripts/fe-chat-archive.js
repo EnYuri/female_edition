@@ -16,7 +16,8 @@ import {
   feSetUiFontClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
-  feSetDx3rdPixelThemeClass,
+  feSetChatGroupOutlineClass,
+  feSetRetroThemeClass,
   feSetNeodgmModeClass,
   feApplyChatMerge,
   feGetMessageIdFromElement,
@@ -1598,7 +1599,7 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   // Keep Foundry/system/theme classes for variable definitions, then force a printable layout.
   const bodyClass = `${document.body.className ?? ""} fe-print-chatlog fe-chat-archive fe-chat-archive-window${effectiveOptimize ? " fe-export-optimized" : ""}${printImgClass}`;
 
-  const feArchivePixelTheme = !!feSetting(S.UI_DX3RD_PIXEL_THEME);
+  const feArchivePixelTheme = !!feSetting(S.UI_RETRO_THEME);
   const feArchiveBg = feArchivePixelTheme ? "#000000" : "#ffffff";
 
   win.document.open();
@@ -1958,7 +1959,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetUiFontClass(win.document);
   feSetUserColorBgClass(win.document);
   feSetUserColorBgBaseClass(win.document);
-  feSetDx3rdPixelThemeClass(win.document);
+  feSetChatGroupOutlineClass(win.document);
+  feSetRetroThemeClass(win.document);
   feSetNeodgmModeClass(win.document);
   feSyncArchiveMergeBodyClasses(win.document);
   // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
@@ -2959,6 +2961,7 @@ ${faces.join("\n")}
   /* dnd5e v5.2.x font vars (best-effort) */
   --dnd5e-font-roboto: var(--fe-font-primary);
   --dnd5e-font-roboto-slab: var(--fe-font-primary);
+  --dnd5e-font-roboto-condensed: var(--fe-font-primary);
   --dnd5e-font-signika: var(--fe-font-primary);
   --dnd5e-font-modesto: var(--fe-font-primary);
 
@@ -3964,7 +3967,15 @@ function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
       push(msg.querySelector?.(":scope > .message-header .message-flavor"));
       push(msg.querySelector?.(":scope > .message-header .flavor-text"));
       push(msg.querySelector?.(":scope > .message-header .message-metadata"));
-      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .card-content > *, .details.card-content > *, .details.collapsible-content.card-content > *, .dice-roll, .dice-result, .dice-formula, .dice-tooltip") || []) push(el);
+      // NOTE: .dice-roll INTERNALS (.dice-result/.dice-formula/.dice-tooltip) are
+      // intentionally NOT listed here. Core renders the dice card as a self-contained
+      // flex-column + grid widget (the tooltip collapses via grid-template-rows:0fr).
+      // Forcing width:100%/height:auto/flex:none onto those internals breaks the
+      // collapse and makes the hidden die-breakdown overflow and overlap the
+      // formula/total. The outer .dice-roll is still matched via ".message-content > *"
+      // / ".card-content > *", so its width handling is preserved while the internal
+      // layout is left to core CSS.
+      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .card-content > *, .details.card-content > *, .details.collapsible-content.card-content > *, .dice-roll") || []) push(el);
     }
 
     for (const el of targets) {

@@ -200,7 +200,10 @@ function feCssEscape(value) {
   } catch {
     /* no-op */
   }
-  return String(value ?? "").replace(/[^a-zA-Z0-9_\-]/g, "\$&");
+  // Backslash-escape each non-identifier char. NOTE: the replacement must be
+  // "\\$&" (backslash + matched char); "\$&" collapses to "$&" which returns the
+  // char unescaped (a no-op). This fallback only runs when CSS.escape is absent.
+  return String(value ?? "").replace(/[^a-zA-Z0-9_\-]/g, "\\$&");
 }
 
 function feClampInt(value, min, max) {
@@ -289,6 +292,43 @@ function feFindScrollContainer(el) {
   return el;
 }
 
+// Follow-lock state. Foundry's app.isAtBottom is unreliable during rapid message
+// bursts: content grows faster than the scroll catches up, so a scroll event mid-burst
+// computes pct < 0.99 and flips #isAtBottom false even though the user never moved.
+// Every re-pin is then blocked by the isAtBottom guard and the newest message gets
+// stranded below the fold. We therefore track our OWN "following" intent: set when we
+// observe/reach the bottom (kept alive across the burst), cleared only by a genuine
+// user scroll-up (a scrollTop DECREASE that is not part of our own pin / prune churn).
+const _feStickyFollowUntil = new WeakMap(); // scrollEl → timestamp through which we follow
+const _feStickyLastTop     = new WeakMap(); // scrollEl → last observed scrollTop
+const _feStickyPinTs       = new WeakMap(); // scrollEl → timestamp of our last programmatic pin
+const _feStickyWatched     = new WeakSet(); // scrollEls that already have the user-scroll watcher
+const FE_STICKY_FOLLOW_MS      = 1500;      // how long "following" persists after the last bottom contact
+const FE_STICKY_PIN_IGNORE_MS  = 160;       // ignore scrollTop drops this soon after our own pin (prune clamp)
+
+function _feStickyNow() { try { return performance.now(); } catch { return Date.now(); } }
+
+// Install a one-time scroll watcher that drops the follow-lock when the USER scrolls up.
+// A scrollTop decrease that is NOT within the post-pin grace window is treated as a
+// deliberate upward gesture (wheel, scrollbar drag, keys, touch — all covered).
+function _feStickyEnsureWatcher(scrollEl) {
+  try {
+    if (!scrollEl || _feStickyWatched.has(scrollEl)) return;
+    _feStickyWatched.add(scrollEl);
+    _feStickyLastTop.set(scrollEl, scrollEl.scrollTop);
+    scrollEl.addEventListener("scroll", () => {
+      try {
+        const cur = scrollEl.scrollTop;
+        const last = _feStickyLastTop.get(scrollEl) ?? cur;
+        _feStickyLastTop.set(scrollEl, cur);
+        if (cur < last - 4 && (_feStickyNow() - (_feStickyPinTs.get(scrollEl) ?? 0)) > FE_STICKY_PIN_IGNORE_MS) {
+          _feStickyFollowUntil.set(scrollEl, 0); // user scrolled up → stop following
+        }
+      } catch { /* no-op */ }
+    }, { passive: true });
+  } catch { /* no-op */ }
+}
+
 function feSnapshotAndRestoreStickyScroll() {
   const logToApp = new Map();
   const registerApp = (app) => {
@@ -310,40 +350,63 @@ function feSnapshotAndRestoreStickyScroll() {
     }
   } catch { /* no-op */ }
 
+  const now = _feStickyNow();
   const states = feGetChatLogs().map((log) => {
     if (!feIsElementNode(log)) return null;
     const app = logToApp.get(log) ?? null;
     const scrollEl = feFindScrollContainer(log);
+    _feStickyEnsureWatcher(scrollEl);
     // When the DOM-pruning ChatLog has forward-pruned its tail, the user is
     // deliberately browsing history — the DOM's bottom is NOT the newest message.
-    // "At bottom of the shortened window" must therefore never be treated as
-    // "following live": pinning/scrollBottom here would snap the reader back to
-    // the latest message. The prune subclass exposes this via isBrowsingHistory.
+    // Never follow here; pinning would snap the reader back to the latest message.
     if (app?.isBrowsingHistory === true) {
-      return { log, scrollEl, atBottom: false, app };
+      _feStickyFollowUntil.set(scrollEl, 0);
+      return { log, scrollEl, follow: false, app };
     }
-    // app.isAtBottom is the primary signal (Foundry updates it synchronously in
-    // _onScrollLog). However it can transiently read false between a DOM resize
-    // and the next scroll event — so pixel-gap ≤ 2px acts as a safety net for
-    // that race window. For unregistered logs (archive/detached) only the
-    // pixel-gap path below is used.
+    // app.isAtBottom is Foundry's signal but it transiently (and during bursts,
+    // stickily) reads false even when the user is following — see the follow-lock
+    // note above. We OR it with a pixel-gap safety net for the at-bottom check, then
+    // fall back to our own follow window so a burst doesn't strand the newest message.
     const pixelGap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
-    if (app && typeof app.isAtBottom === "boolean") {
-      return { log, scrollEl, atBottom: app.isAtBottom || pixelGap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY, app };
-    }
-    return { log, scrollEl, atBottom: pixelGap <= FE_STICKY_PIXEL_TOLERANCE, app };
+    const atBottom = (app && typeof app.isAtBottom === "boolean")
+      ? (app.isAtBottom || pixelGap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY)
+      : (pixelGap <= FE_STICKY_PIXEL_TOLERANCE);
+    if (atBottom) _feStickyFollowUntil.set(scrollEl, now + FE_STICKY_FOLLOW_MS);
+    const follow = atBottom || now < (_feStickyFollowUntil.get(scrollEl) ?? 0);
+    return { log, scrollEl, follow, app };
   }).filter(Boolean);
 
   return function feRestoreStickyScroll() {
-    for (const { scrollEl, atBottom, app } of states) {
-      if (!atBottom) continue;
-      // Set scrollTop on the actual scroll container (.chat-scroll in v13),
-      // not the inner <ol> which is non-scrollable.
-      try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch { /* no-op */ }
-      // v13 ChatLog tracks sticky state in a real ES private (#isAtBottom).
-      // The public scrollBottom() method is the only supported way to nudge
-      // Foundry's internal flag back to "at bottom" after our DOM mutations.
-      try { app?.scrollBottom?.(); } catch { /* no-op */ }
+    for (const { scrollEl, follow, app } of states) {
+      if (!follow) continue;
+      const pin = () => {
+        // Set scrollTop on the actual scroll container (.chat-scroll in v13), not the
+        // inner <ol> which is non-scrollable. scrollBottom() also nudges Foundry's
+        // private #isAtBottom back to true after our DOM mutations.
+        try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch { /* no-op */ }
+        try { app?.scrollBottom?.(); } catch { /* no-op */ }
+        const t = _feStickyNow();
+        _feStickyPinTs.set(scrollEl, t);
+        _feStickyLastTop.set(scrollEl, scrollEl.scrollTop); // so the watcher doesn't read our pin as a user move
+        _feStickyFollowUntil.set(scrollEl, t + FE_STICKY_FOLLOW_MS); // keep following while actively pinned
+      };
+      pin();
+
+      // Re-pin on the next frame to catch layout that settles AFTER our mutation
+      // (merge-class reflow, follow-up render passes, pruning). Gate on the follow
+      // window — the scroll watcher clears it the instant the user scrolls up, so a
+      // genuine upward gesture aborts the re-pin (no "yanked back to bottom").
+      const win = scrollEl.ownerDocument?.defaultView ?? window;
+      const raf = win?.requestAnimationFrame ?? globalThis.requestAnimationFrame;
+      if (typeof raf !== "function") continue;
+      raf.call(win ?? globalThis, () => {
+        try {
+          if (app?.isBrowsingHistory === true) return;
+          if (_feStickyNow() >= (_feStickyFollowUntil.get(scrollEl) ?? 0)) return; // user scrolled up
+          const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+          if (gap > 0) pin();
+        } catch { /* no-op */ }
+      });
     }
   };
 }

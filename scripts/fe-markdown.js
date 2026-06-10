@@ -10,6 +10,19 @@ function feEscapeHTML(str) {
     .replaceAll("'", "&#039;");
 }
 
+// Allow only safe link schemes for markdown `[label](url)` anchors. A bare
+// `javascript:`/`data:`/`vbscript:` href turns a chat link into a script-execution
+// vector the moment another user clicks it. Relative/anchor/protocol-relative URLs
+// (no scheme) and http(s)/mailto are allowed; anything else returns null → rendered
+// as plain text instead of an anchor.
+function feSafeMarkdownUrl(url) {
+  const u = String(url ?? "").trim();
+  if (!u) return null;
+  const scheme = u.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  if (scheme && !/^(?:https?|mailto)$/i.test(scheme[1])) return null;
+  return u;
+}
+
 function feInlineFormat(text) {
   const codeSpans = [];
   text = text.replace(/`([^`]+)`/g, (_m, code) => {
@@ -24,9 +37,11 @@ function feInlineFormat(text) {
   });
 
   text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => {
-    label = feEscapeHTML(label ?? "");
-    url = feEscapeHTML(url ?? "");
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    const safeLabel = feEscapeHTML(label ?? "");
+    const safeUrl = feSafeMarkdownUrl(url);
+    // Unsafe scheme (javascript:/data:/…) → drop the anchor, render label as text.
+    if (!safeUrl) return safeLabel;
+    return `<a href="${feEscapeHTML(safeUrl)}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
   });
 
   text = text.replace(/~~(.+?)~~/gs, "<s>$1</s>");

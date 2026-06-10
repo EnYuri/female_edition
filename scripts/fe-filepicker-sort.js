@@ -51,9 +51,10 @@ function _fetchMeta(url) {
       _metaCache.set(url, m);
       resolve(m);
     }).catch(() => {
-      const m = { size: 0, mtime: 0 }; // 실패(CORS/네트워크) → 0 처리, 정렬에서 뒤로 밀림
-      _metaCache.set(url, m);
-      resolve(m);
+      // 실패(CORS/네트워크) → 이번 정렬에선 0 처리(뒤로 밀림)하되, 영구 캐시하지 않는다.
+      // 캐시 항목을 지워 다음 정렬 시 재시도 가능하게 한다(일시적 실패가 세션 내내 고착되는 것 방지).
+      _metaCache.delete(url);
+      resolve({ size: 0, mtime: 0 });
     }));
     _pump();
   });

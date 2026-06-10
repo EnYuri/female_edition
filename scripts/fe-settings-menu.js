@@ -1,7 +1,7 @@
 // Female-cupwhi: Unified settings menu (collapsible sections)
 // This dialog is the primary UI because individual settings are hidden from core Module Settings.
 
-import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting } from "./fe-chat-enhance.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting, feCaptureWorldSettings } from "./fe-chat-enhance.js";
 
 // ── Portrait settings (registered by fe-chat-portrait.js under MODULE_ID) ──
 
@@ -121,24 +121,40 @@ function feIsDnd5eSystem() {
   try { return game?.system?.id === "dnd5e"; } catch { return false; }
 }
 
-// ── Settings dialog ──
+// ── Settings dialog (ApplicationV2) ──
 
-class FemaleEditionSettingsMenu extends FormApplication {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "fe-settings-menu",
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: "fe-settings-menu",
+    // tag:"form" makes the application's root element the <form>. The template part
+    // therefore must NOT contain its own <form> (nested forms break submission).
+    tag: "form",
+    classes: ["fe-settings-menu"],
+    window: {
       title: "Female-cupwhi 설정",
-      template: `modules/${MODULE_ID}/templates/fe-settings-menu.hbs`,
-      width: 740,
-      height: "auto",
+      icon: "fas fa-sliders-h",
+      resizable: true,
+    },
+    position: { width: 740, height: "auto" },
+    form: {
+      handler: FemaleEditionSettingsMenu.#onSubmit,
       closeOnSubmit: true,
       submitOnChange: false,
-      resizable: true,
-      classes: ["fe-settings-menu"],
-    });
-  }
+    },
+    actions: {
+      expandAll: FemaleEditionSettingsMenu.#onExpandAll,
+      collapseAll: FemaleEditionSettingsMenu.#onCollapseAll,
+    },
+  };
 
-  getData(options = {}) {
+  static PARTS = {
+    body: { template: `modules/${MODULE_ID}/templates/fe-settings-menu.hbs` },
+  };
+
+  async _prepareContext(options = {}) {
+    const context = await super._prepareContext(options);
     const values = {
       // Base toggles
       [S.PRUNE_ENABLED]:       feRead(S.PRUNE_ENABLED),
@@ -187,6 +203,8 @@ class FemaleEditionSettingsMenu extends FormApplication {
       // User-color tint
       [S.USE_USER_COLOR_BG]:  feRead(S.USE_USER_COLOR_BG),
       [S.USER_COLOR_BG_BASE]: feRead(S.USER_COLOR_BG_BASE),
+      [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
+      [S.ACCENT_TEXT_OVERRIDE]: feRead(S.ACCENT_TEXT_OVERRIDE),
 
       // Markdown / Edit
       [S.MARKDOWN_ENABLED]: feRead(S.MARKDOWN_ENABLED),
@@ -200,8 +218,10 @@ class FemaleEditionSettingsMenu extends FormApplication {
       injectCustomConditions:  feRead("injectCustomConditions"),
       injectCustomDamageTypes: feRead("injectCustomDamageTypes"),
 
+      // Retro theme (general — all systems)
+      [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
+
       // DX3rd
-      [S.UI_DX3RD_PIXEL_THEME]:     feRead(S.UI_DX3RD_PIXEL_THEME),
       [S.DX3RD_CARD_BORDER_ALPHA]:  feRead(S.DX3RD_CARD_BORDER_ALPHA),
       [S.DX3RD_RUI_PORTRAIT_WIDTH]: feRead(S.DX3RD_RUI_PORTRAIT_WIDTH),
       [S.DX3RD_RUI_PANEL_WIDTH]:    feRead(S.DX3RD_RUI_PANEL_WIDTH),
@@ -228,7 +248,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
     };
 
     return {
-      ...super.getData(options),
+      ...context,
       values,
       choices:  CHOICES,
       warnings: { chatPortraitDup: feIsChatPortraitModuleActive() },
@@ -238,14 +258,26 @@ class FemaleEditionSettingsMenu extends FormApplication {
     };
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
-    html.find("[data-action='expandAll']").on("click",  (ev) => { ev.preventDefault(); html.find("details").prop("open", true); });
-    html.find("[data-action='collapseAll']").on("click", (ev) => { ev.preventDefault(); html.find("details").prop("open", false); });
+  _onRender(context, options) {
+    super._onRender(context, options);
+    // Parity with the v1 form (autocomplete was set on the <form> in the template,
+    // which no longer exists — the root form is provided by tag:"form").
+    try { this.element?.setAttribute?.("autocomplete", "off"); } catch { /* no-op */ }
   }
 
-  async _updateObject(_event, formData) {
-    const d = foundry.utils.expandObject(formData);
+  // data-action handlers receive (event, target) bound to the application instance.
+  static #onExpandAll(_event, _target) {
+    this.element?.querySelectorAll?.("details")?.forEach?.((d) => { d.open = true; });
+  }
+
+  static #onCollapseAll(_event, _target) {
+    this.element?.querySelectorAll?.("details")?.forEach?.((d) => { d.open = false; });
+  }
+
+  // AppV2 form handler: (event, form, formData) bound to the application instance.
+  // formData is a FormDataExtended; .object is the flat field map (data-dtype coerced).
+  static async #onSubmit(_event, _form, formData) {
+    const d = foundry.utils.expandObject(formData.object);
 
     // Helpers return Promises directly — no async/await needed inside.
     const bool = (key) => game.settings.set(MODULE_ID, key, !!d[key]);
@@ -291,6 +323,10 @@ class FemaleEditionSettingsMenu extends FormApplication {
 
         // User-color background
         bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
+        bool(S.CHAT_GROUP_OUTLINE),
+
+        // Retro theme (general — visible/saved in all systems)
+        bool(S.UI_RETRO_THEME), bool(S.ACCENT_TEXT_OVERRIDE),
 
         // DND5e injection (world-scoped — only GM can set; fields hidden for non-GMs)
         ...(feIsDnd5eSystem() && game.user?.isGM ? [
@@ -300,7 +336,7 @@ class FemaleEditionSettingsMenu extends FormApplication {
         // DX3rd (only when in DX3rd system — fields hidden otherwise,
         // so d[key] would be undefined and would overwrite existing DX3rd preferences)
         ...(feIsDx3rdSystem() ? [
-          bool(S.UI_DX3RD_PIXEL_THEME), num(S.DX3RD_CARD_BORDER_ALPHA),
+          num(S.DX3RD_CARD_BORDER_ALPHA),
           num(S.DX3RD_RUI_PORTRAIT_WIDTH), num(S.DX3RD_RUI_PANEL_WIDTH),
           num(S.DX3RD_RUI_CARD_HEIGHT),
         ] : []),
@@ -313,6 +349,10 @@ class FemaleEditionSettingsMenu extends FormApplication {
         bool(CP.SHOW_IC), bool(CP.SHOW_OOC), bool(CP.SHOW_EMOTE),
         bool(CP.SHOW_WHISPER), bool(CP.SHOW_ROLL), bool(CP.SHOW_OTHER),
       ]);
+
+      // Persist the just-saved values into this world's per-world slice so the
+      // configuration stays independent from other worlds on this browser.
+      try { await feCaptureWorldSettings(); } catch { /* no-op */ }
     } catch (err) {
       console.error(`[${MODULE_ID}] settings save failed`, err);
       ui.notifications?.error("설정 저장 중 오류가 발생했습니다. 콘솔을 확인하세요.");

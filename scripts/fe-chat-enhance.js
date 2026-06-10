@@ -14,7 +14,7 @@
 import {
   MODULE_ID, LEGACY_UI_FONT_KEY, S,
   FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
-  FE_GM_PRIORITY_OVERRIDES_KEY,
+  FE_GM_PRIORITY_OVERRIDES_KEY, FE_WORLD_SETTINGS_KEY,
 } from "./fe-constants.js";
 
 import {
@@ -30,6 +30,7 @@ import {
   feIsGmPrioritySettingKey, feHasGmPriorityOverride,
   feMirrorGmPrioritySetting, feSyncLocalGmPrioritySettings,
   feSeedGmPriorityOverridesFromLocal,
+  feHydrateWorldSettings, feCaptureWorldSettings,
   feFireChatUiUpdated, feSetting,
 } from "./fe-gm-priority.js";
 
@@ -37,8 +38,9 @@ import { feApplyMarkdownOnPreCreate } from "./fe-markdown.js";
 
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
-  feSetUiFontClass, feSetNeodgmModeClass, feSetDx3rdPixelThemeClass,
-  feSetUserColorBgClass, feSetUserColorBgBaseClass,
+  feSetUiFontClass, feSetNeodgmModeClass, feSetRetroThemeClass,
+  feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetChatGroupOutlineClass,
+  feSetAccentTextOverrideClass,
   feApplyStyleVarsFromSettings,
 } from "./fe-style.js";
 
@@ -128,9 +130,11 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetChatFontChoiceClass(doc); } catch { /* no-op */ }
   try { feSetUiFontClass(doc); } catch { /* no-op */ }
   try { feSetNeodgmModeClass(doc); } catch { /* no-op */ }
-  try { feSetDx3rdPixelThemeClass(doc); } catch { /* no-op */ }
+  try { feSetRetroThemeClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
+  try { feSetChatGroupOutlineClass(doc); } catch { /* no-op */ }
+  try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
   try {
     feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
   } catch {
@@ -175,6 +179,16 @@ Hooks.once("init", () => {
       feApplyGmPriorityUiRefresh(document);
       void feSyncLocalGmPrioritySettings();
     },
+  });
+
+  // Per-world settings store (client-scope blob, keyed by world id). See
+  // fe-gm-priority.js for hydrate/capture logic.
+  game.settings.register(MODULE_ID, FE_WORLD_SETTINGS_KEY, {
+    name: "(internal) per-world settings",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
   });
 
   game.settings.register(MODULE_ID, S.MERGE_ENABLED, {
@@ -286,7 +300,12 @@ Hooks.once("init", () => {
       author: "플레이어(작성자) — 같은 유저면 병합",
     },
     default: "token",
-    onChange: () => feApplyChatMergeToAllLogs(),
+    // Re-STAMP (not just re-merge): the merge key cached in each message's
+    // data-fe-merge-key is computed with the speaker-basis in effect at stamp time.
+    // feApplyChatMergeToAllLogs reuses that stale key, so a bare re-merge would not
+    // reflect the new basis until messages re-rendered. feScheduleRenderedStateRefreshForAllLogs
+    // re-stamps every message (recomputing the key) before re-merging.
+    onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
   });
 
   game.settings.register(MODULE_ID, S.EXPORT_ENABLED, {
@@ -476,16 +495,16 @@ Hooks.once("init", () => {
     onChange: () => feSetUiFontClass(document),
   });
 
-  game.settings.register(MODULE_ID, S.UI_DX3RD_PIXEL_THEME, {
-    name: "[DX3rd] 픽셀 고대비 테마",
-    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. double-cross-3rd 시스템 전용 레이아웃 보정 포함. NeoDGM 폰트 모드와 함께 사용 권장.",
+  game.settings.register(MODULE_ID, S.UI_RETRO_THEME, {
+    name: "레트로 테마 (픽셀 고대비)",
+    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용 가능하며 double-cross-3rd 전용 레이아웃 보정도 함께 적용됩니다. NeoDGM 폰트 모드와 함께 사용 권장.",
     scope: "client",
     config: false,
     type: Boolean,
-    default: FE_DEFAULTS[S.UI_DX3RD_PIXEL_THEME],
+    default: FE_DEFAULTS[S.UI_RETRO_THEME],
     onChange: () => {
-      feSetDx3rdPixelThemeClass(document);
-      feFireChatUiUpdated({ reason: "dx3rd-theme", document });
+      feSetRetroThemeClass(document);
+      feFireChatUiUpdated({ reason: "retro-theme", document });
     },
   });
 
@@ -551,6 +570,26 @@ Hooks.once("init", () => {
     },
     default: "white",
     onChange: () => feSetUserColorBgBaseClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.CHAT_GROUP_OUTLINE, {
+    name: "채팅: 병합 그룹 외곽선",
+    hint: "병합된 메시지 그룹(또는 단일 메시지)을 외곽선(유저 색상)으로 감싸 박스처럼 표시합니다. 끄면 색조 배경만 사용합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.CHAT_GROUP_OUTLINE],
+    onChange: () => feSetChatGroupOutlineClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.ACCENT_TEXT_OVERRIDE, {
+    name: "레트로: 텍스트 색조 오버라이드",
+    hint: "레트로 테마에서 dnd5e 시트·채팅의 텍스트를 강조색(픽셀 테마 강조색 스와치) 기반 톤으로 통일합니다. 끄면 기본 텍스트 색(흰/회색·유저 색상)을 사용합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.ACCENT_TEXT_OVERRIDE],
+    onChange: () => feSetAccentTextOverrideClass(document),
   });
 
   game.settings.register(MODULE_ID, S.STYLE_BG_SATURATION, {
@@ -648,6 +687,9 @@ Hooks.on("clientSettingChanged", (fullKey, value) => {
 
 Hooks.once("ready", async () => {
   await feMigrateLegacySettings();
+  // Apply this world's saved settings (or seed on first visit) BEFORE GM
+  // priority so the GM seeds from per-world-correct values.
+  await feHydrateWorldSettings();
   if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal();
   await feSyncLocalGmPrioritySettings();
   feApplyStyleVarsFromSettings(document);
@@ -656,9 +698,11 @@ Hooks.once("ready", async () => {
   feSetChatFontChoiceClass(document);
   feSetUiFontClass(document);
   feSetNeodgmModeClass(document);
-  feSetDx3rdPixelThemeClass(document);
+  feSetRetroThemeClass(document);
   feSetUserColorBgClass(document);
   feSetUserColorBgBaseClass(document);
+  feSetChatGroupOutlineClass(document);
+  feSetAccentTextOverrideClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
 });
@@ -1056,6 +1100,7 @@ export {
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   feSetting,
   feFireChatUiUpdated,
+  feCaptureWorldSettings,
 
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
@@ -1078,9 +1123,11 @@ export {
   feSetChatCardFontClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,
-  feSetDx3rdPixelThemeClass,
+  feSetRetroThemeClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
+  feSetChatGroupOutlineClass,
+  feSetAccentTextOverrideClass,
 
   feApplyChatMerge,
   feCaptureMessageRenderFlagsOnPreCreate,

@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.3.7",
+  "version": "1.4.3",
   "authors": [
     {
       "name": "nayuri",
@@ -43,13 +43,15 @@
     "styles/conditions.css",
     "styles/fe-chat-v13-compat.css",
     { "src": "styles/fe-dx3rd-compat.css", "layer": "layouts" },
+    { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" },
     "styles/fe-image-hover.css",
     "styles/fe-theatre.css",
     "styles/fe-typing-indicator.css",
     "styles/fe-chat-controls-menu.css",
     "styles/fe-scene-controls-collapse.css",
     "styles/fe-screen-panel.css",
-    "styles/fe-filepicker-sort.css"
+    "styles/fe-filepicker-sort.css",
+    "styles/fe-settings-menu.css"
   ],
   "socket": true,
   "documentTypes": {
@@ -70,6 +72,6 @@
     "verified": "14.363",
     "maximum": "14"
   },
-  "description": "Female-cupwhi's female edition. kawaiiiii",
+  "description": "Female-cupwhi's female edition. kawaiiiii-!",
   "flags": {}
 }

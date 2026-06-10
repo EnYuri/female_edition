@@ -65,11 +65,38 @@ function ensureTooltipEl() {
   return el;
 }
 
+// The panel description is an HTMLField authored by the actor's OWNER, but the
+// tooltip is shown to any OBSERVER. Rendering it raw would let a malicious owner
+// run script in observers' browsers (e.g. <img onerror>). Strip the execution
+// vectors (script/embed elements, on* handlers, javascript: URLs) while keeping
+// legitimate rich-text formatting (bold, line breaks, images).
+function _sanitizeTooltipHtml(html) {
+  try {
+    const doc = new DOMParser().parseFromString(String(html ?? ""), "text/html");
+    for (const el of doc.querySelectorAll("script, style, iframe, object, embed, link, meta, base")) el.remove();
+    for (const el of doc.body.querySelectorAll("*")) {
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith("on")) el.removeAttribute(attr.name);
+        else if (/^(?:href|src|xlink:href|formaction|action)$/.test(name) && /^\s*javascript:/i.test(attr.value)) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    }
+    return doc.body.innerHTML;
+  } catch {
+    // On any parser failure, fall back to plain text (never raw HTML).
+    const div = document.createElement("div");
+    div.textContent = String(html ?? "");
+    return div.innerHTML;
+  }
+}
+
 function feShowPanelTooltip(text, clientX, clientY) {
   const trimmed = (text ?? "").toString().trim();
   if (!trimmed) { feHidePanelTooltip(); return; }
   const el = ensureTooltipEl();
-  el.innerHTML = trimmed; // description is an HTMLField — render as-is
+  el.innerHTML = _sanitizeTooltipHtml(trimmed); // owner-authored HTML, sanitized (see above)
   el.style.left = `${clientX + 14}px`;
   el.style.top = `${clientY + 14}px`;
   el.classList.add("active");
