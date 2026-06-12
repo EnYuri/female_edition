@@ -662,6 +662,10 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
 
 Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
   if (!_fetEnabled) return;
+  // Narrator channel + /as plain-alias own their own speaker — never let stage
+  // routing hijack them (flags.female_edition.isNarrator / .plainAlias). fe-narrator.js.
+  const _fnFlags = data?.flags?.[_FET_MODULE] ?? chatMessage.flags?.[_FET_MODULE];
+  if (_fnFlags?.isNarrator || _fnFlags?.plainAlias) return;
   // Skip roll messages — cross-system compat rule mirrors fe-chat-enhance.js
   if (chatMessage.rolls?.length) return;
   // Only process messages created by the local user

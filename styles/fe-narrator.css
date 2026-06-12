@@ -1,0 +1,198 @@
+/* ================================================================
+ * fe-narrator.css — Narrator overlay + styled narrator chat
+ * Adapted from Narrator Tools (elizeuangelo) for female_edition.
+ *
+ * Two parts:
+ *   1. Full-screen cinematic overlay (#fe-narrator) — the /narrate display.
+ *   2. Narrator chat-line styling (.fe-narrator-chat) — visually distinct from
+ *      normal sidebar chat AND from theatre stage chat. These three channels
+ *      are independent (see fe-narrator.js header).
+ *
+ * NOTE: the overlay scroll uses the Web Animations API (JS), NOT CSS
+ * transitions, so the retro theme's global `* { transition: all 1ms }` cannot
+ * freeze it. We still null out transitions on the moving element to be safe.
+ * ================================================================ */
+
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.fe-narrator {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+  z-index: 70;                 /* above canvas/HUD, below dialogs */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fe-narrator-frame {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* vertical gradient band behind the text (height + fade driven by JS/WAAPI).
+   No CSS transition: fades are animated via the Web Animations API in
+   fe-narrator.js so the retro theme's `* {transition:all 1ms}` cannot kill them
+   and there is no CSS/WAAPI double-animation. */
+.fe-narrator-bg {
+  position: absolute;
+  width: 100%;
+  height: 0;
+  background: linear-gradient(
+    transparent 0%,
+    rgba(0, 0, 0, 0.66) 38%,
+    rgba(0, 0, 0, 0.66) 62%,
+    transparent 100%
+  );
+}
+
+.fe-narrator-box {
+  position: absolute;
+  max-height: 310px;
+  overflow: hidden;
+  width: 60%;
+  max-width: 820px;
+}
+
+.fe-narrator-content {
+  position: relative;
+  top: 0;
+  left: 0;
+  text-align: center;
+  z-index: 1;
+  font-family: var(--fe-font-primary, inherit);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #f4f4f4;
+  text-shadow: 0 2px 3px #000, 0 0 8px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+}
+
+/* markdown wraps the narration in <p> — drop default paragraph margins so the
+   centered overlay text isn't pushed off-centre. */
+.fe-narrator-content p { margin: 0; }
+.fe-narrator-content p + p { margin-top: 0.4em; }
+
+.fe-narrator-buttons {
+  position: absolute;
+  top: 60%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  visibility: hidden;
+}
+
+.fe-narrator-buttons button {
+  width: auto;
+  min-width: 92px;
+  padding: 3px 12px;
+  cursor: pointer;
+  pointer-events: all;
+  line-height: 1.6;
+}
+
+/* ── Accent-tinted overlay (retro accent swatch) ─────────────────────────── */
+body.fe-retro-theme.fe-accent-text-override .fe-narrator-content {
+  color: var(--fe-ac-90, #f4f4f4);
+}
+
+/* ── Retro theme: pixelated (stepped/posterized) gradient band ────────────── */
+/* The smooth gradient reads as "modern"; under the pixel retro theme we band it
+   into hard-edged opacity steps so it matches the chunky aesthetic. Hard stops
+   (same % repeated) create the sharp pixel-like edges. Higher specificity than
+   the base `.fe-narrator-bg` so no !important / cascade-layer fight is needed
+   (the retro theme does not set this element's background itself). */
+body.fe-retro-theme .fe-narrator-bg {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0)    0%,   rgba(0, 0, 0, 0)    10%,
+    rgba(0, 0, 0, 0.16) 10%,  rgba(0, 0, 0, 0.16) 22%,
+    rgba(0, 0, 0, 0.38) 22%,  rgba(0, 0, 0, 0.38) 34%,
+    rgba(0, 0, 0, 0.60) 34%,  rgba(0, 0, 0, 0.60) 44%,
+    rgba(0, 0, 0, 0.72) 44%,  rgba(0, 0, 0, 0.72) 56%,
+    rgba(0, 0, 0, 0.60) 56%,  rgba(0, 0, 0, 0.60) 66%,
+    rgba(0, 0, 0, 0.38) 66%,  rgba(0, 0, 0, 0.38) 78%,
+    rgba(0, 0, 0, 0.16) 78%,  rgba(0, 0, 0, 0.16) 90%,
+    rgba(0, 0, 0, 0)    90%,  rgba(0, 0, 0, 0)    100%
+  );
+}
+
+/* Accent override (text 색조 오버라이드 ON): tint the stepped gradient band with
+   the accent hue instead of neutral black, so the narration backdrop tracks the
+   pixel-theme accent swatch. --fe-nbg = a dark accent-hued base; per-band alpha
+   keeps the same posterized steps. */
+body.fe-retro-theme.fe-accent-text-override .fe-narrator-bg {
+  --fe-nbg: var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 80%) 8%;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--fe-nbg) / 0)    0%,   hsl(var(--fe-nbg) / 0)    10%,
+    hsl(var(--fe-nbg) / 0.18) 10%,  hsl(var(--fe-nbg) / 0.18) 22%,
+    hsl(var(--fe-nbg) / 0.40) 22%,  hsl(var(--fe-nbg) / 0.40) 34%,
+    hsl(var(--fe-nbg) / 0.62) 34%,  hsl(var(--fe-nbg) / 0.62) 44%,
+    hsl(var(--fe-nbg) / 0.76) 44%,  hsl(var(--fe-nbg) / 0.76) 56%,
+    hsl(var(--fe-nbg) / 0.62) 56%,  hsl(var(--fe-nbg) / 0.62) 66%,
+    hsl(var(--fe-nbg) / 0.40) 66%,  hsl(var(--fe-nbg) / 0.40) 78%,
+    hsl(var(--fe-nbg) / 0.18) 78%,  hsl(var(--fe-nbg) / 0.18) 90%,
+    hsl(var(--fe-nbg) / 0)    90%,  hsl(var(--fe-nbg) / 0)    100%
+  );
+}
+
+/* ── Narrator chat lines ─────────────────────────────────────────────────── */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-chat {
+  text-align: center;
+  color: #efefef;
+  font-weight: 400;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* hide the speaker header/metadata for narrator lines (toggled open on click) */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-chat .message-header {
+  display: none;
+}
+
+/* narration — italic, darkest */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-narrative {
+  background: rgba(28, 28, 32, 0.92);
+  font-style: italic;
+}
+
+/* description — italic, mid */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-description {
+  background: rgba(60, 58, 70, 0.92);
+  font-style: italic;
+}
+
+/* description background — accent override (색조 오버라이드 ON): dark accent-hued
+   tint instead of neutral grey. !important to beat any retro chat-background rule
+   in an earlier cascade layer. */
+body.fe-retro-theme.fe-accent-text-override
+  :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-description {
+  background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 70%) 20% / 0.92) !important;
+}
+
+/* notification — GM whisper, dotted teal frame */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-notification {
+  background: rgba(60, 96, 96, 0.78);
+  border: 2px dotted rgba(255, 255, 255, 0.25);
+}
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-notification .whisper-to {
+  display: none;
+}
+
+/* keep content links readable on the dark narrator bg */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-chat a.content-link {
+  color: #1b1b1b;
+  font-weight: 600;
+}
+
+/* ── Retro theme: keep narrator lines legible (transition-stuck immune) ───── */
+body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications) .chat-message.fe-narrator-chat {
+  transition: none !important;
+}

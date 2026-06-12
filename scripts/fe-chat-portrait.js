@@ -418,6 +418,13 @@ function cpIsRoundMarkerMessage(message, messageEl) {
 function cpIsNarratorToolsMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("narrator-chat")) return true;
+    if (messageEl?.classList?.contains?.("fe-narrator-chat")) return true;
+  } catch {}
+
+  // female_edition native narrator (fe-narrator.js) — canonical flag, more robust
+  // than the alias fallback below.
+  try {
+    if (message?.getFlag?.("female_edition", "isNarrator")) return true;
   } catch {}
 
   try {

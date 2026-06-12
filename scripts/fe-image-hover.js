@@ -12,6 +12,14 @@ const _IH_DEFAULT_TOKEN = "icons/svg/mystery-man.svg";
 
 const _IH_VIDEO_EXTS = new Set(["mp4", "ogg", "webm", "m4v"]);
 
+// Max upscale factor for the hover image. Small source art (e.g. dx3rd ~300px
+// portraits) shown at the size setting (e.g. 384px) gets upscaled and softens —
+// there is no detail to invent. We allow a mild upscale (sources stay reasonably
+// large) but cap it so heavy upscaling (e.g. 2×+) never produces a blurry image.
+// Beyond the cap the image is pinned to native×factor (sharper, slightly smaller).
+// e.g. a 300px source is shown at most ~375px (1.25×) instead of a blurry 640px.
+const _IH_MAX_UPSCALE = 1.25;
+
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 /** url → {width, height} dimension cache */
@@ -57,6 +65,7 @@ function _ihRegisterSettings() {
     choices: { 0: "없음", 1: "제한됨", 2: "관찰자", 3: "소유자" },
     default: 0,
     type: Number,
+    onChange: () => _ihLoadSettings(),
   });
 
   game.settings.register(_IH_MODULE, "ihArtType", {
@@ -73,6 +82,7 @@ function _ihRegisterSettings() {
     },
     default: "character",
     type: String,
+    onChange: () => _ihLoadSettings(),
   });
 
   game.keybindings.register(_IH_MODULE, "ihShowAllKey", {
@@ -96,6 +106,7 @@ function _ihRegisterSettings() {
     range: { min: 1000, max: 15000, step: 200 },
     default: 6000,
     type: Number,
+    onChange: () => _ihLoadSettings(),
   });
 
   game.settings.register(_IH_MODULE, "ihEnabled", {
@@ -105,7 +116,7 @@ function _ihRegisterSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => canvas.hud.imageHover?.close(),
+    onChange: () => { _ihLoadSettings(); canvas.hud.imageHover?.close(); },
   });
 
   game.keybindings.register(_IH_MODULE, "ihKeybind", {
@@ -160,6 +171,7 @@ function _ihRegisterSettings() {
     },
     default: "Bottom left",
     type: String,
+    onChange: () => _ihLoadSettings(),
   });
 
   game.settings.register(_IH_MODULE, "ihSize", {
@@ -170,6 +182,11 @@ function _ihRegisterSettings() {
     range: { min: 3, max: 20, step: 0.5 },
     default: 7,
     type: Number,
+    // Refresh runtime cache immediately. Without this, _ihSize only reloaded on
+    // closeSettingsConfig, so a programmatic/per-world-hydrated change (which
+    // fires onChange, not the dialog-close hook) left the cache stale until the
+    // settings dialog was next closed → first hover used the old size.
+    onChange: () => _ihLoadSettings(),
   });
 
   game.settings.register(_IH_MODULE, "ihDelay", {
@@ -180,6 +197,7 @@ function _ihRegisterSettings() {
     range: { min: 0, max: 5000, step: 100 },
     default: 0,
     type: Number,
+    onChange: () => _ihLoadSettings(),
   });
 }
 
@@ -240,13 +258,15 @@ function _ihComputePosition(imageWidth, imageHeight) {
   const W = window.innerWidth;
   const H = window.innerHeight;
 
-  // Target width from the size setting (W / size), matching the original
-  // image-hover. Do NOT cap at the image's native width: small portraits (e.g.
-  // 311px art with size=3 wanting 640px) would otherwise render at half the
-  // original's size. Users pick the size deliberately — honor it and upscale small
-  // art like the original. Large art is still HQ-downscaled by feApplyHQPortrait
-  // (so the sparkle/aliasing fix remains); only sub-display-size art is upscaled.
+  // Target width from the size setting (W / size). Large art beyond this is
+  // HQ-downscaled by feApplyHQPortrait (sparkle/aliasing fix). Small art below it
+  // would be upscaled — capped here so the upscale never exceeds _IH_MAX_UPSCALE
+  // of the native resolution (in DEVICE px, so HiDPI is accounted for). A 300px
+  // source therefore shows at most ~450px (1.5×) instead of a blurry 640px.
   let w = W / _ihSize;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const maxUpscaledW = (imageWidth * _IH_MAX_UPSCALE) / dpr; // CSS px cap from native
+  if (w > maxUpscaledW) w = maxUpscaledW;
   let h = w * (imageHeight / imageWidth);
 
   // Clamp height to viewport (downscale only — keeps aspect ratio)
