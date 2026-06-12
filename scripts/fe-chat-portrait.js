@@ -761,8 +761,14 @@ async function cpResampleToDataURL(img, size, fit) {
   const nh = Number(img.naturalHeight || 0);
   if (!nw || !nh) return null;
 
+  // Resample to DEVICE pixels, not CSS px. The <img> displays at `size` CSS px,
+  // so a bitmap at size×dpr maps 1:1 to device pixels → crisp on HiDPI (dpr>1)
+  // instead of being upscaled (soft). At dpr=1 this is identical to `size`.
+  const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  const target = Math.max(1, Math.round(size * dpr));
+
   // Only resample when we are actually downscaling.
-  if (nw <= size && nh <= size) return null;
+  if (nw <= target && nh <= target) return null;
 
   try {
     // Multi-step downscale for better quality (especially from very large portraits).
@@ -783,16 +789,16 @@ async function cpResampleToDataURL(img, size, fit) {
     wctx.drawImage(img, sx, sy, sw, sh, 0, 0, work.width, work.height);
 
     // Step 2: repeatedly half until close to target.
-    while (work.width / 2 > size) {
-      const nextW = Math.max(size, Math.floor(work.width / 2));
-      const nextH = Math.max(size, Math.floor(work.height / 2));
+    while (work.width / 2 > target) {
+      const nextW = Math.max(target, Math.floor(work.width / 2));
+      const nextH = Math.max(target, Math.floor(work.height / 2));
       work = cpDownscaleCanvasStep(work, nextW, nextH);
     }
 
-    // Step 3: final draw into a square destination canvas.
+    // Step 3: final draw into a square destination canvas (device-pixel sized).
     const out = document.createElement("canvas");
-    out.width = size;
-    out.height = size;
+    out.width = target;
+    out.height = target;
     const octx = out.getContext("2d");
     if (!octx) return null;
     octx.imageSmoothingEnabled = true;
@@ -802,8 +808,8 @@ async function cpResampleToDataURL(img, size, fit) {
       /* ignore */
     }
 
-    const { dx, dy, dw, dh } = cpComputeDrawRect({ srcW: sw, srcH: sh, dstSize: size, fit });
-    octx.clearRect(0, 0, size, size);
+    const { dx, dy, dw, dh } = cpComputeDrawRect({ srcW: sw, srcH: sh, dstSize: target, fit });
+    octx.clearRect(0, 0, target, target);
     octx.drawImage(work, 0, 0, work.width, work.height, dx, dy, dw, dh);
 
     return out.toDataURL("image/png");

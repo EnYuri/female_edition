@@ -596,7 +596,58 @@ function feEnsureEditControlsForExistingMessages(rootLike = document) {
 }
 
 
+// ── Defensive: keep one bad module's context-menu condition from breaking ALL menus ──
+// Foundry's ContextMenu#render evaluates every entry's `visible`/`condition` inside a
+// single reduce WITHOUT try/catch (context-menu.mjs). If ANY module's condition throws
+// (e.g. monks-tokenbar's canHeroPointReroll reads `li.dataset` when the target is
+// undefined), the whole reduce throws and the menu never opens — including the
+// right-click AND "…" chat-message menus (same path). We wrap each entry's check so a
+// throw is treated as "hidden" instead of aborting the menu. Idempotent.
+// Gated to v13 only (per request) — v14 is left untouched.
+function feGuardContextMenuEntry(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  for (const key of ["visible", "condition"]) {
+    const fn = entry[key];
+    if (typeof fn === "function" && !fn.__feGuarded) {
+      const guarded = function (...args) {
+        try {
+          return fn.apply(this, args);
+        } catch (e) {
+          console.warn(`${MODULE_ID} | a context-menu condition threw; hiding that entry`, e);
+          return false;
+        }
+      };
+      guarded.__feGuarded = true;
+      entry[key] = guarded;
+    }
+  }
+  return entry;
+}
+
+function feHardenContextMenuConditions() {
+  try {
+    if (Number(game.release?.generation) !== 13) return; // v13-only
+    const CM = foundry?.applications?.ux?.ContextMenu ?? globalThis.ContextMenu;
+    const proto = CM?.prototype;
+    if (!proto || proto.__feConditionGuardInstalled) return;
+    const origRender = proto.render;
+    if (typeof origRender !== "function") return;
+    proto.render = function (...args) {
+      try {
+        if (Array.isArray(this.menuItems)) this.menuItems.forEach(feGuardContextMenuEntry);
+      } catch {
+        /* no-op */
+      }
+      return origRender.apply(this, args);
+    };
+    proto.__feConditionGuardInstalled = true;
+  } catch (e) {
+    console.warn(`${MODULE_ID} | failed to harden ContextMenu conditions`, e);
+  }
+}
+
 Hooks.once("init", () => {
+  feHardenContextMenuConditions();
   feInstallEditContextMenuEarly();
 });
 

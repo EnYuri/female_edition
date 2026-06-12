@@ -269,8 +269,12 @@ function _processDirectoryThumbs(html) {
   }
 }
 
-// 같은 썸네일 partial 을 쓰는 디렉토리들 — 액터 외에 씬/아이템 등도 동일 증상.
-for (const hook of ["renderActorDirectory", "renderItemDirectory", "renderSceneDirectory",
-                    "renderJournalDirectory", "renderCardsDirectory", "renderRollTableDirectory"]) {
+// 풀해상도 원본을 작은 썸네일로 깎아 쓰는 디렉토리만 관찰한다.
+//   · Actor 디렉토리: thumbnail === actor.img (풀해상도 포트레이트) → 10~30× 축소 → 다운스케일 필요.
+//   · Scene 디렉토리: 배경 기반 썸네일 → 큰 경우 있음.
+// Item/Journal/Cards/RollTable 은 작은 아이콘(64px·SVG)이라 다운스케일이 불필요하다
+// (실측: dnd5e 아이템 5424개 관찰 시 다운스케일 0건). 그 디렉토리들까지 관찰하면
+// 수천 개 IntersectionObserver 등록 + 스크롤마다 무의미한 처리가 쌓여 낭비이므로 제외한다.
+for (const hook of ["renderActorDirectory", "renderSceneDirectory"]) {
   Hooks.on(hook, (app, html) => _processDirectoryThumbs(html));
 }
