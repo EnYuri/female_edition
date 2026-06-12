@@ -4395,7 +4395,8 @@ function feFallbackRenderChatMessage(doc, msg) {
 
   try {
     const style = Number(msg?.style ?? msg?.type ?? -1);
-    const styles = CONST?.CHAT_MESSAGE_STYLES || {};
+    // v14: CONST.CHAT_MESSAGE_STYLES | v13: CONST.CHAT_MESSAGE_TYPES (same numeric values)
+    const styles = CONST?.CHAT_MESSAGE_STYLES || CONST?.CHAT_MESSAGE_TYPES || {};
     if (style === styles.OTHER) li.classList.add("other");
     else if (style === styles.IC) li.classList.add("ic");
     else if (style === styles.OOC) li.classList.add("ooc");

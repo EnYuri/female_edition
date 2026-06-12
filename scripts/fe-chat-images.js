@@ -575,7 +575,8 @@ async function ciSendPending(root = document) {
 
     await ChatMessage.create({
       content: ciBuildMessageHtml(resolved, note),
-      style: ciGetMessageStyleOOC(),
+      // v14 uses `style`, v13 uses `type` (same OOC value). Set the right field.
+      ...(CONST?.CHAT_MESSAGE_STYLES ? { style: ciGetMessageStyleOOC() } : { type: ciGetMessageStyleOOC() }),
       // v13+: author replaces the deprecated user field. Keep user as fallback for v12.
       author: game.user?.id,
     });

@@ -516,7 +516,10 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     // showToAll is active — do not disturb the displayed art.
     if (_ihShowAll) return;
 
-    if (hovered && canvas.activeLayer instanceof foundry.canvas.layers.TokenLayer) {
+    // Token layer active? Compare against canvas.tokens directly — version-agnostic
+    // (avoids a hard dependency on the `foundry.canvas.layers.TokenLayer` path,
+    // which would throw in `instanceof` if that namespace differs across cores).
+    if (hovered && canvas.activeLayer === canvas.tokens) {
       clearTimeout(_ihDelayTimer);
       _ihDelayTimer = setTimeout(() => {
         // Re-validate after delay: token must still be the hovered one.
@@ -626,7 +629,12 @@ async function _ihInjectTokenConfigFields(app, html, _data) {
   app.setPosition?.({ height: "auto" });
 
   rootEl.querySelector("button.fe-ih-picker-button")?.addEventListener("click", () => {
-    new foundry.applications.apps.FilePicker.implementation({
+    // Cross-version FilePicker resolution (mirrors fe-theatre.js).
+    const FPClass = foundry.applications?.apps?.FilePicker?.implementation
+      ?? foundry.applications?.apps?.FilePicker
+      ?? globalThis.FilePicker;
+    if (!FPClass) return;
+    new FPClass({
       type: "imagevideo",
       callback: (path) => {
         const input = rootEl.querySelector("input.fe-ih-specific-art");
