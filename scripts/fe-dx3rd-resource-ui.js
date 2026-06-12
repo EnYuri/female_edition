@@ -59,6 +59,7 @@ function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
+function _ruiEnabled()   { try { return feSetting(S.DX3RD_RUI_ENABLED) === true; } catch { return false; } }
 function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
 function _isGlobalOn()   { const v = localStorage.getItem(VISIBLE_KEY); return v === null ? false : v === "true"; }
 function _setGlobalOn(v) { localStorage.setItem(VISIBLE_KEY, String(v)); }
@@ -448,7 +449,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
 
 // 전체 재빌드 — 핀된 액터 목록 기준으로 양쪽 컨테이너 동기화.
 function feRebuildDx3rdResourceUI() {
-  if (!_isSupported()) {
+  if (!_isSupported() || !_ruiEnabled()) {
     document.getElementById(CONTAINER_ID)?.remove();
     document.getElementById(CONTAINER_OWN_ID)?.remove();
     _syncToggleBtn(false);
@@ -617,7 +618,7 @@ function _applyVisibility(visible) {
 }
 
 function _injectChatBtn() {
-  if (!_isSupported()) return;
+  if (!_isSupported() || !_ruiEnabled()) { document.getElementById(BTN_ID)?.remove(); return; }
   if (document.getElementById(BTN_ID)) return;
 
   const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
@@ -645,7 +646,7 @@ function _injectChatBtn() {
 // 사이드바 액터 디렉터리 우클릭
 // v14: getActorContextOptions / v13: getActorContextMenuOptions
 function _ruiContextEntry(html, options) {
-  if (!_isSupported()) return;
+  if (!_isSupported() || !_ruiEnabled()) return;
   if (options.some(o => o.name === "스테이터스 토글")) return;
   const item = {
     name: "스테이터스 토글",
@@ -703,7 +704,10 @@ Hooks.on("getTokenEntries", (token, options) => {
 // ─── 액터 시트 헤더 버튼 ──────────────────────────────────────────────────────
 
 function _injectSheetStatusBtn(app, el) {
-  if (!_isSupported()) return;
+  if (!_isSupported() || !_ruiEnabled()) {
+    el?.querySelectorAll?.(".fedr-sheet-btn")?.forEach(b => b.remove());
+    return;
+  }
   const actor = app.actor ?? app.document;
   if (actor?.documentName !== "Actor") return;
 
@@ -765,6 +769,18 @@ Hooks.on("renderActorSheetV2", _onRenderActorSheet);
 
 Hooks.on("init", () => {
   if (!_isSupported()) return;
+  game.settings.register(MODULE_ID, S.DX3RD_RUI_ENABLED, {
+    name: "스테이터스 UI 표시",
+    hint: "핀 고정한 액터의 HP·자원 카드(스테이터스 UI)를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅의 토글 버튼이 비활성화됩니다.",
+    scope: "client", config: true, type: Boolean,
+    default: false,
+    onChange: () => {
+      feRebuildDx3rdResourceUI();
+      _injectChatBtn();
+      // Clean up header buttons on already-open sheets when toggling off (no re-render).
+      if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
+    },
+  });
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
     name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
     hint: "포트레이트 이미지 영역의 너비. 기본 98.",
