@@ -53,7 +53,7 @@ Hooks.once("init", () => {
       name: `[DND5e] 커스텀 피해 타입 ${idx} 이름`,
       hint: "이 슬롯에 표시될 피해 타입 이름. 비워두면 번호로 표시됩니다.",
       scope: "world",
-      config: true,
+      config: false,
       restricted: true,
       type: String,
       default: String(idx),

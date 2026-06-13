@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.4.8",
+  "version": "1.5.1",
   "authors": [
     {
       "name": "nayuri",
@@ -30,7 +30,8 @@
     "scripts/fe-filepicker-sort.js",
     "scripts/fe-playlist-name.js",
     "scripts/fe-dx3rd-input-align.js",
-    "scripts/fe-narrator.js"
+    "scripts/fe-narrator.js",
+    "scripts/fe-conflict-guard.js"
   ],
   "styles": [
     "styles/ui-font.css",

@@ -19,8 +19,10 @@ let _actions = {
   flip: null,        // (tile, faceIndex)
   toggleShowHide: null, // (tile)
   toggleDisable: null,  // (tile)
+  toggleLock: null,     // (tile)
   remove: null,         // (tile)
   openSheet: null,      // (actor)
+  grantRights: null,    // (actor) — GM only
 };
 
 function feSetPanelMenuActions(actions) {
@@ -180,6 +182,11 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
         disabled ? "FESP.Menu.Enable" : "FESP.Menu.Disable",
         () => _actions.toggleDisable?.(tile));
 
+    const locked = !!flag.locked;
+    add(locked ? "fa-lock-open" : "fa-lock",
+        locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
+        () => _actions.toggleLock?.(tile));
+
     add("fa-trash", "FESP.Menu.Remove", () => _actions.remove?.(tile), { danger: true });
     ownerSection.appendChild(document.createElement("hr"));
 
@@ -192,6 +199,19 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
     ownerSection.appendChild(sheetItem);
 
     el.appendChild(ownerSection);
+  }
+
+  // --- GM controls: delegate operate rights to specific players ---
+  if (game.user.isGM) {
+    const gmSection = document.createElement("div");
+    gmSection.className = "fe-sp-menu-section";
+    const grant = document.createElement("button");
+    grant.type = "button";
+    grant.className = "fe-sp-menu-item";
+    grant.innerHTML = `<i class="fa-solid fa-user-shield"></i><span>${game.i18n.localize("FESP.Menu.GrantRights")}</span>`;
+    grant.addEventListener("click", () => { closePanelMenu(); _actions.grantRights?.(actor); });
+    gmSection.appendChild(grant);
+    el.appendChild(gmSection);
   }
 
   if (!gmOnline && !game.user.isGM && isOwner) {

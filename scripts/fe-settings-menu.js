@@ -51,10 +51,23 @@ const ALL_DEFAULTS = Object.freeze({
   ...CP_DEFAULTS,
   injectCustomConditions:  true,
   injectCustomDamageTypes: true,
+  // dnd5e custom damage-type name slots (registered by inject-damage-type.js)
+  dmgCustom1: "1", dmgCustom2: "2", dmgCustom3: "3", dmgCustom4: "4",
+  dmgCustom5: "5", dmgCustom6: "6", dmgCustom7: "7", dmgCustom8: "8",
   // Standalone-module settings migrated into the unified menu.
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
+  // image-hover (3 world/GM + 4 client)
+  ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
+  ihEnabled: true, ihPosition: "Bottom left", ihSize: 7, ihDelay: 0,
+  // narrator (all world/GM)
+  narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
+  narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
+  // theatre (4 world/GM + 6 client)
+  stageEnabled: false, stageHideMessages: false, stageAutoDecay: true, stageDecayTime: 30000,
+  stagePortraitHeight: 130, stageBoxWidth: 488, stageBoxHeight: 276,
+  stageBoxBottom: 30, stageBoxLeft: 266, stageTextSize: 17,
 });
 
 // ── Template choice lists (static — defined once, not rebuilt per getData call) ──
@@ -86,9 +99,10 @@ const CHOICES = {
     neodgm:     "NeoDGM 픽셀",
   },
   userColorBgBase: {
-    white: "흰색(권장)",
-    black: "검정",
-    none:  "사용 안 함(기존 방식)",
+    white:  "흰색(권장)",
+    black:  "검정",
+    none:   "사용 안 함(기존 방식)",
+    custom: "사용자 지정 색상",
   },
   portraitShape: {
     circle: "원형",
@@ -105,6 +119,23 @@ const CHOICES = {
     center: "가운데",
     left:   "좌측",
   },
+  // image-hover
+  ihPermission: { 0: "없음", 1: "제한됨", 2: "관찰자", 3: "소유자" },
+  ihArtType: {
+    character: "캐릭터 아트",
+    token:     "토큰 아트",
+    wildcard:  "와일드카드일 때 토큰 아트",
+    linked:    "연결 해제된 토큰일 때 토큰 아트",
+  },
+  ihPosition: {
+    "Bottom left":  "왼쪽 아래",
+    "Bottom right": "오른쪽 아래",
+    "Top left":     "왼쪽 위",
+    "Top right":    "오른쪽 위",
+    Centre:         "중앙",
+  },
+  // narrator command permission (USER_ROLES)
+  narratorRole: { 0: "없음", 1: "플레이어", 2: "신뢰 플레이어", 3: "어시스턴트 GM", 4: "게임마스터" },
 };
 
 // ── Helpers ──
@@ -123,6 +154,20 @@ function feIsDx3rdSystem() {
 
 function feIsDnd5eSystem() {
   try { return game?.system?.id === "dnd5e"; } catch { return false; }
+}
+
+// Persist each collapsible section's open/closed state across menu open/close.
+// Pure client UI state → localStorage (no settings registration needed). Keyed
+// by the section's summary text (stable, unique per section).
+const FE_SM_OPEN_STORE = `${MODULE_ID}:settings-menu:open-sections`;
+
+function feSmLoadOpenState() {
+  try { return JSON.parse(localStorage.getItem(FE_SM_OPEN_STORE) || "{}") || {}; }
+  catch { return {}; }
+}
+
+function feSmSaveOpenState(state) {
+  try { localStorage.setItem(FE_SM_OPEN_STORE, JSON.stringify(state)); } catch { /* no-op */ }
 }
 
 // ── Settings dialog (ApplicationV2) ──
@@ -207,6 +252,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // User-color tint
       [S.USE_USER_COLOR_BG]:  feRead(S.USE_USER_COLOR_BG),
       [S.USER_COLOR_BG_BASE]: feRead(S.USER_COLOR_BG_BASE),
+      [S.USER_COLOR_BG_CUSTOM]: feRead(S.USER_COLOR_BG_CUSTOM),
+      [S.USER_COLOR_ALPHA]:   feRead(S.USER_COLOR_ALPHA),
+      [S.SYSTEM_MSG_COLOR]:   feRead(S.SYSTEM_MSG_COLOR),
       [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
       [S.ACCENT_TEXT_OVERRIDE]: feRead(S.ACCENT_TEXT_OVERRIDE),
 
@@ -221,11 +269,48 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // DND5e injection
       injectCustomConditions:  feRead("injectCustomConditions"),
       injectCustomDamageTypes: feRead("injectCustomDamageTypes"),
+      dmgCustom1: feRead("dmgCustom1"), dmgCustom2: feRead("dmgCustom2"),
+      dmgCustom3: feRead("dmgCustom3"), dmgCustom4: feRead("dmgCustom4"),
+      dmgCustom5: feRead("dmgCustom5"), dmgCustom6: feRead("dmgCustom6"),
+      dmgCustom7: feRead("dmgCustom7"), dmgCustom8: feRead("dmgCustom8"),
 
       // Chat images (standalone module — migrated to unified menu)
       chatImagesEnabled:        feRead("chatImagesEnabled"),
       chatImagesShowButton:     feRead("chatImagesShowButton"),
       chatImagesUploadLocation: feRead("chatImagesUploadLocation"),
+
+      // Image Hover (standalone — migrated)
+      ihPermission:   feRead("ihPermission"),
+      ihArtType:      feRead("ihArtType"),
+      ihShowAllTimer: feRead("ihShowAllTimer"),
+      ihEnabled:      feRead("ihEnabled"),
+      ihPosition:     feRead("ihPosition"),
+      ihSize:         feRead("ihSize"),
+      ihDelay:        feRead("ihDelay"),
+
+      // Narrator (standalone — migrated; all world/GM)
+      narratorEnabled:      feRead("narratorEnabled"),
+      narratorDurationMult: feRead("narratorDurationMult"),
+      narratorStartPaused:  feRead("narratorStartPaused"),
+      narratorAllowCopy:    feRead("narratorAllowCopy"),
+      narratorPermNarrate:  feRead("narratorPermNarrate"),
+      narratorPermDescribe: feRead("narratorPermDescribe"),
+      narratorPermAs:       feRead("narratorPermAs"),
+
+      // Theatre / Stage (standalone — migrated)
+      stageEnabled:        feRead("stageEnabled"),
+      stageHideMessages:   feRead("stageHideMessages"),
+      stageAutoDecay:      feRead("stageAutoDecay"),
+      stageDecayTime:      feRead("stageDecayTime"),
+      stagePortraitHeight: feRead("stagePortraitHeight"),
+      stageBoxWidth:       feRead("stageBoxWidth"),
+      stageBoxHeight:      feRead("stageBoxHeight"),
+      stageBoxBottom:      feRead("stageBoxBottom"),
+      stageBoxLeft:        feRead("stageBoxLeft"),
+      stageTextSize:       feRead("stageTextSize"),
+
+      // Screen Panel (standalone — migrated; world/GM, requiresReload)
+      [S.SCREEN_PANEL_ENABLED]: feRead(S.SCREEN_PANEL_ENABLED),
 
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
@@ -276,6 +361,24 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     // Parity with the v1 form (autocomplete was set on the <form> in the template,
     // which no longer exists — the root form is provided by tag:"form").
     try { this.element?.setAttribute?.("autocomplete", "off"); } catch { /* no-op */ }
+
+    // Restore each section's saved open/closed state and persist on toggle. The
+    // template's `open` attribute is only the first-time default; once the user
+    // has expanded/collapsed a section, that choice is remembered. (AppV2 rebuilds
+    // the DOM each render, so per-render listeners do not accumulate.)
+    try {
+      const state = feSmLoadOpenState();
+      for (const d of this.element?.querySelectorAll?.("details") ?? []) {
+        const key = d.querySelector("summary")?.textContent?.trim();
+        if (!key) continue;
+        if (Object.prototype.hasOwnProperty.call(state, key)) d.open = !!state[key];
+        d.addEventListener("toggle", () => {
+          const s = feSmLoadOpenState();
+          s[key] = d.open;
+          feSmSaveOpenState(s);
+        });
+      }
+    } catch { /* no-op */ }
   }
 
   // data-action handlers receive (event, target) bound to the application instance.
@@ -336,6 +439,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // User-color background
         bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
+        str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
         bool(S.CHAT_GROUP_OUTLINE),
 
         // Retro theme (general — visible/saved in all systems)
@@ -344,6 +448,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // DND5e injection (world-scoped — only GM can set; fields hidden for non-GMs)
         ...(feIsDnd5eSystem() && game.user?.isGM ? [
           bool("injectCustomConditions"), bool("injectCustomDamageTypes"),
+          str("dmgCustom1"), str("dmgCustom2"), str("dmgCustom3"), str("dmgCustom4"),
+          str("dmgCustom5"), str("dmgCustom6"), str("dmgCustom7"), str("dmgCustom8"),
         ] : []),
 
         // Status UI (dx3rd + dnd5e) — only when its fields are shown (ruiSupported),
@@ -362,6 +468,27 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Chat images (upload path is world-scoped/GM-only)
         bool("chatImagesEnabled"), bool("chatImagesShowButton"),
         ...(game.user?.isGM ? [str("chatImagesUploadLocation")] : []),
+
+        // Image Hover — world/GM (perm/art/timer) gated; client prefs always saved
+        ...(game.user?.isGM ? [num("ihPermission"), str("ihArtType"), num("ihShowAllTimer")] : []),
+        bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihDelay"),
+
+        // Narrator — all world/GM
+        ...(game.user?.isGM ? [
+          bool("narratorEnabled"), num("narratorDurationMult"), bool("narratorStartPaused"),
+          bool("narratorAllowCopy"),
+          num("narratorPermNarrate"), num("narratorPermDescribe"), num("narratorPermAs"),
+        ] : []),
+
+        // Theatre — world/GM (enable/hide/decay) gated; client box dims always saved
+        ...(game.user?.isGM ? [
+          bool("stageEnabled"), bool("stageHideMessages"), bool("stageAutoDecay"), num("stageDecayTime"),
+        ] : []),
+        num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
+        num("stageBoxBottom"), num("stageBoxLeft"), num("stageTextSize"),
+
+        // Screen Panel — world/GM (requiresReload triggers the reload prompt on change)
+        ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),

@@ -41,6 +41,7 @@ import {
   feSetUiFontClass, feSetNeodgmModeClass, feSetRetroThemeClass,
   feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
+  feSetSystemMsgColorClass,
   feApplyStyleVarsFromSettings,
 } from "./fe-style.js";
 
@@ -114,7 +115,7 @@ async function feMigrateLegacySettings() {
   await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
   await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
   await feNormalizeChoiceSetting(S.MERGE_SPEAKER_BASIS, ["token", "actor", "author"], FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
-  await feNormalizeChoiceSetting(S.USER_COLOR_BG_BASE, ["white", "black", "none"], FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
+  await feNormalizeChoiceSetting(S.USER_COLOR_BG_BASE, ["white", "black", "none", "custom"], FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
   await feNormalizeChoiceSetting(S.EXPORT_PRINT_IMAGE_MODE, Object.keys(FE_EXPORT_PRINT_IMAGE_MODE_CHOICES), FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
   await feNormalizeChoiceSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE, ["off", "button", "auto"], FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]);
 }
@@ -135,6 +136,7 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
   try { feSetChatGroupOutlineClass(doc); } catch { /* no-op */ }
   try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
+  try { feSetSystemMsgColorClass(doc); } catch { /* no-op */ }
   try {
     feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
   } catch {
@@ -567,9 +569,44 @@ Hooks.once("init", () => {
       white: "흰색(권장)",
       black: "검정",
       none: "사용 안 함(기존 방식)",
+      custom: "사용자 지정 색상",
     },
     default: "white",
     onChange: () => feSetUserColorBgBaseClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.USER_COLOR_BG_CUSTOM, {
+    name: "채팅 메시지 배경: 사용자 지정 하부 배경색",
+    hint: "하부 배경을 '사용자 지정 색상'으로 설정했을 때 사용할 색.",
+    scope: "client",
+    config: false,
+    type: String,
+    default: FE_DEFAULTS[S.USER_COLOR_BG_CUSTOM],
+    onChange: () => feSetUserColorBgBaseClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.USER_COLOR_ALPHA, {
+    name: "채팅 메시지 배경: 유저 색상 틴트 농도",
+    hint: "유저 색상이 배경에 입혀지는 진하기(0.05~0.6). 값이 클수록 진해집니다.",
+    scope: "client",
+    config: false,
+    type: Number,
+    range: { min: 0.05, max: 0.6, step: 0.01 },
+    default: FE_DEFAULTS[S.USER_COLOR_ALPHA],
+    onChange: () => feApplyStyleVarsFromSettings(document),
+  });
+
+  game.settings.register(MODULE_ID, S.SYSTEM_MSG_COLOR, {
+    name: "내레이션·시스템 메시지에 시스템 색상 적용",
+    hint: "화자(캐릭터)가 없는 메시지(내레이션, GM의 NPC/내레이션, 시스템 메시지)에 중립 회색 배경을 입힙니다. 레트로 테마 + 텍스트 색조 오버라이드가 켜져 있으면 강조색 톤을 사용합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.SYSTEM_MSG_COLOR],
+    onChange: () => {
+      feSetSystemMsgColorClass(document);
+      feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
+    },
   });
 
   game.settings.register(MODULE_ID, S.CHAT_GROUP_OUTLINE, {
@@ -703,6 +740,7 @@ Hooks.once("ready", async () => {
   feSetUserColorBgBaseClass(document);
   feSetChatGroupOutlineClass(document);
   feSetAccentTextOverrideClass(document);
+  feSetSystemMsgColorClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
 });

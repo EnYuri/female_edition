@@ -12,9 +12,13 @@
 import "./chat-bg-stripper.js";
 import "./fe-chat-enhance.js";
 
-// Settings in fe-chat-enhance / chat-bg-stripper / fe-chat-portrait are config: false
-// — managed exclusively through the unified settings panel (fe-settings-menu.js).
-// fe-chat-images / fe-image-hover / fe-theatre keep config: true (no unified-menu section).
+// ALL module settings are config: false — managed exclusively through the unified
+// settings panel (fe-settings-menu.js). This includes the once-standalone features
+// (fe-chat-images / fe-image-hover / fe-narrator / fe-theatre / fe-screen-panel),
+// whose settings were migrated into the unified menu (no native Module Settings
+// entries). Their modules still READ via game.settings.get; the menu writes them.
+// CLIENT-scope personal ones are listed in FE_GM_PRIORITY_EXCLUDED_KEYS so the
+// menu reflects each client's own value (no GM-priority override staleness).
 
 // Feature splits
 import "./fe-chat-edit.js";

@@ -146,7 +146,18 @@ function ciFind(root = document, selector) {
 }
 
 function ciGetTextarea(root = document) {
-  return ciFind(root, "#chat-message, textarea#chat-message, .chat-message-input, .chat-form textarea") || null;
+  const sel = "#chat-message, textarea#chat-message, .chat-message-input, .chat-form textarea";
+  let all;
+  try { all = Array.from(root?.querySelectorAll?.(sel) ?? []); } catch { all = []; }
+  if (!all.length) return null;
+  // v14 renders a chat input BOTH in the open sidebar (chat tab) and in the
+  // #chat-notifications column (collapsed / notification view). The notifications
+  // input precedes the sidebar one in DOM order, so a naive first-match anchors
+  // the preview tray to the LEFT of the open sidebar. Prefer a VISIBLE input
+  // docked in #sidebar; fall back to any visible input, then the first.
+  const visible = all.filter((el) => { try { return el.getClientRects().length > 0; } catch { return false; } });
+  const pool = visible.length ? visible : all;
+  return pool.find((el) => el.closest?.("#sidebar")) || pool[0] || null;
 }
 
 function ciGetChatForm(root = document) {
@@ -407,7 +418,9 @@ function ciEnsureUploadArea(root = document) {
   const controls = ciGetChatControls(root);
   if (!textarea && !chatForm && !controls) return null;
 
-  let area = ciGetPendingArea(root);
+  // Find the existing tray ANYWHERE (it may have been left in a different chat
+  // container after the input reparented), not just under `root`.
+  let area = ciGetPendingArea(root) || ciGetPendingArea(document);
   if (!area) {
     const anchor = textarea || chatForm || controls;
     const doc = anchor?.ownerDocument || document;
@@ -444,9 +457,15 @@ function ciEnsureUploadArea(root = document) {
 
     actions.append(send, clear);
     area.append(strip, actions);
+  }
 
-    const ref = textarea || controls || chatForm;
-    if (ref?.parentNode) ref.parentNode.insertBefore(area, ref);
+  // Dock the tray immediately before the CURRENT chat input every refresh,
+  // relocating it if the input reparented (v14 moves the input between the open
+  // sidebar and the #chat-notifications column). Without this the tray gets
+  // stranded left of the open sidebar where the notification input lives.
+  const ref = textarea || controls || chatForm;
+  if (ref?.parentNode && area.nextElementSibling !== ref) {
+    ref.parentNode.insertBefore(area, ref);
   }
 
   const strip = ciGetPendingStrip(root);

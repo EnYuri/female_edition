@@ -31,6 +31,7 @@ const FE_PANEL_SOCKET = Object.freeze({
   FLIP: "panelFlip",
   DISABLE: "panelDisable",
   MOVE: "panelMove",
+  LOCK: "panelLock",
 });
 
 const FE_PANEL_DEFAULT_SIZE = 400;

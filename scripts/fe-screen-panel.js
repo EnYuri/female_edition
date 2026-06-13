@@ -160,16 +160,24 @@ function attachBoardListeners() {
   if (!view || view === _boardEl) return; // canvas element is stable across scenes
   if (_boardEl) {
     _boardEl.removeEventListener("pointerdown", onBoardPointerDown, true);
+    _boardEl.removeEventListener("contextmenu", onBoardContextMenu, true);
     _boardEl.removeEventListener("mousemove", onBoardMouseMove, false);
     _boardEl.removeEventListener("mouseleave", onBoardMouseLeave, false);
   }
   _boardEl = view;
   view.addEventListener("pointerdown", onBoardPointerDown, true);
+  view.addEventListener("contextmenu", onBoardContextMenu, true);
   view.addEventListener("mousemove", onBoardMouseMove, false);
   view.addEventListener("mouseleave", onBoardMouseLeave, false);
 }
 
 const FE_PANEL_DRAG_THRESHOLD = 6; // px of pointer travel before a click becomes a drag
+
+// Interaction model (Cocoforia-style): left-drag = move, right-click = menu,
+// double-click = cycle to the next face. A bare left click does nothing (the
+// menu is on right-click), so double-click detection is just a timestamp check.
+const FE_PANEL_DBLCLICK_MS = 300;
+let _lastPanelClick = null; // { tileId, t }
 
 function onBoardPointerDown(event) {
   if (!isPanelFeatureEnabled() || event.button !== 0 || !canvas?.ready) return;
@@ -181,10 +189,27 @@ function onBoardPointerDown(event) {
   event.stopImmediatePropagation(); // suppress core canvas pan / selection
   feHidePanelTooltip();
 
-  // Owners may drag to reposition; everyone else just gets the dropdown. The
-  // distinction between a drag and a click is made on release (threshold below).
-  const canDrag = hit.actor.testUserPermission(game.user, "OWNER") && !hit.actor.system.locked;
+  // Owners may left-drag to reposition (unless the panel is locked — per-actor
+  // or per-placement). Below the move threshold it is a click; a double click
+  // cycles the face. The menu lives on right-click (onBoardContextMenu).
+  const canDrag = hit.actor.testUserPermission(game.user, "OWNER")
+    && !hit.actor.system.locked && !hit.flag?.locked;
   startPanelPointer(hit, event, canDrag);
+}
+
+// Right-click on a panel opens its menu (Cocoforia-style). Capture phase so it
+// runs before core's canvas context handling; we suppress the default browser
+// menu and core's right-context behaviour over the panel only.
+function onBoardContextMenu(event) {
+  if (!isPanelFeatureEnabled() || !canvas?.ready) return;
+  const world = clientToWorld(event.clientX, event.clientY);
+  if (!world) return;
+  const hit = pickPanelTileAt(world);
+  if (!hit || tokenOccludesAt(world, hit.doc)) return; // let core handle elsewhere
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  feHidePanelTooltip();
+  feOpenPanelMenu({ tile: hit.tile, actor: hit.actor, clientX: event.clientX, clientY: event.clientY });
 }
 
 /**
@@ -219,8 +244,18 @@ function startPanelPointer(hit, downEvent, canDrag) {
     if (dragging) {
       try { hit.doc.updateSource({ x: finalPos.x, y: finalPos.y }); } catch { /* local-only optimistic sync */ }
       feActionMove(hit.tile, finalPos.x, finalPos.y);
+      return;
+    }
+    // Click (no travel). A double click (second click on the SAME tile within
+    // the window) cycles to the next face. A single click does nothing — the
+    // menu is on right-click.
+    const tileId = hit.tile.document.id;
+    const now = performance.now();
+    if (_lastPanelClick && _lastPanelClick.tileId === tileId && (now - _lastPanelClick.t) < FE_PANEL_DBLCLICK_MS) {
+      _lastPanelClick = null;
+      feCyclePanelFace(hit.tile, hit.actor);
     } else {
-      feOpenPanelMenu({ tile: hit.tile, actor: hit.actor, clientX: e.clientX, clientY: e.clientY });
+      _lastPanelClick = { tileId, t: now };
     }
   };
   const onCancel = () => {
@@ -316,10 +351,69 @@ async function feRelayPanelOp(type, payload) {
 }
 
 async function feActionFlip(tile, faceIndex) { return feRelayPanelOp(FE_PANEL_SOCKET.FLIP, { ...tileRef(tile), faceIndex }); }
+
+/**
+ * Advance a placed panel to the NEXT face in order (wraps around). Triggered by
+ * a double-click on the tile. Flipping is an OBSERVER-level op (same as the
+ * dropdown's flip), so any viewer can cycle. Returns false when there is nothing
+ * to cycle (fewer than 2 faces), so the caller can fall back to the menu.
+ */
+function feCyclePanelFace(tile, actor) {
+  const faceCount = actor?.system?.faces?.length ?? 0;
+  if (faceCount < 2) return false;
+  const flag = tile.document.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+  const cur = Number.isInteger(flag?.currentFace) ? flag.currentFace : 0;
+  const next = (cur + 1) % faceCount;
+  feActionFlip(tile, next);
+  return true;
+}
 async function feActionMove(tile, x, y) { return feRelayPanelOp(FE_PANEL_SOCKET.MOVE, { ...tileRef(tile), x, y }); }
 async function feActionShowHide(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.SHOW_HIDE, tileRef(tile)); }
 async function feActionDisable(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.DISABLE, tileRef(tile)); }
+async function feActionLock(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.LOCK, tileRef(tile)); }
 async function feActionRemove(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.REMOVE, tileRef(tile)); }
+
+/**
+ * GM-only: delegate operate rights for a panel ACTOR to specific players via
+ * Foundry actor ownership (OWNER lets them drag/flip/lock/etc., enforced by the
+ * existing permission checks + GM relay). Opens a player picker dialog. Changing
+ * ownership is a GM capability, so this is gated to the GM.
+ */
+async function feScreenPanelGrantRights(actor) {
+  if (!game.user.isGM) { ui.notifications?.warn(game.i18n.localize("FESP.Grant.GMOnly")); return; }
+  if (!actor) return;
+  const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  const players = game.users.filter((u) => !u.isGM);
+  if (!players.length) { ui.notifications?.info(game.i18n.localize("FESP.Grant.NoPlayers")); return; }
+  const esc = foundry.utils.escapeHTML ?? ((s) => s);
+  const rows = players.map((u) => {
+    const checked = (actor.ownership?.[u.id] ?? 0) >= OWNER ? "checked" : "";
+    return `<label class="fe-sp-grant-row" style="display:flex;align-items:center;gap:.5em;padding:.25em 0;">
+      <input type="checkbox" name="${u.id}" ${checked}/>
+      <span style="display:inline-block;width:.8em;height:.8em;border-radius:50%;background:${u.color ?? "#888"};"></span>
+      <span>${esc(u.name)}</span>
+    </label>`;
+  }).join("");
+  await foundry.applications.api.DialogV2.prompt({
+    window: { title: game.i18n.format("FESP.Grant.Title", { name: actor.name }) },
+    content: `<p>${game.i18n.localize("FESP.Grant.Hint")}</p><div class="fe-sp-grant-list">${rows}</div>`,
+    ok: {
+      icon: "fa-solid fa-user-shield",
+      label: game.i18n.localize("FESP.Grant.Apply"),
+      callback: async (_event, button) => {
+        const form = button.form ?? button.closest?.("form");
+        if (!form) return;
+        const ownership = foundry.utils.deepClone(actor.ownership ?? {});
+        for (const u of players) {
+          const cb = form.elements?.[u.id];
+          ownership[u.id] = cb?.checked ? OWNER : CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+        }
+        await actor.update({ ownership });
+        ui.notifications?.info(game.i18n.localize("FESP.Grant.Done"));
+      },
+    },
+  });
+}
 
 async function feScreenPanelPlaceOnScene(actor) {
   if (!canvas?.scene) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoScene")); return; }
@@ -389,6 +483,8 @@ async function applyPanelOp(type, data) {
     await doc.update({ hidden: !doc.hidden });
   } else if (type === FE_PANEL_SOCKET.DISABLE) {
     await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.disabled`]: !flag?.disabled });
+  } else if (type === FE_PANEL_SOCKET.LOCK) {
+    await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.locked`]: !flag?.locked });
   } else if (type === FE_PANEL_SOCKET.REMOVE) {
     await scene.deleteEmbeddedDocuments("Tile", [doc.id]);
   }
@@ -427,7 +523,7 @@ Hooks.once("init", () => {
     name: "FESP.Settings.EnableName",
     hint: "FESP.Settings.EnableHint",
     scope: "world",
-    config: true,
+    config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.SCREEN_PANEL_ENABLED],
     requiresReload: true,
@@ -440,8 +536,10 @@ Hooks.once("ready", () => {
     flip: feActionFlip,
     toggleShowHide: feActionShowHide,
     toggleDisable: feActionDisable,
+    toggleLock: feActionLock,
     remove: feActionRemove,
     openSheet: (actor) => actor?.sheet?.render(true),
+    grantRights: feScreenPanelGrantRights,
   });
   game.socket.on(SOCKET_CHANNEL, onPanelSocket);
 

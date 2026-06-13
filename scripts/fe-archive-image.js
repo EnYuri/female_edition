@@ -131,7 +131,7 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
 
   const body = doc.body;
   const hasUserColor = !!body?.classList?.contains?.("fe-msg-bg-usercolor");
-  const hasUserBase = !!(body?.classList?.contains?.("fe-userbg-base-white") || body?.classList?.contains?.("fe-userbg-base-black"));
+  const hasUserBase = !!(body?.classList?.contains?.("fe-userbg-base-white") || body?.classList?.contains?.("fe-userbg-base-black") || body?.classList?.contains?.("fe-userbg-base-custom"));
 
   // Read phase: collect all computed styles before any writes.
   // Separating reads from writes avoids layout thrashing — each write would otherwise

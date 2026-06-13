@@ -98,6 +98,13 @@ function feSetAccentTextOverrideClass(doc = document) {
   } catch {}
 }
 
+function feSetSystemMsgColorClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.SYSTEM_MSG_COLOR);
+    doc?.body?.classList?.toggle("fe-system-msg-color", enabled);
+  } catch {}
+}
+
 function feSetUserColorBgBaseClass(doc = document) {
   try {
     const mode = String(feSetting(S.USER_COLOR_BG_BASE) ?? "white");
@@ -105,8 +112,18 @@ function feSetUserColorBgBaseClass(doc = document) {
     if (!body?.classList) return;
     body.classList.toggle("fe-userbg-base-white", mode === "white");
     body.classList.toggle("fe-userbg-base-black", mode === "black");
+    body.classList.toggle("fe-userbg-base-custom", mode === "custom");
+    if (mode === "custom") {
+      // Feed the custom base color to CSS as "r g b" (inherited down to messages).
+      const hex = String(feSetting(S.USER_COLOR_BG_CUSTOM) ?? "#1b1b1b").trim();
+      const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+      const rgb = m ? `${parseInt(m[1], 16)} ${parseInt(m[2], 16)} ${parseInt(m[3], 16)}` : "27 27 27";
+      body.style.setProperty("--fe-user-bg-base-rgb", rgb);
+    } else {
+      body.style.removeProperty("--fe-user-bg-base-rgb");
+    }
     if (mode === "none") {
-      body.classList.remove("fe-userbg-base-white", "fe-userbg-base-black");
+      body.classList.remove("fe-userbg-base-white", "fe-userbg-base-black", "fe-userbg-base-custom");
     }
   } catch {}
 }
@@ -124,6 +141,10 @@ function feApplyStyleVarsFromSettings(doc = document) {
       const v = Number(n);
       return Number.isFinite(v) ? v : fallback;
     };
+
+    // User-color tint strength (clamped to the registered range).
+    const ucAlpha = num(feSetting(S.USER_COLOR_ALPHA), 0.22);
+    root.style.setProperty("--fe-user-color-alpha", String(Math.min(0.6, Math.max(0.05, ucAlpha))));
 
     root.style.setProperty("--fe-chat-title-size", px(feSetting(S.STYLE_ACTOR_NAME_SIZE), 22));
     root.style.setProperty("--fe-chat-subtitle-size", px(feSetting(S.STYLE_PLAYER_NAME_SIZE), 14));
@@ -168,5 +189,6 @@ export {
   feSetUserColorBgBaseClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
+  feSetSystemMsgColorClass,
   feApplyStyleVarsFromSettings,
 };

@@ -140,7 +140,31 @@
           {{selectOptions choices.userColorBgBase selected=values.ceUserColorBgBase}}
         </select>
       </div>
-      <p class="notes">유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다.</p>
+      <p class="notes">유저 색상 틴트 아래에 불투명한 배경(흰색/검정/사용자 지정)을 깔아 가독성을 높입니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>유저 색상 하부 배경: 사용자 지정 색</label>
+      <div class="form-fields">
+        <input type="color" name="ceUserColorBgCustom" value="{{values.ceUserColorBgCustom}}" />
+      </div>
+      <p class="notes">위에서 '사용자 지정 색상'을 선택했을 때 사용할 하부 배경색.</p>
+    </div>
+
+    <div class="form-group">
+      <label>유저 색상 틴트 농도</label>
+      <div class="form-fields">
+        <input type="number" name="ceUserColorAlpha" data-dtype="Number" value="{{values.ceUserColorAlpha}}" step="0.01" min="0.05" max="0.6" />
+      </div>
+      <p class="notes">유저 색상이 배경에 입혀지는 진하기(0.05~0.6). 값이 클수록 진해집니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>내레이션·시스템 메시지에 시스템 색상</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceSystemMsgColor" data-dtype="Boolean" {{checked values.ceSystemMsgColor}} />
+      </div>
+      <p class="notes">화자(캐릭터)가 없는 메시지(내레이션·GM의 NPC/내레이션·시스템)에 중립 회색 배경을 입힙니다. 레트로 테마 + 텍스트 색조 오버라이드 시 강조색 톤.</p>
     </div>
 
     <div class="form-group">
@@ -477,6 +501,39 @@
       </div>
       <p class="notes">커스텀 피해 타입 8종을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.</p>
     </div>
+
+    <div class="form-group">
+      <label>커스텀 피해 타입 1 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom1" value="{{values.dmgCustom1}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 2 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom2" value="{{values.dmgCustom2}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 3 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom3" value="{{values.dmgCustom3}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 4 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom4" value="{{values.dmgCustom4}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 5 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom5" value="{{values.dmgCustom5}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 6 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom6" value="{{values.dmgCustom6}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 7 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom7" value="{{values.dmgCustom7}}" /></div>
+    </div>
+    <div class="form-group">
+      <label>커스텀 피해 타입 8 이름</label>
+      <div class="form-fields"><input type="text" name="dmgCustom8" value="{{values.dmgCustom8}}" /></div>
+    </div>
   </details>
   {{/if}}{{/if}}
 
@@ -581,6 +638,190 @@
     </div>
     {{/if}}
   </details>
+
+  <details>
+    <summary>이미지 호버 (Image Hover)</summary>
+
+    <div class="form-group">
+      <label>활성화 (개인)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ihEnabled" data-dtype="Boolean" {{checked values.ihEnabled}} />
+      </div>
+      <p class="notes">이 클라이언트에서 토큰 호버 시 캐릭터 아트를 표시합니다.</p>
+    </div>
+    <div class="form-group">
+      <label>이미지 위치 (개인)</label>
+      <div class="form-fields">
+        <select name="ihPosition" data-dtype="String">{{selectOptions choices.ihPosition selected=values.ihPosition}}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>이미지 크기 — 화면 너비의 1/N (개인)</label>
+      <div class="form-fields">
+        <input type="number" name="ihSize" data-dtype="Number" value="{{values.ihSize}}" step="0.5" min="3" max="20" />
+      </div>
+      <p class="notes">값이 작을수록 이미지가 커집니다.</p>
+    </div>
+    <div class="form-group">
+      <label>표시 지연 시간 (ms, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="100" min="0" max="5000" />
+      </div>
+    </div>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>아트 표시 최소 권한 (GM)</label>
+      <div class="form-fields">
+        <select name="ihPermission" data-dtype="Number">{{selectOptions choices.ihPermission selected=values.ihPermission}}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>표시할 아트 유형 (GM)</label>
+      <div class="form-fields">
+        <select name="ihArtType" data-dtype="String">{{selectOptions choices.ihArtType selected=values.ihArtType}}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>전체 표시 지속 시간 (ms, GM)</label>
+      <div class="form-fields">
+        <input type="number" name="ihShowAllTimer" data-dtype="Number" value="{{values.ihShowAllTimer}}" step="200" min="1000" max="15000" />
+      </div>
+    </div>
+    {{/if}}
+  </details>
+
+  {{#if isGM}}
+  <details>
+    <summary>내레이터 채널</summary>
+
+    <div class="form-group">
+      <label>내레이터 기능 활성화</label>
+      <div class="form-fields">
+        <input type="checkbox" name="narratorEnabled" data-dtype="Boolean" {{checked values.narratorEnabled}} />
+      </div>
+      <p class="notes">사이드바 채팅의 /narrate · /describe · /note · /as 명령과 시네마틱 오버레이.</p>
+    </div>
+    <div class="form-group">
+      <label>표시 시간 배수</label>
+      <div class="form-fields">
+        <input type="number" name="narratorDurationMult" data-dtype="Number" value="{{values.narratorDurationMult}}" step="0.25" min="0.25" max="4" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>항상 일시정지 상태로 시작</label>
+      <div class="form-fields">
+        <input type="checkbox" name="narratorStartPaused" data-dtype="Boolean" {{checked values.narratorStartPaused}} />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>복사 버튼 표시</label>
+      <div class="form-fields">
+        <input type="checkbox" name="narratorAllowCopy" data-dtype="Boolean" {{checked values.narratorAllowCopy}} />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>/narrate 최소 권한</label>
+      <div class="form-fields">
+        <select name="narratorPermNarrate" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermNarrate}}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>/describe · /note 최소 권한</label>
+      <div class="form-fields">
+        <select name="narratorPermDescribe" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermDescribe}}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>/as 최소 권한</label>
+      <div class="form-fields">
+        <select name="narratorPermAs" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermAs}}</select>
+      </div>
+    </div>
+  </details>
+  {{/if}}
+
+  <details>
+    <summary>무대(극장) 채팅</summary>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>무대 기능 활성화 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageEnabled" data-dtype="Boolean" {{checked values.stageEnabled}} />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>채팅 로그에서 숨기기 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageHideMessages" data-dtype="Boolean" {{checked values.stageHideMessages}} />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대화 상자 자동 소멸 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageAutoDecay" data-dtype="Boolean" {{checked values.stageAutoDecay}} />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대화 상자 소멸 시간 (ms, GM)</label>
+      <div class="form-fields">
+        <input type="number" name="stageDecayTime" data-dtype="Number" value="{{values.stageDecayTime}}" step="5000" min="5000" max="120000" />
+      </div>
+    </div>
+    {{/if}}
+
+    <div class="form-group">
+      <label>포트레이트 높이 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="1" min="50" max="700" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 가로 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="4" min="200" max="1600" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 세로 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="4" min="100" max="600" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>화면 하단 여백 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="2" min="0" max="300" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>화면 좌측 여백 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="4" min="0" max="1200" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사 폰트 크기 (px, 개인)</label>
+      <div class="form-fields">
+        <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="1" min="10" max="32" />
+      </div>
+    </div>
+  </details>
+
+  {{#if isGM}}
+  <details>
+    <summary>코코포리아식 스크린 패널</summary>
+
+    <div class="form-group">
+      <label>스크린 패널 기능 사용 (GM · 재시작 필요)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceScreenPanelEnabled" data-dtype="Boolean" {{checked values.ceScreenPanelEnabled}} />
+      </div>
+      <p class="notes">액터 서브타입을 씬 캔버스에 올려 면 전환·이동·잠금·권한 이양을 사용합니다. 변경 시 재시작이 필요합니다.</p>
+    </div>
+  </details>
+  {{/if}}
 
   <details>
     <summary>GM 설정 강제</summary>

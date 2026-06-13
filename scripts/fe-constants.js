@@ -32,6 +32,9 @@ const S = {
   UI_STRIP_TEXTURES: "stripChatTextures",
   USE_USER_COLOR_BG: "ceUseUserColorBg",
   USER_COLOR_BG_BASE: "ceUserColorBgBase",
+  USER_COLOR_BG_CUSTOM: "ceUserColorBgCustom",
+  USER_COLOR_ALPHA: "ceUserColorAlpha",
+  SYSTEM_MSG_COLOR: "ceSystemMsgColor",
   CHAT_GROUP_OUTLINE: "ceChatGroupOutline",
   ACCENT_TEXT_OVERRIDE: "ceAccentTextOverride",
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
@@ -94,6 +97,9 @@ const FE_DEFAULTS = {
   [S.UI_STRIP_TEXTURES]: true,
   [S.USE_USER_COLOR_BG]: false,
   [S.USER_COLOR_BG_BASE]: "white",
+  [S.USER_COLOR_BG_CUSTOM]: "#1b1b1b",
+  [S.USER_COLOR_ALPHA]: 0.22,
+  [S.SYSTEM_MSG_COLOR]: false,
   [S.CHAT_GROUP_OUTLINE]: false,
   [S.ACCENT_TEXT_OVERRIDE]: true,
   [S.STYLE_ACTOR_NAME_SIZE]: 22,
@@ -153,6 +159,25 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   // read reflects the raw value (no GM-priority override staleness).
   "chatImagesEnabled",
   "chatImagesShowButton",
+  // image-hover + theatre CLIENT-scope personal settings (also migrated). Each
+  // player keeps their own; never GM-forced.
+  "ihEnabled",
+  "ihPosition",
+  "ihSize",
+  "ihDelay",
+  "stagePortraitHeight",
+  "stageBoxWidth",
+  "stageBoxHeight",
+  "stageBoxBottom",
+  "stageBoxLeft",
+  "stageTextSize",
+  // User-color background appearance tuning — read via feSetting in the apply
+  // path; exclude so the raw per-client value is used (no stale GM-priority
+  // override) and each player tunes their own base/color/alpha.
+  S.USER_COLOR_BG_BASE,
+  S.USER_COLOR_BG_CUSTOM,
+  S.USER_COLOR_ALPHA,
+  S.SYSTEM_MSG_COLOR,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";

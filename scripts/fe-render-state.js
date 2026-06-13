@@ -101,9 +101,15 @@ function feGetMessageUserColor(message) {
     const actor = feGetSpeakerActorFromMessage(message);
 
     if (author?.color) {
-      if (author.isGM && actor) {
-        const owner = fePickActorOwnerUser(actor, null);
-        if (owner?.color && !owner.isGM) return String(owner.color);
+      if (author.isGM) {
+        // GM speaking as a player-owned character → that player's color.
+        if (actor) {
+          const owner = fePickActorOwnerUser(actor, null);
+          if (owner?.color && !owner.isGM) return String(owner.color);
+        }
+        // GM NPC / narration / own chatter → no tint (don't flood the log with
+        // the GM's personal color).
+        return null;
       }
       return String(author.color);
     }
@@ -123,9 +129,12 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
     const author = authorId ? game?.users?.get?.(authorId) ?? null : null;
 
     if (author?.color) {
-      if (author.isGM && actor) {
-        const owner = fePickActorOwnerUser(actor, null);
-        if (owner?.color && !owner.isGM) return String(owner.color);
+      if (author.isGM) {
+        if (actor) {
+          const owner = fePickActorOwnerUser(actor, null);
+          if (owner?.color && !owner.isGM) return String(owner.color);
+        }
+        return null; // GM NPC / narration → no tint
       }
       return String(author.color);
     }
@@ -436,12 +445,29 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     el0.classList.toggle("fe-narrator-chat", isNarratorTools);
     el0.classList.toggle("fe-round-marker-chat", isRoundMarker);
     if (isNarratorTools || isRoundMarker) {
+      el0.classList.remove("fe-system-msg", "fe-has-user-color");
+      el0.style.removeProperty("--fe-user-color-rgb");
+      return;
+    }
+
+    // Resolve the character (author/owner) color ONCE and reuse it below. null →
+    // a "system" message (GM NPC/narration, author-less, Foundry system) which
+    // gets the optional neutral system color via body.fe-system-msg-color.
+    // (Narration is handled separately by .fe-narrator-chat in the same rule.)
+    const charColor = feGetMessageUserColor(message);
+    el0.classList.toggle("fe-system-msg", charColor == null);
+
+    if (!enabled) {
       el0.classList.remove("fe-has-user-color");
       el0.style.removeProperty("--fe-user-color-rgb");
       return;
     }
 
-    if (!enabled) {
+    // GM NPC / narration: suppress the tint even when an OLDER stored flag carries
+    // the GM's personal color (otherwise the historical log stays flooded with it).
+    // (GM speaking as a player-owned character resolves to that player's color in
+    // charColor, so it is NOT suppressed.)
+    if (message?.author?.isGM && charColor == null) {
       el0.classList.remove("fe-has-user-color");
       el0.style.removeProperty("--fe-user-color-rgb");
       return;
@@ -452,7 +478,7 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     if (rgbString) {
       rgb = { text: String(rgbString) };
     } else {
-      const color = state?.userColorHex || message?.flags?.[MODULE_ID]?.userColorHex || feGetMessageUserColor(message);
+      const color = state?.userColorHex || message?.flags?.[MODULE_ID]?.userColorHex || charColor;
       const parsed = feParseHexColorToRgb(color);
       if (parsed) rgb = { text: `${parsed.r} ${parsed.g} ${parsed.b}` };
     }

@@ -77,41 +77,41 @@ function _fnRegisterSettings() {
   game.settings.register(_FN_MODULE, "narratorEnabled", {
     name: "내레이터 기능 활성화",
     hint: "사이드바 채팅에서 /narrate, /describe, /note, /as 명령과 시네마틱 내레이션 오버레이를 사용합니다. (무대 채팅과 별개의 채널)",
-    scope: "world", config: true, restricted: true, type: Boolean, default: true,
+    scope: "world", config: false, restricted: true, type: Boolean, default: true,
     onChange: (v) => { _fnEnabled = v; if (!v) _fnForceClose(); },
   });
   game.settings.register(_FN_MODULE, "narratorDurationMult", {
     name: "내레이터: 표시 시간 배수",
     hint: "/narrate 오버레이가 화면에 머무는 시간을 이 값으로 곱합니다.",
-    scope: "world", config: true, restricted: true, type: Number,
+    scope: "world", config: false, restricted: true, type: Number,
     range: { min: 0.25, max: 4, step: 0.25 }, default: 1,
     onChange: (v) => { _fnDurationMult = v; },
   });
   game.settings.register(_FN_MODULE, "narratorStartPaused", {
     name: "내레이터: 항상 일시정지 상태로 시작",
-    scope: "world", config: true, restricted: true, type: Boolean, default: false,
+    scope: "world", config: false, restricted: true, type: Boolean, default: false,
     onChange: (v) => { _fnStartPaused = v; },
   });
   game.settings.register(_FN_MODULE, "narratorAllowCopy", {
     name: "내레이터: 복사 버튼 표시",
-    scope: "world", config: true, restricted: true, type: Boolean, default: true,
+    scope: "world", config: false, restricted: true, type: Boolean, default: true,
     onChange: (v) => { _fnAllowCopy = v; },
   });
   game.settings.register(_FN_MODULE, "narratorPermNarrate", {
     name: "내레이터: /narrate 최소 권한",
-    scope: "world", config: true, restricted: true, type: Number,
+    scope: "world", config: false, restricted: true, type: Number,
     choices: _fnRoleChoices(), default: 4,
     onChange: (v) => { _fnPermNarrate = Number(v); },
   });
   game.settings.register(_FN_MODULE, "narratorPermDescribe", {
     name: "내레이터: /describe·/note 최소 권한",
-    scope: "world", config: true, restricted: true, type: Number,
+    scope: "world", config: false, restricted: true, type: Number,
     choices: _fnRoleChoices(), default: 4,
     onChange: (v) => { _fnPermDescribe = Number(v); },
   });
   game.settings.register(_FN_MODULE, "narratorPermAs", {
     name: "내레이터: /as 최소 권한",
-    scope: "world", config: true, restricted: true, type: Number,
+    scope: "world", config: false, restricted: true, type: Number,
     choices: _fnRoleChoices(), default: 4,
     onChange: (v) => { _fnPermAs = Number(v); },
   });
