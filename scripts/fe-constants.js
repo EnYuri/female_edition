@@ -148,6 +148,11 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.TYPING_ENABLED,
   // Personal toolbar preference — each player decides; never GM-forced.
   S.SC_COLLAPSE_ENABLED,
+  // Standalone-module client settings migrated into the unified menu — personal,
+  // read by their modules via game.settings.get; exclude so the menu's feSetting
+  // read reflects the raw value (no GM-priority override staleness).
+  "chatImagesEnabled",
+  "chatImagesShowButton",
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";

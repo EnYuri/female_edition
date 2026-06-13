@@ -671,7 +671,7 @@ function ciRegisterSettings() {
     name: "채팅 이미지 업로드/임베드 활성화",
     hint: "chat-images 모듈 기능(업로드 버튼, 붙여넣기/드래그 앤 드롭, !ci|경로! 임베드)을 사용합니다.",
     scope: "client",
-    config: true,
+    config: false, // managed in the unified settings menu (fe-settings-menu)
     type: Boolean,
     default: true,
     onChange: () => ciScheduleRefreshUi(document, 0),
@@ -681,7 +681,7 @@ function ciRegisterSettings() {
     name: "채팅 이미지 업로드 버튼 표시",
     hint: "채팅 입력창 오른쪽 컨트롤에 이미지 업로드 버튼을 표시합니다. 꺼도 붙여넣기/드래그 앤 드롭은 사용할 수 있습니다.",
     scope: "client",
-    config: true,
+    config: false, // managed in the unified settings menu (fe-settings-menu)
     type: Boolean,
     default: true,
     onChange: () => ciScheduleRefreshUi(document, 0),
@@ -691,7 +691,7 @@ function ciRegisterSettings() {
     name: "채팅 이미지 업로드 경로",
     hint: "업로드 가능한 경우 이미지를 저장할 data 폴더 경로입니다.",
     scope: "world",
-    config: true,
+    config: false, // managed in the unified settings menu (fe-settings-menu)
     restricted: true,
     type: String,
     default: "uploaded-chat-images",

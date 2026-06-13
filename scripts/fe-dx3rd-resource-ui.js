@@ -772,7 +772,8 @@ Hooks.on("init", () => {
   game.settings.register(MODULE_ID, S.DX3RD_RUI_ENABLED, {
     name: "스테이터스 UI 표시",
     hint: "핀 고정한 액터의 HP·자원 카드(스테이터스 UI)를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅의 토글 버튼이 비활성화됩니다.",
-    scope: "client", config: true, type: Boolean,
+    // config:false — managed in the unified settings menu (fe-settings-menu) "스테이터스 UI" section.
+    scope: "client", config: false, type: Boolean,
     default: false,
     onChange: () => {
       feRebuildDx3rdResourceUI();
@@ -830,7 +831,7 @@ Hooks.on("ready", () => {
 });
 
 Hooks.on("updateActor", (actor, change) => {
-  if (!_isSupported()) return;
+  if (!_isSupported() || !_ruiEnabled()) return; // skip entirely when the status UI is off
   if (change.system?.actorType !== undefined || change.flags?.[MODULE_ID] !== undefined) {
     // actorType 변경 또는 SHOW_FLAG 변경 → 전체 재빌드 (모든 클라이언트에서 동기화)
     feRebuildDx3rdResourceUI();

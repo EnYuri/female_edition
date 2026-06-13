@@ -51,6 +51,10 @@ const ALL_DEFAULTS = Object.freeze({
   ...CP_DEFAULTS,
   injectCustomConditions:  true,
   injectCustomDamageTypes: true,
+  // Standalone-module settings migrated into the unified menu.
+  chatImagesEnabled: true,
+  chatImagesShowButton: true,
+  chatImagesUploadLocation: "uploaded-chat-images",
 });
 
 // ── Template choice lists (static — defined once, not rebuilt per getData call) ──
@@ -218,11 +222,18 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       injectCustomConditions:  feRead("injectCustomConditions"),
       injectCustomDamageTypes: feRead("injectCustomDamageTypes"),
 
+      // Chat images (standalone module — migrated to unified menu)
+      chatImagesEnabled:        feRead("chatImagesEnabled"),
+      chatImagesShowButton:     feRead("chatImagesShowButton"),
+      chatImagesUploadLocation: feRead("chatImagesUploadLocation"),
+
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
 
       // DX3rd
       [S.DX3RD_CARD_BORDER_ALPHA]:  feRead(S.DX3RD_CARD_BORDER_ALPHA),
+      // Status UI (dx3rd + dnd5e)
+      [S.DX3RD_RUI_ENABLED]:        feRead(S.DX3RD_RUI_ENABLED),
       [S.DX3RD_RUI_PORTRAIT_WIDTH]: feRead(S.DX3RD_RUI_PORTRAIT_WIDTH),
       [S.DX3RD_RUI_PANEL_WIDTH]:    feRead(S.DX3RD_RUI_PANEL_WIDTH),
       [S.DX3RD_RUI_CARD_HEIGHT]:    feRead(S.DX3RD_RUI_CARD_HEIGHT),
@@ -255,6 +266,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       isGM:     !!game.user?.isGM,
       isDx3rd:  feIsDx3rdSystem(),
       isDnd5e:  feIsDnd5eSystem(),
+      // Status UI (fe-dx3rd-resource-ui) works on both dx3rd and dnd5e.
+      ruiSupported: feIsDx3rdSystem() || feIsDnd5eSystem(),
     };
   }
 
@@ -333,13 +346,22 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           bool("injectCustomConditions"), bool("injectCustomDamageTypes"),
         ] : []),
 
-        // DX3rd (only when in DX3rd system — fields hidden otherwise,
-        // so d[key] would be undefined and would overwrite existing DX3rd preferences)
-        ...(feIsDx3rdSystem() ? [
-          num(S.DX3RD_CARD_BORDER_ALPHA),
+        // Status UI (dx3rd + dnd5e) — only when its fields are shown (ruiSupported),
+        // else d[key] would be undefined and overwrite existing preferences.
+        ...((feIsDx3rdSystem() || feIsDnd5eSystem()) ? [
+          bool(S.DX3RD_RUI_ENABLED),
           num(S.DX3RD_RUI_PORTRAIT_WIDTH), num(S.DX3RD_RUI_PANEL_WIDTH),
           num(S.DX3RD_RUI_CARD_HEIGHT),
         ] : []),
+
+        // DX3rd-only (hidden on other systems).
+        ...(feIsDx3rdSystem() ? [
+          num(S.DX3RD_CARD_BORDER_ALPHA),
+        ] : []),
+
+        // Chat images (upload path is world-scoped/GM-only)
+        bool("chatImagesEnabled"), bool("chatImagesShowButton"),
+        ...(game.user?.isGM ? [str("chatImagesUploadLocation")] : []),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),

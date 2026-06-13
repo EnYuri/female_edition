@@ -567,25 +567,16 @@ Hooks.on("renderHeadsUpDisplayContainer", (_app, html) => {
   html.appendChild(anchor);
   canvas.hud.imageHover = new FeImageHoverHUD();
 
+  // Cache only the tiny default-token SVG dimensions up front (it's the fallback).
+  // Per-token portrait dimensions are now cached LAZILY on first hover
+  // (showArtworkRequirements → bind → _updatePosition → _ihCacheToken(url, true)),
+  // instead of eagerly loading EVERY scene token's full-res actor portrait at each
+  // scene draw — which front-loaded dozens of image decodes for art that is often
+  // never hovered. First hover of a token incurs one small dimension-load, then caches.
   _ihCacheToken(_IH_DEFAULT_TOKEN, false);
-  for (const token of canvas.tokens.placeables) {
-    if (!token?.actor) continue;
-    const img = token.actor.img;
-    if (img === _IH_DEFAULT_TOKEN) {
-      _ihCacheToken(token.document.texture.src, false);
-    } else if (!(img in _ihCache)) {
-      _ihCacheToken(img, false);
-    }
-  }
 });
 
-/** Cache art for newly placed tokens. */
-Hooks.on("createToken", (tokenDoc) => {
-  const actor = game.actors.get(tokenDoc.actorId);
-  if (!actor) return;
-  const img = actor.img === _IH_DEFAULT_TOKEN ? tokenDoc.texture.src : actor.img;
-  if (img && !(img in _ihCache)) _ihCacheToken(img, false);
-});
+/** (Token portrait dimensions are cached lazily on first hover — see above.) */
 
 /** Main hover entry point. */
 Hooks.on("hoverToken", (token, hovered) => {

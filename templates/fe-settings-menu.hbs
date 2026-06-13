@@ -500,16 +500,16 @@
     </div>
   </details>
 
-  {{#if isDx3rd}}
+  {{#if ruiSupported}}
   <details>
-    <summary>[DX3rd] 전용 설정</summary>
+    <summary>스테이터스 UI</summary>
 
     <div class="form-group">
-      <label>채팅 카드 테두리 투명도</label>
+      <label>스테이터스 UI 표시</label>
       <div class="form-fields">
-        <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="0.05" min="0" max="1" />
+        <input type="checkbox" name="ceDx3rdRuiEnabled" data-dtype="Boolean" {{checked values.ceDx3rdRuiEnabled}} />
       </div>
-      <p class="notes">픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값. 0 = 완전 투명, 1 = 완전 불투명.</p>
+      <p class="notes">핀 고정한 액터의 HP·자원 카드를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅 토글 버튼이 비활성화됩니다. (dx3rd·dnd5e 공통)</p>
     </div>
 
     <div class="form-group">
@@ -537,6 +537,50 @@
     </div>
   </details>
   {{/if}}
+
+  {{#if isDx3rd}}
+  <details>
+    <summary>[DX3rd] 전용 설정</summary>
+
+    <div class="form-group">
+      <label>채팅 카드 테두리 투명도</label>
+      <div class="form-fields">
+        <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="0.05" min="0" max="1" />
+      </div>
+      <p class="notes">픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값. 0 = 완전 투명, 1 = 완전 불투명.</p>
+    </div>
+  </details>
+  {{/if}}
+
+  <details>
+    <summary>채팅 이미지</summary>
+
+    <div class="form-group">
+      <label>업로드/임베드 활성화</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatImagesEnabled" data-dtype="Boolean" {{checked values.chatImagesEnabled}} />
+      </div>
+      <p class="notes">업로드 버튼·붙여넣기·드래그 앤 드롭·<code>!ci|경로!</code> 임베드 기능을 사용합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>업로드 버튼 표시</label>
+      <div class="form-fields">
+        <input type="checkbox" name="chatImagesShowButton" data-dtype="Boolean" {{checked values.chatImagesShowButton}} />
+      </div>
+      <p class="notes">채팅 입력창 컨트롤에 업로드 버튼을 표시합니다. 꺼도 붙여넣기/드래그는 가능.</p>
+    </div>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>업로드 경로 (GM 전용)</label>
+      <div class="form-fields">
+        <input type="text" name="chatImagesUploadLocation" value="{{values.chatImagesUploadLocation}}" />
+      </div>
+      <p class="notes">업로드 가능 시 이미지를 저장할 data 폴더 경로입니다.</p>
+    </div>
+    {{/if}}
+  </details>
 
   <details>
     <summary>GM 설정 강제</summary>
