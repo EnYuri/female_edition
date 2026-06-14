@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.5.1",
+  "version": "1.5.3",
   "authors": [
     {
       "name": "nayuri",
@@ -75,6 +75,6 @@
     "verified": "14.363",
     "maximum": "14"
   },
-  "description": "Female-cupwhi's female edition. kawaiiiii-!",
+  "description": "Female-cupwhi's female edition for FVTT v13, v14, and system for dx3rd and dnd5e. 「부레옥잠-!」",
   "flags": {}
 }

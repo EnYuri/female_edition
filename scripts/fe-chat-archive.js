@@ -19,6 +19,8 @@ import {
   feSetChatGroupOutlineClass,
   feSetRetroThemeClass,
   feSetNeodgmModeClass,
+  feSetSystemMsgColorClass,
+  feSetAccentTextOverrideClass,
   feApplyChatMerge,
   feGetMessageIdFromElement,
   feIsNarratorToolsMessage,
@@ -1962,6 +1964,8 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   feSetChatGroupOutlineClass(win.document);
   feSetRetroThemeClass(win.document);
   feSetNeodgmModeClass(win.document);
+  feSetSystemMsgColorClass(win.document);
+  feSetAccentTextOverrideClass(win.document);
   feSyncArchiveMergeBodyClasses(win.document);
   // Apply chat portrait vars/classes so archive matches live chat (size, hide-wrap).
   try {
@@ -2865,6 +2869,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   ];
 
   const faces = [];
+  let hasNeodgm = false;
   for (const w of weights) {
     let dataUrl = null;
     let fmt = null;
@@ -2897,10 +2902,43 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     }
   } catch {}
 
+  // Optional: embed NeoDGM (NeoDunggeunmo) pixel font (~0.65MB).
+  // Unlike Geurimilgi (which intentionally falls back to system fonts offline),
+  // the "neodgm" chat-font choice has NO acceptable system substitute — it is a
+  // pixel font. Embed it so the retro look survives offline file:// export.
+  try {
+    const neodgmUrl = `/modules/${MODULE_ID}/font/NeoDunggeunmoPro-Regular.ttf`;
+    const neodgmData = await fetchFont(neodgmUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
+    if (neodgmData) {
+      faces.push(
+        `@font-face{font-family:"FE NeoDGM Embedded";src:url(${neodgmData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
+      );
+      hasNeodgm = true;
+    }
+  } catch {}
+
   if (!faces.length) {
     feEmbeddedFontCssValue = "";
     return "";
   }
+
+  // When the embedded NeoDGM is available AND the "neodgm" chat font is active,
+  // ui-font.css's `body.fe-fonts-enabled.fe-neodgm-mode` rule remaps every font
+  // var to "FE NeoDGM" — whose font file is CORS-blocked offline. Re-assert the
+  // same selector (matching specificity, later source order → wins the tie) so
+  // the var chain resolves to the embedded face instead of falling back to
+  // generic monospace.
+  const neodgmRule = hasNeodgm
+    ? `
+/* Offline neodgm: route every font var to the embedded pixel face. */
+body.fe-fonts-enabled.fe-neodgm-mode,
+body.fe-neodgm-mode {
+  --fe-font-primary: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
+  --fe-font-geurimilgi: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
+  --fe-font-secondary: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
+  --fe-chat-font-family: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
+}`
+    : "";
 
   const css = `
 /* female_edition: embedded CookieRun fonts (offline HTML export) */
@@ -3000,6 +3038,7 @@ html, body {
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
   font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
 }
+${neodgmRule}
 `;
 
     feEmbeddedFontCssValue = css;

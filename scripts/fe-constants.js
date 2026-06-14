@@ -61,6 +61,7 @@ const S = {
   TYPING_SHOW_TO_PLAYERS: "ceTypingShowToPlayers",
   SC_COLLAPSE_ENABLED: "ceSceneControlsCollapse",
   SCREEN_PANEL_ENABLED: "ceScreenPanelEnabled",
+  SCREEN_PANEL_GRID_SNAP: "ceScreenPanelGridSnap",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -126,6 +127,7 @@ const FE_DEFAULTS = {
   [S.TYPING_SHOW_TO_PLAYERS]: true,
   [S.SC_COLLAPSE_ENABLED]: false,
   [S.SCREEN_PANEL_ENABLED]: true,
+  [S.SCREEN_PANEL_GRID_SNAP]: false,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -154,6 +156,8 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.TYPING_ENABLED,
   // Personal toolbar preference — each player decides; never GM-forced.
   S.SC_COLLAPSE_ENABLED,
+  // Personal drag preference for screen panels (local snapping); never GM-forced.
+  S.SCREEN_PANEL_GRID_SNAP,
   // Standalone-module client settings migrated into the unified menu — personal,
   // read by their modules via game.settings.get; exclude so the menu's feSetting
   // read reflects the raw value (no GM-priority override staleness).

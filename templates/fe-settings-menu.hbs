@@ -809,10 +809,10 @@
     </div>
   </details>
 
-  {{#if isGM}}
   <details>
     <summary>코코포리아식 스크린 패널</summary>
 
+    {{#if isGM}}
     <div class="form-group">
       <label>스크린 패널 기능 사용 (GM · 재시작 필요)</label>
       <div class="form-fields">
@@ -820,8 +820,16 @@
       </div>
       <p class="notes">액터 서브타입을 씬 캔버스에 올려 면 전환·이동·잠금·권한 이양을 사용합니다. 변경 시 재시작이 필요합니다.</p>
     </div>
+    {{/if}}
+
+    <div class="form-group">
+      <label>드래그 시 격자에 스냅 (개인)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceScreenPanelGridSnap" data-dtype="Boolean" {{checked values.ceScreenPanelGridSnap}} />
+      </div>
+      <p class="notes">패널을 드래그할 때 씬 격자(격자 없는 씬은 기본 격자 크기)에 맞춰 정렬합니다. 우클릭 메뉴에서도 토글할 수 있습니다.</p>
+    </div>
   </details>
-  {{/if}}
 
   <details>
     <summary>GM 설정 강제</summary>

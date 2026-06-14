@@ -693,6 +693,10 @@ Hooks.once("init", () => {
       if (log) feScheduleRenderedLogRefresh(log, { delay: 0 });
       else feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
 
+      // The incremental refresh above does not reliably mark merge groups when the
+      // log is (re)populated all at once. Follow with an authoritative full pass.
+      feScheduleFullMergePass({ delay: 120 });
+
       feFireChatUiUpdated({
         reason: "renderChatLog",
         root: root ?? log ?? null,
@@ -742,6 +746,10 @@ Hooks.once("ready", async () => {
   feSetAccentTextOverrideClass(document);
   feSetSystemMsgColorClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
+  // Guarantee a correct full merge once the log is populated (the incremental
+  // path misses groups when messages arrive in a single batch / via chat-prune).
+  feScheduleFullMergePass({ delay: 150 });
+  setTimeout(() => feScheduleFullMergePass({ delay: 0 }), 600);
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
 });
 
@@ -875,6 +883,30 @@ function feScheduleRenderedStateRefreshForAllLogs({ delay = 24, allowNarratorMer
   }
 }
 
+// Authoritative, debounced full-log merge pass.
+//
+// The incremental per-message merge path (feFlushQueuedRenderedMessageRefreshes →
+// feApplyChatMergeAroundElement) only re-merges a local neighborhood, and when
+// messages stream in one-per-frame (initial load, chat-prune backward render) the
+// overlapping local slices leave most groups unmarked — verified live: a full
+// feApplyChatMerge produced 11 group classes where the incremental path produced 0.
+// A single full feApplyChatMerge over the (pruned, small) live DOM is cheap and
+// authoritative, so we run one after the log settles. Debounced so a burst of
+// renders/creates coalesces into one pass.
+let feFullMergePassTimer = null;
+function feScheduleFullMergePass({ delay = 120 } = {}) {
+  try {
+    if (!feSetting(S.MERGE_ENABLED)) return;
+    if (feFullMergePassTimer) clearTimeout(feFullMergePassTimer);
+    feFullMergePassTimer = setTimeout(() => {
+      feFullMergePassTimer = null;
+      try { feApplyChatMergeToAllLogs(); } catch { /* no-op */ }
+    }, Math.max(0, Number(delay) || 0));
+  } catch {
+    /* no-op */
+  }
+}
+
 function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, allowNarratorMerge = false, doc = document } = {}) {
   try {
     if (!feHasRenderedStateWork()) return;
@@ -1001,12 +1033,19 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     /* no-op */
   }
   feQueueMergeForRAF(message?.id ?? message?._id);
+  // Authoritative trailing full merge. Covers EVERY message-render path — initial
+  // load, live posts, and chat-prune scroll-batch (re)renders — because the
+  // incremental per-message/around-element path can leave groups unmarked. Debounced
+  // so a burst of renders coalesces into a single pass over the (pruned) DOM.
+  feScheduleFullMergePass({ delay: 120 });
 });
 
 Hooks.on("createChatMessage", (message, _options, userId) => {
   try {
     feHydrateRenderStateOverride(message, null, userId);
     feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));
+    // (Full merge pass is scheduled from the renderChatMessageHTML hook, which fires
+    // for every rendered message — including these newly created ones.)
   } catch {
     /* no-op */
   }
@@ -1166,6 +1205,7 @@ export {
   feSetUserColorBgClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
+  feSetSystemMsgColorClass,
 
   feApplyChatMerge,
   feCaptureMessageRenderFlagsOnPreCreate,

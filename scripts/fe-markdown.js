@@ -30,18 +30,19 @@ function feInlineFormat(text) {
     return `FECODE${idx}`;
   });
 
+  // NOTE: `text` is already HTML-escaped by every feInlineFormat caller, so the
+  // captured alt/label/url are safe for HTML/attribute context as-is. Re-escaping
+  // here would double-encode `&` (e.g. query-string URLs `?a=1&b=2` → `&amp;amp;`)
+  // and corrupt links — so we intentionally do NOT escape again.
   text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt, url) => {
-    alt = feEscapeHTML(alt ?? "");
-    url = feEscapeHTML(url ?? "");
     return `<img src="${url}" alt="${alt}">`;
   });
 
   text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => {
-    const safeLabel = feEscapeHTML(label ?? "");
     const safeUrl = feSafeMarkdownUrl(url);
     // Unsafe scheme (javascript:/data:/…) → drop the anchor, render label as text.
-    if (!safeUrl) return safeLabel;
-    return `<a href="${feEscapeHTML(safeUrl)}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
+    if (!safeUrl) return label;
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
   });
 
   text = text.replace(/~~(.+?)~~/gs, "<s>$1</s>");

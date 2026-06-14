@@ -23,6 +23,8 @@ let _actions = {
   remove: null,         // (tile)
   openSheet: null,      // (actor)
   grantRights: null,    // (actor) — GM only
+  gridSnapState: null,  // () => boolean — current local snap preference
+  toggleGridSnap: null, // () => toggles the local snap preference
 };
 
 function feSetPanelMenuActions(actions) {
@@ -186,6 +188,18 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
     add(locked ? "fa-lock-open" : "fa-lock",
         locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
         () => _actions.toggleLock?.(tile));
+
+    // Grid-snap is a LOCAL drag preference (client setting, no GM relay), so this
+    // item stays enabled even when no GM is online. It toggles snapping for THIS
+    // user's panel drags globally.
+    const snapOn = !!_actions.gridSnapState?.();
+    const snapItem = document.createElement("button");
+    snapItem.type = "button";
+    snapItem.className = "fe-sp-menu-item";
+    snapItem.innerHTML = `<i class="fa-solid ${snapOn ? "fa-table-cells" : "fa-table-cells-large"}"></i>`
+      + `<span>${game.i18n.localize(snapOn ? "FESP.Menu.SnapOff" : "FESP.Menu.SnapOn")}</span>`;
+    snapItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleGridSnap?.(); });
+    ownerSection.appendChild(snapItem);
 
     add("fa-trash", "FESP.Menu.Remove", () => _actions.remove?.(tile), { danger: true });
     ownerSection.appendChild(document.createElement("hr"));

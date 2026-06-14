@@ -11,6 +11,8 @@
 
 	"FESP.Settings.EnableName": "스크린 패널 기능 사용",
 	"FESP.Settings.EnableHint": "코코포리아식 스크린 패널(액터 서브타입)을 씬 캔버스에 올리고 면 전환·표시/숨김·비활성화할 수 있게 합니다. 끄면 캔버스 상호작용이 비활성화됩니다(재시작 필요).",
+	"FESP.Settings.GridSnapName": "스크린 패널: 격자에 스냅",
+	"FESP.Settings.GridSnapHint": "스크린 패널을 드래그할 때 씬 격자(격자 없는 씬은 기본 격자 크기)에 맞춰 정렬합니다. 우클릭 메뉴에서도 켜고 끌 수 있는 개인 설정입니다.",
 
 	"FESP.Sheet.Faces": "면(Face) 목록",
 	"FESP.Sheet.AddFace": "면 추가",
@@ -40,6 +42,8 @@
 	"FESP.Menu.NoFaces": "면이 하나도 없습니다. 시트에서 먼저 면을 추가하세요.",
 	"FESP.Menu.Lock": "위치 고정",
 	"FESP.Menu.Unlock": "고정 해제",
+	"FESP.Menu.SnapOn": "격자에 스냅 켜기",
+	"FESP.Menu.SnapOff": "격자에 스냅 끄기",
 	"FESP.Menu.GrantRights": "조작권 부여…",
 	"FESP.Grant.Title": "조작권 부여 — {name}",
 	"FESP.Grant.Hint": "이 패널을 조작(이동·면 전환·잠금·표시/숨김)할 수 있는 플레이어를 선택하세요. 선택된 플레이어에게 액터 소유권(OWNER)이 부여됩니다.",

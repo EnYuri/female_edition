@@ -311,6 +311,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
       // Screen Panel (standalone — migrated; world/GM, requiresReload)
       [S.SCREEN_PANEL_ENABLED]: feRead(S.SCREEN_PANEL_ENABLED),
+      // Screen Panel grid-snap (client/personal)
+      [S.SCREEN_PANEL_GRID_SNAP]: feRead(S.SCREEN_PANEL_GRID_SNAP),
 
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
@@ -489,6 +491,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // Screen Panel — world/GM (requiresReload triggers the reload prompt on change)
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
+        // Screen Panel grid-snap — client/personal (always saved for every user)
+        bool(S.SCREEN_PANEL_GRID_SNAP),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),

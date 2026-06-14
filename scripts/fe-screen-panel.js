@@ -47,6 +47,40 @@ function isPanelFeatureEnabled() {
   catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_ENABLED]; }
 }
 
+// Per-client "snap to grid while dragging" preference. Read directly (this key is
+// GM-priority-excluded — a personal drag preference, not GM-forced).
+function isGridSnapEnabled() {
+  try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP); }
+  catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP]; }
+}
+
+async function toggleGridSnap() {
+  try {
+    const next = !isGridSnapEnabled();
+    await game.settings.set(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP, next);
+    return next;
+  } catch { return isGridSnapEnabled(); }
+}
+
+// Snap a tile top-left (world coords) to the scene grid. On square/hex scenes we
+// defer to core's grid-aware snapping (TOP_LEFT_VERTEX); on GRIDLESS scenes core
+// returns the point unchanged, so we snap to the base grid-size lattice instead so
+// the toggle still aligns panels predictably.
+function feSnapPanelPoint(x, y) {
+  const grid = canvas?.grid;
+  if (!grid) return { x, y };
+  const size = grid.size || 100;
+  const GRIDLESS = CONST?.GRID_TYPES?.GRIDLESS ?? 0;
+  if (grid.type !== GRIDLESS) {
+    try {
+      const mode = CONST?.GRID_SNAPPING_MODES?.TOP_LEFT_VERTEX ?? CONST?.GRID_SNAPPING_MODES?.VERTEX;
+      const p = grid.getSnappedPoint?.({ x, y }, { mode, resolution: 1 });
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return { x: Math.round(p.x), y: Math.round(p.y) };
+    } catch { /* fall through to manual snap */ }
+  }
+  return { x: Math.round(x / size) * size, y: Math.round(y / size) * size };
+}
+
 // --------------------------------
 // Coordinate + hit-testing helpers
 // --------------------------------
@@ -187,6 +221,16 @@ function onBoardPointerDown(event) {
   if (!hit || tokenOccludesAt(world, hit.doc)) return; // let core handle non-panel / token clicks
   event.preventDefault();
   event.stopImmediatePropagation(); // suppress core canvas pan / selection
+  // The canvas marquee select is driven by the board's PIXI MouseInteractionManager
+  // off FEDERATED events. PIXI's EventSystem dispatches those synchronously from its
+  // own (earlier-registered, capture-phase) DOM listener on the same <canvas>, so our
+  // stopImmediatePropagation can land AFTER the board MIM has already advanced to
+  // GRABBED — leaving the select-rectangle to draw on the next pointermove. Reset the
+  // board MIM back to NONE so its drag-move handler bails (state must be ≥ GRABBED to
+  // start a marquee). Our own panel drag uses independent window listeners, so this
+  // only cancels the stray canvas selection, not the panel move. Idempotent no-op when
+  // our suppression won the race and the MIM never engaged.
+  try { canvas.mouseInteractionManager?.reset?.({ state: true }); } catch { /* no-op */ }
   feHidePanelTooltip();
 
   // Owners may left-drag to reposition (unless the panel is locked — per-actor
@@ -231,7 +275,10 @@ function startPanelPointer(hit, downEvent, canDrag) {
     dragging = true;
     const w = clientToWorld(e.clientX, e.clientY);
     if (!w) return;
-    finalPos = { x: Math.round(origin.x + (w.x - startWorld.x)), y: Math.round(origin.y + (w.y - startWorld.y)) };
+    let nx = Math.round(origin.x + (w.x - startWorld.x));
+    let ny = Math.round(origin.y + (w.y - startWorld.y));
+    if (isGridSnapEnabled()) { const s = feSnapPanelPoint(nx, ny); nx = s.x; ny = s.y; }
+    finalPos = { x: nx, y: ny };
     if (mesh) mesh.position.set(finalPos.x, finalPos.y); // local preview; authoritative update on release
   };
   const cleanup = () => {
@@ -528,6 +575,16 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.SCREEN_PANEL_ENABLED],
     requiresReload: true,
   });
+
+  // Per-client drag preference: snap panels to the scene grid while dragging.
+  game.settings.register(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP, {
+    name: "FESP.Settings.GridSnapName",
+    hint: "FESP.Settings.GridSnapHint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP],
+  });
 });
 
 Hooks.once("ready", () => {
@@ -540,6 +597,8 @@ Hooks.once("ready", () => {
     remove: feActionRemove,
     openSheet: (actor) => actor?.sheet?.render(true),
     grantRights: feScreenPanelGrantRights,
+    gridSnapState: isGridSnapEnabled,
+    toggleGridSnap: toggleGridSnap,
   });
   game.socket.on(SOCKET_CHANNEL, onPanelSocket);
 
