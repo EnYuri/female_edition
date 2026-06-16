@@ -94,7 +94,8 @@ const CHOICES = {
     auto:   "PDF 아이콘 클릭 시 자동",
   },
   chatFontChoice: {
-    cookie:     "쿠키런",
+    cookie:     "쿠키런 + 그림일기",
+    cookieAll:  "쿠키런",
     geurimilgi: "그림일기",
     neodgm:     "NeoDGM 픽셀",
   },
@@ -313,6 +314,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.SCREEN_PANEL_ENABLED]: feRead(S.SCREEN_PANEL_ENABLED),
       // Screen Panel grid-snap (client/personal)
       [S.SCREEN_PANEL_GRID_SNAP]: feRead(S.SCREEN_PANEL_GRID_SNAP),
+      // Attribute name helper (client/personal — hover + hold X → show attribute name)
+      [S.ATTR_PATH_HELPER]: feRead(S.ATTR_PATH_HELPER),
+      [S.ATTR_PATH_HELPER_SOURCE]: feRead(S.ATTR_PATH_HELPER_SOURCE),
 
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
@@ -493,6 +497,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
         // Screen Panel grid-snap — client/personal (always saved for every user)
         bool(S.SCREEN_PANEL_GRID_SNAP),
+        // Attribute name helper — client/personal (always saved for every user)
+        bool(S.ATTR_PATH_HELPER),
+        bool(S.ATTR_PATH_HELPER_SOURCE),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),

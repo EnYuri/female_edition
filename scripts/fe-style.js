@@ -50,6 +50,7 @@ function feSetChatFontChoiceClass(doc = document) {
     const body = doc?.body;
     if (!body) return;
     body.classList.toggle("fe-chat-font-cookie", choice === "cookie");
+    body.classList.toggle("fe-chat-font-cookie-all", choice === "cookieAll");
     body.classList.toggle("fe-chat-font-geurimilgi", choice === "geurimilgi");
   } catch {}
 }

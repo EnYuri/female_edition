@@ -3008,7 +3008,16 @@ ${faces.join("\n")}
 }
 
 body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
+body.fe-chat-font-cookie-all {
+  --fe-font-geurimilgi: var(--fe-font-primary);
+  --fe-font-secondary: var(--fe-font-primary);
+  --fe-chat-font-family: var(--fe-font-primary);
+}
+body.fe-chat-font-geurimilgi {
+  --fe-font-primary: var(--fe-font-geurimilgi);
+  --fe-font-secondary: var(--fe-font-geurimilgi);
+  --fe-chat-font-family: var(--fe-font-geurimilgi);
+}
 body.fe-ui-font-geurimilgi {
   --fe-ui-font-family: var(--fe-font-geurimilgi);
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);

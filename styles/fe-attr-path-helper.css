@@ -1,0 +1,33 @@
+/* female_edition — Attribute Name Helper.
+   Lines appended inside Foundry's native tooltip (#tooltip) on hover: the system
+   attribute name, plus an optional source line. The name line carries a top
+   divider so it reads as an extra bottom line under any native tooltip content;
+   when it is the tooltip's only content (no native tooltip) the divider is
+   suppressed. */
+
+#tooltip .fe-aph-name-line {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(140, 200, 255, 0.25);
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: #8fe3ff;
+  word-break: break-all;
+}
+
+/* Sole content → no divider needed. */
+#tooltip .fe-aph-name-line:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+#tooltip .fe-aph-source-line {
+  margin-top: 1px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: normal;
+  color: rgba(180, 195, 210, 0.7);
+  word-break: break-all;
+}

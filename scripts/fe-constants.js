@@ -62,6 +62,8 @@ const S = {
   SC_COLLAPSE_ENABLED: "ceSceneControlsCollapse",
   SCREEN_PANEL_ENABLED: "ceScreenPanelEnabled",
   SCREEN_PANEL_GRID_SNAP: "ceScreenPanelGridSnap",
+  ATTR_PATH_HELPER: "ceAttrPathHelper",
+  ATTR_PATH_HELPER_SOURCE: "ceAttrPathHelperSource",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -128,6 +130,8 @@ const FE_DEFAULTS = {
   [S.SC_COLLAPSE_ENABLED]: false,
   [S.SCREEN_PANEL_ENABLED]: true,
   [S.SCREEN_PANEL_GRID_SNAP]: false,
+  [S.ATTR_PATH_HELPER]: true,
+  [S.ATTR_PATH_HELPER_SOURCE]: true,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
@@ -158,6 +162,9 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.SC_COLLAPSE_ENABLED,
   // Personal drag preference for screen panels (local snapping); never GM-forced.
   S.SCREEN_PANEL_GRID_SNAP,
+  // Personal developer/inspect tool (hover + hold X → show attribute name); never GM-forced.
+  S.ATTR_PATH_HELPER,
+  S.ATTR_PATH_HELPER_SOURCE,
   // Standalone-module client settings migrated into the unified menu — personal,
   // read by their modules via game.settings.get; exclude so the menu's feSetting
   // read reflects the raw value (no GM-priority override staleness).

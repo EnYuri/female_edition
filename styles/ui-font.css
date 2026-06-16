@@ -188,9 +188,31 @@ body.fe-fonts-enabled :is(.app, .application) {
   --font-primary: var(--fe-font-primary);
 }
 
-/* 채팅 폰트 선택 (모듈 설정) */
-body.fe-fonts-enabled.fe-chat-font-cookie     { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-fonts-enabled.fe-chat-font-geurimilgi { --fe-chat-font-family: var(--fe-font-geurimilgi); }
+/* 채팅/전체 글꼴 선택 (모듈 설정)
+ *  의미별 분류:
+ *    큰 글자(--fe-font-primary, 아웃라인용 강조): 헤더·창 제목·발화자 제목/이름·
+ *      목차·헤딩(h1~h6)·능력치 라벨·**일반 채팅 메시지 본문/인라인** → 쿠키런
+ *    작은 글자(--fe-font-secondary, 가독용 본문): **채팅 카드/박스 내부 텍스트**
+ *      (아이템/주문 카드·midi-qol·dx3rd 칩)·시트 아이템/주문 설명·툴팁·메타 → 그림일기
+ *  - cookie     "쿠키런 + 그림일기"(혼합): 큰=쿠키런, 작은=그림일기.
+ *  - cookieAll  "쿠키런": secondary/geurimilgi 변수까지 쿠키런으로 remap → 전부 쿠키런.
+ *  - geurimilgi "그림일기": primary 까지 그림일기로 remap → 전부 그림일기.
+ *  primary/secondary 변수가 모드별로 remap 되므로 아래 요소별 규칙은
+ *  primary(큰)/secondary(작은) 만 참조하면 세 모드 모두 자동으로 맞는다. */
+body.fe-fonts-enabled.fe-chat-font-cookie {
+  /* 혼합: 일반 채팅 본문 = 큰 글자(쿠키런, 기존대로). 카드/박스 내부는 별도 규칙에서 secondary */
+  --fe-chat-font-family: var(--fe-font-primary);
+}
+body.fe-fonts-enabled.fe-chat-font-cookie-all {
+  --fe-font-geurimilgi:  var(--fe-font-primary);
+  --fe-font-secondary:   var(--fe-font-primary);
+  --fe-chat-font-family: var(--fe-font-primary);
+}
+body.fe-fonts-enabled.fe-chat-font-geurimilgi {
+  --fe-font-primary:     var(--fe-font-geurimilgi);
+  --fe-font-secondary:   var(--fe-font-geurimilgi);
+  --fe-chat-font-family: var(--fe-font-geurimilgi);
+}
 
 /* UI 폰트를 그림일기로 전환 */
 body.fe-fonts-enabled.fe-ui-font-geurimilgi {
@@ -276,18 +298,24 @@ body.fe-fonts-enabled :is(#interface, #ui, #sidebar, .window-app, .application)
  * 4) 채팅 폰트 적용
  * =================================================== */
 
+/* 일반 채팅 메시지 본문 = --fe-chat-font-family (혼합/쿠키런 모드에서 쿠키런, 기존대로) */
 body.fe-fonts-enabled #sidebar #chat,
 body.fe-fonts-enabled #sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
 body.fe-fonts-enabled #sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
-body.fe-fonts-enabled #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
 body.fe-fonts-enabled #chat-notifications,
 body.fe-fonts-enabled #chat-notifications :is(.chat-message, .message-header, .message-content, .flavor-text),
-body.fe-fonts-enabled #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card),
 body.fe-fonts-enabled .chat-popout #chat,
 body.fe-fonts-enabled .chat-popout #chat :is(.chat-log, #chat-log, ol.chat-log),
-body.fe-fonts-enabled .chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
-body.fe-fonts-enabled .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card) {
+body.fe-fonts-enabled .chat-popout #chat :is(.chat-message, .message-header, .message-content, .flavor-text) {
   font-family: var(--fe-chat-font-family) !important;
+}
+
+/* 채팅 카드/박스 내부 텍스트 = 작은 글자(secondary). 혼합에서 그림일기.
+   아이템/주문 카드·midi-qol·dx3rd 칩 — .message-content 의 본문 폰트를 덮어쓴다. */
+body.fe-fonts-enabled #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  font-family: var(--fe-font-secondary) !important;
 }
 
 body.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications)
@@ -362,8 +390,12 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
   font-family: var(--fe-chat-font-family) !important;
 }
 
+/* 툴팁 = 작은 글자(그림일기). 다이스 툴팁 포함 */
+body.fe-fonts-enabled #tooltip {
+  font-family: var(--fe-font-secondary) !important;
+}
 body.fe-fonts-enabled #tooltip :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor) {
-  font-family: var(--fe-font-primary) !important;
+  font-family: var(--fe-font-secondary) !important;
 }
 
 body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
@@ -402,6 +434,19 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) .sheet.actor :is(
   .abilities :is(.label, label, .title, .name)
 ) {
   font-family: var(--fe-dnd5e-label-font-family) !important;
+}
+
+/* 아이템/주문/피처 설명·디스크립션 본문 = 작은 글자(그림일기).
+   시트의 설명 탭/요약과 채팅 카드 설명을 모두 커버(편집 영역은 .prosemirror 규칙). */
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) :is(
+  .item-summary,
+  .item-description,
+  .description .editor-content,
+  [data-tab="description"] .editor-content,
+  .card-content .description,
+  .chat-card .card-content
+) {
+  font-family: var(--fe-font-secondary) !important;
 }
 
 /* ===================================================

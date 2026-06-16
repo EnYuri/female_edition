@@ -1619,9 +1619,17 @@ body.fe-retro-theme .item-extend-dialog .sub-tab-content {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
 }
 
+/* form-label 은 height:26px 고정 박스인데 dx3rd 원본에 세로 정렬 장치(flex/line-height)가
+   없어 텍스트가 박스 상단에 붙는다. 같은 grid 행의 <input>/<select> 는 네이티브로 세로
+   가운데라, 라벨("공식"·"타이밍"·"대상")과 값의 상하가 어긋나 보인다(retro 픽셀 폰트에서
+   특히 도드라짐). flex 로 세로 가운데 정렬해 행 안에서 라벨·값 높이를 맞춘다.
+   justify-content:center 는 기존 text-align:center 의 가로 가운데를 유지한다. */
 body.fe-retro-theme .item-extend-dialog .form-label {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
   color: var(--fe-ac-90) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 body.fe-retro-theme .item-extend-dialog input[type="text"],
@@ -2554,6 +2562,26 @@ body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button.active {
 /* pm-dropdown 서식 레이블 span */
 body.fe-retro-theme :is(.prosemirror, prose-mirror) menu .pm-dropdown > span {
   color: var(--fe-ac-70) !important;
+}
+
+/* ── 이미지/링크/표/색상 삽입 프롬프트 오버레이 (menu-dialog) ──────────
+   코어 _showDialog 는 <dialog class="application menu-dialog prosemirror"> 를
+   만들고, foundry2.css 가 이를 position:fixed; 100vw×100vh; background:transparent
+   인 "전체 화면 투명 클릭-닫기 오버레이"로 둔다(실제 보이는 박스는 안쪽 form).
+   §16-B 의 .application { background:#000 } / ::before·::after 픽셀 보더가 여기
+   걸리면 오버레이가 화면 전체를 시커멓게 덮고 화면 가장자리에 액자가 생긴다.
+   → 이 오버레이만 투명·무장식으로 되돌린다. 내부 form 은 코어 --dialog-background
+   를 그대로 쓰고, 그 안의 input/button 은 §16-B 입력 규칙이 정상 적용된다.
+   selector 에 dialog 엘리먼트를 더해 §16-B(0,3,1)보다 명시도를 높여 확실히 이긴다. */
+body.fe-retro-theme dialog.menu-dialog.prosemirror {
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+}
+body.fe-retro-theme dialog.menu-dialog.prosemirror::before,
+body.fe-retro-theme dialog.menu-dialog.prosemirror::after {
+  content: none !important;
+  display: none !important;
 }
 
 
