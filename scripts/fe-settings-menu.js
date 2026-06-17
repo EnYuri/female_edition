@@ -178,9 +178,6 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "fe-settings-menu",
-    // tag:"form" makes the application's root element the <form>. The template part
-    // therefore must NOT contain its own <form> (nested forms break submission).
-    tag: "form",
     classes: ["fe-settings-menu"],
     window: {
       title: "Female-cupwhi 설정",
@@ -364,9 +361,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
   _onRender(context, options) {
     super._onRender(context, options);
-    // Parity with the v1 form (autocomplete was set on the <form> in the template,
-    // which no longer exists — the root form is provided by tag:"form").
-    try { this.element?.setAttribute?.("autocomplete", "off"); } catch { /* no-op */ }
+    try {
+      const form = this.element?.querySelector?.("form");
+      if (form) form.setAttribute("autocomplete", "off");
+    } catch { /* no-op */ }
 
     // Restore each section's saved open/closed state and persist on toggle. The
     // template's `open` attribute is only the first-time default; once the user

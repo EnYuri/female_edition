@@ -2261,6 +2261,31 @@ body.fe-retro-theme .double-cross-3rd .sheet-wrapper .sheet-header .select-box o
   text-align-last: center !important;
 }
 
+/* ── 능력치 이름 라벨(.main-grid .stat-box .title) 세로 정렬 — 폰트/테마 무관 ──────
+   증상: 신체/감각/정신/사교 라벨 텍스트가 박스 안에서 위로 들떠 보인다.
+   원인: dx3rd 원본이 이 라벨을 height:42px 로 만들면서 line-height:32px(10px 부족)만
+     걸고 flex 세로 정렬 장치를 빼먹었다 — 같은 파일의 EXP/HP/Move 등 일반 stat-box
+     .title 변형(width:80px/height:32px)은 display:flex+align-items:center 로 제대로
+     처리돼 있는데, main-grid(능력치) 변형만 빠짐. 기본 Signika 폰트에서도 이미
+     어긋나는 dx3rd 자체의 사전 결함이다(female_edition 유무와 무관하게 존재).
+     여기에 female_edition 폰트 스왑(쿠키런/그림일기/NeoDGM)이 켜지면 글꼴마다 다른
+     ascent/descent 비율이 더해져 한층 더 어긋난다 — NeoDGM(진짜 비트맵/픽셀 폰트)이
+     비율이 가장 비대칭이라 가장 도드라지지만, 레트로 픽셀 "테마"가 원인이 아니라
+     "폰트 선택"이 원인이다(세 폰트 모드 전부에서 발생, 테마 전용 버그 아님).
+   해결: dx3rd 자신의 다른 stat-box .title 변형과 동일한 flex 중앙 정렬을 적용하고,
+     "line-height를 박스 높이에 맞춰 박아 중앙을 흉내내는" 구식 트릭을 normal 로 풀어
+     flex가 실제 여백을 재분배하게 한다. text-align:center(상위 .sheet-stat .title
+     규칙 상속)는 flex 컨테이너에서 무력화되므로 justify-content:center 로 대체.
+   유지보수 원칙: dx3rd CSS에서 새 정렬 버그를 발견하면 그 요소가 이 "line-height ==
+     box height" 패턴을 쓰는지 먼저 확인할 것 — padding 미세조정 대신 flex 치환으로
+     고치면 폰트가 무엇이든 재발하지 않는다. */
+.double-cross-3rd .sheet-wrapper .sheet-stat .main-grid .stat-box .title {
+  display:         flex !important;
+  align-items:     center !important;
+  justify-content: center !important;
+  line-height:     normal !important;
+}
+
 /* ── 채팅카드(.dx3rd-item-chat) 피쳐 설명 — gray 오버라이드 ── */
 
 body.fe-retro-theme

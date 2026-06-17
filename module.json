@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.5.4",
+  "version": "1.6.4",
   "authors": [
     {
       "name": "nayuri",
@@ -32,7 +32,8 @@
     "scripts/fe-dx3rd-input-align.js",
     "scripts/fe-narrator.js",
     "scripts/fe-conflict-guard.js",
-    "scripts/fe-attr-path-helper.js"
+    "scripts/fe-attr-path-helper.js",
+    "scripts/fe-token-preview.js"
   ],
   "styles": [
     "styles/ui-font.css",
@@ -56,7 +57,8 @@
     "styles/fe-filepicker-sort.css",
     "styles/fe-settings-menu.css",
     "styles/fe-narrator.css",
-    "styles/fe-attr-path-helper.css"
+    "styles/fe-attr-path-helper.css",
+    "styles/fe-token-preview.css"
   ],
   "socket": true,
   "documentTypes": {

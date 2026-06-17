@@ -1093,6 +1093,22 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
 
+    // Screen panel actors are display boards, not characters — never let them be chat speakers.
+    // Main risk: companion token selected on canvas → getSpeaker() resolves to the panel actor.
+    try {
+      const sp = data?.speaker ?? message?.speaker ?? {};
+      let spActor = sp.actor ? (game.actors?.get(sp.actor) ?? null) : null;
+      if (!spActor && sp.token && sp.scene) {
+        const sc = game.scenes?.get(sp.scene);
+        spActor = sc?.tokens?.get(sp.token)?.actor ?? null;
+      }
+      if (spActor?.type === "female_edition.screenPanel") {
+        message.updateSource({
+          speaker: { scene: null, actor: null, token: null, alias: game.user.name },
+        });
+      }
+    } catch { /* no-op */ }
+
     if (game.user?.isGM && feSetting(S.GM_SPEAK_AS_SELF)) {
       try {
         // Theatre stage hook (registered later in module load order) takes priority.

@@ -54,6 +54,19 @@ function isGridSnapEnabled() {
   catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP]; }
 }
 
+function isDblclickCycleEnabled() {
+  try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE); }
+  catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_DBLCLICK_CYCLE]; }
+}
+
+async function toggleDblclickCycle() {
+  try {
+    const next = !isDblclickCycleEnabled();
+    await game.settings.set(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE, next);
+    return next;
+  } catch { return isDblclickCycleEnabled(); }
+}
+
 async function toggleGridSnap() {
   try {
     const next = !isGridSnapEnabled();
@@ -169,6 +182,27 @@ function pickPanelTileAt(world) {
   return best;
 }
 
+/**
+ * A value bar at a world point on this tile, but ONLY if the current user has
+ * OWNER permission on the bar's own linked actor — permission is baked into the
+ * hit test itself so a non-owner's click silently falls through to the normal
+ * panel click/drag handling below (the bar simply isn't "there" for them).
+ */
+function pickPanelBarAt(tile, world) {
+  const list = tile?._fePanelOverlays;
+  if (!list?.length) return null;
+  for (const bar of list) {
+    if (!bar._feIsBar) continue;
+    const left = bar.position.x, top = bar.position.y;
+    const w = bar._feBarW ?? 0, h = bar._feBarH ?? 0;
+    if (world.x < left || world.x > left + w || world.y < top || world.y > top + h) continue;
+    const linkedActor = bar._feLinkedActor;
+    if (!linkedActor?.testUserPermission?.(game.user, "OWNER")) continue;
+    return { linkedActor, attr: bar._feAttr, value: bar._feValue };
+  }
+  return null;
+}
+
 /** Whether a visible token at/above the panel's elevation covers the point. */
 function tokenOccludesAt(world, panelDoc) {
   const tokens = canvas?.tokens?.placeables ?? [];
@@ -233,6 +267,12 @@ function onBoardPointerDown(event) {
   try { canvas.mouseInteractionManager?.reset?.({ state: true }); } catch { /* no-op */ }
   feHidePanelTooltip();
 
+  // A click landing on a value bar (only "there" for users with OWNER on its
+  // linked actor — see pickPanelBarAt) opens its quick-edit dialog instead of
+  // starting a drag or counting toward the double-click face cycle.
+  const barHit = pickPanelBarAt(hit.tile, world);
+  if (barHit) { feOpenBarValueEditor(barHit.linkedActor, barHit.attr, barHit.value); return; }
+
   // Owners may left-drag to reposition (unless the panel is locked — per-actor
   // or per-placement). Below the move threshold it is a click; a double click
   // cycles the face. The menu lives on right-click (onBoardContextMenu).
@@ -280,6 +320,7 @@ function startPanelPointer(hit, downEvent, canDrag) {
     if (isGridSnapEnabled()) { const s = feSnapPanelPoint(nx, ny); nx = s.x; ny = s.y; }
     finalPos = { x: nx, y: ny };
     if (mesh) mesh.position.set(finalPos.x, finalPos.y); // local preview; authoritative update on release
+    feRepositionPanelOverlays(hit.tile); // keep labels glued to the image during the drag preview
   };
   const cleanup = () => {
     window.removeEventListener("pointermove", onMove, true);
@@ -294,11 +335,11 @@ function startPanelPointer(hit, downEvent, canDrag) {
       return;
     }
     // Click (no travel). A double click (second click on the SAME tile within
-    // the window) cycles to the next face. A single click does nothing — the
-    // menu is on right-click.
+    // the window) cycles to the next face (when enabled). A single click does
+    // nothing — the menu is on right-click.
     const tileId = hit.tile.document.id;
     const now = performance.now();
-    if (_lastPanelClick && _lastPanelClick.tileId === tileId && (now - _lastPanelClick.t) < FE_PANEL_DBLCLICK_MS) {
+    if (isDblclickCycleEnabled() && _lastPanelClick && _lastPanelClick.tileId === tileId && (now - _lastPanelClick.t) < FE_PANEL_DBLCLICK_MS) {
       _lastPanelClick = null;
       feCyclePanelFace(hit.tile, hit.actor);
     } else {
@@ -308,6 +349,7 @@ function startPanelPointer(hit, downEvent, canDrag) {
   const onCancel = () => {
     cleanup();
     if (mesh) mesh.position.set(origin.x, origin.y); // snap preview back
+    feRepositionPanelOverlays(hit.tile);
   };
 
   window.addEventListener("pointermove", onMove, true);
@@ -370,12 +412,206 @@ function enforcePanelTileSize(tile) {
 function applyPanelTileVisibility(tile) {
   try {
     const flag = tile?.document?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
-    if (!flag?.actorId || !flag.disabled) return;
+    if (!flag?.actorId) return;
+    const overlays = tile._fePanelOverlays;
+    if (!flag.disabled) {
+      if (overlays) for (const t of overlays) t.visible = true;
+      return;
+    }
     const actor = game.actors.get(flag.actorId);
     const canSee = !!actor && actor.testUserPermission(game.user, "OBSERVER");
     if (!canSee) {
       if (tile.mesh) tile.mesh.visible = false;
       tile.visible = false;
+      if (overlays) for (const t of overlays) t.visible = false;
+    } else if (overlays) {
+      for (const t of overlays) t.visible = true;
+    }
+  } catch { /* no-op */ }
+}
+
+// --------------------------------
+// Overlay labels — text / live attribute values burned onto a face's image at
+// specific coordinates. Rendered as PIXI text objects parented into
+// canvas.primary, the SAME group that holds the tile's own mesh (see
+// `panelTileRect` above): Tile/PlaceableObject itself stays at local (0,0) and
+// never moves — only `tile.mesh` is positioned in world space (registered with
+// canvas.primary so it stays visible regardless of which canvas layer is
+// active). Parenting the labels there too means they pan/zoom/elevation-sort
+// identically with zero manual per-frame syncing, instead of fighting with
+// TilesLayer's active/inactive interaction-layer visibility.
+// --------------------------------
+
+const FE_OVERLAY_TEXT_CLASS = foundry.canvas?.containers?.PreciseText ?? PIXI.Text;
+
+function feClearPanelOverlays(tile) {
+  const list = tile?._fePanelOverlays;
+  if (list?.length) {
+    for (const t of list) { try { t.destroy(); } catch { /* no-op */ } }
+  }
+  if (tile) tile._fePanelOverlays = [];
+}
+
+/** Live attribute value (if `attr` resolves against the linked actor) else the static fallback text. */
+function feResolveOverlayText(item, linkedActor) {
+  if (item?.attr && linkedActor) {
+    try {
+      const v = foundry.utils.getProperty(linkedActor, item.attr);
+      if (v !== undefined && v !== null && v !== "") return String(v);
+    } catch { /* fall through to static text */ }
+  }
+  return item?.text ?? "";
+}
+
+/** Numeric `attr` value against the linked actor, or null when absent/non-numeric — the bar needs a real number, not the display string. */
+function feResolveOverlayNumericValue(item, linkedActor) {
+  if (!item?.attr || !linkedActor) return null;
+  try {
+    const v = foundry.utils.getProperty(linkedActor, item.attr);
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  } catch { /* no-op */ }
+  return null;
+}
+
+/** (Re)draw a bar's track + fill rects in its own local space (0,0 origin). */
+function feDrawBarGraphics(bar, w, h, pct, color) {
+  bar.clear();
+  bar.beginFill(0x000000, 0.5).drawRect(0, 0, w, h).endFill();
+  const fillW = Math.max(0, Math.min(w, w * pct));
+  if (fillW > 0) bar.beginFill(color || "#33cc33").drawRect(0, 0, fillW, h).endFill();
+}
+
+/**
+ * Full (re)build of a panel tile's overlay labels for its CURRENT face. Called
+ * whenever content can change: initial draw, face flips (drawTile fires for
+ * both — texture.src changes set the redraw flag), and whenever the panel
+ * actor's faces/overlays or the linked actor's data is edited.
+ */
+function feRebuildPanelOverlays(tile) {
+  feClearPanelOverlays(tile);
+  try {
+    const doc = tile?.document;
+    const flag = doc?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
+    if (!flag?.actorId) return;
+    const actor = game.actors.get(flag.actorId);
+    const face = fePanelFace(actor, flag.currentFace ?? 0);
+    if (!face.overlays?.length) return;
+    const natW = tile.texture?.width, natH = tile.texture?.height;
+    if (!(natW > 0) || !(natH > 0)) return;
+    const rect = panelTileRect(tile);
+    const mw = rect.right - rect.left, mh = rect.bottom - rect.top;
+    if (!(mw > 0) || !(mh > 0)) return;
+    const scale = mw / natW;
+
+    for (const item of face.overlays) {
+      // Per-overlay link (not per-face/per-panel) — different labels on the
+      // same face may each read from a different actor.
+      const linkedActor = item.linkedActorUuid ? fromUuidSync(item.linkedActorUuid) : null;
+      const str = feResolveOverlayText(item, linkedActor);
+      if (!str) continue;
+      const style = CONFIG.canvasTextStyle.clone();
+      style.fontSize = Math.max(1, Math.round((item.fontSize || 28) * scale));
+      style.fill = item.color || "#ffffff";
+      const text = new FE_OVERLAY_TEXT_CLASS(str, style);
+      text.eventMode = "none";
+      text.anchor.set(0.5, 0.5);
+      text.position.set(rect.left + item.x * mw, rect.top + item.y * mh);
+      text.elevation = doc.elevation ?? 0;
+      // PrimaryCanvasGroup._compareObjects ties on elevation, THEN sortLayer,
+      // THEN sort/zIndex. Tile meshes carry sortLayer = SORT_LAYERS.TILES (500,
+      // assigned by core Tile#_refreshState); leaving the label's sortLayer at
+      // the default 0 means it always loses that comparison and renders BEHIND
+      // the tile's own image regardless of sort/zIndex. Use the SORT_LAYERS
+      // constant directly rather than reading tile.mesh.sortLayer — at the
+      // drawTile hook (when this runs) _refreshState may not have fired yet, so
+      // the mesh's own sortLayer can still read its just-constructed 0.
+      text.sortLayer = canvas.primary?.constructor?.SORT_LAYERS?.TILES ?? 0;
+      text.sort = (doc.sort ?? 0) + 1; // win ties against the tile's own mesh (same sort by default)
+      text.zIndex = (tile.mesh?.zIndex ?? 0) + 1;
+      // Stashed for the cheap reposition path below (authoritative source, since
+      // skipped/empty items mean `tile._fePanelOverlays` indices don't line up
+      // 1:1 with `face.overlays`).
+      text._feX = item.x;
+      text._feY = item.y;
+      text._feFontSize = item.fontSize || 28;
+      canvas.primary.addChild(text);
+      tile._fePanelOverlays.push(text);
+
+      // Optional HP-bar-style value bar just below the text. Only meaningful
+      // when `attr` resolves to an actual number — a static/non-numeric
+      // fallback has no sensible percentage to show.
+      if (item.bar) {
+        const numeric = feResolveOverlayNumericValue(item, linkedActor);
+        const span = (item.barMax ?? 100) - (item.barMin ?? 0);
+        if (numeric !== null && span !== 0) {
+          const pct = Math.max(0, Math.min(1, (numeric - (item.barMin ?? 0)) / span));
+          const barW = Math.max(1, text.width);
+          const barH = Math.max(1, Math.round((item.barHeight || 6) * scale));
+          const gap = Math.max(1, Math.round(2 * scale));
+          const bar = new PIXI.Graphics();
+          feDrawBarGraphics(bar, barW, barH, pct, item.barColor);
+          bar.position.set(text.position.x - barW / 2, text.position.y + text.height / 2 + gap);
+          // Click-to-edit (see pickPanelBarAt / onBoardPointerDown): handled via
+          // this module's own DOM-level board hit-testing, NOT PIXI's federated
+          // events — onBoardPointerDown's capture-phase listener already swallows
+          // any pointerdown landing inside a panel tile's rect before PIXI's own
+          // event system would ever see it, so eventMode/listeners here would
+          // silently never fire. bar.eventMode stays "none"; the stashed fields
+          // below are what the board-level hit test reads instead.
+          bar.eventMode = "none";
+          bar.elevation = text.elevation;
+          bar.sortLayer = text.sortLayer;
+          bar.sort = text.sort;
+          bar.zIndex = text.zIndex;
+          bar._feIsBar = true;
+          bar._feBarHeight = item.barHeight || 6;
+          bar._feBarColor = item.barColor;
+          bar._feBarPct = pct;
+          bar._feBarW = barW;
+          bar._feBarH = barH;
+          bar._feLinkedActor = linkedActor;
+          bar._feAttr = item.attr;
+          bar._feValue = numeric;
+          text._feBar = bar;
+          canvas.primary.addChild(bar);
+          tile._fePanelOverlays.push(bar);
+        }
+      }
+    }
+    if (tile._fePanelOverlays.length) canvas.primary.sortDirty = true;
+  } catch (err) { console.warn(`${MODULE_ID} | screen panel overlay rebuild failed`, err); }
+}
+
+/**
+ * Cheap reposition/rescale of ALREADY-BUILT overlay labels (no restyle/recreate)
+ * — used during live drag preview and on refreshTile (move/resize), where a
+ * full rebuild would needlessly recreate PIXI text objects every tick.
+ */
+function feRepositionPanelOverlays(tile) {
+  const list = tile?._fePanelOverlays;
+  if (!list?.length) return;
+  try {
+    const natW = tile.texture?.width;
+    const rect = panelTileRect(tile);
+    const mw = rect.right - rect.left, mh = rect.bottom - rect.top;
+    const scale = natW > 0 ? mw / natW : 1;
+    for (const obj of list) {
+      if (obj._feIsBar) continue; // repositioned below, via its paired text
+      obj.position.set(rect.left + obj._feX * mw, rect.top + obj._feY * mh);
+      const size = Math.max(1, Math.round(obj._feFontSize * scale));
+      if (obj.style.fontSize !== size) obj.style.fontSize = size;
+      const bar = obj._feBar;
+      if (bar) {
+        obj.updateText?.(true); // force sync re-measure so .width reflects the new fontSize
+        const barW = Math.max(1, obj.width);
+        const barH = Math.max(1, Math.round(bar._feBarHeight * scale));
+        const gap = Math.max(1, Math.round(2 * scale));
+        bar.position.set(obj.position.x - barW / 2, obj.position.y + obj.height / 2 + gap);
+        bar._feBarW = barW; // kept fresh for pickPanelBarAt's hit test
+        bar._feBarH = barH;
+        feDrawBarGraphics(bar, barW, barH, bar._feBarPct, bar._feBarColor);
+      }
     }
   } catch { /* no-op */ }
 }
@@ -462,6 +698,37 @@ async function feScreenPanelGrantRights(actor) {
   });
 }
 
+/**
+ * Quick numeric editor for a value-bar overlay's live attribute, opened by
+ * clicking the bar during actual play (see pickPanelBarAt / onBoardPointerDown).
+ * Independent of ScreenPanelData.tokenize — works whether or not the panel has
+ * a companion Token, since core's own Token resource bar can only ever read/
+ * edit a token's OWN actor (client/documents/token.mjs `getBarAttribute`), not
+ * an arbitrarily-linked other actor like our per-overlay model needs.
+ */
+async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
+  const esc = foundry.utils.escapeHTML ?? ((s) => s);
+  const content = `
+    <div class="form-group">
+      <label>${esc(linkedActor.name)} — ${esc(attr)}</label>
+      <input type="number" name="value" value="${currentValue ?? 0}" step="any" autofocus>
+    </div>`;
+  await foundry.applications.api.DialogV2.prompt({
+    window: { title: game.i18n.localize("FESP.Bar.EditTitle") },
+    content,
+    ok: {
+      icon: "fa-solid fa-check",
+      label: game.i18n.localize("FESP.Bar.EditApply"),
+      callback: async (_event, button) => {
+        const form = button.form ?? button.closest?.("form");
+        const v = Number(form?.elements?.value?.value);
+        if (!Number.isFinite(v)) return;
+        await linkedActor.update({ [attr]: v });
+      },
+    },
+  });
+}
+
 async function feScreenPanelPlaceOnScene(actor) {
   if (!canvas?.scene) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoScene")); return; }
   if (!actor?.testUserPermission(game.user, "OWNER")) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoPerm")); return; }
@@ -492,6 +759,16 @@ async function feScreenPanelPlaceOnScene(actor) {
 // GM relay — apply (runs only on the active GM)
 // --------------------------------
 
+/**
+ * The companion Token created for a "tokenized" panel (see ScreenPanelData.tokenize)
+ * is found via the Tile's own flag (set right after creation) — not by re-scanning
+ * tokens by actorId, since the same actor may be placed more than once.
+ */
+function feFindCompanionToken(scene, flag) {
+  const id = flag?.companionTokenId;
+  return id ? scene?.tokens?.get(id) ?? null : null;
+}
+
 async function applyPanelOp(type, data) {
   const requester = game.users.get(data.requesterId) ?? game.user;
 
@@ -500,11 +777,25 @@ async function applyPanelOp(type, data) {
     if (!actor || !actor.testUserPermission(requester, "OWNER")) return;
     const scene = game.scenes.get(data.sceneId);
     if (!scene) return;
-    await scene.createEmbeddedDocuments("Tile", [{
+    const [tileDoc] = await scene.createEmbeddedDocuments("Tile", [{
       texture: { src: data.img || "", fit: "contain" },
       x: data.x, y: data.y, width: data.width, height: data.height,
       flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: data.actorId, currentFace: data.currentFace ?? 0, disabled: false } } },
     }]);
+    // Optional companion Token (ScreenPanelData.tokenize) — same position/face
+    // image, tagged back to this specific Tile placement (not just the actor,
+    // since the same panel actor may be placed more than once).
+    if (actor.system.tokenize && tileDoc) {
+      try {
+        const tokenDoc = await actor.getTokenDocument({
+          x: data.x, y: data.y, width: data.width, height: data.height,
+          texture: { src: data.img || "" },
+          flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: data.actorId, companion: true, tileId: tileDoc.id } } },
+        }, { parent: scene });
+        const [createdToken] = await scene.createEmbeddedDocuments("Token", [tokenDoc.toObject()]);
+        if (createdToken) await tileDoc.setFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`, createdToken.id);
+      } catch (err) { console.warn(`${MODULE_ID} | screen panel companion token creation failed`, err); }
+    }
     return;
   }
 
@@ -517,6 +808,7 @@ async function applyPanelOp(type, data) {
 
   const level = type === FE_PANEL_SOCKET.FLIP ? "OBSERVER" : "OWNER";
   if (!actor.testUserPermission(requester, level)) return;
+  const companion = feFindCompanionToken(scene, flag);
 
   if (type === FE_PANEL_SOCKET.FLIP) {
     const face = fePanelFace(actor, data.faceIndex);
@@ -524,16 +816,20 @@ async function applyPanelOp(type, data) {
       "texture.src": face.img || "",
       [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.currentFace`]: face.index,
     });
+    if (companion) await companion.update({ "texture.src": face.img || "" });
   } else if (type === FE_PANEL_SOCKET.MOVE) {
     await doc.update({ x: Math.round(data.x), y: Math.round(data.y) });
+    if (companion) await companion.update({ x: Math.round(data.x), y: Math.round(data.y) });
   } else if (type === FE_PANEL_SOCKET.SHOW_HIDE) {
     await doc.update({ hidden: !doc.hidden });
+    if (companion) await companion.update({ hidden: !companion.hidden });
   } else if (type === FE_PANEL_SOCKET.DISABLE) {
     await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.disabled`]: !flag?.disabled });
   } else if (type === FE_PANEL_SOCKET.LOCK) {
     await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.locked`]: !flag?.locked });
   } else if (type === FE_PANEL_SOCKET.REMOVE) {
     await scene.deleteEmbeddedDocuments("Tile", [doc.id]);
+    if (companion) await scene.deleteEmbeddedDocuments("Token", [companion.id]);
   }
 }
 
@@ -585,6 +881,15 @@ Hooks.once("init", () => {
     type: Boolean,
     default: FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP],
   });
+
+  game.settings.register(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE, {
+    name: "FESP.Settings.DblclickCycleName",
+    hint: "FESP.Settings.DblclickCycleHint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.SCREEN_PANEL_DBLCLICK_CYCLE],
+  });
 });
 
 Hooks.once("ready", () => {
@@ -599,6 +904,8 @@ Hooks.once("ready", () => {
     grantRights: feScreenPanelGrantRights,
     gridSnapState: isGridSnapEnabled,
     toggleGridSnap: toggleGridSnap,
+    dblclickCycleState: isDblclickCycleEnabled,
+    toggleDblclickCycle: toggleDblclickCycle,
   });
   game.socket.on(SOCKET_CHANNEL, onPanelSocket);
 
@@ -614,8 +921,15 @@ Hooks.on("canvasReady", attachBoardListeners);
 // the redraw flag), each time with the new texture loaded — so it is the only
 // hook the aspect resize needs.
 Hooks.on("drawTile", enforcePanelTileSize);
+// Must run AFTER enforcePanelTileSize — it reads the tile's just-resized mesh
+// (via panelTileRect) to position labels against the actually-drawn art.
+Hooks.on("drawTile", feRebuildPanelOverlays);
 Hooks.on("drawTile", applyPanelTileVisibility);
+Hooks.on("refreshTile", feRepositionPanelOverlays);
 Hooks.on("refreshTile", applyPanelTileVisibility);
+// Orphaned overlay PIXI objects aren't covered by core's own Tile teardown
+// (canvas.primary.removeTile only destroys the mesh it tracks itself).
+Hooks.on("deleteTile", (doc) => { if (doc?.object) feClearPanelOverlays(doc.object); });
 
 // Force the screenPanel option to the BOTTOM of the Actor-create type dropdown.
 // Core sorts types alphabetically by label (ClientDocument.createDialog), which
@@ -630,13 +944,90 @@ Hooks.on("renderDialogV2", (dialog, element) => {
   } catch { /* no-op */ }
 });
 
-// Re-evaluate placed tiles when a panel actor's ownership changes.
+/**
+ * linkMode "linked" — auto-sync face images from their linked actors' portraits.
+ * Idempotent: skips faces whose image already matches, so a re-entrant
+ * updateActor (from our own update below) is a harmless no-op.
+ */
+function feSyncLinkedFaceImages(panelActor) {
+  const faces = panelActor.system.faces ?? [];
+  let needsUpdate = false;
+  const cloned = foundry.utils.deepClone(faces);
+  for (const face of cloned) {
+    if (face.linkMode !== "linked" || !face.linkedActorUuid) continue;
+    let linked = null;
+    try { linked = fromUuidSync(face.linkedActorUuid); } catch { continue; }
+    if (!linked) continue;
+    const target = linked.img || linked.prototypeToken?.texture?.src || "";
+    if (target && face.img !== target) {
+      face.img = target;
+      needsUpdate = true;
+    }
+  }
+  if (needsUpdate) panelActor.update({ "system.faces": cloned }, { render: false });
+}
+
 Hooks.on("updateActor", (actor, changes) => {
-  if (actor.type !== FE_PANEL_TYPE) return;
-  if (!("ownership" in (changes ?? {}))) return;
+  const isGM = game.user === game.users.activeGM;
+  const facesChanged = changes.system?.faces !== undefined;
+
+  // ── GM-only actor-level syncs (prototype token, linkMode, portrait) ──
+  if (actor.type === FE_PANEL_TYPE && isGM) {
+    if (facesChanged || changes.system?.defaultFace !== undefined) {
+      const face = fePanelFace(actor, actor.system.defaultFace ?? 0);
+      const target = face?.img || "";
+      if (target && (actor.prototypeToken?.texture?.src ?? "") !== target)
+        actor.update({ "prototypeToken.texture.src": target, img: target }, { render: false });
+      else if (target && (actor.img ?? "") !== target)
+        actor.update({ img: target }, { render: false });
+    }
+    if (facesChanged) feSyncLinkedFaceImages(actor);
+  }
+
+  // Non-panel actor portrait changed → sync to linked panel faces.
+  if (actor.type !== FE_PANEL_TYPE && isGM && changes.img !== undefined) {
+    for (const pa of game.actors) {
+      if (pa.type !== FE_PANEL_TYPE) continue;
+      const hasLinkedFace = (pa.system.faces ?? []).some(f => {
+        if (f.linkMode !== "linked" || !f.linkedActorUuid) return false;
+        try { return fromUuidSync(f.linkedActorUuid)?.id === actor.id; } catch { return false; }
+      });
+      if (hasLinkedFace) feSyncLinkedFaceImages(pa);
+    }
+  }
+
+  // ── Canvas tile updates (all clients) ──
   for (const tile of canvas?.tiles?.placeables ?? []) {
     const flag = tile.document.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-    if (flag?.actorId === actor.id) tile.renderFlags?.set?.({ refreshState: true });
+    if (!flag?.actorId) continue;
+    const panelActor = game.actors.get(flag.actorId);
+    if (!panelActor) continue;
+    const isPanelActor = panelActor.id === actor.id;
+
+    if (isPanelActor && "ownership" in (changes ?? {}))
+      tile.renderFlags?.set?.({ refreshState: true });
+
+    // Sync tile texture with current face image when faces data changed.
+    if (isPanelActor && isGM && facesChanged) {
+      const curFace = fePanelFace(panelActor, flag.currentFace ?? 0);
+      const tileSrc = tile.document.texture?.src ?? "";
+      if (curFace.img && tileSrc !== curFace.img) {
+        tile.document.update({ "texture.src": curFace.img });
+        const companion = feFindCompanionToken(canvas.scene, flag);
+        if (companion) companion.update({ "texture.src": curFace.img });
+      }
+    }
+
+    // Overlay rebuild: only when system data actually changed (skip pure
+    // prototypeToken / img-only updates triggered by our own sync above).
+    if (isPanelActor && changes.system !== undefined) feRebuildPanelOverlays(tile);
+
+    if (!isPanelActor) {
+      const isLinkedActor = (panelActor.system?.faces ?? []).some((face) =>
+        (face.overlays ?? []).some((ov) => ov.linkedActorUuid && fromUuidSync(ov.linkedActorUuid)?.id === actor.id)
+      );
+      if (isLinkedActor) feRebuildPanelOverlays(tile);
+    }
   }
 });
 

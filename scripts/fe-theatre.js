@@ -1085,6 +1085,9 @@ function _fetInjectSheetButtons(app, el) {
   if (!_fetEnabled) return;
   const actor = app.actor ?? app.document;
   if (actor?.documentName !== "Actor") return;
+  // A screen panel (female_edition.screenPanel) is a display board, not a
+  // character — stage add/switch/config buttons here would just be confusing.
+  if (actor.type === "female_edition.screenPanel") return;
 
   const root = el.closest?.(".window-app, .application") ?? el;
 

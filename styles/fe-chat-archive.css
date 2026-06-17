@@ -194,10 +194,12 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
     max-height: none !important;
   }
 
-  /* Avoid splitting a single message across pages where possible */
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message {
+  /* Keep message headers together and attached to content */
+  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message :is(.message-header, .message-sender) {
     break-inside: avoid;
     page-break-inside: avoid;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message:last-child {
@@ -567,7 +569,6 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
     sans-serif,
     var(--fe-symbol-fallback, "Segoe UI Symbol", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji");
   --fe-font-geurimilgi: var(--fe-export-system-fallback);
-  --fe-font-light: var(--fe-export-system-fallback);
 }
 
 #fe-chat-export-container .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) .message-metadata {

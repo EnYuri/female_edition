@@ -1,0 +1,201 @@
+/* female_edition: Token Visual Preview — appearance tab grid preview + anchor crosshair */
+
+/* Width set dynamically by JS based on preview size */
+.prototype-token-config.fe-tp-active,
+.token-config.fe-tp-active {}
+
+/* Two-column layout inside the appearance tab */
+.fe-tp-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.fe-tp-controls {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fe-tp-panel {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+}
+
+/* Viewport — the fixed-size window that clips the grid; anchor is always at its center */
+.fe-tp-viewport {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background-color: #1a1a2e;
+}
+
+/* Grid container — positioned absolutely inside the viewport, offset so anchor lands at center */
+.fe-tp-grid {
+  position: absolute;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  /* background-size set inline per grid cell size */
+}
+
+.fe-tp-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Grid space border — complete rectangle around the token area */
+.fe-tp-grid-border {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 60, 60, 0.5);
+  box-shadow: 0 0 3px rgba(200, 200, 200, 0.25);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Inscribed circle — fits inside the grid space for round token alignment */
+.fe-tp-inscribed-circle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+.fe-tp-inscribed-circle ellipse {
+  fill: none;
+  stroke: rgba(255, 60, 60, 0.45);
+  stroke-width: 1;
+  filter: drop-shadow(0 0 2px rgba(200, 200, 200, 0.2));
+}
+
+/* Anchor crosshair — horizontal line */
+.fe-tp-crosshair-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 60, 60, 0.7);
+  box-shadow: 0 0 3px rgba(200, 200, 200, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Anchor crosshair — vertical line */
+.fe-tp-crosshair-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 60, 60, 0.7);
+  box-shadow: 0 0 3px rgba(200, 200, 200, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Anchor crosshair — center dot */
+.fe-tp-crosshair-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3c3c;
+  border: 1px solid #fff;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 4px rgba(200, 200, 200, 0.4);
+}
+
+/* Info labels below the preview */
+.fe-tp-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+.fe-tp-info-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  opacity: 0.6;
+}
+.fe-tp-info-value {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+.fe-tp-info-dim {
+  opacity: 0.5;
+  font-size: 10px;
+}
+
+/* Anchor row: [X] [-----slider-----] [0.5] on a single line */
+.fe-tp-anchor-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.fe-tp-anchor-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 12px;
+  text-align: center;
+}
+.fe-tp-anchor-row input[type="number"] {
+  flex: 0 0 60px;
+  width: 60px;
+}
+.fe-tp-anchor-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Hide Foundry's original inline labels/fields within the anchor form-group once our rows take over */
+.fe-tp-controls .form-group:has(.fe-tp-anchor-row) > label:first-child ~ .form-fields {
+  display: none;
+}
+
+/* Anchor pixel hint (inline, next to the existing anchor hint text) */
+.fe-tp-anchor-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e09060;
+}
+
+/* Resize handle — bottom-right corner of the preview panel, diagonal hatch */
+.fe-tp-resize-handle {
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  cursor: nwse-resize;
+  z-index: 2;
+  overflow: hidden;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.45) 2px,
+    rgba(255, 255, 255, 0.45) 3px
+  );
+  clip-path: polygon(100% 0%, 100% 100%, 0% 100%);
+}
+.fe-tp-resize-handle:hover { opacity: 0.9; }

@@ -1,6 +1,7 @@
-{{!-- Root <form> is provided by the ApplicationV2 frame (tag:"form"); do not nest one here.
-     A Handlebars part must render a SINGLE root element, so wrap everything in one div. --}}
-<div class="fe-settings">
+{{!-- The <form> must be inside the template (not tag:"form") so that v13 AppV2's
+     querySelector("form") can find it. A Handlebars part must render a SINGLE
+     root element, so the <form> IS that root element. --}}
+<form class="fe-settings">
   <div class="fe-settings__topbar flexrow">
     <div class="fe-settings__title">
       <h2>Female-cupwhi 설정</h2>
@@ -826,7 +827,7 @@
   </details>
 
   <details>
-    <summary>코코포리아식 스크린 패널</summary>
+    <summary>스크린 패널</summary>
 
     {{#if isGM}}
     <div class="form-group">
@@ -877,4 +878,4 @@
       <i class="far fa-save"></i> 저장
     </button>
   </footer>
-</div>
+</form>

@@ -1,0 +1,43 @@
+<div class="tab fe-sp-attrs-tab{{#if tab.active}} active{{/if}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+  <div class="fe-sp-field fe-sp-field-checkbox">
+    <label>
+      <input type="checkbox" name="system.tokenize" {{checked fe.tokenize}} {{#unless fe.editable}}disabled{{/unless}}>
+      {{localize "FESP.Sheet.Tokenize"}}
+    </label>
+  </div>
+  <p class="notes">{{localize "FESP.Sheet.TokenizeHint"}}</p>
+
+  <header class="fe-sp-faces-header">
+    <h3>{{localize "FESP.Sheet.CustomAttrs"}}</h3>
+    {{#if fe.editable}}
+      <button type="button" class="fe-sp-btn" data-action="feAddCustomAttr">
+        <i class="fa-solid fa-plus"></i> {{localize "FESP.Sheet.CustomAttrAdd"}}
+      </button>
+    {{/if}}
+  </header>
+  <p class="notes">{{localize "FESP.Sheet.CustomAttrHint"}}</p>
+
+  <ol class="fe-sp-attr-rows">
+    {{#each fe.customAttributes as |ca|}}
+      <li class="fe-sp-attr-row">
+        <input type="text" class="fe-sp-attr-name" name="system.customAttributes.{{ca.index}}.name"
+               value="{{ca.name}}" placeholder="{{localize "FESP.Sheet.CustomAttrNamePh"}}"
+               {{#unless ../fe.editable}}disabled{{/unless}}>
+        <input type="text" class="fe-sp-attr-value" name="system.customAttributes.{{ca.index}}.value"
+               value="{{ca.value}}" placeholder="{{localize "FESP.Sheet.CustomAttrValuePh"}}"
+               {{#unless ../fe.editable}}disabled{{/unless}}>
+        <span class="fe-sp-attr-sep">/</span>
+        <input type="text" class="fe-sp-attr-max" name="system.customAttributes.{{ca.index}}.max"
+               value="{{ca.max}}" placeholder="{{localize "FESP.Sheet.CustomAttrMaxPh"}}"
+               {{#unless ../fe.editable}}disabled{{/unless}}>
+        <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="system.customAttributes.{{ca.index}}"
+              title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">system.customAttributes.{{ca.index}}</code>
+        {{#if ../fe.editable}}
+          <a data-action="feRemoveCustomAttr" data-index="{{ca.index}}" title="{{localize "FESP.Sheet.CustomAttrRemove"}}">
+            <i class="fa-solid fa-trash"></i>
+          </a>
+        {{/if}}
+      </li>
+    {{/each}}
+  </ol>
+</div>

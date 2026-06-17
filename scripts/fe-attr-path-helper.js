@@ -17,8 +17,15 @@
 // (data-ability / data-skill / data-tool) are mapped to canonical names.
 //
 // Self-contained: two client settings (config:false; surfaced in the unified
-// female_edition settings menu), no cross-module imports beyond MODULE_ID / S /
-// FE_DEFAULTS. The value is never shown — name only.
+// female_edition settings menu) + one keybinding, no cross-module imports beyond
+// MODULE_ID / S / FE_DEFAULTS. The value is never shown — name only.
+//
+// Instant-show keybinding (default X, "ceAphInstantKey"): while hovering an
+// element with a resolvable name, pressing it skips the long-hover wait and shows
+// the tooltip immediately. Shares its default key with fe-image-hover.js's own
+// art-preview keybinding (ihKeybind) ON PURPOSE — both firing together for a
+// hovered token portrait is acceptable (this helper still yields image/portrait
+// elements for its OWN name-tooltip purposes; it does not suppress image-hover).
 //
 // Coexistence with fe-image-hover.js (X-key art preview over portraits): this
 // helper YIELDS image/portrait elements, so it never pops a name tooltip over
@@ -77,6 +84,13 @@ function feAphRegisterSetting() {
     config: false, // surfaced via the unified female_edition settings menu
     type: Boolean,
     default: FE_DEFAULTS[S.ATTR_PATH_HELPER_SOURCE],
+  });
+
+  game.keybindings.register(MODULE_ID, "ceAphInstantKey", {
+    name: "FEAPH.Keybind.InstantName",
+    hint: "FEAPH.Keybind.InstantHint",
+    editable: [{ key: "KeyX" }],
+    onDown: () => feAphInstantShow(),
   });
 }
 
@@ -242,6 +256,11 @@ function feAphActivateOwn(element, hit) {
 
 const _fnPending = { el: null, timer: null };
 
+// The element (+ resolved name) currently under the pointer, regardless of
+// whether it has a native tooltip trigger. Tracked independently of _fnPending
+// so the instant-show keybinding (X) can fire for EITHER kind of element.
+const _fnHover = { el: null, hit: null };
+
 function feAphClearPending() {
   if (_fnPending.timer) {
     clearTimeout(_fnPending.timer);
@@ -252,13 +271,18 @@ function feAphClearPending() {
 
 function feAphOnEnter(event) {
   feAphClearPending();
+  _fnHover.el = null;
+  _fnHover.hit = null;
   if (!feAphEnabled()) return;
   const el = event.target;
   if (feAphShouldSkip(el)) return;
-  // Native-tooltip elements are handled by the activate() wrapper.
-  if (feAphHasNativeTrigger(el)) return;
   const hit = feAphResolveName(el);
   if (!hit) return;
+  _fnHover.el = el;
+  _fnHover.hit = hit;
+
+  // Native-tooltip elements are handled by the activate() wrapper.
+  if (feAphHasNativeTrigger(el)) return;
 
   // Mirror the native 500ms long-hover delay.
   _fnPending.el = el;
@@ -270,6 +294,24 @@ function feAphOnEnter(event) {
 
 function feAphOnLeave(event) {
   if (_fnPending.el && event.target === _fnPending.el) feAphClearPending();
+  if (_fnHover.el === event.target) {
+    _fnHover.el = null;
+    _fnHover.hit = null;
+  }
+}
+
+// Instant-show keybinding (default X): skip the long-hover wait entirely and show
+// the attribute name tooltip right away for whatever is currently hovered.
+function feAphInstantShow() {
+  if (!feAphEnabled() || !_fnHover.el) return;
+  feAphClearPending();
+  if (feAphHasNativeTrigger(_fnHover.el)) {
+    // Forces core's own activation immediately; our wrapped activate() then
+    // appends the name line same as a normal (delayed) hover would.
+    game.tooltip?.activate?.(_fnHover.el);
+  } else {
+    feAphActivateOwn(_fnHover.el, _fnHover.hit);
+  }
 }
 
 // ------------------------------------------------------------------

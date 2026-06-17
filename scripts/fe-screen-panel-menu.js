@@ -25,6 +25,8 @@ let _actions = {
   grantRights: null,    // (actor) — GM only
   gridSnapState: null,  // () => boolean — current local snap preference
   toggleGridSnap: null, // () => toggles the local snap preference
+  dblclickCycleState: null, // () => boolean
+  toggleDblclickCycle: null, // () => toggles dblclick face cycling
 };
 
 function feSetPanelMenuActions(actions) {
@@ -200,6 +202,15 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
       + `<span>${game.i18n.localize(snapOn ? "FESP.Menu.SnapOff" : "FESP.Menu.SnapOn")}</span>`;
     snapItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleGridSnap?.(); });
     ownerSection.appendChild(snapItem);
+
+    const dblOn = !!_actions.dblclickCycleState?.();
+    const dblItem = document.createElement("button");
+    dblItem.type = "button";
+    dblItem.className = "fe-sp-menu-item";
+    dblItem.innerHTML = `<i class="fa-solid ${dblOn ? "fa-toggle-on" : "fa-toggle-off"}"></i>`
+      + `<span>${game.i18n.localize(dblOn ? "FESP.Menu.DblclickOff" : "FESP.Menu.DblclickOn")}</span>`;
+    dblItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleDblclickCycle?.(); });
+    ownerSection.appendChild(dblItem);
 
     add("fa-trash", "FESP.Menu.Remove", () => _actions.remove?.(tile), { danger: true });
     ownerSection.appendChild(document.createElement("hr"));

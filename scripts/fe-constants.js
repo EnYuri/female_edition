@@ -62,6 +62,7 @@ const S = {
   SC_COLLAPSE_ENABLED: "ceSceneControlsCollapse",
   SCREEN_PANEL_ENABLED: "ceScreenPanelEnabled",
   SCREEN_PANEL_GRID_SNAP: "ceScreenPanelGridSnap",
+  SCREEN_PANEL_DBLCLICK_CYCLE: "ceScreenPanelDblclickCycle",
   ATTR_PATH_HELPER: "ceAttrPathHelper",
   ATTR_PATH_HELPER_SOURCE: "ceAttrPathHelperSource",
 };
@@ -130,6 +131,7 @@ const FE_DEFAULTS = {
   [S.SC_COLLAPSE_ENABLED]: false,
   [S.SCREEN_PANEL_ENABLED]: true,
   [S.SCREEN_PANEL_GRID_SNAP]: false,
+  [S.SCREEN_PANEL_DBLCLICK_CYCLE]: true,
   [S.ATTR_PATH_HELPER]: true,
   [S.ATTR_PATH_HELPER_SOURCE]: true,
 };
@@ -162,7 +164,9 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.SC_COLLAPSE_ENABLED,
   // Personal drag preference for screen panels (local snapping); never GM-forced.
   S.SCREEN_PANEL_GRID_SNAP,
-  // Personal developer/inspect tool (hover + hold X → show attribute name); never GM-forced.
+  // Personal interaction preference — double-click to cycle faces; never GM-forced.
+  S.SCREEN_PANEL_DBLCLICK_CYCLE,
+  // Personal developer/inspect tool (hover → show attribute name); never GM-forced.
   S.ATTR_PATH_HELPER,
   S.ATTR_PATH_HELPER_SOURCE,
   // Standalone-module client settings migrated into the unified menu — personal,

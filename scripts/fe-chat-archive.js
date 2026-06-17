@@ -382,9 +382,11 @@ function feEnsurePrintCSSOverrides() {
     max-height: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-log .chat-message {
+  body.game.fe-print-chatlog #fe-chat-export-log .chat-message :is(.message-header, .message-sender) {
     break-inside: avoid;
     page-break-inside: avoid;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   @page {
@@ -505,10 +507,12 @@ async function feExportChatLogToPDFInline() {
   // DOM directly, unlike the popup path). Defined here — before the try — so the
   // catch handler can also reach it. Callable from afterprint, the post-print
   // tick, the close button, and the catch; whichever fires first wins.
+  let restorePageBreaks = () => {};
   let cleaned = false;
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    try { restorePageBreaks(); } catch {}
     try { container.remove(); } catch {}
     document.body.classList.remove("fe-print-chatlog");
     document.body.classList.remove("fe-export-optimized");
@@ -596,6 +600,12 @@ async function feExportChatLogToPDFInline() {
     } catch {}
 
     metaEl.textContent = "Opening print dialog…";
+
+    try {
+      restorePageBreaks = fePrepareImagesForPageBreaks(document, logEl);
+    } catch (err) {
+      console.warn("female_edition | inline page-break image preparation failed", err);
+    }
 
     window.addEventListener("afterprint", cleanup, { once: true });
     window.print();
@@ -1818,10 +1828,12 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
         /* Hide the toolbar when printing (save as PDF). */
         #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
 
-        /* Avoid splitting a single message across pages where possible. */
-        #fe-chat-export-log .chat-message {
+        /* Keep message headers together and attached to content. */
+        #fe-chat-export-log .chat-message :is(.message-header, .message-sender) {
           break-inside: avoid;
           page-break-inside: avoid;
+          break-after: avoid;
+          page-break-after: avoid;
         }
 
         #fe-chat-export-log .chat-message:last-child {
@@ -2190,6 +2202,137 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 }
 
 // ===========================================================================
+// Print page-break image handling  (shrink / split for page boundaries)
+// ===========================================================================
+
+/**
+ * Prepare content images for print pagination.
+ * - Images taller than one page: shrink to fit.
+ * - Images crossing a page boundary with < 50% overflow: shrink to fit current page.
+ * - Images crossing a page boundary with >= 50% overflow: split into two clipped
+ *   fragments so the image spans both pages without blank space.
+ *
+ * Must be called after all other pre-print mutations (downscale, background freeze,
+ * font load) and after a reflow.
+ * @param {Document} doc
+ * @param {HTMLElement} logEl
+ * @returns {() => void} Restore function (idempotent).
+ */
+function fePrepareImagesForPageBreaks(doc, logEl) {
+  if (!logEl) return () => {};
+
+  // A4 = 297mm, @page margin = 10mm each → 277mm content ≈ 1047px at 96 dpi.
+  const PAGE_H = 1047;
+  let restored = false;
+  const changes = [];
+
+  const isContentImage = (img) => {
+    try {
+      if (!img?.parentNode) return false;
+      if (img.classList?.contains("avatar")) return false;
+      if (img.matches?.('img.chat-portrait-image-size-name-dnd5e, img[class*="chat-portrait-image-size"]')) return false;
+      if (img.closest?.(".message-header, .message-sender, .chat-portrait-container")) return false;
+      const r = img.getBoundingClientRect();
+      return r.height >= 40 && r.width >= 40;
+    } catch { return false; }
+  };
+
+  try {
+    void logEl.offsetHeight;
+    const scrollY = doc.defaultView?.scrollY ?? 0;
+
+    const imgs = Array.from(logEl.querySelectorAll("img")).filter(isContentImage);
+
+    for (const img of imgs) {
+      void logEl.offsetHeight;
+      const rect = img.getBoundingClientRect();
+      const imgDocTop = rect.top + scrollY;
+      const imgH = rect.height;
+      const imgW = rect.width;
+
+      if (imgH <= 0 || imgW <= 0) continue;
+
+      if (imgH > PAGE_H) {
+        const prevStyle = img.getAttribute("style") || "";
+        img.style.maxHeight = `${PAGE_H - 20}px`;
+        img.style.width = "auto";
+        img.style.objectFit = "contain";
+        changes.push({ type: "shrink", img, prevStyle });
+        continue;
+      }
+
+      const posInPage = ((imgDocTop % PAGE_H) + PAGE_H) % PAGE_H;
+      const remaining = PAGE_H - posInPage;
+
+      if (imgH <= remaining) continue;
+
+      const overflow = imgH - remaining;
+      const overflowRatio = overflow / imgH;
+
+      if (overflowRatio < 0.5) {
+        const prevStyle = img.getAttribute("style") || "";
+        const fitH = Math.max(remaining - 4, 40);
+        img.style.maxHeight = `${fitH}px`;
+        img.style.width = "auto";
+        img.style.objectFit = "contain";
+        changes.push({ type: "shrink", img, prevStyle });
+      } else {
+        const prevStyle = img.getAttribute("style") || "";
+        const parent = img.parentNode;
+        const nextSib = img.nextSibling;
+
+        const wrapper = doc.createElement("div");
+        wrapper.className = "fe-print-img-split";
+        wrapper.style.cssText = "display:block;";
+
+        const frag1 = doc.createElement("div");
+        frag1.style.cssText = `width:${imgW}px; height:${remaining}px; overflow:hidden; display:block; break-inside:avoid; page-break-inside:avoid;`;
+        const img1 = img.cloneNode(true);
+        img1.removeAttribute("style");
+        img1.style.cssText = `width:${imgW}px; height:${imgH}px; display:block; max-width:none;`;
+        frag1.appendChild(img1);
+
+        const frag2 = doc.createElement("div");
+        frag2.style.cssText = `width:${imgW}px; height:${overflow}px; overflow:hidden; display:block; break-inside:avoid; page-break-inside:avoid;`;
+        const img2 = img.cloneNode(true);
+        img2.removeAttribute("style");
+        img2.style.cssText = `width:${imgW}px; height:${imgH}px; display:block; margin-top:${-remaining}px; max-width:none;`;
+        frag2.appendChild(img2);
+
+        wrapper.appendChild(frag1);
+        wrapper.appendChild(frag2);
+
+        parent.replaceChild(wrapper, img);
+        changes.push({ type: "split", img, wrapper, parent, nextSib, prevStyle });
+      }
+    }
+  } catch (err) {
+    console.warn("female_edition | fePrepareImagesForPageBreaks error", err);
+  }
+
+  return () => {
+    if (restored) return;
+    restored = true;
+    for (const ch of changes.reverse()) {
+      try {
+        if (ch.type === "shrink") {
+          if (ch.prevStyle) ch.img.setAttribute("style", ch.prevStyle);
+          else ch.img.removeAttribute("style");
+        } else if (ch.type === "split") {
+          if (ch.prevStyle) ch.img.setAttribute("style", ch.prevStyle);
+          else ch.img.removeAttribute("style");
+          if (ch.nextSib && ch.nextSib.parentNode === ch.parent) {
+            ch.parent.insertBefore(ch.img, ch.nextSib);
+          } else {
+            ch.parent.appendChild(ch.img);
+          }
+          ch.wrapper.remove();
+        }
+      } catch {}
+    }
+  };
+}
+
 // Print Orchestration  (background freeze, image downscale, window.print())
 // ===========================================================================
 
@@ -2319,8 +2462,12 @@ async function feArchivePrint(win) {
   // engine — the main residual OOM source on huge logs. Blank those stragglers
   // right before print (restored on afterprint). Set after downscale.
   let restoreStragglers = () => {};
+  let restorePageBreaks = () => {};
 
   const restoreOnce = () => {
+    try {
+      restorePageBreaks();
+    } catch {}
     try {
       restoreDownscaledImages();
     } catch {}
@@ -2453,6 +2600,12 @@ async function feArchivePrint(win) {
       }
     });
   } catch {}
+
+  try {
+    restorePageBreaks = fePrepareImagesForPageBreaks(doc, logEl);
+  } catch (err) {
+    console.warn("female_edition | print page-break image preparation failed", err);
+  }
 
   try {
     win.print();
@@ -2978,16 +3131,10 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Secondary stack for small text / chat-card descriptions */
-  --fe-font-light:
-    "Noto Sans KR",
-    "Malgun Gothic",
-    "Apple SD Gothic Neo",
-    "Segoe UI",
-    system-ui,
-    -apple-system,
-    sans-serif,
-    var(--fe-symbol-fallback);
+  /* Secondary stack (small text / chat-card descriptions). Mirrors ui-font.css's
+   * :root default — resolves to the readable system stack above, not a decorative
+   * face, since Geurimilgi intentionally isn't embedded for offline export. */
+  --fe-font-secondary: var(--fe-font-geurimilgi);
 
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);
@@ -3042,6 +3189,12 @@ html, body {
 #fe-chat-export-container .chat-message,
 #fe-chat-export-container .chat-message * {
   font-family: var(--fe-chat-font-family) !important;
+}
+/* 카드/박스 내부 = 작은 글자(secondary) — 라이브 ui-font.css의 분리 규칙을 오프라인
+ * file:// 폴백(완전히 외부 CSS를 못 불러오는 경우)에서도 동일하게 재현한다. */
+#fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+#fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
+  font-family: var(--fe-font-secondary) !important;
 }
 
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
@@ -3874,7 +4027,7 @@ function feCanUserSeeChatMessage(msg, user) {
     if (Array.isArray(whisper) && whisper.length) {
       if (user?.isGM) return true;
       if (whisper.includes(user?.id)) return true;
-      if (msg.author?.id === user?.id) return true;
+      if ((msg.author ?? msg.user)?.id === user?.id) return true;
       return false;
     }
 
