@@ -141,6 +141,22 @@ export function feHQImageDownscale(url, tw, th) {
 // cssW/cssH = 표시 크기(CSS px). dpr·2배 오버샘플로 줌/HiDPI 에서도 선명하게.
 export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   if (!imgEl) return;
+
+  // CRITICAL — never substitute the `src` of an editable image.
+  // Core's FormDataExtended serializes an editable image's value straight from the DOM:
+  //   client/applications/ux/form-data-extended.mjs:144 → `value = element.getAttribute("src")`.
+  // Used on BOTH ApplicationV2 (change/submit handlers) AND ApplicationV1 FormApplication
+  // (`_getSubmitData`, fired on close/submit with NO DOM event — confirmed live on dx3rd's V1
+  // DX3rdActorSheet: close→submit→_updateObject→actor.update({img})). A downscaled data: URL in
+  // `src` would therefore be saved as actor.img and uploaded to worlds/<world>/assets/<type>/
+  // img-*.webp, permanently replacing the real high-res file with a ~300px copy. So editable
+  // portraits get NO HQ downscale — the original path is left untouched. The image-hover overlay
+  // and directory thumbnails are display-only (not form fields) and keep HQ below.
+  if (imgEl.hasAttribute?.("data-edit")) {
+    if (url) imgEl.dataset.feHqSrc = url; // let image-hover resolve the real high-res original
+    return;
+  }
+
   if (!url) { imgEl.removeAttribute("src"); imgEl.dataset.feHqSrc = ""; return; }
 
   // 동일 url 재요청 무시 (재렌더 중복 방지)
