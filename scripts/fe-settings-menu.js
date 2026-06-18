@@ -188,6 +188,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     actions: {
       expandAll: FemaleEditionSettingsMenu.#onExpandAll,
       collapseAll: FemaleEditionSettingsMenu.#onCollapseAll,
+      feSave: FemaleEditionSettingsMenu.#onSaveAction,
     },
   };
 
@@ -401,7 +402,15 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     this.element?.querySelectorAll?.("details")?.forEach?.((d) => { d.open = false; });
   }
 
-  // AppV2 form handler: (event, form, formData) bound to the application instance.
+  static async #onSaveAction(event, _target) {
+    event.preventDefault();
+    const form = this.element?.querySelector?.("form");
+    if (!form) return;
+    const formData = new FormDataExtended(form);
+    await FemaleEditionSettingsMenu.#onSubmit.call(this, event, form, formData);
+    await this.close();
+  }
+
   // formData is a FormDataExtended; .object is the flat field map (data-dtype coerced).
   static async #onSubmit(_event, _form, formData) {
     const d = foundry.utils.expandObject(formData.object);

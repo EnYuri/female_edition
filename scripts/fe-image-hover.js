@@ -608,7 +608,8 @@ async function _ihInjectTokenConfigFields(app, html, _data) {
   const hideArt    = await token.getFlag(_IH_MODULE, "ihHideArt");
   const specificArt = (await token.getFlag(_IH_MODULE, "ihSpecificArt")) ?? "path/image.png";
 
-  const contents = await foundry.applications.handlebars.renderTemplate(
+  const _renderTpl = foundry.applications?.handlebars?.renderTemplate ?? globalThis.renderTemplate;
+  const contents = await _renderTpl(
     "modules/female_edition/templates/fe-image-hover-token-config.html",
     { hideHoverStatus: hideArt ? "checked" : "", specificArtStatus: specificArt }
   );
