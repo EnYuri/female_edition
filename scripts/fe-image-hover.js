@@ -46,12 +46,19 @@ let _ihDomDelayTimer;
 
 // Runtime settings cache (populated in init, refreshed on settings close)
 let _ihPermission = 0;
-let _ihEnabled = true;
+let _ihFeatureEnabled = true; // world/GM master switch (whole feature)
+let _ihEnabled = true;        // per-client toggle
 let _ihPosition = "Bottom left";
 let _ihSize = 7;
 let _ihArtType = "character";
 let _ihDelay = 0;
 let _ihShowAllTimer = 6000;
+let _ihMaxUpscale = _IH_MAX_UPSCALE; // resolution-based upscale cap factor; 0 = no cap (unlimited)
+
+/** Effective enabled state: world master AND this client's toggle. */
+function _ihActive() {
+  return _ihFeatureEnabled && _ihEnabled;
+}
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
@@ -107,6 +114,17 @@ function _ihRegisterSettings() {
     default: 6000,
     type: Number,
     onChange: () => _ihLoadSettings(),
+  });
+
+  game.settings.register(_IH_MODULE, "ihFeatureEnabled", {
+    name: "Image Hover: 기능 전체 사용 (GM)",
+    hint: "월드 전체에서 Image Hover 기능을 켜고 끕니다. 끄면 모든 클라이언트에서 비활성화됩니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true,
+    onChange: () => { _ihLoadSettings(); canvas.hud.imageHover?.close(); },
   });
 
   game.settings.register(_IH_MODULE, "ihEnabled", {
@@ -189,6 +207,17 @@ function _ihRegisterSettings() {
     onChange: () => _ihLoadSettings(),
   });
 
+  game.settings.register(_IH_MODULE, "ihMaxUpscale", {
+    name: "Image Hover: 최대 업스케일 배율",
+    hint: "원본 해상도 대비 최대 확대 한도(개인). 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. 0이면 제한 없음(항상 설정 크기로 표시).",
+    scope: "client",
+    config: false,
+    range: { min: 0, max: 5, step: 0.05 },
+    default: _IH_MAX_UPSCALE,
+    type: Number,
+    onChange: () => _ihLoadSettings(),
+  });
+
   game.settings.register(_IH_MODULE, "ihDelay", {
     name: "Image Hover: 표시 지연 시간 (ms)",
     hint: "아트 표시 키를 누른 후 이미지가 나타나기까지 대기 시간(밀리초) — 개인 설정.",
@@ -202,13 +231,15 @@ function _ihRegisterSettings() {
 }
 
 function _ihLoadSettings() {
-  _ihPermission   = game.settings.get(_IH_MODULE, "ihPermission");
-  _ihEnabled      = game.settings.get(_IH_MODULE, "ihEnabled");
-  _ihPosition     = game.settings.get(_IH_MODULE, "ihPosition");
-  _ihSize         = game.settings.get(_IH_MODULE, "ihSize");
-  _ihArtType      = game.settings.get(_IH_MODULE, "ihArtType");
-  _ihDelay        = game.settings.get(_IH_MODULE, "ihDelay");
-  _ihShowAllTimer = game.settings.get(_IH_MODULE, "ihShowAllTimer");
+  _ihPermission     = game.settings.get(_IH_MODULE, "ihPermission");
+  _ihFeatureEnabled = game.settings.get(_IH_MODULE, "ihFeatureEnabled");
+  _ihEnabled        = game.settings.get(_IH_MODULE, "ihEnabled");
+  _ihPosition       = game.settings.get(_IH_MODULE, "ihPosition");
+  _ihSize           = game.settings.get(_IH_MODULE, "ihSize");
+  _ihArtType        = game.settings.get(_IH_MODULE, "ihArtType");
+  _ihDelay          = game.settings.get(_IH_MODULE, "ihDelay");
+  _ihShowAllTimer   = game.settings.get(_IH_MODULE, "ihShowAllTimer");
+  _ihMaxUpscale     = game.settings.get(_IH_MODULE, "ihMaxUpscale");
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -260,13 +291,17 @@ function _ihComputePosition(imageWidth, imageHeight) {
 
   // Target width from the size setting (W / size). Large art beyond this is
   // HQ-downscaled by feApplyHQPortrait (sparkle/aliasing fix). Small art below it
-  // would be upscaled — capped here so the upscale never exceeds _IH_MAX_UPSCALE
-  // of the native resolution (in DEVICE px, so HiDPI is accounted for). A 300px
-  // source therefore shows at most ~450px (1.5×) instead of a blurry 640px.
+  // would be upscaled — capped so the upscale never exceeds the user-set ihMaxUpscale
+  // factor of the native resolution (in DEVICE px, so HiDPI is accounted for). e.g. at
+  // 1.25× a 300px source shows at most ~300-450px instead of a blurry 640px.
+  // ihMaxUpscale = 0 disables the cap entirely (always shown at the W/size setting).
   let w = W / _ihSize;
-  const dpr = Math.min(3, window.devicePixelRatio || 1);
-  const maxUpscaledW = (imageWidth * _IH_MAX_UPSCALE) / dpr; // CSS px cap from native
-  if (w > maxUpscaledW) w = maxUpscaledW;
+  // Upscale cap (user-adjustable via ihMaxUpscale; 0 = no cap → always show at the size setting).
+  if (_ihMaxUpscale > 0) {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const maxUpscaledW = (imageWidth * _ihMaxUpscale) / dpr; // CSS px cap from native
+    if (w > maxUpscaledW) w = maxUpscaledW;
+  }
   let h = w * (imageHeight / imageWidth);
 
   // Clamp height to viewport (downscale only — keeps aspect ratio)
@@ -373,7 +408,7 @@ function _ihRenderDomOverlay(url) {
 
 /** Show DOM portrait art, caching its dimensions first if needed. */
 function _ihShowDomArt(url) {
-  if (!url || !_ihEnabled) return;
+  if (!url || !_ihActive()) return;
   if (url in _ihCache) {
     _ihRenderDomOverlay(url);
   } else {
@@ -496,7 +531,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
    * @param {number}  delay   Milliseconds to wait before showing (ihDelay)
    */
   showArtworkRequirements(token, hovered, delay) {
-    if (!token?.actor || !_ihEnabled) return;
+    if (!token?.actor || !_ihActive()) return;
 
     // Permission check — ownership["default"] === -1 means "None (INHERIT)" which
     // should not block display based on the individual actor permission.
@@ -543,7 +578,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
    * @param {Token} token
    */
   showToAll(token) {
-    if (!token || !_ihEnabled) return;
+    if (!token || !_ihActive()) return;
     _ihShowAll = true;
     canvas.hud.imageHover.bind(token);
     clearTimeout(_ihTimer);

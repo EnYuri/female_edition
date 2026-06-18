@@ -685,8 +685,23 @@
         <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="100" min="0" max="5000" />
       </div>
     </div>
+    <div class="form-group">
+      <label>최대 업스케일 배율 (개인)</label>
+      <div class="form-fields">
+        <input type="range" name="ihMaxUpscale" data-dtype="Number" value="{{values.ihMaxUpscale}}" min="0" max="5" step="0.05" />
+        <span class="fe-range-value" data-for="ihMaxUpscale">{{values.ihMaxUpscale}}</span>
+      </div>
+      <p class="notes">원본 해상도 대비 최대 확대 한도. 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. <b>0 = 제한 없음</b>(항상 설정 크기로 표시).</p>
+    </div>
 
     {{#if isGM}}
+    <div class="form-group">
+      <label>기능 전체 사용 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ihFeatureEnabled" data-dtype="Boolean" {{checked values.ihFeatureEnabled}} />
+      </div>
+      <p class="notes">월드 전체에서 Image Hover를 켜고 끕니다. 끄면 모든 클라이언트에서 비활성화됩니다.</p>
+    </div>
     <div class="form-group">
       <label>아트 표시 최소 권한 (GM)</label>
       <div class="form-fields">

@@ -60,3 +60,17 @@
 .fe-settings-menu .fe-btn--primary {
   font-weight: 700;
 }
+
+/* Range slider rows: let the slider fill the row and show its live value beside it. */
+.fe-settings-menu .form-fields input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.fe-settings-menu .fe-range-value {
+  flex: 0 0 auto;
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}

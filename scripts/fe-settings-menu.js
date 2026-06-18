@@ -58,9 +58,10 @@ const ALL_DEFAULTS = Object.freeze({
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
-  // image-hover (3 world/GM + 4 client)
+  // image-hover (world/GM: feature master + perm/art/timer; client: enable/pos/size/delay/upscale)
+  ihFeatureEnabled: true,
   ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
-  ihEnabled: true, ihPosition: "Bottom left", ihSize: 7, ihDelay: 0,
+  ihEnabled: true, ihPosition: "Bottom left", ihSize: 7, ihDelay: 0, ihMaxUpscale: 1.25,
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
@@ -274,6 +275,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       chatImagesUploadLocation: feRead("chatImagesUploadLocation"),
 
       // Image Hover (standalone — migrated)
+      ihFeatureEnabled: feRead("ihFeatureEnabled"),
       ihPermission:   feRead("ihPermission"),
       ihArtType:      feRead("ihArtType"),
       ihShowAllTimer: feRead("ihShowAllTimer"),
@@ -281,6 +283,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       ihPosition:     feRead("ihPosition"),
       ihSize:         feRead("ihSize"),
       ihDelay:        feRead("ihDelay"),
+      ihMaxUpscale:   feRead("ihMaxUpscale"),
 
       // Narrator (standalone — migrated; all world/GM)
       narratorEnabled:      feRead("narratorEnabled"),
@@ -391,6 +394,18 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         });
       }
     } catch { /* no-op */ }
+
+    // Live value readout for range sliders: keep <span class="fe-range-value"
+    // data-for="NAME"> in sync with its <input type="range" name="NAME">.
+    try {
+      for (const range of this.element?.querySelectorAll?.('input[type="range"]') ?? []) {
+        const out = this.element.querySelector(`.fe-range-value[data-for="${range.name}"]`);
+        if (!out) continue;
+        const sync = () => { out.textContent = range.value; };
+        sync();
+        range.addEventListener("input", sync);
+      }
+    } catch { /* no-op */ }
   }
 
   // data-action handlers receive (event, target) bound to the application instance.
@@ -489,9 +504,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool("chatImagesEnabled"), bool("chatImagesShowButton"),
         ...(game.user?.isGM ? [str("chatImagesUploadLocation")] : []),
 
-        // Image Hover — world/GM (perm/art/timer) gated; client prefs always saved
-        ...(game.user?.isGM ? [num("ihPermission"), str("ihArtType"), num("ihShowAllTimer")] : []),
-        bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihDelay"),
+        // Image Hover — world/GM (feature master + perm/art/timer) gated; client prefs always saved
+        ...(game.user?.isGM ? [bool("ihFeatureEnabled"), num("ihPermission"), str("ihArtType"), num("ihShowAllTimer")] : []),
+        bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihDelay"), num("ihMaxUpscale"),
 
         // Narrator — all world/GM
         ...(game.user?.isGM ? [
