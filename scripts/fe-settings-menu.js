@@ -185,11 +185,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       resizable: true,
     },
     position: { width: 740, height: "auto" },
-    form: {
-      handler: FemaleEditionSettingsMenu.#onSubmit,
-      closeOnSubmit: true,
-      submitOnChange: false,
-    },
     actions: {
       expandAll: FemaleEditionSettingsMenu.#onExpandAll,
       collapseAll: FemaleEditionSettingsMenu.#onCollapseAll,
@@ -361,9 +356,21 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
   _onRender(context, options) {
     super._onRender(context, options);
+
+    // Wire form submit manually — AppV2's built-in form infrastructure requires
+    // tag:"form" or contentTag:"form" for this.form to return non-null, and
+    // neither works reliably across v13+v14. Wiring here is version-agnostic.
     try {
       const form = this.element?.querySelector?.("form");
-      if (form) form.setAttribute("autocomplete", "off");
+      if (form) {
+        form.setAttribute("autocomplete", "off");
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const formData = new FormDataExtended(form);
+          await FemaleEditionSettingsMenu.#onSubmit.call(this, e, form, formData);
+          await this.close();
+        });
+      }
     } catch { /* no-op */ }
 
     // Restore each section's saved open/closed state and persist on toggle. The
