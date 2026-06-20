@@ -138,6 +138,13 @@ const FE_DEFAULTS = {
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
 
+// Per-client backup of each player's OWN value for a setting, captured the first
+// time that key is about to be overwritten by a GM-priority force-sync. Lets us
+// fully restore a player's personal values when "GM 설정 전역 강제" is turned OFF,
+// so disabling enforcement leaves nothing forced behind. Client-scope; cleared
+// after a restore.
+const FE_GM_PRIORITY_BACKUP_KEY = "feGmPriorityBackup";
+
 // Per-world settings store. A single client-scope Object holding
 // { [worldId]: { [settingKey]: value } }. Client settings in Foundry are stored
 // in localStorage per browser origin WITHOUT a world id, so they are shared
@@ -145,7 +152,19 @@ const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";
 // id so each world keeps an independent copy of the user's preferences.
 const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 
+// Keys NEVER forced by "GM 설정 전역 강제" (feSeedGmPriorityOverridesFromLocal
+// seeds EVERY other client-scope module setting, so anything NOT listed here IS
+// forced onto all players when GM priority is enabled). Policy (per request): when
+// GM priority is ON, almost everything is forced — the GM turns the whole feature
+// OFF if they want players to keep personal taste. Only THREE categories stay
+// personal regardless:
+//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) — opt-in per player (glyph/icon breakage risk)
+//   2. 채팅 아카이브 / 내보내기 (EXPORT_*) — output preference
+//   3. 툴바 접기 (SC_COLLAPSE_ENABLED) — personal toolbar layout
+// (GM_PRIORITY_ENABLED / GM_SPEAK_AS_SELF are world-scope sentinels — never
+//  client-forced anyway; listed for clarity.)
 const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
+  // 채팅 아카이브 / 내보내기 — output preference, always personal.
   S.EXPORT_ENABLED,
   S.EXPORT_AUTO_PRINT,
   S.EXPORT_OPTIMIZE,
@@ -153,46 +172,13 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_EMBED_IMAGES,
   S.EXPORT_PRINT_IMAGE_MODE,
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
+  // 커스텀 폰트 유무 — players opt in individually.
   S.UI_ENABLE_FONTS,
-  S.DX3RD_RUI_ENABLED,
+  // 툴바 접기 — personal toolbar preference.
+  S.SC_COLLAPSE_ENABLED,
+  // World-scope sentinels (never client-forced anyway).
   S.GM_PRIORITY_ENABLED,
   S.GM_SPEAK_AS_SELF,
-  S.PRUNE_ENABLED,
-  S.PRUNE_MAX_MESSAGES,
-  S.TYPING_ENABLED,
-  // Personal toolbar preference — each player decides; never GM-forced.
-  S.SC_COLLAPSE_ENABLED,
-  // Personal drag preference for screen panels (local snapping); never GM-forced.
-  S.SCREEN_PANEL_GRID_SNAP,
-  // Personal interaction preference — double-click to cycle faces; never GM-forced.
-  S.SCREEN_PANEL_DBLCLICK_CYCLE,
-  // Personal developer/inspect tool (hover → show attribute name); never GM-forced.
-  S.ATTR_PATH_HELPER,
-  S.ATTR_PATH_HELPER_SOURCE,
-  // Standalone-module client settings migrated into the unified menu — personal,
-  // read by their modules via game.settings.get; exclude so the menu's feSetting
-  // read reflects the raw value (no GM-priority override staleness).
-  "chatImagesEnabled",
-  "chatImagesShowButton",
-  // image-hover + theatre CLIENT-scope personal settings (also migrated). Each
-  // player keeps their own; never GM-forced.
-  "ihEnabled",
-  "ihPosition",
-  "ihSize",
-  "ihDelay",
-  "stagePortraitHeight",
-  "stageBoxWidth",
-  "stageBoxHeight",
-  "stageBoxBottom",
-  "stageBoxLeft",
-  "stageTextSize",
-  // User-color background appearance tuning — read via feSetting in the apply
-  // path; exclude so the raw per-client value is used (no stale GM-priority
-  // override) and each player tunes their own base/color/alpha.
-  S.USER_COLOR_BG_BASE,
-  S.USER_COLOR_BG_CUSTOM,
-  S.USER_COLOR_ALPHA,
-  S.SYSTEM_MSG_COLOR,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";
@@ -213,6 +199,7 @@ export {
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   FE_DEFAULTS,
   FE_GM_PRIORITY_OVERRIDES_KEY,
+  FE_GM_PRIORITY_BACKUP_KEY,
   FE_WORLD_SETTINGS_KEY,
   FE_GM_PRIORITY_EXCLUDED_KEYS,
   FE_RENDER_STATE_FLAG,

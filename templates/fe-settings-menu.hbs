@@ -5,7 +5,7 @@
   <div class="fe-settings__topbar flexrow">
     <div class="fe-settings__title">
       <h2>Female-cupwhi 설정</h2>
-      <p class="notes">설정은 <b>클라이언트(개인)</b> 기준입니다. 저장하면 즉시 적용되며, 일부 항목은 채팅 로그가 다시 렌더링될 때 반영됩니다.</p>
+      <p class="notes">대부분의 설정은 <b>클라이언트(개인)</b> 기준이며, <b>(GM)</b>으로 표시된 항목만 <b>월드 전역</b>(모든 사용자에게 적용)입니다. 저장하면 즉시 적용되며, 일부 항목은 채팅 로그가 다시 렌더링될 때 반영됩니다.</p>
     </div>
 
     <div class="fe-settings__actions flexrow">
@@ -872,8 +872,9 @@
         <input type="checkbox" name="ceGmPriorityEnabled" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} />
       </div>
       <p class="notes">
-        활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다.
-        아카이브/편집 설정은 플레이어 개인 설정을 유지합니다.
+        활성화 시 아래 3가지를 <b>제외한</b> GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑 등 포함).
+        <b>항상 개인 유지:</b> 커스텀 폰트 유무 · 채팅 아카이브/내보내기 · 툴바 접기.
+        플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.
       </p>
     </div>
 

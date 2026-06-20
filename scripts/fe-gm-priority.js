@@ -1,4 +1,4 @@
-import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS } from "./fe-constants.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS } from "./fe-constants.js";
 import { feHasOwn, feValuesEqual } from "./fe-util.js";
 
 let feSyncingLocalGmPrioritySettings = false;
@@ -23,6 +23,7 @@ function feIsGmPriorityEnabled() {
 function feIsGmPrioritySettingKey(key) {
   try {
     if (!key || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    if (key === FE_GM_PRIORITY_BACKUP_KEY) return false;
     if (key === FE_WORLD_SETTINGS_KEY) return false;
     if (FE_GM_PRIORITY_EXCLUDED_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
@@ -36,6 +37,16 @@ function feIsGmPrioritySettingKey(key) {
 function feGetGmPriorityOverrides() {
   try {
     const data = game.settings.get(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+function feGetGmPriorityBackup() {
+  try {
+    const data = game.settings.get(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY);
     if (!data || typeof data !== "object" || Array.isArray(data)) return {};
     return data;
   } catch {
@@ -85,6 +96,7 @@ async function feSetGmPriorityOverrides(partial = {}) {
 async function feMirrorGmPrioritySetting(key, value) {
   try {
     if (!game.user?.isGM) return false;
+    if (!feIsGmPriorityEnabled()) return false;
     if (!feIsGmPrioritySettingKey(key)) return false;
     return await feSetGmPriorityOverrides({ [key]: value });
   } catch {
@@ -92,16 +104,22 @@ async function feMirrorGmPrioritySetting(key, value) {
   }
 }
 
-async function feSeedGmPriorityOverridesFromLocal() {
+// Seed the override store from the GM's own local settings. Gated on enabled so
+// the store is never populated while enforcement is OFF. By default only fills in
+// keys that are still MISSING (steady-state seeding); pass { force: true } on the
+// enable transition to overwrite every key from the GM's current local values, so
+// re-enabling reflects whatever the GM changed while it was off.
+async function feSeedGmPriorityOverridesFromLocal({ force = false } = {}) {
   try {
     if (!game.user?.isGM) return false;
+    if (!feIsGmPriorityEnabled()) return false;
     const existing = feGetGmPriorityOverrides();
     const partial = {};
     for (const [fullKey, cfg] of game.settings.settings ?? []) {
       if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
       const key = String(fullKey).slice(MODULE_ID.length + 1);
       if (!feIsGmPrioritySettingKey(key)) continue;
-      if (feHasOwn(existing, key)) continue;
+      if (!force && feHasOwn(existing, key)) continue;
       partial[key] = game.settings.get(MODULE_ID, key);
     }
     if (!Object.keys(partial).length) return false;
@@ -112,34 +130,100 @@ async function feSeedGmPriorityOverridesFromLocal() {
   }
 }
 
+// Apply the GM's override values into THIS client's local game.settings. Gated on
+// enabled — when "GM 설정 전역 강제" is OFF this is a no-op, so nothing is ever
+// forced while the feature is disabled. Before overwriting a key for the first
+// time, the client's own pre-force value is recorded in the backup store so it can
+// be restored verbatim when enforcement is later turned off.
 async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
   try {
+    if (!feIsGmPriorityEnabled()) return false;
     const overrides = feGetGmPriorityOverrides();
     const wanted = Array.isArray(keys)
       ? keys.filter((key) => feIsGmPrioritySettingKey(key) && feHasOwn(overrides, key))
       : Object.keys(overrides).filter((key) => feIsGmPrioritySettingKey(key));
     if (!wanted.length) return false;
 
+    const backup = foundry.utils.deepClone(feGetGmPriorityBackup());
+    let backupChanged = false;
+
     feSyncingLocalGmPrioritySettings = true;
     let changed = false;
-    for (const key of wanted) {
-      const target = overrides[key];
-      let current;
-      try {
-        current = game.settings.get(MODULE_ID, key);
-      } catch {
-        continue;
+    try {
+      for (const key of wanted) {
+        const target = overrides[key];
+        let current;
+        try {
+          current = game.settings.get(MODULE_ID, key);
+        } catch {
+          continue;
+        }
+        if (feValuesEqual(current, target)) continue;
+        // Record the client's own value before the first overwrite of this key.
+        if (!feHasOwn(backup, key)) {
+          backup[key] = current;
+          backupChanged = true;
+        }
+        await game.settings.set(MODULE_ID, key, target);
+        changed = true;
       }
-      if (feValuesEqual(current, target)) continue;
-      await game.settings.set(MODULE_ID, key, target);
-      changed = true;
+    } finally {
+      feSyncingLocalGmPrioritySettings = false;
+    }
+
+    if (backupChanged) {
+      try {
+        await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, backup);
+      } catch {
+        /* backup is best-effort; a failure only weakens restore, not safety */
+      }
     }
     return changed;
   } catch (err) {
     console.warn(`[${MODULE_ID}] failed to sync local GM-priority settings`, err);
     return false;
-  } finally {
-    feSyncingLocalGmPrioritySettings = false;
+  }
+}
+
+// Restore each backed-up key to the client's own pre-force value and clear the
+// backup. Runs on every client when enforcement is turned OFF, so disabling the
+// feature leaves nothing forced behind. Safe to call when the backup is empty.
+async function feRestoreLocalGmPrioritySettings() {
+  try {
+    const backup = feGetGmPriorityBackup();
+    const keys = Object.keys(backup);
+    if (!keys.length) return false;
+
+    feSyncingLocalGmPrioritySettings = true;
+    try {
+      for (const key of keys) {
+        const target = backup[key];
+        let current;
+        try {
+          current = game.settings.get(MODULE_ID, key);
+        } catch {
+          continue;
+        }
+        if (feValuesEqual(current, target)) continue;
+        try {
+          await game.settings.set(MODULE_ID, key, target);
+        } catch {
+          /* skip unsettable key */
+        }
+      }
+    } finally {
+      feSyncingLocalGmPrioritySettings = false;
+    }
+
+    try {
+      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {});
+    } catch {
+      /* no-op */
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to restore local GM-priority settings`, err);
+    return false;
   }
 }
 
@@ -171,7 +255,7 @@ function feGetWorldId() {
 function feIsPerWorldSettingKey(key) {
   try {
     if (!key) return false;
-    if (key === FE_WORLD_SETTINGS_KEY || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
+    if (key === FE_WORLD_SETTINGS_KEY || key === FE_GM_PRIORITY_OVERRIDES_KEY || key === FE_GM_PRIORITY_BACKUP_KEY) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
     return String(cfg.scope ?? "") === "client";
@@ -190,14 +274,23 @@ function feGetAllWorldSettings() {
   }
 }
 
-// Snapshot the current local values of every per-world key.
+// Snapshot the current local values of every per-world key. For keys currently
+// being GM-forced (present in the backup store) the player's OWN pre-force value is
+// recorded instead of the forced one, so the per-world store always reflects the
+// player's real preference and never re-introduces a forced value on the next
+// hydrate (which would otherwise survive a restore).
 function feSnapshotPerWorldSettings() {
   const snap = {};
+  const backup = feGetGmPriorityBackup();
   try {
     for (const [fullKey] of game.settings.settings ?? []) {
       if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
       const key = String(fullKey).slice(MODULE_ID.length + 1);
       if (!feIsPerWorldSettingKey(key)) continue;
+      if (feHasOwn(backup, key)) {
+        snap[key] = backup[key];
+        continue;
+      }
       try {
         snap[key] = game.settings.get(MODULE_ID, key);
       } catch {
@@ -295,12 +388,14 @@ export {
   feIsGmPriorityEnabled,
   feIsGmPrioritySettingKey,
   feGetGmPriorityOverrides,
+  feGetGmPriorityBackup,
   feGetGmPriorityOverrideValue,
   feHasGmPriorityOverride,
   feSetGmPriorityOverrides,
   feMirrorGmPrioritySetting,
   feSeedGmPriorityOverridesFromLocal,
   feSyncLocalGmPrioritySettings,
+  feRestoreLocalGmPrioritySettings,
   feIsPerWorldSettingKey,
   feGetAllWorldSettings,
   feCaptureWorldSettings,

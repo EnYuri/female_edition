@@ -14,7 +14,7 @@
 import {
   MODULE_ID, LEGACY_UI_FONT_KEY, S,
   FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
-  FE_GM_PRIORITY_OVERRIDES_KEY, FE_WORLD_SETTINGS_KEY,
+  FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY,
 } from "./fe-constants.js";
 
 import {
@@ -29,7 +29,8 @@ import {
   feSyncingLocalGmPrioritySettings,
   feIsGmPrioritySettingKey, feHasGmPriorityOverride,
   feMirrorGmPrioritySetting, feSyncLocalGmPrioritySettings,
-  feSeedGmPriorityOverridesFromLocal,
+  feRestoreLocalGmPrioritySettings,
+  feSeedGmPriorityOverridesFromLocal, feIsGmPriorityEnabled,
   feHydrateWorldSettings, feCaptureWorldSettings,
   feFireChatUiUpdated, feSetting,
 } from "./fe-gm-priority.js";
@@ -187,6 +188,17 @@ Hooks.once("init", () => {
   // fe-gm-priority.js for hydrate/capture logic.
   game.settings.register(MODULE_ID, FE_WORLD_SETTINGS_KEY, {
     name: "(internal) per-world settings",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
+  });
+
+  // Per-client backup of pre-force values, captured on the first GM-priority
+  // overwrite of each key and consumed when enforcement is turned OFF (restore).
+  // See fe-gm-priority.js (feSyncLocalGmPrioritySettings / feRestoreLocalGmPrioritySettings).
+  game.settings.register(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {
+    name: "(internal) GM-priority value backup",
     scope: "client",
     config: false,
     type: Object,
@@ -662,15 +674,28 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.GM_PRIORITY_ENABLED, {
     name: "GM 설정 전역 강제",
-    hint: "활성화 시 GM의 모듈 설정(채팅 병합, 폰트, 스타일 등)이 모든 플레이어에게 강제 적용됩니다. 아카이브/편집 설정은 개인 설정을 유지합니다.",
+    hint: "활성화 시 아래 3가지를 제외한 GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑 등 포함). 항상 개인 유지: 커스텀 폰트 유무 · 채팅 아카이브/내보내기 · 툴바 접기. 플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.",
     scope: "world",
     config: false,
     restricted: true,
     type: Boolean,
     default: true,
-    onChange: () => {
+    onChange: (value) => {
       feApplyGmPriorityUiRefresh(document);
-      void feSyncLocalGmPrioritySettings();
+      // World-scope toggle — this onChange fires on every connected client.
+      if (value) {
+        // Turning ON: the GM (re)seeds the override store from its CURRENT local
+        // values (force, so changes made while OFF are captured), then every
+        // client force-syncs them into local settings (backing up own values).
+        void (async () => {
+          if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal({ force: true });
+          await feSyncLocalGmPrioritySettings();
+        })();
+      } else {
+        // Turning OFF: every client restores its own pre-force values, so nothing
+        // stays forced once enforcement is disabled.
+        void feRestoreLocalGmPrioritySettings();
+      }
     },
   });
 
@@ -732,8 +757,14 @@ Hooks.once("ready", async () => {
   // Apply this world's saved settings (or seed on first visit) BEFORE GM
   // priority so the GM seeds from per-world-correct values.
   await feHydrateWorldSettings();
-  if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal();
-  await feSyncLocalGmPrioritySettings();
+  if (feIsGmPriorityEnabled()) {
+    if (game.user?.isGM) await feSeedGmPriorityOverridesFromLocal();
+    await feSyncLocalGmPrioritySettings();
+  } else {
+    // Enforcement is off — undo any forced values left over from a previous
+    // session (e.g. the GM disabled it while this client was offline).
+    await feRestoreLocalGmPrioritySettings();
+  }
   feApplyStyleVarsFromSettings(document);
   feSetBodyMergeClasses();
   feSetChatCardFontClass(document);
