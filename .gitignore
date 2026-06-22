@@ -1,0 +1,26 @@
+# AI tooling / agent scratch (local-only)
+.codex/
+.claude/
+
+# Local-only tests
+test/
+
+# Markdown docs are local-only — except the repo README
+*.md
+!README.md
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & temp
+*.log
+*.tmp
+*.bak

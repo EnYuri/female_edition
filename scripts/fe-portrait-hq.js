@@ -137,6 +137,79 @@ export function feHQImageDownscale(url, tw, th) {
   return job;
 }
 
+// ─── 편집 가능 이미지(data-edit) 전용 오버레이 HQ ────────────────────────────
+// data-edit 이미지는 src 를 절대 교체할 수 없다(폼 직렬화 → actor.img 파괴, 위 CRITICAL 참고).
+// 대신 img 위에 pointer-events:none 인 div 를 겹쳐 HQ 다운스케일 비트맵을 background-image 로
+// 깔아 "표시만" 선명하게 만든다. img.src 는 진짜 경로 그대로 → FormDataExtended 가 직렬화해도
+// 안전하다. 클릭은 오버레이를 통과해 밑의 img(파일 선택 등)로 전달된다.
+
+function _removeOverlayHQ(imgEl) {
+  const ov = imgEl._feHqOverlay;
+  if (ov) { ov.remove(); imgEl._feHqOverlay = null; }
+  if (imgEl._feHqRO) { imgEl._feHqRO.disconnect(); imgEl._feHqRO = null; }
+}
+
+function _ensureOverlayHQ(imgEl) {
+  let ov = imgEl._feHqOverlay;
+  if (ov && ov.isConnected) return ov;
+  ov = document.createElement("div");
+  ov.className = "fe-hq-portrait-overlay";
+  ov.setAttribute("aria-hidden", "true");
+  ov.style.position = "absolute";
+  ov.style.pointerEvents = "none";
+  ov.style.backgroundRepeat = "no-repeat";
+  // 부모에 positioning context 보장 (absolute 기준이 img 와 동일한 offsetParent 가 되도록)
+  const parent = imgEl.parentElement;
+  if (parent && getComputedStyle(parent).position === "static") parent.style.position = "relative";
+  imgEl.after(ov);            // 직후 형제 → img 위에 페인트, position:absolute 라 레이아웃 영향 없음
+  imgEl._feHqOverlay = ov;
+  return ov;
+}
+
+function _syncOverlayHQ(ov, imgEl) {
+  // img 의 표시 박스에 정확히 포갠다 (offsetParent 가 img 와 같으므로 offset* 좌표 일치)
+  ov.style.left = imgEl.offsetLeft + "px";
+  ov.style.top = imgEl.offsetTop + "px";
+  ov.style.width = imgEl.offsetWidth + "px";
+  ov.style.height = imgEl.offsetHeight + "px";
+  const cs = getComputedStyle(imgEl);
+  const of = cs.objectFit || "fill";
+  ov.style.backgroundSize =
+    of === "cover" ? "cover" :
+    of === "contain" ? "contain" :
+    of === "none" ? "auto" : "100% 100%";
+  ov.style.backgroundPosition = cs.objectPosition || "center";
+  ov.style.borderRadius = cs.borderRadius || "";
+}
+
+function _applyEditableOverlayHQ(imgEl, url, cssW, cssH) {
+  if (!url || url.startsWith("data:")) { _removeOverlayHQ(imgEl); return; }
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const k = 2; // 오버샘플 배수
+  const tw = Math.max(1, Math.ceil((cssW || 98) * dpr * k));
+  const th = Math.max(1, Math.ceil((cssH || 80) * dpr * k));
+  const key = `${url}|${tw}x${th}`;
+
+  const show = (dataURL) => {
+    if (imgEl.dataset.feHqSrc !== url) return;      // 그 사이 다른 이미지로 바뀜
+    if (!dataURL) { _removeOverlayHQ(imgEl); return; } // 확대 불필요/CORS 실패 → 원본 그대로
+    const ov = _ensureOverlayHQ(imgEl);
+    ov.style.backgroundImage = `url("${dataURL}")`;
+    _syncOverlayHQ(ov, imgEl);
+    if (!imgEl._feHqRO && typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(() => {
+        const o = imgEl._feHqOverlay;
+        if (o) _syncOverlayHQ(o, imgEl);
+      });
+      ro.observe(imgEl);
+      imgEl._feHqRO = ro;
+    }
+  };
+
+  if (_hqValue.has(key)) { show(_hqValue.get(key)); return; }
+  feHQImageDownscale(url, tw, th).then(show);
+}
+
 // <img> 에 원본을 즉시 표시한 뒤, 고품질 축소본이 준비되면 교체.
 // cssW/cssH = 표시 크기(CSS px). dpr·2배 오버샘플로 줌/HiDPI 에서도 선명하게.
 export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
@@ -150,10 +223,12 @@ export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   // DX3rdActorSheet: close→submit→_updateObject→actor.update({img})). A downscaled data: URL in
   // `src` would therefore be saved as actor.img and uploaded to worlds/<world>/assets/<type>/
   // img-*.webp, permanently replacing the real high-res file with a ~300px copy. So editable
-  // portraits get NO HQ downscale — the original path is left untouched. The image-hover overlay
-  // and directory thumbnails are display-only (not form fields) and keep HQ below.
+  // portraits get NO src swap — the original path is left untouched. Instead an HQ overlay div is
+  // layered on top (display-only, never a form field) so the portrait still looks sharp. The
+  // image-hover overlay and directory thumbnails are not form fields and keep the src-swap HQ below.
   if (imgEl.hasAttribute?.("data-edit")) {
     if (url) imgEl.dataset.feHqSrc = url; // let image-hover resolve the real high-res original
+    _applyEditableOverlayHQ(imgEl, url, cssW, cssH);
     return;
   }
 

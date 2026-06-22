@@ -65,6 +65,16 @@ const S = {
   SCREEN_PANEL_DBLCLICK_CYCLE: "ceScreenPanelDblclickCycle",
   ATTR_PATH_HELPER: "ceAttrPathHelper",
   ATTR_PATH_HELPER_SOURCE: "ceAttrPathHelperSource",
+  COMBAT_DOCK_ENABLED: "ceCombatDockEnabled",
+  COMBAT_DOCK_PORTRAIT_SIZE: "ceCombatDockPortraitSize",
+  COMBAT_DOCK_SHOW_HP: "ceCombatDockShowHp",
+  COMBAT_DOCK_ASPECT: "ceCombatDockAspect",
+  COMBAT_DOCK_ROUNDNESS: "ceCombatDockRoundness",
+  COMBAT_DOCK_ALIGNMENT: "ceCombatDockAlignment",
+  COMBAT_DOCK_PORTRAIT_IMAGE: "ceCombatDockPortraitImage",
+  COMBAT_DOCK_SHOW_INITIATIVE: "ceCombatDockShowInitiative",
+  COMBAT_DOCK_SHOW_DISPOSITION: "ceCombatDockShowDisposition",
+  COMBAT_DOCK_HIDE_DEFEATED: "ceCombatDockHideDefeated",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -134,6 +144,16 @@ const FE_DEFAULTS = {
   [S.SCREEN_PANEL_DBLCLICK_CYCLE]: true,
   [S.ATTR_PATH_HELPER]: true,
   [S.ATTR_PATH_HELPER_SOURCE]: true,
+  [S.COMBAT_DOCK_ENABLED]: true,
+  [S.COMBAT_DOCK_PORTRAIT_SIZE]: 90,
+  [S.COMBAT_DOCK_SHOW_HP]: true,
+  [S.COMBAT_DOCK_ASPECT]: "1",
+  [S.COMBAT_DOCK_ROUNDNESS]: "8",
+  [S.COMBAT_DOCK_ALIGNMENT]: "center",
+  [S.COMBAT_DOCK_PORTRAIT_IMAGE]: "actor",
+  [S.COMBAT_DOCK_SHOW_INITIATIVE]: true,
+  [S.COMBAT_DOCK_SHOW_DISPOSITION]: true,
+  [S.COMBAT_DOCK_HIDE_DEFEATED]: false,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";

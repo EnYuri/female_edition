@@ -1,4 +1,84 @@
 <div class="tab fe-sp-attrs-tab{{#if tab.active}} active{{/if}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+  {{!-- Per-face attributes (copied from the active face's linked actor) --}}
+  <header class="fe-sp-faces-header">
+    <h3>{{localize "FESP.Sheet.FaceAttrs" n=fe.activeFace.num}}{{#if fe.activeFace.name}} — {{fe.activeFace.name}}{{/if}}</h3>
+    {{#if fe.editable}}
+      <span class="fe-sp-face-attr-actions">
+        {{#if fe.activeFace.linkedActorName}}
+          <button type="button" class="fe-sp-btn" data-action="feRecopyFaceAttrs" title="{{localize "FESP.Sheet.FaceAttrRecopyHint"}}">
+            <i class="fa-solid fa-rotate"></i> {{localize "FESP.Sheet.FaceAttrRecopy"}}
+          </button>
+        {{/if}}
+        <button type="button" class="fe-sp-btn" data-action="feAddFaceAttr">
+          <i class="fa-solid fa-plus"></i> {{localize "FESP.Sheet.FaceAttrAdd"}}
+        </button>
+      </span>
+    {{/if}}
+  </header>
+  {{#if fe.activeFace.linkedActorName}}
+    <p class="notes">{{localize "FESP.Sheet.FaceAttrLinkedNote" actor=fe.activeFace.linkedActorName}}</p>
+  {{else}}
+    <p class="notes">{{localize "FESP.Sheet.FaceAttrNoLink"}}</p>
+  {{/if}}
+
+  {{#if fe.activeFace.attrCount}}
+    <ol class="fe-sp-attr-rows">
+      {{#each fe.activeFace.commonAttrs as |fa|}}
+        <li class="fe-sp-attr-row fe-sp-face-attr-row">
+          <input type="text" class="fe-sp-attr-name fe-sp-face-attr-input" value="{{fa.name}}"
+                 data-face-index="{{../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="name"
+                 placeholder="{{localize "FESP.Sheet.CustomAttrNamePh"}}" {{#unless ../fe.editable}}disabled{{/unless}}>
+          <input type="text" class="fe-sp-attr-value fe-sp-face-attr-input" value="{{fa.value}}"
+                 data-face-index="{{../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="value"
+                 placeholder="{{localize "FESP.Sheet.CustomAttrValuePh"}}" {{#unless ../fe.editable}}disabled{{/unless}}>
+          <span class="fe-sp-attr-sep">/</span>
+          <input type="text" class="fe-sp-attr-max fe-sp-face-attr-input" value="{{fa.max}}"
+                 data-face-index="{{../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="max"
+                 placeholder="{{localize "FESP.Sheet.CustomAttrMaxPh"}}" {{#unless ../fe.editable}}disabled{{/unless}}>
+          {{#if fa.attr}}
+            <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="{{fa.attr}}"
+                  title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">{{fa.attr}}</code>
+          {{/if}}
+          {{#if ../fe.editable}}
+            <a data-action="feRemoveFaceAttr" data-face-index="{{../fe.activeFace.index}}" data-index="{{fa.index}}"
+               title="{{localize "FESP.Sheet.CustomAttrRemove"}}"><i class="fa-solid fa-trash"></i></a>
+          {{/if}}
+        </li>
+      {{/each}}
+    </ol>
+    {{#if fe.activeFace.otherAttrs.length}}
+      <details class="fe-sp-attr-other">
+        <summary>{{localize "FESP.Sheet.FaceAttrOther" n=fe.activeFace.otherAttrs.length}}</summary>
+        <ol class="fe-sp-attr-rows">
+          {{#each fe.activeFace.otherAttrs as |fa|}}
+            <li class="fe-sp-attr-row fe-sp-face-attr-row">
+              <input type="text" class="fe-sp-attr-name fe-sp-face-attr-input" value="{{fa.name}}"
+                     data-face-index="{{../../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="name"
+                     placeholder="{{localize "FESP.Sheet.CustomAttrNamePh"}}" {{#unless ../../fe.editable}}disabled{{/unless}}>
+              <input type="text" class="fe-sp-attr-value fe-sp-face-attr-input" value="{{fa.value}}"
+                     data-face-index="{{../../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="value"
+                     placeholder="{{localize "FESP.Sheet.CustomAttrValuePh"}}" {{#unless ../../fe.editable}}disabled{{/unless}}>
+              <span class="fe-sp-attr-sep">/</span>
+              <input type="text" class="fe-sp-attr-max fe-sp-face-attr-input" value="{{fa.max}}"
+                     data-face-index="{{../../fe.activeFace.index}}" data-attr-index="{{fa.index}}" data-field="max"
+                     placeholder="{{localize "FESP.Sheet.CustomAttrMaxPh"}}" {{#unless ../../fe.editable}}disabled{{/unless}}>
+              {{#if fa.attr}}
+                <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="{{fa.attr}}"
+                      title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">{{fa.attr}}</code>
+              {{/if}}
+              {{#if ../../fe.editable}}
+                <a data-action="feRemoveFaceAttr" data-face-index="{{../../fe.activeFace.index}}" data-index="{{fa.index}}"
+                   title="{{localize "FESP.Sheet.CustomAttrRemove"}}"><i class="fa-solid fa-trash"></i></a>
+              {{/if}}
+            </li>
+          {{/each}}
+        </ol>
+      </details>
+    {{/if}}
+  {{/if}}
+
+  <hr class="fe-sp-attr-divider">
+
   <div class="fe-sp-field fe-sp-field-checkbox">
     <label>
       <input type="checkbox" name="system.tokenize" {{checked fe.tokenize}} {{#unless fe.editable}}disabled{{/unless}}>

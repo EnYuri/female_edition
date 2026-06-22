@@ -1,0 +1,222 @@
+/* fe-combat-dock.css — native combat tracker dock (female_edition)
+ *
+ * Own DOM (#fe-combat-dock on <body>), unlayered. Two themes:
+ *   - default: dark translucent rounded panel
+ *   - body.fe-retro-theme: pixel font, accent hard border, no rounding
+ * Note: fe-dx3rd-compat.css (retro theme, layouts layer) globally strips
+ * text-shadow/box-shadow with !important, so retro readability rules here that
+ * must survive use !important too.
+ */
+
+#fe-combat-dock {
+  position: fixed;
+  top: 6px;
+  z-index: 70;             /* above canvas, below app windows/dialogs */
+  pointer-events: none;    /* only the inner panels capture clicks */
+  display: none;
+  --fe-cd-size: 90px;
+  --fe-cd-h: 90px;
+  --fe-cd-round: 8px;
+  font-family: var(--font-primary, sans-serif);
+  user-select: none;
+}
+
+/* horizontal alignment of the whole dock */
+#fe-combat-dock.fe-cd-align-center { left: 50%; transform: translateX(-50%); }
+#fe-combat-dock.fe-cd-align-left   { left: 8px; }
+#fe-combat-dock.fe-cd-align-right  { right: 8px; }
+#fe-combat-dock.fe-cd-align-left  .fe-cd-inner { align-items: flex-start; }
+#fe-combat-dock.fe-cd-align-right .fe-cd-inner { align-items: flex-end; }
+
+#fe-combat-dock.fe-cd-active { display: block; }
+
+#fe-combat-dock .fe-cd-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+#fe-combat-dock .fe-cd-combatants {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  max-width: 92vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* thin scrollbar for overflow when many combatants */
+#fe-combat-dock .fe-cd-combatants::-webkit-scrollbar { height: 6px; }
+#fe-combat-dock .fe-cd-combatants::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+
+.fe-cd-portrait {
+  position: relative;
+  width: var(--fe-cd-size);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.fe-cd-portrait .fe-cd-frame {
+  width: var(--fe-cd-size);
+  height: var(--fe-cd-h, var(--fe-cd-size));
+  border-radius: var(--fe-cd-round, 6px);
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.fe-cd-portrait .fe-cd-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.fe-cd-portrait.is-active {
+  transform: translateY(-4px) scale(1.06);
+  z-index: 1;
+}
+.fe-cd-portrait.is-active .fe-cd-frame {
+  border-color: var(--fe-dx3rd-accent, #ffd54a);
+  box-shadow: 0 0 10px var(--fe-dx3rd-accent, #ffd54a);
+}
+
+.fe-cd-portrait.is-defeated .fe-cd-frame img { filter: grayscale(1) brightness(0.5); }
+.fe-cd-portrait.is-hidden { opacity: 0.5; }
+
+.fe-cd-init {
+  position: absolute;
+  top: -5px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--fe-dx3rd-accent, #ffd54a);
+  color: #000;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.fe-cd-name {
+  max-width: var(--fe-cd-size);
+  margin-top: 2px;
+  font-size: 11px;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+}
+
+.fe-cd-hp {
+  width: var(--fe-cd-size);
+  height: 4px;
+  margin-top: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.fe-cd-hp-fill { height: 100%; transition: width 0.25s ease; }
+
+/* center control bar (GM) */
+.fe-cd-controlbar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 3px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+.fe-cd-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.fe-cd-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.fe-cd-btn.is-on { color: var(--fe-dx3rd-accent, #ffd54a); }
+
+.fe-cd-round {
+  color: #fff;
+  font-weight: bold;
+  min-width: 38px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.fe-cd-roundonly {
+  pointer-events: none;
+  color: #fff;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* ───────────────────────── retro / pixel theme ───────────────────────── */
+
+body.fe-retro-theme #fe-combat-dock {
+  font-family: var(--fe-font-primary, monospace);
+}
+body.fe-retro-theme #fe-combat-dock .fe-cd-combatants,
+body.fe-retro-theme #fe-combat-dock .fe-cd-controlbar {
+  background: #000;
+  border: 2px solid var(--fe-dx3rd-accent, #fff);
+  border-radius: 0;
+  box-shadow: none;
+}
+body.fe-retro-theme .fe-cd-portrait .fe-cd-frame {
+  border-radius: 0;
+  border-color: var(--fe-dx3rd-accent, #fff);
+}
+body.fe-retro-theme .fe-cd-portrait.is-active .fe-cd-frame {
+  box-shadow: none;
+  outline: 2px solid var(--fe-dx3rd-accent, #fff);
+  outline-offset: 1px;
+}
+body.fe-retro-theme .fe-cd-init,
+body.fe-retro-theme .fe-cd-btn,
+body.fe-retro-theme .fe-cd-roundonly,
+body.fe-retro-theme .fe-cd-hp { border-radius: 0; }
+
+body.fe-retro-theme .fe-cd-name {
+  /* survive §4's global text-shadow:none !important → hard pixel outline */
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+}

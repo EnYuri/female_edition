@@ -31,7 +31,7 @@ import {
   feMirrorGmPrioritySetting, feSyncLocalGmPrioritySettings,
   feRestoreLocalGmPrioritySettings,
   feSeedGmPriorityOverridesFromLocal, feIsGmPriorityEnabled,
-  feHydrateWorldSettings, feCaptureWorldSettings,
+  feHydrateWorldSettings, feCaptureWorldSettings, feIsPerWorldSettingKey,
   feFireChatUiUpdated, feSetting,
 } from "./fe-gm-priority.js";
 
@@ -735,12 +735,29 @@ Hooks.once("init", () => {
   });
 });
 
+// Persist any client-scope setting changed OUTSIDE the settings menu (e.g. the
+// chat-controls accent swatch, font toggle) into this world's per-world slice.
+// Otherwise feHydrateWorldSettings on the next load would re-apply the stale
+// slice value and silently revert the change. Debounced to coalesce bursts.
+let _feWorldCaptureTimer = null;
+function _feScheduleWorldCapture() {
+  if (_feWorldCaptureTimer) clearTimeout(_feWorldCaptureTimer);
+  _feWorldCaptureTimer = setTimeout(() => {
+    _feWorldCaptureTimer = null;
+    void feCaptureWorldSettings();
+  }, 400);
+}
+
 Hooks.on("clientSettingChanged", (fullKey, value) => {
   try {
     if (feSyncingLocalGmPrioritySettings) return;
     const keyPath = String(fullKey ?? "").trim();
     if (!keyPath.startsWith(`${MODULE_ID}.`)) return;
     const key = keyPath.slice(MODULE_ID.length + 1);
+    // Capture per-world for ALL client-scope keys (incl. GM-priority-excluded
+    // ones like fonts/export), not just GM-priority keys. feCaptureWorldSettings
+    // no-ops during hydration, so this never loops on its own FE_WORLD_SETTINGS_KEY write.
+    if (feIsPerWorldSettingKey(key)) _feScheduleWorldCapture();
     if (!feIsGmPrioritySettingKey(key)) return;
     if (game.user?.isGM) void feMirrorGmPrioritySetting(key, value);
     else if (feHasGmPriorityOverride(key)) {

@@ -3050,3 +3050,52 @@ body.fe-retro-theme .applied-effect-table th {
 body.fe-retro-theme #fe-typing-notify {
   color: var(--fe-ac-80) !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 40  마름모꼴 메인프로세스(이니셔티브 카운트) 알림 (#diamond-frame)
+ *
+ *  DX3rd combat.js 의 showTurnActor() 가 <style id="diamond-style"> 를
+ *  document.head 에 JS 주입한다. 그 규칙은 "언레이어드(레이어 없음) 일반
+ *  선언" 이라 우리의 layouts 레이어 일반 규칙을 이긴다(언레이어드 > 레이어드).
+ *  → 모두 !important 로 오버라이드한다(!important 는 레이어 무관하게 일반 선언을
+ *    이긴다).
+ *
+ *  (A) 모든 테마 공통 — 포트레이트 회색 빈영역 소거:
+ *      원본 #diamond-frame 은 radial-gradient(회색) 배경 + img{object-fit:contain}
+ *      이라 포트레이트가 정사각형이 아니거나 투명 PNG 면 빈자리/투명영역에 옅은
+ *      회색이 비친다. 배경을 투명으로 죽이고 cover 로 마름모를 가득 채워 빈영역
+ *      자체를 없앤다(머리 잘림 완화 위해 object-position: top center).
+ *
+ *  (B) 픽셀 테마(body.fe-retro-theme) 한정:
+ *      · 테두리 black → 액센트(흰색 기본)로 픽셀 다이아몬드 외곽선
+ *      · 라벨 폰트 sans-serif → 픽셀 폰트(--fe-font-primary)
+ *      · §4 가 text-shadow 를 전역 제거하므로 라벨 가독성용 하드 1px 검정
+ *        아웃라인(소프트 글로우 아님 — 픽셀 톤)으로 재공급
+ * ══════════════════════════════════════════════════════════════ */
+
+/* (A) 모든 테마 — 회색 빈영역 소거 */
+#diamond-frame {
+  background:       transparent !important;
+  background-image: none        !important;
+}
+#diamond-frame img {
+  object-fit:      cover !important;
+  object-position: top center !important;
+}
+
+/* (B) 픽셀 테마 — 액센트 외곽선 */
+body.fe-retro-theme #diamond-frame {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* (B) 픽셀 테마 — 라벨 폰트/색/하드 아웃라인 */
+body.fe-retro-theme :is(#diamond-label-left, #diamond-label-right) {
+  font-family: var(--fe-font-primary, monospace) !important;
+  color:       var(--fe-ac-90) !important;
+  text-shadow:
+     1px  1px 0 #000,
+    -1px  1px 0 #000,
+     1px -1px 0 #000,
+    -1px -1px 0 #000 !important;
+}

@@ -1,6 +1,0 @@
-Neo둥근모 및 Neo둥근모 Code
-https://github.com/neodgm/neodgm/blob/main/LICENSE.txt
-
-Neo둥근모 Pro
-https://github.com/neodgm/neodgm-pro/blob/main/LICENSE.txt
-

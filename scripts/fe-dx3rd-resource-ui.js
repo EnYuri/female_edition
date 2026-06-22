@@ -12,7 +12,7 @@
 //   · 두 컨테이너 모두 드래그로 이동 가능 (위치 localStorage 저장)
 
 import { MODULE_ID, S } from "./fe-constants.js";
-import { feSetting } from "./fe-gm-priority.js";
+import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 
 // hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0.
@@ -549,9 +549,24 @@ function _getAccent() {
   catch { return "#ffffff"; }
 }
 
-function _setAccent(color) {
+async function _setAccent(color) {
   document.documentElement.style.setProperty("--fe-dx3rd-accent", color);
-  try { game.settings.set(MODULE_ID, S.DX3RD_PIXEL_ACCENT, color); } catch {}
+  try {
+    await game.settings.set(MODULE_ID, S.DX3RD_PIXEL_ACCENT, color);
+    // GM priority override store is world-scope; the setting's onChange mirrors it
+    // but does NOT await the server round-trip, so a quick refresh can leave the
+    // override (which feSetting → feApplyStyleVarsFromSettings reads while priority
+    // is ON) holding the OLD color → theme stays old while the button shows new.
+    // Await it here so the override is persisted before any refresh.
+    await feMirrorGmPrioritySetting(S.DX3RD_PIXEL_ACCENT, color);
+    // Persist into this world's per-world slice IMMEDIATELY. Otherwise
+    // feHydrateWorldSettings on the next load re-applies the stale slice value
+    // and reverts the color. (The clientSettingChanged hook also captures this,
+    // but await-ing here guarantees it before any quick refresh.)
+    await feCaptureWorldSettings();
+  } catch (err) {
+    console.warn(`[${MODULE_ID}] failed to persist accent color`, err);
+  }
 }
 
 function _injectAccentBtn() {

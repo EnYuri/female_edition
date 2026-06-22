@@ -1,10 +1,12 @@
-# female_edition
+# Female_edition_by_Female-cupwhi
 
-이거 완전 AI로 만든 모독적인 모듈! 불만있어요? 불만있어!? 그럼 내릴게요...끼잉..
+
 
 ## Font Licenses
 
-This module includes the following fonts:
+This module bundles the following fonts. Full license texts are
+consolidated in [`font/LICENSES.txt`](font/LICENSES.txt).
 
-- CookieRun Font (© Devsisters) – used under its official license.
-- Dongle Font – licensed under the SIL Open Font License 1.1.
+- **CookieRun** (© Devsisters Corp.) – used under the official CookieRun Font License.
+- **학교안심 그림일기체** (© 서울특별시교육청) – free font, redistributed under its free-use terms.
+- **Neo둥근모** / **Neo둥근모 Pro** (© Eunbin Jeong / Dalgona.) – SIL Open Font License 1.1.

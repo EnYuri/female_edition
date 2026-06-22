@@ -31,6 +31,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       feEditOverlay: ScreenPanelSheet.#onEditOverlay,
       feAddCustomAttr: ScreenPanelSheet.#onAddCustomAttr,
       feRemoveCustomAttr: ScreenPanelSheet.#onRemoveCustomAttr,
+      feAddFaceAttr: ScreenPanelSheet.#onAddFaceAttr,
+      feRemoveFaceAttr: ScreenPanelSheet.#onRemoveFaceAttr,
+      feRecopyFaceAttrs: ScreenPanelSheet.#onRecopyFaceAttrs,
       feClearFaceLinkedActor: ScreenPanelSheet.#onClearFaceLinkedActor,
       feCopyAttrPath: ScreenPanelSheet.#onCopyAttrPath,
       feSwitchFace: ScreenPanelSheet.#onSwitchFace,
@@ -54,12 +57,34 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     },
   };
 
-  /** @override — keep only prototype-token (when tokenize is on); drop portrait/token artwork */
+  /**
+   * @override — drop portrait/token artwork AND the prototype-token entry from
+   * the controls dropdown. Prototype token is instead surfaced as an always-
+   * visible frame header button (see _getFrameButtons) so it is never buried.
+   */
   _getHeaderControls() {
     const controls = super._getHeaderControls();
-    const drop = new Set(["configureToken", "showPortraitArtwork", "showTokenArtwork"]);
-    if (!this.document.system?.tokenize) drop.add("configurePrototypeToken");
+    const drop = new Set(["configureToken", "showPortraitArtwork", "showTokenArtwork", "configurePrototypeToken"]);
     return controls.filter(c => !drop.has(c.action));
+  }
+
+  /**
+   * @override — surface the prototype-token config as an ALWAYS-VISIBLE button
+   * directly in the window header (not inside the `⋮` controls dropdown, and
+   * regardless of the `tokenize` setting). The `configurePrototypeToken` action
+   * is inherited from ActorSheetV2's actions map, so the frame button's
+   * data-action dispatches to it automatically.
+   */
+  _getFrameButtons(options) {
+    const buttons = super._getFrameButtons?.(options) ?? [];
+    if (this.isEditable && !this.document.isToken) {
+      buttons.unshift({
+        action: "configurePrototypeToken",
+        icon: "fa-solid fa-circle-user",
+        label: "TOKEN.TitlePrototype",
+      });
+    }
+    return buttons;
   }
 
   // { faceIndex, overlayIndex } of the overlay awaiting a click-to-place on its
@@ -106,6 +131,70 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return feSortAttrItems(out);
   }
 
+  /**
+   * System-agnostic snapshot of a linked actor's trackable attributes, for the
+   * per-face copied-attribute store. Uses core's `TokenDocument.getTrackedAttributes`
+   * (the same inference the combat-tracker bar dropdown uses) so it works on
+   * dnd5e (schema-based), double-cross-3rd (object-based), and any other system.
+   * Returns `[{name, value, max, attr}]`; `attr` is the live source dot-path.
+   */
+  #extractCopiedAttributes(actor) {
+    if (!actor?.system) return [];
+    const TokenDoc = foundry.documents?.TokenDocument ?? CONFIG?.Token?.documentClass;
+    let tracked;
+    try { tracked = TokenDoc.getTrackedAttributes(actor.system); } catch { return []; }
+    if (!tracked) return [];
+    // path segments whose own name is uninformative — fold into the parent key.
+    const GENERIC = new Set(["value", "max", "min", "total", "point", "bonus", "extra", "dice", "add", "mod", "base"]);
+    const nameFor = (pathArr, isBar) => {
+      const last = pathArr[pathArr.length - 1];
+      if (isBar) return last;                                  // bar path points at the {value,max} object
+      if ((last === "value" || last === "total") && pathArr.length >= 2) return pathArr[pathArr.length - 2];
+      if (GENERIC.has(last) && pathArr.length >= 2) return `${pathArr[pathArr.length - 2]}.${last}`;
+      return last;
+    };
+    const out = [];
+    const seen = new Set();
+    const push = (pathArr, isBar) => {
+      const path = pathArr.join(".");
+      if (seen.has(path)) return;
+      let value = "", max = "";
+      try {
+        const v = foundry.utils.getProperty(actor.system, path);
+        if (isBar) {
+          if (!v || typeof v !== "object") return;
+          if (v.value === undefined || v.value === null) return;
+          value = v.value; max = v.max ?? "";
+        } else {
+          if (v === undefined || v === null || typeof v === "object") return;
+          value = v;
+        }
+      } catch { return; }
+      seen.add(path);
+      out.push({
+        name: nameFor(pathArr, isBar),
+        value: String(value),
+        max: max === "" ? "" : String(max),
+        attr: isBar ? `system.${path}.value` : `system.${path}`,
+      });
+    };
+    for (const p of tracked.bar ?? []) push(p, true);
+    for (const p of tracked.value ?? []) push(p, false);
+    return out;
+  }
+
+  /** Split copied face attributes into common (surfaced) vs other (collapsed), preserving real index. */
+  #splitFaceAttrs(attributes) {
+    const common = new Set(FE_PANEL_COMMON_ATTR_NAMES.map(n => n.toLowerCase()));
+    const rows = (attributes ?? []).map((a, index) => ({
+      index, name: a.name ?? "", value: a.value ?? "", max: a.max ?? "", attr: a.attr ?? "",
+    }));
+    return {
+      common: feSortAttrItems(rows.filter(r => common.has((r.name ?? "").toLowerCase().split(".")[0]))),
+      other: rows.filter(r => !common.has((r.name ?? "").toLowerCase().split(".")[0])),
+    };
+  }
+
   /** @override */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -128,6 +217,12 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         linkedActorImg: faceActor?.img ?? "",
         linkMode: face.linkMode ?? "copy",
         attrs: this.#extractActorAttributes(faceActor),
+        // Copied per-face attributes — rendered as hidden inputs in the faces
+        // template so the faces-array auto-submit stays COMPLETE (otherwise the
+        // attributes sub-array resets to [] on any face edit; see ArrayField rule).
+        attributes: (face.attributes ?? []).map((a, ai) => ({
+          index: ai, name: a.name ?? "", value: a.value ?? "", max: a.max ?? "", attr: a.attr ?? "",
+        })),
         overlays: (face.overlays ?? []).map((ov, oi) => {
           const linkedActorUuid = ov.linkedActorUuid ?? "";
           let linkedActor = null;
@@ -161,6 +256,18 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const customAttributes = feSortAttrItems(
       (sys.customAttributes ?? []).map((ca, i) => ({ index: i, name: ca.name ?? "", value: ca.value ?? "", max: ca.max ?? "" }))
     );
+    const activeRaw = (sys.faces ?? [])[this.#activeFaceIndex];
+    const activeSplit = this.#splitFaceAttrs(activeRaw?.attributes);
+    const activeFace = {
+      index: this.#activeFaceIndex,
+      name: activeRaw?.name ?? "",
+      num: this.#activeFaceIndex + 1,
+      hasFace: !!activeRaw,
+      linkedActorName: faces[this.#activeFaceIndex]?.linkedActorName ?? "",
+      commonAttrs: activeSplit.common,
+      otherAttrs: activeSplit.other,
+      attrCount: (activeRaw?.attributes ?? []).length,
+    };
     context.fe = {
       faces,
       defaultFace: sys.defaultFace ?? 0,
@@ -170,7 +277,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       editable: this.isEditable,
       faceCount: faces.length,
       customAttributes,
+      activeFace,
       tokenize: sys.tokenize ?? false,
+      actorName: this.document.name ?? "",
     };
     return context;
   }
@@ -267,6 +376,20 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (!this.isEditable) return;
     const root = this.element;
 
+    // Panel name = the Actor's own `name`. Deliberately NOT a `name="name"` form
+    // field: an <input> named "name" shadows HTMLFormElement.prototype.name, and
+    // the value did not persist reliably through the multi-part submitOnChange
+    // pipeline. Commit it explicitly (capture + stopPropagation so it doesn't
+    // also race the form auto-submit), mirroring the face-attr inputs below.
+    const nameInput = root.querySelector(".fe-sp-name-input");
+    if (nameInput) {
+      nameInput.addEventListener("change", (event) => {
+        event.stopPropagation();
+        const value = nameInput.value.trim();
+        if (value && value !== this.document.name) this.document.update({ name: value });
+      }, { capture: true });
+    }
+
     // Click-to-place: while an overlay is "armed" (picking), clicking its own
     // face's preview image commits the click position as that overlay's x/y.
     for (const preview of root.querySelectorAll(".fe-sp-overlay-preview")) {
@@ -347,6 +470,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         let data;
         try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
         if (data?.type !== "Actor" || !data.uuid) return;
+        this.#activeFaceIndex = faceIndex; // so the Attributes tab reflects the just-linked face
         await this.#updateFaceLinkedActor(faceIndex, data.uuid);
       });
     }
@@ -368,6 +492,23 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         await this.#pickActorImageForFace(faceIndex, actor);
       });
     }
+
+    // Per-face attribute inline edits. These inputs carry NO `name` (so they
+    // are invisible to the auto-submit FormDataExtended pass) — each commits via
+    // the full-array-clone #updateFaceAttr on change, per the ArrayField rule.
+    for (const input of root.querySelectorAll(".fe-sp-face-attr-input")) {
+      // Capture + stopPropagation so this edit is committed ONLY by #updateFaceAttr
+      // (full-array-clone) and does NOT also trigger the form's submitOnChange,
+      // which would race against it using the faces tab's stale hidden inputs.
+      input.addEventListener("change", (event) => {
+        event.stopPropagation();
+        const fi = Number(input.dataset.faceIndex);
+        const ai = Number(input.dataset.attrIndex);
+        const field = input.dataset.field;
+        if (!Number.isInteger(fi) || !Number.isInteger(ai) || !field) return;
+        this.#updateFaceAttr(fi, ai, { [field]: input.value });
+      }, { capture: true });
+    }
   }
 
   /** Rebuild + persist the faces array (preserves all current input edits via re-render). */
@@ -384,13 +525,42 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const face = faces[faceIndex];
     if (!face) return;
     face.linkedActorUuid = uuid;
-    if (face.linkMode === "linked" && uuid) {
-      try {
-        const linked = await fromUuid(uuid);
-        const img = linked?.img || linked?.prototypeToken?.texture?.src || "";
-        if (img) face.img = img;
-      } catch { /* stale uuid */ }
+    if (uuid) {
+      let linked = null;
+      try { linked = await fromUuid(uuid); } catch { /* stale uuid */ }
+      if (linked) {
+        if (face.linkMode === "linked") {
+          const img = linked.img || linked.prototypeToken?.texture?.src || "";
+          if (img) face.img = img;
+        }
+        // Auto-copy the linked actor's trackable attributes onto THIS face.
+        face.attributes = this.#extractCopiedAttributes(linked);
+      }
+    } else {
+      // Unlinking clears the face's copied attributes (avoid stale values).
+      face.attributes = [];
     }
+    await this.#updateFaces(faces);
+  }
+
+  /** Re-snapshot the active face's copied attributes from its current linked actor. */
+  async #recopyFaceAttrs(faceIndex) {
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const face = faces[faceIndex];
+    if (!face?.linkedActorUuid) return;
+    let linked = null;
+    try { linked = await fromUuid(face.linkedActorUuid); } catch { /* stale uuid */ }
+    if (!linked) return;
+    face.attributes = this.#extractCopiedAttributes(linked);
+    await this.#updateFaces(faces);
+  }
+
+  /** Persist one face-attribute field edit (full-array-clone — never a narrow dot-path). */
+  async #updateFaceAttr(faceIndex, attrIndex, patch) {
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const attr = faces[faceIndex]?.attributes?.[attrIndex];
+    if (!attr) return;
+    Object.assign(attr, patch);
     await this.#updateFaces(faces);
   }
 
@@ -602,6 +772,29 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (!Number.isInteger(i) || i < 0 || i >= items.length) return;
     items.splice(i, 1);
     await this.#updateCustomAttributes(items);
+  }
+
+  static async #onAddFaceAttr() {
+    const fi = this.#activeFaceIndex;
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    if (!faces[fi]) return;
+    faces[fi].attributes ??= [];
+    faces[fi].attributes.push({ name: "", value: "", max: "", attr: "" });
+    await this.#updateFaces(faces);
+  }
+
+  static async #onRemoveFaceAttr(event, target) {
+    const fi = Number(target.dataset.faceIndex);
+    const i = Number(target.dataset.index);
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const attrs = faces[fi]?.attributes;
+    if (!attrs || i < 0 || i >= attrs.length) return;
+    attrs.splice(i, 1);
+    await this.#updateFaces(faces);
+  }
+
+  static async #onRecopyFaceAttrs() {
+    await this.#recopyFaceAttrs(this.#activeFaceIndex);
   }
 
   static async #onClearFaceLinkedActor(event, target) {

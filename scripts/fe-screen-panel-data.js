@@ -40,7 +40,12 @@ const FE_PANEL_DEFAULT_SIZE = 400;
 // and any reference actor's real attributes): these common names first, in this
 // order, then everything else alphabetically. Purely a display concern — storage
 // order is untouched.
-const FE_PANEL_COMMON_ATTR_NAMES = ["hp", "ac", "str", "dex", "con", "int", "wis", "cha"];
+const FE_PANEL_COMMON_ATTR_NAMES = [
+  // dnd5e
+  "hp", "ac", "str", "dex", "con", "int", "wis", "cha",
+  // double-cross-3rd (침식률 + 능력치 body/sense/mind/social)
+  "encroachment", "body", "sense", "mind", "social",
+];
 
 /**
  * Sort `{name, ...}` items for display: FE_PANEL_COMMON_ATTR_NAMES (case-insensitive)
@@ -72,6 +77,20 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
           description: new f.HTMLField({ required: false, blank: true }),
           linkedActorUuid: new f.StringField({ required: false, blank: true, initial: "" }),
           linkMode: new f.StringField({ required: true, blank: false, initial: "copy", choices: ["copy", "linked"] }),
+          // Per-face attributes copied from this face's linked actor, snapshot
+          // on link (system-agnostic — see ScreenPanelSheet#extractCopiedAttributes).
+          // Kept PER-FACE so different faces linking different actors retain
+          // independent attribute sets (no cross-face dedup/overwrite). `attr`
+          // records the source dot-path so an overlay can read the live value.
+          attributes: new f.ArrayField(
+            new f.SchemaField({
+              name: new f.StringField({ required: true, blank: true, initial: "" }),
+              value: new f.StringField({ required: false, blank: true, initial: "" }),
+              max: new f.StringField({ required: false, blank: true, initial: "" }),
+              attr: new f.StringField({ required: false, blank: true, initial: "" }),
+            }),
+            { required: true, initial: [] }
+          ),
           overlays: new f.ArrayField(
             new f.SchemaField({
               x: new f.NumberField({ required: true, min: 0, max: 1, initial: 0.5, nullable: false }),

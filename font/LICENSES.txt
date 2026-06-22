@@ -1,14 +1,73 @@
-Copyright (c) 2022, Eunbin Jeong (Dalgona.) <project-neodgm@dalgona.dev>,
-with Reserved Font Name NeoDunggeunmo Pro.
+========================================================================
+ Female Edition — Bundled Font Licenses
+========================================================================
 
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-http://scripts.sil.org/OFL
+This module redistributes the following third-party fonts. Each is used
+in compliance with its original license. This single file consolidates
+all bundled-font license notices.
+
+  Font                          Files                                License
+  ----------------------------  -----------------------------------  ----------------------
+  CookieRun (Black/Bold/Reg.)   CookieRun *.otf / *.ttf              CookieRun Font License
+  학교안심 그림일기체          HakgyoansimGeurimilgi-R.ttf          Free font (see below)
+  Neo둥근모                     neodgm.ttf                           SIL OFL 1.1
+  Neo둥근모 Pro                 NeoDunggeunmoPro-Regular.ttf         SIL OFL 1.1
 
 
------------------------------------------------------------
+========================================================================
+ 1. CookieRun Font
+========================================================================
+
+CookieRun Font © Devsisters Corp. All rights reserved by the original
+copyright holder.
+
+This module includes the CookieRun font family, redistributed together
+with this project in compliance with the official CookieRun Font License.
+The font may be used for personal and commercial purposes in accordance
+with the terms specified by Devsisters Corp. The font files are not sold
+separately.
+
+Full and official license text:
+  https://www.cookierunfont.com/
+
+
+========================================================================
+ 2. 학교안심 그림일기체 (Hakgyoansim Geurimilgi)
+========================================================================
+
+학교안심 그림일기체 © 서울특별시교육청 (Seoul Metropolitan Office of
+Education).
+
+A free font distributed by 서울특별시교육청 as part of the 학교안심
+글꼴 family. Free to use for personal and commercial purposes; the font
+may be bundled and redistributed but must not be sold by itself.
+
+Source / official distribution:
+  서울특별시교육청 학교안심 글꼴
+  https://hakdadi.sen.go.kr (학교안심 / 학다디)
+
+
+========================================================================
+ 3. Neo둥근모 & Neo둥근모 Pro — SIL Open Font License 1.1
+========================================================================
+
+The following copyright notices apply to the fonts in this section. The
+full SIL Open Font License 1.1 text below covers both.
+
+Copyright (c) 2017-2021, Eunbin Jeong (Dalgona.)
+  <project-neodgm@dalgona.dev>
+  with Reserved Font Name "Neo둥근모", "Neo둥근모 Code",
+  "NeoDunggeunmo", and "NeoDunggeunmo Code".
+  https://github.com/neodgm/neodgm
+
+Copyright (c) 2022, Eunbin Jeong (Dalgona.)
+  <project-neodgm@dalgona.dev>
+  with Reserved Font Name "NeoDunggeunmo Pro".
+  https://github.com/neodgm/neodgm-pro
+
+------------------------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
------------------------------------------------------------
+------------------------------------------------------------------------
 
 PREAMBLE
 The goals of the Open Font License (OFL) are to stimulate worldwide

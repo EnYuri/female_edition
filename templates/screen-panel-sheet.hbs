@@ -1,5 +1,9 @@
 <div class="tab fe-sp-sheet{{#if tab.active}} active{{/if}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
   <section class="fe-sp-settings">
+    <div class="fe-sp-field fe-sp-field-name">
+      <label>{{localize "FESP.Sheet.PanelName"}}</label>
+      <input type="text" class="fe-sp-name-input" value="{{fe.actorName}}" placeholder="{{localize "FESP.Sheet.PanelNamePh"}}" {{#unless fe.editable}}disabled{{/unless}}>
+    </div>
     <div class="fe-sp-field">
       <label>{{localize "FESP.Sheet.DefaultFace"}}</label>
       <select name="system.defaultFace" {{#unless fe.editable}}disabled{{/unless}}>
@@ -68,6 +72,13 @@
                     placeholder="{{localize "FESP.Sheet.DescPh"}}"
                     {{#unless ../fe.editable}}disabled{{/unless}}>{{face.description}}</textarea>
           <input type="hidden" name="system.faces.{{face.index}}.linkedActorUuid" value="{{face.linkedActorUuid}}">
+          {{!-- Copied per-face attributes: hidden inputs keep the faces-array auto-submit complete (edited live in the Attributes tab). --}}
+          {{#each face.attributes as |fa|}}
+            <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.name" value="{{fa.name}}">
+            <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.value" value="{{fa.value}}">
+            <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.max" value="{{fa.max}}">
+            <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.attr" value="{{fa.attr}}">
+          {{/each}}
 
           {{!-- Per-face linked actor + link mode --}}
           <div class="fe-sp-face-actor-section">
@@ -79,11 +90,16 @@
                 {{#if face.linkedActorName}}<img src="{{face.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-user-plus"></i>{{/if}}
               </span>
               {{#if face.linkedActorName}}
-                <span class="fe-sp-face-actor-name">{{face.linkedActorName}}</span>
-                <select name="system.faces.{{face.index}}.linkMode" {{#unless ../fe.editable}}disabled{{/unless}}>
-                  <option value="copy" {{#if (eq face.linkMode "copy")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeCopy"}}</option>
-                  <option value="linked" {{#if (eq face.linkMode "linked")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeLinked"}}</option>
-                </select>
+                <div class="fe-sp-face-actor-info">
+                  <span class="fe-sp-face-actor-name">{{face.linkedActorName}}</span>
+                  <select name="system.faces.{{face.index}}.linkMode" {{#unless ../fe.editable}}disabled{{/unless}}>
+                    <option value="copy" {{#if (eq face.linkMode "copy")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeCopy"}}</option>
+                    <option value="linked" {{#if (eq face.linkMode "linked")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeLinked"}}</option>
+                  </select>
+                  <span class="fe-sp-face-actor-clear-hint notes">{{localize "FESP.Sheet.FaceActorClear"}}</span>
+                </div>
+              {{else}}
+                <span class="fe-sp-face-actor-drophint">{{localize "FESP.Sheet.FaceActorDropHintBig"}}</span>
               {{/if}}
             </div>
             {{#if face.attrs.length}}

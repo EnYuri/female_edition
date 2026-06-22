@@ -93,11 +93,34 @@ async function feSetGmPriorityOverrides(partial = {}) {
   }
 }
 
+// Drop a single key from the per-client backup store. Returns true if removed.
+// The backup key itself is excluded from both mirror and per-world capture, so
+// this write triggers no further sync/capture churn (no re-entrancy wrap needed,
+// mirroring how feSyncLocalGmPrioritySettings writes the backup outside the flag).
+async function feClearGmPriorityBackupKey(key) {
+  try {
+    const backup = feGetGmPriorityBackup();
+    if (!feHasOwn(backup, key)) return false;
+    const next = foundry.utils.deepClone(backup);
+    delete next[key];
+    await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, next);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function feMirrorGmPrioritySetting(key, value) {
   try {
     if (!game.user?.isGM) return false;
     if (!feIsGmPriorityEnabled()) return false;
     if (!feIsGmPrioritySettingKey(key)) return false;
+    // A deliberate GM change makes any pre-force backup of this key obsolete: the
+    // GM's own preference IS now `value`. A stale backup would (1) poison
+    // feSnapshotPerWorldSettings (it records the backup over the current value, so
+    // the change never reaches the per-world slice and reverts on reload) and
+    // (2) make restore-on-disable revert to the old value. So drop it first.
+    await feClearGmPriorityBackupKey(key);
     return await feSetGmPriorityOverrides({ [key]: value });
   } catch {
     return false;

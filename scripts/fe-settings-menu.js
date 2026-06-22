@@ -138,6 +138,11 @@ const CHOICES = {
   },
   // narrator command permission (USER_ROLES)
   narratorRole: { 0: "없음", 1: "플레이어", 2: "신뢰 플레이어", 3: "어시스턴트 GM", 4: "게임마스터" },
+  // combat dock
+  combatDockAspect:    { "1": "정사각형", "1.5": "세로형", "2": "긴 세로형" },
+  combatDockRoundness: { "0": "각짐", "8": "약간 둥글게", "16": "둥글게" },
+  combatDockAlignment: { left: "왼쪽", center: "가운데", right: "오른쪽" },
+  combatDockImage:     { actor: "액터 이미지", token: "토큰 이미지" },
 };
 
 // ── Helpers ──
@@ -313,6 +318,18 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // Attribute name helper (client/personal — hover + hold X → show attribute name)
       [S.ATTR_PATH_HELPER]: feRead(S.ATTR_PATH_HELPER),
       [S.ATTR_PATH_HELPER_SOURCE]: feRead(S.ATTR_PATH_HELPER_SOURCE),
+
+      // Combat Dock (world/GM: enabled + hide-defeated; client: the rest)
+      [S.COMBAT_DOCK_ENABLED]:         feRead(S.COMBAT_DOCK_ENABLED),
+      [S.COMBAT_DOCK_HIDE_DEFEATED]:   feRead(S.COMBAT_DOCK_HIDE_DEFEATED),
+      [S.COMBAT_DOCK_PORTRAIT_SIZE]:   feRead(S.COMBAT_DOCK_PORTRAIT_SIZE),
+      [S.COMBAT_DOCK_ASPECT]:          feRead(S.COMBAT_DOCK_ASPECT),
+      [S.COMBAT_DOCK_ROUNDNESS]:       feRead(S.COMBAT_DOCK_ROUNDNESS),
+      [S.COMBAT_DOCK_ALIGNMENT]:       feRead(S.COMBAT_DOCK_ALIGNMENT),
+      [S.COMBAT_DOCK_PORTRAIT_IMAGE]:  feRead(S.COMBAT_DOCK_PORTRAIT_IMAGE),
+      [S.COMBAT_DOCK_SHOW_INITIATIVE]: feRead(S.COMBAT_DOCK_SHOW_INITIATIVE),
+      [S.COMBAT_DOCK_SHOW_DISPOSITION]:feRead(S.COMBAT_DOCK_SHOW_DISPOSITION),
+      [S.COMBAT_DOCK_SHOW_HP]:         feRead(S.COMBAT_DOCK_SHOW_HP),
 
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
@@ -529,6 +546,17 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Attribute name helper — client/personal (always saved for every user)
         bool(S.ATTR_PATH_HELPER),
         bool(S.ATTR_PATH_HELPER_SOURCE),
+
+        // Combat Dock — world/GM (enabled[requiresReload] + hide-defeated) gated;
+        // client display prefs always saved (GM-priority forces them automatically).
+        ...(game.user?.isGM ? [
+          bool(S.COMBAT_DOCK_ENABLED), bool(S.COMBAT_DOCK_HIDE_DEFEATED),
+        ] : []),
+        num(S.COMBAT_DOCK_PORTRAIT_SIZE),
+        str(S.COMBAT_DOCK_ASPECT), str(S.COMBAT_DOCK_ROUNDNESS),
+        str(S.COMBAT_DOCK_ALIGNMENT), str(S.COMBAT_DOCK_PORTRAIT_IMAGE),
+        bool(S.COMBAT_DOCK_SHOW_INITIATIVE), bool(S.COMBAT_DOCK_SHOW_DISPOSITION),
+        bool(S.COMBAT_DOCK_SHOW_HP),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),
