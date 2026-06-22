@@ -19,7 +19,6 @@ const FE_CTRL_TARGETS = [
   ".control-buttons",
   "#ci-upload-image",
   ".fe-export-pdf",
-  "#fe-dx3rd-rui-toggle-btn",
   // #fe-dx3rd-accent-btn is intentionally excluded — it stays permanently visible
   // outside the panel, directly in #chat-controls.
 ];

@@ -138,11 +138,11 @@ const CHOICES = {
   },
   // narrator command permission (USER_ROLES)
   narratorRole: { 0: "없음", 1: "플레이어", 2: "신뢰 플레이어", 3: "어시스턴트 GM", 4: "게임마스터" },
-  // combat dock
-  combatDockAspect:    { "1": "정사각형", "1.5": "세로형", "2": "긴 세로형" },
-  combatDockRoundness: { "0": "각짐", "8": "약간 둥글게", "16": "둥글게" },
-  combatDockAlignment: { left: "왼쪽", center: "가운데", right: "오른쪽" },
-  combatDockImage:     { actor: "액터 이미지", token: "토큰 이미지" },
+  // combat tracker
+  combatTrackerAspect:    { "1": "정사각형", "1.5": "세로형", "2": "긴 세로형" },
+  combatTrackerRoundness: { "0": "각짐", "8": "약간 둥글게", "16": "둥글게" },
+  combatTrackerAlignment: { left: "왼쪽", center: "가운데", right: "오른쪽" },
+  combatTrackerImage:     { actor: "액터 이미지", token: "토큰 이미지" },
 };
 
 // ── Helpers ──
@@ -319,17 +319,24 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.ATTR_PATH_HELPER]: feRead(S.ATTR_PATH_HELPER),
       [S.ATTR_PATH_HELPER_SOURCE]: feRead(S.ATTR_PATH_HELPER_SOURCE),
 
-      // Combat Dock (world/GM: enabled + hide-defeated; client: the rest)
-      [S.COMBAT_DOCK_ENABLED]:         feRead(S.COMBAT_DOCK_ENABLED),
-      [S.COMBAT_DOCK_HIDE_DEFEATED]:   feRead(S.COMBAT_DOCK_HIDE_DEFEATED),
-      [S.COMBAT_DOCK_PORTRAIT_SIZE]:   feRead(S.COMBAT_DOCK_PORTRAIT_SIZE),
-      [S.COMBAT_DOCK_ASPECT]:          feRead(S.COMBAT_DOCK_ASPECT),
-      [S.COMBAT_DOCK_ROUNDNESS]:       feRead(S.COMBAT_DOCK_ROUNDNESS),
-      [S.COMBAT_DOCK_ALIGNMENT]:       feRead(S.COMBAT_DOCK_ALIGNMENT),
-      [S.COMBAT_DOCK_PORTRAIT_IMAGE]:  feRead(S.COMBAT_DOCK_PORTRAIT_IMAGE),
-      [S.COMBAT_DOCK_SHOW_INITIATIVE]: feRead(S.COMBAT_DOCK_SHOW_INITIATIVE),
-      [S.COMBAT_DOCK_SHOW_DISPOSITION]:feRead(S.COMBAT_DOCK_SHOW_DISPOSITION),
-      [S.COMBAT_DOCK_SHOW_HP]:         feRead(S.COMBAT_DOCK_SHOW_HP),
+      // Combat Tracker (world/GM: enabled + hide-defeated; client: the rest)
+      [S.COMBAT_TRACKER_ENABLED]:         feRead(S.COMBAT_TRACKER_ENABLED),
+      [S.COMBAT_TRACKER_HIDE_DEFEATED]:   feRead(S.COMBAT_TRACKER_HIDE_DEFEATED),
+      [S.COMBAT_TRACKER_PORTRAIT_SIZE]:   feRead(S.COMBAT_TRACKER_PORTRAIT_SIZE),
+      [S.COMBAT_TRACKER_ASPECT]:          feRead(S.COMBAT_TRACKER_ASPECT),
+      [S.COMBAT_TRACKER_ROUNDNESS]:       feRead(S.COMBAT_TRACKER_ROUNDNESS),
+      [S.COMBAT_TRACKER_ALIGNMENT]:       feRead(S.COMBAT_TRACKER_ALIGNMENT),
+      [S.COMBAT_TRACKER_PORTRAIT_IMAGE]:  feRead(S.COMBAT_TRACKER_PORTRAIT_IMAGE),
+      [S.COMBAT_TRACKER_SHOW_INITIATIVE]: feRead(S.COMBAT_TRACKER_SHOW_INITIATIVE),
+      [S.COMBAT_TRACKER_SHOW_DISPOSITION]:feRead(S.COMBAT_TRACKER_SHOW_DISPOSITION),
+      [S.COMBAT_TRACKER_SHOW_HP]:         feRead(S.COMBAT_TRACKER_SHOW_HP),
+
+      // Token selection glow
+      [S.TOKEN_GLOW_ENABLED]:   feRead(S.TOKEN_GLOW_ENABLED),
+      [S.TOKEN_GLOW_HOVER]:     feRead(S.TOKEN_GLOW_HOVER),
+      [S.TOKEN_GLOW_STRENGTH]:  feRead(S.TOKEN_GLOW_STRENGTH),
+      [S.TOKEN_GLOW_TARGET]:    feRead(S.TOKEN_GLOW_TARGET),
+      [S.TOKEN_GLOW_SIGHTLINE]: feRead(S.TOKEN_GLOW_SIGHTLINE),
 
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
@@ -338,6 +345,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.DX3RD_CARD_BORDER_ALPHA]:  feRead(S.DX3RD_CARD_BORDER_ALPHA),
       // Status UI (dx3rd + dnd5e)
       [S.DX3RD_RUI_ENABLED]:        feRead(S.DX3RD_RUI_ENABLED),
+      [S.DX3RD_RUI_VISIBLE]:        feRead(S.DX3RD_RUI_VISIBLE),
       [S.DX3RD_RUI_PORTRAIT_WIDTH]: feRead(S.DX3RD_RUI_PORTRAIT_WIDTH),
       [S.DX3RD_RUI_PANEL_WIDTH]:    feRead(S.DX3RD_RUI_PANEL_WIDTH),
       [S.DX3RD_RUI_CARD_HEIGHT]:    feRead(S.DX3RD_RUI_CARD_HEIGHT),
@@ -387,7 +395,11 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         form.setAttribute("autocomplete", "off");
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
-          const formData = new FormDataExtended(form);
+          // Prefer the namespaced class (avoids v14's once-per-session deprecation
+          // warning on the bare global); fall back to the bare global so any v13.x
+          // without the ux namespace still works. Same pattern as FilePicker resolution.
+          const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
+          const formData = new FDE(form);
           await FemaleEditionSettingsMenu.#onSubmit.call(this, e, form, formData);
           await this.close();
         });
@@ -438,7 +450,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     event.preventDefault();
     const form = this.element?.querySelector?.("form");
     if (!form) return;
-    const formData = new FormDataExtended(form);
+    const FDE = foundry.applications.ux?.FormDataExtended ?? FormDataExtended;
+    const formData = new FDE(form);
     await FemaleEditionSettingsMenu.#onSubmit.call(this, event, form, formData);
     await this.close();
   }
@@ -507,7 +520,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Status UI (dx3rd + dnd5e) — only when its fields are shown (ruiSupported),
         // else d[key] would be undefined and overwrite existing preferences.
         ...((feIsDx3rdSystem() || feIsDnd5eSystem()) ? [
-          bool(S.DX3RD_RUI_ENABLED),
+          bool(S.DX3RD_RUI_ENABLED), bool(S.DX3RD_RUI_VISIBLE),
           num(S.DX3RD_RUI_PORTRAIT_WIDTH), num(S.DX3RD_RUI_PANEL_WIDTH),
           num(S.DX3RD_RUI_CARD_HEIGHT),
         ] : []),
@@ -547,16 +560,20 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.ATTR_PATH_HELPER),
         bool(S.ATTR_PATH_HELPER_SOURCE),
 
-        // Combat Dock — world/GM (enabled[requiresReload] + hide-defeated) gated;
+        // Combat Tracker — world/GM (enabled[requiresReload] + hide-defeated) gated;
         // client display prefs always saved (GM-priority forces them automatically).
         ...(game.user?.isGM ? [
-          bool(S.COMBAT_DOCK_ENABLED), bool(S.COMBAT_DOCK_HIDE_DEFEATED),
+          bool(S.COMBAT_TRACKER_ENABLED), bool(S.COMBAT_TRACKER_HIDE_DEFEATED),
         ] : []),
-        num(S.COMBAT_DOCK_PORTRAIT_SIZE),
-        str(S.COMBAT_DOCK_ASPECT), str(S.COMBAT_DOCK_ROUNDNESS),
-        str(S.COMBAT_DOCK_ALIGNMENT), str(S.COMBAT_DOCK_PORTRAIT_IMAGE),
-        bool(S.COMBAT_DOCK_SHOW_INITIATIVE), bool(S.COMBAT_DOCK_SHOW_DISPOSITION),
-        bool(S.COMBAT_DOCK_SHOW_HP),
+        num(S.COMBAT_TRACKER_PORTRAIT_SIZE),
+        str(S.COMBAT_TRACKER_ASPECT), str(S.COMBAT_TRACKER_ROUNDNESS),
+        str(S.COMBAT_TRACKER_ALIGNMENT), str(S.COMBAT_TRACKER_PORTRAIT_IMAGE),
+        bool(S.COMBAT_TRACKER_SHOW_INITIATIVE), bool(S.COMBAT_TRACKER_SHOW_DISPOSITION),
+        bool(S.COMBAT_TRACKER_SHOW_HP),
+
+        // Token selection glow — client/personal (GM-priority forces them automatically)
+        bool(S.TOKEN_GLOW_ENABLED), bool(S.TOKEN_GLOW_HOVER), num(S.TOKEN_GLOW_STRENGTH),
+        bool(S.TOKEN_GLOW_TARGET), bool(S.TOKEN_GLOW_SIGHTLINE),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),

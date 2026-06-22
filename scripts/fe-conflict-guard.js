@@ -144,15 +144,15 @@ const FE_CG_CONFLICTS = [
     detail: "female_edition이 타이핑 인디케이터를 끄고 이 모듈의 타이핑 알림에 양보했습니다.",
   },
   {
-    // fe-combat-dock.js ALREADY fully yields: feCdOriginalActive() returns true
-    // when this module is active, so the internal combat dock skips its own
-    // install (no double dock). This entry is purely informational — same yield
+    // fe-combat-tracker.js ALREADY fully yields: feCtOriginalActive() returns true
+    // when this module is active, so the internal combat tracker skips its own
+    // install (no double tracker). This entry is purely informational — same yield
     // pattern as chatlog-prune. Carousel is actively maintained, so we never
     // neutralize it.
     id: "combat-tracker-dock",
-    feature: "전투 트래커 도크",
+    feature: "배틀 트래커",
     mode: "yield",
-    detail: "female_edition이 내장 전투 도크를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
+    detail: "female_edition이 내장 배틀 트래커를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
   },
 ];
 

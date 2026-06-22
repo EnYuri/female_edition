@@ -96,10 +96,6 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   flex-shrink: 0;
 }
 
-#fe-ctrl-menu-panel .fe-dx3rd-rui-toggle {
-  flex-shrink: 0;
-}
-
 /* ── Stage nav fills remaining width in #chat-controls ───── */
 /* Without flex:1, the stage select can't expand to fill the bar. */
 #chat-controls > #fe-stage-nav {

@@ -43,11 +43,9 @@ const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
 // 카드 줄바꿈(wrap) 한계 — 화면 밖으로 나가지 않도록.
 const PC_CARDS_PER_ROW    = 5; // 우상단 가로 컨테이너: 5개마다 다음 행
 const ENEMY_CARDS_PER_COL = 8; // 좌상단 세로 컨테이너: 8개마다 우측 새 열
-const BTN_ID           = "fe-dx3rd-rui-toggle-btn";
 const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
 const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → RUI에 표시 (토큰 무관)
 const MASK_FLAG        = "maskResourceValues"; // 수치 값을 ??로 숨김
-const VISIBLE_KEY      = `${MODULE_ID}.ruiVisible2`;
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
 const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 
@@ -61,8 +59,8 @@ function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
 function _ruiEnabled()   { try { return feSetting(S.DX3RD_RUI_ENABLED) === true; } catch { return false; } }
 function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
-function _isGlobalOn()   { const v = localStorage.getItem(VISIBLE_KEY); return v === null ? false : v === "true"; }
-function _setGlobalOn(v) { localStorage.setItem(VISIBLE_KEY, String(v)); }
+// 스테이터스 UI 가시성 — 채팅 토글 버튼에서 모듈 설정으로 이전. 기본 표시(true).
+function _isGlobalOn()   { try { return feSetting(S.DX3RD_RUI_VISIBLE) !== false; } catch { return true; } }
 
 function _portraitW() {
   try { return Math.max(32, Number(feSetting(S.DX3RD_RUI_PORTRAIT_WIDTH)) || 98); }
@@ -452,7 +450,6 @@ function feRebuildDx3rdResourceUI() {
   if (!_isSupported() || !_ruiEnabled()) {
     document.getElementById(CONTAINER_ID)?.remove();
     document.getElementById(CONTAINER_OWN_ID)?.remove();
-    _syncToggleBtn(false);
     return;
   }
 
@@ -468,8 +465,6 @@ function feRebuildDx3rdResourceUI() {
 
   const cntEnemies = _getOrCreateContainer(CONTAINER_ID, POS_KEY);
   _syncContainerCards(cntEnemies, enemies, pw, panelW, ch);
-
-  _syncToggleBtn(_isGlobalOn());
 }
 
 // 단일 액터 데이터 갱신 — 핀된 액터의 HP·침식률 업데이트.
@@ -612,48 +607,15 @@ function _injectAccentBtn() {
   controls.prepend(label);
 }
 
-// ─── chat toggle button ────────────────────────────────────────────────────
-// 채팅 토글은 가시성만 조작 — 카드 DOM은 건드리지 않음.
+// ─── 가시성 적용 ─────────────────────────────────────────────────────────────
+// 가시성은 모듈 설정(DX3RD_RUI_VISIBLE)으로 관리 — 설정 onChange 에서 호출.
+// 카드 DOM은 건드리지 않고 컨테이너 display만 갱신.
 
-function _syncToggleBtn(ruiOn) {
-  const btn = document.getElementById(BTN_ID);
-  if (!btn) return;
-  btn.title = ruiOn ? "스테이터스 숨기기" : "스테이터스 표시";
-  btn.classList.toggle("fe-dx3rd-rui-active", ruiOn);
-}
-
-// 로컬 가시성 적용 — 소켓 수신 및 버튼 클릭 양쪽에서 공유.
-function _applyVisibility(visible) {
-  _setGlobalOn(visible);
+function _refreshVisibility() {
   for (const id of [CONTAINER_ID, CONTAINER_OWN_ID]) {
     const cnt = document.getElementById(id);
     if (cnt) _applyContainerDisplay(cnt);
   }
-  _syncToggleBtn(visible);
-}
-
-function _injectChatBtn() {
-  if (!_isSupported() || !_ruiEnabled()) { document.getElementById(BTN_ID)?.remove(); return; }
-  if (document.getElementById(BTN_ID)) return;
-
-  const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
-  if (!controls) return;
-
-  const btn = document.createElement("button");
-  btn.id        = BTN_ID;
-  btn.type      = "button";
-  btn.className = "fe-dx3rd-rui-toggle";
-  const on = _isGlobalOn();
-  btn.title     = on ? "스테이터스 숨기기" : "스테이터스 표시";
-  btn.classList.toggle("fe-dx3rd-rui-active", on);
-  btn.textContent = "스테이터스";
-  btn.addEventListener("click", () => {
-    const nowOn = !_isGlobalOn();
-    _applyVisibility(nowOn);
-    // 모든 접속 중인 클라이언트에 가시성 상태 브로드캐스트
-    game.socket.emit(`module.${MODULE_ID}`, { type: "ruiVisible", visible: nowOn });
-  });
-  controls.prepend(btn);
 }
 
 // ─── 컨텍스트 메뉴 (사이드바 액터 / 캔버스 토큰 우클릭) ──────────────────────
@@ -704,17 +666,63 @@ Hooks.on("createActor", (actor) => {
   actor.setFlag(MODULE_ID, MASK_FLAG, true);
 });
 
-// 캔버스 토큰 우클릭 (v14: getTokenEntries)
-Hooks.on("getTokenEntries", (token, options) => {
-  if (!_isSupported()) return;
-  const actor = token.actor;
-  if (!actor) return;
-  options.push({
-    name: "스테이터스 토글",
-    icon: '<i class="fas fa-eye"></i>',
-    callback: () => _toggleActorPin(actor),
+// 캔버스 토큰 우클릭 → Token HUD(아이콘 패널)에 버튼 주입.
+// getTokenEntries 는 코어 훅이 아니므로(존재하지 않음) renderTokenHUD 를 사용한다.
+function _hudIconBtn(label, faIcon, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "control-icon fedr-hud-btn";
+  btn.dataset.tooltip = "";
+  btn.setAttribute("aria-label", label);
+  btn.innerHTML = `<i class="fa-solid ${faIcon}" inert></i>`;
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
   });
-});
+  return btn;
+}
+
+function _injectTokenHudButtons(app, el) {
+  const root = el instanceof HTMLElement ? el
+    : (typeof jQuery !== "undefined" && el instanceof jQuery) ? el[0]
+    : app?.element ?? null;
+  if (!(root instanceof HTMLElement)) return;
+
+  const actor = app?.actor ?? app?.document?.actor ?? app?.object?.actor;
+  if (!actor) return;
+
+  // 무대 항목은 좌측 컬럼(설정·잠금 등 GM 컨트롤 열), 스테이터스 토글은 우측 컬럼.
+  const colLeft  = root.querySelector(".col.left")  ?? root;
+  const colRight = root.querySelector(".col.right") ?? colLeft;
+  root.querySelectorAll(".fedr-hud-btn").forEach(b => b.remove());
+
+  // 무대(fe-theatre) 항목 — theatre API 가 있고 액터를 소유한 경우에만. (좌측)
+  const hasStage = typeof globalThis.fetAddToStage === "function";
+  if (hasStage && actor.isOwner) {
+    const onStage = !!globalThis.fetIsOnStage?.(actor.id);
+    if (onStage) {
+      colLeft.appendChild(_hudIconBtn("발화 전환", "fa-comment-dots",
+        () => globalThis.fetSetSpeakingAs?.(actor.id)));
+      colLeft.appendChild(_hudIconBtn("무대에서 제거", "fa-theater-masks",
+        () => globalThis.fetRemoveFromStage?.(actor.id)));
+    } else {
+      colLeft.appendChild(_hudIconBtn("무대에 추가", "fa-theater-masks",
+        () => globalThis.fetAddToStage?.(actor)));
+    }
+  }
+
+  // 스테이터스 UI 토글 — 지원 시스템 + 기능 활성 시에만. (우측)
+  if (_isSupported() && _ruiEnabled()) {
+    const pinned = _isActorPinned(actor);
+    colRight.appendChild(_hudIconBtn(
+      pinned ? "스테이터스 UI에서 제거" : "스테이터스 UI 토글",
+      pinned ? "fa-eye-slash" : "fa-eye",
+      () => _toggleActorPin(actor)));
+  }
+}
+
+Hooks.on("renderTokenHUD", _injectTokenHudButtons);
 
 // ─── 액터 시트 헤더 버튼 ──────────────────────────────────────────────────────
 
@@ -792,10 +800,17 @@ Hooks.on("init", () => {
     default: false,
     onChange: () => {
       feRebuildDx3rdResourceUI();
-      _injectChatBtn();
       // Clean up header buttons on already-open sheets when toggling off (no re-render).
       if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
     },
+  });
+  game.settings.register(MODULE_ID, S.DX3RD_RUI_VISIBLE, {
+    name: "스테이터스 UI 표시(가시성)",
+    hint: "스테이터스 UI 카드를 화면에 표시합니다. 끄면 핀 고정은 유지한 채 카드만 숨깁니다. (이전 채팅 토글 버튼을 대체)",
+    // config:false — managed in the unified settings menu (fe-settings-menu) "스테이터스 UI" section.
+    scope: "client", config: false, type: Boolean,
+    default: true,
+    onChange: _refreshVisibility,
   });
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
     name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
@@ -827,15 +842,12 @@ Hooks.on("init", () => {
 
 Hooks.on("ready", () => {
   if (!_isSupported()) return;
-  _injectChatBtn();
   _injectAccentBtn();
   feRebuildDx3rdResourceUI();
 
   // 다른 클라이언트의 소켓 메시지 수신
   game.socket.on(`module.${MODULE_ID}`, data => {
-    if (data?.type === "ruiVisible") {
-      _applyVisibility(data.visible);
-    } else if (data?.type === "ruiPinToggle" && game.user.isGM) {
+    if (data?.type === "ruiPinToggle" && game.user.isGM) {
       // 직접 수정 권한 없는 플레이어 대신 GM이 플래그 변경 처리
       const actor = game.actors?.get(data.actorId);
       if (!actor) return;
@@ -856,13 +868,12 @@ Hooks.on("updateActor", (actor, change) => {
   }
 });
 
-Hooks.on("renderChatLog",   () => { _injectChatBtn(); _injectAccentBtn(); });
-Hooks.on("renderChatInput", () => { _injectChatBtn(); _injectAccentBtn(); });
-Hooks.on("renderSidebar",   () => { _injectChatBtn(); _injectAccentBtn(); });
+Hooks.on("renderChatLog",   () => { _injectAccentBtn(); });
+Hooks.on("renderChatInput", () => { _injectAccentBtn(); });
+Hooks.on("renderSidebar",   () => { _injectAccentBtn(); });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
   if (!_isSupported()) return;
-  _injectChatBtn();
   _injectAccentBtn();
   feRebuildDx3rdResourceUI();
 });

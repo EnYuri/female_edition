@@ -24,3 +24,6 @@ desktop.ini
 *.log
 *.tmp
 *.bak
+
+#tempzip
+*.zip

@@ -583,7 +583,15 @@
       <div class="form-fields">
         <input type="checkbox" name="ceDx3rdRuiEnabled" data-dtype="Boolean" {{checked values.ceDx3rdRuiEnabled}} />
       </div>
-      <p class="notes">핀 고정한 액터의 HP·자원 카드를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅 토글 버튼이 비활성화됩니다. (dx3rd·dnd5e 공통)</p>
+      <p class="notes">핀 고정한 액터의 HP·자원 카드를 화면에 표시합니다. 끄면 스테이터스 UI 전체가 비활성화됩니다. (dx3rd·dnd5e 공통)</p>
+    </div>
+
+    <div class="form-group">
+      <label>스테이터스 UI 가시성</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceDx3rdRuiVisible" data-dtype="Boolean" {{checked values.ceDx3rdRuiVisible}} />
+      </div>
+      <p class="notes">스테이터스 카드를 화면에 표시할지 여부. 끄면 핀 고정은 유지한 채 카드만 숨깁니다. 기본 표시(켜짐). (이전 채팅의 스테이터스 토글 버튼을 대체)</p>
     </div>
 
     <div class="form-group">
@@ -864,13 +872,15 @@
   </details>
 
   <details>
-    <summary>전투 도크</summary>
+    <summary>배틀 트래커</summary>
+
+    <p class="notes">아래 표시 설정은 클라이언트별로 저장되지만, 배틀 트래커는 인카운터 정보이므로 <b>GM 설정 강제</b>가 켜져 있으면 GM의 값으로 모든 플레이어에게 통일됩니다(개인값이 GM값으로 덮어써짐).</p>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>전투 도크 사용 (GM · 재시작 필요)</label>
+      <label>배틀 트래커 사용 (GM · 재시작 필요)</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceCombatDockEnabled" data-dtype="Boolean" {{checked values.ceCombatDockEnabled}} />
+        <input type="checkbox" name="ceCombatTrackerEnabled" data-dtype="Boolean" {{checked values.ceCombatTrackerEnabled}} />
       </div>
       <p class="notes">전투 중 참여자 포트레이트를 화면 상단에 가로로 표시하고, 가운데에 GM 턴/라운드 컨트롤을 둡니다. 「Carousel Combat Tracker」가 활성화되어 있으면 자동으로 비활성화되어 원본에 양보합니다. 변경 시 재시작이 필요합니다.</p>
     </div>
@@ -878,78 +888,123 @@
     <div class="form-group">
       <label>패배한 전투원 숨김 (GM)</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceCombatDockHideDefeated" data-dtype="Boolean" {{checked values.ceCombatDockHideDefeated}} />
+        <input type="checkbox" name="ceCombatTrackerHideDefeated" data-dtype="Boolean" {{checked values.ceCombatTrackerHideDefeated}} />
       </div>
-      <p class="notes">끄면 패배한 전투원은 흑백 처리되어 계속 표시됩니다. 켜면 도크에서 완전히 제거합니다.</p>
+      <p class="notes">끄면 패배한 전투원은 흑백 처리되어 계속 표시됩니다. 켜면 트래커에서 완전히 제거합니다.</p>
     </div>
     {{/if}}
 
     <div class="form-group">
-      <label>포트레이트 크기 (px, 개인)</label>
+      <label>포트레이트 크기 (px)</label>
       <div class="form-fields">
-        <input type="range" name="ceCombatDockPortraitSize" data-dtype="Number" value="{{values.ceCombatDockPortraitSize}}" min="48" max="160" step="4" />
-        <span class="fe-range-value" data-for="ceCombatDockPortraitSize">{{values.ceCombatDockPortraitSize}}</span>
+        <input type="range" name="ceCombatTrackerPortraitSize" data-dtype="Number" value="{{values.ceCombatTrackerPortraitSize}}" min="48" max="160" step="4" />
+        <span class="fe-range-value" data-for="ceCombatTrackerPortraitSize">{{values.ceCombatTrackerPortraitSize}}</span>
       </div>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 비율 (개인)</label>
+      <label>포트레이트 비율</label>
       <div class="form-fields">
-        <select name="ceCombatDockAspect" data-dtype="String">
-          {{selectOptions choices.combatDockAspect selected=values.ceCombatDockAspect}}
+        <select name="ceCombatTrackerAspect" data-dtype="String">
+          {{selectOptions choices.combatTrackerAspect selected=values.ceCombatTrackerAspect}}
         </select>
       </div>
       <p class="notes">세로/긴 세로형은 전신 일러스트에 적합합니다.</p>
     </div>
 
     <div class="form-group">
-      <label>모서리 둥글기 (개인)</label>
+      <label>모서리 둥글기</label>
       <div class="form-fields">
-        <select name="ceCombatDockRoundness" data-dtype="String">
-          {{selectOptions choices.combatDockRoundness selected=values.ceCombatDockRoundness}}
+        <select name="ceCombatTrackerRoundness" data-dtype="String">
+          {{selectOptions choices.combatTrackerRoundness selected=values.ceCombatTrackerRoundness}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>정렬 위치 (개인)</label>
+      <label>정렬 위치</label>
       <div class="form-fields">
-        <select name="ceCombatDockAlignment" data-dtype="String">
-          {{selectOptions choices.combatDockAlignment selected=values.ceCombatDockAlignment}}
+        <select name="ceCombatTrackerAlignment" data-dtype="String">
+          {{selectOptions choices.combatTrackerAlignment selected=values.ceCombatTrackerAlignment}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>표시 이미지 (개인)</label>
+      <label>표시 이미지</label>
       <div class="form-fields">
-        <select name="ceCombatDockPortraitImage" data-dtype="String">
-          {{selectOptions choices.combatDockImage selected=values.ceCombatDockPortraitImage}}
+        <select name="ceCombatTrackerPortraitImage" data-dtype="String">
+          {{selectOptions choices.combatTrackerImage selected=values.ceCombatTrackerPortraitImage}}
         </select>
       </div>
       <p class="notes">액터 포트레이트 또는 토큰 이미지 중 선택합니다.</p>
     </div>
 
     <div class="form-group">
-      <label>이니셔티브 표시 (개인)</label>
+      <label>이니셔티브 표시</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceCombatDockShowInitiative" data-dtype="Boolean" {{checked values.ceCombatDockShowInitiative}} />
+        <input type="checkbox" name="ceCombatTrackerShowInitiative" data-dtype="Boolean" {{checked values.ceCombatTrackerShowInitiative}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>성향 색상 테두리 (개인)</label>
+      <label>성향 색상 테두리</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceCombatDockShowDisposition" data-dtype="Boolean" {{checked values.ceCombatDockShowDisposition}} />
+        <input type="checkbox" name="ceCombatTrackerShowDisposition" data-dtype="Boolean" {{checked values.ceCombatTrackerShowDisposition}} />
       </div>
       <p class="notes">우호/중립/적대 등 토큰 성향에 따라 테두리 색을 입힙니다. 현재 턴 전투원은 강조색 테두리가 우선합니다.</p>
     </div>
 
     <div class="form-group">
-      <label>HP 막대 표시 (개인)</label>
+      <label>HP 막대 표시</label>
       <div class="form-fields">
-        <input type="checkbox" name="ceCombatDockShowHp" data-dtype="Boolean" {{checked values.ceCombatDockShowHp}} />
+        <input type="checkbox" name="ceCombatTrackerShowHp" data-dtype="Boolean" {{checked values.ceCombatTrackerShowHp}} />
       </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>토큰 선택 글로우</summary>
+
+    <p class="notes">캔버스에서 토큰을 선택하거나 마우스를 올리면, 격자 사각형 테두리 대신 토큰 이미지의 <b>불투명한 실루엣</b>을 따라 글로우를 표시합니다. 글로우 색은 기존 선택 테두리의 <b>색조</b>(선택=초록, 성향 색 등)를 그대로 사용합니다.</p>
+
+    <div class="form-group">
+      <label>토큰 선택 글로우 사용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTokenGlowEnabled" data-dtype="Boolean" {{checked values.ceTokenGlowEnabled}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>호버 시에도 글로우</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTokenGlowHover" data-dtype="Boolean" {{checked values.ceTokenGlowHover}} />
+      </div>
+      <p class="notes">끄면 실제로 선택(컨트롤)한 토큰에만 글로우가 표시됩니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>글로우 세기</label>
+      <div class="form-fields">
+        <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="1" max="8" step="1" />
+        <span class="fe-range-value" data-for="ceTokenGlowStrength">{{values.ceTokenGlowStrength}}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>타겟 표시 글로우</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTokenGlowTarget" data-dtype="Boolean" {{checked values.ceTokenGlowTarget}} />
+      </div>
+      <p class="notes">타겟(<b>T</b>)으로 지정한 토큰의 격자 모서리 화살표 표시에도 글로우를 적용합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>타겟 조준선</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTokenGlowSightline" data-dtype="Boolean" {{checked values.ceTokenGlowSightline}} />
+      </div>
+      <p class="notes">선택(컨트롤)한 토큰에서 지정한 타겟으로 이어지는 조준선을 약한 글로우와 함께 그립니다.</p>
     </div>
   </details>
 
@@ -962,7 +1017,7 @@
         <input type="checkbox" name="ceGmPriorityEnabled" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} />
       </div>
       <p class="notes">
-        활성화 시 아래 3가지를 <b>제외한</b> GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑, 전투 도크 등 포함).
+        활성화 시 아래 3가지를 <b>제외한</b> GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑, 배틀 트래커 등 포함).
         <b>항상 개인 유지:</b> 커스텀 폰트 유무 · 채팅 아카이브/내보내기 · 툴바 접기.
         플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.
       </p>

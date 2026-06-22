@@ -1,0 +1,388 @@
+/* fe-combat-tracker.css — native combat tracker (female_edition)
+ *
+ * Own DOM (#fe-combat-tracker on <body>), unlayered. Two themes:
+ *   - default: dark translucent rounded panel
+ *   - body.fe-retro-theme: pixel font, accent hard border, no rounding
+ * Note: fe-dx3rd-compat.css (retro theme, layouts layer) globally strips
+ * text-shadow/box-shadow with !important, so retro readability rules here that
+ * must survive use !important too.
+ */
+
+#fe-combat-tracker {
+  position: fixed;
+  top: 6px;
+  z-index: 70;             /* above canvas, below app windows/dialogs */
+  pointer-events: none;    /* only the inner panels capture clicks */
+  display: none;
+  --fe-ct-size: 90px;
+  --fe-ct-h: 90px;
+  --fe-ct-round: 8px;
+  font-family: var(--font-primary, sans-serif);
+  user-select: none;
+}
+
+/* horizontal alignment of the whole tracker */
+#fe-combat-tracker.fe-ct-align-center { left: 50%; transform: translateX(-50%); }
+#fe-combat-tracker.fe-ct-align-left   { left: 8px; }
+#fe-combat-tracker.fe-ct-align-right  { right: 8px; }
+#fe-combat-tracker.fe-ct-align-left  .fe-ct-inner { align-items: flex-start; }
+#fe-combat-tracker.fe-ct-align-right .fe-ct-inner { align-items: flex-end; }
+
+#fe-combat-tracker.fe-ct-active { display: block; }
+
+/* minimized: hide the portrait strip, keep the (small) control bar to restore */
+#fe-combat-tracker.fe-ct-collapsed .fe-ct-combatants-wrap { display: none; }
+
+#fe-combat-tracker .fe-ct-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+/* non-scrolling wrapper around the strip — hosts the retro pixel border so it
+   isn't clipped by the strip's own overflow-x:auto (see render() comment) */
+#fe-combat-tracker .fe-ct-combatants-wrap {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+}
+
+#fe-combat-tracker .fe-ct-combatants {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-start;        /* flipped (see transform) → visually bottom-aligned */
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  /* clear the right sidebar + the top-left scene-controls dropdown when centered,
+     plus 72px extra breathing room on each side (640 + 144) so it never touches
+     the sidebar panels */
+  max-width: min(92vw, calc(100vw - 784px));
+  /* scrollbar moved to the TOP (vertical flip) so it doesn't cross the name
+     captions that hang at the bottom; children are flipped back upright */
+  transform: scaleY(-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  /* paint the strip content (incl. the bottom name captions) ABOVE the wrap's
+     pixel-border decoration (::after z-index:0) so the border never covers names */
+  position: relative;
+  z-index: 1;
+}
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait { transform: scaleY(-1); }
+
+/* thin scrollbar for overflow when many combatants */
+#fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar { height: 6px; }
+#fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+
+.fe-ct-portrait {
+  position: relative;
+  width: var(--fe-ct-size);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.fe-ct-portrait .fe-ct-frame {
+  width: var(--fe-ct-size);
+  height: var(--fe-ct-h, var(--fe-ct-size));
+  border-radius: var(--fe-ct-round, 6px);
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.fe-ct-portrait .fe-ct-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  /* portraits are real artwork — force smooth scaling even under the retro
+     theme (fe-dx3rd-compat.css forces image-rendering on decoration subtrees) */
+  image-rendering: auto !important;
+  image-rendering: smooth !important;
+}
+
+/* must out-specify the flip selector (#…> .fe-ct-portrait) to keep the scale,
+   and must re-include scaleY(-1) so the content stays upright under the flip */
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-active {
+  /* gentle bump — half the previous 1.08 so the init badge isn't pushed up out
+     of the strip's clipped top */
+  transform: scaleY(-1) scale(1.04);
+  z-index: 2;
+}
+.fe-ct-portrait.is-active .fe-ct-frame {
+  border-color: var(--fe-dx3rd-accent, #ffd54a);
+  /* glow via filter (not box-shadow) so the retro theme's global
+     box-shadow:none !important stripping cannot kill it; the accent
+     override drives the color in both themes. Slow pulse — fast looked busy. */
+  animation: fe-ct-active-glow 8s ease-in-out infinite;
+}
+
+@keyframes fe-ct-active-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px var(--fe-dx3rd-accent, #ffd54a))
+            drop-shadow(0 0 2px var(--fe-dx3rd-accent, #ffd54a));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px var(--fe-dx3rd-accent, #ffd54a))
+            drop-shadow(0 0 6px var(--fe-dx3rd-accent, #ffd54a));
+  }
+}
+
+.fe-ct-portrait.is-defeated .fe-ct-frame img { filter: grayscale(1) brightness(0.5); }
+.fe-ct-portrait.is-hidden { opacity: 0.5; }
+
+.fe-ct-init {
+  position: absolute;
+  /* sits just BELOW the HP bar (which straddles the top outline at top:0±2px),
+     never covering it */
+  top: 5px;
+  right: 2px;
+  z-index: 5;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--fe-dx3rd-accent, #ffd54a);
+  color: #000;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* name = black-bg caption (sized to text) that STRADDLES the frame's bottom
+   outline — sibling of the frame (NOT inside it) so the frame's overflow:hidden,
+   which clips the image to the rounded box, doesn't clip the caption. Vertically
+   centered on the frame's bottom border line (top = frame height), like stage-chat
+   names hanging over the bottom edge. */
+.fe-ct-name {
+  position: absolute;
+  left: 50%;
+  top: var(--fe-ct-h, var(--fe-ct-size));
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  max-width: calc(100% + 6px);
+  margin: 0;
+  padding: 0 5px;
+  background: #000;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
+/* HP bar STRADDLES the frame's TOP outline (absolute, vertically centered on the
+   top border) — the bottom is taken by the name caption, so HP goes up top. */
+.fe-ct-hp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  transform: translateY(-50%);
+  z-index: 3;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.fe-ct-hp-fill { height: 100%; transition: width 0.25s ease; }
+
+/* control bar (GM) — sits at the BOTTOM-LEFT of the tracker, under the strip */
+.fe-ct-controlbar {
+  pointer-events: auto;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 3px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+.fe-ct-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.fe-ct-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.fe-ct-btn.is-on { color: var(--fe-dx3rd-accent, #ffd54a); }
+
+.fe-ct-round {
+  color: #fff;
+  font-weight: bold;
+  min-width: 38px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.fe-ct-roundonly {
+  pointer-events: none;
+  color: #fff;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* ───────────────────────── retro / pixel theme ───────────────────────── */
+
+body.fe-retro-theme #fe-combat-tracker {
+  font-family: var(--fe-font-primary, monospace);
+}
+body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants,
+body.fe-retro-theme #fe-combat-tracker .fe-ct-controlbar {
+  background: #000;
+  /* the pixel-border decoration (::before/::after below) IS the outline now —
+     drop the panel's own border so the two don't double up */
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* lines + text use the accent-tone (--fe-ac-*) system, like the rest of retro UI */
+body.fe-retro-theme .fe-ct-portrait .fe-ct-frame {
+  border-radius: 0;
+  border-color: var(--fe-ac-45, #fff);
+}
+body.fe-retro-theme .fe-ct-name { color: var(--fe-ac-90, #fff); }
+body.fe-retro-theme .fe-ct-round,
+body.fe-retro-theme .fe-ct-roundonly,
+body.fe-retro-theme .fe-ct-btn { color: var(--fe-ac-90, #fff); }
+body.fe-retro-theme .fe-ct-btn:hover { background: var(--fe-ac-12, rgba(255,255,255,0.18)); }
+body.fe-retro-theme .fe-ct-btn.is-on { color: var(--fe-dx3rd-accent, #fff); }
+body.fe-retro-theme .fe-ct-init { background: var(--fe-ac-45, #fff); color: #000; }
+body.fe-retro-theme .fe-ct-hp { border: 1px solid var(--fe-ac-33, rgba(255,255,255,0.3)); }
+body.fe-retro-theme .fe-ct-portrait.is-active .fe-ct-frame {
+  /* glow keeps coming from the filter animation above (box-shadow would be
+     stripped by §4); add a hard pixel outline as the retro accent */
+  outline: 2px solid var(--fe-dx3rd-accent, #fff);
+  outline-offset: 1px;
+}
+body.fe-retro-theme .fe-ct-init,
+body.fe-retro-theme .fe-ct-btn,
+body.fe-retro-theme .fe-ct-roundonly,
+body.fe-retro-theme .fe-ct-hp { border-radius: 0; }
+
+body.fe-retro-theme .fe-ct-name {
+  /* survive §4's global text-shadow:none !important → hard pixel outline */
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+}
+
+/* outermost pixel-border decoration — same 9-slice pattern as window-app in
+   fe-dx3rd-compat.css: ::before supplies the accent fill, ::after lays the
+   pixel-border.png over it with mix-blend-mode:multiply (white px → accent,
+   black px → black). Asset path is relative to this file (also in styles/).
+   ONLY on the portrait strip — the control bar deliberately has no border
+   decoration (it sits separately at the bottom-left). */
+body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 8px solid var(--fe-dx3rd-accent, #fff);
+  background: transparent;
+}
+body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 0;
+  border: 8px solid transparent;
+  border-image: url("./assets/pixel-border.png") 10 / 8px / 0 repeat;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
+}
+
+/* ───────────────── per-combatant right-click context menu ───────────────── */
+
+.fe-ct-context-menu {
+  position: fixed;
+  z-index: 100;            /* above the tracker itself */
+  min-width: 150px;
+  padding: 4px;
+  background: rgba(15, 15, 18, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-primary, sans-serif);
+  user-select: none;
+}
+.fe-ct-context-menu .fe-ct-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: #eee;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.fe-ct-context-menu .fe-ct-ctx-item i {
+  width: 16px;
+  text-align: center;
+  opacity: 0.85;
+}
+.fe-ct-context-menu .fe-ct-ctx-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* retro variant — the menu lives on <body> directly, so it carries its own
+   fe-retro-theme class (set in JS) rather than inheriting from body */
+.fe-ct-context-menu.fe-retro-theme {
+  font-family: var(--fe-font-primary, monospace);
+  background: #000;
+  border: 1px solid var(--fe-ac-45, #fff);
+  border-radius: 0;
+  box-shadow: none;
+}
+.fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item {
+  color: var(--fe-ac-90, #fff);
+  border-radius: 0;
+}
+.fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item:hover {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.18));
+}

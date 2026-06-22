@@ -149,6 +149,20 @@ function _removeOverlayHQ(imgEl) {
   if (imgEl._feHqRO) { imgEl._feHqRO.disconnect(); imgEl._feHqRO = null; }
 }
 
+// 브라우저 창 리사이즈 시 열려 있는 모든 편집 오버레이를 재배치(앵커 위치가 바뀌는
+// 경우 대비). 한 번만 바인딩. ResizeObserver 가 놓치는 위치-only 이동의 보완.
+let _hqResizeBound = false;
+function _bindGlobalResync() {
+  if (_hqResizeBound) return;
+  _hqResizeBound = true;
+  window.addEventListener("resize", () => {
+    for (const ov of document.querySelectorAll(".fe-hq-portrait-overlay")) {
+      const img = ov.previousElementSibling;
+      if (img && img._feHqOverlay === ov) _syncOverlayHQ(ov, img);
+    }
+  }, { passive: true });
+}
+
 function _ensureOverlayHQ(imgEl) {
   let ov = imgEl._feHqOverlay;
   if (ov && ov.isConnected) return ov;
@@ -195,15 +209,27 @@ function _applyEditableOverlayHQ(imgEl, url, cssW, cssH) {
     if (!dataURL) { _removeOverlayHQ(imgEl); return; } // 확대 불필요/CORS 실패 → 원본 그대로
     const ov = _ensureOverlayHQ(imgEl);
     ov.style.backgroundImage = `url("${dataURL}")`;
+    // renderActorSheet 훅은 레이아웃/페인트 전에 불려 offset* 가 0/부정확할 수 있다 →
+    // 즉시 + 다음 프레임(레이아웃 확정 후) 두 번 배치해 "좌우로 튀는" 깜박임을 막는다.
     _syncOverlayHQ(ov, imgEl);
+    requestAnimationFrame(() => {
+      const o = imgEl._feHqOverlay;
+      if (o && imgEl.isConnected) _syncOverlayHQ(o, imgEl);
+    });
     if (!imgEl._feHqRO && typeof ResizeObserver === "function") {
       const ro = new ResizeObserver(() => {
         const o = imgEl._feHqOverlay;
         if (o) _syncOverlayHQ(o, imgEl);
       });
       ro.observe(imgEl);
+      // 부모(주변 레이아웃)도 관찰 — img 자체 크기는 그대로면서 위치만 좌우로 밀리는
+      // 경우(시트 리사이즈 시 reflow)에도 오버레이가 따라가도록(ResizeObserver 는
+      // 크기 변화에만 발화하므로 위치-only 이동을 놓친다).
+      const par = imgEl.offsetParent;
+      if (par && par !== document.body) { try { ro.observe(par); } catch {} }
       imgEl._feHqRO = ro;
     }
+    _bindGlobalResync();
   };
 
   if (_hqValue.has(key)) { show(_hqValue.get(key)); return; }

@@ -858,25 +858,6 @@ body.fe-retro-theme #sidebar-content::after {
   padding: 0;
 }
 
-/* ─── 채팅 컨트롤 토글 버튼 ─── */
-.fe-dx3rd-rui-toggle {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  color: rgb(from var(--fe-ac-90) r g b / 0.4);
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.fe-dx3rd-rui-toggle.fe-dx3rd-rui-active {
-  color: var(--fe-ac-90);
-}
-
-.fe-dx3rd-rui-toggle:hover {
-  color: var(--fe-ac-90) !important;
-}
-
 /* ══════════════════════════════════════════════════════════════
  * § 17-b  비-픽셀(일반) 테마 상태 UI — FVTT 네이티브 톤 · 둥근 패널
  *
@@ -936,15 +917,6 @@ body:not(.fe-retro-theme) .fedr-label-key,
 body:not(.fe-retro-theme) .fedr-label {
   color:       var(--color-text-light-primary, #c9c7b8);
   font-family: inherit;
-}
-
-/* "스테이터스" 토글 버튼 — 액센트 변수 대신 중립색 */
-body:not(.fe-retro-theme) .fe-dx3rd-rui-toggle {
-  color: rgba(220, 220, 220, 0.45);
-}
-body:not(.fe-retro-theme) .fe-dx3rd-rui-toggle.fe-dx3rd-rui-active,
-body:not(.fe-retro-theme) .fe-dx3rd-rui-toggle:hover {
-  color: var(--color-text-light-highlight, #f0f0e0) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
