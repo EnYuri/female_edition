@@ -1449,7 +1449,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "circle",
+    default: "none",
     choices: {
       circle: "원형",
       square: "사각형",
@@ -1467,7 +1467,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "theme",
+    default: "none",
     choices: {
       theme: "테마/기본값(변경 안 함)",
       none: "없음",
@@ -1487,7 +1487,7 @@ function cpRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 0, max: 12, step: 1 },
-    default: 2,
+    default: 0,
     onChange: () => {
       cpScheduleRefreshAllChatMessages({ delay: 0 });
       feFireChatUiUpdated({ reason: "portrait-settings", document });
@@ -1513,7 +1513,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "center",
+    default: "left",
     choices: {
       center: "가운데 정렬",
       left: "좌측 정렬",

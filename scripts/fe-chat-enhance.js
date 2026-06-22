@@ -270,7 +270,7 @@ Hooks.once("init", () => {
       standard: "표준(경계/간격까지 묶기)",
       simple: "간소화(후속 헤더만 숨김)",
     },
-    default: "simple",
+    default: FE_DEFAULTS[S.MERGE_MODE],
     onChange: () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
@@ -313,7 +313,7 @@ Hooks.once("init", () => {
       actor:  "액터 — 같은 액터면 병합 (토큰 무시)",
       author: "플레이어(작성자) — 같은 유저면 병합",
     },
-    default: "token",
+    default: FE_DEFAULTS[S.MERGE_SPEAKER_BASIS],
     // Re-STAMP (not just re-merge): the merge key cached in each message's
     // data-fe-merge-key is computed with the speaker-basis in effect at stamp time.
     // feApplyChatMergeToAllLogs reuses that stale key, so a bare re-merge would not
@@ -584,7 +584,7 @@ Hooks.once("init", () => {
       none: "사용 안 함(기존 방식)",
       custom: "사용자 지정 색상",
     },
-    default: "white",
+    default: FE_DEFAULTS[S.USER_COLOR_BG_BASE],
     onChange: () => feSetUserColorBgBaseClass(document),
   });
 

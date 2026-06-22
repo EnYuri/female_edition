@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Bump module.json patch version by 0.0.1 on every commit, then re-stage it so
+# the bump travels in the same commit. The .github/workflows/release.yml job
+# turns each new version into a tagged GitHub Release (the manifest URL source).
+#
+# Uses a targeted regex on the top-level "version" line only (not a full JSON
+# re-serialize) so the diff stays to a single line — the styles[] object entries
+# and overall formatting are untouched. Runs via node (always present for FVTT
+# module dev); if node is missing the commit proceeds WITHOUT a bump rather than
+# being blocked.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+manifest="$repo_root/module.json"
+
+[ -f "$manifest" ] || exit 0
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-commit] node not found — skipping version bump." >&2
+  exit 0
+fi
+
+node -e '
+  const fs = require("fs");
+  const p = process.argv[1];
+  let s = fs.readFileSync(p, "utf8");
+  const re = /("version"\s*:\s*")(\d+)\.(\d+)\.(\d+)(")/;
+  if (!re.test(s)) { console.error("[pre-commit] no semver version field — skipping."); process.exit(0); }
+  let next = "";
+  s = s.replace(re, (_m, pre, maj, min, pat, post) => {
+    next = `${maj}.${min}.${Number(pat) + 1}`;
+    return `${pre}${next}${post}`;
+  });
+  fs.writeFileSync(p, s);
+  console.error(`[pre-commit] version -> ${next}`);
+' "$manifest"
+
+git add "$manifest"

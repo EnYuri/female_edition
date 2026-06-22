@@ -797,7 +797,7 @@ Hooks.on("init", () => {
     hint: "핀 고정한 액터의 HP·자원 카드(스테이터스 UI)를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅의 토글 버튼이 비활성화됩니다.",
     // config:false — managed in the unified settings menu (fe-settings-menu) "스테이터스 UI" section.
     scope: "client", config: false, type: Boolean,
-    default: false,
+    default: true,
     onChange: () => {
       feRebuildDx3rdResourceUI();
       // Clean up header buttons on already-open sheets when toggling off (no re-render).
@@ -816,7 +816,7 @@ Hooks.on("init", () => {
     name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
     hint: "포트레이트 이미지 영역의 너비. 기본 98.",
     scope: "client", config: false, type: Number,
-    default: 98,
+    default: 100,
     range: { min: 32, max: 256, step: 4 },
     onChange: feRebuildDx3rdResourceUI,
   });
@@ -824,7 +824,7 @@ Hooks.on("init", () => {
     name: "[DX3rd] 캐릭터 스테이터스 자원 칸 너비(px)",
     hint: "HP·침식률 바가 표시되는 패널의 너비. 기본 110.",
     scope: "client", config: false, type: Number,
-    default: 110,
+    default: 128,
     range: { min: 60, max: 300, step: 4 },
     onChange: feRebuildDx3rdResourceUI,
   });

@@ -198,7 +198,7 @@ function _ihRegisterSettings() {
     scope: "client",
     config: false,
     range: { min: 3, max: 20, step: 0.5 },
-    default: 7,
+    default: 3,
     type: Number,
     // Refresh runtime cache immediately. Without this, _ihSize only reloaded on
     // closeSettingsConfig, so a programmatic/per-world-hydrated change (which
@@ -213,7 +213,7 @@ function _ihRegisterSettings() {
     scope: "client",
     config: false,
     range: { min: 0, max: 5, step: 0.05 },
-    default: _IH_MAX_UPSCALE,
+    default: 0,
     type: Number,
     onChange: () => _ihLoadSettings(),
   });

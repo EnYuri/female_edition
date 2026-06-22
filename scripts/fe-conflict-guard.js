@@ -128,6 +128,19 @@ const FE_CG_CONFLICTS = [
     },
   },
   {
+    // Novel-game-style bottom message window (portrait + typewriter text).
+    // Functionally a SUBSET of fe-theatre (무대): both turn chat messages into a
+    // VN-style portrait+message overlay. Actively maintained (v13, recent) → warn,
+    // never neutralize. Soft conflict (only bites when BOTH features are on): a
+    // staged-actor line double-shows (stage bubble + SMW window), and SMW does not
+    // recognise female_edition's `flags.female_edition.isNarrator`, so /narrate
+    // also double-shows. No hooks to strip / no DOM clash (#smw-* ≠ #fe-*).
+    id: "simple-message-window",
+    feature: "무대(노벨게임풍 메시지 창)",
+    mode: "warn",
+    detail: "채팅을 입그림+메시지 창으로 표시하는 기능이 female_edition 무대(fe-theatre)와 겹칩니다. 둘 다 켜면 무대 발화가 이중 표시되고, /narrate 내레이션도 두 곳에 표시됩니다. 한쪽만 사용하세요.",
+  },
+  {
     id: "chatlog-prune",
     feature: "채팅 자동 정리",
     mode: "yield",

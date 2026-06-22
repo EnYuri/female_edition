@@ -56,7 +56,7 @@ function _fetRegisterSettings() {
     config: false,
     restricted: true,
     type: Boolean,
-    default: false,
+    default: true,
     onChange: (v) => {
       _fetEnabled = v;
       if (!v) {
@@ -92,7 +92,7 @@ function _fetRegisterSettings() {
     config: false,
     restricted: true,
     type: Boolean,
-    default: true,
+    default: false,
     onChange: (v) => { _fetAutoDecay = v; },
   });
 
@@ -113,7 +113,7 @@ function _fetRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 50, max: 700, step: 1 },
-    default: 130,
+    default: 318,
     onChange: (v) => {
       _fetPortraitHeight = v;
       _fetApplyBoxVars();
@@ -126,7 +126,7 @@ function _fetRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 200, max: 1600, step: 4 },
-    default: 488,
+    default: 764,
     onChange: (v) => { _fetBoxWidth = v; _fetApplyBoxVars(); },
   });
 
@@ -136,7 +136,7 @@ function _fetRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 100, max: 600, step: 4 },
-    default: 276,
+    default: 176,
     onChange: (v) => { _fetBoxHeight = v; _fetApplyBoxVars(); },
   });
 
@@ -156,7 +156,7 @@ function _fetRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 0, max: 1200, step: 4 },
-    default: 266,
+    default: 392,
     onChange: (v) => { _fetBoxLeft = v; _fetApplyBoxVars(); },
   });
 
@@ -166,7 +166,7 @@ function _fetRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 10, max: 32, step: 1 },
-    default: 17,
+    default: 14,
     onChange: (v) => { _fetTextSize = v; _fetApplyBoxVars(); },
   });
 }

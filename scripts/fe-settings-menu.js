@@ -31,11 +31,11 @@ const CP_DEFAULTS = Object.freeze({
   [CP.USE_TOKEN]:      false,
   [CP.SIZE]:           64,
   [CP.CARD_ICON_SIZE]: 36,
-  [CP.SHAPE]:          "circle",
-  [CP.BORDER_MODE]:    "theme",
-  [CP.BORDER_WIDTH]:   2,
+  [CP.SHAPE]:          "none",
+  [CP.BORDER_MODE]:    "none",
+  [CP.BORDER_WIDTH]:   0,
   [CP.BORDER_COLOR]:   "#000000",
-  [CP.NAME_ALIGN]:     "center",
+  [CP.NAME_ALIGN]:     "left",
   [CP.APPLY_COMBAT]:   false,
   [CP.SHOW_IC]:        true,
   [CP.SHOW_OOC]:       true,
@@ -61,14 +61,14 @@ const ALL_DEFAULTS = Object.freeze({
   // image-hover (world/GM: feature master + perm/art/timer; client: enable/pos/size/delay/upscale)
   ihFeatureEnabled: true,
   ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
-  ihEnabled: true, ihPosition: "Bottom left", ihSize: 7, ihDelay: 0, ihMaxUpscale: 1.25,
+  ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihDelay: 0, ihMaxUpscale: 0,
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
   // theatre (4 world/GM + 6 client)
-  stageEnabled: false, stageHideMessages: false, stageAutoDecay: true, stageDecayTime: 30000,
-  stagePortraitHeight: 130, stageBoxWidth: 488, stageBoxHeight: 276,
-  stageBoxBottom: 30, stageBoxLeft: 266, stageTextSize: 17,
+  stageEnabled: true, stageHideMessages: false, stageAutoDecay: false, stageDecayTime: 30000,
+  stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
+  stageBoxBottom: 30, stageBoxLeft: 392, stageTextSize: 14,
 });
 
 // ── Template choice lists (static — defined once, not rebuilt per getData call) ──
