@@ -391,7 +391,18 @@ function feFireChatUiUpdated(payload = null) {
 
 function feSetting(key) {
   try {
-    if (feIsGmPriorityEnabled()) {
+    // The GM never reads its OWN override — the override store is only the
+    // propagation vehicle that forces values onto players, and it is seeded
+    // FROM the GM's local settings, so for the GM it is redundant with
+    // game.settings in steady state. Critically, it is updated by the mirror
+    // in the `clientSettingChanged` hook, which core fires strictly AFTER a
+    // setting's own `onChange` (client-settings.mjs: storage write → onChange
+    // → clientSettingChanged). If the GM read the override here, every
+    // onChange handler (which resolves values through feSetting) would apply
+    // the PRE-update override value — making the GM's own saves take visible
+    // effect one save late. Reading game.settings directly (already written
+    // before onChange) keeps the GM's effects in sync with the saved value.
+    if (!game.user?.isGM && feIsGmPriorityEnabled()) {
       const override = feGetGmPriorityOverrideValue(key);
       if (override !== undefined) return override;
     }
