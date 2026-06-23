@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "authors": [
     {
       "name": "nayuri",
@@ -35,10 +35,11 @@
     "scripts/fe-attr-path-helper.js",
     "scripts/fe-token-preview.js",
     "scripts/fe-combat-tracker.js",
-    "scripts/fe-token-glow.js"
+    "scripts/fe-token-glow.js",
+    "scripts/fe-user-font.js"
   ],
   "styles": [
-    "styles/ui-font.css",
+    { "src": "styles/ui-font.css", "layer": "layouts" },
     "styles/chat-bg-stripper.css",
     "styles/fe-chat-enhance.css",
     "styles/fe-chat-archive.css",
