@@ -249,6 +249,18 @@ body:not(.fe-retro-theme) .fe-stage-label {
   z-index: 3;
 }
 
+/* ── 무대 말풍선 글꼴 — 이름·본문 모두 큰 글자(primary, 쿠키런) ──────
+   커스텀 폰트가 켜져 있을 때만 적용. primary 변수는 글꼴 모드(쿠키런/
+   그림일기/NeoDGM/유저폰트)별로 ui-font.css 에서 remap 되므로 모든 모드에서
+   자동으로 맞는다. 이전에는 font-family 미지정으로 body 의 --fe-ui-font-family
+   (=UI 글꼴 토글값)만 상속받아, '쿠키런+그림일기'에서도 이름이 쿠키런이
+   아니었다. */
+body.fe-fonts-enabled .fe-stage-textbox-name,
+body.fe-fonts-enabled .fe-stage-label,
+body.fe-fonts-enabled .fe-stage-textbox-content {
+  font-family: var(--fe-font-primary) !important;
+}
+
 /* ── Nav bar (speak-as dropdown above chat input) ─────────────── */
 
 #fe-stage-nav {

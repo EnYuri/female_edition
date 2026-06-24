@@ -21,6 +21,10 @@ const S = {
   CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
   CHAT_FONT_CHOICE: "ceChatFontChoice",
   UI_USE_GEURIMILGI: "ceUiUseGeurimilgi",
+  // User font: when on, a locally-installed or font/-folder font replaces the
+  // module's built-in CookieRun/Geurimilgi stack entirely (like NeoDGM mode).
+  UI_USE_USER_FONT: "ceUiUseUserFont",
+  USER_FONT_FAMILY: "ceUserFontFamily",
   // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
   // for backwards compatibility with already-saved user settings.
   UI_ENABLE_FONTS: "enableFonts",
@@ -35,6 +39,7 @@ const S = {
   USER_COLOR_BG_CUSTOM: "ceUserColorBgCustom",
   USER_COLOR_ALPHA: "ceUserColorAlpha",
   SYSTEM_MSG_COLOR: "ceSystemMsgColor",
+  FORCE_NORMAL_MSG_COLOR: "ceForceNormalMsgColor",
   CHAT_GROUP_OUTLINE: "ceChatGroupOutline",
   ACCENT_TEXT_OVERRIDE: "ceAccentTextOverride",
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
@@ -113,6 +118,8 @@ const FE_DEFAULTS = {
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
   [S.UI_USE_GEURIMILGI]: true,
+  [S.UI_USE_USER_FONT]: false,
+  [S.USER_FONT_FAMILY]: "",
   [S.UI_ENABLE_FONTS]: true,
   [S.UI_RETRO_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,
@@ -122,6 +129,7 @@ const FE_DEFAULTS = {
   [S.USER_COLOR_BG_CUSTOM]: "#ffffff",
   [S.USER_COLOR_ALPHA]: 0.22,
   [S.SYSTEM_MSG_COLOR]: false,
+  [S.FORCE_NORMAL_MSG_COLOR]: false,
   [S.CHAT_GROUP_OUTLINE]: false,
   [S.ACCENT_TEXT_OVERRIDE]: false,
   [S.STYLE_ACTOR_NAME_SIZE]: 18,
@@ -192,7 +200,9 @@ const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 // GM priority is ON, almost everything is forced — the GM turns the whole feature
 // OFF if they want players to keep personal taste. Only THREE categories stay
 // personal regardless:
-//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) — opt-in per player (glyph/icon breakage risk)
+//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) + 유저 로컬 폰트(UI_USE_USER_FONT/
+//      USER_FONT_FAMILY) — opt-in per player (glyph/icon breakage risk; the user
+//      font depends on what is actually installed on each client)
 //   2. 채팅 아카이브 / 내보내기 (EXPORT_*) — output preference
 //   3. 툴바 접기 (SC_COLLAPSE_ENABLED) — personal toolbar layout
 // (GM_PRIORITY_ENABLED / GM_SPEAK_AS_SELF are world-scope sentinels — never
@@ -208,6 +218,10 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
   // 커스텀 폰트 유무 — players opt in individually.
   S.UI_ENABLE_FONTS,
+  // 유저(로컬) 폰트 — 각 클라이언트에 실제 설치/존재하는 폰트에 의존하므로
+  // GM이 강제하면 폰트가 없는 플레이어는 깨진다. 항상 개인 설정으로 유지.
+  S.UI_USE_USER_FONT,
+  S.USER_FONT_FAMILY,
   // 툴바 접기 — personal toolbar preference.
   S.SC_COLLAPSE_ENABLED,
   // World-scope sentinels (never client-forced anyway).

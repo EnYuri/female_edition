@@ -33,6 +33,14 @@
     </div>
 
     <div class="form-group">
+      <label>유저(로컬) 폰트 사용</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceUiUseUserFont" data-dtype="Boolean" {{checked values.ceUiUseUserFont}} />
+      </div>
+      <p class="notes">컴퓨터에 설치된 폰트 또는 모듈 font 폴더의 폰트를 채팅·UI 전체에 적용합니다(NeoDGM처럼 전부 교체). 켜면 아래 '채팅 글꼴 선택'(모듈 폰트) 대신 '유저 폰트 선택'이 사용됩니다. (개인 설정)</p>
+    </div>
+
+    <div class="form-group fe-module-font-row">
       <label>채팅 글꼴 선택</label>
       <div class="form-fields">
         <select name="ceChatFontChoice" data-dtype="String">
@@ -40,6 +48,29 @@
         </select>
       </div>
       <p class="notes">채팅·UI 기본 글꼴을 선택합니다. '쿠키런 + 그림일기'는 큰 글자/강조=쿠키런, 작은 글자=그림일기 혼합이며, '쿠키런'/'그림일기'는 전부 해당 글꼴로 통일합니다. (커스텀 폰트 적용이 켜져 있어야 합니다)</p>
+    </div>
+
+    <div class="form-group fe-user-font-row">
+      <label>유저 폰트 선택</label>
+      <div class="form-fields fe-user-font-fields">
+        <select class="fe-user-font-picker">
+          <option value="">— 목록에서 선택 —</option>
+          {{#if userFontModuleList.length}}
+          <optgroup label="모듈 font 폴더">
+            {{#each userFontModuleList}}
+            <option value="{{this.family}}">{{this.label}}</option>
+            {{/each}}
+          </optgroup>
+          {{/if}}
+          <optgroup class="fe-user-font-system-group" label="설치된 시스템 폰트"></optgroup>
+        </select>
+        <button type="button" class="fe-load-system-fonts">시스템 폰트 불러오기</button>
+      </div>
+      <div class="form-fields">
+        <input type="text" name="ceUserFontFamily" data-dtype="String" value="{{values.ceUserFontFamily}}" placeholder="폰트 패밀리 이름 (예: Malgun Gothic)" />
+      </div>
+      <div class="fe-user-font-preview">다람쥐 헌 쳇바퀴에 타고파 — ABCabc XYZ 0123 가나다라마바사</div>
+      <p class="notes">목록에서 고르거나 폰트 패밀리 이름을 직접 입력하세요(아래 입력칸 값이 실제 적용값). '시스템 폰트 불러오기'는 설치된 폰트 목록을 채워 줍니다 — 브라우저 권한 허용이 한 번 필요할 수 있습니다.{{#unless localFontsSupported}} 이 환경은 자동 목록을 지원하지 않아 직접 입력 또는 모듈 폴더 폰트만 사용할 수 있습니다.{{/unless}}</p>
     </div>
 
     <div class="form-group">
@@ -182,6 +213,14 @@
         <input type="checkbox" name="ceSystemMsgColor" data-dtype="Boolean" {{checked values.ceSystemMsgColor}} />
       </div>
       <p class="notes">화자(캐릭터)가 없는 메시지(내레이션·GM의 NPC/내레이션·시스템)에 중립 회색 배경을 입힙니다. 레트로 테마 + 텍스트 색조 오버라이드 시 강조색 톤.</p>
+    </div>
+
+    <div class="form-group">
+      <label>일반 메시지 카드·글씨 색 강제 정의</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceForceNormalMsgColor" data-dtype="Boolean" {{checked values.ceForceNormalMsgColor}} />
+      </div>
+      <p class="notes">일반 메시지(특수 메시지·유저 색상 제외)의 카드 배경·글씨 색을 시스템/테마 기본값으로 강제합니다. Carolingian UI 등 채팅을 통째로 다시 칠하는 모듈이 일반 메시지를 덮어써 가독성이 떨어질 때 되돌립니다.</p>
     </div>
 
     <div class="form-group">

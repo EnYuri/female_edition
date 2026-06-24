@@ -39,10 +39,11 @@ import { feApplyMarkdownOnPreCreate } from "./fe-markdown.js";
 
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
-  feSetUiFontClass, feSetNeodgmModeClass, feSetRetroThemeClass,
+  feSetUiFontClass, feSetNeodgmModeClass, feSetUserFontMode, feSetRetroThemeClass,
   feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
+  feSetForceNormalMsgColorClass,
   feApplyStyleVarsFromSettings,
 } from "./fe-style.js";
 
@@ -132,12 +133,14 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetChatFontChoiceClass(doc); } catch { /* no-op */ }
   try { feSetUiFontClass(doc); } catch { /* no-op */ }
   try { feSetNeodgmModeClass(doc); } catch { /* no-op */ }
+  try { feSetUserFontMode(doc); } catch { /* no-op */ }
   try { feSetRetroThemeClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
   try { feSetChatGroupOutlineClass(doc); } catch { /* no-op */ }
   try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
   try { feSetSystemMsgColorClass(doc); } catch { /* no-op */ }
+  try { feSetForceNormalMsgColorClass(doc); } catch { /* no-op */ }
   try {
     feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
   } catch {
@@ -510,6 +513,36 @@ Hooks.once("init", () => {
     onChange: () => feSetUiFontClass(document),
   });
 
+  game.settings.register(MODULE_ID, S.UI_USE_USER_FONT, {
+    name: "유저(로컬) 폰트 사용",
+    hint: "켜면 이 모듈의 커스텀 폰트(쿠키런/그림일기) 대신, 아래에서 고른 '유저 폰트'(컴퓨터에 설치된 폰트 또는 모듈 font 폴더의 폰트)를 채팅·UI 전체에 적용합니다. '커스텀 폰트 적용'이 켜져 있어야 합니다. (개인 설정 — GM 전역 강제 대상 아님)",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.UI_USE_USER_FONT],
+    onChange: () => {
+      feSetUserFontMode(document);
+      // Suppress/restore the module chat-font-choice classes (see feUserFontActive).
+      feSetChatFontChoiceClass(document);
+      feSetNeodgmModeClass(document);
+    },
+  });
+
+  game.settings.register(MODULE_ID, S.USER_FONT_FAMILY, {
+    name: "유저 폰트 패밀리",
+    hint: "적용할 폰트의 패밀리 이름(예: Malgun Gothic). 설정 메뉴에서 설치 폰트 목록·모듈 폰트 중 선택하거나 직접 입력할 수 있습니다.",
+    scope: "client",
+    config: false,
+    type: String,
+    default: FE_DEFAULTS[S.USER_FONT_FAMILY],
+    onChange: () => {
+      feSetUserFontMode(document);
+      // Family going empty/non-empty flips feUserFontActive → refresh module classes.
+      feSetChatFontChoiceClass(document);
+      feSetNeodgmModeClass(document);
+    },
+  });
+
   game.settings.register(MODULE_ID, S.UI_RETRO_THEME, {
     name: "레트로 테마 (픽셀 고대비)",
     hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용 가능하며 double-cross-3rd 전용 레이아웃 보정도 함께 적용됩니다. NeoDGM 폰트 모드와 함께 사용 권장.",
@@ -618,6 +651,19 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.SYSTEM_MSG_COLOR],
     onChange: () => {
       feSetSystemMsgColorClass(document);
+      feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
+    },
+  });
+
+  game.settings.register(MODULE_ID, S.FORCE_NORMAL_MSG_COLOR, {
+    name: "일반 메시지 카드·글씨 색 강제 정의(시스템 기본값)",
+    hint: "켜면 일반 채팅 메시지(특수 메시지·유저 색상 제외)의 카드 배경과 글씨 색을 시스템/테마 기본값으로 강제합니다. Carolingian UI 등 채팅을 통째로 다시 칠하는 모듈이 일반 메시지를 덮어써 가독성이 떨어질 때 되돌리는 용도입니다. 끄면 해당 모듈의 채팅 스타일을 그대로 둡니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.FORCE_NORMAL_MSG_COLOR],
+    onChange: () => {
+      feSetForceNormalMsgColorClass(document);
       feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
     },
   });
@@ -788,12 +834,14 @@ Hooks.once("ready", async () => {
   feSetChatFontChoiceClass(document);
   feSetUiFontClass(document);
   feSetNeodgmModeClass(document);
+  feSetUserFontMode(document);
   feSetRetroThemeClass(document);
   feSetUserColorBgClass(document);
   feSetUserColorBgBaseClass(document);
   feSetChatGroupOutlineClass(document);
   feSetAccentTextOverrideClass(document);
   feSetSystemMsgColorClass(document);
+  feSetForceNormalMsgColorClass(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   // Guarantee a correct full merge once the log is populated (the incremental
   // path misses groups when messages arrive in a single batch / via chat-prune).
@@ -1265,12 +1313,14 @@ export {
   feSetChatCardFontClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,
+  feSetUserFontMode,
   feSetRetroThemeClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
+  feSetForceNormalMsgColorClass,
 
   feApplyChatMerge,
   feCaptureMessageRenderFlagsOnPreCreate,

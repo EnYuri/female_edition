@@ -16,67 +16,204 @@
   display: none !important;
 }
 /* --------------------------- */
-/* Inline message editor       */
+/* Floating message editor      */
 /* --------------------------- */
+/* A draggable, resizable floating panel (appended to <body>, position:fixed) —
+   larger than the old inline strip and styled to echo the v14 sidebar chat input. */
 #fe-chat-inline-editor {
-  margin-bottom: 6px;
-  padding: 6px;
-  border: 1px solid var(--color-border-light-2);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
+  position: fixed;
+  z-index: 70;
+  width: clamp(360px, 34vw, 560px);
+  display: block;
 }
 
+#fe-chat-inline-editor .fe-chat-inline-editor-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border-light-2, rgba(255, 255, 255, 0.18));
+  border-radius: 10px;
+  background: var(--color-cool-5, rgba(20, 22, 28, 0.96));
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+/* Header / drag handle */
 #fe-chat-inline-editor .fe-chat-inline-editor-header {
   display: flex;
   align-items: center;
-  margin-bottom: 5px;
+  gap: 8px;
+  cursor: grab;
+  user-select: none;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#fe-chat-inline-editor .fe-chat-inline-editor-header.fe-dragging {
+  cursor: grabbing;
+}
+
+#fe-chat-inline-editor .fe-edit-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--color-text-light-highlight, #fff);
+  white-space: nowrap;
 }
 
 #fe-chat-inline-editor .fe-edit-mode-toggle {
   display: flex;
   gap: 2px;
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  margin-left: auto;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 5px;
   padding: 2px;
 }
 
 #fe-chat-inline-editor .fe-edit-mode-btn {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 0.75em;
-  border-radius: 3px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 0.78em;
+  border-radius: 4px;
   border: none;
   background: transparent;
-  color: var(--color-text-light-6);
+  color: var(--color-text-light-6, #b9b9b9);
   cursor: pointer;
-  line-height: 22px;
+  line-height: 24px;
 }
 
 #fe-chat-inline-editor .fe-edit-mode-btn.active {
-  background: var(--color-bg-btn, rgba(255, 255, 255, 0.18));
+  background: var(--color-bg-btn, rgba(255, 255, 255, 0.2));
   color: var(--color-text-light-highlight, #fff);
   font-weight: 600;
 }
 
-#fe-chat-inline-editor .fe-chat-inline-editor-row textarea.fe-chat-inline-editor-text {
-  width: 100%;
-  resize: vertical;
-  min-height: 64px;
+#fe-chat-inline-editor .fe-edit-close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-light-6, #b9b9b9);
+  cursor: pointer;
 }
 
+#fe-chat-inline-editor .fe-edit-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* Text input — echoes the sidebar chat input look (rounded faded box). */
+#fe-chat-inline-editor .fe-chat-inline-editor-row {
+  display: flex;
+}
+
+#fe-chat-inline-editor textarea.fe-chat-inline-editor-text {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96px;
+  max-height: 48vh;
+  padding: 8px 10px;
+  resize: vertical;
+  overflow-y: auto;
+  line-height: 1.5;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.22));
+  background: var(--color-cool-5-50, rgba(0, 0, 0, 0.35));
+  color: var(--color-text-light-1, #f0f0f0);
+  font-family: var(--font-primary, inherit);
+}
+
+#fe-chat-inline-editor textarea.fe-chat-inline-editor-text:focus {
+  outline: none;
+  border-color: var(--color-warm-2, #ff9c47);
+  box-shadow: 0 0 6px var(--color-shadow-primary, rgba(255, 156, 71, 0.45));
+}
+
+/* Actions row */
 #fe-chat-inline-editor .fe-chat-inline-editor-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
-#fe-chat-inline-editor button {
-  height: 28px;
+#fe-chat-inline-editor .fe-edit-hint {
+  font-size: 0.72em;
+  color: var(--color-text-light-6, #9a9a9a);
+  opacity: 0.85;
+}
+
+#fe-chat-inline-editor .fe-edit-action-btns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+#fe-chat-inline-editor .fe-edit-action-btns button {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
 }
 
 textarea.fe-chat-input-disabled {
   opacity: 0.55;
+}
+
+/* --------------------------- */
+/* Retro / pixel theme         */
+/* --------------------------- */
+/* Hard outline, no rounding, and the 9-slice pixel-border.png laid OUTSIDE the
+   frame (same pattern as window-app / combat tracker). The inner frame supplies
+   the accent fill (::before), the ::after overlays the pixel art with
+   mix-blend-mode:multiply so white px → accent, black px → black. */
+body.fe-retro-theme #fe-chat-inline-editor .fe-chat-inline-editor-frame {
+  border-radius: 0;
+  border: none;
+  background: var(--color-cool-5, rgba(14, 15, 20, 0.97));
+  box-shadow: none;
+}
+
+body.fe-retro-theme #fe-chat-inline-editor .fe-chat-inline-editor-frame::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 8px solid var(--fe-dx3rd-accent, #fff);
+  background: transparent;
+}
+
+body.fe-retro-theme #fe-chat-inline-editor .fe-chat-inline-editor-frame::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 0;
+  border: 8px solid transparent;
+  border-image: url("./assets/pixel-border.png") 10 / 8px / 0 repeat;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
+}
+
+/* Keep the panel content above the pixel-border ::after overlay. */
+body.fe-retro-theme #fe-chat-inline-editor .fe-chat-inline-editor-frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+body.fe-retro-theme #fe-chat-inline-editor textarea.fe-chat-inline-editor-text,
+body.fe-retro-theme #fe-chat-inline-editor .fe-edit-mode-toggle,
+body.fe-retro-theme #fe-chat-inline-editor .fe-edit-mode-btn {
+  border-radius: 0;
 }
 
 
