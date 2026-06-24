@@ -77,34 +77,40 @@ function feCanEditMessage(msg) {
   }
 }
 
-function feGetEditableRaw(msg) {
-  const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
-  if (stored != null) return String(stored);
-
-  // Fallback: strip HTML from rendered content using DOMParser so attribute values
-  // containing ">" (e.g. data-x="1>2") are handled correctly by the browser parser,
-  // unlike a naive <[^>]+> regex which would truncate at the first >.
+// HTML → 평문(문단/줄바꿈은 \n 으로 보존). DOMParser 우선 — 속성값에 ">" 가 든
+// 경우(data-x="1>2")까지 브라우저 파서가 올바로 처리한다.
+function feHtmlToPlainText(html) {
   try {
-    const html = String(msg?.content ?? "");
-    if (!html) return "";
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    // Preserve paragraph / line-break structure as newlines.
+    const doc = new DOMParser().parseFromString(String(html ?? ""), "text/html");
     for (const br of doc.querySelectorAll("br")) br.replaceWith("\n");
     const parts = [];
-    for (const p of doc.querySelectorAll("p")) {
-      parts.push(p.textContent ?? "");
-    }
+    for (const p of doc.querySelectorAll("p")) parts.push(p.textContent ?? "");
     if (parts.length) return parts.join("\n").trim();
     return (doc.body?.textContent ?? "").trim();
   } catch {
     // Last-resort plain regex strip (cross-origin sandbox or test environment).
-    return String(msg?.content ?? "")
+    return String(html ?? "")
       .replace(/<br\s*\/?\s*>/gi, "\n")
       .replace(/<\/p>\s*<p>/gi, "\n")
       .replace(/<\/?p[^>]*>/gi, "")
       .replace(/<[^>]+>/g, "")
       .trim();
   }
+}
+
+function feGetEditableRaw(msg) {
+  const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
+  if (stored != null) {
+    // raw 는 평문 마크다운 원본이라 보통 그대로 돌려준다(사용자가 일부러 입력한
+    // 리터럴 태그도 보존). 단, 구 내레이터는 raw 에 <br> 을 저장했었는데(현재는
+    // \n 으로 저장) 그런 레거시 메시지를 마크다운 모드로 수정하면 <br> 이
+    // &lt;br&gt; 로 이스케이프돼 노출됐다 → 그 한 경우만 좁게 줄바꿈으로 정규화.
+    return String(stored).replace(/<br\s*\/?>/gi, "\n");
+  }
+
+  const html = String(msg?.content ?? "");
+  if (!html) return "";
+  return feHtmlToPlainText(html);
 }
 
 // Session-persistent floating position (null until the user drags the panel).

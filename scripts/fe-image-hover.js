@@ -365,6 +365,16 @@ function _ihResolveHoverArt(target) {
     const src = img.getAttribute("src");
     if (src && !src.startsWith("data:")) return src;
   }
+
+  // 채팅 메시지 본문 이미지(업로드/임베드/마크다운/카드 아트) — 호버+X 로 표시.
+  // 임베드 base64(data:) 도 실제 이미지 소스이므로 허용한다.
+  const chatImg = target.closest("img");
+  if (chatImg && chatImg.closest(".message-content")) {
+    const orig = chatImg.dataset?.feHqSrc;
+    if (orig) return orig;
+    const src = chatImg.getAttribute("src") || chatImg.currentSrc || "";
+    if (src) return src;
+  }
   return null;
 }
 

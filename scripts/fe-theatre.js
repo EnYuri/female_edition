@@ -309,7 +309,35 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const contentEl = document.createElement("div");
   contentEl.className = "fe-stage-textbox-content";
 
-  textboxEl.append(nameEl, contentEl);
+  // 우상단 버튼 툴바: [이전 발화 불러오기 <] [닫기 ✕]
+  const toolsEl = document.createElement("div");
+  toolsEl.className = "fe-stage-textbox-tools";
+
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "fe-stage-textbox-btn fe-stage-textbox-prev";
+  prevBtn.title = "이전 발화 불러오기";
+  prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+  prevBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    _fetRecallPrev(theatreId);
+  });
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "fe-stage-textbox-btn fe-stage-textbox-close";
+  closeBtn.title = "대사창 닫기";
+  closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+  closeBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const ins = _fet.inserts.get(theatreId);
+    if (ins) _fetDismissInsert(ins);
+  });
+
+  toolsEl.append(prevBtn, closeBtn);
+  textboxEl.append(nameEl, toolsEl, contentEl);
   el.appendChild(textboxEl);
 
   // 우클릭으로 대사창 즉시 닫기 (로컬 전용)
@@ -403,6 +431,7 @@ function _fetInjectInsert(theatreId, actorId, name, src, emotes, remote) {
     el, textboxEl, contentEl, nameEl, imgEl, labelEl, opt,
     decayTimeout: null,
     hideTimeout: null,
+    recallIndex: null,   // 이전 발화 회상 중인 메시지 인덱스 (null = 라이브)
   };
   _fet.inserts.set(theatreId, insert);
 
@@ -533,9 +562,81 @@ function _fetDismissInsert(insert) {
 
 // ── Text / typewriter ──────────────────────────────────────────────────────
 
-function _fetShowText(theatreId, text, userColor) {
+// 말풍선용 평문 추출. content 를 DOMParser(브라우징 컨텍스트 없음 → 리소스 미로드,
+// onerror 미실행)로 textContent 화한다. innerHTML 직접 주입을 피하는 보안 경로.
+function _fetPlainTextFromContent(content) {
+  return (new DOMParser()
+    .parseFromString(String(content ?? ""), "text/html")
+    .body.textContent ?? "").trim();
+}
+
+// 채팅 로그에 이미 렌더(=정제)된 메시지 본문을 복제한다. 원본 content 문자열을
+// innerHTML 로 직접 넣으면 `<img onerror=…>` 등이 실행될 수 있어, Foundry 가 이미
+// 렌더한 안전한 DOM 노드를 cloneNode 하는 방식을 쓴다(없으면 null → 평문 폴백).
+function _fetGetRenderedContentClone(messageId) {
+  if (!messageId) return null;
+  let sel;
+  try { sel = `[data-message-id="${CSS.escape(messageId)}"] .message-content`; }
+  catch { sel = `[data-message-id="${messageId}"] .message-content`; }
+  const node = document.querySelector(sel);
+  return node ? node.cloneNode(true) : null;
+}
+
+// 말풍선에 리치 표시(이미지·표 등)가 필요한지 — 임베드 미디어가 있을 때만 true.
+function _fetContentHasMedia(node) {
+  return !!node?.querySelector?.("img, video, picture, table");
+}
+
+// 미디어가 포함된 메시지면 복제 노드를 말풍선에 그대로 렌더(즉시·스크롤 가능).
+function _fetTryRenderRichContent(insert, messageId) {
+  const clone = _fetGetRenderedContentClone(messageId);
+  if (!clone || !_fetContentHasMedia(clone)) return false;
+  insert.cancelTypewriter?.();
+  insert.contentEl.textContent = "";
+  insert.contentEl.classList.add("fe-stage-textbox-content--rich");
+  insert.contentEl.appendChild(clone);
+  insert.contentEl.scrollTop = 0;
+  return true;
+}
+
+// 한 배우(actorId)가 발화한 메시지 모음 — 무대 발화뿐 아니라 토큰/IC 발화도 포함
+// (speaker.actor 로 식별). 굴림 전용·빈 메시지는 제외, 시간순 정렬.
+function _fetActorMessages(actorId) {
+  if (!actorId) return [];
+  return (game.messages?.contents ?? [])
+    .filter((m) => m.speaker?.actor === actorId
+      && !m.rolls?.length
+      && String(m.content ?? "").trim().length > 0)
+    .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+}
+
+// "<" 버튼: 현재 표시 메시지보다 한 칸 이전(과거)의 발화를 말풍선에 불러온다.
+function _fetRecallPrev(theatreId) {
   const insert = _fet.inserts.get(theatreId);
   if (!insert) return;
+  const msgs = _fetActorMessages(insert.actorId);
+  if (!msgs.length) return;
+  // null(라이브) → 마지막(현재 발화)에서 출발해 한 칸 과거로. 0 에서 더는 못 감.
+  if (insert.recallIndex == null) insert.recallIndex = msgs.length - 1;
+  insert.recallIndex = Math.max(0, insert.recallIndex - 1);
+  const msg = msgs[insert.recallIndex];
+  if (!msg) return;
+  const text = _fetPlainTextFromContent(msg.content);
+  const u = game.users.get(msg.author?.id);
+  const color = u?.color?.css ?? (typeof u?.color === "string" ? u.color : "");
+  _fetShowText(theatreId, text, color, { messageId: msg.id, recall: true });
+}
+
+function _fetShowText(theatreId, text, userColor, opts = {}) {
+  const insert = _fet.inserts.get(theatreId);
+  if (!insert) return;
+
+  const recall = !!opts.recall;
+  // 새 라이브 발화가 오면 회상 위치 초기화(다시 "<" 누르면 최신부터 거슬러 감).
+  if (!recall) insert.recallIndex = null;
+  // 현재 말풍선이 표시 중인 메시지 id — 지연 rAF 미디어 업그레이드가 그새 도착한
+  // 다른 메시지를 덮어쓰지 않도록 식별용으로 기록한다(경쟁 조건 방지).
+  insert.currentMessageId = opts.messageId ?? null;
 
   clearTimeout(insert.decayTimeout);
   clearTimeout(insert.hideTimeout);
@@ -555,10 +656,12 @@ function _fetShowText(theatreId, text, userColor) {
   }
   insert.el.classList.add("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
 
-  // "Pop" pulse animation on the portrait
-  insert.el.classList.remove("fe-stage-insert--pop");
-  void insert.el.offsetWidth; // force reflow to restart animation
-  insert.el.classList.add("fe-stage-insert--pop");
+  // "Pop" pulse animation on the portrait (회상 탐색 시엔 생략 — 과한 흔들림 방지)
+  if (!recall) {
+    insert.el.classList.remove("fe-stage-insert--pop");
+    void insert.el.offsetWidth; // force reflow to restart animation
+    insert.el.classList.add("fe-stage-insert--pop");
+  }
 
   // Show textbox with speaker accent color
   insert.textboxEl.classList.add("fe-stage-textbox--visible");
@@ -566,13 +669,35 @@ function _fetShowText(theatreId, text, userColor) {
     insert.textboxEl.style.setProperty("--fet-speaker-color", userColor);
   }
 
-  // Typewriter — cancel previous animation before starting a new one
+  // 본문 — 임베드 미디어가 있으면 리치(복제) 렌더, 없으면 타자기(또는 회상=즉시).
   insert.cancelTypewriter?.();
+  insert.contentEl.classList.remove("fe-stage-textbox-content--rich");
   insert.contentEl.textContent = "";
-  insert.cancelTypewriter = _fetTypewriter(insert.contentEl, text);
+  insert.contentEl.scrollTop = 0;
+
+  const renderedRich = opts.messageId ? _fetTryRenderRichContent(insert, opts.messageId) : false;
+  if (!renderedRich) {
+    if (recall) {
+      insert.contentEl.textContent = text;
+    } else {
+      insert.cancelTypewriter = _fetTypewriter(insert.contentEl, text);
+      // 라이브 메시지는 createChatMessage 시점에 채팅 로그 DOM 이 아직 없을 수
+      // 있어, 다음 프레임에 한 번 더 미디어 렌더를 시도한다.
+      if (opts.messageId) {
+        requestAnimationFrame(() => {
+          if (_fet.inserts.get(theatreId) === insert &&
+              insert.currentMessageId === opts.messageId &&
+              insert.textboxEl.classList.contains("fe-stage-textbox--visible")) {
+            _fetTryRenderRichContent(insert, opts.messageId);
+          }
+        });
+      }
+    }
+  }
 
   // Auto-decay: hide textbox AND portrait together, then collapse layout space
-  if (_fetAutoDecay) {
+  // (회상 탐색 중엔 자동 소멸하지 않음 — 천천히 훑어볼 수 있게)
+  if (_fetAutoDecay && !recall) {
     const readTime = _fetDecayTime + text.length * 38;
     insert.decayTimeout = setTimeout(() => {
       insert.textboxEl.classList.remove("fe-stage-textbox--visible");
@@ -736,19 +861,17 @@ Hooks.on("createChatMessage", (chatMessage) => {
   // Skip roll messages and slash commands; markdown-wrapped HTML is handled by text extraction below
   if (chatMessage.rolls?.length || chatMessage.content?.startsWith("/")) return;
 
-  // Strip HTML → plain text for the speech bubble. Use DOMParser (inert document)
-  // rather than `div.innerHTML`: the latter loads resources even on a detached node,
-  // so a crafted stage message with `<img onerror=…>` would execute script on every
-  // client that receives it. A DOMParser document has no browsing context — images
-  // never load and inline error handlers never fire.
-  const text = new DOMParser()
-    .parseFromString(String(chatMessage.content ?? ""), "text/html")
-    .body.textContent?.trim() ?? "";
-  if (!text) return;
+  // Strip HTML → plain text for the speech bubble (DOMParser = inert, no resource
+  // load / no onerror execution).
+  const text = _fetPlainTextFromContent(chatMessage.content);
+  // 평문이 비어도 이미지/표 등 임베드 미디어만 있는 발화는 말풍선을 띄운다
+  // (리치 렌더가 다음 프레임에 미디어를 채운다).
+  const hasMedia = /<(?:img|video|picture|table)\b/i.test(String(chatMessage.content ?? ""));
+  if (!text && !hasMedia) return;
 
   const _u = game.users.get(chatMessage.author?.id);
   const color = _u?.color?.css ?? (typeof _u?.color === "string" ? _u.color : "");
-  _fetShowText(theatreId, text, color);
+  _fetShowText(theatreId, text, color, { messageId: chatMessage.id });
 });
 
 Hooks.on("renderChatMessageHTML", (chatMessage, html) => {

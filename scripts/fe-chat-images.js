@@ -284,32 +284,95 @@ function ciExtractFiles(dataTransfer) {
   }
 }
 
+// data: URL → blob: URL. data: 는 최신 Chromium 에서 새 창 top-level 탐색이 차단되지만
+// blob: 은 허용되므로, 임베드 base64 이미지를 새 브라우저 창에 띄울 때 변환해 쓴다.
+function ciDataUrlToBlobUrl(dataUrl) {
+  const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(dataUrl));
+  if (!m) return null;
+  const mime = m[1] || "application/octet-stream";
+  const body = m[3] ?? "";
+  let bytes;
+  if (m[2]) {
+    const bin = atob(body);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } else {
+    bytes = new TextEncoder().encode(decodeURIComponent(body));
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+
+// 실제 브라우저 새 창/탭으로 이미지를 연다(ImagePopout 헤더의 "새 창으로 보기" 버튼).
+// 상대경로는 절대화, data: 는 blob: 으로 변환(top-level 탐색 차단 회피).
+function ciOpenImageInBrowser(src) {
+  if (!src) return;
+  let url = String(src);
+  try {
+    if (url.startsWith("data:")) url = ciDataUrlToBlobUrl(url) || url;
+    else url = new URL(url, document.baseURI).href;
+  } catch {}
+  try {
+    // noopener 를 쓰면 명세상 성공해도 null 을 반환해 차단 감지가 불가능하다.
+    // 대상은 스크립트 없는 이미지 파일이라 opener 악용 위험이 없으므로 생략하고,
+    // null = 팝업 차단으로 정확히 판정한다.
+    const win = window.open(url, "_blank");
+    if (!win) ui?.notifications?.warn?.("팝업이 차단되어 새 창을 열 수 없습니다.");
+  } catch {
+    ui?.notifications?.warn?.("새 창을 열 수 없습니다.");
+  }
+}
+
+// ImagePopout(AppV2) 서브클래스 — 닫기 버튼 바로 왼쪽에 "새 창으로 보기" 프레임 버튼을
+// 추가한다(_getFrameButtons → frame-buttons.hbs → close 앞 beforebegin 삽입).
+let _ciImagePopoutSub = null;
+function ciGetImagePopoutSubclass() {
+  if (_ciImagePopoutSub) return _ciImagePopoutSub;
+  const Base = foundry?.applications?.apps?.ImagePopout;
+  if (!Base) return null; // 레거시(v11/v12): AppV2 ImagePopout 없음 → 폴백 경로 사용
+  _ciImagePopoutSub = class FeChatImagePopout extends Base {
+    static DEFAULT_OPTIONS = {
+      // 부모 actions(shareImage)와 deep-merge 된다(체인 머지).
+      actions: { feOpenInBrowser: function () { ciOpenImageInBrowser(this.options?.src); } },
+    };
+    _getFrameButtons(options) {
+      const buttons = super._getFrameButtons(options);
+      buttons.push({ // 배열 마지막 = 닫기 버튼 바로 왼쪽
+        icon: "fa-solid fa-up-right-from-square",
+        action: "feOpenInBrowser",
+        label: "새 창으로 보기",
+      });
+      return buttons;
+    }
+  };
+  return _ciImagePopoutSub;
+}
+
+// 채팅 이미지를 FVTT 내부 창(ImagePopout)에 큰 크기로 띄운다(클릭 동작).
 function ciOpenImagePopout(src) {
   try {
+    const Sub = ciGetImagePopoutSubclass();
+    if (Sub) { new Sub({ src, editable: false, shareable: true }).render(true); return; }
+    // 레거시 폴백 (v11/v12): (src, options) 시그니처
     const Popout = ciGetImagePopoutClass();
-    if (!Popout) return;
-    // v13 ApplicationV2 ImagePopout takes an options object as its first argument.
-    // Legacy (v11/v12) ImagePopout takes (src, options).
-    // ciGetImagePopoutClass() returns the v13 class when available, so we can
-    // distinguish by checking whether the class lives in the new apps namespace.
-    const isAppV2 = !!foundry?.applications?.apps?.ImagePopout;
-    if (isAppV2) {
-      new Popout({ src, editable: false, shareable: true }).render(true);
-    } else {
-      new Popout(src, { editable: false, shareable: true }).render(true);
-    }
+    if (Popout) new Popout(src, { editable: false, shareable: true }).render(true);
   } catch {}
 }
 
+// 채팅 메시지 본문(.message-content) 안의 이미지를 클릭하면 FVTT 내부 창(ImagePopout)에
+// 크게 띄운다. 업로드/임베드/마크다운/카드 아트 모두 포함(헤더 포트레이트는 .message-content
+// 밖이라 제외 — 그쪽은 이미지 호버가 담당). 자체 클릭 동작이 있는 인터랙티브 카드 요소
+// (a/button/[data-action]) 안의 이미지는 건드리지 않는다.
 function ciBindRenderedImages(root) {
   if (!root?.querySelectorAll) return;
-  for (const img of root.querySelectorAll(".ci-message-image img")) {
+  for (const img of root.querySelectorAll(".message-content img")) {
     if (img.dataset.feCiBound === "1") continue;
+    if (img.closest("a, button, [data-action]")) continue;
     img.dataset.feCiBound = "1";
+    img.style.cursor = "zoom-in";
     img.addEventListener("click", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const src = img.currentSrc || img.getAttribute("src") || img.src;
+      const src = img.dataset?.feHqSrc || img.currentSrc || img.getAttribute("src") || img.src;
       if (src) ciOpenImagePopout(src);
     });
   }
