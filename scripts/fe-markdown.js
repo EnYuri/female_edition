@@ -136,6 +136,10 @@ function feMarkdownToHTML(md) {
 
     const mOList = line.match(/^\s*(\d+)\.\s+(.*)$/);
     if (mOList) {
+      // Honour the typed starting number so a list split across separate chat
+      // messages ("1." / "2." / "3." sent on separate Enters — each its own
+      // single-item <ol>) renders as 1./2./3. instead of all restarting at 1.
+      const startNum = parseInt(mOList[1], 10);
       const items = [];
       while (i < lines.length) {
         const m = lines[i].match(/^\s*(\d+)\.\s+(.*)$/);
@@ -143,7 +147,8 @@ function feMarkdownToHTML(md) {
         items.push(m[2]); i++;
       }
       const lis = items.map((it) => `<li>${feInlineFormat(feEscapeHTML(it ?? ""))}</li>`).join("");
-      blocks.push(`<ol>${lis}</ol>`);
+      const startAttr = (Number.isFinite(startNum) && startNum !== 1) ? ` start="${startNum}"` : "";
+      blocks.push(`<ol${startAttr}>${lis}</ol>`);
       continue;
     }
 
