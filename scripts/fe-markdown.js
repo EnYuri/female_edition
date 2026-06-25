@@ -134,23 +134,9 @@ function feMarkdownToHTML(md) {
       continue;
     }
 
-    const mOList = line.match(/^\s*(\d+)\.\s+(.*)$/);
-    if (mOList) {
-      // Honour the typed starting number so a list split across separate chat
-      // messages ("1." / "2." / "3." sent on separate Enters — each its own
-      // single-item <ol>) renders as 1./2./3. instead of all restarting at 1.
-      const startNum = parseInt(mOList[1], 10);
-      const items = [];
-      while (i < lines.length) {
-        const m = lines[i].match(/^\s*(\d+)\.\s+(.*)$/);
-        if (!m) break;
-        items.push(m[2]); i++;
-      }
-      const lis = items.map((it) => `<li>${feInlineFormat(feEscapeHTML(it ?? ""))}</li>`).join("");
-      const startAttr = (Number.isFinite(startNum) && startNum !== 1) ? ` start="${startNum}"` : "";
-      blocks.push(`<ol${startAttr}>${lis}</ol>`);
-      continue;
-    }
+    // Ordered lists (1. 2. 3.) are intentionally NOT converted — typed numbering is
+    // left as literal text (each chat message is its own line, so an <ol> per message
+    // only ever rendered "1." anyway).
 
     const para = [];
     while (i < lines.length && lines[i].trim()) {
@@ -159,7 +145,6 @@ function feMarkdownToHTML(md) {
       if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i])) break;
       if (lines[i].trim().startsWith(">")) break;
       if (/^\s*[-*]\s+/.test(lines[i])) break;
-      if (/^\s*\d+\.\s+/.test(lines[i])) break;
       para.push(lines[i]); i++;
     }
     pushParagraph(para);
