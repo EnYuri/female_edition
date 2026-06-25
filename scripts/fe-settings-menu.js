@@ -99,7 +99,9 @@ const CHOICES = {
     cookie:     "쿠키런 + 그림일기",
     cookieAll:  "쿠키런",
     geurimilgi: "그림일기",
-    neodgm:     "NeoDGM 픽셀",
+    neodgm:     "NeoDGM",
+    mona:       "Mona10(웹폰트)",
+    galmuri:    "갈무리11(웹폰트)",
   },
   userColorBgBase: {
     white:  "흰색(권장)",

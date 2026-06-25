@@ -113,7 +113,7 @@ async function feMigrateLegacySettings() {
     // ignore
   }
 
-  await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "cookieAll", "geurimilgi", "neodgm"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
+  await feNormalizeChoiceSetting(S.CHAT_FONT_CHOICE, ["cookie", "cookieAll", "geurimilgi", "neodgm", "mona", "galmuri"], FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
   await feNormalizeChoiceSetting(S.MERGE_MODE, ["standard", "simple"], FE_DEFAULTS[S.MERGE_MODE]);
   await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
   await feNormalizeChoiceSetting(S.MERGE_SPEAKER_BASIS, ["token", "actor", "author"], FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
@@ -494,7 +494,9 @@ Hooks.once("init", () => {
       cookie: "쿠키런 + 그림일기",
       cookieAll: "쿠키런",
       geurimilgi: "그림일기",
-      neodgm: "NeoDGM 픽셀",
+      neodgm: "NeoDGM",
+      mona: "Mona10(웹폰트)",
+      galmuri: "갈무리11(웹폰트)",
     },
     default: FE_DEFAULTS[S.CHAT_FONT_CHOICE],
     onChange: () => {

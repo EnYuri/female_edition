@@ -78,7 +78,12 @@ function feSetUiFontClass(doc = document) {
 function feSetNeodgmModeClass(doc = document) {
   try {
     const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
-    doc?.body?.classList?.toggle("fe-neodgm-mode", !feUserFontActive() && choice === "neodgm");
+    const body = doc?.body;
+    if (!body) return;
+    const userFont = feUserFontActive();
+    body.classList.toggle("fe-neodgm-mode", !userFont && choice === "neodgm");
+    body.classList.toggle("fe-mona-mode", !userFont && choice === "mona");
+    body.classList.toggle("fe-galmuri-mode", !userFont && choice === "galmuri");
   } catch {}
 }
 

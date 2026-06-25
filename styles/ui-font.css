@@ -70,6 +70,91 @@
   font-display: swap;
 }
 
+/* Mona10 — 외부 웹폰트(MonadABXY/mona-font), jsDelivr CDN 에서 로드.
+   픽셀 비트맵 계열 폰트라 NeoDGM 모드와 동일하게 다룬다(아래 fe-mona-mode).
+   로컬 파일이 아니므로 인터넷 연결이 있어야 적용된다(없으면 fallback 스택). */
+@font-face {
+  font-family: "Mona10";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona10.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona10";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona10-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Mona12 — 다국어(CJK 등) 커버리지가 넓은 12px 변형. Mona10 에 없는 글리프의
+   fallback 으로 쓴다. Korean 전용 텍스트 변형(Mona12 Text KR)을 한글에 우선.
+   @font-face 는 실제로 매칭 글리프가 렌더될 때만 받아오므로(브라우저 lazy-load),
+   미사용 패밀리를 미리 선언해도 네트워크 비용은 없다. */
+@font-face {
+  font-family: "Mona12 Text KR";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12TextKR.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 이모지 — Mona 픽셀 이모지(컬러 우선, 흑백 보조). 일반 심볼/이모지 fallback
+   (Segoe UI Emoji 등)보다 앞에 두어 Mona 이모지가 우선 적용된다. */
+@font-face {
+  font-family: "Mona12 Color Emoji";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12ColorEmoji.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12 Emoji";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12Emoji.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Galmuri11 — 외부 웹폰트(quiple/galmuri), jsDelivr(npm) CDN 에서 로드.
+   한글·라틴·CJK·이모지를 한 폰트로 폭넓게 커버하는 픽셀 폰트라 Mona 처럼
+   변형을 섞을 필요 없이 단일 패밀리로 충분하다. 로컬 파일이 아니므로 인터넷
+   연결이 있어야 적용된다(없으면 fallback 스택). */
+@font-face {
+  font-family: "Galmuri11";
+  src: url("https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===================================================
  * 2-a) CSS 변수 선언 — fe-* 내부 변수 (항상 정의)
  *       레이아웃/크기 변수는 폰트 on/off와 무관하게 유지
@@ -248,6 +333,61 @@ body.fe-fonts-enabled.fe-neodgm-mode {
 }
 
 body.fe-fonts-enabled.fe-neodgm-mode * {
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: auto !important;
+  font-smooth: never !important;
+  text-rendering: optimizeSpeed !important;
+}
+
+/* 모든 커스텀 폰트를 Mona 웹폰트(픽셀)로 전체 교체 — NeoDGM 모드와 동형.
+   글리프 단위 CSS fallback 으로 변형을 자동 혼합한다:
+     베이스 Mona10 → (없는 글리프) 한글 Mona12 Text KR → 그 외 다국어 Mona12
+     → 이모지 Mona 픽셀 이모지(컬러/흑백) → monospace → 일반 심볼 fallback.
+   브라우저가 코드포인트별로 첫 번째 보유 패밀리를 골라 쓰므로, 라틴/숫자는
+   Mona10 그대로, 한글/CJK 는 Mona12 계열, 이모지는 Mona 이모지로 떨어진다. */
+body.fe-fonts-enabled.fe-mona-mode {
+  --fe-mona-stack:
+    "Mona10",
+    "Mona12 Text KR",
+    "Mona12",
+    "Mona12 Color Emoji",
+    "Mona12 Emoji",
+    monospace,
+    var(--fe-symbol-fallback);
+  --fe-font-primary:    var(--fe-mona-stack);
+  --fe-font-geurimilgi: var(--fe-mona-stack);
+  --fe-font-secondary:  var(--fe-mona-stack);
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+body.fe-fonts-enabled.fe-mona-mode * {
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: auto !important;
+  font-smooth: never !important;
+  text-rendering: optimizeSpeed !important;
+}
+
+/* 모든 커스텀 폰트를 Galmuri11 웹폰트(픽셀)로 전체 교체 — NeoDGM/Mona 모드와 동형.
+   Galmuri11 한 패밀리가 한글/라틴/CJK/이모지를 폭넓게 커버하므로 스택 혼합 불필요. */
+body.fe-fonts-enabled.fe-galmuri-mode {
+  --fe-galmuri-stack: "Galmuri11", monospace, var(--fe-symbol-fallback);
+  --fe-font-primary:    var(--fe-galmuri-stack);
+  --fe-font-geurimilgi: var(--fe-galmuri-stack);
+  --fe-font-secondary:  var(--fe-galmuri-stack);
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+body.fe-fonts-enabled.fe-galmuri-mode * {
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: none !important;
   -moz-osx-font-smoothing: auto !important;
