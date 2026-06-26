@@ -283,15 +283,18 @@ function feTgSyncOverlay(token) {
 
   const { sprite, filter } = entry;
 
-  // Copy the mesh's full local transform so the overlay overlaps it exactly.
-  // canvas.tokens and canvas.primary share the same stage world transform.
+  // Mirror the mesh transform so the overlay overlaps it exactly.
+  // Position uses token.center (document-derived, always current) instead of
+  // mesh.position, which can be stale during Foundry v14's deferred render-flag
+  // flush — the refreshToken hook fires before the mesh's own _refresh pass
+  // writes the new position into the PIXI property.
   sprite.texture = mesh.texture;
-  sprite.anchor.set(mesh.anchor.x, mesh.anchor.y);
-  sprite.position.set(mesh.position.x, mesh.position.y);
+  sprite.anchor.set(0.5, 0.5);
+  sprite.position.set(token.center.x, token.center.y);
   sprite.rotation = mesh.rotation;
   sprite.scale.set(mesh.scale.x, mesh.scale.y);
-  sprite.pivot.set(mesh.pivot.x, mesh.pivot.y);
-  sprite.skew.set(mesh.skew.x, mesh.skew.y);
+  sprite.pivot.set(0, 0);
+  sprite.skew.set(0, 0);
   sprite.alpha = 1;
   sprite.visible = true;
 
@@ -607,12 +610,14 @@ function feTgAddOccluder(occlude, token) {
   const spr = new PIXI.Sprite(mesh.texture);
   spr.eventMode = "none";
   spr.blendMode = PIXI.BLEND_MODES.ERASE;
-  spr.anchor.set(mesh.anchor.x, mesh.anchor.y);
-  spr.position.set(mesh.position.x, mesh.position.y);
+  // Use token.center for position (document-derived, always current) — same
+  // staleness guard as feTgSyncOverlay (see comment there).
+  spr.anchor.set(0.5, 0.5);
+  spr.position.set(token.center.x, token.center.y);
   spr.rotation = mesh.rotation;
   spr.scale.set(mesh.scale.x, mesh.scale.y);
-  spr.pivot.set(mesh.pivot.x, mesh.pivot.y);
-  spr.skew.set(mesh.skew.x, mesh.skew.y);
+  spr.pivot.set(0, 0);
+  spr.skew.set(0, 0);
   occlude.addChild(spr);
 }
 
