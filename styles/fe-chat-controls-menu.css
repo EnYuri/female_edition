@@ -87,6 +87,24 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   margin-right: 0 !important;
 }
 
+/* ── Icon contrast ───────────────────────────────────────── */
+/* The panel background is var(--color-bg) (light in the default theme, dark in
+   the dark theme), but the injected control icons (export PDF, image upload,
+   message-mode toggles, control-buttons) otherwise inherit Foundry's sidebar
+   "light highlight" color and stay light regardless — so they vanish on the
+   light default-theme panel. Pin them to the theme-aware primary text color so
+   they always contrast with var(--color-bg). FA glyphs inherit `color`. */
+#fe-ctrl-menu-panel .ui-control,
+#fe-ctrl-menu-panel .control-icon,
+#fe-ctrl-menu-panel .control-buttons button,
+#fe-ctrl-menu-panel #ci-upload-image,
+#fe-ctrl-menu-panel .fe-export-pdf,
+#fe-ctrl-menu-panel #message-modes .ui-control,
+#fe-ctrl-menu-panel .ui-control > i,
+#fe-ctrl-menu-panel .control-icon > i {
+  color: var(--color-text-primary, #1b1b23);
+}
+
 /* dx3rd accent swatch and RUI toggle inside the panel. */
 #fe-ctrl-menu-panel .fe-dx3rd-accent-btn {
   width: 22px;
@@ -121,6 +139,19 @@ body.fe-retro-theme #fe-ctrl-menu-panel {
 
 body.fe-retro-theme #fe-ctrl-menu-panel #message-modes {
   border-inline-end-color: var(--fe-ac-22) !important;
+}
+
+/* Retro panel bg is black → icons must stay light (accent tone), overriding the
+   theme-aware primary color set above which would read dark here. */
+body.fe-retro-theme #fe-ctrl-menu-panel .ui-control,
+body.fe-retro-theme #fe-ctrl-menu-panel .control-icon,
+body.fe-retro-theme #fe-ctrl-menu-panel .control-buttons button,
+body.fe-retro-theme #fe-ctrl-menu-panel #ci-upload-image,
+body.fe-retro-theme #fe-ctrl-menu-panel .fe-export-pdf,
+body.fe-retro-theme #fe-ctrl-menu-panel #message-modes .ui-control,
+body.fe-retro-theme #fe-ctrl-menu-panel .ui-control > i,
+body.fe-retro-theme #fe-ctrl-menu-panel .control-icon > i {
+  color: var(--fe-ac-90, #ffffff) !important;
 }
 
 /* ── Popped-out quick-reply dock (#chat-notifications) ───────── */
