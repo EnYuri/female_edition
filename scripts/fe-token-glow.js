@@ -328,6 +328,22 @@ function feTgRefresh(token) {
   feTgSyncOverlay(token);
 }
 
+// Reconcile every live overlay against current token state. Movement is already
+// tracked by the per-token `refreshToken` hook; the ONE gap it misses is a vision/fog
+// change (`sightRefresh`) that turns a glowing token invisible without firing a
+// per-token refresh — leaving the glow sprite stranded at the token's last-seen spot
+// (the "glow left behind" bug another client sees). So this is called only from the
+// `sightRefresh` hook, never per animation frame. The map holds only currently-glowing
+// tokens (usually 1–2), so the loop is effectively free; feTgRefresh() both removes
+// (when !shouldGlow / token gone) and re-syncs.
+function feTgReconcileOverlays() {
+  for (const id of [...FE_TG_OVERLAYS.keys()]) {
+    const token = canvas?.tokens?.get(id);
+    if (!token || token.destroyed) { feTgRemoveOverlay(id); continue; }
+    feTgRefresh(token);
+  }
+}
+
 function feTgRebuildAll() {
   for (const id of [...FE_TG_OVERLAYS.keys()]) feTgRemoveOverlay(id);
   if (!feTgEnabled()) {
@@ -499,7 +515,7 @@ function feTgMakeDistanceLabel(ox, oy, token, gs) {
   const tx = token.center.x, ty = token.center.y;
   const text = feTgMeasureDistanceText(ox, oy, tx, ty);
   if (!text) return null;
-  const PT = globalThis.PreciseText ?? foundry.canvas?.containers?.PreciseText ?? PIXI.Text;
+  const PT = foundry.canvas?.containers?.PreciseText ?? globalThis.PreciseText ?? PIXI.Text;
   const style = new PIXI.TextStyle({
     fontFamily: feTgResolveFontFamily(),
     fontSize: Math.round(Math.max(14, gs * 0.20)),
@@ -783,8 +799,13 @@ Hooks.on("refreshToken", (token) => {
   feTgScheduleSightlines();
 });
 // The viewer's own vision recompute (fog reveal, lighting change, their token moving)
-// changes which endpoints are visible -> re-evaluate the both-endpoints-visible gate.
-Hooks.on("sightRefresh", () => feTgScheduleSightlines());
+// changes which endpoints are visible -> re-evaluate the both-endpoints-visible gate,
+// and prune/re-sync any selection glow whose token just went (in)visible — the one
+// staleness gap `refreshToken` doesn't cover (cheap: only currently-glowing tokens).
+Hooks.on("sightRefresh", () => {
+  feTgReconcileOverlays();
+  feTgScheduleSightlines();
+});
 Hooks.on("controlToken", (token) => {
   feTgRefresh(token);
   feTgUpdateLocalSightlines();
