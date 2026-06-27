@@ -11,14 +11,17 @@ name: Release Module
 # a re-run or a push that didn't change the version won't error).
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/release.yml"
       - "module.json"
       - "scripts/**"
       - "styles/**"
       - "templates/**"
       - "lang/**"
+      - "font/**"
       - "assets/**"
 
 permissions:
@@ -50,6 +53,12 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Ensure existing release is marked latest
+        if: steps.check.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "v${{ steps.ver.outputs.version }}" --latest
 
       - name: Build module.zip
         if: steps.check.outputs.exists == 'false'
