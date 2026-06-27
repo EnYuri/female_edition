@@ -253,13 +253,16 @@ function feTgUiScale() {
   return canvas?.dimensions?.uiScale ?? 1;
 }
 
-// Mirror native selection-border visibility: controlled, or hovered when enabled.
+// Glow on real selection (controlled), or on the single token under the cursor when the
+// hover setting is on. We deliberately do NOT mirror `layer.highlightObjects` (the native
+// "오브젝트 강조" / Alt key) — that lights up EVERY token at once, which reads as "선택도
+// 안 했는데 글로우가 전부 토글된다".
 function feTgShouldGlow(token) {
   if (!token || token.destroyed || !token.mesh || token.mesh.destroyed) return false;
   if (token.document?.isSecret) return false;
   if (!token.visible || !token.renderable) return false;
   if (token.controlled) return true;
-  if (feTgSetting(S.TOKEN_GLOW_HOVER) && (token.hover || token.layer?.highlightObjects)) return true;
+  if (feTgSetting(S.TOKEN_GLOW_HOVER) && token.hover) return true;
   return false;
 }
 
@@ -267,6 +270,17 @@ function feTgSyncOverlay(token) {
   const layer = feTgGetLayer();
   if (!layer) return;
   const mesh = token.mesh;
+  // Guard against an unloaded/placeholder texture. Right after F5 the token's real art
+  // may not be loaded yet; mesh.texture is then a 1px placeholder and mesh.scale is
+  // (displaySize / 1px) -> an enormous value. Snapshotting that into the overlay
+  // produces a giant silhouette that stays frozen until something re-syncs the token
+  // (the "새로고침 시 거대 글로우 지속" bug). Skip until the texture is valid; refreshToken
+  // fires again once it loads (and canvasReady's feTgRebuildAll re-runs regardless).
+  const tex = mesh?.texture;
+  if (!tex || !tex.valid || !tex.baseTexture?.valid || (tex.orig?.width ?? tex.width ?? 0) <= 1) {
+    feTgRemoveOverlay(token.id);
+    return;
+  }
   let entry = FE_TG_OVERLAYS.get(token.id);
   if (!entry) {
     const sprite = new PIXI.Sprite(mesh.texture);
@@ -623,6 +637,10 @@ function feTgClearOcclude(occlude) {
 function feTgAddOccluder(occlude, token) {
   const mesh = token?.mesh;
   if (!mesh || mesh.destroyed || !mesh.texture) return;
+  // Same unloaded-texture guard as feTgSyncOverlay — a 1px placeholder would give a
+  // giant ERASE silhouette punching a hole far bigger than the token.
+  const tex = mesh.texture;
+  if (!tex.valid || !tex.baseTexture?.valid || (tex.orig?.width ?? tex.width ?? 0) <= 1) return;
   const spr = new PIXI.Sprite(mesh.texture);
   spr.eventMode = "none";
   spr.blendMode = PIXI.BLEND_MODES.ERASE;
