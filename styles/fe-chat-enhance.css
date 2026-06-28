@@ -112,6 +112,26 @@
   color: var(--fe-narrator-meta, rgb(242 239 232 / 0.74)) !important;
 }
 
+/* Inline rolls inside a narrator message keep their own (dark) text color, which
+ * the white .message-content color above cannot override (they are styled
+ * elements, not plain inherited text). On the dark-gray narrator surface the
+ * light #DDD pill is stripped, leaving black text = unreadable. Repaint them as a
+ * dark translucent pill with narrator-light text so they read regardless of
+ * whether the system keeps/strips the core pill background.
+ * (content-link is intentionally handled separately in fe-narrator.css — its
+ * light pill survives, so it keeps dark text there.) */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.narrator-chat, .fe-narrator-chat) .message-content a.inline-roll,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat) .message-content a.inline-roll {
+  color: var(--fe-narrator-fg, #f2efe8) !important;
+  background: rgb(0 0 0 / 0.28) !important;
+  border-color: rgb(242 239 232 / 0.35) !important;
+}
+
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.narrator-chat, .fe-narrator-chat) .message-content a.inline-roll i,
+#chat-notifications .message:is(.narrator-chat, .fe-narrator-chat) .message-content a.inline-roll i {
+  color: var(--fe-narrator-fg, #f2efe8) !important;
+}
+
 :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)),
 #chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
   background: var(--fe-round-marker-bg, #4b4843) !important;

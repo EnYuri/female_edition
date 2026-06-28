@@ -329,7 +329,10 @@ function _feStickyEnsureWatcher(scrollEl) {
   } catch { /* no-op */ }
 }
 
-function feSnapshotAndRestoreStickyScroll() {
+// Resolve every live chat log <ol> → its owning ChatLog app (main, directory,
+// and v13/v14 popouts). Shared by the snapshot/restore path and the
+// incoming-message follow path.
+function _feBuildChatLogAppMap() {
   const logToApp = new Map();
   const registerApp = (app) => {
     if (!app) return;
@@ -349,6 +352,25 @@ function feSnapshotAndRestoreStickyScroll() {
       if (typeof app?.scrollBottom === "function") registerApp(app);
     }
   } catch { /* no-op */ }
+  return logToApp;
+}
+
+// Pin a scroll container to the bottom and refresh all follow-lock bookkeeping
+// so our own scroll watcher does not read this programmatic move as a user gesture.
+function _feStickyPin(scrollEl, app) {
+  // Set scrollTop on the actual scroll container (.chat-scroll in v13), not the
+  // inner <ol> which is non-scrollable. scrollBottom() also nudges Foundry's
+  // private #isAtBottom back to true after our DOM mutations.
+  try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch { /* no-op */ }
+  try { app?.scrollBottom?.(); } catch { /* no-op */ }
+  const t = _feStickyNow();
+  _feStickyPinTs.set(scrollEl, t);
+  _feStickyLastTop.set(scrollEl, scrollEl.scrollTop); // so the watcher doesn't read our pin as a user move
+  _feStickyFollowUntil.set(scrollEl, t + FE_STICKY_FOLLOW_MS); // keep following while actively pinned
+}
+
+function feSnapshotAndRestoreStickyScroll() {
+  const logToApp = _feBuildChatLogAppMap();
 
   const now = _feStickyNow();
   const states = feGetChatLogs().map((log) => {
@@ -379,17 +401,7 @@ function feSnapshotAndRestoreStickyScroll() {
   return function feRestoreStickyScroll() {
     for (const { scrollEl, follow, app } of states) {
       if (!follow) continue;
-      const pin = () => {
-        // Set scrollTop on the actual scroll container (.chat-scroll in v13), not the
-        // inner <ol> which is non-scrollable. scrollBottom() also nudges Foundry's
-        // private #isAtBottom back to true after our DOM mutations.
-        try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch { /* no-op */ }
-        try { app?.scrollBottom?.(); } catch { /* no-op */ }
-        const t = _feStickyNow();
-        _feStickyPinTs.set(scrollEl, t);
-        _feStickyLastTop.set(scrollEl, scrollEl.scrollTop); // so the watcher doesn't read our pin as a user move
-        _feStickyFollowUntil.set(scrollEl, t + FE_STICKY_FOLLOW_MS); // keep following while actively pinned
-      };
+      const pin = () => _feStickyPin(scrollEl, app);
       pin();
 
       // Re-pin on the next frame to catch layout that settles AFTER our mutation
@@ -409,6 +421,56 @@ function feSnapshotAndRestoreStickyScroll() {
       });
     }
   };
+}
+
+// Called from the `createChatMessage` hook — which fires BEFORE ChatLog#postOne
+// renders and appends the new <li>. At this instant the scroll position still
+// reflects the user's genuine intent (untouched by the incoming message), so a
+// near-zero gap is the most reliable "user is following the bottom" signal we get.
+//
+// Why this exists in addition to the snapshot/restore path: core only auto-scrolls
+// an incoming message from ANOTHER player when its cached `isAtBottom` is true
+// (chat.mjs #postOne). While the user is interacting with another window (e.g. a
+// character sheet) and not touching the chat, a prior async reflow (portrait image
+// load, merge-class change) can have flipped core's #isAtBottom to false even though
+// the user never moved — so core skips the scroll and the new message is stranded
+// below the fold. We capture the pre-append bottom state ourselves and guarantee a
+// re-pin after portrait injection / merge / late image reflow settle, each gated on
+// the follow-lock so a genuine user scroll-up in the meantime cancels it.
+function feFollowIncomingChatMessage() {
+  try {
+    const logToApp = _feBuildChatLogAppMap();
+    const now = _feStickyNow();
+    const followed = [];
+    for (const log of feGetChatLogs()) {
+      if (!feIsElementNode(log)) continue;
+      const app = logToApp.get(log) ?? null;
+      if (app?.isBrowsingHistory === true) continue; // browsing history → never hijack
+      const scrollEl = feFindScrollContainer(log);
+      _feStickyEnsureWatcher(scrollEl);
+      const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+      if (gap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY) {
+        _feStickyFollowUntil.set(scrollEl, now + FE_STICKY_FOLLOW_MS);
+        followed.push({ scrollEl, app });
+      }
+    }
+    if (!followed.length) return;
+    const pinAll = () => {
+      for (const { scrollEl, app } of followed) {
+        try {
+          if (app?.isBrowsingHistory === true) continue;
+          if (_feStickyNow() >= (_feStickyFollowUntil.get(scrollEl) ?? 0)) continue; // user scrolled up
+          const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+          if (gap > 0) _feStickyPin(scrollEl, app);
+        } catch { /* no-op */ }
+      }
+    };
+    // Staggered pins covering the full settle window: immediate, after the merge
+    // RAF + full-merge debounce (~120ms), and after async portrait/image reflow.
+    pinAll();
+    setTimeout(pinAll, 130);
+    setTimeout(pinAll, 280);
+  } catch { /* no-op */ }
 }
 
 function feGetRoundMarkerFlagValue(source) {
@@ -481,6 +543,7 @@ export {
   feWindowRequestFrame,
   feWindowCancelFrame,
   feSnapshotAndRestoreStickyScroll,
+  feFollowIncomingChatMessage,
   feGetRoundMarkerFlagValue,
   feLooksLikeRoundMarkerFlavor,
 };
