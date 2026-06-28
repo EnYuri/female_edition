@@ -22,7 +22,7 @@ import {
   feGetChatLogs, feGetChatLogsInDocument, feDedupeChatMessagesInLog,
   feGetMessageIdFromElement, feNormalizeChatMessageId, feCssEscape,
   feDeferTask, feWindowRequestFrame, feSnapshotAndRestoreStickyScroll,
-  feFollowIncomingChatMessage,
+  feFollowIncomingChatMessage, feRepinFollowingChatLogs,
   feGetMessageFromElementOrCollection,
 } from "./fe-util.js";
 
@@ -646,8 +646,8 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.SYSTEM_MSG_COLOR, {
-    name: "내레이션·시스템 메시지에 시스템 색상 적용",
-    hint: "화자(캐릭터)가 없는 메시지(내레이션, GM의 NPC/내레이션, 시스템 메시지)에 중립 회색 배경을 입힙니다. 레트로 테마 + 텍스트 색조 오버라이드가 켜져 있으면 강조색 톤을 사용합니다.",
+    name: "시스템 메시지에 배경색 적용",
+    hint: "화자(캐릭터)가 없는 메시지(GM의 NPC/내레이션, 시스템 메시지)에 아래에서 지정한 배경색을 입힙니다. 내레이터 채팅(/narrate·/describe·/note)은 글씨가 흰색이라 제외되며 자체 어두운 배경을 유지합니다. 레트로 테마 + 텍스트 색조 오버라이드가 켜져 있으면 강조색 톤을 사용합니다.",
     scope: "client",
     config: false,
     type: Boolean,
@@ -656,6 +656,16 @@ Hooks.once("init", () => {
       feSetSystemMsgColorClass(document);
       feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
     },
+  });
+
+  game.settings.register(MODULE_ID, S.SYSTEM_MSG_BG_COLOR, {
+    name: "시스템 메시지 배경색",
+    hint: "'시스템 메시지에 배경색 적용'이 켜져 있을 때 화자 없는 메시지에 사용할 배경색입니다. 기본값은 흰색.",
+    scope: "client",
+    config: false,
+    type: String,
+    default: FE_DEFAULTS[S.SYSTEM_MSG_BG_COLOR],
+    onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
   game.settings.register(MODULE_ID, S.FORCE_NORMAL_MSG_COLOR, {
@@ -851,6 +861,26 @@ Hooks.once("ready", async () => {
   feScheduleFullMergePass({ delay: 150 });
   setTimeout(() => feScheduleFullMergePass({ delay: 0 }), 600);
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
+
+  // Keep the bottom-pin when the chat becomes visible again after being hidden, for
+  // readers who were following. The inactive sidebar tab is display:none (measurements
+  // read 0) and core's _onActivate does not re-scroll, so a message that arrives while
+  // the chat tab is in the background leaves the log scrolled-up on return. Gated on
+  // core's persistent app.isAtBottom inside feRepinFollowingChatLogs (scroll-up readers
+  // are never yanked). Covers: sidebar tab switch (changeSidebarTab → chat), sidebar
+  // re-expand (collapseSidebar), and browser tab/window refocus (visibilitychange/focus).
+  Hooks.on("changeSidebarTab", (app) => {
+    if (app === ui.chat) feRepinFollowingChatLogs();
+  });
+  Hooks.on("collapseSidebar", (_app, collapsed) => {
+    if (!collapsed) feRepinFollowingChatLogs();
+  });
+  try {
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) feRepinFollowingChatLogs();
+    });
+    window.addEventListener("focus", () => feRepinFollowingChatLogs());
+  } catch { /* no-op */ }
 });
 
 // -------------------------------------
