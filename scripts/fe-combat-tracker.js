@@ -407,6 +407,7 @@ function feCtOpenContextMenu(id, x, y) {
       label: c.isDefeated ? feCtL("FECT.Ctx.Revive", "사망 해제") : feCtL("FECT.Ctx.Defeat", "사망 표시"),
     },
     { action: "adjust-hp", icon: "fa-heart", label: feCtL("FECT.Ctx.AdjustHP", "HP 조절") },
+    { action: "set-initiative", icon: "fa-dice-d20", label: feCtL("FECT.Ctx.SetInit", "이니셔티브 수정") },
     { action: "move-up", icon: "fa-arrow-up", label: feCtL("FECT.Ctx.MoveUp", "순서 위로") },
     { action: "move-down", icon: "fa-arrow-down", label: feCtL("FECT.Ctx.MoveDown", "순서 아래로") },
   ];
@@ -470,6 +471,7 @@ async function feCtHandleContextAction(action, id) {
         break;
       }
       case "adjust-hp":       await feCtOpenHpDialog(c); break;
+      case "set-initiative":  await feCtOpenInitiativeDialog(combat, c); break;
       case "move-up":         await feCtMoveCombatant(combat, c, -1); break;
       case "move-down":       await feCtMoveCombatant(combat, c, +1); break;
     }
@@ -517,6 +519,50 @@ async function feCtOpenHpDialog(c) {
   const val = Number(result);
   if (!Number.isFinite(val)) return;
   await actor.update({ [path]: val });
+}
+
+// Edit a combatant's initiative value for the current encounter. We only write
+// the one combatant's own `initiative` and let Foundry core re-sort — Combat#update
+// calls `setupTurns()` which sorts `turns` by initiative DESC (core's own ordering).
+// This is the safe approach: we never reorder/renumber other combatants ourselves.
+async function feCtOpenInitiativeDialog(combat, c) {
+  const cur = Number(c.initiative);
+  const curStr = Number.isFinite(cur) ? String(cur) : "";
+
+  const DialogV2 = foundry.applications.api.DialogV2;
+  const content =
+    `<div class="fe-ct-init-dialog" style="padding:6px 2px;display:flex;align-items:center;gap:8px;">` +
+    `<label style="font-weight:bold;">${feCtEsc(feCtL("FECT.Ctx.Initiative", "이니셔티브"))}</label>` +
+    `<input type="number" name="init" value="${feCtEsc(curStr)}" step="any" autofocus ` +
+    `placeholder="${feCtEsc(feCtL("FECT.Ctx.InitEmpty", "비움 = 미설정"))}" ` +
+    `style="flex:1;min-width:90px;"></div>`;
+  let result;
+  try {
+    result = await DialogV2.prompt({
+      window: { title: `${feCtL("FECT.Ctx.SetInit", "이니셔티브 수정")} — ${c.name}` },
+      content,
+      ok: {
+        label: feCtL("FECT.Apply", "적용"),
+        callback: (ev, btn) => btn.form.elements.init.value,
+      },
+    });
+  } catch {
+    return; // dialog cancelled
+  }
+  if (result == null) return;
+  const raw = String(result).trim();
+  // empty input → clear initiative (back to "unset"); core re-sorts unset to the bottom
+  if (raw === "") {
+    await c.update({ initiative: null });
+    return;
+  }
+  const val = Number(raw);
+  if (!Number.isFinite(val)) {
+    ui.notifications?.warn(feCtL("FECT.Ctx.InitInvalid", "유효한 이니셔티브 값이 아닙니다."));
+    return;
+  }
+  // write only this combatant's initiative — core's setupTurns() does the re-sort
+  await c.update({ initiative: val });
 }
 
 // Reorder by ACTUALLY changing the moved combatant's own initiative (not a swap —

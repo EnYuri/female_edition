@@ -213,6 +213,10 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
 
+    // 시스템(화자 없는) 메시지 배경색 — 기본 흰색. body.fe-system-msg-color가 켜졌을 때만 적용.
+    const sysBg = String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? "#ffffff").trim() || "#ffffff";
+    root.style.setProperty("--fe-system-msg-bg", sysBg);
+
     root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
 
     const accent = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff";

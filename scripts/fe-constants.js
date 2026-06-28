@@ -39,6 +39,7 @@ const S = {
   USER_COLOR_BG_CUSTOM: "ceUserColorBgCustom",
   USER_COLOR_ALPHA: "ceUserColorAlpha",
   SYSTEM_MSG_COLOR: "ceSystemMsgColor",
+  SYSTEM_MSG_BG_COLOR: "ceSystemMsgBgColor",
   FORCE_NORMAL_MSG_COLOR: "ceForceNormalMsgColor",
   CHAT_GROUP_OUTLINE: "ceChatGroupOutline",
   ACCENT_TEXT_OVERRIDE: "ceAccentTextOverride",
@@ -86,6 +87,11 @@ const S = {
   TOKEN_GLOW_STRENGTH: "ceTokenGlowStrength",
   TOKEN_GLOW_TARGET: "ceTokenGlowTarget",
   TOKEN_GLOW_SIGHTLINE: "ceTokenGlowSightline",
+  // Music: players upload audio (GM-proxied) into their own personal playlist.
+  MUSIC_ENABLED: "ceMusicEnabled",
+  MUSIC_PLAYLIST_NAME: "ceMusicPlaylistName",
+  MUSIC_UPLOAD_ROOT: "ceMusicUploadRoot",
+  MUSIC_MAX_MB: "ceMusicMaxUploadMB",
 };
 
 const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
@@ -129,6 +135,7 @@ const FE_DEFAULTS = {
   [S.USER_COLOR_BG_CUSTOM]: "#ffffff",
   [S.USER_COLOR_ALPHA]: 0.22,
   [S.SYSTEM_MSG_COLOR]: false,
+  [S.SYSTEM_MSG_BG_COLOR]: "#ffffff",
   [S.FORCE_NORMAL_MSG_COLOR]: false,
   [S.CHAT_GROUP_OUTLINE]: false,
   [S.ACCENT_TEXT_OVERRIDE]: false,
@@ -176,6 +183,10 @@ const FE_DEFAULTS = {
   [S.TOKEN_GLOW_STRENGTH]: 5,
   [S.TOKEN_GLOW_TARGET]: true,
   [S.TOKEN_GLOW_SIGHTLINE]: true,
+  [S.MUSIC_ENABLED]: true,
+  [S.MUSIC_PLAYLIST_NAME]: "player-uploads",
+  [S.MUSIC_UPLOAD_ROOT]: "assets/uploadedmusic",
+  [S.MUSIC_MAX_MB]: 20,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";

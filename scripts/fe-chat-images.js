@@ -343,6 +343,22 @@ function ciGetImagePopoutSubclass() {
       });
       return buttons;
     }
+    // 큰 이미지를 클릭하면 창을 닫는다(X 버튼과 동일 동작).
+    _onRender(context, options) {
+      super._onRender?.(context, options);
+      try {
+        const img = this.element?.querySelector?.(".window-content img") ?? this.element?.querySelector?.("img");
+        if (img && img.dataset.feClickClose !== "1") {
+          img.dataset.feClickClose = "1";
+          img.style.cursor = "zoom-out";
+          img.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.close();
+          });
+        }
+      } catch {}
+    }
   };
   return _ciImagePopoutSub;
 }

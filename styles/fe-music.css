@@ -1,0 +1,37 @@
+/* female_edition: Music feature window (ApplicationV2). Ported from emanim-music. */
+
+/* AppV2 height:auto does not clamp to max-height in JS, but the browser-rendered
+   box (which getBoundingClientRect measures) IS capped — so this both caps height
+   and scrolls a long track list. See CLAUDE.md "AppV2 Auto-Height Sheets". */
+.fe-music-app { max-height: 80vh; }
+.fe-music-app .window-content { overflow-y: auto; }
+
+.fe-music { padding: 10px; }
+.fe-music__header { display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; }
+.fe-music__title h2 { margin:0; }
+.fe-music__sub { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+
+.fe-music__actions { display:flex; gap:6px; }
+.fe-music__actions button { width:36px; height:30px; display:grid; place-items:center; }
+
+.fe-music .tag { font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--color-border-light-2); opacity: .9; }
+.fe-music .tag.ok { border-color: var(--color-border-light-highlight, #6a9a6a); color: var(--color-text-light-highlight, #6a9a6a); }
+.fe-music .tag.warn { opacity: .8; }
+
+.fe-music__card { border: 1px solid var(--color-border-light-2); border-radius: 10px; padding: 10px; margin-top: 10px; }
+
+.fe-music__drop-zone { border: 2px dashed var(--color-border-light-2); border-radius: 8px; padding: 12px 10px 8px; margin-top: 8px; text-align: center; transition: background 0.15s, border-color 0.15s; }
+.fe-music__drop-zone.drag-over { background: var(--color-bg-option, rgba(100,140,200,0.08)); border-color: var(--color-border-light-highlight, #6a9a6a); }
+.fe-music__drop-zone.is-disabled { opacity: 0.55; pointer-events: none; }
+
+.fe-music__upload-btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--color-border-light-2); font-size: 13px; transition: background 0.1s; }
+.fe-music__upload-btn:hover { background: var(--color-bg-option, rgba(100,140,200,0.1)); }
+.fe-music__upload-btn input[type="file"] { display: none; }
+.fe-music__row { display:grid; grid-template-columns: 110px 1fr; gap: 8px; align-items:center; margin: 6px 0; }
+.fe-music__list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
+.fe-music__item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; border:1px solid var(--color-border-light-2); }
+.fe-music__item .name { display:flex; gap:8px; align-items:center; overflow:hidden; }
+.fe-music__item .name span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 320px; }
+.fe-music__item .actions { display:flex; gap:6px; }
+.fe-music__item button { width:32px; height:28px; display:grid; place-items:center; }
+.fe-music .hint { opacity:.85; font-size:12px; margin-top: 8px; }

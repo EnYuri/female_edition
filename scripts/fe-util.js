@@ -308,6 +308,18 @@ const FE_STICKY_PIN_IGNORE_MS  = 160;       // ignore scrollTop drops this soon 
 
 function _feStickyNow() { try { return performance.now(); } catch { return Date.now(); } }
 
+// A scroll container inside a display:none subtree (the inactive sidebar tab —
+// core CSS `.app.tab:not(.active,.sidebar-popout){display:none}`) reports
+// scrollHeight/scrollTop/clientHeight all 0, so its pixel gap is a meaningless 0
+// that masquerades as "at bottom". When hidden we must fall back to the persistent
+// intent (app.isAtBottom) instead of trusting the gap, otherwise a reader who
+// deliberately scrolled up before hiding the tab gets a fabricated follow window
+// and is yanked to the bottom on return.
+function _feElementVisible(el) {
+  try { return !!el && el.offsetParent !== null && el.clientHeight > 0; }
+  catch { return true; }
+}
+
 // Install a one-time scroll watcher that drops the follow-lock when the USER scrolls up.
 // A scrollTop decrease that is NOT within the post-pin grace window is treated as a
 // deliberate upward gesture (wheel, scrollbar drag, keys, touch — all covered).
@@ -321,7 +333,16 @@ function _feStickyEnsureWatcher(scrollEl) {
         const cur = scrollEl.scrollTop;
         const last = _feStickyLastTop.get(scrollEl) ?? cur;
         _feStickyLastTop.set(scrollEl, cur);
-        if (cur < last - 4 && (_feStickyNow() - (_feStickyPinTs.get(scrollEl) ?? 0)) > FE_STICKY_PIN_IGNORE_MS) {
+        // Only treat a scrollTop DECREASE as a user scroll-up when it actually
+        // moves us away from the bottom. A content shrink above the viewport (a
+        // message deleted by another user, a merge re-collapse, a typing indicator
+        // removed, an embed/image reflowing smaller) clamps scrollTop DOWN while
+        // keeping us at the bottom (gap stays ~0) — that is NOT a user gesture and
+        // must not drop the follow lock. A genuine upward gesture grows the gap
+        // past the bottom band.
+        const curGap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+        if (cur < last - 4 && curGap > FE_STICKY_PIXEL_TOLERANCE_SAFETY
+            && (_feStickyNow() - (_feStickyPinTs.get(scrollEl) ?? 0)) > FE_STICKY_PIN_IGNORE_MS) {
           _feStickyFollowUntil.set(scrollEl, 0); // user scrolled up → stop following
         }
       } catch { /* no-op */ }
@@ -390,9 +411,13 @@ function feSnapshotAndRestoreStickyScroll() {
     // note above. We OR it with a pixel-gap safety net for the at-bottom check, then
     // fall back to our own follow window so a burst doesn't strand the newest message.
     const pixelGap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
-    const atBottom = (app && typeof app.isAtBottom === "boolean")
-      ? (app.isAtBottom || pixelGap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY)
-      : (pixelGap <= FE_STICKY_PIXEL_TOLERANCE);
+    // While hidden (display:none) the gap is a meaningless 0 — trust only the
+    // persistent intent so a scrolled-up reader is not later yanked to bottom.
+    const atBottom = !_feElementVisible(scrollEl)
+      ? (app?.isAtBottom === true)
+      : ((app && typeof app.isAtBottom === "boolean")
+          ? (app.isAtBottom || pixelGap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY)
+          : (pixelGap <= FE_STICKY_PIXEL_TOLERANCE));
     if (atBottom) _feStickyFollowUntil.set(scrollEl, now + FE_STICKY_FOLLOW_MS);
     const follow = atBottom || now < (_feStickyFollowUntil.get(scrollEl) ?? 0);
     return { log, scrollEl, follow, app };
@@ -445,11 +470,20 @@ function feFollowIncomingChatMessage() {
     for (const log of feGetChatLogs()) {
       if (!feIsElementNode(log)) continue;
       const app = logToApp.get(log) ?? null;
-      if (app?.isBrowsingHistory === true) continue; // browsing history → never hijack
+      // fe-chat-prune.js defines isBrowsingHistory: true when the newest tail is
+      // pruned AND the DOM bottom is NOT the true newest message. Following here
+      // would yank a history-browsing reader down to the (incomplete) DOM bottom.
+      if (app?.isBrowsingHistory === true) continue;
       const scrollEl = feFindScrollContainer(log);
       _feStickyEnsureWatcher(scrollEl);
+      // While hidden the gap is a meaningless 0 → it would fabricate a follow
+      // window even for a scrolled-up reader (who would then be yanked down on
+      // tab return). When hidden, follow only if the persistent intent says so.
       const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
-      if (gap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY) {
+      const following = _feElementVisible(scrollEl)
+        ? (gap <= FE_STICKY_PIXEL_TOLERANCE_SAFETY)
+        : (app?.isAtBottom === true);
+      if (following) {
         _feStickyFollowUntil.set(scrollEl, now + FE_STICKY_FOLLOW_MS);
         followed.push({ scrollEl, app });
       }
@@ -458,7 +492,7 @@ function feFollowIncomingChatMessage() {
     const pinAll = () => {
       for (const { scrollEl, app } of followed) {
         try {
-          if (app?.isBrowsingHistory === true) continue;
+          if (app?.isBrowsingHistory === true) continue; // history-browsing (pruned tail) → never hijack
           if (_feStickyNow() >= (_feStickyFollowUntil.get(scrollEl) ?? 0)) continue; // user scrolled up
           const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
           if (gap > 0) _feStickyPin(scrollEl, app);
@@ -470,6 +504,47 @@ function feFollowIncomingChatMessage() {
     pinAll();
     setTimeout(pinAll, 130);
     setTimeout(pinAll, 280);
+  } catch { /* no-op */ }
+}
+
+// Re-assert the bottom pin when the chat becomes VISIBLE again after being hidden,
+// for readers who were following the bottom. While the chat sidebar tab is inactive
+// it is `display:none` (core CSS: `.app.tab:not(.active,.sidebar-popout){display:none}`),
+// so scroll measurements read 0 and core's scrollBottom() (scrollTop=0x7fffffbf) clamps
+// to nothing — a message arriving meanwhile leaves the log scrolled-up on return, and
+// core's `_onActivate` does NOT re-scroll. The user's at-bottom INTENT survives in core's
+// persistent `app.isAtBottom` (only a real scroll event flips it, never a tab/visibility
+// change), so we gate strictly on it (OR our own still-live follow window) — a reader who
+// deliberately scrolled up has isAtBottom=false and is never yanked down. Deferred to the
+// next frame because the `.active` class (hence layout) is applied AFTER the
+// changeSidebarTab hook fires, so a synchronous read would still see the hidden element.
+function feRepinFollowingChatLogs() {
+  try {
+    const logToApp = _feBuildChatLogAppMap();
+    for (const log of feGetChatLogs()) {
+      if (!feIsElementNode(log)) continue;
+      const app = logToApp.get(log) ?? null;
+      if (app?.isBrowsingHistory === true) continue;
+      const scrollEl = feFindScrollContainer(log);
+      _feStickyEnsureWatcher(scrollEl);
+      const following = (app && app.isAtBottom === true)
+        || (_feStickyNow() < (_feStickyFollowUntil.get(scrollEl) ?? 0));
+      if (!following) continue;
+      const win = scrollEl.ownerDocument?.defaultView ?? window;
+      const raf = win?.requestAnimationFrame ?? globalThis.requestAnimationFrame;
+      const doPin = () => {
+        try {
+          if (app?.isBrowsingHistory === true) return;
+          // Re-check intent at fire time (the user might have scrolled up since).
+          if (app && app.isAtBottom === false
+              && _feStickyNow() >= (_feStickyFollowUntil.get(scrollEl) ?? 0)) return;
+          _feStickyPin(scrollEl, app);
+        } catch { /* no-op */ }
+      };
+      if (typeof raf === "function") raf.call(win ?? globalThis, doPin);
+      else setTimeout(doPin, 0);
+      setTimeout(doPin, 60); // safety net after the tab's layout/transition settles
+    }
   } catch { /* no-op */ }
 }
 
@@ -544,6 +619,7 @@ export {
   feWindowCancelFrame,
   feSnapshotAndRestoreStickyScroll,
   feFollowIncomingChatMessage,
+  feRepinFollowingChatLogs,
   feGetRoundMarkerFlagValue,
   feLooksLikeRoundMarkerFlavor,
 };

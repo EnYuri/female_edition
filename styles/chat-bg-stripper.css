@@ -193,24 +193,26 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-us
   background-blend-mode: normal !important;
 }
 
-/* Optional: neutral "system color" background for narration + system messages
- * (messages with no character color). Toggled by body.fe-system-msg-color. The
- * extra body class makes this win over the default narration background. */
+/* Optional: configurable "system color" background for system messages
+ * (messages with no character color). Toggled by body.fe-system-msg-color, color
+ * via --fe-system-msg-bg (default white). The extra body class makes this win.
+ * NOTE: 내레이터 채팅(/narrate /describe /note)은 의도적으로 제외 — 글씨색이 흰색이라
+ * 밝은 배경에서 안 보이므로 자체 어두운 배경(--fe-narrator-bg)을 유지한다. */
 body.fe-system-msg-color
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message:is(.fe-narrator-chat, .narrator-chat, .fe-system-msg),
+  .chat-message.fe-system-msg,
 body.fe-system-msg-color #chat-notifications
-  .message:is(.fe-narrator-chat, .narrator-chat, .fe-system-msg) {
-  background: var(--fe-system-msg-bg, #45464d) !important;
+  .message.fe-system-msg {
+  background: var(--fe-system-msg-bg, #ffffff) !important;
   background-blend-mode: normal !important;
 }
 
 /* Retro theme + accent override → accent-toned dark system color. */
 body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message:is(.fe-narrator-chat, .narrator-chat, .fe-system-msg),
+  .chat-message.fe-system-msg,
 body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notifications
-  .message:is(.fe-narrator-chat, .narrator-chat, .fe-system-msg) {
+  .message.fe-system-msg {
   background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 14%) !important;
 }
 

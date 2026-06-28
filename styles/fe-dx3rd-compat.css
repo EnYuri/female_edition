@@ -362,6 +362,39 @@ body.fe-retro-theme
   background-image: none            !important;
 }
 
+/* 병합 그룹 내부 가로 실선 제거.
+   ── 원인(라이브 v14.363 확인): 유저색 채팅 틴트는 각 .chat-message 에 *반투명*
+   배경(rgb(user)/0.15)을 칠한다. standard 병합 모드는 mid/end 에 margin-top: -spacing
+   을 줘 박스를 붙이는데, 이 월드에서는 flex row-gap 이 세로 간격에 기여하지 않아
+   순수 -2px *겹침*이 된다. 그 2px 겹침 구간에서 반투명 배경이 두 번 칠해져 색이
+   진해지고 → 가로 실선처럼 보인다. (테두리는 이미 0 으로 접혀 있으므로 테두리가
+   아니다.)
+   ── 해법: 병합 그룹 내부 경계의 겹침을 제거해 정확히 맞닿게(gap 0) 한다. 그러면
+   반투명 배경이 픽셀당 한 번만 칠해져 이음새가 사라진다. layouts 레이어라
+   fe-chat-enhance.css(modules)의 margin !important 를 이긴다. simple 모드의 의도된
+   간격은 건드리지 않도록 standard 모드로 한정. */
+body.fe-retro-theme.fe-chat-merge.fe-merge-mode-standard
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
+  margin-top: 0 !important;
+}
+body.fe-retro-theme.fe-chat-merge.fe-merge-mode-standard
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
+  margin-bottom: 0 !important;
+}
+/* 내부 경계 테두리도 0 으로 (simple 모드 및 방어용 — standard 는 이미 접힘) */
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
+  border-bottom-width: 0 !important;
+}
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log)
+  .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
+  border-top-width: 0 !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 15  채팅카드 — 검정 내부 · 유저 색상(또는 액센트) 테두리

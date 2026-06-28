@@ -261,6 +261,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.USER_COLOR_BG_CUSTOM]: feRead(S.USER_COLOR_BG_CUSTOM),
       [S.USER_COLOR_ALPHA]:   feRead(S.USER_COLOR_ALPHA),
       [S.SYSTEM_MSG_COLOR]:   feRead(S.SYSTEM_MSG_COLOR),
+      [S.SYSTEM_MSG_BG_COLOR]: feRead(S.SYSTEM_MSG_BG_COLOR),
       [S.FORCE_NORMAL_MSG_COLOR]: feRead(S.FORCE_NORMAL_MSG_COLOR),
       [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
       [S.ACCENT_TEXT_OVERRIDE]: feRead(S.ACCENT_TEXT_OVERRIDE),
@@ -337,6 +338,12 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.COMBAT_TRACKER_SHOW_INITIATIVE]: feRead(S.COMBAT_TRACKER_SHOW_INITIATIVE),
       [S.COMBAT_TRACKER_SHOW_DISPOSITION]:feRead(S.COMBAT_TRACKER_SHOW_DISPOSITION),
       [S.COMBAT_TRACKER_SHOW_HP]:         feRead(S.COMBAT_TRACKER_SHOW_HP),
+
+      // Music (player audio upload — world/GM)
+      [S.MUSIC_ENABLED]:         feRead(S.MUSIC_ENABLED),
+      [S.MUSIC_PLAYLIST_NAME]:   feRead(S.MUSIC_PLAYLIST_NAME),
+      [S.MUSIC_UPLOAD_ROOT]:     feRead(S.MUSIC_UPLOAD_ROOT),
+      [S.MUSIC_MAX_MB]:          feRead(S.MUSIC_MAX_MB),
 
       // Token selection glow
       [S.TOKEN_GLOW_ENABLED]:   feRead(S.TOKEN_GLOW_ENABLED),
@@ -614,6 +621,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // User-color background
         bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
         str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
+        str(S.SYSTEM_MSG_BG_COLOR),
         bool(S.FORCE_NORMAL_MSG_COLOR),
         bool(S.CHAT_GROUP_OUTLINE),
 
@@ -680,6 +688,12 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         str(S.COMBAT_TRACKER_ALIGNMENT), str(S.COMBAT_TRACKER_PORTRAIT_IMAGE),
         bool(S.COMBAT_TRACKER_SHOW_INITIATIVE), bool(S.COMBAT_TRACKER_SHOW_DISPOSITION),
         bool(S.COMBAT_TRACKER_SHOW_HP),
+
+        // Music — world/GM (enabled[requiresReload] + name/root/size); non-GMs lack write permission
+        ...(game.user?.isGM ? [
+          bool(S.MUSIC_ENABLED), str(S.MUSIC_PLAYLIST_NAME),
+          str(S.MUSIC_UPLOAD_ROOT), num(S.MUSIC_MAX_MB),
+        ] : []),
 
         // Token selection glow — client/personal (GM-priority forces them automatically)
         bool(S.TOKEN_GLOW_ENABLED), bool(S.TOKEN_GLOW_HOVER), num(S.TOKEN_GLOW_STRENGTH),

@@ -90,6 +90,35 @@ body.fe-retro-theme :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
 
 
 /* ----------------------------------------------------------------
+ * 굴림 결과 숫자 줄바꿈 방지 (테마 무관 — 레트로/일반 모두)
+ *
+ * dnd5e .dice-total 은 --font-primary(여성판이 CookieRun 으로 remap)+큰 글씨
+ * (font-size-28)을 쓰고, 우측에 36px 구분선(::before)+펼침 셰브론(::after)이
+ * 가로폭을 잡아먹는다. 포트레이트 주입으로 좁아진 채팅 폭에서 넓은 폰트가
+ * 겹치면 "27" 같은 두 자리 결과값이 글자 단위(2 / 7)로 세로 분해된다.
+ *   → 결과 숫자는 한 줄로 유지(nowrap). 수식(.dice-formula)은 공백 줄바꿈은
+ *     허용하되 글자 단위 분해만 막는다(keep-all). 인라인 롤 결과도 동일.
+ * layouts 레이어 !important 로 system 레이어 dnd5e 규칙을 확실히 이긴다. */
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.dice-result .dice-total, .dice-roll .dice-total, .dice-total) {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.dice-result .dice-formula, .dice-roll .dice-formula, .dice-formula) {
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .chat-message a.inline-roll {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+
+
+/* ----------------------------------------------------------------
  * dnd5e 텍스트 — 강조색(--fe-ac-*) 기반으로 통일
  *
  * dx3rd 레트로는 텍스트가 강조색 톤인데 dnd5e 는 흰/회색이라 색조 오버라이드가
