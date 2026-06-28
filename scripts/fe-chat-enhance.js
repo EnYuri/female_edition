@@ -22,6 +22,7 @@ import {
   feGetChatLogs, feGetChatLogsInDocument, feDedupeChatMessagesInLog,
   feGetMessageIdFromElement, feNormalizeChatMessageId, feCssEscape,
   feDeferTask, feWindowRequestFrame, feSnapshotAndRestoreStickyScroll,
+  feFollowIncomingChatMessage,
   feGetMessageFromElementOrCollection,
 } from "./fe-util.js";
 
@@ -1140,6 +1141,16 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 });
 
 Hooks.on("createChatMessage", (message, _options, userId) => {
+  try {
+    // Capture the pre-append bottom state NOW (before ChatLog#postOne renders/appends
+    // the new message) and guarantee a re-pin after our portrait/merge mutations settle.
+    // Core only auto-scrolls an incoming OTHER-player message when its cached isAtBottom
+    // is true, which a prior async reflow can wrongly flip to false while the user is in
+    // another window — stranding the new message. This makes following robust.
+    feFollowIncomingChatMessage();
+  } catch {
+    /* no-op */
+  }
   try {
     feHydrateRenderStateOverride(message, null, userId);
     feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));

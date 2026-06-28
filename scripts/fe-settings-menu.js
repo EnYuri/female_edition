@@ -198,6 +198,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       expandAll: FemaleEditionSettingsMenu.#onExpandAll,
       collapseAll: FemaleEditionSettingsMenu.#onCollapseAll,
       feSave: FemaleEditionSettingsMenu.#onSaveAction,
+      feResetDefaults: FemaleEditionSettingsMenu.#onResetDefaults,
     },
   };
 
@@ -543,7 +544,30 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
   // formData is a FormDataExtended; .object is the flat field map (data-dtype coerced).
   static async #onSubmit(_event, _form, formData) {
     const d = foundry.utils.expandObject(formData.object);
+    await FemaleEditionSettingsMenu.#applyValues(d);
+  }
 
+  // Reset every setting to the module's own defaults (ALL_DEFAULTS), reusing the exact
+  // same scope/permission gating as a normal save (non-GMs only reset their client-scope
+  // keys; world/GM keys are left untouched). Then re-render so the fields show defaults.
+  static async #onResetDefaults(event, _target) {
+    event.preventDefault();
+    const DialogV2 = foundry.applications.api.DialogV2;
+    const ok = await DialogV2.confirm({
+      window: { title: "기본값으로 되돌리기" },
+      content: "<p>모든 Female-cupwhi 설정을 <b>모듈 기본값</b>으로 되돌릴까요?</p>"
+        + "<p class=\"notes\">월드(GM) 설정은 GM만 되돌릴 수 있습니다. 일부 항목은 되돌린 뒤 새로고침이 필요할 수 있습니다.</p>",
+      modal: true,
+    }).catch(() => false);
+    if (!ok) return;
+    await FemaleEditionSettingsMenu.#applyValues({ ...ALL_DEFAULTS });
+    ui.notifications?.info("설정을 모듈 기본값으로 되돌렸습니다.");
+    try { await this.render(); } catch { /* no-op */ }
+  }
+
+  // Writes a flat key→value map into game.settings with full scope/permission gating.
+  // Shared by #onSubmit (form values) and #onResetDefaults (ALL_DEFAULTS).
+  static async #applyValues(d) {
     // Helpers return Promises directly — no async/await needed inside.
     const bool = (key) => game.settings.set(MODULE_ID, key, !!d[key]);
     const num  = (key) => { const n = Number(d[key]); return game.settings.set(MODULE_ID, key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };

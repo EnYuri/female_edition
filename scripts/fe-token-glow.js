@@ -1,9 +1,10 @@
 // Female-cupwhi: Token selection glow.
 //
-// When a token is controlled (selected) or hovered, add a soft silhouette glow to the
-// token's own mesh instead of drawing a separate copied token sprite. This keeps the
-// effect tied to core's token mesh lifecycle, avoiding stale oversized overlays when
-// a token texture or mesh transform is mid-refresh.
+// When a token is controlled (selected) or hovered, add a soft additive glow (a halo
+// behind the still-visible token art) to the token's own mesh instead of drawing a
+// separate copied token sprite. This keeps the effect tied to core's token mesh
+// lifecycle, avoiding stale oversized overlays when a token texture or mesh transform
+// is mid-refresh.
 //
 // The selection glow uses this client's player color and hides Foundry's native
 // square/circle border while active.
@@ -40,38 +41,25 @@ function feTgEnabled() {
 // Outline distance (texture-space px the glow reaches out to) and sampling quality.
 // Compiled into the shader as constants, so a change requires a fresh filter (we
 // rebuild everything on the relevant setting onChange anyway).
-const FE_TG_DISTANCE = 12;
+const FE_TG_DISTANCE = 22;
 const FE_TG_QUALITY = 0.12;
 
-// knockout = true  -> silhouette filter: erase the body, show only the outer ring
-//                     (used over the token mesh; the crisp mesh shows through).
-// knockout = false -> additive marker glow: keep the original graphic and add a halo
-//                     behind it (used on the native target-arrow reticule).
-function feTgFragmentShader(knockout = true) {
+// Additive marker glow: keep the original graphic and add a halo behind it. Applied to
+// the token's own mesh (selection/hover glow) and to the native target-arrow reticule.
+function feTgFragmentShader() {
   const dist = FE_TG_DISTANCE.toFixed(0);
   // ANGLE_STEP_SIZE / MAX_TOTAL_ALPHA mirror core GlowOverlayFilter's derivation.
   const angleStep = Math.min(1 / (FE_TG_QUALITY * FE_TG_DISTANCE), Math.PI * 2).toFixed(7);
-  const tail = knockout ? `
-    // Outer glow only, knocked out where the token's own art is opaque so the body
-    // stays transparent (the real mesh below shows through unaltered). The hue is a
-    // radial gradient: strong (near the silhouette) -> glowColorInner (player color),
-    // fading outward -> glowColorOuter (the native selection hue).
-    float bodyMask = 1.0 - smoothstep(0.35, 1.0, curColor.a);
-    float t = clamp(alphaRatio * outerStrength, 0.0, 1.0);
-    // Color mix biased 1.5x toward the inner (player) hue so it occupies more of the
-    // ring; the alpha falloff below stays on the unbiased t.
-    float tc = clamp(t * 1.5, 0.0, 1.0);
-    vec3 gcol = mix(glowColorOuter.rgb, glowColorInner.rgb, tc);
-    // Lift the outer (low-t) region so the selection hue there isn't washed out to ~0
-    // alpha, while still fading to 0 at the very edge (sqrt keeps t=0 -> a=0).
-    float a = clamp(sqrt(t) * bodyMask, 0.0, 1.0);
-    gl_FragColor = vec4(gcol * a, a);
-  ` : `
+  const tail = `
     // Additive marker glow: a halo behind the original graphic. uSampler is
     // premultiplied, so composite the original "source-over" the glow ring.
+    // Hue is a radial gradient: strong (near the silhouette) -> glowColor (inner),
+    // fading outward -> glowColorOuter. When both colors are equal it's a flat hue.
+    // glowColor.a is an overall alpha multiplier (lets the hover overlay sit at <1).
     float ring = clamp(alphaRatio * outerStrength, 0.0, 1.0);
-    float glowA = ring * (1.0 - curColor.a);
-    vec3  glowPM = glowColor.rgb * glowA;
+    vec3  gcol = mix(glowColorOuter.rgb, glowColor.rgb, ring);
+    float glowA = ring * (1.0 - curColor.a) * glowColor.a;
+    vec3  glowPM = gcol * glowA;
     float outA = curColor.a + glowA * (1.0 - curColor.a);
     vec3  outRGB = curColor.rgb + glowPM * (1.0 - curColor.a);
     gl_FragColor = vec4(outRGB, outA);
@@ -85,7 +73,6 @@ function feTgFragmentShader(knockout = true) {
 
   uniform float outerStrength;
   uniform vec4 glowColor;
-  uniform vec4 glowColorInner;
   uniform vec4 glowColorOuter;
 
   const float PI = 3.14159265358979323846264;
@@ -125,16 +112,17 @@ ${tail}
   }`;
 }
 
-// Additive glow applied to the native target-arrow reticule (kept crisp, halo added).
+// Additive glow halo (kept crisp, halo added) — used on both the token mesh selection
+// glow and the native target-arrow reticule.
 class FeMarkerGlowFilter extends PIXI.Filter {
   constructor() {
-    super(undefined, feTgFragmentShader(false), {
+    super(undefined, feTgFragmentShader(), {
       outerStrength: 2.4,
       glowColor: [1.0, 0.27, 0.27, 1.0],
-      glowColorInner: [1.0, 0.27, 0.27, 1.0],
       glowColorOuter: [1.0, 0.27, 0.27, 1.0],
     });
-    this.padding = FE_TG_DISTANCE + 4;
+    // Generous padding so the (possibly stacked controlled+hover) halo isn't clipped.
+    this.padding = FE_TG_DISTANCE + 12;
     this._baseStrength = 2.4;
   }
 
@@ -151,11 +139,137 @@ class FeMarkerGlowFilter extends PIXI.Filter {
 }
 
 /* -------------------------------------------- */
+/*  Outline filter (Alt highlight)              */
+/* -------------------------------------------- */
+
+// A LIGHTWEIGHT silhouette outline — a crisp edge line tracing the token image's own
+// shape (NOT the soft, multi-sample gradient glow). Used for the Alt "오브젝트 강조"
+// highlight, which lights up EVERY visible token at once: the glow shader (16 angles ×
+// 22 distance = ~350 samples/px) would be far too heavy across a whole scene, so this
+// samples only a few px out (THICK) over 16 angles -> a thin, hard-edged ring at a
+// fraction of the cost. Following the image silhouette inherently needs to read texture
+// alpha, so this is still a (tiny) shader — there is no non-shader way to outline an
+// arbitrary image's shape. Output is the token art unchanged + a flat outline ring
+// hugging its edge (premultiplied source-over, mirrors the glow's additive composite).
+const FE_TG_OUTLINE_THICK = 3;
+function feTgOutlineFragmentShader() {
+  const thick = FE_TG_OUTLINE_THICK.toFixed(1);
+  return `
+  precision highp float;
+  varying vec2 vTextureCoord;
+  uniform sampler2D uSampler;
+  uniform vec4 inputSize;
+  uniform vec4 inputClamp;
+  uniform vec4 outlineColor;
+
+  const float PI = 3.14159265358979323846264;
+  const float THICK = ${thick};
+  const float ANGLE_STEP = PI / 8.0; // 16 directions
+
+  float getClip(in vec2 uv) {
+    return step(3.5,
+      step(inputClamp.x, uv.x) +
+      step(inputClamp.y, uv.y) +
+      step(uv.x, inputClamp.z) +
+      step(uv.y, inputClamp.w));
+  }
+
+  void main(void) {
+    vec2 px = inputSize.zw;
+    vec4 cur = texture2D(uSampler, vTextureCoord);
+    float maxA = 0.0;
+    for (float angle = 0.0; angle < PI * 2.0; angle += ANGLE_STEP) {
+      vec2 dir = vec2(cos(angle), sin(angle)) * px;
+      for (float d = 1.0; d <= THICK; d += 1.0) {
+        vec2 disp = vTextureCoord + dir * d;
+        maxA = max(maxA, texture2D(uSampler, disp).a * getClip(disp));
+      }
+    }
+    // Ring lives OUTSIDE the body (where cur.a is low but a neighbor within THICK is
+    // opaque). Inside the body cur.a≈1 -> contribution ≈0, so the art shows untouched.
+    float ring  = clamp(maxA, 0.0, 1.0);
+    float edgeA = ring * (1.0 - cur.a);
+    vec3  edgePM = outlineColor.rgb * edgeA;
+    float outA  = cur.a + edgeA * (1.0 - cur.a);
+    vec3  outRGB = cur.rgb + edgePM * (1.0 - cur.a);
+    gl_FragColor = vec4(outRGB, outA);
+  }`;
+}
+
+class FeOutlineFilter extends PIXI.Filter {
+  constructor() {
+    super(undefined, feTgOutlineFragmentShader(), {
+      outlineColor: [1.0, 1.0, 1.0, 1.0],
+    });
+    this.padding = FE_TG_OUTLINE_THICK + 2;
+  }
+}
+
+/* -------------------------------------------- */
 /*  Overlay management                          */
 /* -------------------------------------------- */
 
-// token.id (current scene) -> { mesh, filter }
-const FE_TG_OVERLAYS = new Map();
+// token.id (current scene) of every token currently carrying the selection/hover glow.
+const FE_TG_GLOWING = new Set();
+
+// Shared lightweight outline filter for ALL Alt-highlighted tokens (see FeOutlineFilter).
+let feTgOutlineFilter = null;
+function feTgGetOutlineFilter() {
+  if (!feTgOutlineFilter || feTgOutlineFilter.destroyed) {
+    feTgOutlineFilter = new FeOutlineFilter();
+    feTgOutlineFilter._feTgMeshGlow = true;
+  }
+  feTgOutlineFilter.uniforms.outlineColor = [...feTgUserColorRGB(game.user), 1.0];
+  return feTgOutlineFilter;
+}
+
+// TWO shared additive glow filters distinguish the three selection states:
+//   - controlled (click)        -> the CONTROLLED filter alone: a flat player-color halo
+//   - hovered (no control)      -> the HOVER filter alone: a brighter inner->player-color
+//                                  gradient at reduced alpha, spread a touch wider
+//   - controlled AND hovered    -> BOTH filters stacked (controlled base + hover overlay),
+//                                  so the combined look reads distinctly from either alone
+// Every glowing token shares the same player color + strength, so one PIXI.Filter per
+// state can be attached to every matching mesh — PIXI supports sharing a filter across
+// display objects (apply() runs per-object each frame; the pulse keys off the global
+// ticker, so all glows stay in sync). The target-arrow reticule keeps its OWN per-token
+// instance (its hue is the target's border color, which differs per token).
+function feTgGlowStrength() {
+  return Number(feTgSetting(S.TOKEN_GLOW_STRENGTH)) || 4;
+}
+
+let feTgControlledFilter = null;
+function feTgGetControlledFilter() {
+  if (!feTgControlledFilter || feTgControlledFilter.destroyed) {
+    feTgControlledFilter = new FeMarkerGlowFilter();
+    feTgControlledFilter._feTgMeshGlow = true;
+  }
+  const c = feTgUserColorRGB(game.user);
+  feTgControlledFilter._baseStrength = feTgGlowStrength();
+  feTgControlledFilter.uniforms.glowColor = [...c, 1.0];      // flat, full alpha
+  feTgControlledFilter.uniforms.glowColorOuter = [...c, 1.0]; // inner == outer -> no gradient
+  return feTgControlledFilter;
+}
+
+let feTgHoverFilter = null;
+function feTgGetHoverFilter() {
+  if (!feTgHoverFilter || feTgHoverFilter.destroyed) {
+    feTgHoverFilter = new FeMarkerGlowFilter();
+    feTgHoverFilter._feTgMeshGlow = true;
+  }
+  const c = feTgUserColorRGB(game.user);
+  // Inner brightened toward white (fades out to the player color) -> a gradient highlight
+  // that visibly overlays the flat controlled base. A bit stronger so it spreads wider.
+  const inner = [
+    Math.min(1, c[0] * 0.35 + 0.65),
+    Math.min(1, c[1] * 0.35 + 0.65),
+    Math.min(1, c[2] * 0.35 + 0.65),
+  ];
+  feTgHoverFilter._baseStrength = feTgGlowStrength() + 2;
+  feTgHoverFilter.uniforms.glowColor = [...inner, 0.85];     // inner color + alpha multiplier
+  feTgHoverFilter.uniforms.glowColorOuter = [...c, 0.85];    // outer = player color
+  return feTgHoverFilter;
+}
 
 function feTgBorderColorRGB(token) {
   let raw;
@@ -203,16 +317,17 @@ function feTgUiScale() {
   return canvas?.dimensions?.uiScale ?? 1;
 }
 
-// Glow on real selection (controlled), or on the single token under the cursor when the
-// hover setting is on. We deliberately do NOT mirror `layer.highlightObjects` (the native
-// "오브젝트 강조" / Alt key) — that lights up EVERY token at once, which reads as "선택도
-// 안 했는데 글로우가 전부 토글된다".
+// Glow on real selection (controlled) and on the token under the cursor when the hover
+// setting is on. The native "오브젝트 강조" / Alt key (`layer.highlightObjects`) lights up
+// EVERY visible token: we replace core's square/circle selector with a lightweight
+// silhouette OUTLINE (feTgGetOutlineFilter) — crisp, cheap, tracks the token image shape.
 function feTgShouldGlow(token) {
   if (!token || token.destroyed || !token.mesh || token.mesh.destroyed) return false;
   if (token.document?.isSecret) return false;
   if (!token.visible || !token.renderable) return false;
   if (token.controlled) return true;
   if (feTgSetting(S.TOKEN_GLOW_HOVER) && token.hover) return true;
+  if (token.layer?.highlightObjects) return true;
   return false;
 }
 
@@ -222,19 +337,22 @@ function feTgSyncOverlay(token) {
     feTgRemoveOverlay(token.id);
     return;
   }
-  let entry = FE_TG_OVERLAYS.get(token.id);
-  if (!entry || entry.mesh !== mesh || entry.filter?.destroyed) {
-    if (entry) feTgRemoveOverlay(token.id);
-    const filter = new FeMarkerGlowFilter();
-    filter._feTgMeshGlow = true;
-    mesh.filters = [...(mesh.filters ?? []).filter((f) => !f?._feTgMeshGlow), filter];
-    entry = { mesh, filter };
-    FE_TG_OVERLAYS.set(token.id, entry);
-  }
-
-  const strength = Number(feTgSetting(S.TOKEN_GLOW_STRENGTH)) || 3;
-  entry.filter._baseStrength = strength;
-  entry.filter.uniforms.glowColor = [...feTgUserColorRGB(game.user), 1.0];
+  // Build this token's glow set from its current state, then re-attach it cleanly
+  // (strip any prior glow filters first — handles state changes and mesh swaps).
+  // Order matters: the controlled base goes first, the hover overlay stacks on top.
+  // Alt highlight (`highlightObjects`) shows only the lightweight outline, and only on
+  // tokens not already carrying a glow (controlled/hovered keep their richer glow).
+  const wantControlled = token.controlled;
+  const wantHover = feTgSetting(S.TOKEN_GLOW_HOVER) && token.hover;
+  const wantOutline = !!token.layer?.highlightObjects && !wantControlled && !wantHover;
+  const glow = [];
+  if (wantControlled) glow.push(feTgGetControlledFilter());
+  if (wantHover) glow.push(feTgGetHoverFilter());
+  if (wantOutline) glow.push(feTgGetOutlineFilter());
+  const filters = (mesh.filters ?? []).filter((f) => !f?._feTgMeshGlow);
+  mesh.filters = glow.length ? [...filters, ...glow] : (filters.length ? filters : null);
+  if (glow.length) FE_TG_GLOWING.add(token.id);
+  else FE_TG_GLOWING.delete(token.id);
   if (token.border) token.border.visible = false;
 }
 
@@ -248,15 +366,16 @@ function feTgRestoreNativeBorder(tokenId) {
 }
 
 function feTgRemoveOverlay(tokenId) {
-  const entry = FE_TG_OVERLAYS.get(tokenId);
-  if (!entry) return;
-  FE_TG_OVERLAYS.delete(tokenId);
+  FE_TG_GLOWING.delete(tokenId);
+  // Strip the shared glow filter off this token's current mesh — but never destroy the
+  // shared instance (other glowing tokens still reference it). A swapped-out old mesh is
+  // destroyed/GC'd anyway, so resolving the live token's mesh is sufficient.
+  const mesh = canvas?.tokens?.get?.(tokenId)?.mesh;
   try {
-    if (entry.mesh && !entry.mesh.destroyed) {
-      const filters = (entry.mesh.filters ?? []).filter((f) => f !== entry.filter && !f?._feTgMeshGlow);
-      entry.mesh.filters = filters.length ? filters : null;
+    if (mesh && !mesh.destroyed && mesh.filters?.length) {
+      const filters = mesh.filters.filter((f) => !f?._feTgMeshGlow);
+      mesh.filters = filters.length ? filters : null;
     }
-    entry.filter?.destroy?.();
   } catch { /* no-op */ }
   finally { feTgRestoreNativeBorder(tokenId); }
 }
@@ -279,7 +398,7 @@ function feTgRefresh(token) {
 // tokens (usually 1–2), so the loop is effectively free; feTgRefresh() both removes
 // (when !shouldGlow / token gone) and re-syncs.
 function feTgReconcileOverlays() {
-  for (const id of [...FE_TG_OVERLAYS.keys()]) {
+  for (const id of [...FE_TG_GLOWING]) {
     const token = canvas?.tokens?.get(id);
     if (!token || token.destroyed) { feTgRemoveOverlay(id); continue; }
     feTgRefresh(token);
@@ -287,7 +406,7 @@ function feTgReconcileOverlays() {
 }
 
 function feTgRebuildAll() {
-  for (const id of [...FE_TG_OVERLAYS.keys()]) feTgRemoveOverlay(id);
+  for (const id of [...FE_TG_GLOWING]) feTgRemoveOverlay(id);
   if (!feTgEnabled()) {
     for (const token of canvas?.tokens?.placeables ?? []) feTgClearTargetGlow(token);
     feTgUpdateLocalSightlines();
@@ -331,7 +450,9 @@ function feTgRefreshTargetGlow(token) {
     filter = new FeMarkerGlowFilter();
     token._feTgArrowFilter = filter;
   }
-  filter.uniforms.glowColor = [...feTgBorderColorRGB(token), 1.0];
+  const arrowRGB = feTgBorderColorRGB(token);
+  filter.uniforms.glowColor = [...arrowRGB, 1.0];
+  filter.uniforms.glowColorOuter = [...arrowRGB, 1.0]; // flat hue (no gradient on arrows)
   if (arrows.filters?.length !== 1 || arrows.filters[0] !== filter) {
     arrows.filters = [filter];
   }
@@ -684,7 +805,7 @@ Hooks.once("init", () => {
     config: false,
     type: Number,
     default: FE_DEFAULTS[S.TOKEN_GLOW_STRENGTH],
-    range: { min: 1, max: 8, step: 1 },
+    range: { min: 1, max: 10, step: 1 },
     onChange: () => feTgRebuildAll(),
   });
   game.settings.register(MODULE_ID, S.TOKEN_GLOW_TARGET, {
@@ -720,7 +841,14 @@ Hooks.on(`${MODULE_ID}.chatUiUpdated`, () => {
 
 Hooks.on("canvasReady", () => {
   // The tokens layer (and our glow/sight containers) is torn down on every scene draw.
-  for (const id of [...FE_TG_OVERLAYS.keys()]) FE_TG_OVERLAYS.delete(id);
+  FE_TG_GLOWING.clear();
+  // Drop the shared filters so the next glow rebuilds them fresh against the redrawn scene.
+  try { feTgControlledFilter?.destroy?.(); } catch { /* no-op */ }
+  try { feTgHoverFilter?.destroy?.(); } catch { /* no-op */ }
+  try { feTgOutlineFilter?.destroy?.(); } catch { /* no-op */ }
+  feTgControlledFilter = null;
+  feTgHoverFilter = null;
+  feTgOutlineFilter = null;
   if (canvas?.tokens) {
     canvas.tokens.feSightLabels = null;
   }

@@ -851,37 +851,37 @@
     {{/if}}
 
     <div class="form-group">
-      <label>포트레이트 높이 (px, 개인)</label>
+      <label>포트레이트 높이 (px)</label>
       <div class="form-fields">
         <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="1" min="50" max="700" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 가로 (px, 개인)</label>
+      <label>대사창 가로 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="4" min="200" max="1600" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 세로 (px, 개인)</label>
+      <label>대사창 세로 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="4" min="100" max="600" />
       </div>
     </div>
     <div class="form-group">
-      <label>화면 하단 여백 (px, 개인)</label>
+      <label>화면 하단 여백 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="2" min="0" max="300" />
       </div>
     </div>
     <div class="form-group">
-      <label>화면 좌측 여백 (px, 개인)</label>
+      <label>화면 좌측 여백 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="4" min="0" max="1200" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사 폰트 크기 (px, 개인)</label>
+      <label>대사 폰트 크기 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="1" min="10" max="32" />
       </div>
@@ -1074,6 +1074,9 @@
   </details>
 
   <footer class="sheet-footer flexrow">
+    <button type="button" data-action="feResetDefaults" class="fe-btn">
+      <i class="fas fa-rotate-left"></i> 기본값으로 되돌리기
+    </button>
     <button type="button" data-action="feSave" class="fe-btn fe-btn--primary">
       <i class="far fa-save"></i> 저장
     </button>

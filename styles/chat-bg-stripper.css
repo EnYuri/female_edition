@@ -351,3 +351,17 @@ body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-messag
   background-image: none !important;
   background: transparent !important;
 }
+
+/* --------------------------------
+ * 2d) System-agnostic element-level texture strip
+ * --------------------------------
+ * dnd5e paints its parchment via a ::before pseudo-element (handled above), but OTHER
+ * systems paint the texture straight onto the message element's own `background-image`.
+ * Neutralize that too so texture removal works on EVERY system — keeping the player-color
+ * tint (which uses background-color + box-shadow, not background-image) intact. Narrator /
+ * round-marker surfaces are excluded (they intentionally keep their own background). */
+body.fe-strip-chat-textures
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
+  :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  background-image: none !important;
+}

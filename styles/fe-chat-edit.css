@@ -19,11 +19,12 @@
 /* Floating message editor      */
 /* --------------------------- */
 /* A draggable, resizable floating panel (appended to <body>, position:fixed) —
-   larger than the old inline strip and styled to echo the v14 sidebar chat input. */
+   sized to echo the v14 sidebar chat input. z-index sits above app windows (which
+   increment from ~100) and the rest of the UI so the editor is never overlaid. */
 #fe-chat-inline-editor {
   position: fixed;
-  z-index: 70;
-  width: clamp(360px, 34vw, 560px);
+  z-index: 10000;
+  width: clamp(280px, 24vw, 380px);
   display: block;
 }
 
@@ -31,8 +32,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   border: 1px solid var(--color-border-light-2, rgba(255, 255, 255, 0.18));
   border-radius: 10px;
   background: var(--color-cool-5, rgba(20, 22, 28, 0.96));
@@ -114,12 +115,13 @@
   display: flex;
 }
 
+/* Compact like the sidebar chat input — a 1–2 line box plus ~30px of edit headroom. */
 #fe-chat-inline-editor textarea.fe-chat-inline-editor-text {
   width: 100%;
   box-sizing: border-box;
-  min-height: 96px;
-  max-height: 48vh;
-  padding: 8px 10px;
+  min-height: 66px;
+  max-height: 40vh;
+  padding: 6px 9px;
   resize: vertical;
   overflow-y: auto;
   line-height: 1.5;
