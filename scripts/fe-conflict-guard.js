@@ -171,6 +171,91 @@ const FE_CG_CONFLICTS = [
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
+function feCgIsMldMidiTargetPositionError(app, err) {
+  const mld = game.modules?.get?.("monks-little-details");
+  if (!mld?.active) return false;
+  const midi = game.modules?.get?.("midi-qol");
+  if (!midi?.active) return false;
+
+  const isMidiTargetDialog = app?.id === "midi-qol-targetConfirmation"
+    || app?.constructor?.name === "TargetConfirmationDialog"
+    || app?.element?.classList?.contains?.("midi-targeting")
+    || app?.options?.classes?.includes?.("midi-targeting");
+  if (!isMidiTargetDialog) return false;
+
+  const stack = String(err?.stack ?? "");
+  const message = String(err?.message ?? err ?? "");
+  const hay = `${message}\n${stack}`;
+  return hay.includes("monks-little-details")
+    && (hay.includes("_updatePosition") || hay.includes("setPosition") || hay.includes("setWidth"));
+}
+
+function feCgPositionFallback(app, position) {
+  const current = app?.position;
+  if (current && typeof current === "object") return current;
+  return position && typeof position === "object" ? position : {};
+}
+
+function feCgInstallMldTargetConfirmationGuard() {
+  try {
+    const mld = game.modules?.get?.("monks-little-details");
+    if (!mld?.active) return false;
+    const midi = game.modules?.get?.("midi-qol");
+    if (!midi?.active) return false;
+    const proto = foundry.applications?.api?.ApplicationV2?.prototype;
+    if (!proto?.setPosition || proto.setPosition._feCgMldGuard) return false;
+
+    const guard = function feCgMldSetPositionGuard(wrapped, ...args) {
+      try {
+        return wrapped(...args);
+      } catch (err) {
+        if (!feCgIsMldMidiTargetPositionError(this, err)) throw err;
+        if (!this._feCgMldPositionWarned) {
+          this._feCgMldPositionWarned = true;
+          console.warn(
+            "[female_edition] monks-little-details/midi-qol TargetConfirmation setPosition 오류를 우회했습니다.",
+            err
+          );
+        }
+        return feCgPositionFallback(this, args[0]);
+      }
+    };
+
+    if (game.modules?.get?.("lib-wrapper")?.active && globalThis.libWrapper?.register) {
+      try {
+        libWrapper.register("female_edition", "foundry.applications.api.ApplicationV2.prototype.setPosition", guard, "WRAPPER");
+        proto.setPosition._feCgMldGuard = true;
+        return true;
+      } catch (err) {
+        console.warn("[female_edition] libWrapper guard registration failed; falling back to manual wrapper", err);
+      }
+    }
+
+    const original = proto.setPosition;
+    const wrapped = function feCgMldSetPositionGuardManual(...args) {
+      try {
+        return original.apply(this, args);
+      } catch (err) {
+        if (!feCgIsMldMidiTargetPositionError(this, err)) throw err;
+        if (!this._feCgMldPositionWarned) {
+          this._feCgMldPositionWarned = true;
+          console.warn(
+            "[female_edition] monks-little-details/midi-qol TargetConfirmation setPosition 오류를 우회했습니다.",
+            err
+          );
+        }
+        return feCgPositionFallback(this, args[0]);
+      }
+    };
+    wrapped._feCgMldGuard = true;
+    proto.setPosition = wrapped;
+    return true;
+  } catch (err) {
+    console.warn("[female_edition] monks-little-details TargetConfirmation guard install failed", err);
+    return false;
+  }
+}
+
 function feCgGenOf(v) {
   if (v == null) return null;
   const n = Number(String(v).split(".")[0]);
@@ -299,6 +384,8 @@ function feCgNeutralize(hit) {
 
 Hooks.once("ready", () => {
   try {
+    feCgInstallMldTargetConfirmationGuard();
+
     const active = FE_CG_CONFLICTS
       .map((c) => ({ ...c, mod: game.modules?.get?.(c.id) }))
       .filter((c) => c.mod?.active)

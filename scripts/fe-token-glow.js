@@ -1,21 +1,12 @@
-// Female-cupwhi: Token selection silhouette glow.
+// Female-cupwhi: Token selection glow.
 //
-// When a token is controlled (selected) or hovered, draw a glow that follows the
-// token image's NON-TRANSPARENT silhouette (the effective visible art), instead of
-// — or in addition to — Foundry's grid-square selection border. Only the HUE of the
-// native selection outline is preserved (control = green, disposition colors, …):
-// `token._getBorderColor()` feeds the glow color. The same smooth glow is used in
-// every theme, including the retro / pixel theme.
+// When a token is controlled (selected) or hovered, add a soft silhouette glow to the
+// token's own mesh instead of drawing a separate copied token sprite. This keeps the
+// effect tied to core's token mesh lifecycle, avoiding stale oversized overlays when
+// a token texture or mesh transform is mid-refresh.
 //
-// Implementation: a per-token overlay PIXI.Sprite mirrors the token's own
-// PrimarySpriteMesh transform and carries a custom knockout outer-glow filter. The
-// sprite lives in a dedicated container under `canvas.tokens` (same world transform
-// as the token meshes), so it pans/zooms with the scene. Knockout means the token's
-// own body pixels are erased from the overlay — only the surrounding glow ring shows,
-// and the real token mesh below stays fully crisp.
-//
-// The selection glow is a radial GRADIENT: inner (near the silhouette) = this client's
-// player color, fading outward to the native selection hue.
+// The selection glow uses this client's player color and hides Foundry's native
+// square/circle border while active.
 //
 // Target sightlines (controlled token -> the user's targets) are BROADCAST over the
 // shared module socket, so every user sees every other user's lines. Each line's solid
@@ -134,30 +125,6 @@ ${tail}
   }`;
 }
 
-class FeTokenGlowFilter extends PIXI.Filter {
-  constructor() {
-    super(undefined, feTgFragmentShader(), {
-      outerStrength: 3.0,
-      glowColor: [0.2, 0.74, 0.3, 1.0],
-      glowColorInner: [0.2, 0.74, 0.3, 1.0],
-      glowColorOuter: [0.2, 0.74, 0.3, 1.0],
-    });
-    this.padding = FE_TG_DISTANCE + 4;
-    this._baseStrength = 3.0;
-  }
-
-  /** @override Scale intensity with zoom + gentle pulse, like core glow/outline filters. */
-  apply(filterManager, input, output, clear) {
-    let strength = this._baseStrength * (canvas.stage?.worldTransform?.d ?? 1);
-    if (!canvas.photosensitiveMode) {
-      const time = canvas.app?.ticker?.lastTime ?? 0;
-      strength *= Math.oscillation(0.85, 1.18, time, 1600);
-    }
-    this.uniforms.outerStrength = strength;
-    filterManager.applyFilter(this, input, output, clear);
-  }
-}
-
 // Additive glow applied to the native target-arrow reticule (kept crisp, halo added).
 class FeMarkerGlowFilter extends PIXI.Filter {
   constructor() {
@@ -187,25 +154,8 @@ class FeMarkerGlowFilter extends PIXI.Filter {
 /*  Overlay management                          */
 /* -------------------------------------------- */
 
-// token.id (current scene) -> { sprite, filter }
+// token.id (current scene) -> { mesh, filter }
 const FE_TG_OVERLAYS = new Map();
-
-function feTgGetLayer() {
-  const tokens = canvas?.tokens;
-  if (!tokens) return null;
-  let layer = tokens.feGlowLayer;
-  if (!layer || layer.destroyed) {
-    layer = new PIXI.Container();
-    layer.eventMode = "none";
-    layer.interactiveChildren = false;
-    layer.sortableChildren = false;
-    // Above the placeable token sprites/borders within the tokens layer.
-    layer.zIndex = -1; // tokens layer sorts children; keep glow just under borders.
-    tokens.addChild(layer);
-    tokens.feGlowLayer = layer;
-  }
-  return layer;
-}
 
 function feTgBorderColorRGB(token) {
   let raw;
@@ -267,70 +217,48 @@ function feTgShouldGlow(token) {
 }
 
 function feTgSyncOverlay(token) {
-  const layer = feTgGetLayer();
-  if (!layer) return;
-  const mesh = token.mesh;
-  // Guard against an unloaded/placeholder texture. Right after F5 the token's real art
-  // may not be loaded yet; mesh.texture is then a 1px placeholder and mesh.scale is
-  // (displaySize / 1px) -> an enormous value. Snapshotting that into the overlay
-  // produces a giant silhouette that stays frozen until something re-syncs the token
-  // (the "새로고침 시 거대 글로우 지속" bug). Skip until the texture is valid; refreshToken
-  // fires again once it loads (and canvasReady's feTgRebuildAll re-runs regardless).
-  const tex = mesh?.texture;
-  if (!tex || !tex.valid || !tex.baseTexture?.valid || (tex.orig?.width ?? tex.width ?? 0) <= 1) {
+  const mesh = token?.mesh;
+  if (!mesh || mesh.destroyed) {
     feTgRemoveOverlay(token.id);
     return;
   }
   let entry = FE_TG_OVERLAYS.get(token.id);
-  if (!entry) {
-    const sprite = new PIXI.Sprite(mesh.texture);
-    sprite.eventMode = "none";
-    const filter = new FeTokenGlowFilter();
-    sprite.filters = [filter];
-    layer.addChild(sprite);
-    entry = { sprite, filter };
+  if (!entry || entry.mesh !== mesh || entry.filter?.destroyed) {
+    if (entry) feTgRemoveOverlay(token.id);
+    const filter = new FeMarkerGlowFilter();
+    filter._feTgMeshGlow = true;
+    mesh.filters = [...(mesh.filters ?? []).filter((f) => !f?._feTgMeshGlow), filter];
+    entry = { mesh, filter };
     FE_TG_OVERLAYS.set(token.id, entry);
-  } else if (entry.sprite.parent !== layer) {
-    // Layer was rebuilt (canvas redraw) — re-home the sprite.
-    layer.addChild(entry.sprite);
   }
 
-  const { sprite, filter } = entry;
-
-  // Mirror the mesh transform so the overlay overlaps it exactly.
-  // Position uses token.center (document-derived, always current) instead of
-  // mesh.position, which can be stale during Foundry v14's deferred render-flag
-  // flush — the refreshToken hook fires before the mesh's own _refresh pass
-  // writes the new position into the PIXI property.
-  sprite.texture = mesh.texture;
-  sprite.anchor.set(0.5, 0.5);
-  sprite.position.set(token.center.x, token.center.y);
-  sprite.rotation = mesh.rotation;
-  sprite.scale.set(mesh.scale.x, mesh.scale.y);
-  sprite.pivot.set(0, 0);
-  sprite.skew.set(0, 0);
-  sprite.alpha = 1;
-  sprite.visible = true;
-
   const strength = Number(feTgSetting(S.TOKEN_GLOW_STRENGTH)) || 3;
-  filter._baseStrength = strength;
-  // Radial gradient: inner (near body) = this client's player color,
-  // fading outward to the native selection hue (token border color).
-  filter.uniforms.glowColorInner = [...feTgUserColorRGB(game.user), 1.0];
-  filter.uniforms.glowColorOuter = [...feTgBorderColorRGB(token), 1.0];
-
-  // Replace the native grid-square outline with the silhouette glow (its hue is
-  // already carried by glowColor). Foundry re-computes border.visible in
-  // _refreshState on every refresh, so this self-heals when the token stops
-  // glowing — no explicit restore needed.
+  entry.filter._baseStrength = strength;
+  entry.filter.uniforms.glowColor = [...feTgUserColorRGB(game.user), 1.0];
   if (token.border) token.border.visible = false;
+}
+
+function feTgRestoreNativeBorder(tokenId) {
+  const token = canvas?.tokens?.get?.(tokenId);
+  const border = token?.border;
+  if (!token || !border || border.destroyed) return;
+  const isSecret = token.document?.isSecret;
+  const isHover = token.hover || token.layer?.highlightObjects;
+  border.visible = !isSecret && (token.controlled || isHover);
 }
 
 function feTgRemoveOverlay(tokenId) {
   const entry = FE_TG_OVERLAYS.get(tokenId);
   if (!entry) return;
   FE_TG_OVERLAYS.delete(tokenId);
-  try { entry.sprite.destroy({ children: true, texture: false, baseTexture: false }); } catch { /* no-op */ }
+  try {
+    if (entry.mesh && !entry.mesh.destroyed) {
+      const filters = (entry.mesh.filters ?? []).filter((f) => f !== entry.filter && !f?._feTgMeshGlow);
+      entry.mesh.filters = filters.length ? filters : null;
+    }
+    entry.filter?.destroy?.();
+  } catch { /* no-op */ }
+  finally { feTgRestoreNativeBorder(tokenId); }
 }
 
 function feTgRefresh(token) {
@@ -625,7 +553,7 @@ function feTgScheduleSightlines() {
 
 // Erase a target token's image silhouette out of the beam framebuffer, so the
 // line/point appear to pass BEHIND that target's art. Mirrors the token mesh's
-// full transform (same approach as feTgSyncOverlay); ERASE subtracts source
+// full transform; ERASE subtracts source
 // alpha, so anti-aliased art edges give a clean, shape-accurate cut (no square).
 function feTgClearOcclude(occlude) {
   for (const c of [...occlude.children]) {
@@ -794,7 +722,6 @@ Hooks.on("canvasReady", () => {
   // The tokens layer (and our glow/sight containers) is torn down on every scene draw.
   for (const id of [...FE_TG_OVERLAYS.keys()]) FE_TG_OVERLAYS.delete(id);
   if (canvas?.tokens) {
-    canvas.tokens.feGlowLayer = null;
     canvas.tokens.feSightLabels = null;
   }
   if (canvas?.primary) canvas.primary.feSightLayer = null;
