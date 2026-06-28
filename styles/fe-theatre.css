@@ -190,10 +190,69 @@
 
 .fe-stage-textbox-content {
   flex: 1;
+  min-height: 0;            /* flex 자식이 줄어들 수 있어야 overflow 스크롤이 작동 */
   overflow-y: auto;
   word-break: break-word;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/* 임베드 이미지/표가 올라온 메시지를 회상하거나 라이브로 받았을 때 — 가로 넘침
+   방지 + 세로는 본문 영역(고정 높이) 안에서 스크롤. */
+.fe-stage-textbox-content--rich :is(img, video, picture) {
+  max-width: 100%;
+  height: auto;
+}
+
+.fe-stage-textbox-content--rich table {
+  max-width: 100%;
+}
+
+.fe-stage-textbox-content--rich p:first-child { margin-top: 0; }
+.fe-stage-textbox-content--rich p:last-child  { margin-bottom: 0; }
+
+/* ── 말풍선 우상단 버튼 툴바: [이전 발화 <] [닫기 ✕] ───────────── */
+
+.fe-stage-textbox-tools {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 4;
+  opacity: 0.5;
+  transition: opacity 0.18s ease;
+}
+
+.fe-stage-textbox:hover .fe-stage-textbox-tools {
+  opacity: 1;
+}
+
+.fe-stage-textbox-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* 호버 강조 — 테마 불문 백색 글로우. box-shadow 는 retro(fe-dx3rd-compat)에서
+   전역 제거되므로 filter: drop-shadow 로 글로우를 줘 픽셀 테마에서도 살아남는다. */
+.fe-stage-textbox-btn:hover,
+.fe-stage-textbox-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.65);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9));
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -247,6 +306,18 @@ body:not(.fe-retro-theme) .fe-stage-label {
     0 0 3px rgba(0, 0, 0, 0.95);
   pointer-events: none;
   z-index: 3;
+}
+
+/* ── 무대 말풍선 글꼴 — 이름·본문 모두 큰 글자(primary, 쿠키런) ──────
+   커스텀 폰트가 켜져 있을 때만 적용. primary 변수는 글꼴 모드(쿠키런/
+   그림일기/NeoDGM/유저폰트)별로 ui-font.css 에서 remap 되므로 모든 모드에서
+   자동으로 맞는다. 이전에는 font-family 미지정으로 body 의 --fe-ui-font-family
+   (=UI 글꼴 토글값)만 상속받아, '쿠키런+그림일기'에서도 이름이 쿠키런이
+   아니었다. */
+body.fe-fonts-enabled .fe-stage-textbox-name,
+body.fe-fonts-enabled .fe-stage-label,
+body.fe-fonts-enabled .fe-stage-textbox-content {
+  font-family: var(--fe-font-primary) !important;
 }
 
 /* ── Nav bar (speak-as dropdown above chat input) ─────────────── */

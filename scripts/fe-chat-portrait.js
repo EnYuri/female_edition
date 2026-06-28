@@ -102,56 +102,6 @@ function cpApplyNameAlignClasses(doc = document) {
   } catch {}
 }
 
-function cpGetMergeFollowMode() {
-  try {
-    return String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
-  } catch {
-    return "hide";
-  }
-}
-
-function cpIsMergeEnabled() {
-  try {
-    return !!feSetting(S.MERGE_ENABLED);
-  } catch {
-    return false;
-  }
-}
-
-function cpIsNotificationMessageElement(messageEl) {
-  try {
-    if (!messageEl) return false;
-    if (messageEl.matches?.("#chat-notifications > .message, #chat-notifications .message")) return true;
-    return !!messageEl.closest?.("#chat-notifications .message");
-  } catch {
-    return false;
-  }
-}
-
-function cpShouldRenderPortraitForMessageElement(messageEl) {
-  try {
-    if (!messageEl) return true;
-    if (cpIsNotificationMessageElement(messageEl)) return true;
-
-    // If FE merge is enabled and this is a follow-up message (mid/end), mimic chat-portrait behavior:
-    // - only show portraits on follow-ups when the merge follow mode is "portrait".
-    if (cpIsMergeEnabled()) {
-      const cl = messageEl.classList;
-      const isFollow =
-        cl?.contains?.("fe-merge-mid") ||
-        cl?.contains?.("fe-merge-end") ||
-        cl?.contains?.("fe-merge-follow");
-      if (isFollow) {
-        const mode = cpGetMergeFollowMode();
-        return mode === "portrait";
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return true;
-}
-
 function cpExtractHTMLElement(html) {
   if (!html) return null;
   if (cpIsElement(html)) return html;
@@ -1106,11 +1056,19 @@ function cpUpsertPortrait(message, messageEl) {
     return;
   }
 
-  // Respect FE's chat-merge follow-up behavior (match chat-portrait expectations)
-  if (!cpShouldRenderPortraitForMessageElement(messageEl)) {
-    cpRemovePortrait(messageEl);
-    return;
-  }
+  // FE chat-merge follow-up behavior is handled ENTIRELY by CSS — the
+  // fe-merge-follow-{hide,name,portrait} rules in fe-chat-enhance.css show/hide
+  // `.message-header img` (our portrait) per the follow-header-style setting.
+  //
+  // Do NOT remove the portrait DOM for follow (mid/end) messages here. Portrait
+  // presence MUST be decoupled from merge classification: a merge recompute (on
+  // delete/edit/insert) only toggles fe-merge-* classes on existing DOM and does
+  // not re-run this upsert, so if we removed a follow message's portrait, a later
+  // reclassification promoting it to a group START (e.g. the prior start was
+  // deleted, or an edit shifted the neighborhood) would leave it permanently
+  // portrait-less. Always inject; let CSS govern follow visibility. (Verified the
+  // steady-state visuals are identical: in name/hide mode the CSS already hid the
+  // header img, and portrait mode always injected.)
 
   // Compatibility: skip known merged-message variants from other modules.
   // cpIsRoundMarkerMessage was already evaluated above (isRoundMarkerSpecial); do not call again.
@@ -1449,7 +1407,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "circle",
+    default: "none",
     choices: {
       circle: "원형",
       square: "사각형",
@@ -1467,7 +1425,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "theme",
+    default: "none",
     choices: {
       theme: "테마/기본값(변경 안 함)",
       none: "없음",
@@ -1487,7 +1445,7 @@ function cpRegisterSettings() {
     config: false,
     type: Number,
     range: { min: 0, max: 12, step: 1 },
-    default: 2,
+    default: 0,
     onChange: () => {
       cpScheduleRefreshAllChatMessages({ delay: 0 });
       feFireChatUiUpdated({ reason: "portrait-settings", document });
@@ -1513,7 +1471,7 @@ function cpRegisterSettings() {
     scope: "client",
     config: false,
     type: String,
-    default: "center",
+    default: "left",
     choices: {
       center: "가운데 정렬",
       left: "좌측 정렬",

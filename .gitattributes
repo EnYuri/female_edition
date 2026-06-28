@@ -1,0 +1,8 @@
+# Files excluded from the distributed module.zip (git archive export-ignore).
+# These are dev/CI-only and should never ship to Foundry users.
+.github           export-ignore
+.githooks         export-ignore
+.gitattributes    export-ignore
+.gitignore        export-ignore
+test              export-ignore
+CLAUDE.md         export-ignore

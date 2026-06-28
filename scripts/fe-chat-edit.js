@@ -77,28 +77,19 @@ function feCanEditMessage(msg) {
   }
 }
 
-function feGetEditableRaw(msg) {
-  const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
-  if (stored != null) return String(stored);
-
-  // Fallback: strip HTML from rendered content using DOMParser so attribute values
-  // containing ">" (e.g. data-x="1>2") are handled correctly by the browser parser,
-  // unlike a naive <[^>]+> regex which would truncate at the first >.
+// HTML → 평문(문단/줄바꿈은 \n 으로 보존). DOMParser 우선 — 속성값에 ">" 가 든
+// 경우(data-x="1>2")까지 브라우저 파서가 올바로 처리한다.
+function feHtmlToPlainText(html) {
   try {
-    const html = String(msg?.content ?? "");
-    if (!html) return "";
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    // Preserve paragraph / line-break structure as newlines.
+    const doc = new DOMParser().parseFromString(String(html ?? ""), "text/html");
     for (const br of doc.querySelectorAll("br")) br.replaceWith("\n");
     const parts = [];
-    for (const p of doc.querySelectorAll("p")) {
-      parts.push(p.textContent ?? "");
-    }
+    for (const p of doc.querySelectorAll("p")) parts.push(p.textContent ?? "");
     if (parts.length) return parts.join("\n").trim();
     return (doc.body?.textContent ?? "").trim();
   } catch {
     // Last-resort plain regex strip (cross-origin sandbox or test environment).
-    return String(msg?.content ?? "")
+    return String(html ?? "")
       .replace(/<br\s*\/?\s*>/gi, "\n")
       .replace(/<\/p>\s*<p>/gi, "\n")
       .replace(/<\/?p[^>]*>/gi, "")
@@ -107,60 +98,89 @@ function feGetEditableRaw(msg) {
   }
 }
 
+function feGetEditableRaw(msg) {
+  const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
+  if (stored != null) {
+    // raw 는 평문 마크다운 원본이라 보통 그대로 돌려준다(사용자가 일부러 입력한
+    // 리터럴 태그도 보존). 단, 구 내레이터는 raw 에 <br> 을 저장했었는데(현재는
+    // \n 으로 저장) 그런 레거시 메시지를 마크다운 모드로 수정하면 <br> 이
+    // &lt;br&gt; 로 이스케이프돼 노출됐다 → 그 한 경우만 좁게 줄바꿈으로 정규화.
+    return String(stored).replace(/<br\s*\/?>/gi, "\n");
+  }
+
+  const html = String(msg?.content ?? "");
+  if (!html) return "";
+  return feHtmlToPlainText(html);
+}
+
+// Session-persistent floating position (null until the user drags the panel).
+let FE_EDITOR_POS = null;
+
 function feEnsureInlineEditorUI() {
-  const chatForm =
-    document.querySelector("#chat-form") ||
-    document.querySelector("form.chat-form") ||
-    document.querySelector("#chat-controls")?.closest("form");
-
-  if (!chatForm) return null;
-
-  let wrap = chatForm.querySelector("#fe-chat-inline-editor");
+  let wrap = document.getElementById("fe-chat-inline-editor");
   if (wrap) return wrap;
 
   wrap = document.createElement("div");
   wrap.id = "fe-chat-inline-editor";
   wrap.className = "fe-chat-inline-editor";
+  // A floating, draggable panel (appended to <body>, position: fixed) — no longer
+  // glued above the chat form. The .fe-chat-inline-editor-frame inner wrapper carries
+  // the retro-theme pixel-border decoration (::before/::after) so the outline can sit
+  // OUTSIDE the panel content without clipping.
   wrap.innerHTML = `
-    <div class="fe-chat-inline-editor-header">
-      <div class="fe-edit-mode-toggle">
-        <button type="button" class="fe-edit-mode-btn active" data-mode="markdown">마크다운</button>
-        <button type="button" class="fe-edit-mode-btn" data-mode="html">HTML</button>
+    <div class="fe-chat-inline-editor-frame">
+      <div class="fe-chat-inline-editor-header" data-fe-drag-handle>
+        <span class="fe-edit-title"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> 메시지 수정</span>
+        <div class="fe-edit-mode-toggle">
+          <button type="button" class="fe-edit-mode-btn active" data-mode="markdown">마크다운</button>
+          <button type="button" class="fe-edit-mode-btn" data-mode="html">HTML</button>
+        </div>
+        <button type="button" class="fe-edit-close" aria-label="닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
-    </div>
-    <div class="fe-chat-inline-editor-row">
-      <textarea class="fe-chat-inline-editor-text" rows="3" spellcheck="false"></textarea>
-    </div>
-    <div class="fe-chat-inline-editor-actions">
-      <button type="button" class="fe-chat-inline-editor-save">
-        <i class="fa-solid fa-check"></i>
-        <span>저장</span>
-      </button>
-      <button type="button" class="fe-chat-inline-editor-cancel">
-        <i class="fa-solid fa-xmark"></i>
-        <span>취소</span>
-      </button>
+      <div class="fe-chat-inline-editor-row">
+        <textarea class="fe-chat-inline-editor-text" spellcheck="false" placeholder="메시지를 입력하세요…"></textarea>
+      </div>
+      <div class="fe-chat-inline-editor-actions">
+        <span class="fe-edit-hint">Enter 저장 · Shift+Enter 줄바꿈 · Esc 취소</span>
+        <div class="fe-edit-action-btns">
+          <button type="button" class="fe-chat-inline-editor-save">
+            <i class="fa-solid fa-check"></i>
+            <span>저장</span>
+          </button>
+          <button type="button" class="fe-chat-inline-editor-cancel">
+            <i class="fa-solid fa-xmark"></i>
+            <span>취소</span>
+          </button>
+        </div>
+      </div>
     </div>
   `;
 
-  chatForm.prepend(wrap);
+  document.body.appendChild(wrap);
 
   const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
   const btnSave = wrap.querySelector(".fe-chat-inline-editor-save");
   const btnCancel = wrap.querySelector(".fe-chat-inline-editor-cancel");
+  const btnClose = wrap.querySelector(".fe-edit-close");
 
   btnSave.addEventListener("click", () => feCommitInlineEdit());
   btnCancel.addEventListener("click", () => feCancelInlineEdit());
+  btnClose.addEventListener("click", () => feCancelInlineEdit());
 
   wrap.querySelectorAll(".fe-edit-mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => feSetEditMode(wrap, btn.dataset.mode));
   });
 
+  // Auto-grow the textarea like the sidebar chat input (within CSS min/max bounds).
+  textarea.addEventListener("input", () => feAutoGrowEditorTextarea(textarea));
+
   textarea.addEventListener("keydown", (ev) => {
-    // Ctrl+Enter => save
-    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
+    // Enter => save (mirrors the sidebar chat input); Shift+Enter inserts a newline.
+    // Ctrl/Cmd+Enter also saves (kept for muscle memory).
+    if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
       ev.preventDefault();
       feCommitInlineEdit();
+      return;
     }
     // Escape => cancel (stopPropagation: ESC가 Foundry 게임 메뉴로 버블링되지 않도록)
     if (ev.key === "Escape") {
@@ -170,8 +190,105 @@ function feEnsureInlineEditorUI() {
     }
   });
 
+  feMakeEditorDraggable(wrap, wrap.querySelector("[data-fe-drag-handle]"));
+
   wrap.style.display = "none";
   return wrap;
+}
+
+// Grow the textarea to fit its content, clamped by CSS min/max-height.
+function feAutoGrowEditorTextarea(textarea) {
+  if (!textarea) return;
+  try {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  } catch {}
+}
+
+// Drag the floating editor by its header. Position is stored in FE_EDITOR_POS so it
+// survives mode toggles / re-opens within the session (resets on reload).
+function feMakeEditorDraggable(wrap, handle) {
+  if (!wrap || !handle) return;
+  let dragging = false;
+  let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
+
+  const onMove = (ev) => {
+    if (!dragging) return;
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    const w = wrap.offsetWidth;
+    const h = wrap.offsetHeight;
+    // Keep the panel within the viewport (leave a small margin).
+    const left = Math.min(Math.max(8, baseLeft + dx), window.innerWidth - w - 8);
+    const top = Math.min(Math.max(8, baseTop + dy), window.innerHeight - h - 8);
+    FE_EDITOR_POS = { left, top };
+    wrap.style.left = `${left}px`;
+    wrap.style.top = `${top}px`;
+    wrap.style.right = "auto";
+    wrap.style.bottom = "auto";
+  };
+
+  const onUp = () => {
+    dragging = false;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    handle.classList.remove("fe-dragging");
+  };
+
+  handle.addEventListener("pointerdown", (ev) => {
+    // Ignore drags that start on the toggle buttons / close button.
+    if (ev.target.closest("button")) return;
+    if (ev.button !== 0) return;
+    dragging = true;
+    const rect = wrap.getBoundingClientRect();
+    startX = ev.clientX;
+    startY = ev.clientY;
+    baseLeft = rect.left;
+    baseTop = rect.top;
+    handle.classList.add("fe-dragging");
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    ev.preventDefault();
+  });
+}
+
+// Place the panel: restore the dragged position, else anchor just above the chat form.
+function fePositionInlineEditor(wrap) {
+  if (!wrap) return;
+  if (FE_EDITOR_POS) {
+    wrap.style.left = `${FE_EDITOR_POS.left}px`;
+    wrap.style.top = `${FE_EDITOR_POS.top}px`;
+    wrap.style.right = "auto";
+    wrap.style.bottom = "auto";
+    return;
+  }
+  // Default: anchored to the bottom-right above the chat sidebar input.
+  const chatForm =
+    document.querySelector("#chat-form") ||
+    document.querySelector("form.chat-form") ||
+    document.querySelector("#chat-controls")?.closest("form") ||
+    document.querySelector("#chat-message");
+  try {
+    const rect = chatForm?.getBoundingClientRect?.();
+    if (rect && rect.width) {
+      const w = wrap.offsetWidth || 420;
+      const h = wrap.offsetHeight || 220;
+      let left = rect.right - w;
+      let top = rect.top - h - 10;
+      left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+      top = Math.min(Math.max(8, top), window.innerHeight - h - 8);
+      wrap.style.left = `${left}px`;
+      wrap.style.top = `${top}px`;
+      wrap.style.right = "auto";
+      wrap.style.bottom = "auto";
+      return;
+    }
+  } catch {}
+  // Last resort: bottom-right corner.
+  wrap.style.left = "auto";
+  wrap.style.top = "auto";
+  wrap.style.right = "16px";
+  wrap.style.bottom = "120px";
 }
 
 function feSetChatInputDisabled(disabled) {
@@ -205,6 +322,7 @@ function feSetEditMode(wrap, newMode) {
     btn.classList.toggle("active", btn.dataset.mode === newMode);
   });
 
+  feAutoGrowEditorTextarea(textarea);
   textarea?.focus();
 }
 
@@ -233,6 +351,11 @@ function feStartInlineEdit(msg) {
 
   wrap.style.display = "";
   feSetChatInputDisabled(true);
+
+  // Measure-then-place: make it visible (display set above) so offsetWidth/Height
+  // are real before anchoring, then size the textarea to its content.
+  fePositionInlineEditor(wrap);
+  feAutoGrowEditorTextarea(textarea);
 
   textarea.focus();
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);

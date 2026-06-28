@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.7.2",
+  "version": "1.7.9",
   "authors": [
     {
       "name": "nayuri",
@@ -35,10 +35,11 @@
     "scripts/fe-attr-path-helper.js",
     "scripts/fe-token-preview.js",
     "scripts/fe-combat-tracker.js",
-    "scripts/fe-token-glow.js"
+    "scripts/fe-token-glow.js",
+    "scripts/fe-user-font.js"
   ],
   "styles": [
-    "styles/ui-font.css",
+    { "src": "styles/ui-font.css", "layer": "layouts" },
     "styles/chat-bg-stripper.css",
     "styles/fe-chat-enhance.css",
     "styles/fe-chat-archive.css",
@@ -50,6 +51,7 @@
     "styles/fe-chat-v13-compat.css",
     { "src": "styles/fe-dx3rd-compat.css", "layer": "layouts" },
     { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" },
+    { "src": "styles/fe-crlngn-compat.css", "layer": "layouts" },
     "styles/fe-image-hover.css",
     "styles/fe-theatre.css",
     "styles/fe-typing-indicator.css",
@@ -83,5 +85,9 @@
     "maximum": "14"
   },
   "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd and dnd5e. 「부레옥잠-!」",
+  "url": "https://github.com/EnYuri/female_edition",
+  "bugs": "https://github.com/EnYuri/female_edition/issues",
+  "manifest": "https://github.com/EnYuri/female_edition/releases/latest/download/module.json",
+  "download": "https://github.com/EnYuri/female_edition/releases/latest/download/module.zip",
   "flags": {}
 }

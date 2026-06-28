@@ -198,7 +198,7 @@ function _ihRegisterSettings() {
     scope: "client",
     config: false,
     range: { min: 3, max: 20, step: 0.5 },
-    default: 7,
+    default: 3,
     type: Number,
     // Refresh runtime cache immediately. Without this, _ihSize only reloaded on
     // closeSettingsConfig, so a programmatic/per-world-hydrated change (which
@@ -213,7 +213,7 @@ function _ihRegisterSettings() {
     scope: "client",
     config: false,
     range: { min: 0, max: 5, step: 0.05 },
-    default: _IH_MAX_UPSCALE,
+    default: 0,
     type: Number,
     onChange: () => _ihLoadSettings(),
   });
@@ -364,6 +364,16 @@ function _ihResolveHoverArt(target) {
     if (orig) return orig;
     const src = img.getAttribute("src");
     if (src && !src.startsWith("data:")) return src;
+  }
+
+  // 채팅 메시지 본문 이미지(업로드/임베드/마크다운/카드 아트) — 호버+X 로 표시.
+  // 임베드 base64(data:) 도 실제 이미지 소스이므로 허용한다.
+  const chatImg = target.closest("img");
+  if (chatImg && chatImg.closest(".message-content")) {
+    const orig = chatImg.dataset?.feHqSrc;
+    if (orig) return orig;
+    const src = chatImg.getAttribute("src") || chatImg.currentSrc || "";
+    if (src) return src;
   }
   return null;
 }

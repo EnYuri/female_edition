@@ -21,6 +21,10 @@ const S = {
   CHATCARD_USE_CUSTOM_FONT: "ceChatCardUseCustomFont",
   CHAT_FONT_CHOICE: "ceChatFontChoice",
   UI_USE_GEURIMILGI: "ceUiUseGeurimilgi",
+  // User font: when on, a locally-installed or font/-folder font replaces the
+  // module's built-in CookieRun/Geurimilgi stack entirely (like NeoDGM mode).
+  UI_USE_USER_FONT: "ceUiUseUserFont",
+  USER_FONT_FAMILY: "ceUserFontFamily",
   // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
   // for backwards compatibility with already-saved user settings.
   UI_ENABLE_FONTS: "enableFonts",
@@ -35,6 +39,7 @@ const S = {
   USER_COLOR_BG_CUSTOM: "ceUserColorBgCustom",
   USER_COLOR_ALPHA: "ceUserColorAlpha",
   SYSTEM_MSG_COLOR: "ceSystemMsgColor",
+  FORCE_NORMAL_MSG_COLOR: "ceForceNormalMsgColor",
   CHAT_GROUP_OUTLINE: "ceChatGroupOutline",
   ACCENT_TEXT_OVERRIDE: "ceAccentTextOverride",
   STYLE_ACTOR_NAME_SIZE: "ceActorNameSize",
@@ -91,14 +96,16 @@ const FE_EXPORT_PRINT_IMAGE_MODE_CHOICES = Object.freeze({
   downscale: "이미지 다운스케일(실험적)",
 });
 
-// Defaults seeded from yuricross world's final feGmPriorityOverrides (2026-05-12).
+// Defaults baked from the dosukebe dnd5e world's live female_edition settings
+// (2026-06-23). These are the module's shipped defaults — a fresh world / new
+// install starts with this exact configuration.
 const FE_DEFAULTS = {
   [S.MERGE_ENABLED]: true,
   [S.MERGE_ONLY_TEXT]: false,
   [S.MERGE_INCLUDE_ROLL_MESSAGES]: true,
   [S.MERGE_DIVIDER]: false,
-  [S.MERGE_GROUP_SPACING]: 14,
-  [S.MERGE_MODE]: "simple",
+  [S.MERGE_GROUP_SPACING]: 0,
+  [S.MERGE_MODE]: "standard",
   [S.MERGE_FOLLOW_HEADER_STYLE]: "hide",
   [S.MERGE_SPEAKER_BASIS]: "actor",
   [S.EXPORT_ENABLED]: true,
@@ -111,38 +118,41 @@ const FE_DEFAULTS = {
   [S.CHATCARD_USE_CUSTOM_FONT]: true,
   [S.CHAT_FONT_CHOICE]: "cookie",
   [S.UI_USE_GEURIMILGI]: true,
+  [S.UI_USE_USER_FONT]: false,
+  [S.USER_FONT_FAMILY]: "",
   [S.UI_ENABLE_FONTS]: true,
   [S.UI_RETRO_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,
   [S.UI_STRIP_TEXTURES]: true,
-  [S.USE_USER_COLOR_BG]: false,
-  [S.USER_COLOR_BG_BASE]: "white",
-  [S.USER_COLOR_BG_CUSTOM]: "#1b1b1b",
+  [S.USE_USER_COLOR_BG]: true,
+  [S.USER_COLOR_BG_BASE]: "custom",
+  [S.USER_COLOR_BG_CUSTOM]: "#ffffff",
   [S.USER_COLOR_ALPHA]: 0.22,
   [S.SYSTEM_MSG_COLOR]: false,
+  [S.FORCE_NORMAL_MSG_COLOR]: false,
   [S.CHAT_GROUP_OUTLINE]: false,
-  [S.ACCENT_TEXT_OVERRIDE]: true,
-  [S.STYLE_ACTOR_NAME_SIZE]: 22,
-  [S.STYLE_PLAYER_NAME_SIZE]: 14,
+  [S.ACCENT_TEXT_OVERRIDE]: false,
+  [S.STYLE_ACTOR_NAME_SIZE]: 18,
+  [S.STYLE_PLAYER_NAME_SIZE]: 12,
   [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
   [S.STYLE_CHATCARD_TEXT_SIZE]: 12,
-  [S.STYLE_BG_SATURATION]: 1,
+  [S.STYLE_BG_SATURATION]: 0.5,
   [S.STYLE_CHAT_MESSAGE_SPACING]: 3,
   [S.STYLE_HEADER_CONTENT_GAP]: 4,
-  [S.MERGE_INNER_GAP]: 8,
+  [S.MERGE_INNER_GAP]: 4,
   [S.MARKDOWN_ENABLED]: true,
   [S.EDIT_ENABLED]: true,
   [S.GM_PRIORITY_ENABLED]: true,
   [S.GM_SPEAK_AS_SELF]: false,
-  [S.DX3RD_RUI_ENABLED]: false,
+  [S.DX3RD_RUI_ENABLED]: true,
   [S.DX3RD_RUI_VISIBLE]: true,
-  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 98,
-  [S.DX3RD_RUI_PANEL_WIDTH]: 110,
+  [S.DX3RD_RUI_PORTRAIT_WIDTH]: 100,
+  [S.DX3RD_RUI_PANEL_WIDTH]: 128,
   [S.DX3RD_RUI_CARD_HEIGHT]: 80,
-  [S.DX3RD_CARD_BORDER_ALPHA]: 0.5,
+  [S.DX3RD_CARD_BORDER_ALPHA]: 0.7,
   [S.DX3RD_PIXEL_ACCENT]: "#ffffff",
   [S.PRUNE_ENABLED]: true,
-  [S.PRUNE_MAX_MESSAGES]: 50,
+  [S.PRUNE_MAX_MESSAGES]: 60,
   [S.TYPING_ENABLED]: true,
   [S.TYPING_SHOW_TO_PLAYERS]: true,
   [S.SC_COLLAPSE_ENABLED]: false,
@@ -152,8 +162,8 @@ const FE_DEFAULTS = {
   [S.ATTR_PATH_HELPER]: true,
   [S.ATTR_PATH_HELPER_SOURCE]: true,
   [S.COMBAT_TRACKER_ENABLED]: true,
-  [S.COMBAT_TRACKER_PORTRAIT_SIZE]: 90,
-  [S.COMBAT_TRACKER_SHOW_HP]: true,
+  [S.COMBAT_TRACKER_PORTRAIT_SIZE]: 88,
+  [S.COMBAT_TRACKER_SHOW_HP]: false,
   [S.COMBAT_TRACKER_ASPECT]: "1",
   [S.COMBAT_TRACKER_ROUNDNESS]: "8",
   [S.COMBAT_TRACKER_ALIGNMENT]: "center",
@@ -190,7 +200,9 @@ const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 // GM priority is ON, almost everything is forced — the GM turns the whole feature
 // OFF if they want players to keep personal taste. Only THREE categories stay
 // personal regardless:
-//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) — opt-in per player (glyph/icon breakage risk)
+//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) + 유저 로컬 폰트(UI_USE_USER_FONT/
+//      USER_FONT_FAMILY) — opt-in per player (glyph/icon breakage risk; the user
+//      font depends on what is actually installed on each client)
 //   2. 채팅 아카이브 / 내보내기 (EXPORT_*) — output preference
 //   3. 툴바 접기 (SC_COLLAPSE_ENABLED) — personal toolbar layout
 // (GM_PRIORITY_ENABLED / GM_SPEAK_AS_SELF are world-scope sentinels — never
@@ -206,6 +218,10 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
   // 커스텀 폰트 유무 — players opt in individually.
   S.UI_ENABLE_FONTS,
+  // 유저(로컬) 폰트 — 각 클라이언트에 실제 설치/존재하는 폰트에 의존하므로
+  // GM이 강제하면 폰트가 없는 플레이어는 깨진다. 항상 개인 설정으로 유지.
+  S.UI_USE_USER_FONT,
+  S.USER_FONT_FAMILY,
   // 툴바 접기 — personal toolbar preference.
   S.SC_COLLAPSE_ENABLED,
   // World-scope sentinels (never client-forced anyway).

@@ -2,6 +2,7 @@
 // This dialog is the primary UI because individual settings are hidden from core Module Settings.
 
 import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting, feCaptureWorldSettings } from "./fe-chat-enhance.js";
+import { feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported } from "./fe-user-font.js";
 
 // ── Portrait settings (registered by fe-chat-portrait.js under MODULE_ID) ──
 
@@ -31,11 +32,11 @@ const CP_DEFAULTS = Object.freeze({
   [CP.USE_TOKEN]:      false,
   [CP.SIZE]:           64,
   [CP.CARD_ICON_SIZE]: 36,
-  [CP.SHAPE]:          "circle",
-  [CP.BORDER_MODE]:    "theme",
-  [CP.BORDER_WIDTH]:   2,
+  [CP.SHAPE]:          "none",
+  [CP.BORDER_MODE]:    "none",
+  [CP.BORDER_WIDTH]:   0,
   [CP.BORDER_COLOR]:   "#000000",
-  [CP.NAME_ALIGN]:     "center",
+  [CP.NAME_ALIGN]:     "left",
   [CP.APPLY_COMBAT]:   false,
   [CP.SHOW_IC]:        true,
   [CP.SHOW_OOC]:       true,
@@ -61,14 +62,14 @@ const ALL_DEFAULTS = Object.freeze({
   // image-hover (world/GM: feature master + perm/art/timer; client: enable/pos/size/delay/upscale)
   ihFeatureEnabled: true,
   ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
-  ihEnabled: true, ihPosition: "Bottom left", ihSize: 7, ihDelay: 0, ihMaxUpscale: 1.25,
+  ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihDelay: 0, ihMaxUpscale: 0,
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
   // theatre (4 world/GM + 6 client)
-  stageEnabled: false, stageHideMessages: false, stageAutoDecay: true, stageDecayTime: 30000,
-  stagePortraitHeight: 130, stageBoxWidth: 488, stageBoxHeight: 276,
-  stageBoxBottom: 30, stageBoxLeft: 266, stageTextSize: 17,
+  stageEnabled: true, stageHideMessages: false, stageAutoDecay: false, stageDecayTime: 30000,
+  stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
+  stageBoxBottom: 30, stageBoxLeft: 392, stageTextSize: 14,
 });
 
 // ── Template choice lists (static — defined once, not rebuilt per getData call) ──
@@ -98,7 +99,9 @@ const CHOICES = {
     cookie:     "쿠키런 + 그림일기",
     cookieAll:  "쿠키런",
     geurimilgi: "그림일기",
-    neodgm:     "NeoDGM 픽셀",
+    neodgm:     "NeoDGM",
+    mona:       "Mona10(웹폰트)",
+    galmuri:    "갈무리11(웹폰트)",
   },
   userColorBgBase: {
     white:  "흰색(권장)",
@@ -238,6 +241,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.CHAT_FONT_CHOICE]:         feRead(S.CHAT_FONT_CHOICE),
       [S.CHATCARD_USE_CUSTOM_FONT]: feRead(S.CHATCARD_USE_CUSTOM_FONT),
       [S.UI_USE_GEURIMILGI]:        feRead(S.UI_USE_GEURIMILGI),
+      [S.UI_USE_USER_FONT]:         feRead(S.UI_USE_USER_FONT),
+      [S.USER_FONT_FAMILY]:         feRead(S.USER_FONT_FAMILY),
 
       // Style vars
       [S.STYLE_CHAT_MESSAGE_SPACING]: feRead(S.STYLE_CHAT_MESSAGE_SPACING),
@@ -255,6 +260,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.USER_COLOR_BG_CUSTOM]: feRead(S.USER_COLOR_BG_CUSTOM),
       [S.USER_COLOR_ALPHA]:   feRead(S.USER_COLOR_ALPHA),
       [S.SYSTEM_MSG_COLOR]:   feRead(S.SYSTEM_MSG_COLOR),
+      [S.FORCE_NORMAL_MSG_COLOR]: feRead(S.FORCE_NORMAL_MSG_COLOR),
       [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
       [S.ACCENT_TEXT_OVERRIDE]: feRead(S.ACCENT_TEXT_OVERRIDE),
 
@@ -370,10 +376,17 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [CP.SHOW_OTHER]:     feRead(CP.SHOW_OTHER),
     };
 
+    // Module font/-folder fonts (no permission needed). System fonts are loaded
+    // on demand via the "시스템 폰트 불러오기" button in _onRender (user gesture).
+    let userFontModuleList = [];
+    try { userFontModuleList = await feRegisterModuleFolderFonts(); } catch { /* no-op */ }
+
     return {
       ...context,
       values,
       choices:  CHOICES,
+      userFontModuleList,
+      localFontsSupported: feLocalFontsSupported(),
       warnings: { chatPortraitDup: feIsChatPortraitModuleActive() },
       isGM:     !!game.user?.isGM,
       isDx3rd:  feIsDx3rdSystem(),
@@ -435,6 +448,77 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         range.addEventListener("input", sync);
       }
     } catch { /* no-op */ }
+
+    // User-font controls: dropdown replacement toggle, picker → input, live
+    // preview, and on-demand system-font enumeration.
+    try { this.#wireUserFontControls(); } catch { /* no-op */ }
+  }
+
+  // Wires up the 폰트 section's user-font UI (added in fe-settings-menu.hbs):
+  //   · the "유저 폰트 사용" checkbox shows the user-font row and hides the module
+  //     font dropdown (and vice-versa);
+  //   · the picker <select> writes into the ceUserFontFamily text input;
+  //   · the preview box live-renders whatever family the text input holds;
+  //   · the "시스템 폰트 불러오기" button enumerates installed fonts on click
+  //     (a real user gesture, so the permission prompt only appears intentionally).
+  #wireUserFontControls() {
+    const root = this.element;
+    if (!root) return;
+    const useToggle = root.querySelector('input[name="ceUiUseUserFont"]');
+    const moduleRow = root.querySelector(".fe-module-font-row");
+    const userRow   = root.querySelector(".fe-user-font-row");
+    const input     = root.querySelector('input[name="ceUserFontFamily"]');
+    const picker    = root.querySelector("select.fe-user-font-picker");
+    const sysGroup  = root.querySelector("optgroup.fe-user-font-system-group");
+    const loadBtn   = root.querySelector("button.fe-load-system-fonts");
+    const preview   = root.querySelector(".fe-user-font-preview");
+
+    const applyVisibility = () => {
+      const on = !!useToggle?.checked;
+      if (moduleRow) moduleRow.style.display = on ? "none" : "";
+      if (userRow)   userRow.style.display   = on ? "" : "none";
+    };
+    const updatePreview = () => {
+      if (!preview) return;
+      const fam = String(input?.value ?? "").trim();
+      preview.style.fontFamily = fam
+        ? `${/["',]/.test(fam) ? fam : `"${fam}"`}, "FE CookieRun", sans-serif`
+        : "";
+    };
+
+    useToggle?.addEventListener("change", applyVisibility);
+    input?.addEventListener("input", updatePreview);
+    picker?.addEventListener("change", () => {
+      if (!picker.value) return;
+      if (input) input.value = picker.value;
+      updatePreview();
+    });
+
+    loadBtn?.addEventListener("click", async () => {
+      loadBtn.disabled = true;
+      const original = loadBtn.textContent;
+      loadBtn.textContent = "불러오는 중…";
+      try {
+        const fonts = await feQueryLocalFonts();
+        if (sysGroup) {
+          sysGroup.replaceChildren();
+          for (const { family, label } of fonts) {
+            const opt = document.createElement("option");
+            opt.value = family;
+            opt.textContent = label;
+            sysGroup.appendChild(opt);
+          }
+        }
+        loadBtn.textContent = fonts.length ? `시스템 폰트 ${fonts.length}개` : "불러오기 실패/거부됨";
+      } catch {
+        loadBtn.textContent = "불러오기 실패";
+      } finally {
+        setTimeout(() => { loadBtn.disabled = false; loadBtn.textContent = original; }, 1500);
+      }
+    });
+
+    applyVisibility();
+    updatePreview();
   }
 
   // data-action handlers receive (event, target) bound to the application instance.
@@ -495,6 +579,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // Fonts
         str(S.CHAT_FONT_CHOICE), bool(S.UI_USE_GEURIMILGI), bool(S.CHATCARD_USE_CUSTOM_FONT),
+        bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
 
         // Style
         num(S.STYLE_CHAT_MESSAGE_SPACING), num(S.STYLE_HEADER_CONTENT_GAP),
@@ -505,6 +590,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // User-color background
         bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
         str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
+        bool(S.FORCE_NORMAL_MSG_COLOR),
         bool(S.CHAT_GROUP_OUTLINE),
 
         // Retro theme (general — visible/saved in all systems)

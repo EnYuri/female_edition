@@ -1,0 +1,69 @@
+name: Release Module
+
+# Builds a GitHub Release on every push to main. The release is tagged
+# v<version> from module.json and carries module.json + module.zip. The
+# manifest/download fields in module.json point at releases/latest/download/*,
+# so Foundry's "Check for Updates" always sees the newest release.
+#
+# Version itself is bumped by the .githooks/pre-commit hook (one patch per
+# commit), so each pushed commit normally produces a fresh release. If a tag for
+# the current version already exists, the release step is skipped (idempotent —
+# a re-run or a push that didn't change the version won't error).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "module.json"
+      - "scripts/**"
+      - "styles/**"
+      - "templates/**"
+      - "lang/**"
+      - "assets/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from module.json
+        id: ver
+        run: echo "version=$(jq -r '.version' module.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version was already released
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.ver.outputs.version }} already exists — skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build module.zip
+        if: steps.check.outputs.exists == 'false'
+        # git archive packages exactly the committed files at HEAD, honouring the
+        # export-ignore attributes in .gitattributes (dev-only files excluded).
+        run: git archive --format=zip --output=module.zip HEAD
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.version }}" \
+            module.json module.zip \
+            --title "v${{ steps.ver.outputs.version }}" \
+            --notes "Automated release for v${{ steps.ver.outputs.version }}." \
+            --latest

@@ -397,16 +397,21 @@ function _fnRenderMarkdown(text) {
 function _fnCreateMessage(type, message, options = {}) {
   if (type === "narration" && game.user.role < _fnPermNarrate) return;
   if (type !== "narration" && game.user.role < _fnPermDescribe) return;
-  message = String(message ?? "").replace(/\\n/g, "<br>");
+
+  // raw 플래그는 "평문 원본"(줄바꿈 = \n)으로 저장한다. 이전엔 \n→<br> 로 바꾼
+  // HTML 문자열을 raw 에 넣어, 메시지 수정 시 마크다운 재변환에서 <br> 이
+  // &lt;br&gt; 로 이스케이프돼 채팅에 그대로 노출됐다.
+  const plain    = String(message ?? "").replace(/\\n/g, "\n");
+  const forRender = plain.replace(/\n/g, "<br>");
 
   // Render once; reuse for overlay + chat so they stay identical. The chat
   // pre-create markdown pass (fe-markdown.js) sees this as real HTML and bails,
   // so there is no double-processing.
-  const rendered = _fnRenderMarkdown(message);
+  const rendered = _fnRenderMarkdown(forRender);
 
   const chatData = {
     content: rendered,
-    flags: { [_FN_MODULE]: { [_FN_NARRATOR_FLAG]: true, [_FN_TYPE_FLAG]: type, raw: message, markdown: true } },
+    flags: { [_FN_MODULE]: { [_FN_NARRATOR_FLAG]: true, [_FN_TYPE_FLAG]: type, raw: plain, markdown: true } },
     ..._fnMsgStyle("OTHER"),
     speaker: { scene: game.user.viewedScene, actor: null, token: null, alias: "내레이터" },
     whisper: type === "notification" ? game.users.filter((u) => u.isGM).map((u) => u.id) : [],

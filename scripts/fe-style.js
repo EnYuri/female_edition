@@ -44,14 +44,25 @@ function feSetChatCardFontClass(doc = document) {
   } catch {}
 }
 
+// True when the user-font override is active — the module's chat-font-choice
+// classes (cookie/neodgm/…) are then suppressed so the user font fully replaces
+// the module font dropdown (and the NeoDGM `*` smoothing rule can't bleed onto a
+// non-pixel user font).
+function feUserFontActive() {
+  try {
+    return !!feSetting(S.UI_USE_USER_FONT) && String(feSetting(S.USER_FONT_FAMILY) ?? "").trim().length > 0;
+  } catch { return false; }
+}
+
 function feSetChatFontChoiceClass(doc = document) {
   try {
     const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
     const body = doc?.body;
     if (!body) return;
-    body.classList.toggle("fe-chat-font-cookie", choice === "cookie");
-    body.classList.toggle("fe-chat-font-cookie-all", choice === "cookieAll");
-    body.classList.toggle("fe-chat-font-geurimilgi", choice === "geurimilgi");
+    const userFont = feUserFontActive();
+    body.classList.toggle("fe-chat-font-cookie", !userFont && choice === "cookie");
+    body.classList.toggle("fe-chat-font-cookie-all", !userFont && choice === "cookieAll");
+    body.classList.toggle("fe-chat-font-geurimilgi", !userFont && choice === "geurimilgi");
   } catch {}
 }
 
@@ -67,7 +78,38 @@ function feSetUiFontClass(doc = document) {
 function feSetNeodgmModeClass(doc = document) {
   try {
     const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
-    doc?.body?.classList?.toggle("fe-neodgm-mode", choice === "neodgm");
+    const body = doc?.body;
+    if (!body) return;
+    const userFont = feUserFontActive();
+    body.classList.toggle("fe-neodgm-mode", !userFont && choice === "neodgm");
+    body.classList.toggle("fe-mona-mode", !userFont && choice === "mona");
+    body.classList.toggle("fe-galmuri-mode", !userFont && choice === "galmuri");
+  } catch {}
+}
+
+// User (local / font-folder) font override. When enabled with a non-empty family,
+// feeds the family into --fe-user-font-family and flips fe-user-font-mode, which
+// remaps every font variable to it (see ui-font.css). Mirrors NeoDGM mode.
+function feSetUserFontMode(doc = document) {
+  try {
+    const root = doc?.documentElement;
+    const body = doc?.body;
+    if (!root || !body) return;
+    const enabled = !!feSetting(S.UI_USE_USER_FONT);
+    const fam = String(feSetting(S.USER_FONT_FAMILY) ?? "").trim();
+    const active = enabled && fam.length > 0;
+    if (active) {
+      // Quote a bare family name (handles spaces/Hangul); leave an already-quoted
+      // or comma-listed value untouched so power users can supply their own stack.
+      const value = /["',]/.test(fam) ? fam : `"${fam}"`;
+      root.style.setProperty(
+        "--fe-user-font-family",
+        `${value}, "FE CookieRun", "Signika", system-ui, "Noto Sans KR", sans-serif, var(--fe-symbol-fallback)`,
+      );
+    } else {
+      root.style.removeProperty("--fe-user-font-family");
+    }
+    body.classList.toggle("fe-user-font-mode", active);
   } catch {}
 }
 
@@ -103,6 +145,13 @@ function feSetSystemMsgColorClass(doc = document) {
   try {
     const enabled = !!feSetting(S.SYSTEM_MSG_COLOR);
     doc?.body?.classList?.toggle("fe-system-msg-color", enabled);
+  } catch {}
+}
+
+function feSetForceNormalMsgColorClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.FORCE_NORMAL_MSG_COLOR);
+    doc?.body?.classList?.toggle("fe-force-normal-msg-color", enabled);
   } catch {}
 }
 
@@ -185,11 +234,13 @@ export {
   feSetChatFontChoiceClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,
+  feSetUserFontMode,
   feSetRetroThemeClass,
   feSetUserColorBgClass,
   feSetUserColorBgBaseClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
+  feSetForceNormalMsgColorClass,
   feApplyStyleVarsFromSettings,
 };

@@ -70,6 +70,91 @@
   font-display: swap;
 }
 
+/* Mona10 — 외부 웹폰트(MonadABXY/mona-font), jsDelivr CDN 에서 로드.
+   픽셀 비트맵 계열 폰트라 NeoDGM 모드와 동일하게 다룬다(아래 fe-mona-mode).
+   로컬 파일이 아니므로 인터넷 연결이 있어야 적용된다(없으면 fallback 스택). */
+@font-face {
+  font-family: "Mona10";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona10.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona10";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona10-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Mona12 — 다국어(CJK 등) 커버리지가 넓은 12px 변형. Mona10 에 없는 글리프의
+   fallback 으로 쓴다. Korean 전용 텍스트 변형(Mona12 Text KR)을 한글에 우선.
+   @font-face 는 실제로 매칭 글리프가 렌더될 때만 받아오므로(브라우저 lazy-load),
+   미사용 패밀리를 미리 선언해도 네트워크 비용은 없다. */
+@font-face {
+  font-family: "Mona12 Text KR";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12TextKR.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 이모지 — Mona 픽셀 이모지(컬러 우선, 흑백 보조). 일반 심볼/이모지 fallback
+   (Segoe UI Emoji 등)보다 앞에 두어 Mona 이모지가 우선 적용된다. */
+@font-face {
+  font-family: "Mona12 Color Emoji";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12ColorEmoji.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona12 Emoji";
+  src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12Emoji.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Galmuri11 — 외부 웹폰트(quiple/galmuri), jsDelivr(npm) CDN 에서 로드.
+   한글·라틴·CJK·이모지를 한 폰트로 폭넓게 커버하는 픽셀 폰트라 Mona 처럼
+   변형을 섞을 필요 없이 단일 패밀리로 충분하다. 로컬 파일이 아니므로 인터넷
+   연결이 있어야 적용된다(없으면 fallback 스택). */
+@font-face {
+  font-family: "Galmuri11";
+  src: url("https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===================================================
  * 2-a) CSS 변수 선언 — fe-* 내부 변수 (항상 정의)
  *       레이아웃/크기 변수는 폰트 on/off와 무관하게 유지
@@ -106,6 +191,15 @@
     var(--fe-symbol-fallback);
 
   --fe-font-secondary: var(--fe-font-geurimilgi);
+
+  /* 유저(로컬/폴더) 폰트 — JS(feSetUserFontMode)가 선택값으로 채운다. 비활성 시 미설정. */
+  --fe-user-font-family:
+    "FE CookieRun",
+    "Signika",
+    system-ui,
+    "Noto Sans KR",
+    sans-serif,
+    var(--fe-symbol-fallback);
 
   /* 적용 대상별 변수 기본값 (fe-fonts-enabled 없을 때 inherit 방지) */
   --fe-ui-font-family:          inherit;
@@ -145,24 +239,30 @@ body.fe-fonts-enabled {
   --fe-chat-font-family:        var(--fe-font-primary);
   --fe-dnd5e-label-font-family: var(--fe-font-primary);
 
-  /* Foundry 전역 폰트 변수 재정의 */
-  --font-primary:   var(--fe-font-primary);
-  --font-sans:      var(--fe-font-primary);
-  --font-serif:     var(--fe-font-primary);
-  --font-h1:        var(--fe-font-primary);
-  --font-h2:        var(--fe-font-primary);
-  --font-h3:        var(--fe-font-primary);
+  /* Foundry 전역 폰트 변수 재정의
+   * NOTE: 변수 재선언에 !important 를 단다 — 경쟁 모듈/시스템이 인라인이나
+   *       이른 레이어(system/layouts)에서 --font-primary 등을 important 로
+   *       덮어 우리가 명시적으로 안 잡는(코어의 var(--font-primary) 상속에
+   *       맡기는) 자손 요소를 끌어가는 "폰트 밀림" 경로를 막는다. ui-font.css
+   *       자체가 layouts 레이어로 등록돼(module.json) important 우선순위에서
+   *       system/modules 보다 위에 서므로, 이 important 변수 선언이 실제로 이긴다. */
+  --font-primary:   var(--fe-font-primary) !important;
+  --font-sans:      var(--fe-font-primary) !important;
+  --font-serif:     var(--fe-font-primary) !important;
+  --font-h1:        var(--fe-font-primary) !important;
+  --font-h2:        var(--fe-font-primary) !important;
+  --font-h3:        var(--fe-font-primary) !important;
   /* h4~h6 도 매핑 — Foundry 코어는 h4 { font-family: var(--font-h4) } 로
      --font-h4 기본값 "Bruno Ace" 를 직접 지정한다(.window-app 의 상속 폰트가
      아닌 h4 자신의 선언이 우선). 이를 빼면 DX3rd .sheet-main 의 h4 > span(.highlight)
      같은 헤딩 하위 텍스트가 커스텀 폰트(NeoDGM 등) 대신 Bruno Ace 로 표시됨. */
-  --font-h4:        var(--fe-font-primary);
-  --font-h5:        var(--fe-font-primary);
-  --font-h6:        var(--fe-font-primary);
-  --font-monospace: var(--fe-ui-font-family);
+  --font-h4:        var(--fe-font-primary) !important;
+  --font-h5:        var(--fe-font-primary) !important;
+  --font-h6:        var(--fe-font-primary) !important;
+  --font-monospace: var(--fe-ui-font-family) !important;
   /* blockquote — 코어가 --font-blockquote(기본 Signika/Palatino)를 blockquote 에
      직접 지정하므로 이 변수를 빼면 인용문만 커스텀 폰트(그림일기/NeoDGM)가 안 먹는다. */
-  --font-blockquote: var(--fe-font-primary);
+  --font-blockquote: var(--fe-font-primary) !important;
 
   /* dnd5e 폰트 변수 재정의
    * NOTE: roboto-condensed 는 dnd5e 신형(quadrone) 시트가 라벨/스킬명에 쓰는
@@ -185,7 +285,7 @@ body.fe-fonts-enabled {
    → .app/.application 스코프에도 재선언해 관통시킨다(특정도 0,3,0 > 코어 0,2,0,
      ui-font.css 는 비-레이어라 일반 선언이 코어 레이어보다 우선). */
 body.fe-fonts-enabled :is(.app, .application) {
-  --font-primary: var(--fe-font-primary);
+  --font-primary: var(--fe-font-primary) !important;
 }
 
 /* 채팅/전체 글꼴 선택 (모듈 설정)
@@ -238,6 +338,73 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
   -moz-osx-font-smoothing: auto !important;
   font-smooth: never !important;
   text-rendering: optimizeSpeed !important;
+}
+
+/* 모든 커스텀 폰트를 Mona 웹폰트(픽셀)로 전체 교체 — NeoDGM 모드와 동형.
+   글리프 단위 CSS fallback 으로 변형을 자동 혼합한다:
+     베이스 Mona10 → (없는 글리프) 한글 Mona12 Text KR → 그 외 다국어 Mona12
+     → 이모지 Mona 픽셀 이모지(컬러/흑백) → monospace → 일반 심볼 fallback.
+   브라우저가 코드포인트별로 첫 번째 보유 패밀리를 골라 쓰므로, 라틴/숫자는
+   Mona10 그대로, 한글/CJK 는 Mona12 계열, 이모지는 Mona 이모지로 떨어진다. */
+body.fe-fonts-enabled.fe-mona-mode {
+  --fe-mona-stack:
+    "Mona10",
+    "Mona12 Text KR",
+    "Mona12",
+    "Mona12 Color Emoji",
+    "Mona12 Emoji",
+    monospace,
+    var(--fe-symbol-fallback);
+  --fe-font-primary:    var(--fe-mona-stack);
+  --fe-font-geurimilgi: var(--fe-mona-stack);
+  --fe-font-secondary:  var(--fe-mona-stack);
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+body.fe-fonts-enabled.fe-mona-mode * {
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: auto !important;
+  font-smooth: never !important;
+  text-rendering: optimizeSpeed !important;
+}
+
+/* 모든 커스텀 폰트를 Galmuri11 웹폰트(픽셀)로 전체 교체 — NeoDGM/Mona 모드와 동형.
+   Galmuri11 한 패밀리가 한글/라틴/CJK/이모지를 폭넓게 커버하므로 스택 혼합 불필요. */
+body.fe-fonts-enabled.fe-galmuri-mode {
+  --fe-galmuri-stack: "Galmuri11", monospace, var(--fe-symbol-fallback);
+  --fe-font-primary:    var(--fe-galmuri-stack);
+  --fe-font-geurimilgi: var(--fe-galmuri-stack);
+  --fe-font-secondary:  var(--fe-galmuri-stack);
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+}
+
+body.fe-fonts-enabled.fe-galmuri-mode * {
+  font-feature-settings: "kern" 1;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: auto !important;
+  font-smooth: never !important;
+  text-rendering: optimizeSpeed !important;
+}
+
+/* 유저(로컬/폴더) 폰트로 전체 교체 — NeoDGM 모드와 동일하게 모든 폰트 변수를
+   remap 한다. cookie/neodgm 등 다른 모드 클래스보다 "뒤"에 선언해, 둘 다 켜져도
+   (저장된 채팅 글꼴 선택값이 남아 있어도) 유저 폰트가 우선 적용되게 한다. */
+body.fe-fonts-enabled.fe-user-font-mode {
+  --fe-font-primary:     var(--fe-user-font-family);
+  --fe-font-geurimilgi:  var(--fe-user-font-family);
+  --fe-font-secondary:   var(--fe-user-font-family);
+  --fe-chat-font-family: var(--fe-user-font-family);
+  --fe-ui-font-family:   var(--fe-user-font-family);
+  --fe-dnd5e-label-font-family: var(--fe-user-font-family);
 }
 
 /* dnd5e 스코프 재어설트 */
