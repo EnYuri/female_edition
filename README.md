@@ -1,6 +1,10 @@
-# Female_edition_by_Female-cupwhi
+# Female_edition_by_Female-cupwhi_by_EnYuri
 
-에마님의 어둠
+야생암컷에마님을 두려워 하는.
+
+# ♀️ 어두운 에마님 진실 ♀️
+
+AI 활용으로 생성된 모독적인 모듈.
 
 ## Font Licenses
 
