@@ -326,6 +326,11 @@ function feSnapshotPerWorldSettings() {
   return snap;
 }
 
+// Reserved top-level key inside FE_WORLD_SETTINGS_KEY recording the world id whose
+// values currently sit in this browser's localStorage. Real world ids are slugs and
+// never start with "__", so this never collides with a per-world slice.
+const FE_WORLD_ACTIVE_KEY = "__activeWorld";
+
 // Persist the current values into this world's slice of the store.
 async function feCaptureWorldSettings() {
   try {
@@ -334,6 +339,7 @@ async function feCaptureWorldSettings() {
     if (!worldId) return false;
     const all = foundry.utils.deepClone(feGetAllWorldSettings());
     all[worldId] = feSnapshotPerWorldSettings();
+    all[FE_WORLD_ACTIVE_KEY] = worldId; // localStorage now holds THIS world's values
     await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
     return true;
   } catch (err) {
@@ -345,24 +351,47 @@ async function feCaptureWorldSettings() {
 // On world load: apply this world's saved slice into local game.settings.
 // First visit (no slice yet) seeds the slice from the current values, so the
 // world adopts whatever the user already had configured.
+//
+// ANTI-REVERT DEFENSE: client settings live in localStorage per browser ORIGIN
+// without a world id, so after a normal SAME-world reload localStorage already
+// holds this world's latest values. Blindly applying the stored slice there can
+// only REVERT a save whose capture was missed (the long-standing recurrence). We
+// track the last active world (FE_WORLD_ACTIVE_KEY): only a genuine WORLD SWITCH
+// (localStorage holds a different world's values) applies the slice; a same-world
+// reload never overwrites game.settings and instead self-heals the slice from the
+// current values, so a missed capture can never cause a revert.
 async function feHydrateWorldSettings() {
   const worldId = feGetWorldId();
   if (!worldId) return false;
   feHydratingWorldSettings = true;
   try {
-    const all = feGetAllWorldSettings();
+    const all = foundry.utils.deepClone(feGetAllWorldSettings());
     const slice = all[worldId];
+    const activeWorld = typeof all[FE_WORLD_ACTIVE_KEY] === "string" ? all[FE_WORLD_ACTIVE_KEY] : null;
+    // No active marker yet = a store written before this defense existed (or the very
+    // first run). Trust localStorage rather than risk a one-time revert by applying a
+    // possibly-stale legacy slice; the marker is written below so later loads are exact.
+    const sameWorld = activeWorld === null || activeWorld === worldId;
 
+    // First visit to this world on this browser — seed the slice, touch nothing.
     if (!slice || typeof slice !== "object") {
-      // First visit — seed from current values without touching game.settings.
-      const seeded = foundry.utils.deepClone(all);
-      seeded[worldId] = feSnapshotPerWorldSettings();
-      await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, seeded);
+      all[worldId] = feSnapshotPerWorldSettings();
+      all[FE_WORLD_ACTIVE_KEY] = worldId;
+      await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
       return false;
     }
 
-    // Apply only the keys whose stored value differs (avoids redundant
-    // onChange churn), mirroring feSyncLocalGmPrioritySettings.
+    // Same world as last load → localStorage IS this world's latest. Never apply
+    // (that could only revert). Self-heal the slice from current so it can't drift.
+    if (sameWorld) {
+      all[worldId] = feSnapshotPerWorldSettings();
+      all[FE_WORLD_ACTIVE_KEY] = worldId;
+      await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
+      return false;
+    }
+
+    // Genuine world switch — restore THIS world's slice (the real purpose of
+    // per-world storage). Apply only keys whose stored value differs.
     let changed = false;
     for (const [key, target] of Object.entries(slice)) {
       if (!feIsPerWorldSettingKey(key)) continue;
@@ -376,6 +405,8 @@ async function feHydrateWorldSettings() {
       await game.settings.set(MODULE_ID, key, target);
       changed = true;
     }
+    all[FE_WORLD_ACTIVE_KEY] = worldId;
+    await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
     return changed;
   } catch (err) {
     console.warn(`[${MODULE_ID}] failed to hydrate per-world settings`, err);

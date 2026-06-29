@@ -575,10 +575,23 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
   // Writes a flat key→value map into game.settings with full scope/permission gating.
   // Shared by #onSubmit (form values) and #onResetDefaults (ALL_DEFAULTS).
   static async #applyValues(d) {
-    // Helpers return Promises directly — no async/await needed inside.
-    const bool = (key) => game.settings.set(MODULE_ID, key, !!d[key]);
-    const num  = (key) => { const n = Number(d[key]); return game.settings.set(MODULE_ID, key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };
-    const str  = (key) => game.settings.set(MODULE_ID, key, d[key] == null ? ALL_DEFAULTS[key] : String(d[key]));
+    // Fault-isolated writes. Each setter NEVER rejects: a single failing key
+    // (unregistered on this core/version/system, validation error, permission)
+    // must NOT abort the whole batch — otherwise the per-world capture below is
+    // skipped and feHydrateWorldSettings silently reverts EVERY change on the next
+    // reload (the long-standing "저장이 안 된다" recurrence). Unregistered keys are
+    // skipped (some settings are conditionally registered per system/version, but
+    // are still listed unconditionally below), failures are collected and surfaced.
+    const failed = [];
+    const has = (key) => { try { return game.settings.settings.has(`${MODULE_ID}.${key}`); } catch { return false; } };
+    const setOne = async (key, value) => {
+      if (!has(key)) return;
+      try { await game.settings.set(MODULE_ID, key, value); }
+      catch (err) { failed.push(key); console.warn(`[${MODULE_ID}] failed to save setting "${key}"`, err); }
+    };
+    const bool = (key) => setOne(key, !!d[key]);
+    const num  = (key) => { const n = Number(d[key]); return setOne(key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };
+    const str  = (key) => setOne(key, d[key] == null ? ALL_DEFAULTS[key] : String(d[key]));
 
     try {
       // All settings are independent — save in parallel so the dialog closes
@@ -707,13 +720,27 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(CP.SHOW_IC), bool(CP.SHOW_OOC), bool(CP.SHOW_EMOTE),
         bool(CP.SHOW_WHISPER), bool(CP.SHOW_ROLL), bool(CP.SHOW_OTHER),
       ]);
-
-      // Persist the just-saved values into this world's per-world slice so the
-      // configuration stays independent from other worlds on this browser.
-      try { await feCaptureWorldSettings(); } catch { /* no-op */ }
     } catch (err) {
-      console.error(`[${MODULE_ID}] settings save failed`, err);
-      ui.notifications?.error("설정 저장 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+      // setOne swallows per-key errors, so reaching here is unexpected — but never
+      // let it skip the capture below.
+      console.error(`[${MODULE_ID}] settings save batch error`, err);
+    } finally {
+      // ALWAYS persist the just-saved values into this world's per-world slice,
+      // even if some individual keys failed. If this is skipped, feHydrateWorldSettings
+      // re-applies the stale slice on the next reload and reverts everything that
+      // DID save. The failure is logged loudly (not silently swallowed) so a future
+      // recurrence names the offending key instead of vanishing.
+      try {
+        await feCaptureWorldSettings();
+      } catch (err) {
+        console.error(`[${MODULE_ID}] feCaptureWorldSettings failed — per-world slice not updated; settings may revert on reload`, err);
+        ui.notifications?.error("설정 저장(월드별 스냅샷) 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+      }
+    }
+
+    if (failed.length) {
+      console.warn(`[${MODULE_ID}] ${failed.length} setting(s) failed to save:`, failed);
+      ui.notifications?.warn(`일부 설정을 저장하지 못했습니다: ${failed.join(", ")}`);
     }
   }
 }
