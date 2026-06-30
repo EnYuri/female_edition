@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "authors": [
     {
       "name": "nayuri",
@@ -28,6 +28,7 @@
     "scripts/fe-screen-panel.js",
     "scripts/fe-settings-menu.js",
     "scripts/fe-filepicker-sort.js",
+    "scripts/fe-filepicker-preview.js",
     "scripts/fe-playlist-name.js",
     "scripts/fe-dx3rd-input-align.js",
     "scripts/fe-narrator.js",
@@ -60,6 +61,7 @@
     "styles/fe-scene-controls-collapse.css",
     "styles/fe-screen-panel.css",
     "styles/fe-filepicker-sort.css",
+    "styles/fe-filepicker-preview.css",
     "styles/fe-settings-menu.css",
     "styles/fe-narrator.css",
     "styles/fe-attr-path-helper.css",

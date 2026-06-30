@@ -661,9 +661,13 @@ async function _ihInjectTokenConfigFields(app, html, _data) {
 
   const wrapper = document.createElement("div");
   wrapper.innerHTML = contents;
-  while (wrapper.firstChild) tab.appendChild(wrapper.firstChild);
+  const insertionTarget = tab.querySelector(".fe-tp-controls") ?? tab;
+  while (wrapper.firstChild) insertionTarget.appendChild(wrapper.firstChild);
 
-  app.setPosition?.({ height: "auto" });
+  const lockedHeight = app.options?.position?.height;
+  const lockedWidth = app.options?.position?.width;
+  if (Number.isFinite(lockedHeight)) app.setPosition?.({ width: lockedWidth, height: lockedHeight });
+  else app.setPosition?.({ height: "auto" });
 
   rootEl.querySelector("button.fe-ih-picker-button")?.addEventListener("click", () => {
     // Cross-version FilePicker resolution (mirrors fe-theatre.js).

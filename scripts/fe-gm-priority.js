@@ -73,20 +73,45 @@ function feHasGmPriorityOverride(key) {
   }
 }
 
+// Serialize read-modify-write of the shared object-valued stores (GM-priority
+// overrides + backup). A single settings-menu save that changes N GM-priority
+// keys fires N concurrent `clientSettingChanged` → feMirrorGmPrioritySetting
+// calls (fe-chat-enhance.js, fire-and-forget via `void`), each doing an
+// UNsynchronized read→merge→write of the SAME overrides object. They interleave
+// — all read the same base, each merges only its own key — and last-writer-wins
+// drops every OTHER key's new value, leaving its STALE override in the store;
+// feSyncLocalGmPrioritySettings then forces local back to that stale override,
+// reverting all-but-one of the saved changes (the "두 설정을 같이 저장하면 하나만
+// 적용·저장, 다시 저장하면 됨" bug). Chaining each critical section onto one
+// promise makes its read and write atomic w.r.t. the others. The lock is
+// process-local (one client); cross-client propagation still goes through
+// game.settings exactly as before.
+let _feStoreWriteChain = Promise.resolve();
+function feWithStoreLock(fn) {
+  const run = _feStoreWriteChain.then(fn, fn);
+  // Keep the chain alive past a rejection so one failure never stalls the queue,
+  // and never let it surface as an unhandled rejection.
+  _feStoreWriteChain = run.then(() => {}, () => {});
+  return run;
+}
+
 async function feSetGmPriorityOverrides(partial = {}) {
   try {
     if (!game.user?.isGM) return false;
-    const current = foundry.utils.deepClone(feGetGmPriorityOverrides());
-    let changed = false;
-    for (const [key, value] of Object.entries(partial ?? {})) {
-      if (!feIsGmPrioritySettingKey(key)) continue;
-      if (feHasOwn(current, key) && feValuesEqual(current[key], value)) continue;
-      current[key] = value;
-      changed = true;
-    }
-    if (!changed) return false;
-    await game.settings.set(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, current);
-    return true;
+    return await feWithStoreLock(async () => {
+      // Re-read INSIDE the lock so concurrent mirrors can't clobber each other.
+      const current = foundry.utils.deepClone(feGetGmPriorityOverrides());
+      let changed = false;
+      for (const [key, value] of Object.entries(partial ?? {})) {
+        if (!feIsGmPrioritySettingKey(key)) continue;
+        if (feHasOwn(current, key) && feValuesEqual(current[key], value)) continue;
+        current[key] = value;
+        changed = true;
+      }
+      if (!changed) return false;
+      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, current);
+      return true;
+    });
   } catch (err) {
     console.warn(`[${MODULE_ID}] failed to update GM-priority overrides`, err);
     return false;
@@ -99,12 +124,14 @@ async function feSetGmPriorityOverrides(partial = {}) {
 // mirroring how feSyncLocalGmPrioritySettings writes the backup outside the flag).
 async function feClearGmPriorityBackupKey(key) {
   try {
-    const backup = feGetGmPriorityBackup();
-    if (!feHasOwn(backup, key)) return false;
-    const next = foundry.utils.deepClone(backup);
-    delete next[key];
-    await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, next);
-    return true;
+    return await feWithStoreLock(async () => {
+      const backup = feGetGmPriorityBackup();
+      if (!feHasOwn(backup, key)) return false;
+      const next = foundry.utils.deepClone(backup);
+      delete next[key];
+      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, next);
+      return true;
+    });
   } catch {
     return false;
   }
@@ -167,8 +194,8 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
       : Object.keys(overrides).filter((key) => feIsGmPrioritySettingKey(key));
     if (!wanted.length) return false;
 
-    const backup = foundry.utils.deepClone(feGetGmPriorityBackup());
-    let backupChanged = false;
+    const backup = feGetGmPriorityBackup();
+    const newBackupEntries = {}; // keys recorded for the first time this call
 
     feSyncingLocalGmPrioritySettings = true;
     let changed = false;
@@ -183,10 +210,7 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
         }
         if (feValuesEqual(current, target)) continue;
         // Record the client's own value before the first overwrite of this key.
-        if (!feHasOwn(backup, key)) {
-          backup[key] = current;
-          backupChanged = true;
-        }
+        if (!feHasOwn(backup, key)) newBackupEntries[key] = current;
         await game.settings.set(MODULE_ID, key, target);
         changed = true;
       }
@@ -194,9 +218,19 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
       feSyncingLocalGmPrioritySettings = false;
     }
 
-    if (backupChanged) {
+    if (Object.keys(newBackupEntries).length) {
       try {
-        await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, backup);
+        // Locked read-modify-MERGE: re-read the live backup inside the lock and
+        // add only keys not already present, so a concurrent feClearGmPriorityBackupKey
+        // (from a mirror) is never clobbered by a stale whole-object write.
+        await feWithStoreLock(async () => {
+          const cur = foundry.utils.deepClone(feGetGmPriorityBackup());
+          let merged = false;
+          for (const [k, v] of Object.entries(newBackupEntries)) {
+            if (!feHasOwn(cur, k)) { cur[k] = v; merged = true; }
+          }
+          if (merged) await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, cur);
+        });
       } catch {
         /* backup is best-effort; a failure only weakens restore, not safety */
       }
@@ -239,7 +273,7 @@ async function feRestoreLocalGmPrioritySettings() {
     }
 
     try {
-      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {});
+      await feWithStoreLock(() => game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {}));
     } catch {
       /* no-op */
     }

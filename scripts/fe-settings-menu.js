@@ -218,6 +218,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.UI_HIDE_PORTRAITS]: feRead(S.UI_HIDE_PORTRAITS),
       [S.UI_STRIP_TEXTURES]: feRead(S.UI_STRIP_TEXTURES),
       [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
+      [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
 
       // Merge
       [S.MERGE_ENABLED]:               feRead(S.MERGE_ENABLED),
@@ -604,6 +605,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         ...(game.user?.isGM ? [bool(S.TYPING_SHOW_TO_PLAYERS)] : []),
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
         bool(S.SC_COLLAPSE_ENABLED),
+        bool(S.TOKEN_CONFIG_TWO_COLUMN),
 
         // Merge
         bool(S.MERGE_ENABLED), bool(S.MERGE_ONLY_TEXT), bool(S.MERGE_INCLUDE_ROLL_MESSAGES),

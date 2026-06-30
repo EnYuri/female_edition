@@ -11,7 +11,65 @@
   align-items: flex-start;
 }
 .fe-tp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex: 1 1 auto;
+  min-width: 0;
+}
+.fe-tp-controls > :is(.form-group, fieldset, .token-image-group) {
+  margin-block: 0;
+}
+.fe-tp-controls > .form-group {
+  align-items: center;
+}
+.fe-tp-controls > .form-group > label,
+.fe-tp-controls > .form-group > .label {
+  min-width: 120px;
+}
+.fe-tp-controls > .form-group > .form-fields {
+  min-width: 0;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable.active:not([data-tab="appearance"]),
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable.active:not([data-tab="appearance"]) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 10px 16px;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) > :is(.form-group, fieldset),
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) > :is(.form-group, fieldset) {
+  min-width: 0;
+  margin-block: 0;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset,
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset > :is(.form-group, header),
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset > :is(.form-group, header) {
+  margin-block: 0;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-group,
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-group {
+  min-width: 0;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-group > :is(label, .label),
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-group > :is(label, .label) {
+  min-width: 112px;
+}
+
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-fields,
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) .form-fields {
   min-width: 0;
 }
 .fe-tp-panel {
@@ -32,15 +90,25 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   background-color: #1a1a2e;
+  cursor: grab;
+  user-select: none;
+}
+.fe-tp-viewport.fe-tp-panning {
+  cursor: grabbing;
+}
+
+.fe-tp-grid-field {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.13) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.13) 2px, transparent 2px);
+  pointer-events: none;
 }
 
 /* Grid container — positioned absolutely inside the viewport, offset so anchor lands at center */
 .fe-tp-grid {
   position: absolute;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  /* background-size set inline per grid cell size */
 }
 
 .fe-tp-img {
@@ -168,13 +236,6 @@
 /* Hide Foundry's original inline labels/fields within the anchor form-group once our rows take over */
 .fe-tp-controls .form-group:has(.fe-tp-anchor-row) > label:first-child ~ .form-fields {
   display: none;
-}
-
-/* Anchor pixel hint (inline, next to the existing anchor hint text) */
-.fe-tp-anchor-hint {
-  font-size: 11px;
-  font-weight: 600;
-  color: #e09060;
 }
 
 /* Resize handle — bottom-right corner of the preview panel, diagonal hatch */

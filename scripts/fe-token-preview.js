@@ -5,10 +5,19 @@
 // Pure DOM injection via renderPrototypeTokenConfig hook — no core override.
 // Self-contained entry-point script (registered in module.json).
 
+import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+
 const _FE_TP_PREVIEW_DEFAULT = 300;
 const _FE_TP_PREVIEW_MIN = 150;
+const _FE_TP_SHEET_BASE_WIDTH = 544;
+const _FE_TP_SHEET_MIN_HEIGHT = 720;
 const _FE_TP_STORAGE_KEY = "fe-tp-preview-size";
 const _FE_TP_IMG_CACHE = new Map();
+
+function feTokenConfigTwoColumnEnabled() {
+  try { return !!game.settings.get(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN); }
+  catch { return !!FE_DEFAULTS[S.TOKEN_CONFIG_TWO_COLUMN]; }
+}
 
 function _feTPGetPreviewSize() {
   const stored = localStorage.getItem(_FE_TP_STORAGE_KEY);
@@ -70,8 +79,11 @@ function feRenderGridPreview(container, vals, natSize) {
   // Offset the grid so the anchor point sits at the viewport center.
   const vpW = vpSize;
   const vpH = vpSize;
-  const gridLeft = Math.round(vpW / 2 - vals.anchorX * pw);
-  const gridTop = Math.round(vpH / 2 - vals.anchorY * ph);
+  const baseGridLeft = Math.round(vpW / 2 - vals.anchorX * pw);
+  const baseGridTop = Math.round(vpH / 2 - vals.anchorY * ph);
+  const pan = container._feTPPan ?? { x: 0, y: 0 };
+  const gridLeft = baseGridLeft + pan.x;
+  const gridTop = baseGridTop + pan.y;
 
   const esc = foundry.utils.escapeHTML ?? ((s) => s);
 
@@ -80,7 +92,8 @@ function feRenderGridPreview(container, vals, natSize) {
 
   container.innerHTML = `
     <div class="fe-tp-viewport" style="width:${vpW}px;height:${vpH}px;">
-      <div class="fe-tp-grid" style="width:${pw}px;height:${ph}px;left:${gridLeft}px;top:${gridTop}px;background-size:${cellSize}px ${cellSize}px;">
+      <div class="fe-tp-grid-field" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="background-size:${cellSize}px ${cellSize}px;background-position:${gridLeft}px ${gridTop}px;"></div>
+      <div class="fe-tp-grid" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="width:${pw}px;height:${ph}px;left:${gridLeft}px;top:${gridTop}px;">
         ${vals.src ? `<img class="fe-tp-img" src="${esc(vals.src)}" alt=""
           style="object-fit:${vals.fit};transform:scale(${scaleX},${scaleY});">` : ""}
         <div class="fe-tp-grid-border"></div>
@@ -111,6 +124,64 @@ function feRenderGridPreview(container, vals, natSize) {
   } else {
     container.appendChild(existingHandle);
   }
+  _feTPWirePan(container);
+}
+
+function _feTPApplyPan(panel, pan) {
+  panel._feTPPan = pan;
+  const grid = panel.querySelector(".fe-tp-grid");
+  const field = panel.querySelector(".fe-tp-grid-field");
+  const baseLeft = parseFloat(grid?.dataset?.baseLeft ?? field?.dataset?.baseLeft ?? "0");
+  const baseTop = parseFloat(grid?.dataset?.baseTop ?? field?.dataset?.baseTop ?? "0");
+  const left = Math.round(baseLeft + pan.x);
+  const top = Math.round(baseTop + pan.y);
+  if (grid) {
+    grid.style.left = `${left}px`;
+    grid.style.top = `${top}px`;
+  }
+  if (field) field.style.backgroundPosition = `${left}px ${top}px`;
+}
+
+function _feTPWirePan(panel) {
+  const viewport = panel.querySelector(".fe-tp-viewport");
+  if (!viewport || viewport._feTPPanWired) return;
+  viewport._feTPPanWired = true;
+
+  viewport.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  viewport.addEventListener("pointerdown", (e) => {
+    if (e.button !== 2) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPan = panel._feTPPan ?? { x: 0, y: 0 };
+    viewport.classList.add("fe-tp-panning");
+    viewport.setPointerCapture?.(e.pointerId);
+
+    const onMove = (ev) => {
+      ev.preventDefault();
+      _feTPApplyPan(panel, {
+        x: startPan.x + ev.clientX - startX,
+        y: startPan.y + ev.clientY - startY,
+      });
+    };
+    const onUp = (ev) => {
+      viewport.releasePointerCapture?.(ev.pointerId);
+      viewport.classList.remove("fe-tp-panning");
+      viewport.removeEventListener("pointermove", onMove);
+      viewport.removeEventListener("pointerup", onUp);
+      viewport.removeEventListener("pointercancel", onUp);
+    };
+
+    viewport.addEventListener("pointermove", onMove);
+    viewport.addEventListener("pointerup", onUp);
+    viewport.addEventListener("pointercancel", onUp);
+  });
 }
 
 function _feTPWireResize(panel, handle) {
@@ -130,7 +201,7 @@ function _feTPWireResize(panel, handle) {
       const vp = panel.querySelector(".fe-tp-viewport");
       if (vp) { vp.style.width = `${newSize}px`; vp.style.height = `${newSize}px`; }
       if (configEl) {
-        const targetW = 480 + newSize;
+        const targetW = _FE_TP_SHEET_BASE_WIDTH + newSize;
         configEl.style.width = `${targetW}px`;
         configEl.style.minWidth = `${targetW}px`;
       }
@@ -143,6 +214,58 @@ function _feTPWireResize(panel, handle) {
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerup", onUp, true);
   });
+}
+
+function feGetTokenConfigElement(root) {
+  return root?.closest?.(".prototype-token-config, .token-config") ?? null;
+}
+
+function feApplyPreviewSheetSize(app, root) {
+  const configEl = feGetTokenConfigElement(root);
+  if (!configEl) return;
+  configEl.classList.add("fe-tp-active");
+  configEl.classList.toggle("fe-tp-two-column", feTokenConfigTwoColumnEnabled());
+  const targetW = _FE_TP_SHEET_BASE_WIDTH + _feTPGetPreviewSize();
+  const currentH = Math.round(configEl.getBoundingClientRect?.().height || 0);
+  const viewportH = configEl.ownerDocument?.documentElement?.clientHeight ?? window.innerHeight ?? 900;
+  const maxH = Math.max(520, viewportH - 80);
+  const targetH = Math.min(Math.max(currentH, _FE_TP_SHEET_MIN_HEIGHT), maxH);
+
+  if (app?.options?.position) {
+    app.options.position.width = targetW;
+    app.options.position.height = targetH;
+  }
+  try { app?.setPosition?.({ width: targetW, height: targetH }); } catch (_) { /* best effort for v13/v14 variants */ }
+  configEl.style.width = `${targetW}px`;
+  configEl.style.minWidth = `${targetW}px`;
+  configEl.style.height = `${targetH}px`;
+}
+
+function feRegisterTokenPreviewSettings() {
+  game.settings.register(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN, {
+    name: "프로토타입 토큰 설정: 다른 탭 2열 정렬",
+    hint: "비주얼 미리보기 때문에 넓어진 토큰 설정 창에서, 비주얼 탭이 아닌 탭들도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.TOKEN_CONFIG_TWO_COLUMN],
+    onChange: (value) => {
+      for (const el of document.querySelectorAll(".prototype-token-config.fe-tp-active, .token-config.fe-tp-active")) {
+        el.classList.toggle("fe-tp-two-column", !!value);
+      }
+    },
+  });
+}
+
+function feNormalizeAppearanceLayout(tab) {
+  const layout = tab?.querySelector?.(":scope > .fe-tp-layout");
+  const controls = layout?.querySelector?.(":scope > .fe-tp-controls");
+  if (!tab || !layout || !controls) return;
+
+  for (const child of Array.from(tab.children)) {
+    if (child === layout) continue;
+    controls.appendChild(child);
+  }
 }
 
 function feInjectTokenPreview(app, html) {
@@ -168,24 +291,15 @@ function feInjectTokenPreview(app, html) {
     layout.appendChild(controls);
     layout.appendChild(panel);
     tab.appendChild(layout);
-    const configEl = root.closest(".prototype-token-config, .token-config");
-    if (configEl) {
-      configEl.classList.add("fe-tp-active");
-      const ps = _feTPGetPreviewSize();
-      const targetW = 480 + ps;
-      configEl.style.width = `${targetW}px`;
-      configEl.style.minWidth = `${targetW}px`;
-    }
   }
+  feNormalizeAppearanceLayout(tab);
+  feApplyPreviewSheetSize(app, root);
 
   const panel = layout.querySelector(".fe-tp-panel");
   feLoadImage(vals.src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
 
   // Inject range sliders next to anchor X/Y number inputs
   feInjectAnchorSliders(tab, form);
-
-  // Anchor px hint next to the anchor fields
-  feUpdateAnchorHint(tab, vals);
 }
 
 function feInjectAnchorSliders(tab, form) {
@@ -230,26 +344,6 @@ function feInjectAnchorSliders(tab, form) {
   }
 }
 
-function feUpdateAnchorHint(tab, vals) {
-  // Find the anchor hint paragraph — it's the one after the anchor form fields
-  const anchorXInput = tab.querySelector('[name="texture.anchorX"]');
-  if (!anchorXInput) return;
-  const group = anchorXInput.closest(".form-group");
-  if (!group) return;
-  let hint = group.querySelector(".fe-tp-anchor-hint");
-  if (!hint) {
-    hint = document.createElement("span");
-    hint.className = "fe-tp-anchor-hint";
-    const existingHint = group.querySelector(".hint");
-    if (existingHint) existingHint.after(hint);
-    else group.appendChild(hint);
-  }
-  feLoadImage(vals.src).then((natSize) => {
-    if (!natSize) { hint.textContent = ""; return; }
-    hint.textContent = ` → ${Math.round(vals.anchorX * natSize.w)}px, ${Math.round(vals.anchorY * natSize.h)}px (${natSize.w}×${natSize.h})`;
-  });
-}
-
 // Live update: listen for input changes on the appearance tab fields
 function feWirePreviewUpdates(app, html) {
   const root = html instanceof HTMLElement ? html : html?.[0] ?? html;
@@ -266,7 +360,6 @@ function feWirePreviewUpdates(app, html) {
     const vals = feReadAppearanceValues(form);
     if (!vals) return;
     feLoadImage(vals.src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
-    feUpdateAnchorHint(tab, vals);
   };
 
   // Attach updatePreview to the panel so the resize handle can trigger it
@@ -348,6 +441,8 @@ function feInjectPanelBarAttributes(app, html) {
     if (group.children.length) sel.appendChild(group);
   }
 }
+
+Hooks.once("init", feRegisterTokenPreviewSettings);
 
 Hooks.on("renderPrototypeTokenConfig", (app, html) => {
   feInjectTokenPreview(app, html);

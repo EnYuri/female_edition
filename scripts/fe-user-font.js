@@ -63,15 +63,20 @@ async function feRegisterModuleFolderFonts() {
       const res = await Picker.browse("data", FONT_DIR);
       const files = Array.isArray(res?.files) ? res.files : [];
       for (const path of files) {
-        const fileName = String(path).split("/").pop() ?? "";
+        // FilePicker.browse returns ALREADY URL-encoded paths (spaces → %20,
+        // Hangul → %xx). Decode for the family/label/builtin checks, and reuse
+        // the encoded basename verbatim for the fetch URL — re-encoding it would
+        // double-encode (%20 → %2520 → 404) and the builtin filter would miss
+        // (it stores space-separated names, not %20).
+        const rawName = String(path).split("/").pop() ?? "";
+        const fileName = decodeURIComponent(rawName);
         if (!FONT_EXT_RE.test(fileName)) continue;
         if (FE_BUILTIN_FONT_FILES.has(fileName.toLowerCase())) continue;
         const family = feFamilyFromFile(fileName);
         const label = fileName.replace(FONT_EXT_RE, "");
         try {
           if (!_moduleFontsRegistered) {
-            // encodeURI handles spaces/Hangul in the file name.
-            const url = `${FONT_DIR}/${encodeURIComponent(fileName)}`;
+            const url = `${FONT_DIR}/${rawName}`;
             const face = new FontFace(family, `url("${url}")`, { display: "swap" });
             await face.load();
             document.fonts.add(face);
