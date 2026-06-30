@@ -56,7 +56,7 @@ export function stripExt(name) {
 }
 
 export function getAudioHelper() {
-  return globalThis.AudioHelper ?? globalThis.foundry?.audio?.AudioHelper ?? null;
+  return globalThis.foundry?.audio?.AudioHelper ?? globalThis.AudioHelper ?? null;
 }
 
 export function allowedAudio(name) {
@@ -68,6 +68,7 @@ export function allowedAudio(name) {
 /** Cross-version FilePicker implementation resolver. */
 export function getFilePicker() {
   return (
+    globalThis.CONFIG?.ux?.FilePicker ??
     foundry?.applications?.apps?.FilePicker?.implementation ??
     foundry?.applications?.apps?.FilePicker ??
     globalThis.FilePicker ??
@@ -91,17 +92,25 @@ export function sanitizeFileName(name, { maxLen = 120 } = {}) {
 }
 
 /**
- * Normalize a data directory path to a safe, relative form.
+ * Normalize a Foundry User Data directory path to a safe, relative form.
  * - Converts backslashes to slashes.
+ * - Treats "~data/", "Data/", and ".../Data/" as the FilePicker "data" root.
  * - Removes leading/trailing slashes and '.'/'..' segments.
  * - Replaces Windows-reserved chars.
  */
 export function normalizeDataDir(p) {
   const raw = String(p ?? "").replace(/\\/g, "/").trim();
-  const parts = raw
+  const rawParts = raw
     .split("/")
     .map(s => s.trim())
-    .filter(Boolean)
+    .filter(Boolean);
+  let rootIdx = -1;
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i].toLowerCase();
+    if (part === "~data" || part === "data") rootIdx = i;
+  }
+  const relativeParts = rootIdx >= 0 ? rawParts.slice(rootIdx + 1) : rawParts;
+  const parts = relativeParts
     .filter(s => s !== "." && s !== "..")
     .map(s => s.replace(/[:*?"<>|]/g, "_"));
   return parts.join("/");
@@ -185,11 +194,28 @@ export async function ensureDirectory(source, dir) {
   const FP = getFilePicker();
   const norm = normalizeDataDir(dir);
   if (!norm) return;
+  if (!FP?.createDirectory || !FP?.browse) throw new Error("FilePicker API를 사용할 수 없습니다.");
   const parts = norm.split("/").filter(Boolean);
   let cur = "";
   for (const part of parts) {
     cur = cur ? `${cur}/${part}` : part;
-    try { await FP.createDirectory(source, cur); } catch (_) {}
+    try {
+      await FP.browse(source, cur);
+      continue;
+    } catch (_) {
+      // Missing directories are expected here; create below and verify after.
+    }
+    try {
+      await FP.createDirectory(source, cur);
+    } catch (_) {
+      // Another client may have created it, or the server may report "exists".
+      // Verify below so permission/path failures are not silently ignored.
+    }
+    try {
+      await FP.browse(source, cur);
+    } catch (err) {
+      throw new Error(`업로드 폴더를 만들 수 없습니다: ${cur}${err?.message ? ` (${err.message})` : ""}`);
+    }
   }
 }
 

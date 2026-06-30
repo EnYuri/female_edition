@@ -162,9 +162,22 @@ export async function resendMissingChunks({ uploadId, missing, attempt }) {
 
 async function stopSharedMusic(pl) {
   if (!pl) return;
-  for (const s of pl.sounds) {
-    if (s.playing) { try { await pl.stopSound(s); } catch (_) {} }
-  }
+  await pl.update({
+    playing: false,
+    sounds: pl.sounds.map(s => ({ _id: s.id, playing: false, pausedTime: null })),
+  }, { diff: false, forceSync: true });
+}
+
+async function stopSharedSound(pl, sound) {
+  if (!pl || !sound) return;
+  await pl.update({
+    playing: pl.sounds.some(s => (s.id !== sound.id) && s.playing),
+    sounds: pl.sounds.map(s => ({
+      _id: s.id,
+      playing: s.id === sound.id ? false : s.playing,
+      pausedTime: s.id === sound.id ? null : s.pausedTime,
+    })),
+  }, { diff: false, forceSync: true });
 }
 
 // ── The window ──
@@ -280,7 +293,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const pl = this.playlist;
     const sound = pl?.sounds?.get(target.dataset.soundId);
     if (!pl || !sound) return;
-    await pl.stopSound(sound);
+    await stopSharedSound(pl, sound);
     this.render();
   }
 
@@ -375,7 +388,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } catch (e) {
           if (e?.message !== "HANDLED") {
             console.error("female_edition | music upload failed", e);
-            ui.notifications.error(`업로드 실패: ${file.name}`);
+            ui.notifications.error(`업로드 실패: ${file.name}${e?.message ? ` (${e.message})` : ""}`);
           }
           failed++;
         }

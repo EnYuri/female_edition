@@ -63,6 +63,19 @@ async function ensureSharedPlaylist({ notify = true } = {}) {
   return pl;
 }
 
+async function ensureMusicUploadDirectory({ notify = false } = {}) {
+  if (!game.user?.isGM) return false;
+  const dir = musicUploadDir();
+  try {
+    await ensureDirectory("data", dir);
+    return true;
+  } catch (err) {
+    console.warn("[female_edition] music upload directory init failed", err);
+    if (notify) ui.notifications.warn(`음악 업로드 폴더를 만들 수 없습니다: ${dir}`);
+    return false;
+  }
+}
+
 /** 공용 음악 문서(플레이리스트 / 트랙) 여부 */
 function isSharedPlaylist(pl) {
   return pl?.getFlag?.(MODULE_ID, SHARED_FLAG) === true;
@@ -332,6 +345,7 @@ function registerDeleteGuards() {
 function registerSidebarButton() {
   function getPlaylistDirectoryClass() {
     return (
+      globalThis.CONFIG?.ui?.playlists ??
       foundry?.applications?.sidebar?.tabs?.PlaylistDirectory ??
       foundry?.applications?.sidebar?.PlaylistDirectory ??
       globalThis?.PlaylistDirectory ??
@@ -342,7 +356,7 @@ function registerSidebarButton() {
   // 1) 공식 Header Controls (ApplicationV2)
   Hooks.on("getHeaderControlsApplicationV2", (app, controls) => {
     const PD = getPlaylistDirectoryClass();
-    if (!PD || !(app instanceof PD)) return;
+    if (typeof PD !== "function" || !(app instanceof PD)) return;
     if (controls?.some?.(c => c?.action === "fe-music-open")) return;
     controls.push({
       action: "fe-music-open",
@@ -415,7 +429,11 @@ Hooks.once("init", () => {
     scope: "world", config: false, type: String, default: FE_DEFAULTS[S.MUSIC_PLAYLIST_NAME]
   });
   game.settings.register(MODULE_ID, S.MUSIC_UPLOAD_ROOT, {
-    scope: "world", config: false, type: String, default: FE_DEFAULTS[S.MUSIC_UPLOAD_ROOT]
+    scope: "world", config: false, type: String, default: FE_DEFAULTS[S.MUSIC_UPLOAD_ROOT],
+    onChange: () => {
+      if (!musicEnabled()) return;
+      ensureMusicUploadDirectory({ notify: true });
+    }
   });
   game.settings.register(MODULE_ID, S.MUSIC_MAX_MB, {
     scope: "world", config: false, type: Number, default: FE_DEFAULTS[S.MUSIC_MAX_MB]
@@ -452,6 +470,7 @@ Hooks.once("ready", async () => {
     // 공용 플레이리스트 생성/권한 보정(이름은 생성 시에만). 첫 부트스트랩 1회 알림.
     const done = game.settings.get(MODULE_ID, AUTO_INIT_KEY);
     await ensureSharedPlaylist({ notify: false });
+    await ensureMusicUploadDirectory({ notify: true });
     if (!done) await game.settings.set(MODULE_ID, AUTO_INIT_KEY, true);
   }
 });

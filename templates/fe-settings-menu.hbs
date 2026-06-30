@@ -948,11 +948,11 @@
     </div>
 
     <div class="form-group">
-      <label>업로드 폴더 (Data 기준 상대 경로)</label>
+      <label>업로드 폴더 (~data 기준 상대 경로)</label>
       <div class="form-fields">
         <input type="text" name="ceMusicUploadRoot" value="{{values.ceMusicUploadRoot}}" />
       </div>
-      <p class="notes"><code>Data\assets\uploadedmusic</code> 에 저장하려면 <code>assets/uploadedmusic</code>. 모든 업로드가 이 단일 폴더로 통합됩니다.</p>
+      <p class="notes"><code>~data/assets/uploadedmusic</code> 에 저장하려면 <code>assets/uploadedmusic</code>. <code>Data\</code> 또는 <code>~data/</code>가 앞에 붙어도 자동으로 제거합니다.</p>
     </div>
 
     <div class="form-group">
