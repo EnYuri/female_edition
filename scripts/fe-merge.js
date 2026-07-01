@@ -2,7 +2,7 @@ import { S, FE_MERGE_CLASS_LIST, FE_MERGE_CLASS_SORTED } from "./fe-constants.js
 import {
   feIsElementNode, feExtractHTMLElement, feIsNotificationMessageElement,
   feGetChatLogs, feGetMessageIdFromElement, feGetMessageFromElementOrCollection,
-  feBindMessageToElement, feGetChatMessageElementOrder, feDedupeChatMessagesInLog,
+  feBindMessageToElement, feCreateChatMessageOrderContext, feGetChatMessageElementOrder, feDedupeChatMessagesInLog,
   feSnapshotAndRestoreStickyScroll,
 } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
@@ -76,6 +76,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
 
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
     const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+    const orderContext = feCreateChatMessageOrderContext();
     const makeInfo = (el, fallbackIndex = 0) => {
       const msgId = feGetMessageIdFromElement(el);
       const msg = feGetMessageFromElementOrCollection(el) || (msgId ? game.messages?.get?.(msgId) : null);
@@ -86,7 +87,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
       info.missing = !msg && !hasStampedKey;
       info.el = el;
       info.domIndex = fallbackIndex;
-      info.order = feGetChatMessageElementOrder(el, fallbackIndex);
+      info.order = feGetChatMessageElementOrder(el, fallbackIndex, orderContext);
       info.key = info.key || (msg ? feMergeKey(info, speakerBasis) : `__fe_missing__||${msgId ?? fallbackIndex}`);
       if (!msg && !hasStampedKey) info.mergeableText = false;
       return info;
@@ -224,6 +225,7 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false, preNodes = null }
   const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
   const simpleMode = mergeMode === "simple";
   const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+  const orderContext = feCreateChatMessageOrderContext();
 
   const infos = [];
   let idx = 0;
@@ -237,12 +239,17 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false, preNodes = null }
       missing: !msg && !info?.key,
       el,
       idx,
-      order: feGetChatMessageElementOrder(el, idx),
+      order: feGetChatMessageElementOrder(el, idx, orderContext),
     });
     idx += 1;
   }
 
-  infos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  infos.sort((a, b) => {
+    const ao = Number.isFinite(a?.order) ? a.order : a?.idx ?? 0;
+    const bo = Number.isFinite(b?.order) ? b.order : b?.idx ?? 0;
+    if (ao !== bo) return ao - bo;
+    return (a?.idx ?? 0) - (b?.idx ?? 0);
+  });
 
   let hasMissingDocs = false;
   for (const info of infos) {
@@ -318,11 +325,24 @@ function fePreApplyMergeHint(message, el) {
     const thisKey = feMergeKey(thisInfo, speakerBasis);
     if (!thisKey) return;
 
+    const orderContext = feCreateChatMessageOrderContext();
     for (const log of feGetChatLogs()) {
       if (!feIsElementNode(log)) continue;
       const items = log.querySelectorAll?.("li.chat-message");
       if (!items?.length) continue;
-      const lastEl = items[items.length - 1];
+      let lastEl = null;
+      let lastOrder = -Infinity;
+      let lastDomIndex = -1;
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        const order = feGetChatMessageElementOrder(item, i, orderContext);
+        if (order > lastOrder || (order === lastOrder && i > lastDomIndex)) {
+          lastEl = item;
+          lastOrder = order;
+          lastDomIndex = i;
+        }
+      }
+      if (!lastEl) continue;
       const lastId = feGetMessageIdFromElement(lastEl);
       const lastMsg = lastId ? game.messages?.get?.(lastId) : null;
       if (!lastMsg) continue;

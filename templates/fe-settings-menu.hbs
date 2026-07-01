@@ -853,6 +853,13 @@
       </div>
     </div>
     <div class="form-group">
+      <label>이전 발화에 비액터 메시지 포함 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageRecallIncludeNonActor" data-dtype="Boolean" {{checked values.stageRecallIncludeNonActor}} />
+      </div>
+      <p class="notes">끄면 이전 발화 버튼은 현재 무대에 있는 액터들의 발화만 훑습니다.</p>
+    </div>
+    <div class="form-group">
       <label>대화 상자 자동 소멸 (GM)</label>
       <div class="form-fields">
         <input type="checkbox" name="stageAutoDecay" data-dtype="Boolean" {{checked values.stageAutoDecay}} />

@@ -66,30 +66,42 @@ function fePickActorOwnerUser(actor, preferredUser = null) {
   try {
     if (!actor || !game?.users) return null;
     const users = Array.isArray(game.users) ? game.users : game.users.contents ?? [];
+    const ownerLvl = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+
+    // Color ownership must be explicit. actor.testUserPermission() also honors
+    // default ownership, which can make every player resolve a GM/NPC card to
+    // their own color on their own client.
+    const explicitOwnerIds = Object.entries(actor.ownership ?? {})
+      .filter(([uid, level]) => uid !== "default" && Number(level) >= ownerLvl)
+      .map(([uid]) => uid);
+    const explicitOwners = explicitOwnerIds
+      .map((uid) => game.users?.get?.(uid) ?? users.find((u) => u?.id === uid) ?? null)
+      .filter(Boolean);
+    if (explicitOwners.length) {
+      if (preferredUser?.id && explicitOwners.some((u) => u.id === preferredUser.id)) return preferredUser;
+      return (
+        explicitOwners.find((u) => !u.isGM && u.active) ||
+        explicitOwners.find((u) => !u.isGM) ||
+        explicitOwners.find((u) => u.active) ||
+        explicitOwners[0] ||
+        null
+      );
+    }
 
     const canOwn = (u) => {
       try {
         if (typeof actor.testUserPermission === "function") return actor.testUserPermission(u, "OWNER");
         const lvl = actor.ownership?.[u.id] ?? 0;
-        const ownerLvl = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         return lvl >= ownerLvl;
       } catch {
         return false;
       }
     };
 
-    const owners = users.filter((u) => canOwn(u));
+    const owners = preferredUser?.id && canOwn(preferredUser) ? [preferredUser] : [];
     if (!owners.length) return null;
 
-    if (preferredUser?.id && owners.some((u) => u.id === preferredUser.id)) return preferredUser;
-
-    return (
-      owners.find((u) => !u.isGM && u.active) ||
-      owners.find((u) => !u.isGM) ||
-      owners.find((u) => u.active) ||
-      owners[0] ||
-      null
-    );
+    return owners[0] || null;
   } catch {
     return null;
   }

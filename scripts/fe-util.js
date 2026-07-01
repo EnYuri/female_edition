@@ -52,10 +52,60 @@ function feGetMessageIdFromElement(el) {
   return feNormalizeChatMessageId(id);
 }
 
-function feGetChatMessageElementOrder(el, fallback) {
-  const raw = el.dataset.order ?? el.style.order;
-  const n = Number.parseFloat(raw);
-  return Number.isFinite(n) ? n : fallback;
+function feCreateChatMessageOrderContext() {
+  const byId = new Map();
+  const byDoc = new WeakMap();
+  try {
+    const messages = game.messages?.contents;
+    if (!Array.isArray(messages)) return { byId, byDoc };
+    for (let i = 0; i < messages.length; i += 1) {
+      const msg = messages[i];
+      if (!msg || typeof msg !== "object") continue;
+      byDoc.set(msg, i);
+      if (msg.id) byId.set(String(msg.id), i);
+      if (msg._id) byId.set(String(msg._id), i);
+    }
+  } catch {
+    /* no-op */
+  }
+  return { byId, byDoc };
+}
+
+function feGetChatMessageElementOrder(el, fallback, orderContext = null) {
+  try {
+    const styleOrder = Number.parseFloat(el?.style?.order);
+    if (Number.isFinite(styleOrder)) return styleOrder;
+
+    const id = feGetMessageIdFromElement(el);
+    const msg = id ? game.messages?.get?.(id) : null;
+    if (msg && orderContext?.byDoc) {
+      const idx = orderContext.byDoc.get(msg);
+      if (Number.isFinite(idx)) return idx;
+    }
+    if (id && orderContext?.byId) {
+      const idx = orderContext.byId.get(id);
+      if (Number.isFinite(idx)) return idx;
+    }
+    if (!orderContext) {
+      const messages = game.messages?.contents;
+      if (msg && Array.isArray(messages)) {
+        const idx = messages.indexOf(msg);
+        if (idx >= 0) return idx;
+      }
+      if (id && Array.isArray(messages)) {
+        const idx = messages.findIndex((m) => m?.id === id || m?._id === id);
+        if (idx >= 0) return idx;
+      }
+    }
+    const dataOrder = Number.parseFloat(el?.dataset?.order);
+    if (Number.isFinite(dataOrder)) return dataOrder;
+
+    const ts = Number(msg?.timestamp);
+    if (Number.isFinite(ts)) return ts;
+  } catch {
+    /* no-op */
+  }
+  return fallback;
 }
 
 // v13 stored every open Application in ui.windows (numeric ids → app).
@@ -603,6 +653,7 @@ export {
   feEnsureStyleTag,
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
+  feCreateChatMessageOrderContext,
   feGetChatMessageElementOrder,
   feGetChatLogs,
   feGetChatLogsInDocument,

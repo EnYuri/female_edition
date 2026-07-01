@@ -66,8 +66,9 @@ const ALL_DEFAULTS = Object.freeze({
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
-  // theatre (4 world/GM + 6 client)
-  stageEnabled: true, stageHideMessages: false, stageAutoDecay: false, stageDecayTime: 30000,
+  // theatre (5 world/GM + 6 client)
+  stageEnabled: true, stageHideMessages: false, stageRecallIncludeNonActor: false,
+  stageAutoDecay: false, stageDecayTime: 30000,
   stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
   stageBoxBottom: 30, stageBoxLeft: 392, stageTextSize: 14,
 });
@@ -311,6 +312,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // Theatre / Stage (standalone — migrated)
       stageEnabled:        feRead("stageEnabled"),
       stageHideMessages:   feRead("stageHideMessages"),
+      stageRecallIncludeNonActor: feRead("stageRecallIncludeNonActor"),
       stageAutoDecay:      feRead("stageAutoDecay"),
       stageDecayTime:      feRead("stageDecayTime"),
       stagePortraitHeight: feRead("stagePortraitHeight"),
@@ -678,9 +680,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           num("narratorPermNarrate"), num("narratorPermDescribe"), num("narratorPermAs"),
         ] : []),
 
-        // Theatre — world/GM (enable/hide/decay) gated; client box dims always saved
+        // Theatre — world/GM (enable/hide/history/decay) gated; client box dims always saved
         ...(game.user?.isGM ? [
-          bool("stageEnabled"), bool("stageHideMessages"), bool("stageAutoDecay"), num("stageDecayTime"),
+          bool("stageEnabled"), bool("stageHideMessages"), bool("stageRecallIncludeNonActor"),
+          bool("stageAutoDecay"), num("stageDecayTime"),
         ] : []),
         num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
         num("stageBoxBottom"), num("stageBoxLeft"), num("stageTextSize"),

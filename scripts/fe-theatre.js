@@ -18,6 +18,7 @@ const _FET_SOCKET_TYPE = "fe-stage";
 const _FET_ID_PREFIX   = "fes-";          // theatreId prefix: "fes-<actorId>"
 const _FET_FLAG_KEY    = "stage";         // actor flag namespace under female_edition
 const _FET_NONE        = "__none__";      // sentinel: theatre nav visible but no overrides applied
+const _FET_RECALL_NON_ACTOR_ID = "__fe-stage-recall-non-actor__";
 
 // ── Runtime state ──────────────────────────────────────────────────────────
 
@@ -26,11 +27,14 @@ const _fet = {
   inserts: new Map(),
   /** local client: theatreId the current user is speaking as, or null (자신으로 말하기), or _FET_NONE (없음) */
   speakingAs: _FET_NONE,
+  /** ChatMessage id currently selected by cross-speaker history recall, or null for live mode. */
+  recallMessageId: null,
 };
 
 // Settings cache — updated on init and on settings close
 let _fetEnabled       = false;
 let _fetHideMessages  = false;
+let _fetRecallIncludeNonActor = false;
 let _fetAutoDecay     = true;
 let _fetDecayTime     = 30000;
 let _fetPortraitHeight = 130;
@@ -83,6 +87,23 @@ function _fetRegisterSettings() {
     type: Boolean,
     default: false,
     onChange: (v) => { _fetHideMessages = v; },
+  });
+
+  game.settings.register(_FET_MODULE, "stageRecallIncludeNonActor", {
+    name: "무대 채팅: 이전 발화에 비액터 메시지 포함",
+    hint: "이전 발화 버튼이 액터가 없는 일반/OOC 메시지도 함께 훑습니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: false,
+    onChange: (v) => {
+      _fetRecallIncludeNonActor = v;
+      if (!v) {
+        const insert = _fet.inserts.get(_FET_RECALL_NON_ACTOR_ID);
+        if (insert) _fetDismissInsert(insert);
+      }
+    },
   });
 
   game.settings.register(_FET_MODULE, "stageAutoDecay", {
@@ -174,6 +195,7 @@ function _fetRegisterSettings() {
 function _fetLoadSettings() {
   _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled");
   _fetHideMessages   = game.settings.get(_FET_MODULE, "stageHideMessages");
+  _fetRecallIncludeNonActor = game.settings.get(_FET_MODULE, "stageRecallIncludeNonActor");
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
   _fetDecayTime      = game.settings.get(_FET_MODULE, "stageDecayTime");
   _fetPortraitHeight = game.settings.get(_FET_MODULE, "stagePortraitHeight");
@@ -387,6 +409,35 @@ function _fetCreateSelectOption(theatreId, name) {
   return opt;
 }
 
+function _fetEnsureRecallNonActorInsert() {
+  let insert = _fet.inserts.get(_FET_RECALL_NON_ACTOR_ID);
+  if (insert) return insert;
+  if (!_fetDockEl) return null;
+
+  const { el, textboxEl, contentEl, nameEl, imgEl, labelEl } =
+    _fetCreateInsertEl(_FET_RECALL_NON_ACTOR_ID, "메시지", "icons/svg/mystery-man.svg");
+  _fetDockEl.appendChild(el);
+  insert = {
+    theatreId: _FET_RECALL_NON_ACTOR_ID,
+    actorId: null,
+    name: "메시지",
+    src: "icons/svg/mystery-man.svg",
+    baseSrc: "icons/svg/mystery-man.svg",
+    emote: null,
+    emotes: {},
+    el, textboxEl, contentEl, nameEl, imgEl, labelEl,
+    opt: null,
+    recallOnly: true,
+    decayTimeout: null,
+    hideTimeout: null,
+    cancelTypewriter: null,
+    currentMessageId: null,
+  };
+  _fet.inserts.set(_FET_RECALL_NON_ACTOR_ID, insert);
+  el.hidden = true;
+  return insert;
+}
+
 // ── Stage management ───────────────────────────────────────────────────────
 
 function _fetGetActorStageData(actor) {
@@ -431,7 +482,7 @@ function _fetInjectInsert(theatreId, actorId, name, src, emotes, remote) {
     el, textboxEl, contentEl, nameEl, imgEl, labelEl, opt,
     decayTimeout: null,
     hideTimeout: null,
-    recallIndex: null,   // 이전 발화 회상 중인 메시지 인덱스 (null = 라이브)
+    currentMessageId: null,
   };
   _fet.inserts.set(theatreId, insert);
 
@@ -453,6 +504,9 @@ function _fetRemoveInsert(theatreId, remote = false) {
   clearTimeout(insert.decayTimeout);
   clearTimeout(insert.hideTimeout);
   insert.cancelTypewriter?.();
+  if (insert.currentMessageId && insert.currentMessageId === _fet.recallMessageId) {
+    _fet.recallMessageId = null;
+  }
   insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
   setTimeout(() => insert.el.remove(), 400);
   insert.opt?.remove();
@@ -555,6 +609,9 @@ function _fetDismissInsert(insert) {
   clearTimeout(insert.decayTimeout);
   clearTimeout(insert.hideTimeout);
   insert.cancelTypewriter?.();
+  if (insert.currentMessageId && insert.currentMessageId === _fet.recallMessageId) {
+    _fet.recallMessageId = null;
+  }
   insert.textboxEl.classList.remove("fe-stage-textbox--visible");
   insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
   insert.hideTimeout = setTimeout(() => { insert.el.hidden = true; }, 400);
@@ -599,32 +656,84 @@ function _fetTryRenderRichContent(insert, messageId) {
   return true;
 }
 
-// 한 배우(actorId)가 발화한 메시지 모음 — 무대 발화뿐 아니라 토큰/IC 발화도 포함
-// (speaker.actor 로 식별). 굴림 전용·빈 메시지는 제외, 시간순 정렬.
-function _fetActorMessages(actorId) {
-  if (!actorId) return [];
+function _fetMessageHasStageRecallContent(message) {
+  const content = String(message?.content ?? "");
+  return _fetPlainTextFromContent(content).length > 0 || /<(?:img|video|picture|table)\b/i.test(content);
+}
+
+function _fetRecallTargetForMessage(message) {
+  const stageId = message?.flags?.[_FET_MODULE]?.stageId;
+  if (stageId && stageId !== _FET_RECALL_NON_ACTOR_ID && _fet.inserts.has(stageId)) {
+    return {
+      theatreId: stageId,
+      displayName: _fet.inserts.get(stageId)?.name,
+    };
+  }
+
+  const actorId = message?.speaker?.actor;
+  if (actorId) {
+    const theatreId = _FET_ID_PREFIX + actorId;
+    if (_fet.inserts.has(theatreId)) {
+      return {
+        theatreId,
+        displayName: _fet.inserts.get(theatreId)?.name,
+      };
+    }
+    return null;
+  }
+
+  if (!_fetRecallIncludeNonActor) return null;
+  const insert = _fetEnsureRecallNonActorInsert();
+  if (!insert) return null;
+  const user = game.users.get(message?.author?.id);
+  return {
+    theatreId: _FET_RECALL_NON_ACTOR_ID,
+    displayName: message?.speaker?.alias || user?.name || "메시지",
+  };
+}
+
+// 현재 무대에 있는 모든 배우의 발화 타임라인. 필요하면 설정에 따라 액터 없는
+// 일반/OOC 메시지도 같은 커서에 포함한다. 굴림 전용·빈 메시지는 제외한다.
+function _fetRecallMessages() {
   return (game.messages?.contents ?? [])
-    .filter((m) => m.speaker?.actor === actorId
-      && !m.rolls?.length
-      && String(m.content ?? "").trim().length > 0)
-    .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    .filter((message) =>
+      !message.rolls?.length &&
+      !String(message.content ?? "").startsWith("/") &&
+      _fetMessageHasStageRecallContent(message))
+    .map((message) => ({ message, target: _fetRecallTargetForMessage(message) }))
+    .filter(({ target }) => target)
+    .sort((a, b) => {
+      const dt = (a.message.timestamp ?? 0) - (b.message.timestamp ?? 0);
+      if (dt) return dt;
+      return String(a.message.id ?? "").localeCompare(String(b.message.id ?? ""));
+    });
 }
 
 // "<" 버튼: 현재 표시 메시지보다 한 칸 이전(과거)의 발화를 말풍선에 불러온다.
 function _fetRecallPrev(theatreId) {
   const insert = _fet.inserts.get(theatreId);
   if (!insert) return;
-  const msgs = _fetActorMessages(insert.actorId);
-  if (!msgs.length) return;
-  // null(라이브) → 마지막(현재 발화)에서 출발해 한 칸 과거로. 0 에서 더는 못 감.
-  if (insert.recallIndex == null) insert.recallIndex = msgs.length - 1;
-  insert.recallIndex = Math.max(0, insert.recallIndex - 1);
-  const msg = msgs[insert.recallIndex];
-  if (!msg) return;
+  const rows = _fetRecallMessages();
+  if (!rows.length) return;
+
+  const anchorId = _fet.recallMessageId || insert.currentMessageId;
+  const anchorIndex = anchorId ? rows.findIndex((row) => row.message.id === anchorId) : -1;
+  const nextIndex = anchorIndex >= 0
+    ? Math.max(0, anchorIndex - 1)
+    : rows.length - 1;
+  const row = rows[nextIndex];
+  if (!row) return;
+
+  const msg = row.message;
+  _fet.recallMessageId = msg.id ?? null;
   const text = _fetPlainTextFromContent(msg.content);
   const u = game.users.get(msg.author?.id);
   const color = u?.color?.css ?? (typeof u?.color === "string" ? u.color : "");
-  _fetShowText(theatreId, text, color, { messageId: msg.id, recall: true });
+  _fetShowText(row.target.theatreId, text, color, {
+    messageId: msg.id,
+    recall: true,
+    displayName: row.target.displayName,
+  });
 }
 
 function _fetShowText(theatreId, text, userColor, opts = {}) {
@@ -632,8 +741,8 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   if (!insert) return;
 
   const recall = !!opts.recall;
-  // 새 라이브 발화가 오면 회상 위치 초기화(다시 "<" 누르면 최신부터 거슬러 감).
-  if (!recall) insert.recallIndex = null;
+  // 새 라이브 발화가 오면 전역 회상 위치 초기화(다시 "<" 누르면 최신부터 거슬러 감).
+  if (!recall) _fet.recallMessageId = null;
   // 현재 말풍선이 표시 중인 메시지 id — 지연 rAF 미디어 업그레이드가 그새 도착한
   // 다른 메시지를 덮어쓰지 않도록 식별용으로 기록한다(경쟁 조건 방지).
   insert.currentMessageId = opts.messageId ?? null;
@@ -664,6 +773,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   }
 
   // Show textbox with speaker accent color
+  insert.nameEl.textContent = opts.displayName || insert.name;
   insert.textboxEl.classList.add("fe-stage-textbox--visible");
   if (userColor) {
     insert.textboxEl.style.setProperty("--fet-speaker-color", userColor);

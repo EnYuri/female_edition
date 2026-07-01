@@ -276,6 +276,25 @@ function _ihCacheToken(url, applyToScreen) {
   }).catch(() => {});
 }
 
+function _ihFlagValues(value) {
+  return Array.isArray(value) ? value : [value];
+}
+
+function _ihFlagBool(value) {
+  return _ihFlagValues(value).some((v) => v === true || v === "true" || v === 1 || v === "1" || v === "on");
+}
+
+function _ihSpecificArtFlag(value) {
+  const values = _ihFlagValues(value);
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    const v = values[i];
+    if (typeof v !== "string") continue;
+    const s = v.trim();
+    if (s && s !== "path/image.png") return s;
+  }
+  return "path/image.png";
+}
+
 /**
  * Compute image position in CSS viewport pixels (position: fixed coordinate space).
  * Using viewport pixels avoids any scene-coordinate / canvas-zoom mismatch
@@ -468,7 +487,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
       image = token.document.texture.src;
     }
 
-    const specific = token.document.getFlag(_IH_MODULE, "ihSpecificArt");
+    const specific = _ihSpecificArtFlag(token.document.getFlag(_IH_MODULE, "ihSpecificArt"));
     if (specific && specific !== "path/image.png") image = specific;
 
     data.url = image;
@@ -492,7 +511,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     let url = this.object.actor.img;
     const isWildcard = this.object.actor.prototypeToken.randomImg;
     const isLinked = this.object.document.actorLink;
-    const specific = this.object.document.getFlag(_IH_MODULE, "ihSpecificArt");
+    const specific = _ihSpecificArtFlag(this.object.document.getFlag(_IH_MODULE, "ihSpecificArt"));
 
     if (specific && specific !== "path/image.png") {
       url = specific;
@@ -550,7 +569,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
       token.actor.ownership.default !== -1
     ) return;
 
-    if (token.document.getFlag(_IH_MODULE, "ihHideArt")) return;
+    if (_ihFlagBool(token.document.getFlag(_IH_MODULE, "ihHideArt"))) return;
 
     // Imprecise-vision tokens (e.g. PF2e detection filter) — non-GM should not see art.
     if (token.detectionFilter && !game.user.isGM) return;
@@ -650,8 +669,8 @@ async function _ihInjectTokenConfigFields(app, html, _data) {
   // Dedup: both hooks may fire on the same render in some FVTT versions.
   if (tab.querySelector(".fe-ih-specific-art")) return;
 
-  const hideArt    = await token.getFlag(_IH_MODULE, "ihHideArt");
-  const specificArt = (await token.getFlag(_IH_MODULE, "ihSpecificArt")) ?? "path/image.png";
+  const hideArt = _ihFlagBool(await token.getFlag(_IH_MODULE, "ihHideArt"));
+  const specificArt = _ihSpecificArtFlag(await token.getFlag(_IH_MODULE, "ihSpecificArt"));
 
   const _renderTpl = foundry.applications?.handlebars?.renderTemplate ?? globalThis.renderTemplate;
   const contents = await _renderTpl(

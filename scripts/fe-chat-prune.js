@@ -344,7 +344,9 @@ export function feInstallChatLogPrune() {
           this.#renderedIds.add(msg.id);
           if (!this.isPopout) msg.logged = true;
           try {
-            fragments.push(await this.constructor.renderMessage(msg));
+            const el = await this.constructor.renderMessage(msg);
+            this.#stampMessageOrder(el, i);
+            fragments.push(el);
           } catch (err) {
             Hooks.onError("FeChatLogPrune.renderBatch", err, {
               msg: `Chat message ${msg.id} failed to render`, log: "error",
@@ -395,7 +397,9 @@ export function feInstallChatLogPrune() {
           lastIdx = i;
           visible++;
           try {
-            fragments.push(await this.constructor.renderMessage(msg));
+            const el = await this.constructor.renderMessage(msg);
+            this.#stampMessageOrder(el, i);
+            fragments.push(el);
           } catch (err) {
             Hooks.onError("FeChatLogPrune.renderBatchForward", err, {
               msg: `Chat message ${msg.id} failed to render`, log: "error",
@@ -470,6 +474,15 @@ export function feInstallChatLogPrune() {
         if (all[i].visible) return true;
       }
       return false;
+    }
+
+    #stampMessageOrder(el, index) {
+      try {
+        const n = Number(index);
+        if (!Number.isFinite(n) || n < 0) return el;
+        if (el?.dataset) el.dataset.order = String(n);
+      } catch { /* no-op */ }
+      return el;
     }
 
     #updateOverflowClass() {
