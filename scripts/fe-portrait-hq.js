@@ -140,52 +140,67 @@ export function feHQImageDownscale(url, tw, th) {
 // ─── 편집 가능 이미지(data-edit) 전용 오버레이 HQ ────────────────────────────
 // data-edit 이미지는 src 를 절대 교체할 수 없다(폼 직렬화 → actor.img 파괴, 위 CRITICAL 참고).
 // 대신 img 위에 pointer-events:none 인 div 를 겹쳐 HQ 다운스케일 비트맵을 background-image 로
-// 깔아 "표시만" 선명하게 만든다. img.src 는 진짜 경로 그대로 → FormDataExtended 가 직렬화해도
-// 안전하다. 클릭은 오버레이를 통과해 밑의 img(파일 선택 등)로 전달된다.
+// 깔아 "표시만" 선명하게 만든다. AppV2 submitOnChange 재렌더 중 좌표/크롭 교대가 보이지
+// 않도록 overlay 는 숨긴 상태로 만들고, 실제 이미지 박스와 크롭 속성을 동기화한 뒤 보인다.
 
 function _removeOverlayHQ(imgEl) {
   const ov = imgEl._feHqOverlay;
   if (ov) { ov.remove(); imgEl._feHqOverlay = null; }
   if (imgEl._feHqRO) { imgEl._feHqRO.disconnect(); imgEl._feHqRO = null; }
+  if (imgEl._feHqRaf) { cancelAnimationFrame(imgEl._feHqRaf); imgEl._feHqRaf = 0; }
 }
 
-// 브라우저 창 리사이즈 시 열려 있는 모든 편집 오버레이를 재배치(앵커 위치가 바뀌는
-// 경우 대비). 한 번만 바인딩. ResizeObserver 가 놓치는 위치-only 이동의 보완.
 let _hqResizeBound = false;
 function _bindGlobalResync() {
   if (_hqResizeBound) return;
   _hqResizeBound = true;
-  window.addEventListener("resize", () => {
-    for (const ov of document.querySelectorAll(".fe-hq-portrait-overlay")) {
-      const img = ov.previousElementSibling;
-      if (img && img._feHqOverlay === ov) _syncOverlayHQ(ov, img);
-    }
-  }, { passive: true });
+  window.addEventListener("resize", () => _syncAllOverlayHQ(), { passive: true });
+  window.addEventListener("scroll", () => _syncAllOverlayHQ(), { passive: true, capture: true });
+}
+
+function _syncAllOverlayHQ() {
+  for (const ov of document.querySelectorAll(".fe-hq-portrait-overlay")) {
+    const img = ov.previousElementSibling;
+    if (img && img._feHqOverlay === ov) _syncOverlayHQ(ov, img);
+  }
 }
 
 function _ensureOverlayHQ(imgEl) {
   let ov = imgEl._feHqOverlay;
   if (ov && ov.isConnected) return ov;
+
   ov = document.createElement("div");
   ov.className = "fe-hq-portrait-overlay";
   ov.setAttribute("aria-hidden", "true");
   ov.style.position = "absolute";
   ov.style.pointerEvents = "none";
   ov.style.backgroundRepeat = "no-repeat";
-  // 부모에 positioning context 보장 (absolute 기준이 img 와 동일한 offsetParent 가 되도록)
+  ov.style.boxSizing = "border-box";
+  ov.style.visibility = "hidden";
+
   const parent = imgEl.parentElement;
   if (parent && getComputedStyle(parent).position === "static") parent.style.position = "relative";
-  imgEl.after(ov);            // 직후 형제 → img 위에 페인트, position:absolute 라 레이아웃 영향 없음
+  imgEl.after(ov);
   imgEl._feHqOverlay = ov;
   return ov;
 }
 
-function _syncOverlayHQ(ov, imgEl) {
-  // img 의 표시 박스에 정확히 포갠다 (offsetParent 가 img 와 같으므로 offset* 좌표 일치)
-  ov.style.left = imgEl.offsetLeft + "px";
-  ov.style.top = imgEl.offsetTop + "px";
-  ov.style.width = imgEl.offsetWidth + "px";
-  ov.style.height = imgEl.offsetHeight + "px";
+function _syncOverlayHQ(ov, imgEl, { reveal = false } = {}) {
+  if (!ov?.isConnected || !imgEl?.isConnected) return false;
+  const parent = imgEl.parentElement;
+  if (!parent) return false;
+
+  const imgRect = imgEl.getBoundingClientRect();
+  const parentRect = parent.getBoundingClientRect();
+  if (!imgRect.width || !imgRect.height) return false;
+
+  // offsetLeft/offsetWidth 는 inline 이미지와 text-align:center 셀에서 정수 반올림과
+  // offsetParent 차이로 1프레임 좌우 점프를 만들 수 있다. 실제 페인트된 rect 기준으로 맞춘다.
+  ov.style.left = `${imgRect.left - parentRect.left + (parent.scrollLeft || 0)}px`;
+  ov.style.top = `${imgRect.top - parentRect.top + (parent.scrollTop || 0)}px`;
+  ov.style.width = `${imgRect.width}px`;
+  ov.style.height = `${imgRect.height}px`;
+
   const cs = getComputedStyle(imgEl);
   const of = cs.objectFit || "fill";
   ov.style.backgroundSize =
@@ -194,6 +209,18 @@ function _syncOverlayHQ(ov, imgEl) {
     of === "none" ? "auto" : "100% 100%";
   ov.style.backgroundPosition = cs.objectPosition || "center";
   ov.style.borderRadius = cs.borderRadius || "";
+
+  if (reveal) ov.style.visibility = "visible";
+  return true;
+}
+
+function _queueOverlaySync(imgEl, ov, { reveal = false } = {}) {
+  if (imgEl._feHqRaf) cancelAnimationFrame(imgEl._feHqRaf);
+  imgEl._feHqRaf = requestAnimationFrame(() => {
+    imgEl._feHqRaf = 0;
+    if (!_syncOverlayHQ(ov, imgEl, { reveal })) return;
+    requestAnimationFrame(() => _syncOverlayHQ(ov, imgEl, { reveal }));
+  });
 }
 
 function _applyEditableOverlayHQ(imgEl, url, cssW, cssH) {
@@ -207,26 +234,21 @@ function _applyEditableOverlayHQ(imgEl, url, cssW, cssH) {
   const show = (dataURL) => {
     if (imgEl.dataset.feHqSrc !== url) return;      // 그 사이 다른 이미지로 바뀜
     if (!dataURL) { _removeOverlayHQ(imgEl); return; } // 확대 불필요/CORS 실패 → 원본 그대로
+
     const ov = _ensureOverlayHQ(imgEl);
+    ov.style.visibility = "hidden";
     ov.style.backgroundImage = `url("${dataURL}")`;
-    // renderActorSheet 훅은 레이아웃/페인트 전에 불려 offset* 가 0/부정확할 수 있다 →
-    // 즉시 + 다음 프레임(레이아웃 확정 후) 두 번 배치해 "좌우로 튀는" 깜박임을 막는다.
-    _syncOverlayHQ(ov, imgEl);
-    requestAnimationFrame(() => {
-      const o = imgEl._feHqOverlay;
-      if (o && imgEl.isConnected) _syncOverlayHQ(o, imgEl);
-    });
+    _syncOverlayHQ(ov, imgEl, { reveal: false });
+    _queueOverlaySync(imgEl, ov, { reveal: true });
+
     if (!imgEl._feHqRO && typeof ResizeObserver === "function") {
       const ro = new ResizeObserver(() => {
         const o = imgEl._feHqOverlay;
-        if (o) _syncOverlayHQ(o, imgEl);
+        if (o) _queueOverlaySync(imgEl, o, { reveal: true });
       });
       ro.observe(imgEl);
-      // 부모(주변 레이아웃)도 관찰 — img 자체 크기는 그대로면서 위치만 좌우로 밀리는
-      // 경우(시트 리사이즈 시 reflow)에도 오버레이가 따라가도록(ResizeObserver 는
-      // 크기 변화에만 발화하므로 위치-only 이동을 놓친다).
-      const par = imgEl.offsetParent;
-      if (par && par !== document.body) { try { ro.observe(par); } catch {} }
+      const parent = imgEl.parentElement;
+      if (parent && parent !== document.body) { try { ro.observe(parent); } catch {} }
       imgEl._feHqRO = ro;
     }
     _bindGlobalResync();
@@ -250,10 +272,11 @@ export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   // `src` would therefore be saved as actor.img and uploaded to worlds/<world>/assets/<type>/
   // img-*.webp, permanently replacing the real high-res file with a ~300px copy. So editable
   // portraits get NO src swap — the original path is left untouched. Instead an HQ overlay div is
-  // layered on top (display-only, never a form field) so the portrait still looks sharp. The
-  // image-hover overlay and directory thumbnails are not form fields and keep the src-swap HQ below.
+  // layered on top (display-only, never a form field). The image-hover overlay and directory
+  // thumbnails are not form fields and keep the src-swap HQ below.
   if (imgEl.hasAttribute?.("data-edit")) {
     if (url) imgEl.dataset.feHqSrc = url; // let image-hover resolve the real high-res original
+    else imgEl.dataset.feHqSrc = "";
     _applyEditableOverlayHQ(imgEl, url, cssW, cssH);
     return;
   }

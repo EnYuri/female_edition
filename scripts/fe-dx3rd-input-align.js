@@ -6,13 +6,15 @@
 //   그래서 fe-dx3rd-compat.css 의 정렬 규칙(가로 좌측 대칭 + select line-height)은
 //   "첫 페인트 베이스라인"이고, 픽셀단위 완성은 여기서 인라인으로 처리한다.
 //
-// 동작: dx3rd 윈도우(.double-cross-3rd) 안에 추가/재렌더되는 input·select 를
+// 동작: dx3rd 윈도우(.dx3rd-emanim / legacy .double-cross-3rd) 안에
+//   추가/재렌더되는 input·select 를
 //   MutationObserver 로 감지(시트·아이템·모든 커스텀 다이얼로그 공통) → 인라인 정렬.
 //   · input  : text-align:center 인 값칸만 좌우 4px 대칭. 좌측정렬(이름/코드네임)은 건너뜀.
 //   · select : line-height normal(세로 중앙) + 좌우 대칭 패딩. 화살표 있는 셀렉트는 우측
 //     공간을 확보하고, 좁아서 글자가 잘릴 것 같으면 패딩을 자동 축소(클리핑 방지).
 
-const SYS_ID = "double-cross-3rd";
+const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
+const DX3RD_ROOT_SELECTOR = ".dx3rd-emanim, .double-cross-3rd";
 const _measCtx = document.createElement("canvas").getContext("2d");
 
 function _textWidth(text, cs) {
@@ -59,11 +61,11 @@ function _alignRoot(root) {
 
 let _started = false;
 function _start() {
-  if (_started || game.system?.id !== SYS_ID) return;
+  if (_started || !DX3RD_SYSTEM_IDS.has(game.system?.id)) return;
   _started = true;
 
   // 이미 열려 있는 dx3rd 윈도우 처리
-  document.querySelectorAll(".double-cross-3rd").forEach(_alignRoot);
+  document.querySelectorAll(DX3RD_ROOT_SELECTOR).forEach(_alignRoot);
 
   // dx3rd 윈도우 안에 추가/재렌더되는 input·select 감지 (rAF 배치)
   const pending = new Set();
@@ -72,7 +74,7 @@ function _start() {
   const obs = new MutationObserver(muts => {
     for (const m of muts) for (const n of m.addedNodes) {
       if (n.nodeType !== 1) continue;
-      if (!n.closest?.(".double-cross-3rd")) continue;       // dx3rd 윈도우 밖 → 빠른 탈출
+      if (!n.closest?.(DX3RD_ROOT_SELECTOR)) continue;       // dx3rd 윈도우 밖 → 빠른 탈출
       if (n.matches?.("input, select")) pending.add(n);
       n.querySelectorAll?.("input, select").forEach(e => pending.add(e));
     }

@@ -51,7 +51,9 @@ const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 
 // ─── guards ────────────────────────────────────────────────────────────────
 
-function _isDx3rd()      { return game.system?.id === "double-cross-3rd"; }
+const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
+
+function _isDx3rd()      { return DX3RD_SYSTEM_IDS.has(game.system?.id); }
 function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // Systems where this status panel is available. DX3rd shows HP + 침식률(encroachment);
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
@@ -726,6 +728,30 @@ Hooks.on("renderTokenHUD", _injectTokenHudButtons);
 
 // ─── 액터 시트 헤더 버튼 ──────────────────────────────────────────────────────
 
+// ApplicationV2 sheets already ship their own header-controls dropdown (the
+// "⋯" button, `data-action="toggleControls"` — core application.mjs
+// `_getHeaderControls()` / `_headerControlButtons()`). Rather than building a
+// bespoke dropdown, 수치 숨기기/드러내기 is pushed straight into THAT menu via
+// the `getHeaderControls{ClassName}` hook chain, which always includes the
+// base class name too ("getHeaderControlsApplicationV2" —
+// `Application#_callHooks` walks `inheritanceChain()` and fires one hook per
+// class, ApplicationV2 last). DX3rd's own actor sheet is a v1 classic
+// FormApplication though (no such menu exists there at all), so this hook is
+// mostly future-proofing; the practical path for DX3rd today is the
+// windowHeader plain-button fallback in _injectSheetStatusBtn below.
+function _ruiOnGetHeaderControls(app, controls) {
+  if (!_isSupported() || !_ruiEnabled()) return;
+  const actor = app.actor ?? app.document;
+  if (actor?.documentName !== "Actor") return;
+  controls.push({
+    action: "fedrToggleMask",
+    icon: "fas fa-question-circle",
+    label: _isMasked(actor) ? "수치 표시" : "수치 숨기기 (??)",
+    onClick: () => _toggleActorMask(actor),
+  });
+}
+Hooks.on("getHeaderControlsApplicationV2", _ruiOnGetHeaderControls);
+
 function _injectSheetStatusBtn(app, el) {
   if (!_isSupported() || !_ruiEnabled()) {
     el?.querySelectorAll?.(".fedr-sheet-btn")?.forEach(b => b.remove());
@@ -762,15 +788,28 @@ function _injectSheetStatusBtn(app, el) {
   maskBtn.addEventListener("click", e => { e.preventDefault(); _toggleActorMask(actor); });
 
   if (headerBtns) {
-    headerBtns.prepend(maskBtn);
-    headerBtns.prepend(btn);
+    // Append (not prepend) so our button sorts AFTER any core/system buttons
+    // already present in the container — lower priority than the existing
+    // header menu, not first. 수치 숨기기/드러내기 lives in the sheet's own
+    // native "⋯" controls dropdown instead — see _ruiOnGetHeaderControls above.
+    headerBtns.append(btn);
   } else {
     // AppV2 (dnd5e 5.x) close button is `button[data-action="close"]` (class
     // .header-control), not `.header-button.close`/`.close-window`. Without matching
     // it the buttons were appended AFTER close (to its right). Match all variants.
+    // This branch also catches AppV2 sheets that simply lack the dnd5e-style
+    // .header-buttons container — those DO have the native "⋯" dropdown (it's
+    // part of every ApplicationV2 frame, see application.mjs _renderFrame),
+    // so the mask toggle must NOT be added here too or it would duplicate the
+    // _ruiOnGetHeaderControls entry. Only genuine v1 sheets (no
+    // [data-action="toggleControls"] at all — DX3rd today) get the plain
+    // fallback button.
     const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');
-    closeBtn ? windowHeader.insertBefore(maskBtn, closeBtn) : windowHeader.appendChild(maskBtn);
+    const hasNativeControls = !!windowHeader.querySelector('[data-action="toggleControls"]');
     closeBtn ? windowHeader.insertBefore(btn, closeBtn) : windowHeader.appendChild(btn);
+    if (!hasNativeControls) {
+      closeBtn ? windowHeader.insertBefore(maskBtn, closeBtn) : windowHeader.appendChild(maskBtn);
+    }
   }
 }
 

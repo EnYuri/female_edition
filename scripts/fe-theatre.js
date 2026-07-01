@@ -1204,6 +1204,31 @@ function _fetResolveEl(app, html) {
   return html?.element?.[0] ?? null;
 }
 
+// ApplicationV2 sheets already ship their own header-controls dropdown (the
+// "⋯" button, `data-action="toggleControls"` — core
+// application.mjs `_getHeaderControls()` / `_headerControlButtons()`). Rather
+// than building a bespoke dropdown, 무대 설정 is pushed straight into THAT
+// menu via the `getHeaderControls{ClassName}` hook chain, which always
+// includes the base class name too ("getHeaderControlsApplicationV2" —
+// `Application#_callHooks` walks `inheritanceChain()` and fires one hook per
+// class, ApplicationV2 last), so this single registration covers every AppV2
+// actor sheet regardless of system. v1 sheets (classic FormApplication, e.g.
+// DX3rd) have no such menu at all — those keep 무대 설정 as a plain header
+// button (see the windowHeader fallback branch in _fetInjectSheetButtons).
+function _fetOnGetHeaderControls(app, controls) {
+  if (!_fetEnabled || !game.user?.isGM) return;
+  const actor = app.actor ?? app.document;
+  if (actor?.documentName !== "Actor") return;
+  if (actor.type === "female_edition.screenPanel") return;
+  controls.push({
+    action: "fetStageConfig",
+    icon: "fas fa-cog",
+    label: "무대 설정",
+    onClick: () => _fetOpenActorConfig(actor.id),
+  });
+}
+Hooks.on("getHeaderControlsApplicationV2", _fetOnGetHeaderControls);
+
 function _fetInjectSheetButtons(app, el) {
   if (!_fetEnabled) return;
   const actor = app.actor ?? app.document;
@@ -1242,29 +1267,36 @@ function _fetInjectSheetButtons(app, el) {
   };
 
   if (headerBtns) {
-    // Container mode: prepend in reverse visual order.
-    // Final order (left → right): [추가/전환] [제거] [설정] [Foundry 기본 버튼들]
-    if (game.user?.isGM) {
-      headerBtns.prepend(mkBtn("fet-stage-config", "fa-cog", "무대 설정",
-        () => _fetOpenActorConfig(actor.id)));
-    }
+    // Container mode: append in forward visual order, AFTER whatever core/system
+    // buttons are already in the container — our injected controls sort last
+    // (lower priority than the existing header menu), not first.
+    // Final order (left → right): [Foundry 기본 버튼들] [추가/전환] [제거]
+    // 무대 설정(GM) lives in the sheet's own native "⋯" controls dropdown
+    // instead — see _fetOnGetHeaderControls above.
     if (onStage) {
-      headerBtns.prepend(mkBtn("fet-stage-remove", "fa-door-open", "무대에서 제거",
-        () => _fetRemoveInsert(theatreId)));
-      headerBtns.prepend(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
+      headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
         () => _fetSetSpeakingAs(theatreId)));
+      headerBtns.append(mkBtn("fet-stage-remove", "fa-door-open", "무대에서 제거",
+        () => _fetRemoveInsert(theatreId)));
     } else {
-      headerBtns.prepend(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
+      headerBtns.append(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
         () => fetAddToStage(actor)));
     }
   } else {
     // Header fallback: insert before the close button (forward order, left → right).
-    // Final order: [추가/전환] [제거] [설정] before [close]
+    // Final order: [Foundry 기본 버튼들] [추가/전환] [제거] [설정] before [close]
     // AppV2 (dnd5e 5.x) close button is `button[data-action="close"]` (class
     // .header-control), not `.header-button.close`/`.close-window`. Without matching
     // it the buttons were appended AFTER close (to its right). Match all variants.
+    // This branch also catches AppV2 sheets that simply lack the dnd5e-style
+    // .header-buttons container — those DO have the native "⋯" dropdown (it's
+    // part of every ApplicationV2 frame, see application.mjs _renderFrame),
+    // so 무대 설정 must NOT be added here too or it would duplicate the
+    // _fetOnGetHeaderControls entry. Only genuine v1 sheets (no
+    // [data-action="toggleControls"] at all) get the plain fallback button.
     const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');
     const ins = (btn) => closeBtn ? windowHeader.insertBefore(btn, closeBtn) : windowHeader.appendChild(btn);
+    const hasNativeControls = !!windowHeader.querySelector('[data-action="toggleControls"]');
 
     if (onStage) {
       ins(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
@@ -1275,7 +1307,7 @@ function _fetInjectSheetButtons(app, el) {
       ins(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
         () => fetAddToStage(actor)));
     }
-    if (game.user?.isGM) {
+    if (game.user?.isGM && !hasNativeControls) {
       ins(mkBtn("fet-stage-config", "fa-cog", "무대 설정",
         () => _fetOpenActorConfig(actor.id)));
     }

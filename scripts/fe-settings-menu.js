@@ -159,7 +159,7 @@ function feIsChatPortraitModuleActive() {
 }
 
 function feIsDx3rdSystem() {
-  try { return game?.system?.id === "double-cross-3rd"; } catch { return false; }
+  try { return ["dx3rd-emanim", "double-cross-3rd"].includes(game?.system?.id); } catch { return false; }
 }
 
 function feIsDnd5eSystem() {

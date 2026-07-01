@@ -612,15 +612,15 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) .sheet.actor :is(
 /* 아이템/주문/피처 설명·디스크립션 본문 = 작은 글자(그림일기).
    시트의 설명 탭/요약, 전기(biography)/노트, 채팅 카드 설명을 모두 커버
    (편집 영역은 .prosemirror 규칙). dnd5e.css(코어) + tidy5e-sheet.css +
-   double-cross-3rd 의 styles.css 세 곳 모두 실제 클래스명을 대조해 작성 —
+   dx3rd-emanim / double-cross-3rd 의 styles.css 세 곳 모두 실제 클래스명을 대조해 작성 —
    bare .editor-content/.description/.summary 는 세 시스템 모두에서 "서술형
    본문" 용도로 일관되게 쓰여 좁은 조상 제약 없이 잡아도 안전하다(헤더/라벨은
    위 §5 첫 블록에서 이미 primary 로 못박혀 있어 specificity 충돌 없음).
    조상 스코프에 .tidy5e-sheet(Tidy5e 는 애플리케이션 루트에 .dnd5e2 대신/더불어
-   이 클래스를 씀)와 .double-cross-3rd(dx3rd 시트 루트)를 추가 — 이전에는 §5가
+   이 클래스를 씀)와 .dx3rd-emanim / .double-cross-3rd(dx3rd 시트 루트)를 추가 — 이전에는 §5가
    dnd5e/tidy5e 에만 스코프돼 dx3rd 시트 설명문이 secondary 분리를 못 받고
    §3 전역 규칙의 primary 폰트로만 떨어졌었다. */
-body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .tidy5e-sheet, .double-cross-3rd) :is(
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .tidy5e-sheet, .dx3rd-emanim, .double-cross-3rd) :is(
   .editor-content,
   .description,
   .summary,

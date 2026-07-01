@@ -75,7 +75,25 @@
 /* ── Name label (floating over portrait) ──────────────────────── */
 
 .fe-stage-label {
-  display: none;
+  display: block;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 100%;
+  padding: 2px 12px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f4f4f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 3px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+  z-index: 3;
 }
 
 /* ── Emote picker button (top-right of portrait, hover-only) ──── */
@@ -118,9 +136,11 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: rgb(8, 8, 12);
-  padding: 28px 16px 12px;
-  color: var(--fe-ac-90, #e8e8e8) !important;
+  background: rgba(10, 11, 16, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 16px 18px 14px;
+  color: #e8e8e8 !important;
   font-size: var(--fet-text-size, 14px);
   line-height: 1.55;
   overflow: hidden;
@@ -129,27 +149,9 @@
   transition: opacity 0.28s ease;
 }
 
-/* Diagonal stripe border (pixel-theme aesthetic) */
+/* Diagonal stripe border (pixel-theme aesthetic; enabled only by .fe-retro-theme) */
 .fe-stage-textbox::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--fet-speaker-color, rgba(140, 170, 255, 0.55)) 0,
-    var(--fet-speaker-color, rgba(140, 170, 255, 0.55)) 2px,
-    transparent 2px,
-    transparent 6px
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) 3px 3px / calc(100% - 6px) calc(100% - 6px) no-repeat,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: destination-out;
-  mask:
-    linear-gradient(#000 0 0) 3px 3px / calc(100% - 6px) calc(100% - 6px) no-repeat,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  display: none;
 }
 
 .fe-stage-textbox--visible {
@@ -166,7 +168,7 @@
   left: 70px;
   transform: translateX(-50%);
   border: 9px solid transparent;
-  border-bottom-color: rgb(8, 8, 12);
+  border-bottom-color: rgba(10, 11, 16, 0.92);
   border-top: none;
 }
 
@@ -186,6 +188,7 @@
   white-space: nowrap;
   line-height: 1.4;
   z-index: 2;
+  display: none;
 }
 
 .fe-stage-textbox-content {
@@ -256,56 +259,29 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   비-픽셀(일반) 테마 — 원본 Theatre Inserts 풍 외형
-   · 대각 줄무늬 픽셀 테두리 제거 → 심플 둥근 어두운 말풍선
-   · 테두리에 걸친 이름 숨김 → 포트레이트 하단에 큰 이름
-   픽셀 테마(body.fe-retro-theme)에는 미적용 = 기존 줄무늬 유지.
+   픽셀(레트로) 테마 — 기본 일반 말풍선을 픽셀 톤으로 전환.
+   실제 9-slice 외곽선은 fe-dx3rd-compat.css 의 body.fe-retro-theme 블록이
+   담당하므로, 여기서는 테마별 기본 표시 상태만 전환한다.
    ═══════════════════════════════════════════════════════════════ */
 
-/* 줄무늬 테두리 제거 */
-body:not(.fe-retro-theme) .fe-stage-textbox::before {
-  display: none;
+body.fe-retro-theme .fe-stage-textbox {
+  background: rgb(8, 8, 12);
+  border: none;
+  border-radius: 0;
+  padding: 28px 16px 12px;
+  color: var(--fe-ac-90, #e8e8e8) !important;
 }
 
-/* 심플 둥근 어두운 말풍선 (이름이 테두리에 안 걸치므로 상단 패딩 축소) */
-body:not(.fe-retro-theme) .fe-stage-textbox {
-  background: rgba(10, 11, 16, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  padding: 16px 18px 14px;
-}
-
-/* 위쪽 삼각 꼬리 — 말풍선 배경색에 맞춤 */
-body:not(.fe-retro-theme) .fe-stage-textbox::after {
-  border-bottom-color: rgba(10, 11, 16, 0.92);
-}
-
-/* 테두리에 걸친 이름 숨김 */
-body:not(.fe-retro-theme) .fe-stage-textbox-name {
-  display: none;
-}
-
-/* 포트레이트 하단에 큰 이름 (원본 Theatre Inserts 라벨 느낌) */
-body:not(.fe-retro-theme) .fe-stage-label {
+body.fe-retro-theme .fe-stage-textbox::before {
   display: block;
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 100%;
-  padding: 2px 12px;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #f4f4f4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.9),
-    0 0 3px rgba(0, 0, 0, 0.95);
-  pointer-events: none;
-  z-index: 3;
+}
+
+body.fe-retro-theme .fe-stage-textbox-name {
+  display: block;
+}
+
+body.fe-retro-theme .fe-stage-label {
+  display: none;
 }
 
 /* ── 무대 말풍선 글꼴 — 이름·본문 모두 큰 글자(primary, 쿠키런) ──────
