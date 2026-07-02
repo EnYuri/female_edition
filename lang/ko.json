@@ -4,7 +4,7 @@
 	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>",
 
 	"FEAPH.Settings.EnableName": "어트리뷰트 이름 도우미",
-	"FEAPH.Settings.EnableHint": "시트나 채팅에 표시된 값 위에 마우스를 올리면, 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd 모두 지원하는 개인용 점검 도구입니다.",
+	"FEAPH.Settings.EnableHint": "시트나 채팅에 표시된 값 위에 마우스를 올리면, 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd 모두 지원하는 점검 도구입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
 	"FEAPH.Settings.SourceName": "어트리뷰트 이름 도우미: 소스 함께 표시",
 	"FEAPH.Settings.SourceHint": "이름이 읽힌 출처(예: name, data-property)를 이름 아래에 함께 표시합니다.",
 	"FEAPH.Keybind.InstantName": "어트리뷰트 이름 도우미: 즉시 표시",
@@ -76,7 +76,7 @@
 	"FESP.Settings.EnableName": "스크린 패널 기능 사용",
 	"FESP.Settings.EnableHint": "스크린 패널(액터 서브타입)을 씬 캔버스에 올리고 면 전환·표시/숨김·비활성화할 수 있게 합니다. 끄면 캔버스 상호작용이 비활성화됩니다(재시작 필요).",
 	"FESP.Settings.GridSnapName": "스크린 패널: 격자에 스냅",
-	"FESP.Settings.GridSnapHint": "스크린 패널을 드래그할 때 씬 격자(격자 없는 씬은 기본 격자 크기)에 맞춰 정렬합니다. 우클릭 메뉴에서도 켜고 끌 수 있는 개인 설정입니다.",
+	"FESP.Settings.GridSnapHint": "스크린 패널을 드래그할 때 씬 격자(격자 없는 씬은 기본 격자 크기)에 맞춰 정렬합니다. 우클릭 메뉴에서도 켜고 끌 수 있습니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
 
 	"FESP.Tabs.faces": "면",
 	"FESP.Tabs.attributes": "패널 어트리뷰트",

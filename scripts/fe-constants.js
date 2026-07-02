@@ -218,8 +218,9 @@ const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 //      font depends on what is actually installed on each client)
 //   2. 채팅 아카이브 / 내보내기 (EXPORT_*) — output preference
 //   3. 툴바 접기 (SC_COLLAPSE_ENABLED) — personal toolbar layout
-// (GM_PRIORITY_ENABLED / GM_SPEAK_AS_SELF are world-scope sentinels — never
-//  client-forced anyway; listed for clarity.)
+// GM_PRIORITY_ENABLED is a world-scope sentinel; GM_SPEAK_AS_SELF is GM-only and
+// client-scoped so each GM can keep their own speaker behavior. Neither is
+// client-forced.
 const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   // 채팅 아카이브 / 내보내기 — output preference, always personal.
   S.EXPORT_ENABLED,
@@ -231,7 +232,8 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
   // 커스텀 폰트 유무 — players opt in individually.
   S.UI_ENABLE_FONTS,
-  // 유저(로컬) 폰트 — 각 클라이언트에 실제 설치/존재하는 폰트에 의존하므로
+  // 유저(로컬/모듈 폴더) 폰트 — 각 클라이언트에 실제 설치/존재하는
+  // 폰트에 의존하므로
   // GM이 강제하면 폰트가 없는 플레이어는 깨진다. 항상 개인 설정으로 유지.
   S.UI_USE_USER_FONT,
   S.USER_FONT_FAMILY,

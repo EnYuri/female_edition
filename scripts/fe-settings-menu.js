@@ -325,9 +325,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
       // Screen Panel (standalone — migrated; world/GM, requiresReload)
       [S.SCREEN_PANEL_ENABLED]: feRead(S.SCREEN_PANEL_ENABLED),
-      // Screen Panel grid-snap (client/personal)
+      // Screen Panel grid-snap (client-scoped; GM-priority-forced unless excluded)
       [S.SCREEN_PANEL_GRID_SNAP]: feRead(S.SCREEN_PANEL_GRID_SNAP),
-      // Attribute name helper (client/personal — hover + hold X → show attribute name)
+      [S.SCREEN_PANEL_DBLCLICK_CYCLE]: feRead(S.SCREEN_PANEL_DBLCLICK_CYCLE),
+      // Attribute name helper (client-scoped; GM-priority-forced unless excluded)
       [S.ATTR_PATH_HELPER]: feRead(S.ATTR_PATH_HELPER),
       [S.ATTR_PATH_HELPER_SOURCE]: feRead(S.ATTR_PATH_HELPER_SOURCE),
 
@@ -461,7 +462,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       }
     } catch { /* no-op */ }
 
-    // User-font controls: dropdown replacement toggle, picker → input, live
+    // User-font controls: dropdown replacement toggle, picker -> input, live
     // preview, and on-demand system-font enumeration.
     try { this.#wireUserFontControls(); } catch { /* no-op */ }
   }
@@ -596,10 +597,12 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const bool = (key) => setOne(key, !!d[key]);
     const num  = (key) => { const n = Number(d[key]); return setOne(key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };
     const str  = (key) => setOne(key, d[key] == null ? ALL_DEFAULTS[key] : String(d[key]));
+    const nextChatFontChoice = String(d[S.CHAT_FONT_CHOICE] ?? ALL_DEFAULTS[S.CHAT_FONT_CHOICE] ?? "cookie");
 
     try {
-      // All settings are independent — save in parallel so the dialog closes
-      // in one round-trip instead of sequential game.settings.set() calls.
+      // Save in parallel so the dialog closes in one round-trip instead of
+      // sequential game.settings.set() calls. ceUiUseGeurimilgi is legacy/internal
+      // state now and is derived from the mixed CookieRun + Geurimilgi preset.
       await Promise.all([
         // Base toggles
         bool(S.PRUNE_ENABLED), num(S.PRUNE_MAX_MESSAGES),
@@ -627,7 +630,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         str(S.EXPORT_PRINT_IMAGE_MODE), str(S.EXPORT_DESKTOP_EXTERNAL_MODE),
 
         // Fonts
-        str(S.CHAT_FONT_CHOICE), bool(S.UI_USE_GEURIMILGI), bool(S.CHATCARD_USE_CUSTOM_FONT),
+        str(S.CHAT_FONT_CHOICE),
+        setOne(S.UI_USE_GEURIMILGI, nextChatFontChoice === "cookie"),
+        bool(S.CHATCARD_USE_CUSTOM_FONT),
         bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
 
         // Style
@@ -691,9 +696,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // Screen Panel — world/GM (requiresReload triggers the reload prompt on change)
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
-        // Screen Panel grid-snap — client/personal (always saved for every user)
+        // Screen Panel grid-snap — client-scoped (always saved for every user)
         bool(S.SCREEN_PANEL_GRID_SNAP),
-        // Attribute name helper — client/personal (always saved for every user)
+        bool(S.SCREEN_PANEL_DBLCLICK_CYCLE),
+        // Attribute name helper — client-scoped (always saved for every user)
         bool(S.ATTR_PATH_HELPER),
         bool(S.ATTR_PATH_HELPER_SOURCE),
 
@@ -714,7 +720,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           str(S.MUSIC_UPLOAD_ROOT), num(S.MUSIC_MAX_MB),
         ] : []),
 
-        // Token selection glow — client/personal (GM-priority forces them automatically)
+        // Token selection glow — client-scoped (GM-priority forces them automatically)
         bool(S.TOKEN_GLOW_ENABLED), bool(S.TOKEN_GLOW_HOVER), num(S.TOKEN_GLOW_STRENGTH),
         bool(S.TOKEN_GLOW_TARGET), bool(S.TOKEN_GLOW_SIGHTLINE),
 

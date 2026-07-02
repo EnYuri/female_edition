@@ -38,8 +38,10 @@ let localIdleTimer = null;
 let indicatorEl = null;
 let textSpan = null;
 
-// ── Settings access (read directly; these keys are intentionally outside the
-//    GM-priority system — typing visibility is a personal/world preference) ────
+// ── Settings access
+// TYPING_ENABLED is client-scoped but not GM-priority-excluded, so enforcement
+// syncs the local game.settings value before this direct read matters.
+// TYPING_SHOW_TO_PLAYERS is world-scoped and GM-only.
 
 function feCgmpActive() {
   try { return !!game.modules.get("CautiousGamemastersPack")?.active; }

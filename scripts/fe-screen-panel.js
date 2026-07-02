@@ -47,8 +47,8 @@ function isPanelFeatureEnabled() {
   catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_ENABLED]; }
 }
 
-// Per-client "snap to grid while dragging" preference. Read directly (this key is
-// GM-priority-excluded — a personal drag preference, not GM-forced).
+// Per-client storage for "snap to grid while dragging". It is not in
+// FE_GM_PRIORITY_EXCLUDED_KEYS, so GM priority may force the local value.
 function isGridSnapEnabled() {
   try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP); }
   catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP]; }
@@ -1024,7 +1024,11 @@ Hooks.on("updateActor", (actor, changes) => {
 
     if (!isPanelActor) {
       const isLinkedActor = (panelActor.system?.faces ?? []).some((face) =>
-        (face.overlays ?? []).some((ov) => ov.linkedActorUuid && fromUuidSync(ov.linkedActorUuid)?.id === actor.id)
+        (face.overlays ?? []).some((ov) => {
+          if (!ov.linkedActorUuid) return false;
+          try { return fromUuidSync(ov.linkedActorUuid)?.id === actor.id; }
+          catch { return false; }
+        })
       );
       if (isLinkedActor) feRebuildPanelOverlays(tile);
     }

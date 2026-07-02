@@ -192,6 +192,18 @@
 
   --fe-font-secondary: var(--fe-font-geurimilgi);
 
+  /* Safe non-decorative stack used when chat-card custom fonts are disabled.
+     Do not route this through --font-primary/--dnd5e-*; those vars are remapped
+     to module fonts while body.fe-fonts-enabled is active. */
+  --fe-chat-card-system-font-family:
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+
   /* 유저(로컬/폴더) 폰트 — JS(feSetUserFontMode)가 선택값으로 채운다. 비활성 시 미설정. */
   --fe-user-font-family:
     "FE CookieRun",
@@ -294,7 +306,7 @@ body.fe-fonts-enabled :is(.app, .application) {
  *      목차·헤딩(h1~h6)·능력치 라벨·**일반 채팅 메시지 본문/인라인** → 쿠키런
  *    작은 글자(--fe-font-secondary, 가독용 본문): **채팅 카드/박스 내부 텍스트**
  *      (아이템/주문 카드·midi-qol·dx3rd 칩)·시트 아이템/주문 설명·툴팁·메타 → 그림일기
- *  - cookie     "쿠키런 + 그림일기"(혼합): 큰=쿠키런, 작은=그림일기.
+ *  - cookie     "쿠키런 + 그림일기"(혼합): 큰=쿠키런, 작은/UI=그림일기.
  *  - cookieAll  "쿠키런": secondary/geurimilgi 변수까지 쿠키런으로 remap → 전부 쿠키런.
  *  - geurimilgi "그림일기": primary 까지 그림일기로 remap → 전부 그림일기.
  *  primary/secondary 변수가 모드별로 remap 되므로 아래 요소별 규칙은
@@ -314,7 +326,7 @@ body.fe-fonts-enabled.fe-chat-font-geurimilgi {
   --fe-chat-font-family: var(--fe-font-geurimilgi);
 }
 
-/* UI 폰트를 그림일기로 전환 */
+/* Mixed CookieRun + Geurimilgi preset: UI/sheet default font uses Geurimilgi. */
 body.fe-fonts-enabled.fe-ui-font-geurimilgi {
   --fe-ui-font-family:          var(--fe-font-geurimilgi);
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
@@ -481,13 +493,52 @@ body.fe-fonts-enabled #fe-chat-export-log :is(.chat-message, .message-header, .m
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 채팅 카드/박스 내부 텍스트 = 작은 글자(secondary). 혼합에서 그림일기.
+/* 채팅 카드/박스 내부 텍스트.
+   옵션 OFF: 메시지 본문(primary) 상속을 끊고 안전한 시스템 폰트로 복원.
+   옵션 ON: 작은 글자(secondary). 혼합에서 그림일기.
    아이템/주문 카드·midi-qol·dx3rd 칩 — .message-content 의 본문 폰트를 덮어쓴다.
    (위와 동일한 이유로 #fe-chat-export-log 도 포함) */
-body.fe-fonts-enabled #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
-body.fe-fonts-enabled #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
-body.fe-fonts-enabled .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
-body.fe-fonts-enabled #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  --font-primary: var(--fe-chat-card-system-font-family) !important;
+  --font-sans: var(--fe-chat-card-system-font-family) !important;
+  --font-serif: var(--fe-chat-card-system-font-family) !important;
+  --font-h1: var(--fe-chat-card-system-font-family) !important;
+  --font-h2: var(--fe-chat-card-system-font-family) !important;
+  --font-h3: var(--fe-chat-card-system-font-family) !important;
+  --font-h4: var(--fe-chat-card-system-font-family) !important;
+  --font-h5: var(--fe-chat-card-system-font-family) !important;
+  --font-h6: var(--fe-chat-card-system-font-family) !important;
+  --font-blockquote: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto-slab: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto-condensed: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-signika: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-modesto: var(--fe-chat-card-system-font-family) !important;
+  font-family: var(--fe-chat-card-system-font-family) !important;
+}
+
+body.fe-fonts-enabled.fe-chatcard-custom-font #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled.fe-chatcard-custom-font #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled.fe-chatcard-custom-font .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  --font-primary: var(--fe-font-secondary) !important;
+  --font-sans: var(--fe-font-secondary) !important;
+  --font-serif: var(--fe-font-secondary) !important;
+  --font-h1: var(--fe-font-secondary) !important;
+  --font-h2: var(--fe-font-secondary) !important;
+  --font-h3: var(--fe-font-secondary) !important;
+  --font-h4: var(--fe-font-secondary) !important;
+  --font-h5: var(--fe-font-secondary) !important;
+  --font-h6: var(--fe-font-secondary) !important;
+  --font-blockquote: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto-slab: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto-condensed: var(--fe-font-secondary) !important;
+  --dnd5e-font-signika: var(--fe-font-secondary) !important;
+  --dnd5e-font-modesto: var(--fe-font-secondary) !important;
   font-family: var(--fe-font-secondary) !important;
 }
 
@@ -578,7 +629,7 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
 }
 
 body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message :is(.message-content, .chat-card, .midi-chat-card, .dnd5e2.chat-card) em {
+  .chat-message :is(.message-content, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) em {
   font-style: italic !important;
   font-synthesis: style;
 }

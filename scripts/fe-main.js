@@ -17,8 +17,9 @@ import "./fe-chat-enhance.js";
 // (fe-chat-images / fe-image-hover / fe-narrator / fe-theatre / fe-screen-panel),
 // whose settings were migrated into the unified menu (no native Module Settings
 // entries). Their modules still READ via game.settings.get; the menu writes them.
-// CLIENT-scope personal ones are listed in FE_GM_PRIORITY_EXCLUDED_KEYS so the
-// menu reflects each client's own value (no GM-priority override staleness).
+// Client-scope settings are GM-forced unless listed in
+// FE_GM_PRIORITY_EXCLUDED_KEYS; those excluded keys are the only always-personal
+// categories.
 
 // Feature splits
 import "./fe-chat-edit.js";

@@ -487,7 +487,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.CHAT_FONT_CHOICE, {
     name: "채팅/UI 글꼴 선택",
-    hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '쿠키런 + 그림일기'는 UI/시트 기본 글꼴도 그림일기로 처리합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
     scope: "client",
     config: false,
     type: String,
@@ -502,13 +502,14 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.CHAT_FONT_CHOICE],
     onChange: () => {
       feSetChatFontChoiceClass(document);
+      feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
     },
   });
 
   game.settings.register(MODULE_ID, S.UI_USE_GEURIMILGI, {
-    name: "UI/시트 기본 글꼴: 그림일기 사용(쿠키런 대체)",
-    hint: "html/body, #ui/#interface, dnd5e2 능력치 라벨(ability-scores/abilities) 등 기본 UI 글꼴을 그림일기 폰트로 바꿉니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
+    name: "(internal) UI/시트 그림일기 동기화",
+    hint: "레거시 호환용 내부 값입니다. 현재는 '채팅/UI 글꼴 선택'의 '쿠키런 + 그림일기' 프리셋에서 자동으로 동기화됩니다.",
     scope: "client",
     config: false,
     type: Boolean,
@@ -527,6 +528,7 @@ Hooks.once("init", () => {
       feSetUserFontMode(document);
       // Suppress/restore the module chat-font-choice classes (see feUserFontActive).
       feSetChatFontChoiceClass(document);
+      feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
     },
   });
@@ -542,6 +544,7 @@ Hooks.once("init", () => {
       feSetUserFontMode(document);
       // Family going empty/non-empty flips feUserFontActive → refresh module classes.
       feSetChatFontChoiceClass(document);
+      feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
     },
   });
@@ -733,7 +736,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.GM_PRIORITY_ENABLED, {
     name: "GM 설정 전역 강제",
-    hint: "활성화 시 아래 3가지를 제외한 GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑 등 포함). 항상 개인 유지: 커스텀 폰트 유무 · 채팅 아카이브/내보내기 · 툴바 접기. 플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.",
+    hint: "활성화 시 아래 3가지를 제외한 GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑 등 포함). 항상 개인 유지: 커스텀 폰트 유무/유저 로컬 폰트 · 채팅 아카이브/내보내기 · 툴바 접기. 플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.",
     scope: "world",
     config: false,
     restricted: true,

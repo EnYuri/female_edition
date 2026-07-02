@@ -15,10 +15,51 @@
  * 1) Notification tray / popout / archive typography consistency
  * ------------------------------------------------------------------ */
 #chat-notifications,
-#chat-notifications :is(.message, .message-header, .message-content, .flavor-text, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card),
-.chat-popout #chat :is(.message, .message-header, .message-content, .flavor-text),
-.chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
+#chat-notifications :is(.message, .message-header, .message-content, .flavor-text),
+.chat-popout #chat :is(.message, .message-header, .message-content, .flavor-text) {
   font-family: var(--fe-chat-font-family, var(--fe-font-primary), var(--font-primary), Signika, sans-serif) !important;
+}
+
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font)
+  :is(#chat-notifications, .chat-popout #chat)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
+  --font-primary: var(--fe-chat-card-system-font-family) !important;
+  --font-sans: var(--fe-chat-card-system-font-family) !important;
+  --font-serif: var(--fe-chat-card-system-font-family) !important;
+  --font-h1: var(--fe-chat-card-system-font-family) !important;
+  --font-h2: var(--fe-chat-card-system-font-family) !important;
+  --font-h3: var(--fe-chat-card-system-font-family) !important;
+  --font-h4: var(--fe-chat-card-system-font-family) !important;
+  --font-h5: var(--fe-chat-card-system-font-family) !important;
+  --font-h6: var(--fe-chat-card-system-font-family) !important;
+  --font-blockquote: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto-slab: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-roboto-condensed: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-signika: var(--fe-chat-card-system-font-family) !important;
+  --dnd5e-font-modesto: var(--fe-chat-card-system-font-family) !important;
+  font-family: var(--fe-chat-card-system-font-family) !important;
+}
+
+body.fe-fonts-enabled.fe-chatcard-custom-font
+  :is(#chat-notifications, .chat-popout #chat)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
+  --font-primary: var(--fe-font-secondary) !important;
+  --font-sans: var(--fe-font-secondary) !important;
+  --font-serif: var(--fe-font-secondary) !important;
+  --font-h1: var(--fe-font-secondary) !important;
+  --font-h2: var(--fe-font-secondary) !important;
+  --font-h3: var(--fe-font-secondary) !important;
+  --font-h4: var(--fe-font-secondary) !important;
+  --font-h5: var(--fe-font-secondary) !important;
+  --font-h6: var(--fe-font-secondary) !important;
+  --font-blockquote: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto-slab: var(--fe-font-secondary) !important;
+  --dnd5e-font-roboto-condensed: var(--fe-font-secondary) !important;
+  --dnd5e-font-signika: var(--fe-font-secondary) !important;
+  --dnd5e-font-modesto: var(--fe-font-secondary) !important;
+  font-family: var(--fe-font-secondary) !important;
 }
 
 :is(#sidebar #chat, .chat-popout #chat, #chat-notifications)
@@ -38,7 +79,7 @@
 #chat-notifications
   :is(.chat-message, .message)
   .message-metadata {
-  font-family: var(--fe-font-secondary, var(--fe-chat-font-family, inherit)) !important;
+  font-family: inherit !important;
   font-weight: var(--fe-font-weight-small, 400) !important;
   font-size: var(--fe-chat-meta-size, 12px) !important;
   line-height: 1 !important;
@@ -52,9 +93,21 @@
   .message-metadata
   :is(.message-timestamp, time) {
   order: 0;
-  font-family: var(--fe-font-secondary, var(--fe-chat-font-family, inherit)) !important;
+  font-family: inherit !important;
   font-size: var(--fe-chat-meta-size, 12px) !important;
   font-weight: var(--fe-font-weight-small, 400) !important;
+}
+
+body.fe-fonts-enabled
+  #chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata,
+body.fe-fonts-enabled
+  #chat-notifications
+  :is(.chat-message, .message)
+  .message-metadata
+  :is(.message-timestamp, time) {
+  font-family: var(--fe-font-secondary, var(--fe-chat-font-family, inherit)) !important;
 }
 
 #chat-notifications
@@ -192,7 +245,7 @@
   text-shadow: none !important;
 }
 
-body.fe-chatcard-custom-font
+body.fe-fonts-enabled.fe-chatcard-custom-font
   #chat-notifications
   :is(.chat-message, .message)
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)

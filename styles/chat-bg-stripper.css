@@ -91,7 +91,7 @@ body:not(.fe-chatcard-custom-font) {
  */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.details.card-content,
     .details.card-content,
@@ -113,10 +113,10 @@ body:not(.fe-chatcard-custom-font) {
  * (Helps avoid CookieRun looking overly heavy in dense rules text.)
  * The exact Geurimilgi face mapping is defined in styles/ui-font.css.
  */
-body.fe-chatcard-custom-font
+body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.details.card-content,
     .details.card-content,
@@ -132,7 +132,7 @@ body.fe-chatcard-custom-font
 /* Slight grey background for the collapsible description header box. */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.card-header.description,
     section.card-header.description.collapsible,
@@ -221,7 +221,7 @@ body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notificati
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
   .message-content
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(p, li) {
@@ -230,7 +230,7 @@ body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notificati
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
   .message-content
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(p, li):last-child {
@@ -241,7 +241,7 @@ body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notificati
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message
   .message-content
-  :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(section.card-header.description, .card-header.description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
   .wrapper :is(strong, b) {

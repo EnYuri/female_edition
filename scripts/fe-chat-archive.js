@@ -3136,6 +3136,15 @@ ${faces.join("\n")}
    * face, since Geurimilgi intentionally isn't embedded for offline export. */
   --fe-font-secondary: var(--fe-font-geurimilgi);
 
+  --fe-chat-card-system-font-family:
+    "Signika",
+    system-ui,
+    -apple-system,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif,
+    var(--fe-symbol-fallback);
+
   --font-primary: var(--fe-font-primary);
   --font-sans: var(--fe-font-primary);
   --font-serif: var(--fe-font-primary);
@@ -3190,10 +3199,13 @@ html, body {
 #fe-chat-export-container .chat-message * {
   font-family: var(--fe-chat-font-family) !important;
 }
-/* 카드/박스 내부 = 작은 글자(secondary) — 라이브 ui-font.css의 분리 규칙을 오프라인
- * file:// 폴백(완전히 외부 CSS를 못 불러오는 경우)에서도 동일하게 재현한다. */
-#fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
-#fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
+/* 카드/박스 내부 — 라이브 ui-font.css와 동일하게 토글을 따른다. */
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
+  font-family: var(--fe-chat-card-system-font-family) !important;
+}
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
   font-family: var(--fe-font-secondary) !important;
 }
 

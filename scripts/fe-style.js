@@ -68,7 +68,11 @@ function feSetChatFontChoiceClass(doc = document) {
 
 function feSetUiFontClass(doc = document) {
   try {
-    const enabled = !!feSetting(S.UI_USE_GEURIMILGI);
+    // "UI/sheet Geurimilgi" is not an independent font mode. It only has a
+    // distinct meaning in the mixed CookieRun + Geurimilgi preset; every other
+    // preset remaps the UI font variables to its own single font already.
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    const enabled = !feUserFontActive() && choice === "cookie";
     doc?.body?.classList?.toggle("fe-ui-font-geurimilgi", enabled);
   } catch (_e) {
     /* noop */

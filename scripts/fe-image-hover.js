@@ -178,7 +178,7 @@ function _ihRegisterSettings() {
 
   game.settings.register(_IH_MODULE, "ihPosition", {
     name: "Image Hover: 이미지 위치",
-    hint: "화면 내 이미지 표시 위치 (개인 설정).",
+    hint: "화면 내 이미지 표시 위치입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
     scope: "client",
     config: false,
     choices: {
@@ -195,7 +195,7 @@ function _ihRegisterSettings() {
 
   game.settings.register(_IH_MODULE, "ihSize", {
     name: "Image Hover: 이미지 크기 (화면 너비의 1/N)",
-    hint: "값이 작을수록 이미지가 커집니다 (개인 설정).",
+    hint: "값이 작을수록 이미지가 커집니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
     scope: "client",
     config: false,
     range: { min: 3, max: 20, step: 0.5 },
@@ -210,7 +210,7 @@ function _ihRegisterSettings() {
 
   game.settings.register(_IH_MODULE, "ihSizeWide", {
     name: "Image Hover: 가로 이미지 크기 (화면 높이의 1/N)",
-    hint: "가로로 긴 이미지(가로:세로 ≥ 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다 (개인 설정).",
+    hint: "가로로 긴 이미지(가로:세로 ≥ 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
     scope: "client",
     config: false,
     range: { min: 1, max: 20, step: 0.025 },
@@ -221,7 +221,7 @@ function _ihRegisterSettings() {
 
   game.settings.register(_IH_MODULE, "ihMaxUpscale", {
     name: "Image Hover: 최대 업스케일 배율",
-    hint: "원본 해상도 대비 최대 확대 한도(개인). 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. 0이면 제한 없음(항상 설정 크기로 표시).",
+    hint: "원본 해상도 대비 최대 확대 한도입니다. 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. 0이면 제한 없음(항상 설정 크기로 표시). GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
     scope: "client",
     config: false,
     range: { min: 0, max: 5, step: 0.05 },
@@ -232,7 +232,7 @@ function _ihRegisterSettings() {
 
   game.settings.register(_IH_MODULE, "ihDelay", {
     name: "Image Hover: 표시 지연 시간 (ms)",
-    hint: "아트 표시 키를 누른 후 이미지가 나타나기까지 대기 시간(밀리초) — 개인 설정.",
+    hint: "아트 표시 키를 누른 후 이미지가 나타나기까지 대기 시간(밀리초)입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
     scope: "client",
     config: false,
     range: { min: 0, max: 5000, step: 100 },
@@ -601,7 +601,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
    * @param {boolean} hovered Whether cursor is over the token
    * @param {number}  delay   Milliseconds to wait before showing (ihDelay)
    */
-  showArtworkRequirements(token, hovered, delay) {
+  showArtworkRequirements(token, hovered, delay, pointerEvent = null) {
     if (!token?.actor || !_ihActive()) return;
 
     // Permission check — ownership["default"] === -1 means "None (INHERIT)" which
@@ -617,7 +617,7 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     if (token.detectionFilter && !game.user.isGM) return;
 
     // Mouse button held — user is dragging.
-    if (event?.buttons > 0) return;
+    if (pointerEvent?.buttons > 0) return;
 
     // showToAll is active — do not disturb the displayed art.
     if (_ihShowAll) return;
