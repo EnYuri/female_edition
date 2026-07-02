@@ -1131,14 +1131,18 @@
     <summary>GM 설정 강제</summary>
 
     <div class="form-group">
-      <label>GM 설정 전역 강제 활성화</label>
+      <label>GM 설정 전역 강제 활성화 (GM)</label>
       <div class="form-fields">
+        {{#if isGM}}
         <input type="checkbox" name="ceGmPriorityEnabled" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} />
+        {{else}}
+        <input type="checkbox" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} disabled />
+        {{/if}}
       </div>
       <p class="notes">
         활성화 시 아래 3가지를 <b>제외한</b> GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑, 배틀 트래커 등 포함).
         <b>항상 개인 유지:</b> 커스텀 폰트 유무/유저 로컬 폰트 · 채팅 아카이브/내보내기 · 툴바 접기.
-        플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.
+        플레이어가 개인 취향대로 쓰게 하려면 GM이 이 기능을 꺼야 합니다.{{#unless isGM}} 이 항목은 현재 상태만 표시하며, 변경은 GM만 할 수 있습니다.{{/unless}}
       </p>
     </div>
 

@@ -193,6 +193,78 @@ body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-us
   background-blend-mode: normal !important;
 }
 
+/* Repaint chat-message context menus from the message surface instead of
+ * Foundry's default canvas menu colors so texture stripping, system-message
+ * color, and user-color tint remain visually continuous while the dropdown is
+ * open. Non-fixed menus inherit directly; fixed popover menus receive copied
+ * inline background/color values from chat-bg-stripper.js. */
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.message, .chat-message)
+  > #context-menu {
+  background: inherit !important;
+  background-color: inherit !important;
+  background-image: inherit !important;
+  background-blend-mode: inherit !important;
+  color: inherit !important;
+  text-shadow: inherit !important;
+}
+
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.message, .chat-message)
+  > #context-menu,
+#context-menu.fe-chat-context-menu {
+  border-color: var(--fe-group-outline-color, var(--chat-message-border-color, rgb(0 0 0 / 0.35))) !important;
+  --text-color: inherit;
+  --hover-text-color: inherit;
+  --group-separator: rgb(0 0 0 / 0.18);
+  --hover-entry-border: rgb(0 0 0 / 0.16);
+  --hover-entry-background: rgb(0 0 0 / 0.08);
+}
+
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.message, .chat-message)
+  > #context-menu
+  li.context-item:hover,
+#context-menu.fe-chat-context-menu
+  li.context-item:hover {
+  background: rgb(0 0 0 / 0.08) !important;
+  background: color-mix(in srgb, currentColor 10%, transparent) !important;
+  border-color: rgb(0 0 0 / 0.16) !important;
+  color: inherit !important;
+}
+
+body.fe-msg-bg-usercolor
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  > #context-menu,
+body.fe-msg-bg-usercolor
+  #chat-notifications
+  .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  > #context-menu,
+body.fe-msg-bg-usercolor
+  #context-menu.fe-chat-context-menu.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
+  background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
+  background-blend-mode: screen !important;
+  border-color: rgb(var(--fe-user-color-rgb) / 0.55) !important;
+}
+
+body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  > #context-menu,
+body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  #chat-notifications
+  .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  > #context-menu,
+body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  #context-menu.fe-chat-context-menu.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
+  background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
+  background-blend-mode: normal !important;
+  box-shadow:
+    inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)),
+    0 3px 6px rgb(0 0 0 / 0.45) !important;
+}
+
 /* Optional: configurable "system color" background for system messages
  * (messages with no character color). Toggled by body.fe-system-msg-color, color
  * via --fe-system-msg-bg (default white). The extra body class makes this win.

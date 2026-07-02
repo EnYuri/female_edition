@@ -87,10 +87,102 @@ function restoreAllExisting() {
 }
 
 // --------------------------------
+// Chat context-menu surface sync
+// --------------------------------
+
+const FE_CHAT_CONTEXT_SURFACE_CLASSES = [
+  "fe-has-user-color",
+  "fe-system-msg",
+  "fe-narrator-chat",
+  "narrator-chat",
+  "fe-round-marker-chat",
+  "round-marker",
+];
+
+const FE_CHAT_CONTEXT_CSS_VARS = [
+  "--fe-user-color-rgb",
+  "--fe-user-bg-base-rgb",
+  "--fe-group-outline-color",
+  "--chat-message-border-color",
+];
+
+function feGetChatContextMessage(target) {
+  try {
+    const message = target?.closest?.(".chat-message, .message");
+    if (!message?.matches?.("[data-message-id], [data-document-id]")) return null;
+    if (!message.closest?.(".chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log")) return null;
+    return message;
+  } catch {
+    return null;
+  }
+}
+
+function feSyncChatContextMenuSurface(contextMenu, menuOverride = null, targetOverride = null) {
+  try {
+    const menu = menuOverride ?? contextMenu?.element;
+    const message = feGetChatContextMessage(targetOverride ?? contextMenu?.target);
+    if (!menu || !message) return;
+
+    const cs = getComputedStyle(message);
+    menu.classList.add("fe-chat-context-menu");
+    for (const cls of FE_CHAT_CONTEXT_SURFACE_CLASSES) {
+      menu.classList.toggle(cls, message.classList.contains(cls));
+    }
+
+    menu.style.backgroundColor = cs.backgroundColor;
+    menu.style.backgroundImage = cs.backgroundImage;
+    menu.style.backgroundRepeat = cs.backgroundRepeat;
+    menu.style.backgroundPosition = cs.backgroundPosition;
+    menu.style.backgroundSize = cs.backgroundSize;
+    menu.style.backgroundBlendMode = cs.backgroundBlendMode;
+    menu.style.color = cs.color;
+    menu.style.textShadow = cs.textShadow;
+    menu.style.fontFamily = cs.fontFamily;
+
+    for (const name of FE_CHAT_CONTEXT_CSS_VARS) {
+      const value = cs.getPropertyValue(name).trim();
+      if (value) menu.style.setProperty(name, value);
+      else menu.style.removeProperty(name);
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feInstallChatContextMenuSurfaceSync() {
+  try {
+    const CM = foundry?.applications?.ux?.ContextMenu ?? globalThis.ContextMenu;
+    const proto = CM?.prototype;
+    if (!proto || proto.__feChatContextSurfaceSyncInstalled) return;
+    const origSetPosition = proto._setPosition;
+    if (typeof origSetPosition === "function") {
+      proto._setPosition = function (menu, target, options) {
+        const result = origSetPosition.call(this, menu, target, options);
+        feSyncChatContextMenuSurface(this, menu, target);
+        return result;
+      };
+    } else {
+      const origRender = proto.render;
+      if (typeof origRender !== "function") return;
+      proto.render = async function (...args) {
+        const result = await origRender.apply(this, args);
+        feSyncChatContextMenuSurface(this);
+        return result;
+      };
+    }
+    proto.__feChatContextSurfaceSyncInstalled = true;
+  } catch (err) {
+    console.warn(`${MODULE_ID} | failed to install chat context-menu surface sync`, err);
+  }
+}
+
+// --------------------------------
 // Foundry hooks
 // --------------------------------
 
 Hooks.once("init", () => {
+  feInstallChatContextMenuSurfaceSync();
+
   game.settings.register(MODULE_ID, SETTINGS.ENABLE_FONTS, {
     name: "커스텀 폰트 적용 (쿠키런/그림일기)",
     hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + 그림일기 폰트 및 관련 옵션(채팅 글꼴 선택 등)이 동작합니다.",
@@ -140,6 +232,7 @@ Hooks.once("ready", () => {
   try { document.body?.classList?.toggle("fe-strip-chat-textures", !!stripTextures); } catch {}
   // Remove any inline overrides left by pre-v0.3.91 builds.
   restoreAllExisting();
+  feInstallChatContextMenuSurfaceSync();
 
   // Re-assert local font preference after every GM priority sync.
   // enableFonts is excluded from GM priority (players control it personally),
