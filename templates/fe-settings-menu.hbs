@@ -856,6 +856,13 @@
       </div>
     </div>
     <div class="form-group">
+      <label>시스템 메시지 제외 (GM)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageExcludeSystemMessages" data-dtype="Boolean" {{checked values.stageExcludeSystemMessages}} />
+      </div>
+      <p class="notes">아이템/공격 카드, 이니셔티브, 타 모듈이 만든 시스템 메시지는 무대 발화로 내보내지 않고 원래 화자로 둡니다.</p>
+    </div>
+    <div class="form-group">
       <label>이전 발화에 비액터 메시지 포함 (GM)</label>
       <div class="form-fields">
         <input type="checkbox" name="stageRecallIncludeNonActor" data-dtype="Boolean" {{checked values.stageRecallIncludeNonActor}} />

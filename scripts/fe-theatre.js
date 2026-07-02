@@ -34,6 +34,7 @@ const _fet = {
 // Settings cache — updated on init and on settings close
 let _fetEnabled       = false;
 let _fetHideMessages  = false;
+let _fetExcludeSystemMessages = true;
 let _fetRecallIncludeNonActor = false;
 let _fetAutoDecay     = true;
 let _fetDecayTime     = 30000;
@@ -87,6 +88,17 @@ function _fetRegisterSettings() {
     type: Boolean,
     default: false,
     onChange: (v) => { _fetHideMessages = v; },
+  });
+
+  game.settings.register(_FET_MODULE, "stageExcludeSystemMessages", {
+    name: "무대 채팅: 시스템 메시지 제외",
+    hint: "아이템/공격 카드, 이니셔티브, 타 모듈이 생성한 시스템 메시지는 무대 발화로 내보내지 않고 원래 화자 그대로 둡니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true,
+    onChange: (v) => { _fetExcludeSystemMessages = v; },
   });
 
   game.settings.register(_FET_MODULE, "stageRecallIncludeNonActor", {
@@ -195,6 +207,7 @@ function _fetRegisterSettings() {
 function _fetLoadSettings() {
   _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled");
   _fetHideMessages   = game.settings.get(_FET_MODULE, "stageHideMessages");
+  _fetExcludeSystemMessages = game.settings.get(_FET_MODULE, "stageExcludeSystemMessages");
   _fetRecallIncludeNonActor = game.settings.get(_FET_MODULE, "stageRecallIncludeNonActor");
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
   _fetDecayTime      = game.settings.get(_FET_MODULE, "stageDecayTime");
@@ -895,6 +908,27 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
   chatData.speaker.alias ??= insert.name;
 });
 
+// A message the user did NOT type as plain chat — an item/attack card, initiative,
+// or any system/other-module generated message. Such messages carry either their
+// own system/module flags (anything outside core/female_edition) or chat-card HTML
+// in their content. When "시스템 메시지 제외" is on we leave these at their original
+// speaker instead of overriding them into the active stage actor's speech.
+function _fetIsSystemMessage(chatMessage, data) {
+  const flags = data?.flags ?? chatMessage.flags ?? {};
+  for (const scope of Object.keys(flags)) {
+    if (scope === "core" || scope === _FET_MODULE) continue;
+    // Any non-empty foreign-scope flag block ⇒ system/module-authored message.
+    const block = flags[scope];
+    if (block && typeof block === "object" && Object.keys(block).length) return true;
+  }
+  const content = data?.content ?? chatMessage.content ?? "";
+  if (typeof content === "string" && content &&
+      /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdnd5e2\b)[^"']*["']/i.test(content)) {
+    return true;
+  }
+  return false;
+}
+
 Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
   if (!_fetEnabled) return;
   // Narrator channel + /as plain-alias own their own speaker — never let stage
@@ -903,6 +937,9 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
   if (_fnFlags?.isNarrator || _fnFlags?.plainAlias) return;
   // Skip roll messages — cross-system compat rule mirrors fe-chat-enhance.js
   if (chatMessage.rolls?.length) return;
+  // Skip system/module-authored messages (item cards, initiative, etc.) when enabled,
+  // so they aren't rerouted into the active stage actor's speech.
+  if (_fetExcludeSystemMessages && _fetIsSystemMessage(chatMessage, data)) return;
   // Only process messages created by the local user
   if (userId && userId !== game.user.id) return;
 
@@ -1371,7 +1408,10 @@ function _fetInjectSheetButtons(app, el) {
     const btn = document.createElement("a");
     btn.className = `header-button fet-stage-btn ${extraCls}`;
     btn.title = title;
-    btn.innerHTML = `<i class="fas ${icon}"></i> ${title}`;
+    // Label wrapped in a span so systems that force icon-only round header
+    // buttons (dnd5e: .window-header .header-button → 18px grid) can hide the
+    // text via CSS instead of letting it wrap and stack the buttons vertically.
+    btn.innerHTML = `<i class="fas ${icon}"></i><span class="fet-stage-btn-label"> ${title}</span>`;
     btn.addEventListener("click", (e) => { e.preventDefault(); onClick(); });
     return btn;
   };

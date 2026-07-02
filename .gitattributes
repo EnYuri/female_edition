@@ -6,3 +6,6 @@
 .gitignore        export-ignore
 test              export-ignore
 CLAUDE.md         export-ignore
+AGENTS.md        export-ignore
+.codex       export-ignore
+.claude       export-ignore

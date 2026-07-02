@@ -430,6 +430,17 @@ async function feExportChatLogToPDF() {
     preRangeSpec = null;
   }
 
+  // Step 3a: Desktop (Electron) app — window.open popups are blocked and
+  // window.print() invokes the OS print dialog (Microsoft Print to PDF → slow,
+  // 0 KB files). Render offscreen and hand off to the system browser for a real
+  // "Save as PDF". Skipped only when the user explicitly set the desktop-external
+  // mode to "off" (opting back into the legacy in-app print path below).
+  if (feIsElectron() && String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off") !== "off") {
+    const done = await feExportChatLogViaDesktopBrowser({ preCollectedMessages, preRangeSpec });
+    if (done) return;
+    // Fell through (frame/render failed) — try the legacy popup/inline path.
+  }
+
   // Step 3: Now open the archive popup window.
   const win = feOpenChatArchiveWindow();
   if (win) {
@@ -649,6 +660,73 @@ function feOpenChatArchiveWindow() {
     return win;
   } catch {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Export — Desktop (Electron) path
+//
+// The Foundry desktop app blocks window.open popups (feOpenChatArchiveWindow
+// returns null), and window.print() there invokes the OS print dialog
+// ("Microsoft Print to PDF" → very slow, produces 0 KB files) instead of a
+// browser-style "Save as PDF". Instead we render the archive into a hidden,
+// same-origin <iframe> — a full document just like a popup, so the entire
+// existing render pipeline (feRenderChatArchiveWindow) is reused unchanged —
+// then hand the result to the system browser, where the user gets the real
+// print → "PDF로 저장" they expect.
+// ---------------------------------------------------------------------------
+
+function feCreateHiddenArchiveFrame() {
+  const iframe = document.createElement("iframe");
+  iframe.id = "fe-chat-archive-frame";
+  // Kept RENDERED (not display:none) so images/fonts load and layout measures
+  // correctly, but pushed fully off-screen and made inert.
+  iframe.style.cssText =
+    "position:fixed;left:-100000px;top:0;width:1100px;height:800px;border:0;opacity:0;pointer-events:none;z-index:-1;";
+  document.body.appendChild(iframe);
+  return iframe;
+}
+
+async function feExportChatLogViaDesktopBrowser({ preCollectedMessages = null, preRangeSpec = null } = {}) {
+  const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
+  const worldName = game.world?.title || game.world?.name || "";
+  const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+
+  const iframe = feCreateHiddenArchiveFrame();
+  const win = iframe.contentWindow;
+  if (!win) {
+    try { iframe.remove(); } catch {}
+    return false;
+  }
+
+  try {
+    ui.notifications?.info("female_edition | 아카이브 생성 중… 완료되면 시스템 브라우저에서 열립니다.", { console: false });
+
+    await feRenderChatArchiveWindow(win, {
+      autoPrint: false,
+      optimize,
+      preCollectedMessages,
+      preRangeSpec,
+    });
+
+    // Open in the system browser (real "PDF로 저장"). force:true bypasses the
+    // desktop-external mode gate — this path only runs when the caller already
+    // decided desktop external handoff is wanted.
+    const opened = await feOpenArchiveInExternalBrowser(win, titleText, { force: true });
+    if (!opened) {
+      // Shell access unavailable (or open failed): save the HTML directly so the
+      // user can open it in a browser manually and print → PDF from there.
+      await feDownloadArchiveHTML(win, titleText);
+      ui.notifications?.info("female_edition | 외부 브라우저를 열 수 없어 HTML로 저장했습니다. 브라우저로 열어 PDF로 저장하세요.", { console: false });
+    }
+    return true;
+  } catch (err) {
+    console.warn("female_edition | desktop browser export failed", err);
+    return false;
+  } finally {
+    // The temp file is already fully written before shell.openPath resolves, so
+    // the frame can go now; a short delay is just belt-and-suspenders.
+    setTimeout(() => { try { iframe.remove(); } catch {} }, 2000);
   }
 }
 
@@ -2869,12 +2947,16 @@ async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
   }
 }
 
-async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { closeAfter = false } = {}) {
+async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { closeAfter = false, force = false } = {}) {
+  // Returns true when the archive was successfully handed to the system browser,
+  // false otherwise (so callers can fall back to a direct HTML download).
   const mode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
-  if (mode === "off") return;
+  // `force` bypasses the mode gate — used by the desktop (Electron) export path,
+  // where opening in the system browser is the only way to get a real "Save as PDF".
+  if (mode === "off" && !force) return false;
   if (!feIsElectron()) {
     ui?.notifications?.warn?.("외부 브라우저 열기는 데스크톱(Electron) 앱에서만 지원됩니다.");
-    return;
+    return false;
   }
 
   const electron = feTryRequire("electron");
@@ -2885,7 +2967,7 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
 
   if (!shell || !fs || !path || !os) {
     ui?.notifications?.warn?.("Electron shell/fs 접근이 불가하여 자동으로 외부 브라우저를 열 수 없습니다. 아카이브 창에서 HTML 저장 후 외부 브라우저로 열어주세요.");
-    return;
+    return false;
   }
 
   const metaEl = win?.document?.getElementById?.("fe-chat-export-meta");
@@ -2934,7 +3016,7 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
       console.warn("female_edition | open external browser failed", errMsg);
       ui?.notifications?.warn?.(`외부 브라우저 열기 실패: ${errMsg}`);
     } else {
-      ui?.notifications?.info?.("외부 브라우저에서 채팅 아카이브를 열었습니다.");
+      ui?.notifications?.info?.("외부 브라우저에서 채팅 아카이브를 열었습니다. 브라우저의 인쇄 → PDF로 저장을 사용하세요.");
     }
 
     if (closeAfter) {
@@ -2942,9 +3024,11 @@ async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { clo
         win.close();
       } catch {}
     }
+    return !errMsg;
   } catch (err) {
     console.warn("female_edition | external open failed", err);
     ui?.notifications?.warn?.("외부 브라우저 열기 실패. HTML 저장 후 수동으로 열어주세요.");
+    return false;
   } finally {
     setMeta(originalMeta);
   }

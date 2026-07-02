@@ -384,14 +384,14 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.EXPORT_DESKTOP_EXTERNAL_MODE, {
     name: "FVTT 데스크톱: 외부 브라우저로 아카이브 열기",
-    hint: "데스크톱(Electron) 앱에서 인쇄(PDF) 시 메모리/멈춤 문제가 있을 때, 아카이브를 HTML 파일로 만들어 시스템 기본 브라우저로 열 수 있습니다. (Electron/Node API 접근이 가능한 경우에만 동작)",
+    hint: "데스크톱(Electron) 앱은 팝업 창을 막고, 인쇄 시 브라우저의 'PDF로 저장'이 아니라 OS 인쇄 대화상자(Microsoft Print to PDF)를 띄웁니다(느리고 0KB PDF). 이 옵션을 켜면 아카이브를 HTML로 만들어 시스템 기본 브라우저에서 자동으로 열어, 브라우저의 인쇄 → PDF로 저장을 그대로 쓸 수 있습니다. '사용 안 함'은 앱 내부 인쇄(구 방식)로 되돌립니다. (Electron/Node API 접근이 가능한 경우에만 동작)",
     scope: "client",
     config: false,
     type: String,
     choices: {
-      off: "사용 안 함",
-      button: "아카이브 창에 버튼 표시",
-      auto: "PDF 아이콘 클릭 시 자동",
+      off: "사용 안 함(앱 내부 인쇄)",
+      button: "시스템 브라우저에서 열기",
+      auto: "시스템 브라우저에서 열기",
     },
     default: "button",
   });

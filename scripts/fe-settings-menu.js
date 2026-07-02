@@ -66,8 +66,9 @@ const ALL_DEFAULTS = Object.freeze({
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
-  // theatre (5 world/GM + 6 client)
-  stageEnabled: true, stageHideMessages: false, stageRecallIncludeNonActor: false,
+  // theatre (6 world/GM + 6 client)
+  stageEnabled: true, stageHideMessages: false, stageExcludeSystemMessages: true,
+  stageRecallIncludeNonActor: false,
   stageAutoDecay: false, stageDecayTime: 30000,
   stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
   stageBoxBottom: 30, stageBoxLeft: 392, stageTextSize: 14,
@@ -92,9 +93,9 @@ const CHOICES = {
   },
   exportPrintImageMode: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   exportDesktopExternalMode: {
-    off:    "사용 안 함",
-    button: "아카이브 창에 버튼 표시",
-    auto:   "PDF 아이콘 클릭 시 자동",
+    off:    "사용 안 함(앱 내부 인쇄)",
+    button: "시스템 브라우저에서 열기",
+    auto:   "시스템 브라우저에서 열기",
   },
   chatFontChoice: {
     cookie:     "쿠키런 + 그림일기",
@@ -313,6 +314,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // Theatre / Stage (standalone — migrated)
       stageEnabled:        feRead("stageEnabled"),
       stageHideMessages:   feRead("stageHideMessages"),
+      stageExcludeSystemMessages: feRead("stageExcludeSystemMessages"),
       stageRecallIncludeNonActor: feRead("stageRecallIncludeNonActor"),
       stageAutoDecay:      feRead("stageAutoDecay"),
       stageDecayTime:      feRead("stageDecayTime"),
@@ -688,7 +690,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // Theatre — world/GM (enable/hide/history/decay) gated; client box dims always saved
         ...(game.user?.isGM ? [
-          bool("stageEnabled"), bool("stageHideMessages"), bool("stageRecallIncludeNonActor"),
+          bool("stageEnabled"), bool("stageHideMessages"), bool("stageExcludeSystemMessages"),
+          bool("stageRecallIncludeNonActor"),
           bool("stageAutoDecay"), num("stageDecayTime"),
         ] : []),
         num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
