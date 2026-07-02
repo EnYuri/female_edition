@@ -2621,12 +2621,20 @@ body.fe-retro-theme #fe-stage-nav {
 /* speak-as 드롭다운 */
 body.fe-retro-theme .fe-stage-select {
   background-color: #000 !important;
-  border-color:     var(--fe-ac-22) !important;
-  color:            var(--fe-ac-57) !important;
+  border-color:     var(--fe-ac-57) !important;
+  color:            var(--fe-ac-90) !important;
+  opacity:          1 !important;
+  text-shadow:      none !important;
 }
 
 body.fe-retro-theme .fe-stage-select:focus {
-  border-color: var(--fe-ac-57) !important;
+  border-color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .fe-stage-select option,
+body.fe-retro-theme .fe-stage-select optgroup {
+  background: #000 !important;
+  color: var(--fe-ac-90) !important;
 }
 
 /* 감정 선택 버튼 — 비활성 상태: L=70% 하한 + 채도 30% 축소로 dim 표현 */

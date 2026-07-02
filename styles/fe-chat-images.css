@@ -61,6 +61,13 @@
   min-height: 32px !important;
   padding: 0 !important;
   box-sizing: border-box !important;
+  background: var(--control-bg-color, rgba(15, 17, 23, 0.92)) !important;
+  border: 1px solid var(--control-border-color, rgba(255, 255, 255, 0.28)) !important;
+  border-radius: 5px !important;
+  color: var(--control-icon-color, #f4f6ff) !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
 }
 #ci-upload-image > i {
   display: inline-flex !important;
@@ -72,4 +79,13 @@
   min-height: 32px !important;
   font-size: 18px !important;
   line-height: 1 !important;
+  color: currentColor !important;
+  opacity: 1 !important;
+}
+#ci-upload-image:hover,
+#ci-upload-image:focus {
+  background: var(--control-hover-bg-color, rgba(45, 58, 84, 0.98)) !important;
+  border-color: var(--control-hover-border-color, rgba(255, 255, 255, 0.62)) !important;
+  color: var(--control-hover-icon-color, #ffffff) !important;
+  outline: none !important;
 }

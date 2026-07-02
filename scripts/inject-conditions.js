@@ -63,12 +63,12 @@ function feBuildConditions() {
 Hooks.once("init", () => {
   game.settings.register("female_edition", "injectCustomConditions", {
     name: "[DND5e] 커스텀 컨디션 주입 활성화",
-    hint: "이 모듈의 커스텀 컨디션(짝짓기 금지/표식 등)을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.",
+    hint: "이 모듈의 커스텀 컨디션을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.",
     scope: "world",
     config: false,
     restricted: true,
     type: Boolean,
-    default: true,
+    default: false,
     requiresReload: true,
   });
 

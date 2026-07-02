@@ -50,6 +50,7 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   padding: 4px;
 
   background: var(--color-bg, #f0f0e0);
+  color: var(--color-text-primary, #1b1b23);
   border: 1px solid var(--color-border-light-primary, #9f9275);
   border-radius: 4px;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
@@ -102,7 +103,63 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
 #fe-ctrl-menu-panel #message-modes .ui-control,
 #fe-ctrl-menu-panel .ui-control > i,
 #fe-ctrl-menu-panel .control-icon > i {
-  color: var(--color-text-primary, #1b1b23);
+  color: var(--color-text-primary, #1b1b23) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+#fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control) {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid rgba(0, 0, 0, 0.28) !important;
+}
+
+#fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):hover,
+#fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):focus {
+  background: rgba(0, 0, 0, 0.16) !important;
+  border-color: rgba(0, 0, 0, 0.5) !important;
+  color: var(--color-text-primary, #111318) !important;
+  outline: none !important;
+}
+
+body.theme-dark #fe-ctrl-menu-panel,
+.theme-dark #fe-ctrl-menu-panel {
+  background: rgba(17, 20, 29, 0.98);
+  color: var(--color-text-primary, #f1f3fb);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+body.theme-dark #fe-ctrl-menu-panel .ui-control,
+body.theme-dark #fe-ctrl-menu-panel .control-icon,
+body.theme-dark #fe-ctrl-menu-panel .control-buttons button,
+body.theme-dark #fe-ctrl-menu-panel #ci-upload-image,
+body.theme-dark #fe-ctrl-menu-panel .fe-export-pdf,
+body.theme-dark #fe-ctrl-menu-panel #message-modes .ui-control,
+body.theme-dark #fe-ctrl-menu-panel .ui-control > i,
+body.theme-dark #fe-ctrl-menu-panel .control-icon > i,
+.theme-dark #fe-ctrl-menu-panel .ui-control,
+.theme-dark #fe-ctrl-menu-panel .control-icon,
+.theme-dark #fe-ctrl-menu-panel .control-buttons button,
+.theme-dark #fe-ctrl-menu-panel #ci-upload-image,
+.theme-dark #fe-ctrl-menu-panel .fe-export-pdf,
+.theme-dark #fe-ctrl-menu-panel #message-modes .ui-control,
+.theme-dark #fe-ctrl-menu-panel .ui-control > i,
+.theme-dark #fe-ctrl-menu-panel .control-icon > i {
+  color: #f4f6ff !important;
+}
+
+body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control),
+.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control) {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):hover,
+body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):focus,
+.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):hover,
+.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):focus {
+  background: rgba(120, 154, 230, 0.28) !important;
+  border-color: rgba(180, 205, 255, 0.78) !important;
+  color: #ffffff !important;
 }
 
 /* dx3rd accent swatch and RUI toggle inside the panel. */
@@ -152,6 +209,11 @@ body.fe-retro-theme #fe-ctrl-menu-panel #message-modes .ui-control,
 body.fe-retro-theme #fe-ctrl-menu-panel .ui-control > i,
 body.fe-retro-theme #fe-ctrl-menu-panel .control-icon > i {
   color: var(--fe-ac-90, #ffffff) !important;
+}
+
+body.fe-retro-theme #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control) {
+  background: #000000 !important;
+  border-color: var(--fe-ac-57, #ffffff) !important;
 }
 
 /* ── Popped-out quick-reply dock (#chat-notifications) ───────── */

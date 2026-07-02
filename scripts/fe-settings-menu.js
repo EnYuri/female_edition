@@ -50,7 +50,7 @@ const CP_DEFAULTS = Object.freeze({
 const ALL_DEFAULTS = Object.freeze({
   ...FE_DEFAULTS,
   ...CP_DEFAULTS,
-  injectCustomConditions:  true,
+  injectCustomConditions:  false,
   injectCustomDamageTypes: true,
   // dnd5e custom damage-type name slots (registered by inject-damage-type.js)
   dmgCustom1: "1", dmgCustom2: "2", dmgCustom3: "3", dmgCustom4: "4",
