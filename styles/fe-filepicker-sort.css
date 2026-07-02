@@ -1,17 +1,45 @@
 /* fe-filepicker-sort.css — FilePicker 정렬 컨트롤 */
 
-.fe-fp-sort .form-fields {
-  display: flex;
+/* 서브헤더 컨트롤(즐겨찾기·검색·정렬·보기 모드) 간 세로 간격 축소 →
+   파일 목록에 쓸 공간 확보. 코어 기본 gap 은 var(--spacer-16). */
+header.subheader.standard-form {
   gap: 4px;
+}
+
+/* 정렬 기준 + 보기 모드를 한 줄에 배치하는 통합 컨트롤 행. */
+.fe-fp-controls-row {
+  display: flex;
+  flex-direction: row;
   align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
-.fe-fp-sort .fe-fp-sort-key {
-  flex: 1 1 auto;
-  min-width: 0;
+/* 각 컨트롤 앞 라벨은 내용 폭만 차지(그리드/flex-basis 늘어남 방지). */
+.fe-fp-controls-row .fe-fp-ctl-label {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  white-space: nowrap;
 }
 
-.fe-fp-sort .fe-fp-sort-dir {
+/* "보기 모드" 라벨은 정렬 셀렉트 뒤에 약간 띄워 시각적으로 구분. */
+.fe-fp-controls-row .fe-fp-mode-label {
+  margin-left: auto;
+}
+
+/* 긴 드롭다운을 내용 기준으로 축소하되, 여유롭게 약간 넓힌다. */
+.fe-fp-controls-row .fe-fp-sort-key {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 120px;
+}
+
+.fe-fp-controls-row .split-button {
+  flex: 0 0 auto;
+}
+
+.fe-fp-controls-row .fe-fp-sort-dir {
   flex: 0 0 auto;
 }
 

@@ -743,6 +743,13 @@
       <p class="notes">값이 작을수록 이미지가 커집니다.</p>
     </div>
     <div class="form-group">
+      <label>가로 이미지 크기 — 화면 높이의 1/N (개인)</label>
+      <div class="form-fields">
+        <input type="number" name="ihSizeWide" data-dtype="Number" value="{{values.ihSizeWide}}" step="0.025" min="1" max="20" />
+      </div>
+      <p class="notes">가로로 긴 이미지(가로:세로 &ge; 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다.</p>
+    </div>
+    <div class="form-group">
       <label>표시 지연 시간 (ms, 개인)</label>
       <div class="form-fields">
         <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="100" min="0" max="5000" />

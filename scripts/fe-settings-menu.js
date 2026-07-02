@@ -62,7 +62,7 @@ const ALL_DEFAULTS = Object.freeze({
   // image-hover (world/GM: feature master + perm/art/timer; client: enable/pos/size/delay/upscale)
   ihFeatureEnabled: true,
   ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
-  ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihDelay: 0, ihMaxUpscale: 0,
+  ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihSizeWide: 1.225, ihDelay: 0, ihMaxUpscale: 0,
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
@@ -297,6 +297,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       ihEnabled:      feRead("ihEnabled"),
       ihPosition:     feRead("ihPosition"),
       ihSize:         feRead("ihSize"),
+      ihSizeWide:     feRead("ihSizeWide"),
       ihDelay:        feRead("ihDelay"),
       ihMaxUpscale:   feRead("ihMaxUpscale"),
 
@@ -671,7 +672,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
         // Image Hover — world/GM (feature master + perm/art/timer) gated; client prefs always saved
         ...(game.user?.isGM ? [bool("ihFeatureEnabled"), num("ihPermission"), str("ihArtType"), num("ihShowAllTimer")] : []),
-        bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihDelay"), num("ihMaxUpscale"),
+        bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihSizeWide"), num("ihDelay"), num("ihMaxUpscale"),
 
         // Narrator — all world/GM
         ...(game.user?.isGM ? [

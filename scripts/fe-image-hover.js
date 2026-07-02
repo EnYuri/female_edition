@@ -50,6 +50,7 @@ let _ihFeatureEnabled = true; // world/GM master switch (whole feature)
 let _ihEnabled = true;        // per-client toggle
 let _ihPosition = "Bottom left";
 let _ihSize = 7;
+let _ihSizeWide = 1.225; // size divisor for wide (landscape) images — applied to screen HEIGHT
 let _ihArtType = "character";
 let _ihDelay = 0;
 let _ihShowAllTimer = 6000;
@@ -207,6 +208,17 @@ function _ihRegisterSettings() {
     onChange: () => _ihLoadSettings(),
   });
 
+  game.settings.register(_IH_MODULE, "ihSizeWide", {
+    name: "Image Hover: 가로 이미지 크기 (화면 높이의 1/N)",
+    hint: "가로로 긴 이미지(가로:세로 ≥ 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다 (개인 설정).",
+    scope: "client",
+    config: false,
+    range: { min: 1, max: 20, step: 0.025 },
+    default: 1.225,
+    type: Number,
+    onChange: () => _ihLoadSettings(),
+  });
+
   game.settings.register(_IH_MODULE, "ihMaxUpscale", {
     name: "Image Hover: 최대 업스케일 배율",
     hint: "원본 해상도 대비 최대 확대 한도(개인). 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. 0이면 제한 없음(항상 설정 크기로 표시).",
@@ -236,6 +248,7 @@ function _ihLoadSettings() {
   _ihEnabled        = game.settings.get(_IH_MODULE, "ihEnabled");
   _ihPosition       = game.settings.get(_IH_MODULE, "ihPosition");
   _ihSize           = game.settings.get(_IH_MODULE, "ihSize");
+  _ihSizeWide       = game.settings.get(_IH_MODULE, "ihSizeWide");
   _ihArtType        = game.settings.get(_IH_MODULE, "ihArtType");
   _ihDelay          = game.settings.get(_IH_MODULE, "ihDelay");
   _ihShowAllTimer   = game.settings.get(_IH_MODULE, "ihShowAllTimer");
@@ -307,26 +320,55 @@ function _ihSpecificArtFlag(value) {
 function _ihComputePosition(imageWidth, imageHeight) {
   const W = window.innerWidth;
   const H = window.innerHeight;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
 
-  // Target width from the size setting (W / size). Large art beyond this is
-  // HQ-downscaled by feApplyHQPortrait (sparkle/aliasing fix). Small art below it
-  // would be upscaled — capped so the upscale never exceeds the user-set ihMaxUpscale
-  // factor of the native resolution (in DEVICE px, so HiDPI is accounted for). e.g. at
-  // 1.25× a 300px source shows at most ~300-450px instead of a blurry 640px.
-  // ihMaxUpscale = 0 disables the cap entirely (always shown at the W/size setting).
-  let w = W / _ihSize;
-  // Upscale cap (user-adjustable via ihMaxUpscale; 0 = no cap → always show at the size setting).
-  if (_ihMaxUpscale > 0) {
-    const dpr = Math.min(3, window.devicePixelRatio || 1);
-    const maxUpscaledW = (imageWidth * _ihMaxUpscale) / dpr; // CSS px cap from native
-    if (w > maxUpscaledW) w = maxUpscaledW;
-  }
-  let h = w * (imageHeight / imageWidth);
+  // Wide (landscape) images are sized by the VERTICAL axis instead of width.
+  // The size setting (W/size) was previously applied to width regardless of shape,
+  // so a horizontally-long image ended up short and cramped. When the image is
+  // clearly landscape (width/height ≥ 1.2), the size setting is applied to height
+  // (H/size) and width is derived from it. Wide images use their OWN size divisor
+  // (ihSizeWide, applied to height) so they can be scaled up independently of the
+  // portrait width divisor (ihSize). The 1.2 threshold (rather than a strict 3:2)
+  // keeps near-square art as portrait while catching common landscape ratios like
+  // 4:3 (1.33) and 3:2 (1.50) that real art frequently sits at.
+  const aspect = imageWidth / imageHeight;
+  const isWide = aspect >= 1.2;
 
-  // Clamp height to viewport (downscale only — keeps aspect ratio)
-  if (h > H) {
-    w = (H / h) * w;
-    h = H;
+  let w, h;
+  if (isWide) {
+    // Size by height. Large art beyond this is HQ-downscaled by feApplyHQPortrait;
+    // small art is upscale-capped against native HEIGHT (see below).
+    h = H / _ihSizeWide;
+    if (_ihMaxUpscale > 0) {
+      const maxUpscaledH = (imageHeight * _ihMaxUpscale) / dpr; // CSS px cap from native
+      if (h > maxUpscaledH) h = maxUpscaledH;
+    }
+    w = h * aspect;
+    // Clamp width to viewport (downscale only — keeps aspect ratio)
+    if (w > W) {
+      h = (W / w) * h;
+      w = W;
+    }
+  } else {
+    // Target width from the size setting (W / size). Large art beyond this is
+    // HQ-downscaled by feApplyHQPortrait (sparkle/aliasing fix). Small art below it
+    // would be upscaled — capped so the upscale never exceeds the user-set ihMaxUpscale
+    // factor of the native resolution (in DEVICE px, so HiDPI is accounted for). e.g. at
+    // 1.25× a 300px source shows at most ~300-450px instead of a blurry 640px.
+    // ihMaxUpscale = 0 disables the cap entirely (always shown at the W/size setting).
+    w = W / _ihSize;
+    // Upscale cap (user-adjustable via ihMaxUpscale; 0 = no cap → always show at the size setting).
+    if (_ihMaxUpscale > 0) {
+      const maxUpscaledW = (imageWidth * _ihMaxUpscale) / dpr; // CSS px cap from native
+      if (w > maxUpscaledW) w = maxUpscaledW;
+    }
+    h = w * (imageHeight / imageWidth);
+
+    // Clamp height to viewport (downscale only — keeps aspect ratio)
+    if (h > H) {
+      w = (H / h) * w;
+      h = H;
+    }
   }
 
   const sidebar = document.getElementById("sidebar");

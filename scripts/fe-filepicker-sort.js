@@ -118,32 +118,47 @@ function _updateControl(element, key, dir) {
 
 function _injectControl(element) {
   const sub = element.querySelector("header.subheader");
-  if (!sub || sub.querySelector(".fe-fp-sort")) return;
-
-  const group = document.createElement("div");
-  group.className = "form-group slim fe-fp-sort";
-  group.innerHTML =
-    `<label>정렬 기준</label>` +
-    `<div class="form-fields">` +
-      `<select class="fe-fp-sort-key" aria-label="정렬 기준">` +
-        `<option value="name">이름순</option>` +
-        `<option value="date">수정 날짜순</option>` +
-        `<option value="size">크기순</option>` +
-      `</select>` +
-      `<button type="button" class="ui-control icon fa-solid fe-fp-sort-dir" data-tooltip aria-label="정렬 방향"></button>` +
-    `</div>`;
+  if (!sub || sub.querySelector(".fe-fp-controls-row")) return;
 
   const modeGroup = sub.querySelector('[data-action="changeDisplayMode"]')?.closest(".form-group");
-  if (modeGroup) modeGroup.after(group); else sub.appendChild(group);
 
-  const sel = group.querySelector(".fe-fp-sort-key");
+  // 정렬 기준 + 보기 모드를 한 줄에 합친 컨트롤 행.
+  const row = document.createElement("div");
+  row.className = "form-group slim fe-fp-controls-row";
+  row.innerHTML =
+    `<label class="fe-fp-ctl-label">정렬 기준</label>` +
+    `<select class="fe-fp-sort-key" aria-label="정렬 기준">` +
+      `<option value="name">이름순</option>` +
+      `<option value="date">수정 날짜순</option>` +
+      `<option value="size">크기순</option>` +
+    `</select>`;
+
+  // 코어 "보기 모드" 그룹의 label + split-button 을 이 행으로 이동시키고 원래 그룹은 제거.
+  if (modeGroup) {
+    const modeLabel = modeGroup.querySelector("label");
+    const splitBtn = modeGroup.querySelector(".split-button");
+    if (modeLabel) { modeLabel.classList.add("fe-fp-ctl-label", "fe-fp-mode-label"); row.appendChild(modeLabel); }
+    if (splitBtn) row.appendChild(splitBtn);
+  }
+
+  // 정렬 방향 토글 버튼 (행 맨 오른쪽)
+  const dirBtn = document.createElement("button");
+  dirBtn.type = "button";
+  dirBtn.className = "ui-control icon fa-solid fe-fp-sort-dir";
+  dirBtn.setAttribute("data-tooltip", "");
+  dirBtn.setAttribute("aria-label", "정렬 방향");
+  row.appendChild(dirBtn);
+
+  if (modeGroup) modeGroup.replaceWith(row); else sub.appendChild(row);
+
+  const sel = row.querySelector(".fe-fp-sort-key");
   sel.value = getKey();
   sel.addEventListener("change", e => {
     e.stopPropagation();
     setKey(sel.value);
     _applySort(element);
   });
-  group.querySelector(".fe-fp-sort-dir").addEventListener("click", e => {
+  dirBtn.addEventListener("click", e => {
     e.stopPropagation();
     const k = getKey();
     setDir(k, getDir(k) === "asc" ? "desc" : "asc");
