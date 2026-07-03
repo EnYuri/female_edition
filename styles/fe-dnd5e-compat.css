@@ -185,6 +185,8 @@ body.fe-retro-theme .tidy5e-sheet.application
     .long-rest,
     .hd-row,
     .hd-row *,
+    .portrait-hd,
+    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
     .hit-dice-counter,
     .actor-name input,
     [data-tidy-sheet-part="actor-name"] input,
@@ -262,6 +264,8 @@ body.fe-retro-theme .tidy5e-sheet.application
     .short-rest,
     .long-rest,
     .hd-row,
+    .portrait-hd,
+    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
     .hit-dice-counter,
     .actor-name input,
     [data-tidy-sheet-part="actor-name"] input,
@@ -402,9 +406,10 @@ body.fe-retro-theme .tidy5e-sheet.application
 body.fe-retro-theme .tidy5e-sheet.application
   .window-header .header-sheet-edit-mode-toggle {
   background: transparent !important;
-  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  border: 0 !important;
   box-shadow: none !important;
   outline: none !important;
+  overflow: visible !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -437,6 +442,7 @@ body.fe-retro-theme .tidy5e-sheet.application
     a.config-button.icon-button,
     .config-button.attribute-value,
     .current-hd,
+    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
     .initiative-container .block-score-wrapper > button,
     .initiative-container :is(.block-title, .ini-score),
     .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
@@ -465,6 +471,7 @@ body.fe-retro-theme .tidy5e-sheet.application
     a.config-button.icon-button,
     .config-button.attribute-value,
     .current-hd,
+    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
     .initiative-container .block-score-wrapper > button,
     .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
     .portrait-hd .current-hd,
@@ -479,6 +486,80 @@ body.fe-retro-theme .tidy5e-sheet.application
   filter: none !important;
   outline: none !important;
   text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  button:is(
+    .transparent-button,
+    .transparent-inline,
+    .transparent-inline-icon,
+    .inline-icon-button,
+    .inline-transparent-button,
+    .button-menu-opener,
+    .config-button,
+    .ability-mod,
+    .ability-save,
+    .proficiency-toggle
+  ):not([disabled]):not(.window-header button),
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  a:is(.config-button, .icon-button):not(.window-header a),
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    .current-hd,
+    .portrait-hd,
+    .portrait-hd button,
+    .portrait-hd a,
+    .portrait-hd label,
+    .portrait-hd span,
+    .portrait-hd i,
+    .portrait-hd svg,
+    .initiative-container .block-score-wrapper > button,
+    .configure-creature-type
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    button.transparent-button,
+    button.transparent-inline,
+    button.transparent-inline-icon,
+    button.inline-icon-button,
+    button.inline-transparent-button,
+    button.button-menu-opener,
+    button.config-button,
+    button.ability-mod,
+    button.ability-save,
+    button.proficiency-toggle,
+    a.config-button,
+    a.icon-button
+  ):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .actor-stats
+  .vertical-line-separator {
+  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.32) !important;
+  box-shadow: none !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -532,9 +613,9 @@ body.fe-retro-theme .tidy5e-sheet.application
 }
 
 body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
-  border: 1px solid transparent !important;
+  border: 1px solid var(--fe-tidy-rule-faint, rgba(255, 255, 255, 0.09)) !important;
   outline: none !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -542,6 +623,857 @@ body.fe-retro-theme .tidy5e-sheet.application
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
   outline: none !important;
   box-shadow: 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) inset !important;
+}
+
+/* ----------------------------------------------------------------
+ * Tidy5e Classic: monochrome retro surface pass
+ *
+ * Keep the global black sheet base. Use neutral near-black surfaces for
+ * hierarchy, accent-tinted hairlines for structure, and reserve full accent
+ * fill for selected/active controls. This keeps accent override meaningful
+ * without recoloring every text box.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme .tidy5e-sheet.application {
+  --fe-tidy-mono-bg: #000000;
+  --fe-tidy-mono-surface: hsl(
+    var(--fe-dx3rd-accent-h, 0deg)
+    calc(var(--fe-dx3rd-accent-s, 0%) * 0.10)
+    5%
+  );
+  --fe-tidy-mono-surface-2: hsl(
+    var(--fe-dx3rd-accent-h, 0deg)
+    calc(var(--fe-dx3rd-accent-s, 0%) * 0.12)
+    8%
+  );
+  --fe-tidy-mono-hover: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08);
+  --fe-tidy-mono-line-soft: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16);
+  --fe-tidy-mono-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.30);
+  --fe-tidy-mono-line-strong: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55);
+  --fe-tidy-rule-faint: rgba(255, 255, 255, 0.09);
+  --fe-tidy-rule: rgba(255, 255, 255, 0.16);
+  --fe-tidy-rule-strong: rgba(255, 255, 255, 0.26);
+  --fe-tidy-mono-text: var(--fe-ac-90, rgba(230, 230, 230, 0.9));
+  --fe-tidy-mono-muted: var(--fe-ac-57, rgba(230, 230, 230, 0.58));
+  --fe-tidy-ability-band-light: rgba(255, 255, 255, 0.085);
+  --fe-tidy-ability-band-dark: rgba(255, 255, 255, 0.15);
+  --fe-tidy-ability-band-faint: rgba(255, 255, 255, 0.045);
+  --fe-tidy-state-fill: rgba(255, 255, 255, 0.15);
+  --fe-tidy-state-fill-strong: rgba(255, 255, 255, 0.22);
+  --fe-tidy-state-fill-hover: rgba(255, 255, 255, 0.26);
+  --fe-tidy-state-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.72);
+  --fe-tidy-state-line-strong: var(--fe-dx3rd-accent, #ffffff);
+  --t5e-prepared-background: var(--fe-tidy-state-fill);
+  --t5e-pact-background: var(--fe-tidy-state-fill);
+  --t5e-atwill-background: var(--fe-tidy-state-fill);
+  --t5e-ritual-only-background: var(--fe-tidy-state-fill);
+  --t5e-innate-background: var(--fe-tidy-state-fill);
+  --t5e-alwaysprepared-background: var(--fe-tidy-state-fill);
+  --t5e-equipped-background: var(--fe-tidy-state-fill);
+  --t5e-prepared-item-grid-tile-outline-color: var(--fe-tidy-state-line);
+  --t5e-prepared-item-grid-tile-accent-color: var(--fe-tidy-state-line);
+  --t5e-equipped-item-grid-tile-outline-color: var(--fe-tidy-state-line);
+  --t5e-equipped-item-grid-tile-accent-color: var(--fe-tidy-state-line);
+  --t5e-pact-outline-color: var(--fe-tidy-state-line);
+  --t5e-pact-accent-color: var(--fe-tidy-state-line);
+  --t5e-atwill-outline-color: var(--fe-tidy-state-line);
+  --t5e-atwill-accent-color: var(--fe-tidy-state-line);
+  --t5e-ritual-only-outline-color: var(--fe-tidy-state-line);
+  --t5e-ritual-only-accent-color: var(--fe-tidy-state-line);
+  --t5e-innate-accent: var(--fe-tidy-state-line);
+  --t5e-alwaysprepared-outline-color: var(--fe-tidy-state-line);
+  --t5e-alwaysprepared-accent-color: var(--fe-tidy-state-line);
+  --t5e-magic-accent-color: var(--fe-tidy-state-line);
+  --t5e-attuned-color: var(--fe-tidy-state-line);
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.tidy5e-sheet-header, .sheet-header, .sheet-body, .tab-body, .tab-container) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application .tidy5e-sheet-header {
+  background-color: var(--fe-tidy-mono-surface) !important;
+  border-bottom: 1px solid var(--fe-tidy-mono-line-soft) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .items-header,
+    .list-header,
+    .item-list-header,
+    .inventory-header,
+    .spell-level-header,
+    .effects-header,
+    .section-header,
+    .resources-header,
+    .favorites-header,
+    .item-table-header-row
+  ) {
+  background: var(--fe-tidy-mono-surface-2) !important;
+  border-block: 1px solid var(--fe-tidy-mono-line-soft) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .items-list,
+    .inventory-list,
+    .features-list,
+    .spell-list,
+    .effects-list,
+    .skills-list,
+    .traits-list,
+    .trait-list,
+    .proficiency-list,
+    .proficiencies-list,
+    .item-table
+  ) {
+  border-color: var(--fe-tidy-mono-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item,
+    .item-row,
+    .effect,
+    .skill,
+    .trait,
+    .trait-item,
+    .proficiency,
+    .proficiency-item,
+    .item-table-row-container,
+    .item-table-row,
+    .list-row,
+    li
+  ) {
+  border-color: var(--fe-tidy-mono-line-soft) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application .item-table-row-container {
+  background: var(--fe-tidy-mono-surface) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .items-list,
+    .inventory-list,
+    .features-list,
+    .spell-list,
+    .effects-list,
+    .skills-list,
+    .traits-list,
+    .trait-list,
+    .proficiency-list,
+    .proficiencies-list,
+    .item-table
+  )
+  :is(.item, .item-row, .effect, .skill, .trait, .trait-item, .proficiency, .proficiency-item, .item-table-row-container, .item-table-row, .list-row, li):hover {
+  background: var(--fe-tidy-mono-hover) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    button.transparent-button,
+    button.transparent-inline,
+    button.transparent-inline-icon,
+    button.inline-icon-button,
+    button.inline-transparent-button,
+    button.button-menu-opener,
+    button.config-button,
+    button.ability-mod,
+    button.ability-save,
+    button.proficiency-toggle,
+    a.config-button,
+    a.icon-button
+  ):is(:hover, :focus, :focus-visible) {
+  background: var(--fe-tidy-mono-hover) !important;
+  border-color: var(--fe-tidy-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    button.transparent-button,
+    button.transparent-inline,
+    button.transparent-inline-icon,
+    button.inline-icon-button,
+    button.inline-transparent-button,
+    button.button-menu-opener,
+    button.config-button,
+    button.ability-mod,
+    button.ability-save,
+    button.proficiency-toggle,
+    a.config-button,
+    a.icon-button
+  ):active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+  color: #000000 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.active, [aria-selected="true"], [aria-pressed="true"], .selected, .is-active)
+  :is(i, svg, span, label, .label, .title, .name) {
+  color: inherit !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.inspiration.inspiration-1, .inspiration.active, .exhaustion.active, .exhaustion.selected) {
+  background: var(--fe-tidy-mono-hover) !important;
+  border-color: var(--fe-tidy-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
+  background: transparent !important;
+  border: 1px solid var(--fe-tidy-rule-faint) !important;
+  color: var(--fe-tidy-mono-muted) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible):not(.active):not([aria-selected="true"]) {
+  background: var(--fe-tidy-mono-hover) !important;
+  border-color: var(--fe-tidy-mono-line-strong) !important;
+  color: var(--fe-tidy-mono-text) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  a.tab-option[role="tab"]:is(.active, [aria-selected="true"]) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.subtle, .hint, .notes, .subtitle, .caption, .metadata, .source-label) {
+  color: var(--fe-tidy-mono-muted) !important;
+}
+
+/* ----------------------------------------------------------------
+ * Tidy5e Classic: final form/icon state cleanup
+ *
+ * The global retro input/button rules are useful for ordinary Foundry dialogs,
+ * but Tidy Classic already draws its own compact sheet controls. Inside the
+ * actor sheet, leave the black sheet base intact and remove the extra control
+ * boxes that sit directly on top of stats, inventory rows, and SVG badges.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  overflow: visible !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > :is(button.transparent-button, .block-score, .ability-modifiers, .mod-label) {
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin-inline: auto !important;
+  min-height: 1rem !important;
+  outline: none !important;
+  text-shadow: none !important;
+  width: 100% !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button {
+  background: var(--fe-tidy-ability-band-light) !important;
+  background-image: none !important;
+  color: var(--fe-tidy-mono-text) !important;
+  padding-block: 1px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .block-score {
+  align-items: center !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  padding-block: 1px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .block-score
+  input {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers {
+  align-items: center !important;
+  background: transparent !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers
+  :is(.ability-mod, .ability-save) {
+  background: var(--fe-tidy-ability-band-light) !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--fe-tidy-mono-text) !important;
+  min-height: 1rem !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers
+  :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
+  background: var(--fe-tidy-ability-band-faint) !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--fe-tidy-mono-muted) !important;
+  min-height: 1rem !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .mod-label {
+  background: transparent !important;
+  color: var(--fe-tidy-mono-muted) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container:is(:hover, :focus-within) {
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch {
+  align-items: center !important;
+  background: transparent !important;
+  border: 1px solid var(--fe-tidy-rule-strong) !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  height: 18px !important;
+  justify-content: center !important;
+  outline: none !important;
+  padding: 0 !important;
+  position: relative !important;
+  top: -1px !important;
+  width: 38px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  height: 16px !important;
+  margin: 0 !important;
+  outline: none !important;
+  width: 36px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch:is(:hover, :focus-within) {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is([data-tab-contents-for], .tidy-tab.active) {
+  border-top-color: transparent !important;
+  box-shadow: inset 0 1px 0 var(--fe-tidy-rule) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats {
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tabs {
+  overflow: visible !important;
+  position: relative !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tabs::before {
+  background: var(--fe-tidy-rule) !important;
+  content: "" !important;
+  height: 1px !important;
+  left: 16px !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 16px !important;
+  top: -10px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(.item-table, .tidy-table, .items-list, .inventory-list, .features-list, .spell-list, .effects-list) {
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow:
+    inset 0 1px 0 var(--fe-tidy-rule),
+    inset 0 -1px 0 var(--fe-tidy-rule-faint) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(.item-table-header-row, .items-header, .list-header, .item-list-header, .spell-level-header, .section-header) {
+  border-top-color: var(--fe-tidy-rule-strong) !important;
+  border-bottom-color: var(--fe-tidy-rule) !important;
+  box-shadow: inset 0 -1px 0 var(--fe-tidy-rule-faint) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(.item-table-row-container, .tidy-table-row, .tidy-table-row-v2, .item-row, .list-row) {
+  border-top-color: transparent !important;
+  box-shadow: inset 0 1px 0 var(--fe-tidy-rule-faint) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .inline-activities-container {
+  box-shadow: inset 0 1px 0 var(--fe-tidy-rule-faint) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button {
+  background-color: var(--fe-tidy-ability-band-light) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button
+  :is(.block-title, h4, span),
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .block-score
+  input,
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers
+  :is(.ability-mod, .ability-save) {
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers
+  :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item-table-row,
+    .tidy-table-row,
+    .tidy-table-row-v2,
+    .item,
+    .item-row
+  ):is(.equipped, .prepared, .attuned, .magic-item, .active),
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item-table-row.equipped,
+    .item-table-row.prepared,
+    .item-table-row.attuned,
+    .tidy-table-row.equipped,
+    .tidy-table-row.prepared,
+    .tidy-table-row.attuned,
+    .tidy-table-row-v2.equipped,
+    .tidy-table-row-v2.prepared,
+    .tidy-table-row-v2.attuned
+  ) {
+  background-color: transparent !important;
+  background-image:
+    linear-gradient(
+      to right,
+      var(--fe-tidy-state-line) 0 3px,
+      var(--fe-tidy-state-fill-strong) 3px 0.875rem,
+      var(--fe-tidy-state-fill) 0.875rem,
+      rgba(255, 255, 255, 0.04) 58%,
+      rgba(255, 255, 255, 0) 120%
+    ) !important;
+  border-color: var(--fe-tidy-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item-table-row,
+    .tidy-table-row,
+    .tidy-table-row-v2,
+    .item,
+    .item-row
+  ):is(.equipped, .prepared, .attuned, .magic-item, .active):hover {
+  background-color: var(--fe-tidy-state-fill) !important;
+  background-image:
+    linear-gradient(
+      to right,
+      var(--fe-tidy-state-line-strong) 0 4px,
+      var(--fe-tidy-state-fill-hover) 4px 1rem,
+      var(--fe-tidy-state-fill-strong) 1rem,
+      rgba(255, 255, 255, 0.07) 62%,
+      rgba(255, 255, 255, 0) 120%
+    ) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item-table-row,
+    .tidy-table-row,
+    .tidy-table-row-v2
+  ):is(
+    .can-prepare.prepared,
+    .can-prepare.always,
+    .method-pact,
+    .method-atwill,
+    .method-ritual,
+    .method-innate,
+    .method-spell.prepared,
+    .equipped,
+    .attuned,
+    .magic-item
+  ) {
+  --t5e-item-table-row-background: var(--fe-tidy-state-fill) !important;
+  --t5e-tidy-table-row-background: var(--fe-tidy-state-fill) !important;
+  background-color: transparent !important;
+  background-image:
+    linear-gradient(
+      to right,
+      var(--fe-tidy-state-line) 0 3px,
+      var(--fe-tidy-state-fill-strong) 3px 0.875rem,
+      var(--fe-tidy-state-fill) 0.875rem,
+      rgba(255, 255, 255, 0.04) 58%,
+      rgba(255, 255, 255, 0) 120%
+    ) !important;
+  border-color: var(--fe-tidy-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .item-table-row,
+    .tidy-table-row,
+    .tidy-table-row-v2
+  ):is(
+    .can-prepare.prepared,
+    .can-prepare.always,
+    .method-pact,
+    .method-atwill,
+    .method-ritual,
+    .method-innate,
+    .method-spell.prepared,
+    .equipped,
+    .attuned,
+    .magic-item
+  ):hover {
+  --t5e-item-table-row-background: var(--fe-tidy-state-fill-hover) !important;
+  --t5e-tidy-table-row-background: var(--fe-tidy-state-fill-hover) !important;
+  background-color: var(--fe-tidy-state-fill) !important;
+  background-image:
+    linear-gradient(
+      to right,
+      var(--fe-tidy-state-line-strong) 0 4px,
+      var(--fe-tidy-state-fill-hover) 4px 1rem,
+      var(--fe-tidy-state-fill-strong) 1rem,
+      rgba(255, 255, 255, 0.07) 62%,
+      rgba(255, 255, 255, 0) 120%
+    ) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.items, .spells)
+  :is(.item.equipped, .item.magic-item, .item.attuned) {
+  background: var(--fe-tidy-state-fill) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.items, .spells)
+  :is(.item.equipped, .item.magic-item, .item.attuned):hover {
+  background: var(--fe-tidy-state-fill-hover) !important;
+  box-shadow: inset 0 0 0 2px var(--fe-tidy-state-line-strong) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.items, .spells)
+  :is(.item.equipped, .item.magic-item, .item.attuned)
+  :is(.item-image, .spell-image, .icon-attuned) {
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.items, .spells)
+  .icon-attuned {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    .item-table-row,
+    .tidy-table-row,
+    .tidy-table-row-v2,
+    .item-table-row-container,
+    .items-list,
+    .inventory-list,
+    .features-list,
+    .spell-list,
+    .effects-list,
+    .items,
+    .spells
+  )
+  :is(
+    .item-controls,
+    .active-effect-controls,
+    .list-controls,
+    .item-table-column,
+    .item-list-button,
+    .item-control,
+    .inline-icon-button,
+    .icon-button,
+    .footer-command,
+    .button-borderless
+  ),
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    .item-controls,
+    .active-effect-controls,
+    .list-controls
+  )
+  :is(button, a, i, svg, span) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  :is(
+    .item-controls,
+    .active-effect-controls,
+    .list-controls
+  )
+  :is(button, a, .item-control, .inline-icon-button, .icon-button):is(:hover, :focus, :focus-visible) {
+  background: var(--fe-tidy-mono-hover) !important;
+  border-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.inspiration, .inspiration.inspiration-1, .exhaustion)
+  :is(label, label i, .checkbox, i, svg):is(:hover, :focus, :focus-visible, :active),
+body.fe-retro-theme .tidy5e-sheet.application
+  .inspiration.inspiration-1 :is(label, label i, .checkbox, i, svg) {
+  animation: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs)
+  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"]),
+body.fe-retro-theme .tidy5e-sheet.application
+  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"]) {
+  background: var(--fe-tidy-mono-hover) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs)
+  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"])
+  :is(i, svg, span, label, .label, .title, .name),
+body.fe-retro-theme .tidy5e-sheet.application
+  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"])
+  :is(i, svg, span, label, .label, .title, .name) {
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application svg {
+  image-rendering: pixelated !important;
+  shape-rendering: crispEdges !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application svg :is(path, rect, circle, ellipse, line, polyline, polygon, use) {
+  shape-rendering: crispEdges !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application svg image {
+  image-rendering: pixelated !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  img.item-image:not([src$=".svg" i]):not(.actor-image):not([data-edit="img"]) {
+  filter: saturate(0.82) contrast(0.96) !important;
+  image-rendering: auto !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(img.actor-image, img[data-edit="img"], .profile img, .portrait img, .portrait-hp img) {
+  filter: none !important;
+  image-rendering: auto !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button {
+  isolation: isolate !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button::before {
+  background: var(--fe-tidy-ability-band-light) !important;
+  content: "" !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: 0 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button
+  > * {
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 
@@ -595,4 +1527,330 @@ body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
 body.fe-retro-theme .tidy5e-sheet .tidy-info-card > * {
   position: relative !important;
   z-index: 1 !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * Tidy5e Quadrone + dnd5e standard sheets: accent-monotone retro pass
+ *
+ * Classic has a large, measured block above. These sheets use different DOM,
+ * so keep this scoped and focused: replace fixed gold/red/green surfaces with
+ * low-saturation accent-derived monochrome, and remove small black text/icon
+ * boxes that obscure the sheet artwork and badges.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme
+  :is(
+    .tidy5e-sheet.application.quadrone,
+    .dnd5e2.application.sheet.actor.standard-form
+  ) {
+  --fe-dnd5e-mono-bg: #000000;
+  --fe-dnd5e-mono-surface: hsl(
+    var(--fe-dx3rd-accent-h, 0deg)
+    calc(var(--fe-dx3rd-accent-s, 0%) * 0.10)
+    5%
+  );
+  --fe-dnd5e-mono-surface-2: hsl(
+    var(--fe-dx3rd-accent-h, 0deg)
+    calc(var(--fe-dx3rd-accent-s, 0%) * 0.12)
+    8%
+  );
+  --fe-dnd5e-mono-surface-3: hsl(
+    var(--fe-dx3rd-accent-h, 0deg)
+    calc(var(--fe-dx3rd-accent-s, 0%) * 0.14)
+    11%
+  );
+  --fe-dnd5e-mono-hover: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08);
+  --fe-dnd5e-mono-line-faint: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12);
+  --fe-dnd5e-mono-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.26);
+  --fe-dnd5e-mono-line-strong: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.50);
+  --fe-dnd5e-mono-text: var(--fe-ac-90, rgba(230, 230, 230, 0.9));
+  --fe-dnd5e-mono-muted: var(--fe-ac-57, rgba(230, 230, 230, 0.58));
+  --fe-dnd5e-state-fill: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.14);
+  --fe-dnd5e-state-fill-hover: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22);
+  color: var(--fe-dnd5e-mono-text) !important;
+}
+
+body.fe-retro-theme
+  :is(
+    .tidy5e-sheet.application.quadrone,
+    .dnd5e2.application.sheet.actor.standard-form
+  )
+  :is(.window-content, .sheet-header, .sheet-body, .main-content, .tab-body) {
+  background-color: var(--fe-dnd5e-mono-bg) !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.quadrone.actor,
+    form.dnd5e2.application.sheet.actor.standard-form
+  )
+  :where(.window-content)
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select,
+    button.unbutton,
+    button.button-borderless,
+    button.button-icon-only,
+    button.gold-button,
+    .button-borderless,
+    .button-icon-only,
+    .gold-button,
+    .header-control,
+    .filter-control,
+    .config-button,
+    .item-control,
+    .label.pointer,
+    .button-toggle,
+    .button-secondary,
+    .item-controls :is(button, a, i, svg, span),
+    .active-effect-controls :is(button, a, i, svg, span),
+    .list-controls :is(button, a, i, svg, span),
+    .sidebar-collapser,
+    .create-child,
+    .temp-hp,
+    .roll-hp,
+    .skill-expand-button,
+    .skill-ability,
+    .use-ability-roll-button,
+    .ability-roll-button,
+    .ability-save,
+    .proficiency
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.quadrone.actor,
+    form.dnd5e2.application.sheet.actor.standard-form
+  )
+  :where(.window-content)
+  :is(
+    button.unbutton,
+    button.button-borderless,
+    button.button-icon-only,
+    button.gold-button,
+    .button-borderless,
+    .button-icon-only,
+    .gold-button,
+    .filter-control,
+    .config-button,
+    .item-control,
+    .label.pointer,
+    .button-toggle,
+    .button-secondary,
+    .sidebar-collapser,
+    .create-child,
+    .skill-expand-button,
+    .skill-ability,
+    .use-ability-roll-button,
+    .ability-roll-button,
+    .ability-save,
+    .proficiency
+  ):is(:hover, :focus, :focus-visible) {
+  background: var(--fe-dnd5e-mono-hover) !important;
+  border-color: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-strong) !important;
+  color: var(--fe-dnd5e-mono-text) !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.quadrone.actor,
+    form.dnd5e2.application.sheet.actor.standard-form
+  )
+  > .window-header
+  :is(
+    button.header-control,
+    a.header-button,
+    .header-button,
+    .header-control,
+    .header-sheet-edit-mode-toggle,
+    .header-sheet-edit-mode-toggle :is(label, div, span, i, svg)
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.quadrone.actor,
+    form.dnd5e2.application.sheet.actor.standard-form
+  )
+  > .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch {
+  border: 1px solid var(--fe-dnd5e-mono-line-strong) !important;
+  box-sizing: border-box !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.quadrone.actor,
+    form.dnd5e2.application.sheet.actor.standard-form
+  )
+  > .window-header
+  :is(button.header-control, a.header-button, .header-button, .header-control, .tidy-switch):is(:hover, :focus, :focus-visible) {
+  background: var(--fe-dnd5e-mono-hover) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(
+    .tidy5e-sheet-header,
+    .actor-vitals,
+    .level-container,
+    search,
+    .button-group,
+    .tidy-table-row,
+    .tidy-table-row-v2,
+    .item-table-row,
+    .item-table-row-container
+  ),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(
+    .card,
+    .ability-scores.card,
+    .ability-scores .save-tab,
+    .items-section.card,
+    search,
+    .pills .pill,
+    .meter,
+    .activity-row,
+    .item-row
+  ) {
+  background: var(--fe-dnd5e-mono-surface) !important;
+  background-image: none !important;
+  border-color: var(--fe-dnd5e-mono-line) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(
+    .items-header,
+    .tidy-table-header-row,
+    .item-table-header-row,
+    .spell-level-header,
+    .section-header
+  ),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.items-header, .items-header.header, .items-list > .header) {
+  background: linear-gradient(
+    to right,
+    var(--fe-dnd5e-mono-surface-3),
+    var(--fe-dnd5e-mono-surface-2)
+  ) !important;
+  border-color: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow:
+    inset 0 1px 0 var(--fe-dnd5e-mono-line),
+    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.divider-dot, .trait-pip, .separator-dot) {
+  background: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.actor-vitals, .actor-vitals-row, .level-container.challenge-rating) {
+  border-color: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.ability-bonus-container, .initiative-score-container, .shield) {
+  filter: saturate(0.15) contrast(0.92) brightness(0.88) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.ability-bonus-container, .initiative-score-container, .shield)
+  :is(button, span, label, div) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme
+  :is(.tidy5e-sheet.application.quadrone, .dnd5e2.application.sheet.actor.standard-form)
+  :is(.item-table-row, .tidy-table-row, .tidy-table-row-v2, .item, .item-row, .activity-row):hover {
+  background: var(--fe-dnd5e-mono-hover) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-strong) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tabs, .tabs-right, .sheet-tabs) {
+  background: transparent !important;
+  border-color: var(--fe-dnd5e-mono-line) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tabs, .tabs-right, .sheet-tabs)
+  :is(a.item, a.control, button) {
+  background: transparent !important;
+  border: 1px solid var(--fe-dnd5e-mono-line-faint) !important;
+  color: var(--fe-dnd5e-mono-muted) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tabs, .tabs-right, .sheet-tabs)
+  :is(a.item, a.control, button):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]) {
+  background: var(--fe-dnd5e-mono-hover) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-dnd5e-mono-text) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.initiative-score, .initiative.rollable, .ac-badge, .cr-badge, .badge) {
+  background-color: var(--fe-dnd5e-mono-surface-2) !important;
+  background-image: none !important;
+  border-color: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.portrait, .portrait img, img.item-image.gold-icon, .item-image.gold-icon) {
+  background: transparent !important;
+  border-color: var(--fe-dnd5e-mono-line-strong) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  img.item-image.gold-icon:not([src$=".svg" i]) {
+  filter: saturate(0.82) contrast(0.96) !important;
+  image-rendering: auto !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.slide-toggle-track, .slide-toggle-thumb) {
+  background: var(--fe-dnd5e-mono-surface-3) !important;
+  border-color: var(--fe-dnd5e-mono-line) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.slide-toggle, .toggle, [aria-pressed="true"], .active)
+  :is(.slide-toggle-track, .slide-toggle-thumb) {
+  background: var(--fe-dnd5e-state-fill) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
