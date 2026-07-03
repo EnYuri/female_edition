@@ -21,6 +21,10 @@ import { MODULE_ID } from "./fe-constants.js";
 export const MUSIC_SOCKET = `module.${MODULE_ID}`;
 
 export const MUSIC_MSG = Object.freeze({
+  // GM-authoritative folder creation (any client → GM makes the upload dir).
+  ENSURE_DIR:     "music:ensureDir",
+  ENSURE_DIR_ACK: "music:ensureDirAck",
+
   UP_INIT:        "music:upInit",
   UP_INIT_ACK:    "music:upInitAck",
   UP_CHUNK:       "music:upChunk",

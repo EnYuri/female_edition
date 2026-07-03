@@ -23,6 +23,7 @@ import {
 } from "./fe-music-shared.js";
 import {
   FeMusicApp, resendMissingChunks, clearLocalUpload, markInitAck, markUploadAck, markUploadError,
+  markEnsureDirAck,
 } from "./fe-music-app.js";
 
 const AUTO_INIT_KEY = "ceMusicAutoInitDone";
@@ -172,6 +173,10 @@ function registerSocket() {
 
     /** ===== 플레이어 수신 ===== */
     if (!game.user.isGM) {
+      if (msg.type === MUSIC_MSG.ENSURE_DIR_ACK && msg.toUserId === game.user.id) {
+        markEnsureDirAck(msg.reqId, !!msg.ok, msg.reason);
+        return;
+      }
       if (msg.type === MUSIC_MSG.UP_INIT_ACK && msg.toUserId === game.user.id) {
         markInitAck(msg.uploadId, { reused: !!msg.reused });
         if (msg.reused) {
@@ -201,6 +206,23 @@ function registerSocket() {
     }
 
     /** ===== GM 처리 (프록시 업로드만) ===== */
+
+    // 폴더 생성 요청: 플레이어가 브라우즈/생성 권한이 없어도 GM 권한으로 업로드 폴더 생성.
+    // 클라이언트가 보낸 경로는 무시하고, GM 자신의 설정(musicUploadDir)만 사용 —
+    // 임의 폴더 생성을 유도당하지 않기 위함.
+    if (msg.type === MUSIC_MSG.ENSURE_DIR) {
+      const { reqId, fromUserId } = msg;
+      if (!reqId || !fromUserId || !game.users.get(fromUserId)) return;
+      let ok = false, reason = "";
+      try {
+        await ensureDirectory("data", musicUploadDir());
+        ok = true;
+      } catch (e) {
+        reason = e?.message || "폴더 생성 실패";
+      }
+      game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.ENSURE_DIR_ACK, toUserId: fromUserId, reqId, ok, reason });
+      return;
+    }
 
     // 업로드 INIT
     if (msg.type === MUSIC_MSG.UP_INIT) {

@@ -32,9 +32,67 @@ function readSetting(key) {
   try { return game.settings.get(MODULE_ID, key); } catch { return FE_DEFAULTS[key]; }
 }
 
-/** Whether THIS client can write files directly (skips the GM proxy). */
+/**
+ * Whether THIS client can write files directly (skips the GM proxy chunk relay).
+ * Requires FILES_UPLOAD (to write the file at all). Folder creation is delegated:
+ *  - a client WITH FILES_BROWSE creates/deduplicates the folder itself;
+ *  - a client WITHOUT FILES_BROWSE lets an online GM create the folder over the
+ *    socket (see ensureUploadDir / requestGmEnsureDir), so it must NOT try to
+ *    browse/create locally (that throws "You do not have permission to browse the
+ *    host file system!"). Hence direct upload also needs EITHER browse OR a GM
+ *    online to make the folder on its behalf. Everyone else falls back to the
+ *    full GM-proxied chunked upload.
+ */
 function canUploadDirect() {
-  return game.user?.can?.("FILES_UPLOAD") === true;
+  if (game.user?.can?.("FILES_UPLOAD") !== true) return false;
+  return game.user?.can?.("FILES_BROWSE") === true || isAnyGMOnline();
+}
+
+/**
+ * Ensure the upload directory exists, preferring GM authority when this client
+ * cannot create folders itself. The reason it was failing before: a player tried
+ * to create the `assets` folder and lacked FILES_BROWSE. Now a browse-less client
+ * asks the online GM to create the folder (with the GM's own permissions), and
+ * only self-creates when it actually has the rights.
+ */
+async function ensureUploadDir(dir) {
+  const canSelf = !!game.user?.isGM || game.user?.can?.("FILES_BROWSE") === true;
+  if (canSelf) { await ensureDirectory("data", dir); return; }
+  if (isAnyGMOnline()) { await requestGmEnsureDir(); return; }
+  // Last resort — will surface a clear permission error to the caller/user.
+  await ensureDirectory("data", dir);
+}
+
+// ── GM-authoritative folder creation (browse-less client → GM makes the dir) ──
+
+const ensureDirWaiters = new Map(); // reqId -> { resolve, reject, timer }
+const ENSURE_DIR_TIMEOUT_MS = 15000;
+
+/** Ask an online GM to create the configured upload folder; resolves when done. */
+function requestGmEnsureDir() {
+  const reqId = `${game.user.id}-dir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ensureDirWaiters.delete(reqId);
+      reject(new Error("ENSURE_DIR_TIMEOUT"));
+    }, ENSURE_DIR_TIMEOUT_MS);
+    ensureDirWaiters.set(reqId, { resolve, reject, timer });
+    game.socket.emit(MUSIC_SOCKET, {
+      type: MUSIC_MSG.ENSURE_DIR,
+      reqId,
+      fromUserId: game.user.id,
+    });
+  });
+}
+
+/** Driven by the GM's ENSURE_DIR_ACK in fe-music.js. */
+export function markEnsureDirAck(reqId, ok, reason) {
+  const w = ensureDirWaiters.get(reqId);
+  if (!w) return;
+  clearTimeout(w.timer);
+  ensureDirWaiters.delete(reqId);
+  if (ok) w.resolve(true);
+  else w.reject(new Error(reason || "ENSURE_DIR_FAILED"));
 }
 
 function musicUploadDir() {
@@ -408,7 +466,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
   async _directUpload(file) {
     const FP = getFilePicker();
     const dir = musicUploadDir();
-    await ensureDirectory("data", dir);
+    await ensureUploadDir(dir);
 
     const fileName = sanitizeFileName(file.name);             // original name, ext kept
     const target = await resolveUploadTarget(dir, fileName, file.size);
