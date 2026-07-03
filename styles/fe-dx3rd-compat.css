@@ -876,6 +876,16 @@ body.fe-retro-theme #sidebar-content::after {
   overflow: hidden;
 }
 
+.fe-dx3rd-accent-btn::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: var(--fe-accent-swatch, var(--fe-dx3rd-accent, #ffffff));
+  border: 1px solid rgb(255 255 255 / 0.32);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
 .fe-dx3rd-accent-btn:hover {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
 }

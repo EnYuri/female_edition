@@ -157,7 +157,14 @@ function feRebuildCtrlMenu() {
   for (const sel of FE_CTRL_TARGETS) {
     const el = controls.querySelector(sel) ??
       (sel === ".fe-export-pdf" ? searchRoot.querySelector(sel) : null);
-    if (el && !panel.contains(el)) panel.appendChild(el);
+    if (!el) continue;
+
+    // Canonicalize direct panel children every rebuild. This fixes timing cases
+    // where fe-chat-archive injects .fe-export-pdf into an existing empty panel
+    // before native controls are collected; appendChild moves it to the intended
+    // final slot instead of leaving it as the first visible button.
+    if (panel.contains(el) && el.parentElement !== panel) continue;
+    panel.appendChild(el);
   }
 }
 

@@ -9,22 +9,24 @@
  *  - Portrait images fixed to the bottom of the screen
  *  - Typewriter speech bubble when speaking as a staged actor
  *  - Per-actor emotion/expression image set (configured via actor flags)
- *  - Multi-user sync over module.female_edition socket
+ *  - Per-user persisted stage membership
  *  - Optional: hide theatre messages from chat log
  */
 
 const _FET_MODULE      = "female_edition";
-const _FET_SOCKET_TYPE = "fe-stage";
 const _FET_ID_PREFIX   = "fes-";          // theatreId prefix: "fes-<actorId>"
 const _FET_FLAG_KEY    = "stage";         // actor flag namespace under female_edition
+const _FET_USER_STATE_FLAG = "stageUserState";
 const _FET_NONE        = "__none__";      // sentinel: theatre nav visible but no overrides applied
 const _FET_RECALL_NON_ACTOR_ID = "__fe-stage-recall-non-actor__";
 
 // ── Runtime state ──────────────────────────────────────────────────────────
 
 const _fet = {
-  /** Map<theatreId, insertObj> — all actors currently on stage */
+  /** Map<theatreId, insertObj> — actors the local user personally added to stage */
   inserts: new Map(),
+  /** Map<theatreId, insertObj> — receive-only render targets for other users' stage chat */
+  displayInserts: new Map(),
   /** local client: theatreId the current user is speaking as, or null (자신으로 말하기), or _FET_NONE (없음) */
   speakingAs: _FET_NONE,
   /** ChatMessage id currently selected by cross-speaker history recall, or null for live mode. */
@@ -50,6 +52,10 @@ let _fetDockEl   = null;   // #fe-stage-dock
 let _fetNavEl    = null;   // #fe-stage-nav
 let _fetSelectEl = null;   // <select> inside #fe-stage-nav
 let _fetRootEl   = null;   // chat log root element (used for scoped querySelector)
+let _fetSaveTimer = null;
+let _fetSuppressLocalSave = 0;
+const _fetPreloadedImages = new Map();
+const _FET_PRELOAD_MAX = 256;
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
@@ -74,6 +80,7 @@ function _fetRegisterSettings() {
         _fetRefreshSheetHeaders();
       } else {
         _fetInjectUI();
+        void _fetRestoreUserState();
         _fetRefreshSheetHeaders();
       }
     },
@@ -219,6 +226,159 @@ function _fetLoadSettings() {
   _fetTextSize       = game.settings.get(_FET_MODULE, "stageTextSize");
 }
 
+// ── Per-user persistence ──────────────────────────────────────────────────
+
+function _fetWorldId() {
+  return game.world?.id ?? game.world?.data?.id ?? "world";
+}
+
+function _fetLocalStorageKey() {
+  return `${_FET_MODULE}.stageUserState.${_fetWorldId()}.${game.user?.id ?? "anonymous"}`;
+}
+
+function _fetIsUserStageInsert(insert) {
+  return !!insert?.actorId && !insert.recallOnly;
+}
+
+function _fetStageActorInserts() {
+  return [..._fet.inserts.values()].filter(_fetIsUserStageInsert);
+}
+
+function _fetGetDisplayInsert(theatreId) {
+  return _fet.inserts.get(theatreId) ?? _fet.displayInserts.get(theatreId) ?? null;
+}
+
+function _fetDisplayInsertEntries() {
+  const entries = [..._fet.inserts.entries()];
+  for (const row of _fet.displayInserts.entries()) {
+    if (!_fet.inserts.has(row[0])) entries.push(row);
+  }
+  return entries;
+}
+
+function _fetBuildUserState() {
+  const inserts = _fetStageActorInserts()
+    .filter((ins) => game.actors?.has?.(ins.actorId))
+    .map((ins) => ({
+      actorId: ins.actorId,
+      emote: ins.emote ?? null,
+    }));
+
+  const speakingAs =
+    _fet.speakingAs === _FET_NONE ? _FET_NONE :
+    (_fet.speakingAs && _fetIsUserStageInsert(_fet.inserts.get(_fet.speakingAs)) ? _fet.speakingAs : null);
+
+  return {
+    version: 1,
+    worldId: _fetWorldId(),
+    userId: game.user?.id ?? null,
+    updatedAt: Date.now(),
+    speakingAs,
+    inserts,
+  };
+}
+
+function _fetValidateUserState(state) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return null;
+  if (state.worldId && state.worldId !== _fetWorldId()) return null;
+  if (state.userId && state.userId !== game.user?.id) return null;
+  if (!Array.isArray(state.inserts)) return null;
+  return state;
+}
+
+function _fetReadUserState() {
+  let flagState = null;
+  try {
+    flagState = game.user?.getFlag?.(_FET_MODULE, _FET_USER_STATE_FLAG) ?? null;
+  } catch {
+    flagState = null;
+  }
+  flagState = _fetValidateUserState(flagState);
+
+  let localState = null;
+  try {
+    localState = JSON.parse(localStorage.getItem(_fetLocalStorageKey()) || "null");
+  } catch {
+    localState = null;
+  }
+  localState = _fetValidateUserState(localState);
+
+  if (!flagState) return localState;
+  if (!localState) return flagState;
+  const flagTime = Number(flagState.updatedAt) || 0;
+  const localTime = Number(localState.updatedAt) || 0;
+  return localTime > flagTime ? localState : flagState;
+}
+
+async function _fetSaveUserStateNow() {
+  if (_fetSuppressLocalSave > 0) return;
+  const state = _fetBuildUserState();
+  try {
+    localStorage.setItem(_fetLocalStorageKey(), JSON.stringify(state));
+  } catch {
+    /* localStorage is a fallback only */
+  }
+  try {
+    await game.user?.setFlag?.(_FET_MODULE, _FET_USER_STATE_FLAG, state);
+  } catch (err) {
+    console.warn("[female_edition] fe-theatre: failed to persist user stage state", err);
+  }
+}
+
+function _fetScheduleSaveUserState(delay = 80) {
+  if (_fetSuppressLocalSave > 0) return;
+  try {
+    localStorage.setItem(_fetLocalStorageKey(), JSON.stringify(_fetBuildUserState()));
+  } catch {
+    /* best-effort immediate refresh protection */
+  }
+  if (_fetSaveTimer) clearTimeout(_fetSaveTimer);
+  _fetSaveTimer = setTimeout(() => {
+    _fetSaveTimer = null;
+    void _fetSaveUserStateNow();
+  }, Math.max(0, Number(delay) || 0));
+}
+
+async function _fetRestoreUserState() {
+  if (!_fetEnabled) return;
+  const state = _fetReadUserState();
+  if (!state) return;
+
+  _fetSuppressLocalSave++;
+  try {
+    const seen = new Set();
+    for (const row of state.inserts) {
+      const actorId = String(row?.actorId ?? "");
+      if (!actorId || seen.has(actorId)) continue;
+      seen.add(actorId);
+
+      const actor = game.actors?.get?.(actorId);
+      if (!actor || !_fetCanSpeakAs(actorId)) continue;
+
+      const theatreId = _FET_ID_PREFIX + actor.id;
+      const { name, src, emotes } = _fetGetActorStageData(actor);
+      if (_fet.inserts.has(theatreId)) {
+        _fetApplyInsertStageData(_fet.inserts.get(theatreId), actor.id, name, src, emotes);
+      } else {
+        const promoted = _fetPromoteDisplayInsert(theatreId, actor.id, name, src, emotes);
+        if (!promoted) _fetInjectInsert(theatreId, actor.id, name, src, emotes, true);
+      }
+      if (row.emote) _fetSetEmote(theatreId, row.emote, true);
+    }
+
+    const wantedSpeaking = state.speakingAs === _FET_NONE
+      ? _FET_NONE
+      : (state.speakingAs && _fet.inserts.has(state.speakingAs) ? state.speakingAs : null);
+    _fetSetSpeakingAs(wantedSpeaking);
+  } finally {
+    _fetSuppressLocalSave--;
+  }
+
+  _fetUpdateActiveStates();
+  _fetRefreshSheetHeaders();
+  _fetScheduleSaveUserState(0);
+}
+
 function _fetApplyBoxVars() {
   if (!_fetDockEl) return;
   _fetDockEl.style.setProperty("--fet-portrait-height", `${_fetPortraitHeight}px`);
@@ -299,17 +459,19 @@ function _fetInjectUI() {
   removeBtn.title = "무대에서 제거";
   removeBtn.innerHTML = '<i class="fas fa-door-open"></i>';
   removeBtn.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    if (_fet.speakingAs) _fetRemoveInsert(_fet.speakingAs);
+    _fetOpenRemoveMenu(removeBtn);
   });
 
   nav.append(select, emoteBtn, removeBtn);
   _fetNavEl    = nav;
   _fetSelectEl = select;
 
-  // Re-add options + update insert.opt refs for inserts that survived a scene change
-  // Only add option if current user has owner permission for that actor
-  for (const insert of _fet.inserts.values()) {
+  // Re-add options + update insert.opt refs for the local user's staged actors
+  // that survived a scene change. Receive-only display inserts never enter this
+  // dropdown.
+  for (const insert of _fetStageActorInserts()) {
     if (!_fetCanSpeakAs(insert.actorId)) { insert.opt = null; continue; }
     const opt = _fetCreateSelectOption(insert.theatreId, insert.name);
     select.appendChild(opt);
@@ -367,7 +529,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   closeBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const ins = _fet.inserts.get(theatreId);
+    const ins = _fetGetDisplayInsert(theatreId);
     if (ins) _fetDismissInsert(ins);
   });
 
@@ -378,7 +540,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   // 우클릭으로 대사창 즉시 닫기 (로컬 전용)
   const onDismiss = (e) => {
     e.preventDefault();
-    const ins = _fet.inserts.get(theatreId);
+    const ins = _fetGetDisplayInsert(theatreId);
     if (ins) _fetDismissInsert(ins);
   };
   textboxEl.addEventListener("contextmenu", onDismiss);
@@ -400,7 +562,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   emoteBtn.innerHTML = '<i class="fas fa-theater-masks"></i>';
   emoteBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    _fetOpenEmoteMenu(theatreId, emoteBtn);
+    if (_fet.inserts.has(theatreId)) _fetOpenEmoteMenu(theatreId, emoteBtn);
   });
 
   const labelEl = document.createElement("div");
@@ -462,24 +624,120 @@ function _fetGetActorStageData(actor) {
   };
 }
 
+function _fetResolveStageImage(baseSrc, emotes, emoteName) {
+  return (emoteName && emotes?.[emoteName]?.src) ? emotes[emoteName].src : baseSrc;
+}
+
+function _fetCollectStageAssetUrls(src, emotes) {
+  const urls = new Set();
+  const add = (value) => {
+    const url = String(value ?? "").trim();
+    if (!url || url.startsWith("data:")) return;
+    urls.add(url);
+  };
+
+  add(src);
+  for (const emote of Object.values(emotes ?? {})) {
+    if (!emote || typeof emote !== "object") continue;
+    add(emote.src);
+    add(emote.img);
+  }
+  return urls;
+}
+
+function _fetPreloadImage(url) {
+  if (!url || String(url).startsWith("data:")) return;
+  if (_fetPreloadedImages.has(url)) return;
+  while (_fetPreloadedImages.size >= _FET_PRELOAD_MAX) {
+    const oldest = _fetPreloadedImages.keys().next().value;
+    _fetPreloadedImages.delete(oldest);
+  }
+
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+  _fetPreloadedImages.set(url, img);
+}
+
+function _fetPreloadStageAssets(src, emotes) {
+  for (const url of _fetCollectStageAssetUrls(src, emotes)) _fetPreloadImage(url);
+}
+
+function _fetApplyInsertStageData(insert, actorId, name, src, emotes) {
+  _fetPreloadStageAssets(src, emotes);
+  insert.actorId = actorId;
+  insert.name = name;
+  insert.emotes = emotes ?? {};
+  insert.baseSrc = src;
+  if (insert.emote && !insert.emotes[insert.emote]) insert.emote = null;
+  insert.src = _fetResolveStageImage(insert.baseSrc, insert.emotes, insert.emote);
+  insert.labelEl.textContent = name;
+  insert.nameEl.textContent = name;
+  insert.imgEl.alt = name;
+  insert.imgEl.src = insert.src;
+  if (insert.opt) insert.opt.textContent = name;
+}
+
+function _fetAttachStageOption(insert) {
+  if (insert.opt || !_fetCanSpeakAs(insert.actorId)) return;
+  insert.opt = _fetCreateSelectOption(insert.theatreId, insert.name);
+  _fetSelectEl?.appendChild(insert.opt);
+}
+
+function _fetPromoteDisplayInsert(theatreId, actorId, name, src, emotes) {
+  const insert = _fet.displayInserts.get(theatreId);
+  if (!insert) return null;
+
+  _fet.displayInserts.delete(theatreId);
+  _fet.inserts.set(theatreId, insert);
+  insert.el.classList.remove("fe-stage-insert--display");
+  _fetApplyInsertStageData(insert, actorId, name, src, emotes);
+  _fetAttachStageOption(insert);
+  return insert;
+}
+
 /** Public: add actor to stage (called from context menu, macro, or sheet header). */
 export function fetAddToStage(actorOrId) {
   const actor = typeof actorOrId === "string" ? game.actors.get(actorOrId) : actorOrId;
   if (!actor) return;
+  if (!_fetCanSpeakAs(actor.id)) {
+    ui.notifications?.warn?.("이 액터를 무대에 추가할 권한이 없습니다.");
+    return;
+  }
   const theatreId = _FET_ID_PREFIX + actor.id;
-  if (_fet.inserts.has(theatreId)) { _fetSetSpeakingAs(theatreId); return; }
   const { name, src, emotes } = _fetGetActorStageData(actor);
+  const existing = _fet.inserts.get(theatreId);
+  if (existing) {
+    _fetApplyInsertStageData(existing, actor.id, name, src, emotes);
+    _fetAttachStageOption(existing);
+    _fetSetSpeakingAs(theatreId);
+    _fetScheduleSaveUserState();
+    _fetRefreshSheetHeaders();
+    return;
+  }
+
+  const promoted = _fetPromoteDisplayInsert(theatreId, actor.id, name, src, emotes);
+  if (promoted) {
+    _fetSetSpeakingAs(theatreId);
+    _fetScheduleSaveUserState();
+    _fetRefreshSheetHeaders();
+    return;
+  }
   _fetInjectInsert(theatreId, actor.id, name, src, emotes, false);
 }
 
 // Global exposure for macros/RUI interaction
 globalThis.fetAddToStage      = fetAddToStage;
-globalThis.fetIsOnStage       = (actorId) => _fet.inserts.has(_FET_ID_PREFIX + actorId);
-globalThis.fetRemoveFromStage = (actorId) => _fetRemoveInsert(_FET_ID_PREFIX + actorId);
+globalThis.fetIsOnStage       = (actorId) => _fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + actorId));
+globalThis.fetRemoveFromStage = (actorId) => {
+  const theatreId = _FET_ID_PREFIX + actorId;
+  if (_fetIsUserStageInsert(_fet.inserts.get(theatreId))) _fetRemoveInsert(theatreId);
+};
 globalThis.fetSetSpeakingAs   = (actorId) => _fetSetSpeakingAs(_FET_ID_PREFIX + actorId);
 
 function _fetInjectInsert(theatreId, actorId, name, src, emotes, remote) {
   if (!_fetDockEl || _fet.inserts.has(theatreId)) return;
+  _fetPreloadStageAssets(src, emotes);
 
   const { el, textboxEl, contentEl, nameEl, imgEl, labelEl } =
     _fetCreateInsertEl(theatreId, name, src);
@@ -503,11 +761,43 @@ function _fetInjectInsert(theatreId, actorId, name, src, emotes, remote) {
   el.hidden = true;
 
   if (!remote) {
-    _fetSendEvent("enter", { theatreId, actorId, name, src, emotes });
     _fetSetSpeakingAs(theatreId);
+    _fetScheduleSaveUserState();
   }
 
   _fetRefreshSheetHeaders();
+}
+
+function _fetInjectDisplayInsert(theatreId, actorId, name, src, emotes) {
+  const stageInsert = _fet.inserts.get(theatreId);
+  if (stageInsert) return stageInsert;
+
+  let insert = _fet.displayInserts.get(theatreId);
+  if (insert) {
+    _fetApplyInsertStageData(insert, actorId, name, src, emotes);
+    return insert;
+  }
+
+  if (!_fetDockEl) return null;
+  _fetPreloadStageAssets(src, emotes);
+
+  const { el, textboxEl, contentEl, nameEl, imgEl, labelEl } =
+    _fetCreateInsertEl(theatreId, name, src);
+  el.classList.add("fe-stage-insert--display");
+  _fetDockEl.appendChild(el);
+
+  insert = {
+    theatreId, actorId, name,
+    src, baseSrc: src, emote: null, emotes: emotes ?? {},
+    el, textboxEl, contentEl, nameEl, imgEl, labelEl,
+    opt: null,
+    decayTimeout: null,
+    hideTimeout: null,
+    currentMessageId: null,
+  };
+  _fet.displayInserts.set(theatreId, insert);
+  el.hidden = true;
+  return insert;
 }
 
 function _fetRemoveInsert(theatreId, remote = false) {
@@ -527,11 +817,49 @@ function _fetRemoveInsert(theatreId, remote = false) {
   _fetRefreshSheetHeaders();
 
   if (_fet.speakingAs === theatreId) _fetSetSpeakingAs(null);
-  if (!remote) _fetSendEvent("exit", { theatreId });
+  if (!remote) _fetScheduleSaveUserState();
+}
+
+function _fetRemoveDisplayInsert(theatreId) {
+  const insert = _fet.displayInserts.get(theatreId);
+  if (!insert) return;
+
+  clearTimeout(insert.decayTimeout);
+  clearTimeout(insert.hideTimeout);
+  insert.cancelTypewriter?.();
+  if (insert.currentMessageId && insert.currentMessageId === _fet.recallMessageId) {
+    _fet.recallMessageId = null;
+  }
+  insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+  setTimeout(() => insert.el.remove(), 400);
+  _fet.displayInserts.delete(theatreId);
 }
 
 function _fetClearAll(remote = false) {
-  for (const id of [..._fet.inserts.keys()]) _fetRemoveInsert(id, remote);
+  _fetSuppressLocalSave++;
+  try {
+    for (const id of [..._fet.inserts.keys()]) _fetRemoveInsert(id, remote);
+    for (const id of [..._fet.displayInserts.keys()]) _fetRemoveDisplayInsert(id);
+  } finally {
+    _fetSuppressLocalSave--;
+  }
+  if (!remote) _fetScheduleSaveUserState();
+}
+
+function _fetClearUserStage() {
+  const ids = _fetStageActorInserts().map((ins) => ins.theatreId);
+  if (!ids.length) return;
+
+  _fetSuppressLocalSave++;
+  try {
+    for (const id of ids) _fetRemoveInsert(id, false);
+  } finally {
+    _fetSuppressLocalSave--;
+  }
+  if (_fet.speakingAs && _fet.speakingAs !== _FET_NONE && !_fet.inserts.has(_fet.speakingAs)) {
+    _fetSetSpeakingAs(null);
+  }
+  _fetScheduleSaveUserState(0);
 }
 
 // ── Speaking-as ────────────────────────────────────────────────────────────
@@ -541,23 +869,96 @@ function _fetClearAll(remote = false) {
 function _fetSetSpeakingAs(theatreId) {
   if (theatreId && theatreId !== _FET_NONE) {
     const insert = _fet.inserts.get(theatreId);
+    if (!_fetIsUserStageInsert(insert)) return;
     if (insert && !_fetCanSpeakAs(insert.actorId)) return; // no owner permission
   }
   _fet.speakingAs = theatreId ?? null;
   _fetUpdateActiveStates();
+  _fetScheduleSaveUserState();
 }
 
 function _fetUpdateActiveStates() {
   const tid      = _fet.speakingAs;
   const hasActor = !!tid && tid !== _FET_NONE;
+  const hasStageActors = _fetStageActorInserts().length > 0;
 
   if (_fetSelectEl) _fetSelectEl.value = tid ?? "";
   _fetNavEl?.querySelector(".fe-stage-nav-emote")?.classList.toggle("hidden", !hasActor);
-  _fetNavEl?.querySelector(".fe-stage-nav-remove-cur")?.classList.toggle("hidden", !hasActor);
+  _fetNavEl?.querySelector(".fe-stage-nav-remove-cur")?.classList.toggle("hidden", !hasStageActors);
 
   _fetDockEl?.querySelectorAll(".fe-stage-insert").forEach((el) =>
     el.classList.toggle("fe-stage-insert--speaking", el.dataset.theatreId === tid)
   );
+}
+
+function _fetOpenRemoveMenu(anchor) {
+  document.querySelector(".fe-stage-remove-menu")?.remove();
+
+  const selectedId = _fet.speakingAs && _fet.speakingAs !== _FET_NONE ? _fet.speakingAs : null;
+  const selected = selectedId ? _fet.inserts.get(selectedId) : null;
+  const removableSelected = _fetIsUserStageInsert(selected);
+  const count = _fetStageActorInserts().length;
+  if (!selected && !count) return;
+
+  const menu = document.createElement("div");
+  menu.className = "fe-stage-remove-menu";
+
+  const mkItem = (label, icon, onClick, disabled = false) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "fe-stage-remove-item";
+    item.disabled = !!disabled;
+    const iconEl = document.createElement("i");
+    iconEl.className = `fas ${icon}`;
+    const labelEl = document.createElement("span");
+    labelEl.textContent = label;
+    item.append(iconEl, labelEl);
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (item.disabled) return;
+      menu.remove();
+      onClick();
+    });
+    return item;
+  };
+
+  menu.appendChild(mkItem(
+    removableSelected ? `${selected.name} 제거` : "현재 선택 제거",
+    "fa-door-open",
+    () => { if (selectedId && removableSelected) _fetRemoveInsert(selectedId); },
+    !selectedId || !removableSelected,
+  ));
+  menu.appendChild(mkItem(
+    "내 무대 모두 비우기",
+    "fa-trash",
+    () => _fetClearUserStage(),
+    count <= 0,
+  ));
+
+  menu.style.visibility = "hidden";
+  document.body.appendChild(menu);
+
+  const rect = anchor.getBoundingClientRect();
+  const fallbackRect = _fetNavEl?.getBoundingClientRect?.();
+  const anchorRect = rect.width || rect.height ? rect : fallbackRect;
+  const menuRect = menu.getBoundingClientRect();
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const maxLeft = Math.max(8, window.innerWidth - menuRect.width - 8);
+  const maxTop = Math.max(8, window.innerHeight - menuRect.height - 8);
+  const left = anchorRect
+    ? clamp(anchorRect.right - menuRect.width, 8, maxLeft)
+    : maxLeft;
+  const top = anchorRect
+    ? clamp(anchorRect.top - menuRect.height - 4, 8, maxTop)
+    : maxTop;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.visibility = "";
+
+  setTimeout(() => {
+    document.addEventListener("click", () => menu.remove(), { once: true });
+  }, 0);
 }
 
 // ── Emotion system ─────────────────────────────────────────────────────────
@@ -567,13 +968,12 @@ function _fetSetEmote(theatreId, emoteName, remote = false) {
   if (!insert) return;
 
   insert.emote = emoteName ?? null;
-  const src = (emoteName && insert.emotes[emoteName]?.src)
-    ? insert.emotes[emoteName].src
-    : insert.baseSrc;
+  const src = _fetResolveStageImage(insert.baseSrc, insert.emotes, insert.emote);
+  _fetPreloadImage(src);
   insert.src = src;
   insert.imgEl.src = src;
 
-  if (!remote) _fetSendEvent("emote", { theatreId, emoteName });
+  if (!remote) _fetScheduleSaveUserState();
 }
 
 function _fetOpenEmoteMenu(theatreId, anchor) {
@@ -676,10 +1076,15 @@ function _fetMessageHasStageRecallContent(message) {
 
 function _fetRecallTargetForMessage(message) {
   const stageId = message?.flags?.[_FET_MODULE]?.stageId;
-  if (stageId && stageId !== _FET_RECALL_NON_ACTOR_ID && _fet.inserts.has(stageId)) {
+  if (stageId && stageId !== _FET_RECALL_NON_ACTOR_ID) {
+    const insert = _fetGetDisplayInsert(stageId);
+    const actorId = message?.speaker?.actor ??
+      (String(stageId).startsWith(_FET_ID_PREFIX) ? String(stageId).slice(_FET_ID_PREFIX.length) : null);
+    const actor = actorId ? game.actors?.get?.(actorId) : null;
+    const stageData = actor ? _fetGetActorStageData(actor) : null;
     return {
       theatreId: stageId,
-      displayName: _fet.inserts.get(stageId)?.name,
+      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || "무대",
     };
   }
 
@@ -724,7 +1129,7 @@ function _fetRecallMessages() {
 
 // "<" 버튼: 현재 표시 메시지보다 한 칸 이전(과거)의 발화를 말풍선에 불러온다.
 function _fetRecallPrev(theatreId) {
-  const insert = _fet.inserts.get(theatreId);
+  const insert = _fetGetDisplayInsert(theatreId);
   if (!insert) return;
   const rows = _fetRecallMessages();
   if (!rows.length) return;
@@ -738,6 +1143,9 @@ function _fetRecallPrev(theatreId) {
   if (!row) return;
 
   const msg = row.message;
+  if (row.target.theatreId !== _FET_RECALL_NON_ACTOR_ID) {
+    _fetEnsureMessageDisplayInsert(msg, row.target.theatreId);
+  }
   _fet.recallMessageId = msg.id ?? null;
   const text = _fetPlainTextFromContent(msg.content);
   const u = game.users.get(msg.author?.id);
@@ -746,11 +1154,12 @@ function _fetRecallPrev(theatreId) {
     messageId: msg.id,
     recall: true,
     displayName: row.target.displayName,
+    portraitSrc: msg.flags?.[_FET_MODULE]?.portraitSrc,
   });
 }
 
 function _fetShowText(theatreId, text, userColor, opts = {}) {
-  const insert = _fet.inserts.get(theatreId);
+  const insert = _fetGetDisplayInsert(theatreId);
   if (!insert) return;
 
   const recall = !!opts.recall;
@@ -764,7 +1173,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   clearTimeout(insert.hideTimeout);
 
   // Fade out and collapse all other inserts after their transition completes
-  for (const [tid, other] of _fet.inserts) {
+  for (const [tid, other] of _fetDisplayInsertEntries()) {
     if (tid === theatreId) continue;
     clearTimeout(other.hideTimeout);
     other.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
@@ -787,6 +1196,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
 
   // Show textbox with speaker accent color
   insert.nameEl.textContent = opts.displayName || insert.name;
+  insert.imgEl.src = opts.portraitSrc || insert.src;
   insert.textboxEl.classList.add("fe-stage-textbox--visible");
   if (userColor) {
     insert.textboxEl.style.setProperty("--fet-speaker-color", userColor);
@@ -808,7 +1218,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
       // 있어, 다음 프레임에 한 번 더 미디어 렌더를 시도한다.
       if (opts.messageId) {
         requestAnimationFrame(() => {
-          if (_fet.inserts.get(theatreId) === insert &&
+          if (_fetGetDisplayInsert(theatreId) === insert &&
               insert.currentMessageId === opts.messageId &&
               insert.textboxEl.classList.contains("fe-stage-textbox--visible")) {
             _fetTryRenderRichContent(insert, opts.messageId);
@@ -828,6 +1238,31 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
       insert.hideTimeout = setTimeout(() => { insert.el.hidden = true; }, 400);
     }, readTime);
   }
+}
+
+function _fetEnsureMessageDisplayInsert(chatMessage, theatreId) {
+  const actorId = chatMessage?.speaker?.actor ??
+    (String(theatreId).startsWith(_FET_ID_PREFIX) ? String(theatreId).slice(_FET_ID_PREFIX.length) : null);
+  const actor = actorId ? game.actors?.get?.(actorId) : null;
+  const stageData = actor ? _fetGetActorStageData(actor) : null;
+  const flags = chatMessage?.flags?.[_FET_MODULE] ?? {};
+  const name = chatMessage?.speaker?.alias || stageData?.name || actor?.name || "무대";
+  const src = flags.portraitSrc || stageData?.src || actor?.img || "icons/svg/mystery-man.svg";
+  const emotes = stageData?.emotes ?? {};
+
+  const stageInsert = _fet.inserts.get(theatreId);
+  if (stageInsert) return stageInsert;
+
+  let displayInsert = _fet.displayInserts.get(theatreId);
+  if (displayInsert) {
+    _fetApplyInsertStageData(displayInsert, actorId, name, src, emotes);
+    return displayInsert;
+  }
+
+  if (!_fetDockEl) _fetInjectUI();
+  if (!_fetDockEl) return null;
+
+  return _fetInjectDisplayInsert(theatreId, actorId, name, src, emotes);
 }
 
 function _fetTypewriter(el, text) {
@@ -1003,7 +1438,7 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
 Hooks.on("createChatMessage", (chatMessage) => {
   if (!_fetEnabled) return;
   const theatreId = chatMessage.flags?.[_FET_MODULE]?.stageId;
-  if (!theatreId || !_fet.inserts.has(theatreId)) return;
+  if (!theatreId) return;
 
   // Skip roll messages and slash commands; markdown-wrapped HTML is handled by text extraction below
   if (chatMessage.rolls?.length || chatMessage.content?.startsWith("/")) return;
@@ -1015,10 +1450,15 @@ Hooks.on("createChatMessage", (chatMessage) => {
   // (리치 렌더가 다음 프레임에 미디어를 채운다).
   const hasMedia = /<(?:img|video|picture|table)\b/i.test(String(chatMessage.content ?? ""));
   if (!text && !hasMedia) return;
+  if (!_fetEnsureMessageDisplayInsert(chatMessage, theatreId)) return;
 
   const _u = game.users.get(chatMessage.author?.id);
   const color = _u?.color?.css ?? (typeof _u?.color === "string" ? _u.color : "");
-  _fetShowText(theatreId, text, color, { messageId: chatMessage.id });
+  _fetShowText(theatreId, text, color, {
+    messageId: chatMessage.id,
+    displayName: chatMessage.speaker?.alias,
+    portraitSrc: chatMessage.flags?.[_FET_MODULE]?.portraitSrc,
+  });
 });
 
 Hooks.on("renderChatMessageHTML", (chatMessage, html) => {
@@ -1030,60 +1470,14 @@ Hooks.on("renderChatMessageHTML", (chatMessage, html) => {
 Hooks.on("updateActor", (actor, change) => {
   if (!_fetEnabled) return;
   if (!change?.flags?.[_FET_MODULE]?.[_FET_FLAG_KEY]) return;
-  const insert = _fet.inserts.get(_FET_ID_PREFIX + actor.id);
-  if (!insert) return;
   const { name, src, emotes } = _fetGetActorStageData(actor);
-  insert.name    = name;
-  insert.emotes  = emotes;
-  insert.baseSrc = src;
-  insert.labelEl.textContent = name;
-  insert.nameEl.textContent  = name;
-  if (insert.opt) insert.opt.textContent = name;
-  if (!insert.emote) { insert.src = src; insert.imgEl.src = src; }
-});
-
-// ── Socket ─────────────────────────────────────────────────────────────────
-
-function _fetSendEvent(event, data = {}) {
-  game.socket.emit("module.female_edition", { type: _FET_SOCKET_TYPE, event, ...data });
-}
-
-function _fetHandleSocket(payload) {
-  if (!_fetEnabled || payload?.type !== _FET_SOCKET_TYPE) return;
-  switch (payload.event) {
-    case "enter":
-      _fetInjectInsert(payload.theatreId, payload.actorId, payload.name, payload.src, payload.emotes, true);
-      break;
-    case "exit":
-      _fetRemoveInsert(payload.theatreId, true);
-      break;
-    case "emote":
-      _fetSetEmote(payload.theatreId, payload.emoteName ?? null, true);
-      break;
-    case "resync":
-      if (game.user.isGM) _fetSendResyncData();
-      break;
-    case "resyncdata":
-      _fetClearAll(true);
-      for (const ins of payload.inserts ?? []) {
-        _fetInjectInsert(ins.theatreId, ins.actorId, ins.name, ins.src, ins.emotes, true);
-        if (ins.emote) _fetSetEmote(ins.theatreId, ins.emote, true);
-      }
-      break;
+  for (const insert of [
+    _fet.inserts.get(_FET_ID_PREFIX + actor.id),
+    _fet.displayInserts.get(_FET_ID_PREFIX + actor.id),
+  ]) {
+    if (insert) _fetApplyInsertStageData(insert, actor.id, name, src, emotes);
   }
-}
-
-function _fetSendResyncData() {
-  const inserts = [..._fet.inserts.values()].map((ins) => ({
-    theatreId: ins.theatreId, actorId: ins.actorId,
-    name: ins.name, src: ins.src, emotes: ins.emotes, emote: ins.emote,
-  }));
-  game.socket.emit("module.female_edition", {
-    type: _FET_SOCKET_TYPE,
-    event: "resyncdata",
-    inserts,
-  });
-}
+});
 
 // ── Actor config dialog ────────────────────────────────────────────────────
 
@@ -1207,19 +1601,12 @@ async function _fetSaveActorConfig(actorId, root) {
 
   await actor.setFlag(_FET_MODULE, _FET_FLAG_KEY, { name, baseSrc, emotes });
 
-  // Live-update the insert if actor is currently on stage
-  const insert = _fet.inserts.get(_FET_ID_PREFIX + actorId);
-  if (!insert) return;
-
-  insert.name   = name;
-  insert.emotes = emotes;
-  insert.baseSrc = baseSrc;
-  insert.labelEl.textContent = name;
-  insert.nameEl.textContent  = name;
-  if (insert.opt) insert.opt.textContent = name;
-  if (!insert.emote) {
-    insert.src = baseSrc;
-    insert.imgEl.src = baseSrc;
+  // Live-update personal stage and receive-only display inserts if present.
+  for (const insert of [
+    _fet.inserts.get(_FET_ID_PREFIX + actorId),
+    _fet.displayInserts.get(_FET_ID_PREFIX + actorId),
+  ]) {
+    if (insert) _fetApplyInsertStageData(insert, actorId, name, baseSrc, emotes);
   }
 }
 
@@ -1267,7 +1654,7 @@ function _fetRegisterContextOptions(_html, options) {
         const id = _fetGetActorIdFromLi(li);
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
         if (!id || !game.actors.get(id)?.isOwner) return false;
-        return !_fet.inserts.has(_FET_ID_PREFIX + id);
+        return !_fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + id));
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
@@ -1282,7 +1669,7 @@ function _fetRegisterContextOptions(_html, options) {
         const id = _fetGetActorIdFromLi(li);
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
         if (!id || !game.actors.get(id)?.isOwner) return false;
-        return _fet.inserts.has(_FET_ID_PREFIX + id);
+        return _fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + id));
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
@@ -1321,13 +1708,12 @@ Hooks.on("getActorContextMenuOptions", _fetRegisterContextOptions);
 
 Hooks.on("init", () => {
   _fetRegisterSettings();
-  game.socket.on("module.female_edition", _fetHandleSocket);
 });
 
 Hooks.on("ready", () => {
   _fetLoadSettings();   // world-scoped settings are only reliable here
   _fetInjectUI();
-  if (_fetEnabled && !game.user.isGM) _fetSendEvent("resync");
+  void _fetRestoreUserState();
 });
 
 Hooks.on("renderChatLog", (app, html) => {
@@ -1402,7 +1788,7 @@ function _fetInjectSheetButtons(app, el) {
   target.querySelectorAll(".fet-stage-btn").forEach((b) => b.remove());
 
   const theatreId = _FET_ID_PREFIX + actor.id;
-  const onStage   = _fet.inserts.has(theatreId);
+  const onStage   = _fetIsUserStageInsert(_fet.inserts.get(theatreId));
 
   const mkBtn = (extraCls, icon, title, onClick) => {
     const btn = document.createElement("a");

@@ -284,12 +284,12 @@ function feAphOnEnter(event) {
   // Native-tooltip elements are handled by the activate() wrapper.
   if (feAphHasNativeTrigger(el)) return;
 
-  // Mirror the native 500ms long-hover delay.
+  // Mirror the native 729((3^3)^2)ms long-hover delay.
   _fnPending.el = el;
   _fnPending.timer = setTimeout(() => {
     _fnPending.timer = null;
     if (_fnPending.el === el && feAphEnabled()) feAphActivateOwn(el, hit);
-  }, 500);
+  }, 729);
 }
 
 function feAphOnLeave(event) {

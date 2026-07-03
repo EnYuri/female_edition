@@ -575,18 +575,23 @@ function _injectAccentBtn() {
     document.getElementById(ACCENT_BTN_ID)?.remove();
     return;
   }
-  if (document.getElementById(ACCENT_BTN_ID)) return;
-
   const controls = document.querySelector("chat-controls, #chat-controls, .chat-controls");
   if (!controls) return;
 
   const color = _getAccent();
+  const existing = document.getElementById(ACCENT_BTN_ID);
+  if (existing) {
+    existing.style.removeProperty("background");
+    existing.style.setProperty("--fe-accent-swatch", color);
+    controls.appendChild(existing);
+    return;
+  }
 
   const label = document.createElement("label");
   label.id        = ACCENT_BTN_ID;
   label.className = "fe-dx3rd-accent-btn";
   label.title     = "픽셀 테마 강조색";
-  label.style.background = color;
+  label.style.setProperty("--fe-accent-swatch", color);
 
   const input = document.createElement("input");
   input.type  = "color";
@@ -595,7 +600,7 @@ function _injectAccentBtn() {
   // real-time preview while dragging the picker — §20 palette(H·S)도 즉시 반영
   input.addEventListener("input", (e) => {
     const color = e.target.value;
-    label.style.background = color;
+    label.style.setProperty("--fe-accent-swatch", color);
     const root = document.documentElement;
     root.style.setProperty("--fe-dx3rd-accent", color);
     const { h, s } = _hexToHs(color);
@@ -606,7 +611,7 @@ function _injectAccentBtn() {
   input.addEventListener("change", (e) => _setAccent(e.target.value));
 
   label.appendChild(input);
-  controls.prepend(label);
+  controls.append(label);
 }
 
 // ─── 가시성 적용 ─────────────────────────────────────────────────────────────

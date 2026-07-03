@@ -10,6 +10,21 @@
   display: none !important;
 }
 
+#chat-controls > #ci-upload-image-hidden-input,
+chat-controls > #ci-upload-image-hidden-input,
+.chat-controls > #ci-upload-image-hidden-input {
+  position: absolute !important;
+  inline-size: 0 !important;
+  block-size: 0 !important;
+  flex: 0 0 0 !important;
+  min-inline-size: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Safety net: hide .fe-export-pdf anywhere in the active controls, not just direct children.
    Catches cases where the button lands outside #chat-controls (e.g. in the parent form).
    Specificity (1,2,0). */
@@ -178,10 +193,19 @@ body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-but
   min-width: 0;
 }
 
-/* Accent color button: vertically centered, never shrinks */
-#chat-controls > #fe-dx3rd-accent-btn {
-  flex-shrink: 0;
-  align-self:  center;
+/* Accent color button: stays after the stage nav and matches the chat UI rhythm. */
+#chat-controls > #fe-dx3rd-accent-btn,
+chat-controls > #fe-dx3rd-accent-btn,
+.chat-controls > #fe-dx3rd-accent-btn {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  align-self: center;
+  margin-inline-start: 1px;
+  background: rgba(8, 10, 15, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 
 /* ── dx3rd pixel theme override ──────────────────────────── */

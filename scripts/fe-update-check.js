@@ -95,7 +95,7 @@ function feUpdNotify(latestVersion, localVersion) {
   }
 
   ui.notifications?.warn(
-    `Female-cupwhi 업데이트 가능: 현재 ${local}, 최신 ${latest}. Foundry의 모듈 관리 화면에서 업데이트를 확인하세요.`,
+    `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는거에요!!: 현재 ${local}이구, 최신은 ${latest}인 거에요... 글애서 FVTT 셋업- 부가 모듈 탭에서 업데이트를 확인하시는거에요챱`,
     { permanent: true, console: false },
   );
 }
