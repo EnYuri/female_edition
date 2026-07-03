@@ -1890,6 +1890,25 @@ body.fe-retro-theme {
 body.fe-retro-theme :is(.window-app, .application) {
   background:       #000 !important;
   background-image: none !important;
+  backdrop-filter:         none !important;
+  -webkit-backdrop-filter: none !important;
+  /* Window dragging updates left/top every frame. If a system or core rule
+     leaves transition-property: all on the frame, the retro 1ms duration still
+     makes every move schedule a transition. Keep minimize/maximize transitions
+     below, but do not transition ordinary frame position changes. */
+  transition-property: none !important;
+}
+
+body.fe-retro-theme :is(.application.minimizing, .application.maximizing) {
+  transition-property: max-height, max-width !important;
+}
+
+/* DX3rd AppV2 actor sheets enforce min-width:850px so the fixed-width sheet
+   grid does not wrap. That is correct while open, but it prevents Foundry's
+   AppV2 minimize path from shrinking to --minimized-width. */
+body.fe-retro-theme .application.sheet.dx3rd-emanim.actor.actor-sheet-v2:is(.minimizing, .minimized, .maximizing) {
+  min-width: unset !important;
+  min-height: unset !important;
 }
 
 body.fe-retro-theme :is(.window-app, .application) .window-header,
@@ -1912,6 +1931,8 @@ body.fe-retro-theme :is(.window-app, .application) .window-content,
 body.fe-retro-theme :is(.window-app, .application) section.window-content {
   background:       #000 !important;
   background-image: none !important;
+  backdrop-filter:         none !important;
+  -webkit-backdrop-filter: none !important;
   color:            var(--fe-ac-90) !important;
 }
 
@@ -1931,6 +1952,19 @@ body.fe-retro-theme :is(.window-app, .application)
 body.fe-retro-theme :is(.window-app, .application)
   :is(.header-control, .close, .minimize, .header-button):not([disabled]):hover {
   color: var(--fe-ac-90) !important;
+}
+
+/* DX3rd injects text buttons directly into the AppV2 header and makes them
+   display:inline-flex with a system-level selector. Core's minimized rule is
+   less specific, so these buttons otherwise remain visible in the collapsed
+   title bar. */
+body.fe-retro-theme .application.minimized .window-header
+  :is(.dx3rd-header-btn, .fedr-sheet-btn, .fet-stage-btn, .header-control:not([data-action="close"])) {
+  display: none !important;
+}
+
+body.fe-retro-theme .application.minimized .window-header .header-control[data-action="close"] {
+  display: inline-flex !important;
 }
 
 /* ── C. 내비게이션 · 툴 컨트롤 ────────────────────────────── */

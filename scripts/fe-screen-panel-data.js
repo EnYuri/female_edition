@@ -47,6 +47,40 @@ const FE_PANEL_COMMON_ATTR_NAMES = [
   "encroachment", "body", "sense", "mind", "social",
 ];
 
+class ScreenPanelSourcedItemsMap extends Map {
+  get(key) {
+    if (!key) return undefined;
+    return super.get(key);
+  }
+
+  set(key, value) {
+    if (!key) return this;
+    if (!super.has(key)) super.set(key, new Set());
+    super.get(key).add(value);
+    return this;
+  }
+
+  _redirectKeys() {
+    // dnd5e 5.3.3 calls this on every Actor during ready. Screen panels do not
+    // participate in dnd5e sourced-item redirects, but the method must exist.
+  }
+}
+
+function feEnsureScreenPanelDnd5eActorCompat(actor) {
+  if (!actor || actor.type !== FE_PANEL_TYPE) return;
+  if (actor.sourcedItems && typeof actor.sourcedItems._redirectKeys === "function") return;
+  try {
+    Object.defineProperty(actor, "sourcedItems", {
+      value: new ScreenPanelSourcedItemsMap(),
+      configurable: true,
+      enumerable: false,
+      writable: true,
+    });
+  } catch {
+    actor.sourcedItems = new ScreenPanelSourcedItemsMap();
+  }
+}
+
 /**
  * Sort `{name, ...}` items for display: FE_PANEL_COMMON_ATTR_NAMES (case-insensitive)
  * first in that fixed order, then the rest alphabetically. Does not mutate input.
@@ -150,6 +184,8 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
 
   /** Clamp defaultFace into the valid range whenever data is prepared. */
   prepareDerivedData() {
+    feEnsureScreenPanelDnd5eActorCompat(this.parent);
+
     const n = this.faces?.length ?? 0;
     if (n === 0) this.defaultFace = 0;
     else if (this.defaultFace >= n) this.defaultFace = n - 1;
@@ -191,6 +227,7 @@ export {
   FE_PANEL_DEFAULT_SIZE,
   FE_PANEL_COMMON_ATTR_NAMES,
   feSortAttrItems,
+  feEnsureScreenPanelDnd5eActorCompat,
   ScreenPanelData,
   fePanelFace,
 };

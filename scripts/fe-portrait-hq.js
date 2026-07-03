@@ -13,12 +13,26 @@
 //   표시 크기의 ~2배(HiDPI/줌 여유)까지 미리 줄인 비트맵을 만들어 <img>.src 로 교체한다.
 //   결과 비트맵은 표시 크기에 근접하므로 브라우저의 추가 축소는 ≤2배(고품질 영역)에 머문다.
 //
-// CORS: 동일 출처(Foundry 유저 데이터) 이미지는 toDataURL 가능. 외부 교차 출처 이미지는
-//   캔버스가 오염되어 toDataURL 이 throw → null 반환 → 원본 src 유지(이미지는 정상 표시).
+// CORS: 동일 출처(Foundry 유저 데이터) 이미지만 fetch/canvas 다운스케일한다.
+//   외부 교차 출처 이미지는 브라우저 fetch CORS 에러를 콘솔에 남기므로 다운스케일을
+//   아예 건너뛰고 원본 src 표시만 유지한다.
 
 const _hqCache = new Map();   // key `${url}|${tw}x${th}` → Promise<dataURL|null>
 const _hqValue = new Map();   // key → 해결된 dataURL|null (동기 fast-path용)
 const _HQ_CACHE_MAX = 160;
+
+function _canDownscaleUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  if (url.startsWith("data:")) return false;
+  try {
+    const parsed = new URL(url, document.baseURI);
+    if (parsed.protocol === "blob:") return true;
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
+    return parsed.origin === window.location.origin;
+  } catch {
+    return !/^[a-z][a-z0-9+.-]*:/i.test(url);
+  }
+}
 
 // 동시 처리 제한 — 디렉토리에 큰 이미지(예: 3328²)가 여러 장일 때 동시 디코드로 인한
 // 메모리 급증을 막는다. (status/sheet 는 1~2장이라 영향 없음)
@@ -126,6 +140,10 @@ export function feHQImageDownscale(url, tw, th) {
   const key = `${url}|${tw}x${th}`;
   const cached = _hqCache.get(key);
   if (cached) { _hqCache.delete(key); _hqCache.set(key, cached); return cached; } // LRU bump
+  if (!_canDownscaleUrl(url)) {
+    _hqValue.set(key, null);
+    return Promise.resolve(null);
+  }
 
   const job = _enqueue(() => _produce(url, tw, th)).then(v => { _hqValue.set(key, v); return v; });
   _hqCache.set(key, job);

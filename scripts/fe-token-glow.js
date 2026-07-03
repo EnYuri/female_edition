@@ -41,7 +41,7 @@ function feTgEnabled() {
 // Outline distance (texture-space px the glow reaches out to) and sampling quality.
 // Compiled into the shader as constants, so a change requires a fresh filter (we
 // rebuild everything on the relevant setting onChange anyway).
-const FE_TG_DISTANCE = 22;
+const FE_TG_DISTANCE = 14;
 const FE_TG_QUALITY = 0.12;
 
 // Additive marker glow: keep the original graphic and add a halo behind it. Applied to

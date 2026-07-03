@@ -1,13 +1,13 @@
 // female_edition: package update notifier.
-// Self-contained entry-point script. Uses Foundry's package check API first and
-// falls back to direct manifest fetch if the API is unavailable in-world.
+// Self-contained entry-point script. Uses Foundry's server-side package APIs so
+// remote GitHub manifests are never fetched directly by the browser (CORS).
 // Cache lives in localStorage so it never enters GM-priority/per-world setting sync.
 
 const FE_UPD_MODULE_ID = "female_edition";
 const FE_UPD_FALLBACK_MANIFEST = "https://github.com/EnYuri/female_edition/releases/latest/download/module.json";
 const FE_UPD_CACHE_KEY = "female_edition.updateCheck.v1";
-const FE_UPD_SESSION_PREFIX = "female_edition.updateNotified.";
 const FE_UPD_CACHE_TTL_MS = 27 * 60 * 60 * 1000;
+const FE_UPD_NOTIFIED_THIS_LOAD = new Set();
 
 if (!globalThis.__femaleEditionUpdateCheckInstalled) {
   globalThis.__femaleEditionUpdateCheckInstalled = true;
@@ -86,13 +86,9 @@ function feUpdNotify(latestVersion, localVersion) {
   const local = String(localVersion || "").trim();
   if (!latest || !local) return;
 
-  const sessionKey = `${FE_UPD_SESSION_PREFIX}${latest}`;
-  try {
-    if (sessionStorage.getItem(sessionKey)) return;
-    sessionStorage.setItem(sessionKey, "1");
-  } catch {
-    // If sessionStorage is unavailable, still notify once through the ready hook.
-  }
+  const loadKey = `${local}->${latest}`;
+  if (FE_UPD_NOTIFIED_THIS_LOAD.has(loadKey)) return;
+  FE_UPD_NOTIFIED_THIS_LOAD.add(loadKey);
 
   ui.notifications?.warn(
     `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는거에요!!: 현재 ${local}이구, 최신은 ${latest}인 거에요... 글애서 FVTT 셋업- 부가 모듈 탭에서 업데이트를 확인하시는거에요챱`,
@@ -121,18 +117,22 @@ async function feUpdCheckViaFoundryApi() {
   return feUpdExtractPackageCheckVersion(response);
 }
 
-async function feUpdCheckViaManifestFetch() {
-  const baseUrl = feUpdManifestUrl();
-  const join = baseUrl.includes("?") ? "&" : "?";
-  const url = `${baseUrl}${join}_feUpdateCheck=${Date.now()}`;
-  const response = await fetch(url, {
-    cache: "no-store",
-    credentials: "omit",
-    redirect: "follow",
-  });
-  if (!response?.ok) throw new Error(`HTTP ${response?.status ?? "unknown"}`);
-  const manifest = await response.json();
-  const latestVersion = String(manifest?.version || "").trim();
+async function feUpdCheckViaRemoteManifest() {
+  const manifestUrl = feUpdManifestUrl();
+  let remote = null;
+
+  const ModulePackage = globalThis.foundry?.packages?.Module;
+  if (typeof ModulePackage?.fromRemoteManifest === "function") {
+    remote = await ModulePackage.fromRemoteManifest(manifestUrl, { strict: false });
+  } else if (typeof game?.post === "function") {
+    const data = await game.post(
+      { action: "getPackageFromRemoteManifest", type: "module", manifest: manifestUrl },
+      { notify: false, timeoutMs: 15000 },
+    );
+    if (data) remote = { version: data.version };
+  }
+
+  const latestVersion = String(remote?.version || "").trim();
   return {
     latestVersion,
     isUpgrade: feUpdIsNewer(latestVersion, feUpdVersionOf()),
@@ -145,11 +145,11 @@ async function feUpdCheckRemote() {
     const checked = await feUpdCheckViaFoundryApi();
     if (checked?.latestVersion) return { ...checked, source: "foundry" };
   } catch (err) {
-    console.warn("female_edition | Foundry package update check failed; falling back to manifest fetch", err);
+    console.warn("female_edition | Foundry package update check failed; falling back to remote manifest API", err);
   }
 
-  const checked = await feUpdCheckViaManifestFetch();
-  return { ...checked, source: "manifest" };
+  const checked = await feUpdCheckViaRemoteManifest();
+  return { ...checked, source: "remote-manifest" };
 }
 
 async function feUpdCheckForUpdate() {

@@ -158,3 +158,441 @@ body.fe-retro-theme .tidy5e-sheet :is(
     !important;
   transition: none !important;
 }
+
+
+/* ----------------------------------------------------------------
+ * Tidy5e Classic: targeted retro corrections
+ *
+ * Keep the sheet/window black base from fe-dx3rd-compat.css. Only remove the
+ * small per-text/per-icon black boxes and outlines called out on the Tidy
+ * actor sheet.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .portrait-hp .resource-container,
+    .portrait-hp .resource-value,
+    .portrait-hp .resource-max,
+    .portrait-hp .hp-overlay-bar,
+    .portrait-hp .hp-overlay-bar *,
+    .portrait-hp .temp-hp,
+    .portrait-hp .temp-hp *,
+    .portrait-hp button.temp-hp,
+    .rest-container,
+    .rest-container *,
+    .resting,
+    .resting *,
+    .short-rest,
+    .long-rest,
+    .hd-row,
+    .hd-row *,
+    .hit-dice-counter,
+    .actor-name input,
+    [data-tidy-sheet-part="actor-name"] input,
+    .xp-tracker input,
+    .xp-tracker .experience,
+    .xp-tracker .experience *,
+    .exp-data input,
+    .exp-input,
+    .initiative-score-container .ability-roll-button,
+    .initiative-score-container .ability-abbr,
+    .initiative-score-container .ability-label-container,
+    .initiative-score-container .modifier,
+    .initiative-score-container .bonus,
+    .skills-list .tidy5e-skill-name,
+    .skills-list .skill-ability,
+    .traits .trait-list,
+    .traits .trait-tag,
+    .traits .trait-tag *,
+    .traits .pill,
+    .traits .pill *,
+    .traits .tag,
+    .traits .tag *,
+    .traits .badge,
+    .traits .badge *,
+    .traits .chip,
+    .traits .chip *,
+    .traits .button-config,
+    .traits .button-config *,
+    .list.traits .list-values,
+    .list.traits .list-values *,
+    .list.traits .trait-item,
+    .list.traits .trait-item *,
+    .list.traits .pills,
+    .list.traits .pills *,
+    .list.traits .button-config,
+    .list.traits .button-config *,
+    .tab.inventory :is(
+      .item-name,
+      .item-name *,
+      .item-summary,
+      .item-summary *,
+      .item-table-column,
+      .item-table-column *,
+      .source-label,
+      .source-custom,
+      .item-quantity,
+      .item-quantity *,
+      .item-uses,
+      .item-uses *,
+      input,
+      label
+    ),
+    .tab.journal .journal-header,
+    .tab.journal .journal-header *
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .portrait-hp .resource-container,
+    .portrait-hp .resource-value,
+    .portrait-hp .resource-max,
+    .portrait-hp .hp-overlay-bar,
+    .portrait-hp .temp-hp,
+    .rest-container,
+    .resting,
+    .short-rest,
+    .long-rest,
+    .hd-row,
+    .hit-dice-counter,
+    .actor-name input,
+    [data-tidy-sheet-part="actor-name"] input,
+    .xp-tracker input,
+    .exp-data input,
+    .exp-input,
+    .initiative-score-container .ability-roll-button,
+    .skills-list .tidy5e-skill-name,
+    .skills-list .skill-ability,
+    .traits .trait-tag,
+    .traits .pill,
+    .traits .tag,
+    .traits .badge,
+    .traits .chip,
+    .list.traits .pill,
+    .list.traits .tag,
+    .list.traits .badge,
+    .list.traits .chip,
+    .tab.inventory :is(
+      .item-name,
+      .item-summary,
+      .item-table-column,
+      .source-label,
+      .source-custom,
+      .item-quantity,
+      .item-uses,
+      input,
+      label
+    ),
+    .tab.journal .journal-header
+  ):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .tab.features :is(.item-name, .item-name *, .item-summary, .item-summary *) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .tab.features :is(.item-name, .item-summary):is(:hover, :focus, :focus-visible, :active) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .block-score,
+    .block-score *,
+    .ability-score,
+    .ability-score *,
+    .ability-scores :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
+    .abilities :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
+    .attributes :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
+    .ac-container :is(.ac-value, .ac-label),
+    .ac-display :is(.ac-value, .ac-label),
+    .ability-labels :is(.label, .divider),
+    .ability .ability-label-container,
+    .ability .ability-label-container *,
+    .ability .ability-abbr
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.ac-container .shield, .ac-display .ac-shield) {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .block-score,
+    .ability-score,
+    .ability-scores :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
+    .attributes :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
+    .ac-container :is(.ac-value, .ac-label),
+    .ac-display :is(.ac-value, .ac-label),
+    .ability .ability-label-container,
+    .ability .ability-abbr
+  ):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .inspiration,
+    .inspiration *,
+    .inspiration.inspiration-1,
+    .inspiration.inspiration-1 *,
+    .inspiration-icon,
+    .inspiration-icon.animate,
+    .exhaustion,
+    .exhaustion *,
+    .exhaustion-container,
+    .exhaustion-container *,
+    .exhaustion-wrap,
+    .exhaustion-wrap *,
+    .exhaustion-icon,
+    .exhaustion-level-option,
+    .level-display
+  ) {
+  animation: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .window-header .header-sheet-edit-mode-toggle {
+  background: transparent !important;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .window-header .header-sheet-edit-mode-toggle :is(input, label, i, svg) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs)
+  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"]) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  box-shadow: none !important;
+}
+
+/* Measured Tidy5e Classic controls: these inherit the global retro button
+ * background, but Tidy already supplies the visual structure behind them. */
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    button.transparent-button,
+    button.transparent-inline,
+    button.transparent-inline-icon,
+    button.inline-icon-button,
+    button.inline-transparent-button,
+    button.button-menu-opener,
+    a.config-button.icon-button,
+    .config-button.attribute-value,
+    .current-hd,
+    .initiative-container .block-score-wrapper > button,
+    .initiative-container :is(.block-title, .ini-score),
+    .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
+    .portrait-hd .current-hd,
+    .profile-temp button,
+    .configure-creature-type
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    button.transparent-button,
+    button.transparent-inline,
+    button.transparent-inline-icon,
+    button.inline-icon-button,
+    button.inline-transparent-button,
+    button.button-menu-opener,
+    a.config-button.icon-button,
+    .config-button.attribute-value,
+    .current-hd,
+    .initiative-container .block-score-wrapper > button,
+    .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
+    .portrait-hd .current-hd,
+    .profile-temp button,
+    .configure-creature-type
+  ):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.skills-list, .traits-list, .trait-list, .proficiency-list, .proficiencies-list) {
+  background: transparent !important;
+  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .traits,
+    .list.traits,
+    .trait-list,
+    .traits-list,
+    .proficiency-list,
+    .proficiencies-list,
+    [data-tidy-sheet-part*="trait"],
+    [data-tidy-sheet-part*="proficien"]
+  )
+  :is(.tag, .value, .pill, .trait-tag, .trait-item, .list-value, span, button, a, i, svg) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .traits,
+    .list.traits,
+    .trait-list,
+    .traits-list,
+    .proficiency-list,
+    .proficiencies-list,
+    [data-tidy-sheet-part*="trait"],
+    [data-tidy-sheet-part*="proficien"]
+  )
+  :is(button, a):is(:hover, :focus, :focus-visible, :active) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
+  border: 1px solid transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"]) {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) inset !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * Tidy5e item pop-out cards
+ *
+ * Tidy attaches info cards flush to the sheet edge. The retro window frame
+ * extends 10px outside the sheet, so the card visually collides with the frame.
+ * Shift attached cards by 30px: 10px sheet frame + 10px card frame + 10px gap.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card {
+  position: absolute !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+  border: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card.attached.left {
+  translate: -30px 0 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card.attached.right {
+  translate: 30px 0 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card::before,
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card::before {
+  z-index: 0 !important;
+  border: 10px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  background: transparent !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
+  z-index: 0 !important;
+  border: 10px solid transparent !important;
+  border-image: url("./assets/pixel-border.png") 10 / 10px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  mix-blend-mode: multiply !important;
+  background: none !important;
+  background-color: transparent !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card > * {
+  position: relative !important;
+  z-index: 1 !important;
+}

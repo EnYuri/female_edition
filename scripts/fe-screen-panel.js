@@ -27,6 +27,7 @@ import {
   FE_PANEL_SOCKET,
   FE_PANEL_DEFAULT_SIZE,
   ScreenPanelData,
+  feEnsureScreenPanelDnd5eActorCompat,
   fePanelFace,
 } from "./fe-screen-panel-data.js";
 import { ScreenPanelSheet } from "./fe-screen-panel-sheet.js";
@@ -890,6 +891,10 @@ Hooks.once("init", () => {
     type: Boolean,
     default: FE_DEFAULTS[S.SCREEN_PANEL_DBLCLICK_CYCLE],
   });
+});
+
+Hooks.once("setup", () => {
+  for (const actor of game.actors ?? []) feEnsureScreenPanelDnd5eActorCompat(actor);
 });
 
 Hooks.once("ready", () => {
