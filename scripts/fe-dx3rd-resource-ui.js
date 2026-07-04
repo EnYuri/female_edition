@@ -783,13 +783,15 @@ function _injectSheetStatusBtn(app, el) {
   const btn = document.createElement("a");
   btn.className = "header-button fedr-sheet-btn";
   btn.title = pinned ? "숨기기" : "스테이터스";
-  btn.innerHTML = `<i class="fas ${pinned ? "fa-eye" : "fa-eye-slash"}"></i> 스테이터스`;
+  btn.setAttribute("aria-label", btn.title);
+  btn.innerHTML = `<i class="fas ${pinned ? "fa-eye" : "fa-eye-slash"}" inert></i>`;
   btn.addEventListener("click", e => { e.preventDefault(); _toggleActorPin(actor); });
 
   const maskBtn = document.createElement("a");
   maskBtn.className = "header-button fedr-sheet-btn";
   maskBtn.title = masked ? "수치 표시" : "수치 숨기기 (??)";
-  maskBtn.innerHTML = `<i class="fas fa-question-circle"></i> ${masked ? "수치 표시" : "수치 ??"}`;
+  maskBtn.setAttribute("aria-label", maskBtn.title);
+  maskBtn.innerHTML = `<i class="fas fa-question-circle" inert></i>`;
   maskBtn.addEventListener("click", e => { e.preventDefault(); _toggleActorMask(actor); });
 
   if (headerBtns) {

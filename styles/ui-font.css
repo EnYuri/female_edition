@@ -660,6 +660,42 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) .sheet.actor :is(
   font-family: var(--fe-dnd5e-label-font-family) !important;
 }
 
+/* Tidy Quadrone uses its own utility classes for compact labels/data
+   (font-label-*, font-data-*) which can bypass the broader Tidy remap. */
+body.fe-fonts-enabled .tidy5e-sheet.application.quadrone
+  :is(
+    .font-label-tiny,
+    .font-label-small,
+    .font-label-medium,
+    .font-label-large,
+    .font-label-xlarge,
+    .font-data-tiny,
+    .font-data-small,
+    .font-data-medium,
+    .font-data-large,
+    .font-data-xlarge,
+    .actor-details-subtitle-row,
+    .actor-details-subtitle-row *,
+    .actor-subtitle,
+    .actor-subtitle *,
+    .ability-labels,
+    .ability-labels *,
+    .ability-bonus-container,
+    .ability-bonus-container *,
+    .initiative-score-container,
+    .initiative-score-container *,
+    .ability-score-container,
+    .ability-score-container *,
+    .ability-save-container,
+    .ability-save-container *,
+    .concentration-bonus,
+    .concentration-bonus *,
+    .proficiency-bonus,
+    .proficiency-bonus *
+  ) {
+  font-family: var(--fe-dnd5e-label-font-family, var(--fe-font-primary)) !important;
+}
+
 /* 아이템/주문/피처 설명·디스크립션 본문 = 작은 글자(그림일기).
    시트의 설명 탭/요약, 전기(biography)/노트, 채팅 카드 설명을 모두 커버
    (편집 영역은 .prosemirror 규칙). dnd5e.css(코어) + tidy5e-sheet.css +

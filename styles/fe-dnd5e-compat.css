@@ -60,7 +60,9 @@ body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
   :is(.portrait-hp, .meter, .progress, .resource) input,
 body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet) input.resource-value {
   background: transparent !important;
-  text-shadow: 0 0 2px #000, 0 0 3px #000 !important;
+  text-shadow:
+    0 0 2px var(--fe-retro-shadow-strong, #000000),
+    0 0 3px var(--fe-retro-shadow-soft, #000000) !important;
 }
 
 
@@ -654,9 +656,6 @@ body.fe-retro-theme .tidy5e-sheet.application {
   --fe-tidy-rule-strong: rgba(255, 255, 255, 0.26);
   --fe-tidy-mono-text: var(--fe-ac-90, rgba(230, 230, 230, 0.9));
   --fe-tidy-mono-muted: var(--fe-ac-57, rgba(230, 230, 230, 0.58));
-  --fe-tidy-ability-band-light: rgba(255, 255, 255, 0.085);
-  --fe-tidy-ability-band-dark: rgba(255, 255, 255, 0.15);
-  --fe-tidy-ability-band-faint: rgba(255, 255, 255, 0.045);
   --fe-tidy-state-fill: rgba(255, 255, 255, 0.15);
   --fe-tidy-state-fill-strong: rgba(255, 255, 255, 0.22);
   --fe-tidy-state-fill-hover: rgba(255, 255, 255, 0.26);
@@ -927,7 +926,8 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .actor-stats
   .ability-score-container
   > button.transparent-button {
-  background: var(--fe-tidy-ability-band-light) !important;
+  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
   color: var(--fe-tidy-mono-text) !important;
   padding-block: 1px !important;
@@ -978,7 +978,8 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .ability-score-container
   > .ability-modifiers
   :is(.ability-mod, .ability-save) {
-  background: var(--fe-tidy-ability-band-light) !important;
+  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
   border-color: transparent !important;
   box-shadow: none !important;
@@ -993,7 +994,8 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .ability-score-container
   > .ability-modifiers
   :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
-  background: var(--fe-tidy-ability-band-faint) !important;
+  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
   border-color: transparent !important;
   box-shadow: none !important;
@@ -1130,7 +1132,8 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .actor-stats
   .ability-score-container
   > button.transparent-button {
-  background-color: var(--fe-tidy-ability-band-light) !important;
+  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
   opacity: 1 !important;
 }
@@ -1443,40 +1446,6 @@ body.fe-retro-theme .tidy5e-sheet.application
   image-rendering: auto !important;
 }
 
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button {
-  isolation: isolate !important;
-  overflow: hidden !important;
-  position: relative !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button::before {
-  background: var(--fe-tidy-ability-band-light) !important;
-  content: "" !important;
-  inset: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  z-index: 0 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button
-  > * {
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-
 /* ----------------------------------------------------------------
  * Tidy5e item pop-out cards
  *
@@ -1519,7 +1488,8 @@ body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
   border: 10px solid transparent !important;
   border-image: url("./assets/pixel-border.png") 10 / 10px / 0 repeat !important;
   image-rendering: pixelated !important;
-  mix-blend-mode: multiply !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
   background: none !important;
   background-color: transparent !important;
 }
@@ -1853,4 +1823,1302 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.slide-toggle-track, .slide-toggle-thumb) {
   background: var(--fe-dnd5e-state-fill) !important;
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * dnd5e sheet polish: thin pixel glows, not boxed tab highlights
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme
+  :is(.tidy5e-sheet.application, .dnd5e2.application.sheet.actor.standard-form) {
+  --fe-dnd5e-tab-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24);
+  --fe-dnd5e-tab-line-lit: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.74);
+  --fe-dnd5e-tab-glow: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.36);
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
+  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.sheet-tabs)
+  :is(a.item, a.control, button, [data-tab]) {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
+  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle)
+  :is(span, label, i, svg),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.sheet-tabs)
+  :is(a.item, a.control, button, [data-tab])
+  :is(span, label, i, svg) {
+  border-bottom-color: var(--fe-dnd5e-tab-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
+  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.sheet-tabs)
+  :is(a.item, a.control, button, [data-tab]):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--fe-dnd5e-mono-text, var(--fe-tidy-mono-text, var(--fe-ac-90))) !important;
+  text-shadow:
+    1px 0 0 var(--fe-dnd5e-tab-glow),
+    -1px 0 0 var(--fe-dnd5e-tab-glow),
+    0 1px 0 var(--fe-dnd5e-tab-glow),
+    0 -1px 0 var(--fe-dnd5e-tab-glow) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-tabs [data-tab] :is(label, span),
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.tabs-row, .tidy-tabs) :is(a.tab-option, [role="tab"], a, button):not(.sidebar-toggle)
+  :is(span, label) {
+  border-bottom: 1px solid var(--fe-dnd5e-tab-line) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-tabs [data-tab]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"])
+  :is(label, span),
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(.tabs-row, .tidy-tabs) :is(a.tab-option, [role="tab"], a, button):not(.sidebar-toggle):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"])
+  :is(span, label) {
+  border-bottom-color: var(--fe-dnd5e-tab-line-lit) !important;
+  box-shadow:
+    0 1px 0 var(--fe-dnd5e-tab-line-lit),
+    0 2px 0 rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.20) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.sheet-tabs)
+  :is(a.item, a.control, button, [data-tab]):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"])
+  :is(i, svg, dnd5e-icon) {
+  filter:
+    drop-shadow(1px 0 0 var(--fe-dnd5e-tab-glow))
+    drop-shadow(0 1px 0 var(--fe-dnd5e-tab-glow)) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle {
+  align-items: center !important;
+  display: inline-flex !important;
+  height: 18px !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  padding: 1px !important;
+  width: 38px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch {
+  border: 0 !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  position: relative !important;
+  top: 0 !important;
+  width: 36px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch::after {
+  border: 1px solid var(--fe-tidy-rule-strong) !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  content: "" !important;
+  inset: -1px !important;
+  pointer-events: none !important;
+  position: absolute !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.minimized
+  .window-header
+  .header-sheet-edit-mode-toggle,
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor.minimized
+  .window-header
+  .header-sheet-edit-mode-toggle {
+  display: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch:is(:hover, :focus-within)::after {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch > div {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.actor-name, h1.actor-name, [data-tidy-sheet-part="actor-name"]) {
+  font-size: 1.42rem !important;
+  line-height: 1.12 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.actor-name, h1.actor-name, [data-tidy-sheet-part="actor-name"])
+  :is(input, button, span) {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.concentration-bonus, .proficiency-bonus, .initiative-bonus, .ability-label-container) {
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.concentration, .proficiency-bonus)
+  :is(.label, .modifier, .value, button, span) {
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .concentration .concentration-roll-button .label {
+  display: inline-block !important;
+  max-width: 5.5rem !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: bottom !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .level-container .proficiency-bonus .label {
+  display: inline-block !important;
+  max-width: 4.75rem !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container {
+  background: transparent !important;
+  box-shadow:
+    inset 0 1px 0 var(--fe-dnd5e-mono-line-faint),
+    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container
+  > :is(button.ability-roll-button, .ability-score, .ability-score-input, .ability-label-container, .config-container) {
+  border-top: 1px solid var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container
+  > :is(button.ability-roll-button, .ability-score):first-child {
+  border-top-color: transparent !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is([data-tab="journal"], .tab.journal, .tab.biography, [data-tab="biography"])
+  :is(hr, .golden-fade, tidy-gold-header-underline, .horizontal-line-separator, .separator, .faint, .light) {
+  background: var(--fe-dnd5e-mono-line) !important;
+  background-image: none !important;
+  border-color: var(--fe-dnd5e-mono-line) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is([data-tab="journal"], .tab.journal, .tab.biography, [data-tab="biography"])
+  :is(.editor-rendered-content h3, h1, h2, h3, h4) {
+  border-bottom-color: var(--fe-dnd5e-mono-line) !important;
+  box-shadow: inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ac-badge {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow:
+    1px 0 0 var(--fe-dnd5e-tab-glow),
+    0 1px 0 var(--fe-dnd5e-tab-glow) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .ac-badge.badge {
+  align-items: center !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  filter: none !important;
+  gap: 0.2em !important;
+  height: auto !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .ac-badge.badge::before {
+  color: var(--fe-dnd5e-mono-muted) !important;
+  content: "AC" !important;
+  font-size: 0.72em !important;
+  line-height: 1 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .ac-badge.badge
+  .config-button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right {
+  background: var(--fe-dnd5e-mono-surface-2) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  gap: 8px !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+  padding: 7px 6px !important;
+  position: absolute !important;
+  translate: 10px 0 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::before,
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::after {
+  box-sizing: border-box !important;
+  content: "" !important;
+  inset: -6px !important;
+  pointer-events: none !important;
+  position: absolute !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::before {
+  background: transparent !important;
+  border: 6px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  z-index: -2 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::after {
+  background: transparent !important;
+  border: 6px solid transparent !important;
+  border-image: url("./assets/pixel-border.png") 10 / 6px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  mix-blend-mode: multiply !important;
+  z-index: -1 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right
+  > a.item.control {
+  background: var(--fe-dnd5e-mono-surface) !important;
+  border: 1px solid var(--fe-dnd5e-mono-line) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
+  color: var(--fe-dnd5e-mono-muted) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right
+  > a.item.control:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]) {
+  background: var(--fe-dnd5e-mono-hover) !important;
+  border-color: var(--fe-dnd5e-tab-line-lit) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--fe-dnd5e-tab-line-lit),
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24) !important;
+  color: var(--fe-dnd5e-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  > .window-content {
+  box-sizing: border-box !important;
+  padding-top: 32px !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  > .window-header {
+  background: rgb(0 0 0 / 0.92) !important;
+  box-shadow: inset 0 -1px 0 var(--fe-tidy-rule, var(--fe-dnd5e-tab-line)) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  .tidy-info-card
+  .info-card-body
+  > header {
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card
+  :is(
+    button.pin,
+    button.pin-button,
+    button.sticky,
+    button[class*="pin"],
+    a[class*="pin"],
+    [data-action*="pin"],
+    [data-action*="stick"],
+    [aria-label*="Pin"],
+    [aria-label*="pin"],
+    [data-tooltip*="Pin"],
+    [data-tooltip*="pin"]
+  ) {
+  background: transparent !important;
+  background-image: none !important;
+  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-tab-line-lit)) !important;
+  box-shadow: none !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
+  outline: none !important;
+}
+
+/* Late measured fixes: Tidy's classic lock switch thumb is positioned outside
+   the switch body by the upstream component, which makes an otherwise correct
+   outline look misaligned. Draw the frame on the header control and constrain
+   the thumb inside that measured frame. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle {
+  align-items: center !important;
+  background: transparent !important;
+  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-mono-line-strong)) !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  height: 20px !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  padding: 1px 2px !important;
+  position: relative !important;
+  width: 40px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  height: 16px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  position: relative !important;
+  top: 0 !important;
+  width: 34px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch::after {
+  display: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div {
+  background: transparent !important;
+  border: 0 !important;
+  height: 16px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  width: 34px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div[aria-checked="true"] {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div::before {
+  background: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.55)) !important;
+  bottom: auto !important;
+  height: 14px !important;
+  left: 1px !important;
+  right: auto !important;
+  top: 1px !important;
+  width: 14px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div[aria-checked="true"]::before {
+  background: var(--fe-tidy-mono-text, var(--fe-ac-90, #f0f0f0)) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.42) !important;
+  left: 19px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  .thumb-icon {
+  align-items: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  bottom: auto !important;
+  color: #050505 !important;
+  display: flex !important;
+  font-size: 9px !important;
+  height: 14px !important;
+  justify-content: center !important;
+  left: 1px !important;
+  line-height: 1 !important;
+  position: absolute !important;
+  right: auto !important;
+  top: 1px !important;
+  transform: none !important;
+  width: 14px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  .thumb-icon
+  :is(i, svg) {
+  color: #050505 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div[aria-checked="true"]
+  .thumb-icon {
+  left: 19px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle:is(:hover, :focus-within) {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.30) !important;
+}
+
+/* dnd5e standard sheet AC: keep the useful box, but make it monotone and
+   align it to the HP block instead of leaving a floating bare number. */
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .left.ac {
+  box-sizing: border-box !important;
+  display: flex !important;
+  height: 41px !important;
+  padding-top: 6px !important;
+  width: 40px !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .right {
+  margin-left: 4px !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .left.ac
+  .ac-badge.badge {
+  align-items: center !important;
+  background: var(--fe-dnd5e-mono-surface, #0d0d0d) !important;
+  background-image: none !important;
+  border: 1px solid var(--fe-dnd5e-mono-line, rgb(255 255 255 / 0.26)) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint, rgb(255 255 255 / 0.12)) !important;
+  box-sizing: border-box !important;
+  color: var(--fe-dnd5e-mono-text, var(--fe-ac-90)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  height: 100% !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  min-height: 0 !important;
+  padding: 2px 0 !important;
+  text-shadow: none !important;
+  width: 100% !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .left.ac
+  .ac-badge.badge::before {
+  color: var(--fe-dnd5e-mono-muted, var(--fe-ac-57)) !important;
+  content: "AC" !important;
+  display: block !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  width: auto !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .vitals
+  .left.ac
+  .ac-badge.badge
+  > [data-attribution] {
+  display: block !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+
+/* The separated right-side tab rail needs a real hit target, not icon-width
+   buttons inside a filled panel. */
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right {
+  align-items: center !important;
+  background: var(--fe-dnd5e-mono-surface-2, #111111) padding-box !important;
+  border: 8px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  border-image: url("./assets/pixel-border.png") 10 / 8px / 0 repeat !important;
+  box-shadow:
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22),
+    inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint, rgb(255 255 255 / 0.12)) !important;
+  image-rendering: pixelated !important;
+  min-width: 62px !important;
+  padding: 8px 7px !important;
+  translate: 18px 0 !important;
+  width: 62px !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::before,
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right::after {
+  content: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  nav.tabs.tabs-right
+  > a.item.control {
+  align-items: center !important;
+  display: inline-flex !important;
+  flex: 0 0 30px !important;
+  height: 30px !important;
+  justify-content: center !important;
+  min-width: 30px !important;
+  width: 30px !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  > .window-content {
+  padding-top: 0 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  > .window-header {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  > .window-header
+  :is(button, a, .header-control, .header-button) {
+  background: transparent !important;
+  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-tab-line-lit)) !important;
+  box-shadow: none !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  .tidy-info-card
+  .info-card-body
+  > header,
+body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
+  .tidy-info-card
+  :is(.info-card-header, .info-card-title, .info-card-name, .card-header, h1, h2, h3, h4):first-child {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.42) !important;
+  box-shadow:
+    inset 0 -1px 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]) {
+  background: var(--fe-dnd5e-mono-surface, #0d0d0d) !important;
+  border: 1px solid var(--fe-dnd5e-mono-line, rgb(255 255 255 / 0.26)) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint, rgb(255 255 255 / 0.12)) !important;
+  color: var(--fe-dnd5e-mono-text, var(--fe-ac-90)) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(
+    button.header-control,
+    a.header-button,
+    .header-control,
+    .header-button
+  ):not([hidden]):is(
+    [data-action*="edit" i],
+    [aria-label*="edit" i],
+    [aria-label*="편집"],
+    [data-tooltip*="edit" i],
+    [data-tooltip*="편집"]
+  ),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):has(
+    :is(.fa-edit, .fa-pen-to-square, .fa-lock, .fa-lock-open)
+  ) {
+  background: #050505 !important;
+  border-color: var(--fe-dnd5e-mono-line-strong, rgb(255 255 255 / 0.42)) !important;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.65)) !important;
+  color: var(--fe-dnd5e-mono-text, #f0f0f0) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):is(
+    [data-action*="edit" i],
+    [aria-label*="edit" i],
+    [aria-label*="편집"],
+    [data-tooltip*="edit" i],
+    [data-tooltip*="편집"]
+  )
+  :is(i, svg),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):has(
+    :is(.fa-edit, .fa-pen-to-square, .fa-lock, .fa-lock-open)
+  )
+  :is(i, svg) {
+  color: var(--fe-dnd5e-mono-text, #f0f0f0) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):is(
+    [data-action*="edit" i],
+    [aria-label*="edit" i],
+    [aria-label*="편집"],
+    [data-tooltip*="edit" i],
+    [data-tooltip*="편집"],
+    .active,
+    [aria-pressed="true"],
+    [aria-checked="true"]
+  ):is(:hover, :focus, :focus-visible, .active, [aria-pressed="true"], [aria-checked="true"]) {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-dnd5e-mono-text, var(--fe-ac-90, #f0f0f0)) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .window-header
+  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):is(:hover, :focus, :focus-visible) {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow:
+    inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45),
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.26) !important;
+  color: var(--fe-dnd5e-mono-text, #ffffff) !important;
+}
+
+/* ----------------------------------------------------------------
+ * Retro sheet cleanup: late cascade fixes for icon contrast, tooltip
+ * nameplates, and spell/preparation state colors.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  .thumb-icon,
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  .thumb-icon
+  :is(i, svg) {
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #f0f0f0)) !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  text-shadow:
+    1px 0 0 var(--fe-retro-shadow-strong, #000000),
+    -1px 0 0 var(--fe-retro-shadow-strong, #000000),
+    0 1px 0 var(--fe-retro-shadow-strong, #000000),
+    0 -1px 0 var(--fe-retro-shadow-strong, #000000) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div::before,
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  .window-header
+  .header-sheet-edit-mode-toggle
+  .tidy-switch
+  > div[aria-checked="true"]::before {
+  background: #050505 !important;
+  box-shadow:
+    inset 0 0 0 1px var(--fe-tidy-rule-strong, rgb(255 255 255 / 0.34)),
+    0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.74)) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet
+  .tidy-info-card
+  :is(
+    .info-card-body > header,
+    .info-card-header,
+    .info-card-title,
+    .info-card-name,
+    .card-header,
+    .name,
+    .title,
+    h1,
+    h2,
+    h3,
+    h4
+  ):first-child,
+body.fe-retro-theme .tidy5e-sheet
+  .tidy-info-card
+  .info-card-body
+  > header {
+  background:
+    linear-gradient(
+      to right,
+      rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28),
+      rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12)
+    ) !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.48) !important;
+  box-shadow:
+    inset 0 -1px 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)),
+    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+  text-shadow:
+    1px 0 0 var(--fe-retro-shadow-strong, rgb(0 0 0 / 0.82)),
+    0 1px 0 var(--fe-retro-shadow-strong, rgb(0 0 0 / 0.82)) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .method-pact,
+    .method-atwill,
+    .method-innate,
+    .method-ritual,
+    .method-spell,
+    .can-prepare,
+    .spell-method,
+    .spell-method-text,
+    [class*="method-"],
+    [class*="prepared"],
+    [style*="--t5e-method-color"],
+    [style*="--t5e-item-color"]
+  ) {
+  --t5e-method-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
+  --t5e-item-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
+  --t5e-accent-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
+  --t5e-color-text-gold: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+  background-color: transparent !important;
+  border-color: var(--fe-tidy-mono-line, rgb(255 255 255 / 0.30)) !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(
+    .spell-method,
+    .spell-method-text,
+    .spell-component,
+    .tag,
+    .pill,
+    .badge,
+    .filter-item
+  ):is(
+    .method-pact,
+    .method-atwill,
+    .method-innate,
+    .method-ritual,
+    .prepared,
+    .active,
+    [aria-pressed="true"],
+    [aria-selected="true"]
+  ) {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+  border-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
+  box-shadow: inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22) !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tab[data-tab="spells"], .spells-list, .spellcasting.card, .card.spellcasting) {
+  --dnd5e-color-gold: var(--fe-dnd5e-mono-line-strong, rgb(255 255 255 / 0.50)) !important;
+  --dnd5e-color-blue: var(--fe-dx3rd-accent, #ffffff) !important;
+  --dnd5e-color-green: var(--fe-dnd5e-state-fill, rgb(255 255 255 / 0.14)) !important;
+  --dnd5e-color-red: var(--fe-dnd5e-state-fill, rgb(255 255 255 / 0.14)) !important;
+  --dnd5e-color-maroon: var(--fe-dnd5e-state-fill, rgb(255 255 255 / 0.14)) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tab[data-tab="spells"], .spells-list, .spellcasting.card, .card.spellcasting)
+  :is(
+    .filter-item,
+    .spell-component,
+    .pill,
+    .tag,
+    .badge,
+    .pip,
+    .spell-slots input,
+    .spell-max,
+    .prepared,
+    .school,
+    [data-filter],
+    [data-level],
+    [data-type="spell"]
+  ) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: var(--fe-dnd5e-mono-line, rgb(255 255 255 / 0.26)) !important;
+  box-shadow: none !important;
+  color: var(--fe-dnd5e-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+  filter: grayscale(1) saturate(0.12) !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  :is(.tab[data-tab="spells"], .spells-list, .spellcasting.card, .card.spellcasting)
+  :is(
+    .filter-item.active,
+    .filter-item:is(:hover, :focus, :focus-visible),
+    .spell-component.tag,
+    .pip.filled,
+    .pip.tmp.filled,
+    .item.active,
+    .item.prepared,
+    .item-row.active,
+    .item-row.prepared
+  ) {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+  border-color: var(--fe-dnd5e-tab-line-lit, var(--fe-dx3rd-accent, #ffffff)) !important;
+  box-shadow:
+    inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24),
+    0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.45)) !important;
+  color: var(--fe-dnd5e-mono-text, #f0f0f0) !important;
+  filter: grayscale(1) saturate(0.12) !important;
+}
+
+/* dnd5e standard + Tidy Classic ability blocks: remove vertical dividers
+   without adding extra row framing. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .vertical-line-separator {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  inline-size: 0 !important;
+  margin-inline: 0 !important;
+  opacity: 0 !important;
+  width: 0 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button,
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > .ability-modifiers
+  :is(.ability-mod, .ability-save) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container
+  > button.transparent-button::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score
+  :is(.label, .mod, .score) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  inline-size: 100% !important;
+  text-align: center !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .ability-scores
+  .save-tab {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+body.fe-retro-theme
+  :is(
+    form.tidy5e-sheet.application.classic.actor,
+    .dnd5e2.application.sheet.actor.standard-form
+  ) {
+  --fe-dnd5e-ability-focus-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.56);
+  --fe-dnd5e-ability-focus-glow: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22);
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container,
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score {
+  position: relative !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container {
+  box-shadow: inset 0 0 0 1px var(--fe-tidy-rule-faint, rgb(255 255 255 / 0.12)) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container:is(:hover, :focus-within),
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score:is(:hover, :focus-within) {
+  box-shadow:
+    inset 0 0 0 1px var(--fe-dnd5e-ability-focus-line),
+    0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
+    0 0 0 2px var(--fe-dnd5e-ability-focus-glow) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container:is(:hover, :focus-within) {
+  isolation: isolate !important;
+  z-index: 4 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score
+  > img {
+  filter: grayscale(1) saturate(0) brightness(1.2) contrast(0.9) !important;
+  image-rendering: pixelated !important;
+  mix-blend-mode: screen !important;
+  opacity: 0.13 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score:is(:hover, :focus-within)
+  > img {
+  opacity: 0.22 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .ability-scores
+  .ability-score
+  > :not(img) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats
+  .ability-score-container:is(:hover, :focus-within)
+  > .mod-label {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow:
+    inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16),
+    1px 0 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)),
+    -1px 0 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)) !important;
+  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
+  position: absolute !important;
+  opacity: 1 !important;
+  z-index: 20 !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .ability-scores
+  .ability-score
+  :is(.mod, .save-tab, .save-tab > *, .save-tab button, .save-tab .proficiency, .save-tab .proficiency-toggle) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .ability-scores
+  .ability-score
+  :is(.mod, .save-tab)::before,
+body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
+  .sheet-header
+  .ability-scores
+  .ability-score
+  :is(.mod, .save-tab)::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Late quadrone restore: the broad text-background cleanup must not remove
+   Tidy's ability badge silhouettes or fade the retro window frame. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone::before {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone::after {
+  mix-blend-mode: multiply !important;
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container {
+  background:
+    transparent
+    url("/modules/tidy5e-sheet/images/badge_ability_dark.webp")
+    no-repeat
+    50% 0%
+    / contain !important;
+  box-shadow:
+    inset 0 1px 0 var(--fe-dnd5e-mono-line-faint),
+    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container.proficient {
+  background-image: url("/modules/tidy5e-sheet/images/badge_ability_dark_prof.webp") !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container
+  :is(
+    button,
+    input,
+    label,
+    span,
+    .ability-score,
+    .ability-score-input,
+    .ability-label-container,
+    .config-container
+  ) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Tidy Quadrone: align initiative/ability badges and move row dividers into
+   the score/save rows instead of floating around the badge art. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner {
+  --fe-tidy-quadrone-badge-w: 64px;
+  --fe-tidy-quadrone-badge-h: 72px;
+  --fe-tidy-quadrone-row-line: var(--fe-dnd5e-mono-line-faint, rgba(255, 255, 255, 0.12));
+  position: relative !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner
+  > .ability.initiative {
+  overflow: visible !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner::before,
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner::after {
+  background: var(--fe-tidy-quadrone-row-line) !important;
+  content: "" !important;
+  height: 1px !important;
+  left: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 0 !important;
+  z-index: 3 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner::before {
+  top: 92px !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .abilities-container-inner::after {
+  top: calc(100% - 1px) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.ability-bonus-container, .initiative-score-container) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .initiative-score-container {
+  align-self: center !important;
+  background:
+    transparent
+    url("/modules/tidy5e-sheet/images/badge_init_dark.webp")
+    no-repeat
+    50% 0%
+    / var(--fe-tidy-quadrone-badge-w) var(--fe-tidy-quadrone-badge-h) !important;
+  block-size: var(--fe-tidy-quadrone-badge-h) !important;
+  flex: 0 0 var(--fe-tidy-quadrone-badge-h) !important;
+  inline-size: var(--fe-tidy-quadrone-badge-w) !important;
+  max-block-size: var(--fe-tidy-quadrone-badge-h) !important;
+  max-inline-size: var(--fe-tidy-quadrone-badge-w) !important;
+  margin-top: 0 !important;
+  min-block-size: var(--fe-tidy-quadrone-badge-h) !important;
+  min-inline-size: var(--fe-tidy-quadrone-badge-w) !important;
+  transform: translateY(-6px) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container {
+  transform: translateY(-6px) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .initiative-score-container
+  > .ability-roll-button {
+  min-block-size: 47px !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .ability-bonus-container
+  > :is(button.ability-roll-button, .ability-score, .ability-score-input, .ability-label-container, .config-container) {
+  border-top: 0 !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.ability-score-container, .ability-save-container, .ability-labels > .label) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  :is(.ability-score-container, .ability-save-container)
+  :is(button, input, span, label, div) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .actor-details-subtitle-row {
+  position: relative !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone
+  .actor-details-subtitle-row::after {
+  background: var(--fe-tidy-quadrone-row-line, var(--fe-dnd5e-mono-line-faint, rgba(255, 255, 255, 0.12))) !important;
+  content: "" !important;
+  height: 1px !important;
+  left: 16px !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 8px !important;
+  top: calc(100% + 2px) !important;
 }
