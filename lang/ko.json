@@ -52,6 +52,7 @@
 	"FECT.PrevTurn": "이전 턴",
 	"FECT.NextTurn": "다음 턴",
 	"FECT.NextRound": "다음 라운드",
+	"FECT.StartCombat": "전투 개시",
 	"FECT.EndCombat": "전투 종료",
 	"FECT.Deactivate": "전투 일시종료 (인카운터 비활성화)",
 	"FECT.Resume": "전투 재개",

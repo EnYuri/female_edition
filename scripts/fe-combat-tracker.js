@@ -208,7 +208,12 @@ function feCtCollapseBtnHTML() {
 function feCtControlsHTML(combat) {
   const round = combat.round ?? 0;
   const paused = combat.active === false;
+  const started = Number(round) > 0;
+  const startButton = started
+    ? ""
+    : feCtBtnHTML("start-combat", "fa-circle-play", feCtL("FECT.StartCombat", "전투 개시"));
   return (
+    startButton +
     feCtBtnHTML("end-combat", "fa-flag-checkered", feCtL("FECT.EndCombat", "전투 종료")) +
     feCtBtnHTML(
       "toggle-active",
@@ -345,6 +350,16 @@ async function feCtHandleAction(action) {
       case "prev-turn":  await combat.previousTurn(); break;
       case "next-turn":  await combat.nextTurn(); break;
       case "next-round": await combat.nextRound(); break;
+      case "start-combat": {
+        if (combat.round > 0) {
+          if (combat.active === false) await (combat.activate?.() ?? combat.update({ active: true }));
+          break;
+        }
+        if (combat.active === false) await (combat.activate?.() ?? combat.update({ active: true }));
+        if (typeof combat.startCombat === "function") await combat.startCombat();
+        else await combat.update({ round: 1, turn: 0 });
+        break;
+      }
       case "end-combat": await combat.endCombat(); break;
       // 인카운터 활성/비활성 토글: 전투를 삭제하지 않고 일시정지/재개(네이티브 트래커와 동일 상태)
       case "toggle-active": await combat.update({ active: !combat.active }); break;

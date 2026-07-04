@@ -191,6 +191,11 @@
   pointer-events: none;
 }
 
+.fe-ct-portrait.is-active .fe-ct-name {
+  top: calc(var(--fe-ct-h, var(--fe-ct-size)) - 3px);
+  z-index: 8;
+}
+
 /* HP bar STRADDLES the frame's TOP outline (absolute, vertically centered on the
    top border) — the bottom is taken by the name caption, so HP goes up top. */
 .fe-ct-hp {
