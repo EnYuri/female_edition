@@ -374,6 +374,15 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 .fe-ct-context-menu .fe-ct-ctx-item:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+.fe-ct-context-menu .fe-ct-ctx-item:disabled,
+.fe-ct-context-menu .fe-ct-ctx-item.is-disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.fe-ct-context-menu .fe-ct-ctx-item:disabled:hover,
+.fe-ct-context-menu .fe-ct-ctx-item.is-disabled:hover {
+  background: transparent;
+}
 
 /* retro variant — the menu lives on <body> directly, so it carries its own
    fe-retro-theme class (set in JS) rather than inheriting from body */

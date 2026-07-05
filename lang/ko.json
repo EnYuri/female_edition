@@ -73,6 +73,10 @@
 	"FECT.Ctx.Initiative": "이니셔티브",
 	"FECT.Ctx.InitEmpty": "비움 = 미설정",
 	"FECT.Ctx.InitInvalid": "유효한 이니셔티브 값이 아닙니다.",
+	"FECT.Ctx.EndTurn": "턴 종료",
+	"FECT.Ctx.NoTurnPermission": "이 전투원의 턴을 종료할 권한이 없습니다.",
+	"FECT.Ctx.NotCurrentTurn": "현재 턴인 전투원만 턴을 종료할 수 있습니다.",
+	"FECT.Ctx.NoGM": "GM이 접속해 있지 않아 턴을 종료할 수 없습니다.",
 
 	"FESP.Settings.EnableName": "스크린 패널 기능 사용",
 	"FESP.Settings.EnableHint": "스크린 패널(액터 서브타입)을 씬 캔버스에 올리고 면 전환·표시/숨김·비활성화할 수 있게 합니다. 끄면 캔버스 상호작용이 비활성화됩니다(재시작 필요).",

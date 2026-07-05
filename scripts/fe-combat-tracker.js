@@ -27,6 +27,8 @@ import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 
 const CTD_ID = "combat-tracker-dock"; // original Carousel Combat Tracker — we yield to it
 const TRACKER_DOM_ID = "fe-combat-tracker";
+const SOCKET_CHANNEL = `module.${MODULE_ID}`;
+const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
 
 // 트래커 접힘(최소화) 상태 — 클라이언트 런타임 플래그(새로고침 시 초기화).
 let _ctCollapsed = false;
@@ -112,6 +114,33 @@ function feCtCombatHasActor(actor) {
   const combat = feCtGetCombat();
   if (!combat || !actor) return false;
   return combat.combatants?.some((c) => c.actor?.id === actor.id);
+}
+
+function feCtActiveGm() {
+  return game.users?.activeGM ?? game.users?.find?.((u) => u.active && u.isGM) ?? null;
+}
+
+function feCtIsPrimaryGm() {
+  const gm = feCtActiveGm();
+  return !!game.user?.isGM && (!gm || gm.id === game.user.id);
+}
+
+function feCtUserOwnsCombatant(combatant, user = game.user) {
+  if (!combatant || !user) return false;
+  if (user.isGM) return true;
+  try {
+    if (typeof combatant.testUserPermission === "function") {
+      return !!combatant.testUserPermission(user, "OWNER");
+    }
+  } catch { /* fall through */ }
+  try { return !!combatant.actor?.testUserPermission?.(user, "OWNER"); }
+  catch { return false; }
+}
+
+function feCtCanEndTurnForCombatant(combat, combatant, user = game.user) {
+  if (!combat || !combatant) return false;
+  if (!feCtUserOwnsCombatant(combatant, user)) return false;
+  return combat.combatant?.id === combatant.id;
 }
 
 function feCtEsc(s) {
@@ -317,11 +346,14 @@ function feCtBindRootEvents(root) {
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitDblClick(port.dataset.combatantId);
   });
-  // 우클릭 → 전투원 드롭다운 메뉴(GM 전용): 숨김/사망 토글, HP 조절, 순서 바꾸기.
+  // 우클릭 → 전투원 드롭다운 메뉴. GM은 전체 관리 메뉴, 플레이어는 자신이
+  // 소유한 전투원의 "턴 종료"만 노출한다.
   root.addEventListener("contextmenu", (ev) => {
     const port = ev.target.closest?.("[data-combatant-id]");
     if (!port) return;
-    if (!game.user?.isGM) return; // players: leave the native right-click menu alone
+    const combat = feCtGetCombat();
+    const c = combat?.combatants?.get(port.dataset.combatantId);
+    if (!c || (!game.user?.isGM && !feCtUserOwnsCombatant(c))) return;
     ev.preventDefault();
     feCtOpenContextMenu(port.dataset.combatantId, ev.clientX, ev.clientY);
   });
@@ -388,7 +420,7 @@ function feCtHandlePortraitDblClick(id) {
   try { c?.actor?.sheet?.render(true); } catch {}
 }
 
-// ── per-combatant context menu (GM only) ─────────────────────────────────────
+// ── per-combatant context menu ───────────────────────────────────────────────
 
 const CTX_MENU_ID = "fe-ct-context-menu";
 
@@ -404,13 +436,24 @@ function feCtCloseContextMenu() {
 }
 
 function feCtOpenContextMenu(id, x, y) {
-  if (!game.user?.isGM) return;
   feCtCloseContextMenu();
   const combat = feCtGetCombat();
   const c = combat?.combatants?.get(id);
   if (!c) return;
+  const isGM = !!game.user?.isGM;
+  const isOwner = feCtUserOwnsCombatant(c);
+  if (!isGM && !isOwner) return;
 
   const items = [
+    {
+      action: "end-turn",
+      icon: "fa-hourglass-end",
+      label: feCtL("FECT.Ctx.EndTurn", "턴 종료"),
+      disabled: !feCtCanEndTurnForCombatant(combat, c),
+    },
+  ];
+
+  if (isGM) items.push(
     {
       action: "toggle-hidden",
       icon: c.hidden ? "fa-eye" : "fa-eye-slash",
@@ -425,7 +468,7 @@ function feCtOpenContextMenu(id, x, y) {
     { action: "set-initiative", icon: "fa-dice-d20", label: feCtL("FECT.Ctx.SetInit", "이니셔티브 수정") },
     { action: "move-up", icon: "fa-arrow-up", label: feCtL("FECT.Ctx.MoveUp", "순서 위로") },
     { action: "move-down", icon: "fa-arrow-down", label: feCtL("FECT.Ctx.MoveDown", "순서 아래로") },
-  ];
+  );
 
   const menu = document.createElement("div");
   menu.id = CTX_MENU_ID;
@@ -434,7 +477,8 @@ function feCtOpenContextMenu(id, x, y) {
   menu.innerHTML = items
     .map(
       (it) =>
-        `<button type="button" class="fe-ct-ctx-item" data-ct-ctx="${it.action}">` +
+        `<button type="button" class="fe-ct-ctx-item${it.disabled ? " is-disabled" : ""}" ` +
+        `data-ct-ctx="${it.action}" ${it.disabled ? "disabled" : ""}>` +
         `<i class="fas ${it.icon}"></i><span>${feCtEsc(it.label)}</span></button>`
     )
     .join("");
@@ -465,11 +509,15 @@ function feCtOpenContextMenu(id, x, y) {
 }
 
 async function feCtHandleContextAction(action, id) {
-  if (!game.user?.isGM) return;
   const combat = feCtGetCombat();
   const c = combat?.combatants?.get(id);
   if (!c) return;
   try {
+    if (action === "end-turn") {
+      await feCtRequestEndTurn(combat, c);
+      return;
+    }
+    if (!game.user?.isGM) return;
     switch (action) {
       case "toggle-hidden":   await c.update({ hidden: !c.hidden }); break;
       case "toggle-defeated": {
@@ -493,6 +541,51 @@ async function feCtHandleContextAction(action, id) {
   } catch (e) {
     console.error("[female_edition] combat-tracker context action failed", e);
   }
+}
+
+async function feCtRequestEndTurn(combat, c) {
+  if (!feCtCanEndTurnForCombatant(combat, c)) {
+    const msg = combat?.combatant?.id === c?.id
+      ? feCtL("FECT.Ctx.NoTurnPermission", "이 전투원의 턴을 종료할 권한이 없습니다.")
+      : feCtL("FECT.Ctx.NotCurrentTurn", "현재 턴인 전투원만 턴을 종료할 수 있습니다.");
+    ui.notifications?.warn(msg);
+    return;
+  }
+
+  const payload = {
+    type: CT_SOCKET_END_TURN,
+    combatId: combat.id,
+    combatantId: c.id,
+    requesterId: game.user.id,
+  };
+
+  if (game.user?.isGM) {
+    await feCtApplyEndTurn(payload);
+    return;
+  }
+
+  if (!feCtActiveGm()) {
+    ui.notifications?.warn(feCtL("FECT.Ctx.NoGM", "GM이 접속해 있지 않아 턴을 종료할 수 없습니다."));
+    return;
+  }
+  game.socket.emit(SOCKET_CHANNEL, payload);
+}
+
+async function feCtApplyEndTurn(data) {
+  const requester = game.users?.get?.(data.requesterId) ?? null;
+  if (!requester) return;
+  const combat = game.combats?.get?.(data.combatId) ?? null;
+  const c = combat?.combatants?.get?.(data.combatantId) ?? null;
+  if (!feCtCanEndTurnForCombatant(combat, c, requester)) return;
+  await combat.nextTurn();
+}
+
+function feCtOnSocket(data) {
+  if (data?.type !== CT_SOCKET_END_TURN) return;
+  if (!feCtIsPrimaryGm()) return;
+  feCtApplyEndTurn(data).catch((e) => {
+    console.error("[female_edition] combat-tracker end-turn request failed", e);
+  });
 }
 
 async function feCtOpenHpDialog(c) {
@@ -736,6 +829,7 @@ Hooks.once("ready", () => {
   }
   feCtEnsureRoot();
   feCtRender();
+  game.socket.on(SOCKET_CHANNEL, feCtOnSocket);
 
   const rerender = () => feCtScheduleRender();
   Hooks.on("createCombat", rerender);
