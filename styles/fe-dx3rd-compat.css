@@ -2408,6 +2408,23 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
   border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
 }
 
+/* 요구 1: 능력치 헤더(육체/감각/정신/사회)의 외곽선이 아래 기능치 사다리꼴 박스에
+   묻히지 않도록 stat-header를 기능치 박스(같은 stat-box 스태킹 컨텍스트 내 z:2)보다
+   위로 올린다. 라벨 ::before(z:-1)까지 헤더 컨텍스트째 상단에 렌더된다. */
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .stat-header {
+  position: relative !important;
+  z-index:  5 !important;
+}
+
+/* 요구 2: 기능치 사다리꼴 박스 구분. 인접한 두 박스의 맞닿는 면에 강조 구분선.
+   구분선을 위 박스 하단(border-bottom)에 그리면 DOM상 나중에 그려지는 아래 박스
+   ::before 에 덮여 묻힌다 → 나중에(위에) 그려지는 아래 박스의 상단(border-top)에
+   그려 묻힘을 방지한다(위/첫 행 제외). 같은 divider 라인이라 위치는 동일.
+   위 .main-grid .skill-box .title::before(투명화)보다 특이도 상위. */
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .skill-box label.skill:not(:first-of-type) .title.skill-roll::before {
+  border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+}
+
 /* 스탯박스 입력 — 투명 배경으로 ::before 강조색 색조 노출.
    background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
    padding-right 복원 — 전역 select 규칙의 20px 화살표 여백 불필요. */
@@ -2714,11 +2731,11 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
   background:       var(--fe-ac-06) !important;
 }
 
-/* 다이스 레이블(.title)의 skew 사다리꼴 ::before 밝은 외곽선 제거(사용자 요청).
-   .dice-info .title 은 상위 .sheet-stat .title 규칙보다 특이도가 높으므로 여기서도
-   투명 처리해야 강조색이 남지 않는다. border-width 유지, 색만 투명화. */
+/* 다이스 레이블(.title)의 skew 사다리꼴 ::before. 다이스 박스는 어두운 틴트(ac-06)
+   바탕의 검은 라벨 박스이므로 사용자 요청대로 외곽선을 유지한다.
+   .dice-info .title 은 상위 .sheet-stat .title 규칙보다 특이도가 높으므로 여기서 명시. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .dice-info .title::before {
-  border: 1px solid transparent !important;
+  border: 1px solid var(--fe-ac-57) !important;
 }
 
 /* 상태이상·기타 조건 셀 헤더(.cell--title) — 어두운 틴트 + 테두리 */
