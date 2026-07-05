@@ -37,6 +37,7 @@ let localTypingActive = false;
 let localIdleTimer = null;
 let indicatorEl = null;
 let textSpan = null;
+let refreshTimer = null;
 
 // ── Settings access
 // TYPING_ENABLED is client-scoped but not GM-priority-excluded, so enforcement
@@ -133,15 +134,46 @@ function feHandleSocket(payload) {
 
 // ── Indicator DOM ────────────────────────────────────────────────────────────
 
-function feFindChatInput() {
-  return document.querySelector("#chat-message")
-      ?? document.querySelector("#chat-form textarea[name='message']")
-      ?? document.querySelector("textarea[name='message']");
+const CHAT_INPUT_SELECTOR = "#chat-message, #chat-form textarea[name='message'], textarea[name='message']";
+
+function feElementVisible(el) {
+  try { return !!el?.getClientRects?.().length; }
+  catch { return false; }
 }
 
-function feInjectIndicator() {
-  const input = feFindChatInput();
+function feFindChatInput(root = document) {
+  let inputs;
+  try { inputs = Array.from(root?.querySelectorAll?.(CHAT_INPUT_SELECTOR) ?? []); }
+  catch { inputs = []; }
+  if (root !== document && !inputs.some(feElementVisible)) {
+    try {
+      const documentInputs = Array.from(document.querySelectorAll(CHAT_INPUT_SELECTOR));
+      if (documentInputs.some(feElementVisible) || !inputs.length) inputs = documentInputs;
+    } catch { /* keep scoped inputs */ }
+  }
+  if (!inputs.length) return null;
+
+  // v14 can have a chat input in both #sidebar and #chat-notifications. A first
+  // match may be the quick-reply/notification copy, which strands this element
+  // after the sidebar is re-expanded. Anchor to the visible sidebar input first.
+  const visible = inputs.filter(feElementVisible);
+  const pool = visible.length ? visible : inputs;
+  return pool.find((el) => el.closest?.("#sidebar #chat"))
+      ?? pool.find((el) => el.closest?.("#sidebar"))
+      ?? pool.find((el) => !el.closest?.("#chat-notifications"))
+      ?? pool[0]
+      ?? null;
+}
+
+function feFindChatFormForInput(input) {
+  return input?.closest?.(".chat-form, #chat-form, form.chat-form") ?? input?.parentElement ?? null;
+}
+
+function feInjectIndicator(root = document) {
+  const input = feFindChatInput(root);
   if (!input) return false;
+  const form = feFindChatFormForInput(input);
+  if (!form) return false;
 
   let el = document.getElementById(INDICATOR_ID);
   if (!el) {
@@ -152,8 +184,12 @@ function feInjectIndicator() {
     el.innerHTML =
       '<span class="fe-typing-dots"><span></span><span></span><span></span></span>' +
       '<span class="fe-typing-text"></span>';
-    // Place directly above the chat input box.
-    input.parentElement?.insertBefore(el, input);
+  }
+  // Place at the top of the current chat form. Re-parenting matters in v14, where
+  // the shared chat-input block can move between #chat-notifications and the
+  // sidebar as the sidebar is collapsed and restored.
+  if (el.parentElement !== form || form.firstElementChild !== el) {
+    form.insertBefore(el, form.firstChild);
   }
   indicatorEl = el;
   textSpan = el.querySelector(".fe-typing-text");
@@ -161,8 +197,8 @@ function feInjectIndicator() {
   return true;
 }
 
-function feAttachInputListeners() {
-  const input = feFindChatInput();
+function feAttachInputListeners(root = document) {
+  const input = feFindChatInput(root);
   if (!input || input.__feTypingBound) return;
   input.__feTypingBound = true;
 
@@ -179,6 +215,16 @@ function feAttachInputListeners() {
     if (!feTypingFeatureEnabled()) return;
     if (feInputIsEmpty(input)) feEmitTypingEnd();
   });
+}
+
+function feRefreshTypingUi(root = document, delay = 0) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    if (!feTypingFeatureEnabled()) return;
+    feInjectIndicator(root);
+    feAttachInputListeners(root);
+  }, delay);
 }
 
 function feUpdateIndicator() {
@@ -259,14 +305,23 @@ Hooks.on("renderChatLog", (app, _html) => {
   if (app?.options?.popOut === true || app?.popOut === true || app?.id === "chat-popout") return;
   // The input/controls render into #chat-notifications (a separate subtree); a
   // microtask defer ensures #chat-message exists before we query for it.
-  queueMicrotask(() => {
-    feInjectIndicator();
-    feAttachInputListeners();
-  });
+  queueMicrotask(() => feRefreshTypingUi(app?.element || document, 0));
+});
+
+// v14: fires whenever the shared chat input block is created or reparented.
+Hooks.on("renderChatInput", () => {
+  feRefreshTypingUi(document, 0);
+});
+
+Hooks.on("activateChatLog", (app) => {
+  feRefreshTypingUi(app?.element || document, 0);
+});
+
+Hooks.on("collapseSidebar", () => {
+  feRefreshTypingUi(document, 0);
 });
 
 Hooks.once("ready", () => {
   if (!feTypingFeatureEnabled()) return;
-  feInjectIndicator();
-  feAttachInputListeners();
+  feRefreshTypingUi(document, 0);
 });

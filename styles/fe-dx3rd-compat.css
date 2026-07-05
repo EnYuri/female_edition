@@ -79,6 +79,47 @@ body.fe-retro-theme :is(#pause, #pause *)::after {
   animation-delay:    0s !important;
 }
 
+/* 일시정지 배경 — /narrate 오버레이와 같은 픽셀 스크린톤으로 교체.
+   core 기본값은 #pause 자체에 부드러운 좌우 그라디언트를 깔기 때문에
+   background/mask를 함께 덮어써 중앙이 짙고 양끝이 사라지는 형태만 유지한다. */
+body.fe-retro-theme #pause {
+  background-color: transparent !important;
+  background-image: repeating-conic-gradient(
+    rgba(0, 0, 0, 0.92) 0% 25%,
+    transparent 0% 50%
+  ) !important;
+  background-size: 6px 6px !important;
+  image-rendering: pixelated;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0)    0%,   rgba(0, 0, 0, 0)    10%,
+    rgba(0, 0, 0, 0.45) 10%,  rgba(0, 0, 0, 0.45) 24%,
+    rgba(0, 0, 0, 0.72) 24%,  rgba(0, 0, 0, 0.72) 38%,
+    rgba(0, 0, 0, 1)    38%,  rgba(0, 0, 0, 1)    62%,
+    rgba(0, 0, 0, 0.72) 62%,  rgba(0, 0, 0, 0.72) 76%,
+    rgba(0, 0, 0, 0.45) 76%,  rgba(0, 0, 0, 0.45) 90%,
+    rgba(0, 0, 0, 0)    90%,  rgba(0, 0, 0, 0)    100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0)    0%,   rgba(0, 0, 0, 0)    10%,
+    rgba(0, 0, 0, 0.45) 10%,  rgba(0, 0, 0, 0.45) 24%,
+    rgba(0, 0, 0, 0.72) 24%,  rgba(0, 0, 0, 0.72) 38%,
+    rgba(0, 0, 0, 1)    38%,  rgba(0, 0, 0, 1)    62%,
+    rgba(0, 0, 0, 0.72) 62%,  rgba(0, 0, 0, 0.72) 76%,
+    rgba(0, 0, 0, 0.45) 76%,  rgba(0, 0, 0, 0.45) 90%,
+    rgba(0, 0, 0, 0)    90%,  rgba(0, 0, 0, 0)    100%
+  );
+}
+
+body.fe-retro-theme.fe-accent-text-override #pause {
+  --fe-pause-bg: var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 80%) 10%;
+  background-image: repeating-conic-gradient(
+    hsl(var(--fe-pause-bg) / 0.92) 0% 25%,
+    transparent 0% 50%
+  ) !important;
+}
+
 /* 로딩 스피너류 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
    "상태를 알리는" 무한 회전 스피너까지 1ms로 돌면 정지/뭉개짐처럼 보인다.
    일시정지 기어와 동일한 예외 패턴으로 정상 회전 주기를 복원한다.
