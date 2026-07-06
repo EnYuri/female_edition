@@ -123,9 +123,16 @@ form.chat-form:has(#chat-controls.fe-ctrl-menu-active) > .fe-export-pdf {
   text-shadow: none !important;
 }
 
+/* Each injected control is an individually FILLED box so it reads as a distinct
+   button on the panel — visible regardless of the user-color feature. Mirrors
+   the look of the native chat filter/search control. */
 #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control) {
-  background: rgba(0, 0, 0, 0.08) !important;
-  border: 1px solid rgba(0, 0, 0, 0.28) !important;
+  background: rgba(0, 0, 0, 0.22) !important;
+  border: 1px solid rgba(0, 0, 0, 0.4) !important;
+  border-radius: 4px !important;
+  padding: 4px 6px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
 }
 
 #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):hover,
@@ -164,8 +171,8 @@ body.theme-dark #fe-ctrl-menu-panel .control-icon > i,
 
 body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control),
 .theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control) {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
 }
 
 body.theme-dark #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control-buttons button, #ci-upload-image, .fe-export-pdf, #message-modes .ui-control):hover,

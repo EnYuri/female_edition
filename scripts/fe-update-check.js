@@ -6,6 +6,7 @@
 const FE_UPD_MODULE_ID = "female_edition";
 const FE_UPD_FALLBACK_MANIFEST = "https://github.com/EnYuri/female_edition/releases/latest/download/module.json";
 const FE_UPD_CACHE_KEY = "female_edition.updateCheck.v1";
+const FE_UPD_CHAT_DISABLED_KEY = "female_edition.updateCheck.chatDisabled";
 const FE_UPD_CACHE_TTL_MS = 27 * 60 * 60 * 1000;
 const FE_UPD_NOTIFIED_THIS_LOAD = new Set();
 
@@ -18,6 +19,44 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
       void feUpdCheckForUpdate();
     }, 4000);
   });
+
+  // Wire the "흐에알겠는" dismiss button on our update-notice chat card.
+  Hooks.on("renderChatMessageHTML", (message, html) => {
+    try {
+      if (!message?.flags?.female_edition?.updateNotice) return;
+      const el = html?.nodeType ? html : (html?.[0] ?? html);
+      // Reuse the chat-merge header-hide styling to drop the speaker header.
+      el?.classList?.add?.("fe-update-notice-card");
+      const btn = el?.querySelector?.("[data-fe-upd-dismiss]");
+      if (!btn) return;
+      // The dismiss control is GM-only (it turns off the notice + deletes the card,
+      // which non-GMs can't do). Players still see the informational card.
+      if (!game?.user?.isGM) { btn.remove(); return; }
+      if (btn.dataset.feUpdBound === "1") return;
+      btn.dataset.feUpdBound = "1";
+      btn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        feUpdSetChatDisabled(true);
+        ui.notifications?.info("흐에... 이제 업데이트 채팅 알림은 안 보내는 거에요챱 (토스트 알림은 그대로에요)");
+        try { await message.delete(); } catch { /* no-op */ }
+      });
+    } catch (err) {
+      console.warn("female_edition | update-notice button wiring failed", err);
+    }
+  });
+}
+
+function feUpdChatDisabled() {
+  try { return localStorage.getItem(FE_UPD_CHAT_DISABLED_KEY) === "1"; }
+  catch { return false; }
+}
+
+function feUpdSetChatDisabled(disabled) {
+  try {
+    if (disabled) localStorage.setItem(FE_UPD_CHAT_DISABLED_KEY, "1");
+    else localStorage.removeItem(FE_UPD_CHAT_DISABLED_KEY);
+  } catch { /* no-op */ }
 }
 
 function feUpdModule() {
@@ -94,6 +133,51 @@ function feUpdNotify(latestVersion, localVersion) {
     `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는거에요!!: 현재 ${local}이구, 최신은 ${latest}인 거에요... 글애서 FVTT 셋업- 부가 모듈 탭에서 업데이트를 확인하시는거에요챱`,
     { permanent: true, console: false },
   );
+
+  void feUpdPostChatNotice(latest, local, loadKey);
+}
+
+function feUpdBuildNoticeContent(latest, local) {
+  const esc = (v) => foundry.utils.escapeHTML?.(String(v)) ?? String(v);
+  return `
+<div class="fe-update-notice" style="border:2px solid var(--color-warm-2,#c9a13b);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.28);">
+  <div style="display:flex;align-items:center;gap:8px;font-weight:bold;font-size:1.05em;margin-bottom:6px;">
+    <i class="fas fa-arrow-up-right-dots"></i>
+    <span>암컷모듈 업데이트가 있는 거에요!</span>
+  </div>
+  <div style="line-height:1.5;">
+    흐에흐에!!! <b>Female_edition</b> (aka. Female-cupwhi) 을 업데이트 할 수 있는거에요!!<br>
+    현재는 <b>${esc(local)}</b> 이구, 최신은 <b>${esc(latest)}</b> 인 거에요...<br>
+    글애서 <b>FVTT 셋업 → 부가 모듈</b> 탭에서 업데이트를 확인하시는거에요챱
+  </div>
+  <div style="margin-top:10px;text-align:right;">
+    <button type="button" data-fe-upd-dismiss style="cursor:pointer;">
+      <i class="fas fa-check"></i> 흐에알겠는
+    </button>
+  </div>
+</div>`.trim();
+}
+
+async function feUpdPostChatNotice(latest, local, loadKey) {
+  try {
+    if (feUpdChatDisabled()) return;
+    if (typeof ChatMessage?.create !== "function") return;
+
+    // Dedupe across reloads: post the chat card once per version transition.
+    const cached = feUpdReadCache();
+    if (String(cached.chatNotifiedFor || "") === loadKey) return;
+
+    await ChatMessage.create({
+      content: feUpdBuildNoticeContent(latest, local),
+      speaker: { alias: "Female Edition" },
+      flags: { female_edition: { updateNotice: true } },
+    });
+
+    // Record only after a successful post, so a failed create can retry next load.
+    feUpdWriteCache({ ...feUpdReadCache(), chatNotifiedFor: loadKey });
+  } catch (err) {
+    console.warn("female_edition | update-notice chat post failed", err);
+  }
 }
 
 function feUpdExtractPackageCheckVersion(response) {

@@ -55,6 +55,7 @@ import {
   feGetPendingMessageSource,
   feIsNarratorToolsMessage, feIsRoundMarkerMessage, feIsUntouchedSpecialMessage,
   feApplyUserColorBgToMessageElement, feApplyUserColorBgToAllLogs, feApplyUserColorBgToLog,
+  feUserColorBgFeatureActive,
   feStampRenderedStateAttributes,
   feMessageMergeInfo, feMergeKey, feCanMergePair,
   feGetMessageUserColor, feGetSpeakerActorFromMessage,
@@ -82,7 +83,7 @@ feSetMergeScheduleCallback((logEl, opts) => feScheduleRenderedLogRefresh(logEl, 
 
 function feHasRenderedStateWork() {
   try {
-    return !!feSetting(S.MERGE_ENABLED) || !!feSetting(S.USE_USER_COLOR_BG);
+    return !!feSetting(S.MERGE_ENABLED) || feUserColorBgFeatureActive();
   } catch {
     return true;
   }
@@ -612,8 +613,8 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.USER_COLOR_BG_BASE, {
-    name: "채팅 메시지 배경: 유저 색상 하부 배경(불투명)",
-    hint: "유저 색상 틴트 아래에 불투명한 배경(흰색/검정)을 깔아 가독성을 높입니다. (유저 색상 배경이 켜져 있을 때만 의미가 있습니다)",
+    name: "채팅 메시지 배경: 채팅카드 하부 배경(불투명)",
+    hint: "채팅카드에 불투명한 배경(흰색/검정/사용자 지정)을 깔아 가독성을 높입니다. 유저 색상 틴트와 독립적으로 동작하므로, 틴트가 꺼져 있어도 단독으로 적용됩니다.",
     scope: "client",
     config: false,
     type: String,
@@ -624,7 +625,12 @@ Hooks.once("init", () => {
       custom: "사용자 지정 색상",
     },
     default: FE_DEFAULTS[S.USER_COLOR_BG_BASE],
-    onChange: () => feSetUserColorBgBaseClass(document),
+    onChange: () => {
+      // Base mode now drives .fe-has-user-color independently of the tint,
+      // so a none↔white/black/custom change must re-classify existing messages.
+      feSetUserColorBgBaseClass(document);
+      feApplyUserColorBgToAllLogs(document);
+    },
   });
 
   game.settings.register(MODULE_ID, S.USER_COLOR_BG_CUSTOM, {

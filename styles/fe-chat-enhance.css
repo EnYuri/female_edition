@@ -316,6 +316,12 @@ body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #
   display: none !important;
 }
 
+/* Update-notice card: reuse the merge header-hide to drop the speaker header
+   (unconditional — not gated on the merge feature toggle). */
+:is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-update-notice-card .message-header {
+  display: none !important;
+}
+
 body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header img {
   display: none !important;
 }

@@ -9,6 +9,7 @@ import { feSetting } from "./fe-gm-priority.js";
 import {
   feMessageMergeInfo, feMergeKey, feCanMergePair,
   feStampRenderedStateAttributes, feApplyUserColorBgToLog,
+  feUserColorBgFeatureActive,
 } from "./fe-render-state.js";
 
 // -------------------------------------
@@ -396,7 +397,7 @@ function feScheduleMergeRetry(logEl, delay = 80) {
       try {
         feDedupeChatMessagesInLog(logEl);
         feApplyChatMerge(logEl);
-        if (feSetting(S.USE_USER_COLOR_BG)) feApplyUserColorBgToLog(logEl, logEl?.ownerDocument ?? document);
+        if (feUserColorBgFeatureActive()) feApplyUserColorBgToLog(logEl, logEl?.ownerDocument ?? document);
       } finally {
         restoreStickyScroll();
       }

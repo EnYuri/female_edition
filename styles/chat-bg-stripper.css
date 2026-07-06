@@ -170,24 +170,30 @@ body.fe-msg-bg-usercolor
  * - Implemented with an inset box-shadow so we don't fight with background-image
  *   layers used by Foundry/themes (and our texture-stripper).
  */
-body.fe-msg-bg-usercolor.fe-userbg-base-white
+/* NOTE: the solid base background is DECOUPLED from the user-color tint toggle
+ * (body.fe-msg-bg-usercolor). It keys on the base-mode class alone so a card can
+ * have a solid opaque background even with the tint off. The tint overlay below
+ * references --fe-user-color-rgb, which fe-render-state.js only sets when the tint
+ * is enabled — so with the tint off the box-shadow value is invalid and drops out,
+ * leaving just the solid base. */
+body.fe-userbg-base-white
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   --fe-user-bg-base-rgb: 255 255 255;
 }
 
-body.fe-msg-bg-usercolor.fe-userbg-base-black
+body.fe-userbg-base-black
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   --fe-user-bg-base-rgb: 0 0 0;
 }
 
-body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   /* Solid base */
   background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
-  /* Tint overlay */
+  /* Tint overlay (auto-drops when the tint is off → --fe-user-color-rgb unset) */
   box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
   /* In this mode we don't rely on screen blending. */
   background-blend-mode: normal !important;
@@ -248,15 +254,15 @@ body.fe-msg-bg-usercolor
   border-color: rgb(var(--fe-user-color-rgb) / 0.55) !important;
 }
 
-body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
   > #context-menu,
-body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
   #chat-notifications
   .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
   > #context-menu,
-body.fe-msg-bg-usercolor:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
   #context-menu.fe-chat-context-menu.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
   background-color: rgb(var(--fe-user-bg-base-rgb) / 1) !important;
   background-blend-mode: normal !important;

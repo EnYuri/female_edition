@@ -439,9 +439,36 @@ function feCaptureMessageRenderFlagsOnPreUpdate(message, changed = {}, userId = 
 // User color bg application
 // -------------------------------------
 
+// The per-message user-color marker (.fe-has-user-color + --fe-user-color-rgb)
+// drives TWO independent features that both key off which messages carry a
+// resolvable user color:
+//   1) 유저 색상 틴트 (USE_USER_COLOR_BG)     — per-user color overlay
+//   2) 채팅카드 하부 배경 (USER_COLOR_BG_BASE) — solid opaque card background
+// Historically both were gated on the tint toggle, so turning the tint off also
+// killed the solid background. They are now decoupled: the marker class is added
+// whenever EITHER feature is active, and the tint-only CSS var is set only when
+// the tint itself is enabled.
+function feUserColorBgBaseActive() {
+  try {
+    const base = String(feSetting(S.USER_COLOR_BG_BASE) ?? "none");
+    return base === "white" || base === "black" || base === "custom";
+  } catch {
+    return false;
+  }
+}
+
+function feUserColorBgFeatureActive() {
+  try {
+    return !!feSetting(S.USE_USER_COLOR_BG) || feUserColorBgBaseActive();
+  } catch {
+    return false;
+  }
+}
+
 function feApplyUserColorBgToMessageElement(message, messageEl) {
   try {
-    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const tintEnabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const enabled = feUserColorBgFeatureActive();
     const el0 = messageEl?.[0] ?? messageEl;
     if (!el0?.classList || !el0?.style) return;
 
@@ -501,7 +528,11 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     }
 
     el0.classList.add("fe-has-user-color");
-    el0.style.setProperty("--fe-user-color-rgb", rgb.text);
+    // The rgb var is only consumed by the tint overlay; when the tint is off but
+    // the solid base is on, leave it unset so the box-shadow tint drops out
+    // (invalid var → declaration ignored) while the solid base still paints.
+    if (tintEnabled) el0.style.setProperty("--fe-user-color-rgb", rgb.text);
+    else el0.style.removeProperty("--fe-user-color-rgb");
   } catch {
     /* noop */
   }
@@ -509,7 +540,7 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
 
 function feApplyUserColorBgToAllLogs(doc = document) {
   try {
-    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const enabled = feUserColorBgFeatureActive();
     const queryRoot = doc?.querySelectorAll ? doc : document;
     const roots = Array.from(queryRoot.querySelectorAll?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications") ?? []);
     if (queryRoot?.matches?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications")) roots.unshift(queryRoot);
@@ -536,7 +567,7 @@ function feApplyUserColorBgToAllLogs(doc = document) {
 
 function feApplyUserColorBgToLog(logEl, doc = document) {
   try {
-    const enabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const enabled = feUserColorBgFeatureActive();
     if (!enabled) return;
     if (!logEl?.querySelectorAll) return;
 
@@ -785,6 +816,8 @@ export {
   feApplyUserColorBgToMessageElement,
   feApplyUserColorBgToAllLogs,
   feApplyUserColorBgToLog,
+  feUserColorBgFeatureActive,
+  feUserColorBgBaseActive,
   feReadStampedMergeInfoFromElement,
   feStampRenderedStateAttributes,
   feMessageMergeInfo,
