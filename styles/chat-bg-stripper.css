@@ -294,6 +294,25 @@ body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notificati
   background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 14%) !important;
 }
 
+/* Paired TEXT color for system messages — contrasts with --fe-system-msg-bg
+ * (both computed together in fe-style.js). Without this, a dark chosen background
+ * left the default (dark) message text invisible, and a light one left the dx3rd
+ * combat h3 (hardcoded white — un-hardcoded to `inherit` in fe-dx3rd-compat.css)
+ * invisible. Now every system message body follows a background-contrasting color,
+ * and the dx3rd combat h3 inherits it. Retro theme's §14 (layouts) intentionally
+ * wins over this for its own light-on-dark scheme. Scoped to the message body so
+ * descendants with their own explicit color (inline rolls, links) keep it. */
+body.fe-system-msg-color
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-system-msg > .message-content,
+body.fe-system-msg-color
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-system-msg .message-header .message-sender,
+body.fe-system-msg-color #chat-notifications
+  .message.fe-system-msg .message-content {
+  color: var(--fe-system-msg-text, inherit) !important;
+}
+
 
 /* Paragraph spacing inside the wrapper */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)

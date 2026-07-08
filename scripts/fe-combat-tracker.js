@@ -172,7 +172,7 @@ function feCtEnsureRoot() {
   return root;
 }
 
-function feCtPortraitHTML(c, active) {
+function feCtPortraitHTML(c, active, canEndTurn) {
   const img = feCtPortraitImage(c);
   const name = feCtEsc(c.name);
   const init = c.initiative;
@@ -205,6 +205,20 @@ function feCtPortraitHTML(c, active) {
         `style="width:${hp.pct}%;background:${hp.color}"></div></div>`;
     }
   }
+  // 호버 시 나타나는 「턴 종료」 >> 표식 — 현재 턴이면서 이 유저가 그 전투원의
+  // 턴을 종료할 수 있을 때만(GM은 모두, 플레이어는 자신 소유) 렌더한다. 배경 채우기
+  // 없이 포트레이트 중앙에 큰 글로우 처리된 글자만 띄우고(예시 모듈 방식), 컨테이너는
+  // pointer-events:none 이라 글자 밖 영역의 선택/패닝/더블클릭(시트 열기)은 그대로다.
+  // 클릭 대상은 글자 그 자체. 레트로 테마에서는 fa 아이콘 대신 각진 픽셀 폰트 ">>"가
+  // 노출되도록 두 표현을 함께 담아 CSS로 전환한다.
+  const endTurnBtn = canEndTurn
+    ? `<div class="fe-ct-endturn">` +
+        `<i class="fas fa-angles-right fe-ct-endturn-icon" data-ct-endturn="1" ` +
+          `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.EndTurn", "턴 종료"))}"></i>` +
+        `<span class="fe-ct-endturn-px" data-ct-endturn="1" ` +
+          `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.EndTurn", "턴 종료"))}">&gt;&gt;</span>` +
+      `</div>`
+    : "";
   return (
     `<div class="${cls.join(" ")}" data-combatant-id="${c.id}" data-tooltip="${name}">` +
     `<div class="fe-ct-frame"${frameStyle}>` +
@@ -215,6 +229,7 @@ function feCtPortraitHTML(c, active) {
     `<div class="fe-ct-name">${name}</div>` +
     `${initBadge}` +
     `${hpBar}` +
+    `${endTurnBtn}` +
     `</div>`
   );
 }
@@ -301,7 +316,14 @@ function feCtRender() {
     (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
   );
   const activeId = combat.combatant?.id;
-  const portraits = combatants.map((c) => feCtPortraitHTML(c, c.id === activeId)).join("");
+  const portraits = combatants
+    .map((c) => {
+      const isActive = c.id === activeId;
+      // 현재 턴인 전투원에 한해, 그 턴을 종료할 권한이 있는 유저에게만 >> 노출
+      const canEndTurn = isActive && feCtCanEndTurnForCombatant(combat, c);
+      return feCtPortraitHTML(c, isActive, canEndTurn);
+    })
+    .join("");
 
   // 컨트롤 패널은 GM 전용. 단, 최소화 버튼만은 플레이어에게도 노출(개인 UI 토글).
   const center = isGM
@@ -339,10 +361,21 @@ function feCtBindRootEvents(root) {
       await feCtHandleAction(btn.dataset.ctAction);
       return;
     }
+    // 포트레이트 위 호버 >> 버튼: 클릭 즉시 턴 종료(포트레이트 선택/패닝보다 우선).
+    const endBtn = ev.target.closest?.("[data-ct-endturn]");
+    if (endBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const port = endBtn.closest?.("[data-combatant-id]");
+      if (port) await feCtHandleEndTurnClick(port.dataset.combatantId);
+      return;
+    }
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitClick(port.dataset.combatantId);
   });
   root.addEventListener("dblclick", (ev) => {
+    // >> 버튼 위 더블클릭은 시트를 열지 않는다(단일 클릭이 이미 턴을 종료).
+    if (ev.target.closest?.("[data-ct-endturn]")) return;
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitDblClick(port.dataset.combatantId);
   });
@@ -418,6 +451,19 @@ function feCtHandlePortraitDblClick(id) {
   const combat = feCtGetCombat();
   const c = combat?.combatants?.get(id);
   try { c?.actor?.sheet?.render(true); } catch {}
+}
+
+// 호버 >> 버튼 클릭 → 턴 종료. 컨텍스트 메뉴의 "턴 종료"와 동일한 경로(권한 검사 +
+// GM 직접 처리 / 플레이어는 소켓 프록시)를 그대로 탄다.
+async function feCtHandleEndTurnClick(id) {
+  const combat = feCtGetCombat();
+  const c = combat?.combatants?.get(id);
+  if (!combat || !c) return;
+  try {
+    await feCtRequestEndTurn(combat, c);
+  } catch (e) {
+    console.error("[female_edition] combat-tracker end-turn (>>) failed", e);
+  }
 }
 
 // ── per-combatant context menu ───────────────────────────────────────────────

@@ -144,6 +144,39 @@
 .fe-ct-portrait.is-defeated .fe-ct-frame img { filter: grayscale(1) brightness(0.5); }
 .fe-ct-portrait.is-hidden { opacity: 0.5; }
 
+/* 호버 시 나타나는 「턴 종료」 >> 표식 — 현재 턴이면서 권한이 있는 유저의 포트레이트에만
+   렌더된다(JS). 배경 채우기 없이, 프레임 전체를 덮는 컨테이너 중앙에 큰 글로우 글자만
+   띄운다(예시 모듈 방식). 컨테이너 자체는 pointer-events:none — 글자 밖 영역의 선택/패닝/
+   더블클릭(시트 열기)을 그대로 통과시키고, 클릭 대상은 글자(>>) 그 자체다. */
+.fe-ct-endturn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: var(--fe-ct-h, var(--fe-ct-size));
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #fff;
+  font-size: calc(var(--fe-ct-size) * 0.6);
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.7);
+}
+/* 글자 자체만 상호작용 대상 — 기본은 투명, 포트레이트 호버 시 드러나고 글자에
+   직접 호버하면 완전 불투명 + 살짝 확대 */
+.fe-ct-endturn > * {
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+.fe-ct-portrait:hover .fe-ct-endturn > * { opacity: 0.85; }
+.fe-ct-endturn > *:hover { opacity: 1; transform: scale(1.12); }
+/* 기본 테마는 fa 벡터 아이콘, 픽셀 글자는 숨김 */
+.fe-ct-endturn .fe-ct-endturn-px { display: none; }
+
 .fe-ct-init {
   position: absolute;
   /* sits just BELOW the HP bar (which straddles the top outline at top:0±2px),
@@ -303,6 +336,22 @@ body.fe-retro-theme .fe-ct-hp { border-radius: 0; }
 
 body.fe-retro-theme .fe-ct-name {
   /* survive §4's global text-shadow:none !important → hard pixel outline */
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+}
+
+/* 레트로 테마의 >> 표식 — 배경 채우기 없이, fa 벡터 아이콘 대신 각진 픽셀 폰트
+   ">>" 글자를 노출한다(픽셀 폰트 자체가 각져 있어 안티에일리어싱이 사실상 없다). */
+body.fe-retro-theme .fe-ct-endturn {
+  color: var(--fe-ac-90, #fff);
+  font-family: var(--fe-font-primary, monospace);
+  image-rendering: pixelated;
+}
+body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-icon { display: none; }
+body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-px {
+  display: inline;
+  font-weight: bold;
+  letter-spacing: -0.06em;
+  /* §4의 전역 text-shadow:none !important 를 이기고 하드 픽셀 외곽선 유지 */
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
 }
 

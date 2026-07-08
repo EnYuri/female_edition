@@ -23,6 +23,21 @@ function feAccentToHs(hex) {
   return { h: h * 360, s };
 }
 
+// 배경 hex → 대비되는 가독 글자색. 밝은 배경이면 어두운 글씨, 어두운 배경이면 밝은
+// 글씨를 돌려준다(sRGB 상대휘도 기준). 「채팅카드 하부 색상」(--fe-system-msg-bg)에
+// 짝을 이루는 --fe-system-msg-text 계산에 쓰인다.
+function feContrastText(hex) {
+  let h = String(hex).replace(/^#/, "");
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return "#f0f0f0";
+  const chan = (i) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * chan(0) + 0.7152 * chan(2) + 0.0722 * chan(4);
+  return L > 0.45 ? "#141414" : "#f0f0f0";
+}
+
 function feSetBodyMergeClasses() {
   const enabled = !!feSetting(S.MERGE_ENABLED);
   document.body.classList.toggle("fe-chat-merge", enabled);
@@ -220,6 +235,10 @@ function feApplyStyleVarsFromSettings(doc = document) {
     // 시스템(화자 없는) 메시지 배경색 — 기본 흰색. body.fe-system-msg-color가 켜졌을 때만 적용.
     const sysBg = String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? "#ffffff").trim() || "#ffffff";
     root.style.setProperty("--fe-system-msg-bg", sysBg);
+    // 배경에 대비되는 글자색 — 흰 배경이면 어둡게, 검정 배경이면 밝게. 시스템(화자
+    // 없는) 메시지 본문 + dx3rd 전투 메시지(흰색 하드코딩을 상속으로 푼 것)가 이 색을
+    // 따라가 어떤 하부색을 골라도 가독성이 유지된다.
+    root.style.setProperty("--fe-system-msg-text", feContrastText(sysBg));
 
     root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
 
