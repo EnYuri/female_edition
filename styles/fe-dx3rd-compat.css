@@ -3077,7 +3077,14 @@ body.fe-retro-theme .combo-items-dialog .level {
 
 /* ── (1) 액션 버튼 ─────────────────────────────────────────── */
 
-body.fe-retro-theme .dx3rd-item-chat .use-item-btn {
+/* use-item-btn(무기 사용 등)과 attack-roll-btn(공격)은 시스템 CSS에서 원래
+   동일한 외곽선형 버튼(투명 배경 + currentColor 테두리)이다. 이전엔 공격 버튼만
+   흰(액센트) 채움 + 검정 글자로 반전시켜 강조했으나, 고대비 레트로에서 채움색이
+   글자색과 비슷하게 보여 텍스트가 묻히는 문제가 있었다(사용자 보고).
+   → 공격 버튼도 다른 버튼과 동일하게 외곽선형으로 통일한다.
+   반전 채움 강조는 success / win-check 버튼에만 남긴다. */
+body.fe-retro-theme .dx3rd-item-chat .use-item-btn,
+body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn {
   background: transparent !important;
   background-color: transparent !important;
   color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -3086,7 +3093,6 @@ body.fe-retro-theme .dx3rd-item-chat .use-item-btn {
   outline-offset: 0 !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn,
 body.fe-retro-theme :is(.dx3rd-success-btn, .dx3rd-win-check-btn) {
   background: var(--fe-dx3rd-accent, #ffffff) !important;
   color:      #000000 !important;
@@ -3095,13 +3101,13 @@ body.fe-retro-theme :is(.dx3rd-success-btn, .dx3rd-win-check-btn) {
   outline-offset: 0 !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn:hover,
 body.fe-retro-theme .dx3rd-success-btn:hover:not(:disabled),
 body.fe-retro-theme .dx3rd-win-check-btn:hover:not(:disabled) {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .use-item-btn:hover:not(:disabled) {
+body.fe-retro-theme .dx3rd-item-chat .use-item-btn:hover:not(:disabled),
+body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn:hover:not(:disabled) {
   background: transparent !important;
   background-color: transparent !important;
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;

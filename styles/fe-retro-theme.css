@@ -308,6 +308,40 @@ body.fe-retro-theme .application::after {
           mask-border: none !important;
 }
 
+/* ── 최소화(minimized) 윈도우: 콘텐츠 클리핑 + 솔리드 테두리 ──────────
+   [근본 원인 — 라이브 v14.363 실측]
+   Foundry v14 는 AppV1 처럼 window-content 를 display:none 으로 숨기지 않고,
+   창을 max-height:header-height 로 클램프한 뒤 `.application { overflow:hidden }`
+   의 클리핑으로 본문을 가린다(v14 foundry2.css 엔 `.minimized … display` 규칙이
+   아예 없다 — CSS 클리핑 방식). 그런데 이 파일 위쪽(§16)이 픽셀 액자(::after
+   inset:-10px)가 잘리지 않도록 `.application/.window-app { overflow:visible }`
+   를 걸어, 이 클리핑을 무력화한다. 그 결과 V2 시트를 최소화하면 본문(window-content,
+   여전히 display:flex)이 헤더 아래로 삐져나와 "넓은 검은 띠"가 남는다(사용자 보고).
+   (AppV1 시트는 최소화 시 window-content 를 display:none 처리하므로 무관.)
+
+   [해법]
+   ① 최소화 상태에서만 overflow:hidden 을 복원 → 본문 클리핑 정상화(넓은 띠 제거).
+      같은 layouts 레이어의 §16 overflow:visible(0,2,1)보다 .minimized 로 특이도
+      (0,3,1)가 높아 확실히 이긴다.
+   ② overflow:hidden 이면 element 바깥(inset:-10px)의 픽셀 액자 ::before/::after 는
+      어차피 잘려 안 보인다 → 픽셀 액자를 끄고, element 자체(border-box, 클리핑
+      대상 아님)에 실제 솔리드 액센트 테두리를 준다. 라운딩 없는 하드 엣지라
+      픽셀 테마 미감과도 일치하며, 어떤 크기에서도 떨어지거나 삐져나올 수 없다. */
+body.fe-retro-theme .application.minimized,
+body.fe-retro-theme .window-app.minimized {
+  overflow: hidden !important;
+  border: 2px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  border-radius: 0 !important;
+}
+
+body.fe-retro-theme .application.minimized::before,
+body.fe-retro-theme .application.minimized::after,
+body.fe-retro-theme .window-app.minimized::before,
+body.fe-retro-theme .window-app.minimized::after {
+  content: none !important;
+  display: none !important;
+}
+
 /* #sidebar-content: accent 백드롭 — 좌측 6px 띠에 accent 색 공급
    isolation:isolate(부모) 덕분에 multiply 블렌딩이 사이드바 내부에만 적용 */
 body.fe-retro-theme #sidebar-content::before {
