@@ -5,9 +5,9 @@ name: Release Module
 # manifest/download fields in module.json point at releases/latest/download/*,
 # so Foundry's "Check for Updates" always sees the newest release.
 #
-# Version itself is bumped by the .githooks/pre-commit hook (one patch per
-# commit), so each pushed commit normally produces a fresh release. If a tag for
-# the current version already exists, the release step is skipped (idempotent —
+# Version itself is bumped by the .githooks/pre-commit hook (patches 0…9, then
+# a minor rollover), so each pushed commit normally produces a fresh release.
+# If a tag for the current version already exists, the release step is skipped (idempotent —
 # a re-run or a push that didn't change the version won't error).
 
 on:

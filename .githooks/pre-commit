@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Bump module.json patch version by 0.0.1 on every commit, then re-stage it so
-# the bump travels in the same commit. The .github/workflows/release.yml job
+# Bump module.json on every commit, then re-stage it so the bump travels in the
+# same commit. Patch releases run 0 through 9; committing from x.y.9 rolls to
+# x.(y+1).0 instead of creating x.y.10. The .github/workflows/release.yml job
 # turns each new version into a tagged GitHub Release (the manifest URL source).
 #
 # Uses a targeted regex on the top-level "version" line only (not a full JSON
@@ -28,7 +29,13 @@ node -e '
   if (!re.test(s)) { console.error("[pre-commit] no semver version field — skipping."); process.exit(0); }
   let next = "";
   s = s.replace(re, (_m, pre, maj, min, pat, post) => {
-    next = `${maj}.${min}.${Number(pat) + 1}`;
+    const patch = Number(pat);
+    const minor = Number(min);
+    // Keep releases in the x.y.0…x.y.9 range. A tenth patch release begins
+    // the next minor line: x.y.9 → x.(y+1).0.
+    next = patch >= 9
+      ? `${maj}.${minor + 1}.0`
+      : `${maj}.${minor}.${patch + 1}`;
     return `${pre}${next}${post}`;
   });
   fs.writeFileSync(p, s);
