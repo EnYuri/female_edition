@@ -542,6 +542,33 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-log :is(.chat-card
   font-family: var(--fe-font-secondary) !important;
 }
 
+/* dnd5e item/activity chat cards render saved description HTML inside this
+   exact section. An inline font family in that HTML otherwise breaks the card
+   font option by stopping inheritance at the nested span. */
+body.fe-fonts-enabled.fe-chatcard-custom-font
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card.item-card, .chat-card.activation-card)
+  > .card-header.description
+  > .details.collapsible-content.card-content
+  :is([style*="font-family"], font[face]) {
+  font-family: var(--fe-font-secondary) !important;
+}
+
+/* dnd5e puts its item/activity title directly on .name-stacked .title using
+   --dnd5e-font-roboto-slab. Keep this compact summary header in the primary
+   font; only the expanded card description is secondary. */
+body.fe-fonts-enabled.fe-chatcard-custom-font
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .chat-message
+  :is(.chat-card.item-card, .chat-card.activation-card)
+  > .card-header.description
+  > .summary
+  .name-stacked
+  :is(.title, .subtitle) {
+  font-family: var(--fe-font-primary) !important;
+}
+
 body.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications)
   .chat-message .message-sender :is(.name-stacked .title, .title) {
   font-family: var(--fe-font-primary) !important;

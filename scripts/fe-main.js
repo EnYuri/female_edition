@@ -32,3 +32,8 @@ import "./fe-chat-images.js";
 import "./inject-conditions.js";
 import "./inject-damage-type.js";
 import "./fe-scene-controls-collapse.js";
+
+// Token features
+import "./fe-token-preview.js";
+import "./fe-token-name-sync.js";
+import "./fe-token-glow.js";

@@ -17,11 +17,47 @@
   margin: 0 0 4px 0;
 }
 
+.fe-settings-menu .fe-settings__tabs {
+  display: flex;
+  gap: 2px;
+  margin: 12px 0;
+  padding: 3px 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  overflow-x: auto;
+}
+
+.fe-settings-menu .fe-settings__tab {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.fe-settings-menu .fe-settings__tab:hover,
+.fe-settings-menu .fe-settings__tab.active {
+  opacity: 1;
+  outline: 1px solid var(--color-warm-2, #d66a2c);
+  outline-offset: 0;
+}
+
+.fe-settings-menu .fe-settings__tab.active {
+  border-bottom-color: var(--color-warm-2, #d66a2c);
+}
+
+body.fe-retro-theme .fe-settings-menu .fe-settings__tab:is(:hover, .active) {
+  outline-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  text-shadow: 0 0 3px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
+}
+
 .fe-settings-menu .fe-settings__actions {
   gap: 8px;
 }
 
-.fe-settings-menu details {
+.fe-settings-menu .fe-settings__section {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 8px 10px;
@@ -29,14 +65,10 @@
   background: rgba(0, 0, 0, 0.12);
 }
 
-.fe-settings-menu details > summary {
-  cursor: pointer;
+.fe-settings-menu .fe-settings__section-title {
   font-weight: 700;
-  margin: 0;
-}
-
-.fe-settings-menu details[open] > summary {
-  margin-bottom: 8px;
+  margin: 0 0 8px;
+  font-size: 16px;
 }
 
 .fe-settings-menu .fe-settings__warning {
@@ -73,6 +105,12 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
+}
+
+/* The control is truly disabled; this gives its entire setting row the same
+   inactive state so the dependency is visible before the user tries to edit it. */
+.fe-settings-menu .form-group.fe-setting-dependent-disabled {
+  opacity: 0.55;
 }
 
 /* User-font controls (폰트 섹션) */

@@ -6,6 +6,7 @@ import {
   S,
   feSetting,
   feMarkdownToHTML,
+  feUnwrapProseMirrorHTML,
   feCaptureMessageRenderFlagsOnPreUpdate,
   feGetChatLogs,
   feNormalizeChatMessageId,
@@ -105,7 +106,8 @@ function feGetEditableRaw(msg) {
     // 리터럴 태그도 보존). 단, 구 내레이터는 raw 에 <br> 을 저장했었는데(현재는
     // \n 으로 저장) 그런 레거시 메시지를 마크다운 모드로 수정하면 <br> 이
     // &lt;br&gt; 로 이스케이프돼 노출됐다 → 그 한 경우만 좁게 줄바꿈으로 정규화.
-    return String(stored).replace(/<br\s*\/?>/gi, "\n");
+    const raw = String(stored);
+    return feUnwrapProseMirrorHTML(raw) ?? raw.replace(/<br\s*\/?>/gi, "\n");
   }
 
   const html = String(msg?.content ?? "");
@@ -336,9 +338,9 @@ function feStartInlineEdit(msg) {
 
   FE_EDITING_MESSAGE_ID = msg.id;
 
-  // Default to markdown mode if raw flag exists, otherwise HTML mode
-  const hasRaw = !!(msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain"));
-  const initialMode = hasRaw ? "markdown" : "html";
+  // Always start in the same plain-text markdown workflow as the chat input.
+  // HTML remains an explicit mode for editing preserved markup.
+  const initialMode = "markdown";
   FE_EDIT_MODE = initialMode;
 
   const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
@@ -403,7 +405,8 @@ function feCancelInlineEdit() {
 }
 
 function feBuildEditUpdate(rawText) {
-  const raw = (rawText ?? "").toString();
+  const entered = (rawText ?? "").toString();
+  const raw = feUnwrapProseMirrorHTML(entered) ?? entered;
   const html = feMarkdownToHTML(raw);
   return {
     content: html,
@@ -421,7 +424,8 @@ function feApplyRawEditPreUpdate(message, changed, userId = null) {
     const hasPlain = !!(modFlags && Object.prototype.hasOwnProperty.call(modFlags, "plain"));
     if (!hasRaw && !hasPlain) return;
 
-    const nextRaw = String((hasRaw ? modFlags.raw : modFlags.plain) ?? "");
+    const candidateRaw = String((hasRaw ? modFlags.raw : modFlags.plain) ?? "");
+    const nextRaw = feUnwrapProseMirrorHTML(candidateRaw) ?? candidateRaw;
     const currentRaw = String(
       message?.getFlag?.(MODULE_ID, "raw") ??
       message?.getFlag?.(MODULE_ID, "plain") ??

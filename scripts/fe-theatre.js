@@ -264,16 +264,13 @@ function _fetBuildUserState() {
       emote: ins.emote ?? null,
     }));
 
-  const speakingAs =
-    _fet.speakingAs === _FET_NONE ? _FET_NONE :
-    (_fet.speakingAs && _fetIsUserStageInsert(_fet.inserts.get(_fet.speakingAs)) ? _fet.speakingAs : null);
-
   return {
     version: 1,
     worldId: _fetWorldId(),
     userId: game.user?.id ?? null,
     updatedAt: Date.now(),
-    speakingAs,
+    // 무대 구성은 복원하지만 발화자는 다음 세션에 넘기지 않는다.
+    speakingAs: _FET_NONE,
     inserts,
   };
 }
@@ -366,10 +363,9 @@ async function _fetRestoreUserState() {
       if (row.emote) _fetSetEmote(theatreId, row.emote, true);
     }
 
-    const wantedSpeaking = state.speakingAs === _FET_NONE
-      ? _FET_NONE
-      : (state.speakingAs && _fet.inserts.has(state.speakingAs) ? state.speakingAs : null);
-    _fetSetSpeakingAs(wantedSpeaking);
+    // 화자 선택은 해당 채팅 세션에서만 유효하다. 복원된 무대 구성은 유지하되,
+    // 이전 세션의 액터 화자가 다음 접속의 기본 발화자가 되지 않게 한다.
+    _fetSetSpeakingAs(_FET_NONE);
   } finally {
     _fetSuppressLocalSave--;
   }
@@ -710,7 +706,6 @@ export function fetAddToStage(actorOrId) {
   if (existing) {
     _fetApplyInsertStageData(existing, actor.id, name, src, emotes);
     _fetAttachStageOption(existing);
-    _fetSetSpeakingAs(theatreId);
     _fetScheduleSaveUserState();
     _fetRefreshSheetHeaders();
     return;
@@ -718,7 +713,6 @@ export function fetAddToStage(actorOrId) {
 
   const promoted = _fetPromoteDisplayInsert(theatreId, actor.id, name, src, emotes);
   if (promoted) {
-    _fetSetSpeakingAs(theatreId);
     _fetScheduleSaveUserState();
     _fetRefreshSheetHeaders();
     return;
@@ -761,7 +755,6 @@ function _fetInjectInsert(theatreId, actorId, name, src, emotes, remote) {
   el.hidden = true;
 
   if (!remote) {
-    _fetSetSpeakingAs(theatreId);
     _fetScheduleSaveUserState();
   }
 
@@ -816,7 +809,7 @@ function _fetRemoveInsert(theatreId, remote = false) {
   _fet.inserts.delete(theatreId);
   _fetRefreshSheetHeaders();
 
-  if (_fet.speakingAs === theatreId) _fetSetSpeakingAs(null);
+  if (_fet.speakingAs === theatreId) _fetSetSpeakingAs(_FET_NONE);
   if (!remote) _fetScheduleSaveUserState();
 }
 
@@ -857,7 +850,7 @@ function _fetClearUserStage() {
     _fetSuppressLocalSave--;
   }
   if (_fet.speakingAs && _fet.speakingAs !== _FET_NONE && !_fet.inserts.has(_fet.speakingAs)) {
-    _fetSetSpeakingAs(null);
+    _fetSetSpeakingAs(_FET_NONE);
   }
   _fetScheduleSaveUserState(0);
 }
@@ -1405,7 +1398,7 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
 
   // Safety net: reset speak-as if user somehow lost owner permission
   if (!_fetCanSpeakAs(insert.actorId)) {
-    _fetSetSpeakingAs(null);
+    _fetSetSpeakingAs(_FET_NONE);
     return;
   }
 

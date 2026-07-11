@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "authors": [
     {
       "name": "nayuri",
@@ -35,6 +35,7 @@
     "scripts/fe-conflict-guard.js",
     "scripts/fe-attr-path-helper.js",
     "scripts/fe-token-preview.js",
+    "scripts/fe-token-name-sync.js",
     "scripts/fe-combat-tracker.js",
     "scripts/fe-token-glow.js",
     "scripts/fe-user-font.js",

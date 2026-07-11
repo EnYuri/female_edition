@@ -163,14 +163,15 @@ function feLooksLikeHTML(text) {
 // Returns the unwrapped plain text, or null if the HTML contains real elements.
 function feUnwrapProseMirrorHTML(html) {
   const trimmed = html.trim();
-  if (!trimmed.startsWith("<p>")) return null;
-  // Reject if any tag other than <p>, </p>, <br>, <br/> exists
-  if (/<(?!\/?p>|br\s*\/?>)[a-zA-Z]/.test(trimmed)) return null;
+  if (!/^<p(?:\s[^>]*)?>/i.test(trimmed)) return null;
+  // ProseMirror may put harmless attributes on paragraphs. Reject only when the
+  // content includes an actual nested HTML element rather than p/br structure.
+  if (/<(?!\/?p(?:\s[^>]*)?>|br\s*\/?>)[a-zA-Z]/i.test(trimmed)) return null;
 
   let text = trimmed
-    .replace(/<\/p>\s*<p>/g, "\n\n")
+    .replace(/<\/p>\s*<p(?:\s[^>]*)?>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/?p>/g, "");
+    .replace(/<\/?p(?:\s[^>]*)?>/gi, "");
 
   // Decode HTML entities the ProseMirror serializer may have encoded
   text = text

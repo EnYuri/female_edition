@@ -88,6 +88,8 @@ const S = {
   TOKEN_GLOW_TARGET: "ceTokenGlowTarget",
   TOKEN_GLOW_SIGHTLINE: "ceTokenGlowSightline",
   TOKEN_CONFIG_TWO_COLUMN: "ceTokenConfigTwoColumn",
+  TOKEN_SYNC_NAME: "ceTokenSyncName",
+  TOKEN_SYNC_PLACED_NAME: "ceTokenSyncPlacedName",
   // Music: players upload audio (GM-proxied) into their own personal playlist.
   MUSIC_ENABLED: "ceMusicEnabled",
   MUSIC_PLAYLIST_NAME: "ceMusicPlaylistName",
@@ -185,6 +187,8 @@ const FE_DEFAULTS = {
   [S.TOKEN_GLOW_TARGET]: true,
   [S.TOKEN_GLOW_SIGHTLINE]: true,
   [S.TOKEN_CONFIG_TWO_COLUMN]: true,
+  [S.TOKEN_SYNC_NAME]: true,
+  [S.TOKEN_SYNC_PLACED_NAME]: false,
   [S.MUSIC_ENABLED]: true,
   [S.MUSIC_PLAYLIST_NAME]: "player-uploads",
   [S.MUSIC_UPLOAD_ROOT]: "assets/uploadedmusic",

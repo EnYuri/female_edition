@@ -255,6 +255,7 @@ function feRegisterTokenPreviewSettings() {
       }
     },
   });
+
 }
 
 function feNormalizeAppearanceLayout(tab) {

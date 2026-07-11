@@ -168,19 +168,7 @@ function feIsDnd5eSystem() {
   try { return game?.system?.id === "dnd5e"; } catch { return false; }
 }
 
-// Persist each collapsible section's open/closed state across menu open/close.
-// Pure client UI state → localStorage (no settings registration needed). Keyed
-// by the section's summary text (stable, unique per section).
-const FE_SM_OPEN_STORE = `${MODULE_ID}:settings-menu:open-sections`;
-
-function feSmLoadOpenState() {
-  try { return JSON.parse(localStorage.getItem(FE_SM_OPEN_STORE) || "{}") || {}; }
-  catch { return {}; }
-}
-
-function feSmSaveOpenState(state) {
-  try { localStorage.setItem(FE_SM_OPEN_STORE, JSON.stringify(state)); } catch { /* no-op */ }
-}
+const FE_SM_TAB_STORE = `${MODULE_ID}:settings-menu:active-tab`;
 
 // ── Settings dialog (ApplicationV2) ──
 
@@ -197,8 +185,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     },
     position: { width: 740, height: "auto" },
     actions: {
-      expandAll: FemaleEditionSettingsMenu.#onExpandAll,
-      collapseAll: FemaleEditionSettingsMenu.#onCollapseAll,
       feSave: FemaleEditionSettingsMenu.#onSaveAction,
       feResetDefaults: FemaleEditionSettingsMenu.#onResetDefaults,
     },
@@ -221,6 +207,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.UI_STRIP_TEXTURES]: feRead(S.UI_STRIP_TEXTURES),
       [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
       [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
+      [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
+      [S.TOKEN_SYNC_PLACED_NAME]: feRead(S.TOKEN_SYNC_PLACED_NAME),
 
       // Merge
       [S.MERGE_ENABLED]:               feRead(S.MERGE_ENABLED),
@@ -313,7 +301,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
       // Theatre / Stage (standalone — migrated)
       stageEnabled:        feRead("stageEnabled"),
-      stageHideMessages:   feRead("stageHideMessages"),
       stageExcludeSystemMessages: feRead("stageExcludeSystemMessages"),
       stageRecallIncludeNonActor: feRead("stageRecallIncludeNonActor"),
       stageAutoDecay:      feRead("stageAutoDecay"),
@@ -434,23 +421,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       }
     } catch { /* no-op */ }
 
-    // Restore each section's saved open/closed state and persist on toggle. The
-    // template's `open` attribute is only the first-time default; once the user
-    // has expanded/collapsed a section, that choice is remembered. (AppV2 rebuilds
-    // the DOM each render, so per-render listeners do not accumulate.)
-    try {
-      const state = feSmLoadOpenState();
-      for (const d of this.element?.querySelectorAll?.("details") ?? []) {
-        const key = d.querySelector("summary")?.textContent?.trim();
-        if (!key) continue;
-        if (Object.prototype.hasOwnProperty.call(state, key)) d.open = !!state[key];
-        d.addEventListener("toggle", () => {
-          const s = feSmLoadOpenState();
-          s[key] = d.open;
-          feSmSaveOpenState(s);
-        });
-      }
-    } catch { /* no-op */ }
+    try { this.#wireTabs(); } catch { /* no-op */ }
 
     // Live value readout for range sliders: keep <span class="fe-range-value"
     // data-for="NAME"> in sync with its <input type="range" name="NAME">.
@@ -467,6 +438,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     // User-font controls: dropdown replacement toggle, picker -> input, live
     // preview, and on-demand system-font enumeration.
     try { this.#wireUserFontControls(); } catch { /* no-op */ }
+
+    // A disabled dependent control is omitted from FormData. Keep the UI and
+    // the targeted save-preservation rules below in sync.
+    try { this.#wireDependentControls(); } catch { /* no-op */ }
   }
 
   // Wires up the 폰트 section's user-font UI (added in fe-settings-menu.hbs):
@@ -479,9 +454,11 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
   #wireUserFontControls() {
     const root = this.element;
     if (!root) return;
+    const enableToggle = root.querySelector('input[name="enableFonts"]');
     const useToggle = root.querySelector('input[name="ceUiUseUserFont"]');
     const moduleRow = root.querySelector(".fe-module-font-row");
     const userRow   = root.querySelector(".fe-user-font-row");
+    const cardToggle = root.querySelector('input[name="ceChatCardUseCustomFont"]');
     const input     = root.querySelector('input[name="ceUserFontFamily"]');
     const picker    = root.querySelector("select.fe-user-font-picker");
     const sysGroup  = root.querySelector("optgroup.fe-user-font-system-group");
@@ -489,9 +466,18 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const preview   = root.querySelector(".fe-user-font-preview");
 
     const applyVisibility = () => {
-      const on = !!useToggle?.checked;
-      if (moduleRow) moduleRow.style.display = on ? "none" : "";
-      if (userRow)   userRow.style.display   = on ? "" : "none";
+      const fontsEnabled = !!enableToggle?.checked;
+      const userFontEnabled = !!useToggle?.checked;
+      if (moduleRow) moduleRow.hidden = !fontsEnabled || userFontEnabled;
+      if (userRow) userRow.hidden = !fontsEnabled || !userFontEnabled;
+      if (useToggle) useToggle.disabled = !fontsEnabled;
+      if (cardToggle) cardToggle.disabled = !fontsEnabled;
+      for (const field of moduleRow?.querySelectorAll("input, select, button, textarea") ?? []) {
+        field.disabled = !fontsEnabled;
+      }
+      for (const field of userRow?.querySelectorAll("input, select, button, textarea") ?? []) {
+        field.disabled = !fontsEnabled;
+      }
     };
     const updatePreview = () => {
       if (!preview) return;
@@ -501,6 +487,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         : "";
     };
 
+    enableToggle?.addEventListener("change", applyVisibility);
     useToggle?.addEventListener("change", applyVisibility);
     input?.addEventListener("input", updatePreview);
     picker?.addEventListener("change", () => {
@@ -536,13 +523,68 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     updatePreview();
   }
 
-  // data-action handlers receive (event, target) bound to the application instance.
-  static #onExpandAll(_event, _target) {
-    this.element?.querySelectorAll?.("details")?.forEach?.((d) => { d.open = true; });
+  // Keep a small, explicit list of settings whose subordinate value has no
+  // effect until its controlling checkbox is enabled. Do not generalize this
+  // into a convention: disabled form fields need matching save handling.
+  #wireDependentControls() {
+    const root = this.element;
+    if (!root) return;
+    const wire = (masterName, dependentNames) => {
+      const master = root.querySelector(`[name="${masterName}"]`);
+      const fields = dependentNames
+        .map((name) => root.querySelector(`[name="${name}"]`))
+        .filter(Boolean);
+      if (!master || !fields.length) return;
+
+      const sync = () => {
+        const enabled = !!master.checked;
+        for (const field of fields) {
+          field.disabled = !enabled;
+          field.closest(".form-group")?.classList.toggle("fe-setting-dependent-disabled", !enabled);
+        }
+      };
+      master.addEventListener("change", sync);
+      sync();
+    };
+
+    wire(S.ATTR_PATH_HELPER, [S.ATTR_PATH_HELPER_SOURCE]);
+    wire("stageAutoDecay", ["stageDecayTime"]);
+    wire(S.TOKEN_SYNC_NAME, [S.TOKEN_SYNC_PLACED_NAME]);
   }
 
-  static #onCollapseAll(_event, _target) {
-    this.element?.querySelectorAll?.("details")?.forEach?.((d) => { d.open = false; });
+  #wireTabs() {
+    const root = this.element;
+    const buttons = Array.from(root?.querySelectorAll?.("[data-fe-settings-tab-button]") ?? []);
+    const panels = Array.from(root?.querySelectorAll?.("[data-fe-settings-tab]") ?? []);
+    if (!buttons.length || !panels.length) return;
+
+    const visibleButtons = buttons.filter((button) => {
+      const tab = button.dataset.feSettingsTabButton;
+      const available = panels.some((panel) => panel.dataset.feSettingsTab === tab);
+      button.hidden = !available;
+      return available;
+    });
+    if (!visibleButtons.length) return;
+
+    const available = new Set(visibleButtons.map((button) => button.dataset.feSettingsTabButton));
+    let active = "general";
+    try { active = localStorage.getItem(FE_SM_TAB_STORE) || active; } catch { /* no-op */ }
+    if (!available.has(active)) active = visibleButtons[0].dataset.feSettingsTabButton;
+
+    const select = (tab) => {
+      for (const button of buttons) {
+        const selected = button.dataset.feSettingsTabButton === tab;
+        button.classList.toggle("active", selected);
+        button.setAttribute("aria-selected", String(selected));
+      }
+      for (const panel of panels) panel.hidden = panel.dataset.feSettingsTab !== tab;
+      try { localStorage.setItem(FE_SM_TAB_STORE, tab); } catch { /* no-op */ }
+    };
+
+    for (const button of visibleButtons) {
+      button.addEventListener("click", () => select(button.dataset.feSettingsTabButton));
+    }
+    select(active);
   }
 
   static async #onSaveAction(event, _target) {
@@ -599,6 +641,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const bool = (key) => setOne(key, !!d[key]);
     const num  = (key) => { const n = Number(d[key]); return setOne(key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };
     const str  = (key) => setOne(key, d[key] == null ? ALL_DEFAULTS[key] : String(d[key]));
+    const supplied = (key) => Object.prototype.hasOwnProperty.call(d, key);
+    const fontsEnabled = !!d[S.UI_ENABLE_FONTS];
+    const saveFontDependents = fontsEnabled || [
+      S.CHAT_FONT_CHOICE, S.CHATCARD_USE_CUSTOM_FONT, S.UI_USE_USER_FONT, S.USER_FONT_FAMILY,
+    ].some(supplied);
+    const saveAttrSource = !!d[S.ATTR_PATH_HELPER] || supplied(S.ATTR_PATH_HELPER_SOURCE);
+    const saveDecayTime = !!d.stageAutoDecay || supplied("stageDecayTime");
+    const savePlacedTokenNameSync = !!d[S.TOKEN_SYNC_NAME] || supplied(S.TOKEN_SYNC_PLACED_NAME);
     const nextChatFontChoice = String(d[S.CHAT_FONT_CHOICE] ?? ALL_DEFAULTS[S.CHAT_FONT_CHOICE] ?? "cookie");
 
     try {
@@ -614,6 +664,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
         bool(S.SC_COLLAPSE_ENABLED),
         bool(S.TOKEN_CONFIG_TWO_COLUMN),
+        ...(game.user?.isGM ? [
+          bool(S.TOKEN_SYNC_NAME),
+          ...(savePlacedTokenNameSync ? [bool(S.TOKEN_SYNC_PLACED_NAME)] : []),
+        ] : []),
 
         // Merge
         bool(S.MERGE_ENABLED), bool(S.MERGE_ONLY_TEXT), bool(S.MERGE_INCLUDE_ROLL_MESSAGES),
@@ -632,10 +686,12 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         str(S.EXPORT_PRINT_IMAGE_MODE), str(S.EXPORT_DESKTOP_EXTERNAL_MODE),
 
         // Fonts
-        str(S.CHAT_FONT_CHOICE),
-        setOne(S.UI_USE_GEURIMILGI, nextChatFontChoice === "cookie"),
-        bool(S.CHATCARD_USE_CUSTOM_FONT),
-        bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
+        ...(saveFontDependents ? [
+          str(S.CHAT_FONT_CHOICE),
+          setOne(S.UI_USE_GEURIMILGI, nextChatFontChoice === "cookie"),
+          bool(S.CHATCARD_USE_CUSTOM_FONT),
+          bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
+        ] : []),
 
         // Style
         num(S.STYLE_CHAT_MESSAGE_SPACING), num(S.STYLE_HEADER_CONTENT_GAP),
@@ -688,11 +744,13 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           num("narratorPermNarrate"), num("narratorPermDescribe"), num("narratorPermAs"),
         ] : []),
 
-        // Theatre — world/GM (enable/hide/history/decay) gated; client box dims always saved
+        // Theatre — world/GM (enable/history/decay) gated; client box dims always saved.
+        // stageHideMessages remains a compatibility-only setting and is intentionally
+        // omitted: theatre is a visual presentation of the same sidebar message.
         ...(game.user?.isGM ? [
-          bool("stageEnabled"), bool("stageHideMessages"), bool("stageExcludeSystemMessages"),
+          bool("stageEnabled"), bool("stageExcludeSystemMessages"),
           bool("stageRecallIncludeNonActor"),
-          bool("stageAutoDecay"), num("stageDecayTime"),
+          bool("stageAutoDecay"), ...(saveDecayTime ? [num("stageDecayTime")] : []),
         ] : []),
         num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
         num("stageBoxBottom"), num("stageBoxLeft"), num("stageTextSize"),
@@ -703,8 +761,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.SCREEN_PANEL_GRID_SNAP),
         bool(S.SCREEN_PANEL_DBLCLICK_CYCLE),
         // Attribute name helper — client-scoped (always saved for every user)
-        bool(S.ATTR_PATH_HELPER),
-        bool(S.ATTR_PATH_HELPER_SOURCE),
+        bool(S.ATTR_PATH_HELPER), ...(saveAttrSource ? [bool(S.ATTR_PATH_HELPER_SOURCE)] : []),
 
         // Combat Tracker — world/GM (enabled[requiresReload] + hide-defeated) gated;
         // client display prefs always saved (GM-priority forces them automatically).

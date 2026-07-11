@@ -36,7 +36,7 @@ import {
   feFireChatUiUpdated, feSetting,
 } from "./fe-gm-priority.js";
 
-import { feApplyMarkdownOnPreCreate } from "./fe-markdown.js";
+import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapProseMirrorHTML } from "./fe-markdown.js";
 
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
@@ -69,7 +69,6 @@ import {
   fePreApplyMergeHint, feSetMergeScheduleCallback,
 } from "./fe-merge.js";
 
-import { feMarkdownToHTML, feEscapeHTML } from "./fe-markdown.js";
 import { feStripChatTexturesInWindow } from "./fe-texture.js";
 import { feInstallChatLogPrune } from "./fe-chat-prune.js";
 
@@ -1350,6 +1349,7 @@ export {
   feGetChatLogs,
   feMarkdownToHTML,
   feEscapeHTML,
+  feUnwrapProseMirrorHTML,
   feGetSpeakerActorFromMessage,
   feGetMessageUserColor,
 
