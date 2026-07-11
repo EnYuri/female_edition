@@ -916,6 +916,48 @@ function onPanelSocket(data) {
   applyPanelOp(data.type, data).catch(err => console.error(`${MODULE_ID} | screen panel op failed`, err));
 }
 
+/**
+ * Item Piles 3.2.x builds libWrapper targets by treating every Actor type as a
+ * dot-separated object path. Module document types are intentionally namespaced
+ * strings ("female_edition.screenPanel"), so its generated target becomes
+ * `sheetClasses.female_edition.screenPanel` instead of the real, literal-keyed
+ * `sheetClasses["female_edition.screenPanel"]`. The failed wrapper is noisy on
+ * every client startup.
+ *
+ * Provide only that resolution path as a non-enumerable alias. It is not a
+ * second sheet registration and thus does not affect Foundry's sheet picker;
+ * non-enumerability also prevents Item Piles from scanning the alias as another
+ * actor type. This can be removed once Item Piles handles dotted type IDs.
+ */
+function feInstallItemPilesScreenPanelSheetAlias() {
+  if (!game.modules.get("item-piles")?.active) return;
+
+  const sheetClasses = CONFIG.Actor.sheetClasses;
+  const panelSheets = sheetClasses?.[FE_PANEL_TYPE];
+  if (!panelSheets) return;
+
+  try {
+    let moduleNamespace = sheetClasses[MODULE_ID];
+    if (!moduleNamespace) {
+      moduleNamespace = Object.create(null);
+      Object.defineProperty(sheetClasses, MODULE_ID, {
+        value: moduleNamespace,
+        enumerable: false,
+        configurable: true,
+      });
+    }
+
+    Object.defineProperty(moduleNamespace, "screenPanel", {
+      value: panelSheets,
+      enumerable: false,
+      configurable: true,
+    });
+  } catch (err) {
+    // A nonstandard system-owned CONFIG shape should never block panel setup.
+    console.warn(`${MODULE_ID} | could not install Item Piles screen-panel compatibility alias`, err);
+  }
+}
+
 // --------------------------------
 // Hooks
 // --------------------------------
@@ -936,6 +978,7 @@ Hooks.once("init", () => {
     makeDefault: true,
     label: "FESP.SheetLabel",
   });
+  feInstallItemPilesScreenPanelSheetAlias();
 
   game.settings.register(MODULE_ID, S.SCREEN_PANEL_ENABLED, {
     // Pass localization KEYS — at the `init` hook i18n is not yet loaded; the
