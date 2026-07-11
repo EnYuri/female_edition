@@ -2058,13 +2058,13 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
   border-color:     var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button) {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab) {
   background:   #000 !important;
   color:        var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):hover {
   background:   var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -2915,22 +2915,24 @@ body.fe-retro-theme
  *        명시도가 높으므로 충돌 없음.
  * ══════════════════════════════════════════════════════════════ */
 
-/* 전역 버튼 기본값 */
-body.fe-retro-theme button {
+/* 전역 버튼 기본값.
+   스크린 패널의 면 탭은 활성 상태에서 아래 패널의 상단선을 가리지 않도록
+   자체적으로 투명 배경을 관리하므로 이 공통 배경 규칙에서 제외한다. */
+body.fe-retro-theme button:not(.fe-sp-face-tab) {
   background-color: #000000 !important;
   border-color:     rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
   color:            var(--fe-ac-90) !important;
 }
 
 /* 전역 버튼 호버 */
-body.fe-retro-theme button:hover:not(:disabled) {
+body.fe-retro-theme button:not(.fe-sp-face-tab):hover:not(:disabled) {
   background-color: var(--fe-dx3rd-accent, #ffffff) !important;
   border-color:     var(--fe-dx3rd-accent, #ffffff) !important;
   color:            #000000 !important;
 }
 
 /* 전역 버튼 클릭(active) — 글로우로 피드백 */
-body.fe-retro-theme button:active:not(:disabled) {
+body.fe-retro-theme button:not(.fe-sp-face-tab):active:not(:disabled) {
   background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
   border-color:     var(--fe-dx3rd-accent, #ffffff) !important;
   color:            var(--fe-dx3rd-accent, #ffffff) !important;
@@ -3302,4 +3304,113 @@ body.fe-retro-theme :is(#diamond-label-left, #diamond-label-right) {
     -1px  1px 0 #000,
      1px -1px 0 #000,
     -1px -1px 0 #000 !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 41  DX3rd 상태 HUD — 캔버스 우상단 상태 아이콘
+ *        위치·크기와 상태 아이콘 자체는 시스템에 맡기고, 레트로 테마에서는
+ *        반투명 둥근 프레임만 검정/액센트의 하드 프레임으로 교체한다.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-retro-theme #dx3rd-condition-hud .dx3rd-condition-hud-icon {
+  background: #000000 !important;
+  border-color: var(--fe-ac-45, var(--fe-dx3rd-accent, #ffffff)) !important;
+}
+
+body.fe-retro-theme #dx3rd-condition-hud .dx3rd-condition-hud-icon img {
+  border: none !important;
+}
+
+body.fe-retro-theme #dx3rd-condition-hud .dx3rd-condition-hud-badge {
+  background: #b51f1f !important;
+  border: 1px solid #000000 !important;
+  color: #ffffff !important;
+  font-family: var(--fe-font-primary, monospace) !important;
+  line-height: 11px !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § 42  DX3rd 커스텀 DOM 다이얼로그
+ *        일부 사용/판정 다이얼로그는 Foundry Application이 아니라 body에
+ *        직접 삽입되고 배경·테두리를 인라인으로 지정한다. 공통 버튼은 앞선
+ *        전역 버튼 규칙에 맡기고, 여기서는 독립 루트와 의미색만 보정한다.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-retro-theme :is(
+  .weapon-use-custom-dialog,
+  .vehicle-use-custom-dialog,
+  .after-damage-dialog,
+  #dx3rd-urge-dialog,
+  #dx3rd-scene-enter-dialog,
+  #dx3rd-panic-effect-dialog,
+  #dx3rd-panic-select-dialog,
+  #dx3rd-madness-effect-dialog,
+  #dx3rd-madness-select-dialog
+) {
+  background: #000000 !important;
+  border: 2px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-ac-90, #f0f0f0) !important;
+  font-family: var(--fe-font-primary, monospace) !important;
+}
+
+body.fe-retro-theme :is(
+  .weapon-use-custom-dialog,
+  .vehicle-use-custom-dialog,
+  .after-damage-dialog
+) > :first-child,
+body.fe-retro-theme :is(
+  #dx3rd-urge-dialog,
+  #dx3rd-scene-enter-dialog,
+  #dx3rd-panic-effect-dialog,
+  #dx3rd-panic-select-dialog,
+  #dx3rd-madness-effect-dialog,
+  #dx3rd-madness-select-dialog
+) .dx3rd-urge-dialog-title {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme :is(
+  #dx3rd-urge-dialog,
+  #dx3rd-scene-enter-dialog,
+  #dx3rd-panic-effect-dialog,
+  #dx3rd-panic-select-dialog,
+  #dx3rd-madness-effect-dialog,
+  #dx3rd-madness-select-dialog
+) .dx3rd-urge-dialog-divider {
+  border-top-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme :is(
+  #dx3rd-urge-dialog,
+  #dx3rd-scene-enter-dialog,
+  #dx3rd-panic-effect-dialog,
+  #dx3rd-panic-select-dialog,
+  #dx3rd-madness-effect-dialog,
+  #dx3rd-madness-select-dialog
+) .dx3rd-urge-dialog-button {
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme :is(.weapon-use-custom-dialog, .vehicle-use-custom-dialog) button {
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme :is(
+  #dx3rd-urge-dialog,
+  #dx3rd-scene-enter-dialog,
+  #dx3rd-panic-effect-dialog,
+  #dx3rd-panic-select-dialog,
+  #dx3rd-madness-effect-dialog,
+  #dx3rd-madness-select-dialog
+) .dx3rd-urge-dialog-button.dx3rd-urge-dialog-cancel {
+  border-color: #c83f3f !important;
+  color: #ff7777 !important;
+}
+
+body.fe-retro-theme .condition-rank-dialog :is(input, select) {
+  background: #000000 !important;
+  border-color: var(--fe-ac-45, var(--fe-dx3rd-accent, #ffffff)) !important;
+  color: var(--fe-ac-90, #f0f0f0) !important;
 }

@@ -187,6 +187,24 @@
 .fe-screen-panel-sheet .fe-sp-face-actions a { cursor: pointer; opacity: 0.7; }
 .fe-screen-panel-sheet .fe-sp-face-actions a:hover { opacity: 1; }
 .fe-screen-panel-sheet .fe-sp-face textarea { resize: vertical; }
+.fe-screen-panel-sheet .fe-sp-face-body > file-picker {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.fe-screen-panel-sheet .fe-sp-face-body > file-picker > input {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+}
+.fe-screen-panel-sheet .fe-sp-face-body > file-picker > button {
+  flex: 0 0 32px;
+  width: 32px;
+  margin: 0;
+  padding: 0;
+}
 
 /* ----- Per-face linked actor section ----- */
 .fe-screen-panel-sheet .fe-sp-face-actor-section { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0, 0, 0, 0.1); }
@@ -378,3 +396,129 @@
 .fe-sp-overlay-edit-form .fe-sp-field label { font-weight: 600; font-size: 12px; }
 .fe-sp-overlay-edit-form hr { border: none; border-top: 1px solid rgba(0, 0, 0, 0.15); margin: 2px 0; }
 .fe-sp-overlay-bar-toggle { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+
+/* ----- Retro theme -----
+   The window frame is handled by fe-retro-theme.css. Keep these overrides
+   local to the panel's own canvas UI and editor surfaces. */
+body.fe-retro-theme .fe-sp-menu,
+body.fe-retro-theme .fe-sp-tooltip {
+  background: #000;
+  border-color: var(--fe-ac-45, var(--fe-dx3rd-accent, #fff));
+  color: var(--fe-ac-90, #f0f0f0);
+}
+
+body.fe-retro-theme .fe-sp-menu hr,
+body.fe-retro-theme .fe-sp-overlay-edit-form hr {
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
+}
+
+body.fe-retro-theme .fe-sp-menu-label {
+  color: var(--fe-ac-57, #aaa);
+  opacity: 1;
+}
+
+body.fe-retro-theme .fe-sp-menu-item:hover:not(:disabled) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12));
+}
+
+body.fe-retro-theme .fe-sp-menu-item.active {
+  background: var(--fe-dx3rd-accent, #fff);
+  color: #000;
+}
+
+body.fe-retro-theme .fe-sp-menu-item.danger:hover:not(:disabled) {
+  background: #b52b2b;
+  color: #fff;
+}
+
+body.fe-retro-theme .fe-sp-menu-note {
+  color: #ff8a8a;
+  opacity: 1;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet :is(
+  .fe-sp-face-tab,
+  .fe-sp-face,
+  .fe-sp-face-thumb,
+  .fe-sp-face-actor-drop,
+  .fe-sp-overlay-link,
+  .fe-sp-overlay-preview,
+  .fe-sp-attr-path,
+  .fe-sp-reference-actor
+) {
+  background: var(--fe-ac-06, rgba(255, 255, 255, 0.06));
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet :is(
+  .fe-sp-face-actor-section,
+  .fe-sp-overlay-section,
+  .fe-sp-attr-divider
+) {
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab {
+  color: var(--fe-ac-57, #aaa);
+  opacity: 1;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab:hover {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12));
+  color: var(--fe-ac-90, #f0f0f0);
+  opacity: 1;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab.active {
+  background: transparent;
+  border-color: var(--fe-dx3rd-accent, #fff);
+  color: var(--fe-dx3rd-accent, #fff);
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab.active::after {
+  content: none;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet :is(
+  .fe-sp-face-actor-drophint,
+  .fe-sp-overlay-hint,
+  .fe-sp-attr-path,
+  .fe-sp-reference-attr-name
+) {
+  color: var(--fe-ac-t33, var(--fe-ac-57, #aaa));
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet :is(
+  .fe-sp-face-actor-drop,
+  .fe-sp-overlay-link,
+  .fe-sp-reference-dropzone
+) {
+  border-color: var(--fe-ac-45, var(--fe-dx3rd-accent, #fff));
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-reference-dropzone {
+  background: #000;
+  color: var(--fe-ac-70, #ccc);
+  opacity: 1;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-attr-path:hover {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12));
+  color: var(--fe-ac-90, #f0f0f0);
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-marker:not(.has-preview):not(.picking) {
+  background: var(--fe-dx3rd-accent, #fff);
+  border-color: var(--fe-dx3rd-accent, #fff);
+  color: #000;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview {
+  background: #000;
+  border-color: currentColor;
+}
+
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-marker.dragging {
+  outline: 2px solid var(--fe-dx3rd-accent, #fff);
+  outline-offset: 0;
+}

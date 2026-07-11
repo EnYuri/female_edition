@@ -331,7 +331,16 @@ function startPanelPointer(hit, downEvent, canDrag) {
   const onUp = (e) => {
     cleanup();
     if (dragging) {
-      try { hit.doc.updateSource({ x: finalPos.x, y: finalPos.y }); } catch { /* local-only optimistic sync */ }
+      // Optimistic local sync — but ONLY for non-GM clients. The authoritative
+      // persistence is feActionMove → applyPanelOp → doc.update({x,y}). Core's
+      // update pipeline (client-backend.mjs) diffs the change against doc._source
+      // and SKIPS the DB write entirely when the diff is empty. On the GM's own
+      // client feActionMove runs doc.update() locally, so pre-writing _source via
+      // updateSource here would make that update a no-op → the move is never
+      // persisted → the position is lost on scene switch. Players relay to the GM
+      // (whose _source is untouched), so their optimistic write is safe and avoids
+      // a transient snap-back while the relay round-trips.
+      if (!game.user.isGM) { try { hit.doc.updateSource({ x: finalPos.x, y: finalPos.y }); } catch { /* no-op */ } }
       feActionMove(hit.tile, finalPos.x, finalPos.y);
       return;
     }
@@ -753,6 +762,7 @@ async function feScreenPanelPlaceOnScene(actor) {
     height: h,
     img: face.img,
     currentFace: face.index,
+    gridSnap: isGridSnapEnabled(), // initiator's intent → companion token size branch
   });
 }
 
@@ -770,6 +780,77 @@ function feFindCompanionToken(scene, flag) {
   return id ? scene?.tokens?.get(id) ?? null : null;
 }
 
+/**
+ * Companion Token size (in GRID UNITS — token width/height are grid units, NOT
+ * pixels; a NumberField that is positive & fractional-allowed, see core token.mjs).
+ * Two branches, selected by the grid-snap toggle (the SAME preference that snaps
+ * panel dragging):
+ *   - snap OFF → pixel-exact: the token covers exactly the panel image's pixel
+ *     box (fractional grid units, `px / gridSize`), so the token and the tile art
+ *     line up 1:1 regardless of grid.
+ *   - snap ON  → grid-converted: round to whole grid units so the token occupies
+ *     a clean integer number of cells (Cocoforia-style "roughly snapped" token).
+ * gridSize comes from the token's OWN scene (feSyncPanelTokenization walks scenes
+ * that may not be the viewed one), falling back to the active canvas grid.
+ */
+function feCompanionTokenSize(scene, pxWidth, pxHeight, snap) {
+  const gridSize = scene?.grid?.size || canvas?.grid?.size || 100;
+  let w = (pxWidth || gridSize) / gridSize;
+  let h = (pxHeight || gridSize) / gridSize;
+  if (snap) { w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h)); }
+  else { w = Math.max(0.05, w); h = Math.max(0.05, h); } // schema requires positive
+  return { width: w, height: h };
+}
+
+/**
+ * Create a companion Token for one already-placed panel Tile, mirroring its
+ * current position/face image and its pixel size (converted to grid units per
+ * feCompanionTokenSize). Tags the token back to this specific Tile and stores
+ * companionTokenId on the Tile's flag so feFindCompanionToken can resolve it.
+ * GM-only (embedded writes). `snap` defaults to the local grid-snap preference;
+ * PLACE passes the initiator's own flag through so their intent is honored.
+ */
+async function feCreateCompanionTokenFor(scene, tileDoc, actor, snap = isGridSnapEnabled()) {
+  const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+  const face = fePanelFace(actor, flag?.currentFace ?? 0);
+  const { width, height } = feCompanionTokenSize(scene, tileDoc.width, tileDoc.height, snap);
+  const tokenDoc = await actor.getTokenDocument({
+    x: tileDoc.x, y: tileDoc.y, width, height,
+    hidden: tileDoc.hidden,
+    texture: { src: face.img || tileDoc.texture?.src || "" },
+    flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: actor.id, companion: true, tileId: tileDoc.id } } },
+  }, { parent: scene });
+  const [created] = await scene.createEmbeddedDocuments("Token", [tokenDoc.toObject()]);
+  if (created) await tileDoc.setFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`, created.id);
+}
+
+/**
+ * Reactively reconcile every placed instance of `panelActor` (across ALL scenes)
+ * with its current `system.tokenize` setting: spawn a companion Token where one
+ * is now wanted but missing, and remove the companion where tokenize was turned
+ * off. This makes the tokenize toggle take effect on already-placed panels
+ * instead of only at placement time. GM-only; runs from the updateActor hook.
+ */
+async function feSyncPanelTokenization(panelActor) {
+  if (game.user !== game.users.activeGM) return;
+  const want = !!panelActor.system.tokenize;
+  for (const scene of game.scenes ?? []) {
+    for (const tileDoc of scene.tiles ?? []) {
+      const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+      if (!flag || flag.actorId !== panelActor.id) continue;
+      const companion = feFindCompanionToken(scene, flag);
+      try {
+        if (want && !companion) {
+          await feCreateCompanionTokenFor(scene, tileDoc, panelActor);
+        } else if (!want && companion) {
+          await scene.deleteEmbeddedDocuments("Token", [companion.id]);
+          await tileDoc.unsetFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`);
+        }
+      } catch (err) { console.warn(`${MODULE_ID} | screen panel tokenize sync failed`, err); }
+    }
+  }
+}
+
 async function applyPanelOp(type, data) {
   const requester = game.users.get(data.requesterId) ?? game.user;
 
@@ -785,17 +866,12 @@ async function applyPanelOp(type, data) {
     }]);
     // Optional companion Token (ScreenPanelData.tokenize) — same position/face
     // image, tagged back to this specific Tile placement (not just the actor,
-    // since the same panel actor may be placed more than once).
+    // since the same panel actor may be placed more than once). Token size is
+    // grid-unit-converted from the tile's pixel box, honoring the INITIATOR's
+    // own grid-snap preference (data.gridSnap) rather than the GM's.
     if (actor.system.tokenize && tileDoc) {
-      try {
-        const tokenDoc = await actor.getTokenDocument({
-          x: data.x, y: data.y, width: data.width, height: data.height,
-          texture: { src: data.img || "" },
-          flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: data.actorId, companion: true, tileId: tileDoc.id } } },
-        }, { parent: scene });
-        const [createdToken] = await scene.createEmbeddedDocuments("Token", [tokenDoc.toObject()]);
-        if (createdToken) await tileDoc.setFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`, createdToken.id);
-      } catch (err) { console.warn(`${MODULE_ID} | screen panel companion token creation failed`, err); }
+      try { await feCreateCompanionTokenFor(scene, tileDoc, actor, !!data.gridSnap); }
+      catch (err) { console.warn(`${MODULE_ID} | screen panel companion token creation failed`, err); }
     }
     return;
   }
@@ -978,6 +1054,9 @@ Hooks.on("updateActor", (actor, changes) => {
 
   // ── GM-only actor-level syncs (prototype token, linkMode, portrait) ──
   if (actor.type === FE_PANEL_TYPE && isGM) {
+    // Reactive tokenize: turning the setting on/off adds/removes the companion
+    // token for every already-placed instance (not just at placement time).
+    if (changes.system?.tokenize !== undefined) feSyncPanelTokenization(actor);
     if (facesChanged || changes.system?.defaultFace !== undefined) {
       const face = fePanelFace(actor, actor.system.defaultFace ?? 0);
       const target = face?.img || "";

@@ -1386,28 +1386,19 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
   const insert = theatreId ? _fet.inserts.get(theatreId) : null;
 
   if (!insert) {
-    if (game.user.isGM && _fetNavEl) {
-      // GM: clear actor/token so a canvas token selection doesn't leak through.
+    if (_fetNavEl) {
+      // "자신으로 말하기" is deliberately a user speaker, never the selected
+      // canvas token. In IC mode the chatMessage hook may temporarily seed an
+      // actor solely for Foundry's pre-create validation; that validation has
+      // already completed by this hook. Finish as an explicit OOC message so
+      // its presentation is as unambiguously user-spoken as its speaker data.
+      const oocStyle = CONST.CHAT_MESSAGE_STYLES
+        ? { style: CONST.CHAT_MESSAGE_STYLES.OOC }
+        : { type: CONST.CHAT_MESSAGE_TYPES.OOC };
       chatMessage.updateSource({
         speaker: { scene: null, actor: null, token: null, alias: game.user.name },
+        ...oocStyle,
       });
-    } else if (!game.user.isGM && _fetNavEl) {
-      // Player "자신으로 말하기": when PaC (ic) mode is active, assert character speaker
-      // and IC style so the message renders with the character portrait.
-      const char = game.user.character;
-      if (char) {
-        try {
-          if (game.settings.get("core", "messageMode") === "ic") {
-            const icStyle = CONST.CHAT_MESSAGE_STYLES
-              ? { style: CONST.CHAT_MESSAGE_STYLES.IC }
-              : { type: CONST.CHAT_MESSAGE_TYPES.IC };
-            chatMessage.updateSource({
-              speaker: { scene: null, actor: char.id, token: null, alias: char.name },
-              ...icStyle,
-            });
-          }
-        } catch { /* messageMode not registered on v13 — no-op */ }
-      }
     }
     return;
   }
