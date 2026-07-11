@@ -16,6 +16,11 @@
  *              @font-face는 항상 등록되어 있으나 fe-fonts-enabled 없이는 적용 안 됨.
  */
 
+/* Neo둥근모 Pro — 공식 웹폰트 키트의 고정 버전.
+ * 모듈에 TTF를 동봉하지 않아 배포 용량을 줄이고, WOFF2를 우선 사용한다.
+ * `latest` 대신 1.020을 고정해 배포 후 글꼴 결과가 예고 없이 바뀌지 않게 한다. */
+@import url("https://cdn.jsdelivr.net/gh/neodgm/neodgm-pro-webfont@1.020/neodgm_pro/style.css");
+
 /* ===================================================
  * 1) @font-face 등록 (항상 로드)
  * =================================================== */
@@ -60,14 +65,6 @@
   font-style: normal;
   font-display: swap;
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
-}
-
-@font-face {
-  font-family: "FE NeoDGM";
-  src: url("../font/NeoDunggeunmoPro-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
 }
 
 /* Mona10 — 외부 웹폰트(MonadABXY/mona-font), jsDelivr CDN 에서 로드.
@@ -334,10 +331,12 @@ body.fe-fonts-enabled.fe-ui-font-geurimilgi {
 
 /* 모든 커스텀 폰트를 NeoDGM 픽셀 폰트로 전체 교체 */
 body.fe-fonts-enabled.fe-neodgm-mode {
-  --fe-font-primary:    "FE NeoDGM", monospace;
-  --fe-font-geurimilgi: "FE NeoDGM", monospace;
-  --fe-font-secondary:  "FE NeoDGM", monospace;
-  font-feature-settings: "kern" 1;
+  --fe-font-primary:    "NeoDunggeunmo Pro", monospace;
+  --fe-font-geurimilgi: "NeoDunggeunmo Pro", monospace;
+  --fe-font-secondary:  "NeoDunggeunmo Pro", monospace;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
   font-smooth: never;
@@ -345,7 +344,9 @@ body.fe-fonts-enabled.fe-neodgm-mode {
 }
 
 body.fe-fonts-enabled.fe-neodgm-mode * {
-  font-feature-settings: "kern" 1;
+  font-kerning: normal !important;
+  font-variant-ligatures: common-ligatures !important;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1 !important;
   -webkit-font-smoothing: none !important;
   -moz-osx-font-smoothing: auto !important;
   font-smooth: never !important;

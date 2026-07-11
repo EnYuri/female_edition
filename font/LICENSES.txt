@@ -11,7 +11,7 @@ all bundled-font license notices.
   CookieRun (Black/Bold/Reg.)   CookieRun *.otf / *.ttf              CookieRun Font License
   학교안심 그림일기체          HakgyoansimGeurimilgi-R.ttf          Free font (see below)
   Neo둥근모                     neodgm.ttf                           SIL OFL 1.1
-  Neo둥근모 Pro                 NeoDunggeunmoPro-Regular.ttf         SIL OFL 1.1
+  Neo둥근모 Pro                 CDN 웹폰트 (jsDelivr)                 SIL OFL 1.1
 
 
 ========================================================================

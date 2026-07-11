@@ -397,7 +397,7 @@
       <div class="form-fields">
         <input type="checkbox" name="ceExportAutoPrint" data-dtype="Boolean" {{checked values.ceExportAutoPrint}} />
       </div>
-      <p class="notes">끄면 아카이브만 열립니다.</p>
+      <p class="notes">끄면 아카이브만 열립니다. FVTT 데스크톱 앱(Electron)에서는 HTML 저장 방식이 사용되므로 적용되지 않습니다.</p>
     </div>
 
     <div class="form-group">
@@ -430,16 +430,14 @@
           {{selectOptions choices.exportPrintImageMode selected=values.ceExportPrintImageMode}}
         </select>
       </div>
+      <p class="notes">웹 브라우저의 PDF/인쇄에만 적용됩니다. FVTT 데스크톱 앱(Electron)은 HTML 아카이브 저장 방식이라 적용되지 않습니다.</p>
     </div>
 
-    <div class="form-group">
-      <label>FVTT 데스크톱: 외부 브라우저로 아카이브 열기</label>
-      <div class="form-fields">
-        <select name="ceExportDesktopExternalMode" data-dtype="String">
-          {{selectOptions choices.exportDesktopExternalMode selected=values.ceExportDesktopExternalMode}}
-        </select>
-      </div>
-    </div>
+    <p class="notes">
+      <strong>FVTT 데스크톱 앱(Electron):</strong> 앱 내부의 PDF 인쇄는 Microsoft Print to PDF 등 OS 인쇄 기능을 사용해 느리거나 저장에 실패할 수 있습니다.
+      따라서 데스크톱 앱에서는 PDF 대신 HTML 아카이브만 저장됩니다. 저장한 HTML 파일을 Chrome/Edge에서 열어 <em>인쇄 → PDF로 저장</em>을 사용하세요.
+      일반 웹 브라우저로 접속한 경우에는 기존처럼 PDF 인쇄 기능을 사용할 수 있습니다.
+    </p>
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat">

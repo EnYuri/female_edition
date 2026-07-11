@@ -85,6 +85,22 @@ function feSanitizeExportFilename(name, fallback = "chat-log") {
 // Returns { mode: "all"|"range", from, to } or null if cancelled.
 // from/to are 1-based indices (inclusive).
 async function feShowArchiveRangeDialog(totalCount = 0) {
+  const readRange = (root) => {
+    try {
+      // DialogV2 supplies an HTMLElement while v13's Dialog callback supplies
+      // a jQuery collection.  Normalize both without making the range picker
+      // depend on either application framework.
+      const el = root?.[0] ?? root;
+      const form = el?.querySelector?.("form") ?? el;
+      const mode = form?.querySelector?.("input[name='fe-range-mode']:checked")?.value ?? "all";
+      const from = Math.max(1, parseInt(form?.querySelector?.("#fe-range-from")?.value ?? "1", 10) || 1);
+      const to = Math.max(from, parseInt(form?.querySelector?.("#fe-range-to")?.value ?? String(totalCount), 10) || totalCount);
+      return { mode, from, to };
+    } catch {
+      return { mode: "all", from: 1, to: Math.max(1, totalCount) };
+    }
+  };
+
   try {
     const content = `
 <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;">
@@ -111,35 +127,61 @@ async function feShowArchiveRangeDialog(totalCount = 0) {
   </p>
 </div>`;
 
-    return await foundry.applications.api.DialogV2.prompt({
-      window: { title: "채팅 아카이브 — 범위 선택" },
-      content,
-      ok: {
-        label: "저장 시작",
-        callback: (event, button, dialog) => {
-          const form = button.form ?? dialog.element.querySelector("form") ?? dialog.element;
-          const mode = form.querySelector?.("input[name='fe-range-mode']:checked")?.value ?? "all";
-          const from = Math.max(1, parseInt(form.querySelector?.("#fe-range-from")?.value ?? "1", 10) || 1);
-          const to = Math.max(from, parseInt(form.querySelector?.("#fe-range-to")?.value ?? String(totalCount), 10) || totalCount);
-          return { mode, from, to };
+    const DialogV2 = foundry?.applications?.api?.DialogV2;
+    if (typeof DialogV2?.prompt === "function") {
+      return await DialogV2.prompt({
+        window: { title: "채팅 아카이브 — 범위 선택" },
+        content,
+        ok: {
+          label: "저장 시작",
+          callback: (event, button, dialog) => readRange(button?.form ?? dialog?.element),
         },
-      },
-      rejectClose: false,
-      render: (event, dialog) => {
-        try {
-          const el = dialog.element;
-          // Clicking either number input switches to range mode
-          ["#fe-range-from", "#fe-range-to"].forEach((sel) => {
-            const inp = el.querySelector(sel);
-            if (inp) inp.addEventListener("focus", () => {
-              const r = el.querySelector("input[value='range']");
-              if (r) r.checked = true;
+        rejectClose: false,
+        render: (event, dialog) => {
+          try {
+            const el = dialog.element;
+            // Clicking either number input switches to range mode
+            ["#fe-range-from", "#fe-range-to"].forEach((sel) => {
+              const inp = el.querySelector(sel);
+              if (inp) inp.addEventListener("focus", () => {
+                const r = el.querySelector("input[value='range']");
+                if (r) r.checked = true;
+              });
             });
-          });
-        } catch {
-          /* no-op */
-        }
-      },
+          } catch {
+            /* no-op */
+          }
+        },
+      });
+    }
+
+    // Keep a legacy Dialog fallback for installations where DialogV2 is not
+    // exposed (including older v13-compatible environments). Do not treat
+    // that API gap as a cancellation: the archive renderer itself can still
+    // run perfectly well once a range has been chosen.
+    const LegacyDialog = globalThis.Dialog;
+    if (typeof LegacyDialog !== "function") return null;
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      const dialog = new LegacyDialog({
+        title: "채팅 아카이브 — 범위 선택",
+        content,
+        buttons: {
+          save: {
+            icon: '<i class="fas fa-save"></i>',
+            label: "저장 시작",
+            callback: (html) => finish(readRange(html)),
+          },
+        },
+        default: "save",
+        close: () => finish(null),
+      });
+      dialog.render(true);
     });
   } catch {
     return null;
@@ -405,6 +447,9 @@ function feEnsurePrintCSSOverrides() {
  *     - Avoids Chromium/Electron print clipping caused by Foundry's fixed viewport.
  *     - Lets the user save/print like a normal web page (Ctrl+S / Print to PDF).
  *  2) If popups are blocked, fall back to the in-document export container.
+ *  3) In the Foundry desktop (Electron) app, save a self-contained HTML archive
+ *     instead. Modules cannot access Electron's native printToPDF API, while
+ *     window.print() uses the slow/unreliable OS printer route.
  */
 async function feExportChatLogToPDF() {
   // Step 1: Collect messages BEFORE opening the popup window,
@@ -430,38 +475,33 @@ async function feExportChatLogToPDF() {
     preRangeSpec = null;
   }
 
-  // Step 3a: Desktop (Electron) app — window.open popups are blocked and
-  // window.print() invokes the OS print dialog (Microsoft Print to PDF → slow,
-  // 0 KB files). Render offscreen and hand off to the system browser for a real
-  // "Save as PDF". Skipped only when the user explicitly set the desktop-external
-  // mode to "off" (opting back into the legacy in-app print path below).
-  if (feIsElectron() && String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off") !== "off") {
-    const done = await feExportChatLogViaDesktopBrowser({ preCollectedMessages, preRangeSpec });
-    if (done) return;
-    // Fell through (frame/render failed) — try the legacy popup/inline path.
+  // The Electron renderer cannot call the native printToPDF API. Its
+  // window.print() route opens the OS printer dialog (often Microsoft Print to
+  // PDF), which is slow and can produce invalid files on image-heavy archives.
+  // Keep desktop export reliable and portable: download HTML, then let the user
+  // open it in any normal browser and use that browser's PDF-save feature.
+  if (feIsElectron()) {
+    const done = await feExportChatLogToDesktopHTML({ preCollectedMessages, preRangeSpec });
+    if (!done) ui.notifications?.error("female_edition | 데스크톱 앱에서 HTML 아카이브 저장에 실패했습니다. 콘솔을 확인해 주세요.", { console: false });
+    return;
   }
 
   // Step 3: Now open the archive popup window.
   const win = feOpenChatArchiveWindow();
   if (win) {
     try {
-      const desktopExternalMode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
-      const wantsExternalAuto = feIsElectron() && desktopExternalMode === "auto";
       const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
 
       const worldName = game.world?.title || game.world?.name || "";
       const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
 
       await feRenderChatArchiveWindow(win, {
-        autoPrint: wantsExternalAuto ? false : !!feSetting(S.EXPORT_AUTO_PRINT),
+        autoPrint: !!feSetting(S.EXPORT_AUTO_PRINT),
         optimize,
         preCollectedMessages,
         preRangeSpec,
       });
 
-      if (wantsExternalAuto) {
-        await feOpenArchiveInExternalBrowser(win, titleText, { closeAfter: true });
-      }
       return;
     } catch (err) {
       console.warn("female_edition | archive window export failed, falling back to inline export", err);
@@ -471,15 +511,26 @@ async function feExportChatLogToPDF() {
     }
   }
 
-  // Fallback: in-document export + print.
-  await feExportChatLogToPDFInline();
+  // Defensive second check for Electron builds whose user agent is populated
+  // late. Never allow the desktop client to fall through to window.print().
+  if (feIsElectron()) {
+    const done = await feExportChatLogToDesktopHTML({ preCollectedMessages, preRangeSpec });
+    if (!done) ui.notifications?.error("female_edition | 데스크톱 앱에서 HTML 아카이브 저장에 실패했습니다. 콘솔을 확인해 주세요.", { console: false });
+    return;
+  }
+
+  // Browser fallback: in-document export + print. Reuse the already-collected messages
+  // and range selection: popup blockers are common in the desktop client, and
+  // collecting again here used to discard the user's selected range.
+  ui.notifications?.info("female_edition | 새 창을 열 수 없어 현재 Foundry 창에서 아카이브와 인쇄를 진행합니다.", { console: false });
+  await feExportChatLogToPDFInline({ preCollectedMessages, preRangeSpec });
 }
 
 // ---------------------------------------------------------------------------
 // Export — Inline fallback (print from current document)
 // ---------------------------------------------------------------------------
 
-async function feExportChatLogToPDFInline() {
+async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRangeSpec = null } = {}) {
   if (document.body.classList.contains("fe-print-chatlog")) return;
 
   // Foundry runs the app in a fixed viewport with overflow hidden.
@@ -541,12 +592,32 @@ async function feExportChatLogToPDFInline() {
 
   try {
     const liveMessageMap = feBuildLiveChatMessageElementMap();
-    const messages = await feCollectVisibleChatMessages(game.user, {
-      liveMessageMap,
-      progress: (text) => {
-        try { if (metaEl) metaEl.textContent = text; } catch {}
-      },
-    });
+    let allMessages;
+    if (Array.isArray(preCollectedMessages) && preCollectedMessages.length > 0) {
+      allMessages = preCollectedMessages;
+    } else {
+      allMessages = await feCollectVisibleChatMessages(game.user, {
+        liveMessageMap,
+        progress: (text) => {
+          try { if (metaEl) metaEl.textContent = text; } catch {}
+        },
+      });
+    }
+
+    let rangeSpec = preRangeSpec;
+    if (rangeSpec == null) {
+      rangeSpec = await feShowArchiveRangeDialog(allMessages.length);
+      if (rangeSpec == null) {
+        cleanup();
+        return;
+      }
+    }
+    const messages = feApplyMessageRange(allMessages, rangeSpec);
+    if (!messages.length) {
+      ui.notifications?.warn("female_edition | 선택한 범위에 아카이브할 메시지가 없습니다.");
+      cleanup();
+      return;
+    }
     const renderProfile = feGetArchiveRenderProfile(messages.length);
 
     // Header/meta
@@ -650,7 +721,10 @@ function feOpenChatArchiveWindow() {
 
     const win = window.open("", "fe-chat-archive", features);
     if (!win || win.closed) {
-      ui.notifications?.warn("채팅 아카이브 팝업이 차단됐습니다. 브라우저 팝업 차단을 해제해 주세요.");
+      // The caller has a same-window render/print fallback. This is especially
+      // expected in Foundry's Electron client, where window.open is commonly
+      // disabled, so do not instruct users to change popup-blocker settings.
+      console.info("female_edition | chat archive popup unavailable; using in-document fallback");
       return null;
     }
 
@@ -666,14 +740,11 @@ function feOpenChatArchiveWindow() {
 // ---------------------------------------------------------------------------
 // Export — Desktop (Electron) path
 //
-// The Foundry desktop app blocks window.open popups (feOpenChatArchiveWindow
-// returns null), and window.print() there invokes the OS print dialog
-// ("Microsoft Print to PDF" → very slow, produces 0 KB files) instead of a
-// browser-style "Save as PDF". Instead we render the archive into a hidden,
-// same-origin <iframe> — a full document just like a popup, so the entire
-// existing render pipeline (feRenderChatArchiveWindow) is reused unchanged —
-// then hand the result to the system browser, where the user gets the real
-// print → "PDF로 저장" they expect.
+// The Foundry desktop app blocks window.open popups and its window.print()
+// route invokes an OS printer dialog, not Chromium's reliable PDF-save UI.
+// A distributed module cannot access Electron's native printToPDF API, so the
+// supported desktop output is an HTML archive saved from a hidden same-origin
+// iframe. Users can open that file in Chrome/Edge and print it to PDF there.
 // ---------------------------------------------------------------------------
 
 function feCreateHiddenArchiveFrame() {
@@ -687,7 +758,7 @@ function feCreateHiddenArchiveFrame() {
   return iframe;
 }
 
-async function feExportChatLogViaDesktopBrowser({ preCollectedMessages = null, preRangeSpec = null } = {}) {
+async function feExportChatLogToDesktopHTML({ preCollectedMessages = null, preRangeSpec = null } = {}) {
   const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
   const worldName = game.world?.title || game.world?.name || "";
   const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
@@ -700,32 +771,27 @@ async function feExportChatLogViaDesktopBrowser({ preCollectedMessages = null, p
   }
 
   try {
-    ui.notifications?.info("female_edition | 아카이브 생성 중… 완료되면 시스템 브라우저에서 열립니다.", { console: false });
+    ui.notifications?.info("female_edition | HTML 아카이브 생성 중…", { console: false });
 
     await feRenderChatArchiveWindow(win, {
       autoPrint: false,
       optimize,
+      // The HTML snapshot fetches/embeds its own assets below. Waiting for a
+      // hidden iframe to decode its full image tree first is redundant and can
+      // add a 20-second timeout (or a decode spike) in the Electron client.
+      waitForAssets: false,
       preCollectedMessages,
       preRangeSpec,
     });
 
-    // Open in the system browser (real "PDF로 저장"). force:true bypasses the
-    // desktop-external mode gate — this path only runs when the caller already
-    // decided desktop external handoff is wanted.
-    const opened = await feOpenArchiveInExternalBrowser(win, titleText, { force: true });
-    if (!opened) {
-      // Shell access unavailable (or open failed): save the HTML directly so the
-      // user can open it in a browser manually and print → PDF from there.
-      await feDownloadArchiveHTML(win, titleText);
-      ui.notifications?.info("female_edition | 외부 브라우저를 열 수 없어 HTML로 저장했습니다. 브라우저로 열어 PDF로 저장하세요.", { console: false });
-    }
-    return true;
+    const saved = await feDownloadArchiveHTML(win, titleText);
+    if (saved) ui.notifications?.info("female_edition | HTML 아카이브를 저장했습니다. Chrome 또는 Edge로 열어 인쇄 → PDF로 저장하세요.", { console: false });
+    return saved;
   } catch (err) {
-    console.warn("female_edition | desktop browser export failed", err);
+    console.warn("female_edition | desktop HTML archive export failed", err);
     return false;
   } finally {
-    // The temp file is already fully written before shell.openPath resolves, so
-    // the frame can go now; a short delay is just belt-and-suspenders.
+    // Let the browser receive the download click before tearing down its frame.
     setTimeout(() => { try { iframe.remove(); } catch {} }, 2000);
   }
 }
@@ -1046,14 +1112,11 @@ async function feFetchAllChatMessagesFromDatabase() {
     const docClass = game?.messages?.documentClass || CONFIG?.ChatMessage?.documentClass || foundry?.documents?.ChatMessage || globalThis.ChatMessage?.implementation || globalThis.ChatMessage;
     const backend = docClass?.database;
     if (!docClass || !backend?.get) return [];
-    // v13 changed the third argument of ClientBackend.get() from a User document
-    // to a plain context object { userId: string }. Passing the User object directly
-    // caused context.id to be undefined in v13's permission checks, leading to
-    // silent message filtering / empty archive results.
-    // Build the context object that works for both v12 (accepts User) and v13 (wants { userId }).
-    const userId = game?.user?.id ?? null;
-    const backendContext = userId ? { userId } : (game?.user ?? {});
-    const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, backendContext);
+    // The public v13 API defines the third argument as the requesting User
+    // document. v14 continues to accept that argument (and its client get
+    // path does not require a private context object). Passing `{userId}` here
+    // can make v13 permission-aware retrieval fail or omit older messages.
+    const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, game?.user);
     if (!Array.isArray(rows)) return [];
     return rows.map((row) => {
       if (!row) return null;
@@ -1602,18 +1665,8 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
 }
 
 // ===========================================================================
-// Platform Utilities  (filename sanitize, Electron detection, require shim)
+// Platform Utilities  (Electron detection)
 // ===========================================================================
-
-function feSanitizeFilename(name) {
-  const s = String(name ?? "")
-    .trim()
-    // Windows reserved characters
-    .replace(/[\\/:*?"<>|]+/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
-  return s.slice(0, 120);
-}
 
 function feIsElectron() {
   try {
@@ -1626,23 +1679,19 @@ function feIsElectron() {
   return false;
 }
 
-function feTryRequire(moduleName) {
-  try {
-    const req = window.require || globalThis.require;
-    if (!req) return null;
-    return req(moduleName);
-  } catch {
-    return null;
-  }
-}
-
 // ===========================================================================
 // Archive Window — Main Render Loop
 // Collects history, renders all messages into the popup document, wires
 // export/print controls, and optionally triggers autoPrint.
 // ===========================================================================
 
-async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = false, preCollectedMessages = null, preRangeSpec = null } = {}) {
+async function feRenderChatArchiveWindow(win, {
+  autoPrint = false,
+  optimize = false,
+  waitForAssets = true,
+  preCollectedMessages = null,
+  preRangeSpec = null,
+} = {}) {
   if (!win || win.closed) throw new Error("Archive window is not available.");
 
   // Treat the chat-bg-stripper's "채팅 카드 텍스쳐 제거" setting as an implicit
@@ -1666,12 +1715,9 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
   const headStyles = feCollectHeadStylesHTML();
   const baseHref = feEscapeAttr(feGetFoundryBaseHref());
 
-  // Desktop (Electron) can optionally open the archive in the system browser.
-  const desktopExternalMode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
-  const showExternalBtn = feIsElectron() && desktopExternalMode !== "off";
-  const externalBtnHTML = showExternalBtn
-    ? `<a class="fe-chat-export-action fe-chat-export-external" id="fe-archive-external" data-tooltip="외부 브라우저로 열기">브라우저</a>`
-    : "";
+  // Electron exports are saved as HTML by the entry path; do not surface an
+  // external-browser control in archive documents.
+  const externalBtnHTML = "";
 
   // Print/PDF image handling (Chrome/Electron can freeze on image-heavy pages)
   const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
@@ -2068,7 +2114,6 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
 
   const btnPrint = win.document.getElementById("fe-archive-print");
   const btnDownload = win.document.getElementById("fe-archive-download");
-  const btnExternal = win.document.getElementById("fe-archive-external");
   const btnClose = win.document.getElementById("fe-archive-close");
   const statusEl = win.document.getElementById("fe-chat-export-status");
 
@@ -2118,12 +2163,6 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     btnDownload.addEventListener("click", async (ev) => {
       ev.preventDefault();
       await feDownloadArchiveHTML(win, titleText);
-    });
-
-  if (btnExternal)
-    btnExternal.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      await feOpenArchiveInExternalBrowser(win, titleText);
     });
 
   if (btnClose)
@@ -2246,13 +2285,18 @@ async function feRenderChatArchiveWindow(win, { autoPrint = false, optimize = fa
     feFireArchiveRenderUpdated(win.document, logEl);
   } catch {}
 
-  // Wait for images so avatars/icons actually show up.
-  if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
-  const imgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
-  if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) did not load within timeout`);
+  // Popup/print output needs decoded assets before it becomes interactive.
+  // The Electron HTML path instead builds a serialized snapshot immediately;
+  // that path independently fetches and embeds assets where configured, so
+  // waiting here only wastes time and raises its peak decoded-image memory.
+  if (waitForAssets) {
+    if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
+    const imgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
+    if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) did not load within timeout`);
 
-  if (metaEl) metaEl.textContent = "Loading fonts…";
-  await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
+    if (metaEl) metaEl.textContent = "Loading fonts…";
+    await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
+  }
 
   if (metaEl) metaEl.textContent = metaText;
   try {
@@ -2905,7 +2949,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
 }
 
 async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
-  if (!win || win.closed) return;
+  if (!win || win.closed) return false;
   const metaEl = win.document.getElementById("fe-chat-export-meta");
   const originalMeta = (() => {
     try {
@@ -2940,94 +2984,9 @@ async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
   } catch (err) {
     console.warn("female_edition | failed to download archive HTML", err);
-  } finally {
-    setMeta(originalMeta);
-  }
-}
-
-async function feOpenArchiveInExternalBrowser(win, titleText = "Chat Log", { closeAfter = false, force = false } = {}) {
-  // Returns true when the archive was successfully handed to the system browser,
-  // false otherwise (so callers can fall back to a direct HTML download).
-  const mode = String(feSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE) ?? "off");
-  // `force` bypasses the mode gate — used by the desktop (Electron) export path,
-  // where opening in the system browser is the only way to get a real "Save as PDF".
-  if (mode === "off" && !force) return false;
-  if (!feIsElectron()) {
-    ui?.notifications?.warn?.("외부 브라우저 열기는 데스크톱(Electron) 앱에서만 지원됩니다.");
-    return false;
-  }
-
-  const electron = feTryRequire("electron");
-  const shell = electron?.shell;
-  const fs = feTryRequire("fs");
-  const path = feTryRequire("path");
-  const os = feTryRequire("os");
-
-  if (!shell || !fs || !path || !os) {
-    ui?.notifications?.warn?.("Electron shell/fs 접근이 불가하여 자동으로 외부 브라우저를 열 수 없습니다. 아카이브 창에서 HTML 저장 후 외부 브라우저로 열어주세요.");
-    return false;
-  }
-
-  const metaEl = win?.document?.getElementById?.("fe-chat-export-meta");
-  const originalMeta = (() => {
-    try {
-      return metaEl?.textContent ?? "";
-    } catch {
-      return "";
-    }
-  })();
-  const setMeta = (t) => {
-    try {
-      if (metaEl) metaEl.textContent = t;
-    } catch {}
-  };
-
-  try {
-    setMeta("Building HTML…");
-    const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta });
-
-    const safeName = feSanitizeFilename(titleText) || "chat-log";
-    const filePath = path.join(os.tmpdir(), `${safeName}-${Date.now()}.html`);
-    // Write as binary to avoid constructing one massive JS string for huge logs.
-    const ab = await blob.arrayBuffer();
-    const buf = globalThis.Buffer ? globalThis.Buffer.from(ab) : new Uint8Array(ab);
-    fs.writeFileSync(filePath, buf);
-
-    setMeta("Opening system browser…");
-
-    // shell.openPath is preferred for opening local files.
-    // It resolves with an error message string, or empty string on success.
-    let errMsg = "";
-    try {
-      if (typeof shell.openPath === "function") {
-        errMsg = (await shell.openPath(filePath)) || "";
-      } else if (typeof shell.openExternal === "function") {
-        await shell.openExternal(`file://${filePath}`);
-      } else {
-        throw new Error("Electron shell has no openPath/openExternal");
-      }
-    } catch (err) {
-      errMsg = String(err?.message ?? err);
-    }
-
-    if (errMsg) {
-      console.warn("female_edition | open external browser failed", errMsg);
-      ui?.notifications?.warn?.(`외부 브라우저 열기 실패: ${errMsg}`);
-    } else {
-      ui?.notifications?.info?.("외부 브라우저에서 채팅 아카이브를 열었습니다. 브라우저의 인쇄 → PDF로 저장을 사용하세요.");
-    }
-
-    if (closeAfter) {
-      try {
-        win.close();
-      } catch {}
-    }
-    return !errMsg;
-  } catch (err) {
-    console.warn("female_edition | external open failed", err);
-    ui?.notifications?.warn?.("외부 브라우저 열기 실패. HTML 저장 후 수동으로 열어주세요.");
     return false;
   } finally {
     setMeta(originalMeta);
@@ -3106,7 +3065,6 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   ];
 
   const faces = [];
-  let hasNeodgm = false;
   for (const w of weights) {
     let dataUrl = null;
     let fmt = null;
@@ -3139,46 +3097,39 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     }
   } catch {}
 
-  // Optional: embed NeoDGM (NeoDunggeunmo) pixel font (~0.65MB).
-  // Unlike Geurimilgi (which intentionally falls back to system fonts offline),
-  // the "neodgm" chat-font choice has NO acceptable system substitute — it is a
-  // pixel font. Embed it so the retro look survives offline file:// export.
-  try {
-    const neodgmUrl = `/modules/${MODULE_ID}/font/NeoDunggeunmoPro-Regular.ttf`;
-    const neodgmData = await fetchFont(neodgmUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
-    if (neodgmData) {
-      faces.push(
-        `@font-face{font-family:"FE NeoDGM Embedded";src:url(${neodgmData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
-      );
-      hasNeodgm = true;
-    }
-  } catch {}
-
-  if (!faces.length) {
-    feEmbeddedFontCssValue = "";
-    return "";
-  }
-
-  // When the embedded NeoDGM is available AND the "neodgm" chat font is active,
-  // ui-font.css's `body.fe-fonts-enabled.fe-neodgm-mode` rule remaps every font
-  // var to "FE NeoDGM" — whose font file is CORS-blocked offline. Re-assert the
-  // same selector (matching specificity, later source order → wins the tie) so
-  // the var chain resolves to the embedded face instead of falling back to
-  // generic monospace.
-  const neodgmRule = hasNeodgm
-    ? `
-/* Offline neodgm: route every font var to the embedded pixel face. */
+  // The normal UI imports the official NeoDGM Pro webfont. Re-assert the same
+  // import in standalone file:// archive HTML, whose copied module stylesheet
+  // cannot resolve its original relative location. The CDN font response permits
+  // cross-origin use, so the saved HTML remains lightweight while online.
+  const neodgmRule = `
+@import url("https://cdn.jsdelivr.net/gh/neodgm/neodgm-pro-webfont@1.020/neodgm_pro/style.css");
+/* NeoDGM Pro webfont: route every font var to the imported face. */
 body.fe-fonts-enabled.fe-neodgm-mode,
 body.fe-neodgm-mode {
-  --fe-font-primary: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
-  --fe-font-geurimilgi: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
-  --fe-font-secondary: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
-  --fe-chat-font-family: "FE NeoDGM Embedded", "FE NeoDGM", monospace;
-}`
-    : "";
+  --fe-font-primary: "NeoDunggeunmo Pro", monospace;
+  --fe-font-geurimilgi: "NeoDunggeunmo Pro", monospace;
+  --fe-font-secondary: "NeoDunggeunmo Pro", monospace;
+  --fe-chat-font-family: "NeoDunggeunmo Pro", monospace;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
+}
+body.fe-fonts-enabled.fe-neodgm-mode * {
+  font-kerning: normal !important;
+  font-variant-ligatures: common-ligatures !important;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1 !important;
+}`;
+
+  // Even if optional local faces fail to load, preserve the NeoDGM Pro webfont
+  // rule so the selected pixel-font mode does not silently fall back.
+  if (!faces.length) {
+    feEmbeddedFontCssValue = neodgmRule;
+    return neodgmRule;
+  }
 
   const css = `
 /* female_edition: embedded CookieRun fonts (offline HTML export) */
+${neodgmRule}
 ${faces.join("\n")}
 
 /* Prefer the embedded faces when opening the saved HTML as file://
@@ -3296,7 +3247,6 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
   font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
 }
-${neodgmRule}
 `;
 
     feEmbeddedFontCssValue = css;

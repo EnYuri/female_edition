@@ -92,11 +92,6 @@ const CHOICES = {
     author: "플레이어(작성자) — 같은 유저면 병합",
   },
   exportPrintImageMode: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
-  exportDesktopExternalMode: {
-    off:    "사용 안 함(앱 내부 인쇄)",
-    button: "시스템 브라우저에서 열기",
-    auto:   "시스템 브라우저에서 열기",
-  },
   chatFontChoice: {
     cookie:     "쿠키런 + 그림일기",
     cookieAll:  "쿠키런",
@@ -227,7 +222,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.EXPORT_EMBED_FONTS]:           feRead(S.EXPORT_EMBED_FONTS),
       [S.EXPORT_EMBED_IMAGES]:          feRead(S.EXPORT_EMBED_IMAGES),
       [S.EXPORT_PRINT_IMAGE_MODE]:      feRead(S.EXPORT_PRINT_IMAGE_MODE),
-      [S.EXPORT_DESKTOP_EXTERNAL_MODE]: feRead(S.EXPORT_DESKTOP_EXTERNAL_MODE),
 
       // Fonts
       [S.CHAT_FONT_CHOICE]:         feRead(S.CHAT_FONT_CHOICE),
@@ -683,7 +677,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Export
         bool(S.EXPORT_ENABLED), bool(S.EXPORT_AUTO_PRINT), bool(S.EXPORT_OPTIMIZE),
         bool(S.EXPORT_EMBED_FONTS), bool(S.EXPORT_EMBED_IMAGES),
-        str(S.EXPORT_PRINT_IMAGE_MODE), str(S.EXPORT_DESKTOP_EXTERNAL_MODE),
+        str(S.EXPORT_PRINT_IMAGE_MODE),
 
         // Fonts
         ...(saveFontDependents ? [

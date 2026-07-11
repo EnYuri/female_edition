@@ -27,3 +27,7 @@ desktop.ini
 
 #tempzip
 *.zip
+
+# Neo둥근모 Pro is retained locally for offline use, but the module now loads
+# the official webfont CDN instead of distributing this binary through GitHub.
+/font/NeoDunggeunmoPro-Regular.ttf
