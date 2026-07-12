@@ -200,6 +200,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.UI_HIDE_PORTRAITS]: feRead(S.UI_HIDE_PORTRAITS),
       [S.UI_STRIP_TEXTURES]: feRead(S.UI_STRIP_TEXTURES),
       [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
+      [S.CORE_UI_TOKEN_PREVIEW]: feRead(S.CORE_UI_TOKEN_PREVIEW),
+      [S.CORE_UI_FILEPICKER_ENHANCEMENTS]: feRead(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
       [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
       [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
       [S.TOKEN_SYNC_PLACED_NAME]: feRead(S.TOKEN_SYNC_PLACED_NAME),
@@ -651,6 +653,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         ...(game.user?.isGM ? [bool(S.TYPING_SHOW_TO_PLAYERS)] : []),
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
         bool(S.SC_COLLAPSE_ENABLED),
+        bool(S.CORE_UI_TOKEN_PREVIEW), bool(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
         bool(S.TOKEN_CONFIG_TWO_COLUMN),
         ...(game.user?.isGM ? [
           bool(S.TOKEN_SYNC_NAME),

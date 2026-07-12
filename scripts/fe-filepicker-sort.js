@@ -9,6 +9,9 @@
 //   body 파트의 <li class="file"> 들을 재정렬한다. 부분 재렌더(표시 모드 변경 등)에도
 //   매 렌더마다 다시 적용된다. 코어 클래스/템플릿은 건드리지 않는다.
 
+import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+function feFilePickerEnhancementsEnabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
+
 // ─── 영구 설정 (localStorage, 클라이언트 개인 설정) ──────────────────────────
 const LS_KEY = "fe-fp-sort-key";
 const LS_DIR = k => `fe-fp-sort-dir-${k}`;
@@ -177,6 +180,7 @@ function _hookRoot(element, app) {
 }
 
 Hooks.on("renderFilePicker", (app, element) => {
+  if (!feFilePickerEnhancementsEnabled()) return;
   const el = _hookRoot(element, app);
   if (!el?.querySelector) return;
   _injectControl(el);

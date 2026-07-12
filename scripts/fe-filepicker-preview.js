@@ -10,7 +10,13 @@
 //   (querySelector([data-application-part]) → replaceWith 제자리 교체)에 그대로 살아남는다. aside 는 파트가
 //   아니라 재렌더 대상이 아니다.
 
+import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
 const PREVIEW_WIDTH = 288; // 사이드바 폭(px). CSS grid-template-columns 와 일치시킬 것.
+function _enabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
+Hooks.once("init", () => game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS, {
+  name: "코어 UI: 파일 픽커 미리보기 및 개선", hint: "파일 픽커 미리보기와 정렬 개선을 표시합니다.",
+  scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS],
+}));
 
 // ─── 확장자 분류 ──────────────────────────────────────────────────────────────
 function _extSet(constKey, fallback) {
@@ -254,6 +260,7 @@ function _hookRoot(element, app) {
 }
 
 Hooks.on("renderFilePicker", (app, element) => {
+  if (!_enabled()) return;
   const el = _hookRoot(element, app);
   if (!el?.querySelector) return;
 

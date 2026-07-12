@@ -18,6 +18,10 @@ function feTokenConfigTwoColumnEnabled() {
   try { return !!game.settings.get(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN); }
   catch { return !!FE_DEFAULTS[S.TOKEN_CONFIG_TWO_COLUMN]; }
 }
+function feTokenPreviewEnabled() {
+  try { return !!game.settings.get(MODULE_ID, S.CORE_UI_TOKEN_PREVIEW); }
+  catch { return !!FE_DEFAULTS[S.CORE_UI_TOKEN_PREVIEW]; }
+}
 
 function _feTPGetPreviewSize() {
   const stored = localStorage.getItem(_FE_TP_STORAGE_KEY);
@@ -242,6 +246,10 @@ function feApplyPreviewSheetSize(app, root) {
 }
 
 function feRegisterTokenPreviewSettings() {
+  game.settings.register(MODULE_ID, S.CORE_UI_TOKEN_PREVIEW, {
+    name: "코어 UI: 토큰 설정 미리보기", hint: "프로토타입 토큰 비주얼 탭에 라이브 미리보기를 표시합니다.",
+    scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_TOKEN_PREVIEW],
+  });
   game.settings.register(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN, {
     name: "프로토타입 토큰 설정: 다른 탭 2열 정렬",
     hint: "비주얼 미리보기 때문에 넓어진 토큰 설정 창에서, 비주얼 탭이 아닌 탭들도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.",
@@ -446,13 +454,11 @@ function feInjectPanelBarAttributes(app, html) {
 Hooks.once("init", feRegisterTokenPreviewSettings);
 
 Hooks.on("renderPrototypeTokenConfig", (app, html) => {
-  feInjectTokenPreview(app, html);
-  feWirePreviewUpdates(app, html);
+  if (feTokenPreviewEnabled()) { feInjectTokenPreview(app, html); feWirePreviewUpdates(app, html); }
   feHideVisionTabForPanel(app, html);
   feInjectPanelBarAttributes(app, html);
 });
 
 Hooks.on("renderTokenConfig", (app, html) => {
-  feInjectTokenPreview(app, html);
-  feWirePreviewUpdates(app, html);
+  if (feTokenPreviewEnabled()) { feInjectTokenPreview(app, html); feWirePreviewUpdates(app, html); }
 });

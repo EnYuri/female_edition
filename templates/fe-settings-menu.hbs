@@ -175,6 +175,26 @@
       <p class="notes">이름이 읽힌 출처(예: name, data-property)를 이름 아래에 함께 표시합니다.</p>
     </div>
 
+    <div class="form-group">
+      <label>토큰 설정 미리보기</label>
+      <div class="form-fields"><input type="checkbox" name="ceCoreUiTokenPreview" data-dtype="Boolean" {{checked values.ceCoreUiTokenPreview}} /></div>
+      <p class="notes">프로토타입 토큰 비주얼 탭의 격자·앵커 라이브 미리보기와 조절 슬라이더를 표시합니다. 새로 여는 토큰 설정 창부터 반영됩니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>파일 픽커 미리보기 및 개선</label>
+      <div class="form-fields"><input type="checkbox" name="ceCoreUiFilepickerEnhancements" data-dtype="Boolean" {{checked values.ceCoreUiFilepickerEnhancements}} /></div>
+      <p class="notes">파일 픽커의 미리보기·드롭 업로드 영역과 이름·날짜·크기 정렬을 표시합니다. 새로 여는 파일 픽커부터 반영됩니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>토큰 설정: 다른 탭 2열 정렬</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTokenConfigTwoColumn" data-dtype="Boolean" {{checked values.ceTokenConfigTwoColumn}} />
+      </div>
+      <p class="notes">토큰 미리보기로 넓어진 프로토타입 토큰 설정 창에서, 비주얼 탭이 아닌 탭도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.</p>
+    </div>
+
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-appearance">
@@ -914,14 +934,6 @@
 
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
     <h3 class="fe-settings__section-title">토큰 설정</h3>
-
-    <div class="form-group">
-      <label>토큰 설정: 다른 탭 2열 정렬</label>
-      <div class="form-fields">
-        <input type="checkbox" name="ceTokenConfigTwoColumn" data-dtype="Boolean" {{checked values.ceTokenConfigTwoColumn}} />
-      </div>
-      <p class="notes">비주얼 미리보기 때문에 넓어진 프로토타입 토큰 설정 창에서, 비주얼 탭이 아닌 탭들도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.</p>
-    </div>
 
     {{#if isGM}}
     <div class="form-group">
