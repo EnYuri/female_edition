@@ -1084,13 +1084,18 @@ function _fetRecallTargetForMessage(message) {
   const actorId = message?.speaker?.actor;
   if (actorId) {
     const theatreId = _FET_ID_PREFIX + actorId;
-    if (_fet.inserts.has(theatreId)) {
-      return {
-        theatreId,
-        displayName: _fet.inserts.get(theatreId)?.name,
-      };
-    }
-    return null;
+    // A normal message sent while the stage selector is "없음" has no stageId,
+    // but it is still an actor's utterance. Include it in the history and let
+    // _fetEnsureMessageDisplayInsert create a receive-only display insert when
+    // it is recalled. This never adds the actor to the user's dropdown or
+    // persisted stage membership.
+    const insert = _fetGetDisplayInsert(theatreId);
+    const actor = game.actors?.get?.(actorId);
+    const stageData = actor ? _fetGetActorStageData(actor) : null;
+    return {
+      theatreId,
+      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || "무대",
+    };
   }
 
   if (!_fetRecallIncludeNonActor) return null;
@@ -1103,7 +1108,8 @@ function _fetRecallTargetForMessage(message) {
   };
 }
 
-// 현재 무대에 있는 모든 배우의 발화 타임라인. 필요하면 설정에 따라 액터 없는
+// 무대 발화와 일반 액터 발화를 아우르는 타임라인. 일반 액터 발화는 회수할 때만
+// receive-only 표시 무대를 만들어 재생한다. 필요하면 설정에 따라 액터 없는
 // 일반/OOC 메시지도 같은 커서에 포함한다. 굴림 전용·빈 메시지는 제외한다.
 function _fetRecallMessages() {
   return (game.messages?.contents ?? [])

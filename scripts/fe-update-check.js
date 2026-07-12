@@ -5,9 +5,13 @@
 
 const FE_UPD_MODULE_ID = "female_edition";
 const FE_UPD_FALLBACK_MANIFEST = "https://github.com/EnYuri/female_edition/releases/latest/download/module.json";
+// This is intentionally a browser fetch. GitHub's REST API sends CORS headers,
+// unlike release-asset redirect URLs; it is usable from an active game world.
+const FE_UPD_GITHUB_LATEST_RELEASE = "https://api.github.com/repos/EnYuri/female_edition/releases/latest";
 const FE_UPD_CACHE_KEY = "female_edition.updateCheck.v1";
 const FE_UPD_CHAT_DISABLED_KEY = "female_edition.updateCheck.chatDisabled";
 const FE_UPD_CACHE_TTL_MS = 27 * 60 * 60 * 1000;
+const FE_UPD_FAILURE_TTL_MS = 60 * 60 * 1000;
 const FE_UPD_NOTIFIED_THIS_LOAD = new Set();
 
 if (!globalThis.__femaleEditionUpdateCheckInstalled) {
@@ -161,22 +165,46 @@ function feUpdBuildNoticeContent(latest, local) {
 async function feUpdPostChatNotice(latest, local, loadKey) {
   try {
     if (feUpdChatDisabled()) return;
+    if (!feUpdIsPrimaryActiveGM()) return;
     if (typeof ChatMessage?.create !== "function") return;
 
     // Dedupe across reloads: post the chat card once per version transition.
     const cached = feUpdReadCache();
     if (String(cached.chatNotifiedFor || "") === loadKey) return;
+    if (feUpdHasPostedChatNotice(latest, local)) return;
 
     await ChatMessage.create({
       content: feUpdBuildNoticeContent(latest, local),
       speaker: { alias: "Female Edition" },
-      flags: { female_edition: { updateNotice: true } },
+      flags: { female_edition: { updateNotice: { latest, local } } },
     });
 
     // Record only after a successful post, so a failed create can retry next load.
     feUpdWriteCache({ ...feUpdReadCache(), chatNotifiedFor: loadKey });
   } catch (err) {
     console.warn("female_edition | update-notice chat post failed", err);
+  }
+}
+
+function feUpdIsPrimaryActiveGM() {
+  try {
+    const gms = Array.from(game.users ?? [])
+      .filter((user) => user?.active && user?.isGM)
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return !gms.length || gms[0]?.id === game.user?.id;
+  } catch {
+    return true;
+  }
+}
+
+function feUpdHasPostedChatNotice(latest, local) {
+  try {
+    return Array.from(game.messages ?? []).some((message) => {
+      const notice = message?.flags?.[FE_UPD_MODULE_ID]?.updateNotice;
+      return notice && String(notice?.latest ?? "") === latest && String(notice?.local ?? "") === local;
+    });
+  } catch {
+    return false;
   }
 }
 
@@ -199,6 +227,31 @@ async function feUpdCheckViaFoundryApi() {
     timeout: 15000,
   });
   return feUpdExtractPackageCheckVersion(response);
+}
+
+async function feUpdCheckViaGitHubRelease() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(FE_UPD_GITHUB_LATEST_RELEASE, {
+      method: "GET",
+      headers: { Accept: "application/vnd.github+json" },
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`GitHub release query failed (${response.status})`);
+    const release = await response.json();
+    const latestVersion = String(release?.tag_name ?? "").trim();
+    if (!latestVersion) throw new Error("GitHub latest release has no tag_name");
+    return {
+      latestVersion,
+      isUpgrade: feUpdIsNewer(latestVersion, feUpdVersionOf()),
+      isTrackChange: false,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function feUpdCheckViaRemoteManifest() {
@@ -226,6 +279,13 @@ async function feUpdCheckViaRemoteManifest() {
 
 async function feUpdCheckRemote() {
   try {
+    const checked = await feUpdCheckViaGitHubRelease();
+    if (checked?.latestVersion) return { ...checked, source: "github-release" };
+  } catch (err) {
+    console.warn("female_edition | GitHub release update check failed; trying Foundry compatibility paths", err);
+  }
+
+  try {
     const checked = await feUpdCheckViaFoundryApi();
     if (checked?.latestVersion) return { ...checked, source: "foundry" };
   } catch (err) {
@@ -249,21 +309,24 @@ async function feUpdCheckForUpdate() {
     if (feUpdIsNewer(cachedLatest, localVersion)) feUpdNotify(cachedLatest, localVersion);
     return;
   }
+  if ((now - (Number(cached.failedAt) || 0)) < FE_UPD_FAILURE_TTL_MS) return;
 
   try {
     const checked = await feUpdCheckRemote();
     const latestVersion = String(checked?.latestVersion || "").trim();
-    if (!latestVersion) return;
+    if (!latestVersion) throw new Error("No latest module version returned by any update source");
 
     feUpdWriteCache({
       checkedAt: now,
       latestVersion,
       manifest: feUpdManifestUrl(),
       source: checked?.source ?? "unknown",
+      failedAt: 0,
     });
 
     if (checked?.isUpgrade || feUpdIsNewer(latestVersion, localVersion)) feUpdNotify(latestVersion, localVersion);
   } catch (err) {
+    feUpdWriteCache({ ...feUpdReadCache(), failedAt: now });
     console.warn("female_edition | update check failed", err);
   }
 }

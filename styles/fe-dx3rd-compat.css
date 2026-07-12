@@ -146,6 +146,14 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   --checkbox-checked-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
 }
 
+/* 아이템 이름 밑줄은 상태 전환이 아니라 정보 탐색의 시각적 단서다. 전역 1ms
+   규칙에서 이 의도적 hover 드로우만 제외해, 시스템 본래의 250ms 폭 전환을 유지한다. */
+body.fe-retro-theme.fe-retro-system-dx3rd
+  :is(.double-cross-3rd, .dx3rd-emanim) .item-label::after {
+  transition-duration: 250ms !important;
+  transition-delay: 0ms !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 12  드롭 존 — 픽셀 스타일 점선 → 실선

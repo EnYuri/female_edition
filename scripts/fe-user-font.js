@@ -7,8 +7,10 @@
 // styles/ui-font.css and `feSetUserFontMode` in fe-style.js.
 //
 // Two font sources, both surfaced to the settings menu:
-//   1. font/ folder fonts — scanned via FilePicker.browse, registered as FontFace
-//      objects so their family names become usable. No permission prompt.
+//   1. font/ folder fonts — scanned via FilePicker.browse only for users with
+//      FILES_BROWSE permission, then registered as FontFace objects so their
+//      family names become usable. Other users skip the protected directory
+//      listing entirely (their local/system-font path remains available).
 //   2. locally-installed system fonts — enumerated via the Local Font Access API
 //      (window.queryLocalFonts), which needs a user gesture + a one-time permission
 //      grant. Falls back to plain manual family-name entry when unavailable.
@@ -43,6 +45,16 @@ function feResolveFilePicker() {
   );
 }
 
+// FilePicker.browse is a server-side manageFiles socket request, not a passive
+// static-file read. Calling it without this permission produces the server's
+// "You do not have permission to browse the host file system" error. Check
+// before sending anything so ordinary players neither see a warning nor spend
+// a socket round-trip on a request that is guaranteed to fail.
+function feCanBrowseModuleFonts() {
+  try { return game.user?.can?.("FILES_BROWSE") === true; }
+  catch { return false; }
+}
+
 // Derive a stable, human-readable family name from a font file name.
 // "MyCoolFont-Regular.ttf" → "MyCoolFont Regular". Prefixed so it never collides
 // with the built-in "FE *" families.
@@ -59,7 +71,7 @@ async function feRegisterModuleFolderFonts() {
     const out = [];
     try {
       const Picker = feResolveFilePicker();
-      if (!Picker?.browse) return out;
+      if (!Picker?.browse || !feCanBrowseModuleFonts()) return out;
       const res = await Picker.browse("data", FONT_DIR);
       const files = Array.isArray(res?.files) ? res.files : [];
       for (const path of files) {

@@ -1259,10 +1259,14 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
     if (game.user?.isGM && feSetting(S.GM_SPEAK_AS_SELF)) {
       try {
         // Theatre stage hook (registered later in module load order) takes priority.
-        // Skip speaker reset only when theatre has an actual actor selected (not "없음" or "자신으로 말하기").
+        // Its "없음" choice is an explicit core-speaker pass-through: preserve the
+        // speaker ChatMessage.getSpeaker() derived from the controlled canvas token
+        // (or its normal user-character/user fallback), instead of applying this GM-only
+        // speak-as-self override. An actual staged actor also owns its speaker.
         const _stageVal = document.querySelector("#fe-stage-nav select.fe-stage-select")?.value;
         const stageActive = !!_stageVal && _stageVal !== "__none__" && _stageVal !== "";
-        if (!stageActive) {
+        const stageCorePassThrough = _stageVal === "__none__";
+        if (!stageActive && !stageCorePassThrough) {
           const speaker = data?.speaker ?? message?.speaker ?? {};
           const OWNER = 3;
 
