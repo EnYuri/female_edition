@@ -49,6 +49,15 @@ function feCtOriginalActive() {
   return !!game.modules?.get?.(CTD_ID)?.active;
 }
 
+// DX3rd replaces Combat#nextTurn with its action-end/action-delay workflow.
+// That workflow must start in the acting player's browser: it opens a local
+// choice dialog, updates their owned Actor, then asks DX3rd's own GM socket
+// handler to continue the initiative process. Running it through our GM proxy
+// would put the choice dialog on the GM's screen instead.
+function feCtUsesLocalPlayerTurnEndWorkflow() {
+  return game.system?.id === "dx3rd-emanim";
+}
+
 // ── data helpers ────────────────────────────────────────────────────────────
 
 function feCtGetCombat() {
@@ -607,6 +616,14 @@ async function feCtRequestEndTurn(combat, c) {
 
   if (game.user?.isGM) {
     await feCtApplyEndTurn(payload);
+    return;
+  }
+
+  // DX3rd's nextTurn is deliberately a player-facing action-end workflow, not
+  // a direct Combat update. Let the owning player invoke it locally so its
+  // dialog and follow-up system socket run on the intended client.
+  if (feCtUsesLocalPlayerTurnEndWorkflow()) {
+    await combat.nextTurn();
     return;
   }
 
