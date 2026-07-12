@@ -59,12 +59,11 @@ const ALL_DEFAULTS = Object.freeze({
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
-  // image-hover (world/GM: feature master + perm/art/timer; client: enable/pos/size/delay/upscale)
-  ihFeatureEnabled: true,
-  ihPermission: 0, ihArtType: "character", ihShowAllTimer: 6000,
+  // image-hover (world/GM: permission/art; client: enable/pos/size/delay/upscale)
+  ihPermission: 0, ihArtType: "character",
   ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihSizeWide: 1.225, ihDelay: 0, ihMaxUpscale: 0,
   // narrator (all world/GM)
-  narratorEnabled: true, narratorDurationMult: 1, narratorStartPaused: false,
+  narratorEnabled: true, narratorDurationMult: 1,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
   // theatre (6 world/GM + 6 client)
   stageEnabled: true, stageHideMessages: false, stageExcludeSystemMessages: true,
@@ -225,7 +224,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
 
       // Fonts
       [S.CHAT_FONT_CHOICE]:         feRead(S.CHAT_FONT_CHOICE),
-      [S.CHATCARD_USE_CUSTOM_FONT]: feRead(S.CHATCARD_USE_CUSTOM_FONT),
       [S.UI_USE_GEURIMILGI]:        feRead(S.UI_USE_GEURIMILGI),
       [S.UI_USE_USER_FONT]:         feRead(S.UI_USE_USER_FONT),
       [S.USER_FONT_FAMILY]:         feRead(S.USER_FONT_FAMILY),
@@ -246,6 +244,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.USER_COLOR_BG_CUSTOM]: feRead(S.USER_COLOR_BG_CUSTOM),
       [S.USER_COLOR_ALPHA]:   feRead(S.USER_COLOR_ALPHA),
       [S.SYSTEM_MSG_COLOR]:   feRead(S.SYSTEM_MSG_COLOR),
+      [S.SYSTEM_MSG_BG_ENABLED]: feRead(S.SYSTEM_MSG_BG_ENABLED),
       [S.SYSTEM_MSG_BG_COLOR]: feRead(S.SYSTEM_MSG_BG_COLOR),
       [S.FORCE_NORMAL_MSG_COLOR]: feRead(S.FORCE_NORMAL_MSG_COLOR),
       [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
@@ -273,10 +272,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       chatImagesUploadLocation: feRead("chatImagesUploadLocation"),
 
       // Image Hover (standalone — migrated)
-      ihFeatureEnabled: feRead("ihFeatureEnabled"),
       ihPermission:   feRead("ihPermission"),
       ihArtType:      feRead("ihArtType"),
-      ihShowAllTimer: feRead("ihShowAllTimer"),
       ihEnabled:      feRead("ihEnabled"),
       ihPosition:     feRead("ihPosition"),
       ihSize:         feRead("ihSize"),
@@ -287,7 +284,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // Narrator (standalone — migrated; all world/GM)
       narratorEnabled:      feRead("narratorEnabled"),
       narratorDurationMult: feRead("narratorDurationMult"),
-      narratorStartPaused:  feRead("narratorStartPaused"),
       narratorAllowCopy:    feRead("narratorAllowCopy"),
       narratorPermNarrate:  feRead("narratorPermNarrate"),
       narratorPermDescribe: feRead("narratorPermDescribe"),
@@ -452,7 +448,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const useToggle = root.querySelector('input[name="ceUiUseUserFont"]');
     const moduleRow = root.querySelector(".fe-module-font-row");
     const userRow   = root.querySelector(".fe-user-font-row");
-    const cardToggle = root.querySelector('input[name="ceChatCardUseCustomFont"]');
     const input     = root.querySelector('input[name="ceUserFontFamily"]');
     const picker    = root.querySelector("select.fe-user-font-picker");
     const sysGroup  = root.querySelector("optgroup.fe-user-font-system-group");
@@ -465,7 +460,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       if (moduleRow) moduleRow.hidden = !fontsEnabled || userFontEnabled;
       if (userRow) userRow.hidden = !fontsEnabled || !userFontEnabled;
       if (useToggle) useToggle.disabled = !fontsEnabled;
-      if (cardToggle) cardToggle.disabled = !fontsEnabled;
       for (const field of moduleRow?.querySelectorAll("input, select, button, textarea") ?? []) {
         field.disabled = !fontsEnabled;
       }
@@ -610,14 +604,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       modal: true,
     }).catch(() => false);
     if (!ok) return;
-    await FemaleEditionSettingsMenu.#applyValues({ ...ALL_DEFAULTS });
+    await FemaleEditionSettingsMenu.#applyValues({ ...ALL_DEFAULTS }, { resetDefaults: true });
     ui.notifications?.info("설정을 모듈 기본값으로 되돌렸습니다.");
     try { await this.render(); } catch { /* no-op */ }
   }
 
   // Writes a flat key→value map into game.settings with full scope/permission gating.
   // Shared by #onSubmit (form values) and #onResetDefaults (ALL_DEFAULTS).
-  static async #applyValues(d) {
+  static async #applyValues(d, { resetDefaults = false } = {}) {
     // Fault-isolated writes. Each setter NEVER rejects: a single failing key
     // (unregistered on this core/version/system, validation error, permission)
     // must NOT abort the whole batch — otherwise the per-world capture below is
@@ -638,7 +632,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const supplied = (key) => Object.prototype.hasOwnProperty.call(d, key);
     const fontsEnabled = !!d[S.UI_ENABLE_FONTS];
     const saveFontDependents = fontsEnabled || [
-      S.CHAT_FONT_CHOICE, S.CHATCARD_USE_CUSTOM_FONT, S.UI_USE_USER_FONT, S.USER_FONT_FAMILY,
+      S.CHAT_FONT_CHOICE, S.UI_USE_USER_FONT, S.USER_FONT_FAMILY,
     ].some(supplied);
     const saveAttrSource = !!d[S.ATTR_PATH_HELPER] || supplied(S.ATTR_PATH_HELPER_SOURCE);
     const saveDecayTime = !!d.stageAutoDecay || supplied("stageDecayTime");
@@ -678,12 +672,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.EXPORT_ENABLED), bool(S.EXPORT_AUTO_PRINT), bool(S.EXPORT_OPTIMIZE),
         bool(S.EXPORT_EMBED_FONTS), bool(S.EXPORT_EMBED_IMAGES),
         str(S.EXPORT_PRINT_IMAGE_MODE),
+        // Hidden legacy preference: preserve it on ordinary saves, but honour
+        // the reset action's promise to restore every registered setting.
+        ...(resetDefaults ? [str(S.EXPORT_DESKTOP_EXTERNAL_MODE)] : []),
 
         // Fonts
         ...(saveFontDependents ? [
           str(S.CHAT_FONT_CHOICE),
           setOne(S.UI_USE_GEURIMILGI, nextChatFontChoice === "cookie"),
-          bool(S.CHATCARD_USE_CUSTOM_FONT),
           bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
         ] : []),
 
@@ -696,12 +692,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // User-color background
         bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
         str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
-        str(S.SYSTEM_MSG_BG_COLOR),
+        bool(S.SYSTEM_MSG_BG_ENABLED), str(S.SYSTEM_MSG_BG_COLOR),
         bool(S.FORCE_NORMAL_MSG_COLOR),
         bool(S.CHAT_GROUP_OUTLINE),
 
-        // Retro theme (general — visible/saved in all systems)
+        // Retro theme (general — visible/saved in all systems). The accent is
+        // edited from the chat-control swatch, so only the reset path touches it.
         bool(S.UI_RETRO_THEME), bool(S.ACCENT_TEXT_OVERRIDE),
+        ...(resetDefaults ? [str(S.DX3RD_PIXEL_ACCENT)] : []),
 
         // DND5e injection (world-scoped — only GM can set; fields hidden for non-GMs)
         ...(feIsDnd5eSystem() && game.user?.isGM ? [
@@ -727,22 +725,23 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool("chatImagesEnabled"), bool("chatImagesShowButton"),
         ...(game.user?.isGM ? [str("chatImagesUploadLocation")] : []),
 
-        // Image Hover — world/GM (feature master + perm/art/timer) gated; client prefs always saved
-        ...(game.user?.isGM ? [bool("ihFeatureEnabled"), num("ihPermission"), str("ihArtType"), num("ihShowAllTimer")] : []),
+        // Image Hover — world/GM (permission/art) gated; client prefs always saved
+        ...(game.user?.isGM ? [num("ihPermission"), str("ihArtType")] : []),
         bool("ihEnabled"), str("ihPosition"), num("ihSize"), num("ihSizeWide"), num("ihDelay"), num("ihMaxUpscale"),
 
         // Narrator — all world/GM
         ...(game.user?.isGM ? [
-          bool("narratorEnabled"), num("narratorDurationMult"), bool("narratorStartPaused"),
+          bool("narratorEnabled"), num("narratorDurationMult"),
           bool("narratorAllowCopy"),
           num("narratorPermNarrate"), num("narratorPermDescribe"), num("narratorPermAs"),
         ] : []),
 
         // Theatre — world/GM (enable/history/decay) gated; client box dims always saved.
-        // stageHideMessages remains a compatibility-only setting and is intentionally
-        // omitted: theatre is a visual presentation of the same sidebar message.
+        // stageHideMessages remains hidden during ordinary saves, but must reset.
         ...(game.user?.isGM ? [
-          bool("stageEnabled"), bool("stageExcludeSystemMessages"),
+          bool("stageEnabled"),
+          ...(resetDefaults ? [bool("stageHideMessages")] : []),
+          bool("stageExcludeSystemMessages"),
           bool("stageRecallIncludeNonActor"),
           bool("stageAutoDecay"), ...(saveDecayTime ? [num("stageDecayTime")] : []),
         ] : []),

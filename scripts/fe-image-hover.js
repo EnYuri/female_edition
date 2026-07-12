@@ -7,7 +7,6 @@
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 
 const _IH_MODULE = "female_edition";
-const _IH_SOCKET_TYPE = "fe-image-hover";
 const _IH_DEFAULT_TOKEN = "icons/svg/mystery-man.svg";
 
 const _IH_VIDEO_EXTS = new Set(["mp4", "ogg", "webm", "m4v"]);
@@ -24,12 +23,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 /** url → {width, height} dimension cache */
 let _ihCache = {};
-/** setTimeout handle for showToAll auto-close */
-let _ihTimer;
 /** setTimeout handle for hover-delay — cleared before re-creating to prevent pile-up */
 let _ihDelayTimer;
-/** True while showToAll is active — suppresses new hover events */
-let _ihShowAll = false;
 
 /** True after X is pressed while hovering — cleared when mouse leaves the token */
 let _ihKeyToggled = false;
@@ -46,19 +41,17 @@ let _ihDomDelayTimer;
 
 // Runtime settings cache (populated in init, refreshed on settings close)
 let _ihPermission = 0;
-let _ihFeatureEnabled = true; // world/GM master switch (whole feature)
-let _ihEnabled = true;        // per-client toggle
+let _ihEnabled = true; // per-client toggle
 let _ihPosition = "Bottom left";
-let _ihSize = 7;
+let _ihSize = 3;
 let _ihSizeWide = 1.225; // size divisor for wide (landscape) images — applied to screen HEIGHT
 let _ihArtType = "character";
 let _ihDelay = 0;
-let _ihShowAllTimer = 6000;
 let _ihMaxUpscale = _IH_MAX_UPSCALE; // resolution-based upscale cap factor; 0 = no cap (unlimited)
 
-/** Effective enabled state: world master AND this client's toggle. */
+/** Effective enabled state for this client. */
 function _ihActive() {
-  return _ihFeatureEnabled && _ihEnabled;
+  return _ihEnabled;
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
@@ -93,41 +86,6 @@ function _ihRegisterSettings() {
     onChange: () => _ihLoadSettings(),
   });
 
-  game.keybindings.register(_IH_MODULE, "ihShowAllKey", {
-    name: "Image Hover: 모두에게 아트 표시 (GM 전용)",
-    restricted: true,
-    editable: [],
-    onDown: () => {
-      const token = canvas.tokens.hover;
-      if (!token) return;
-      canvas.hud.imageHover?.showToAll(token);
-      game.socket.emit("module.female_edition", { type: _IH_SOCKET_TYPE, tokenID: token.id });
-    },
-  });
-
-  game.settings.register(_IH_MODULE, "ihShowAllTimer", {
-    name: "Image Hover: 전체 표시 지속 시간 (ms)",
-    hint: "GM의 전체 표시 키바인드 사용 시 아트가 유지되는 시간(밀리초).",
-    restricted: true,
-    scope: "world",
-    config: false,
-    range: { min: 1000, max: 15000, step: 200 },
-    default: 6000,
-    type: Number,
-    onChange: () => _ihLoadSettings(),
-  });
-
-  game.settings.register(_IH_MODULE, "ihFeatureEnabled", {
-    name: "Image Hover: 기능 전체 사용 (GM)",
-    hint: "월드 전체에서 Image Hover 기능을 켜고 끕니다. 끄면 모든 클라이언트에서 비활성화됩니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: () => { _ihLoadSettings(); canvas.hud.imageHover?.close(); },
-  });
-
   game.settings.register(_IH_MODULE, "ihEnabled", {
     name: "Image Hover: 활성화/비활성화",
     hint: "비활성화 시 이 클라이언트에서 Image Hover를 끕니다.",
@@ -148,7 +106,7 @@ function _ihRegisterSettings() {
         if (_ihKeyToggled) {
           // 이미 표시 중 → 취소
           _ihKeyToggled = false;
-          if (!_ihShowAll) canvas.hud.imageHover?.close();
+          canvas.hud.imageHover?.close();
         } else {
           _ihKeyToggled = true;
           canvas.hud.imageHover?.showArtworkRequirements(token, true, _ihDelay);
@@ -244,14 +202,12 @@ function _ihRegisterSettings() {
 
 function _ihLoadSettings() {
   _ihPermission     = game.settings.get(_IH_MODULE, "ihPermission");
-  _ihFeatureEnabled = game.settings.get(_IH_MODULE, "ihFeatureEnabled");
   _ihEnabled        = game.settings.get(_IH_MODULE, "ihEnabled");
   _ihPosition       = game.settings.get(_IH_MODULE, "ihPosition");
   _ihSize           = game.settings.get(_IH_MODULE, "ihSize");
   _ihSizeWide       = game.settings.get(_IH_MODULE, "ihSizeWide");
   _ihArtType        = game.settings.get(_IH_MODULE, "ihArtType");
   _ihDelay          = game.settings.get(_IH_MODULE, "ihDelay");
-  _ihShowAllTimer   = game.settings.get(_IH_MODULE, "ihShowAllTimer");
   _ihMaxUpscale     = game.settings.get(_IH_MODULE, "ihMaxUpscale");
 }
 
@@ -397,7 +353,7 @@ function _ihComputePosition(imageWidth, imageHeight) {
 
 function _ihClearArt() {
   _ihKeyToggled = false;
-  if (!_ihShowAll) canvas.hud.imageHover?.close();
+  canvas.hud.imageHover?.close();
   _ihHideDomArt();
 }
 
@@ -619,9 +575,6 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     // Mouse button held — user is dragging.
     if (pointerEvent?.buttons > 0) return;
 
-    // showToAll is active — do not disturb the displayed art.
-    if (_ihShowAll) return;
-
     // Token layer active? Compare against canvas.tokens directly — version-agnostic
     // (avoids a hard dependency on the `foundry.canvas.layers.TokenLayer` path,
     // which would throw in `instanceof` if that namespace differs across cores).
@@ -643,21 +596,6 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
     }
   }
 
-  /**
-   * Show art to this client for showAllTimer ms.
-   * Called both locally (GM keybind) and via socket (all other users).
-   * @param {Token} token
-   */
-  showToAll(token) {
-    if (!token || !_ihActive()) return;
-    _ihShowAll = true;
-    canvas.hud.imageHover.bind(token);
-    clearTimeout(_ihTimer);
-    _ihTimer = setTimeout(() => {
-      _ihShowAll = false;
-      canvas.hud.imageHover.close();
-    }, _ihShowAllTimer);
-  }
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
@@ -686,7 +624,7 @@ Hooks.on("renderHeadsUpDisplayContainer", (_app, html) => {
 
 /** Main hover entry point. */
 Hooks.on("hoverToken", (token, hovered) => {
-  if (_ihShowAll || !canvas.hud.imageHover) return;
+  if (!canvas.hud.imageHover) return;
   if (!hovered) {
     // 토큰에서 마우스가 떠남 → 래치 해제 + 이미지 닫기
     _ihKeyToggled = false;
@@ -767,7 +705,7 @@ Hooks.on("canvasReady", () => { _ihCache = {}; });
 window.addEventListener("blur", () => {
   if (_ihKeyToggled) {
     _ihKeyToggled = false;
-    if (!_ihShowAll) canvas.hud?.imageHover?.close();
+    canvas.hud?.imageHover?.close();
   }
   _ihHideDomArt();
 });
@@ -791,14 +729,6 @@ document.addEventListener("pointerout", (ev) => {
 Hooks.on("init", () => {
   _ihRegisterSettings();
   _ihLoadSettings();
-
-  // Socket: GM emits a tokenID; all other clients call showToAll locally.
-  // Uses a type discriminator so other female_edition socket consumers are unaffected.
-  game.socket.on("module.female_edition", (data) => {
-    if (data?.type !== _IH_SOCKET_TYPE) return;
-    const token = canvas.tokens?.get(data.tokenID);
-    if (token) canvas.hud.imageHover?.showToAll(token);
-  });
 });
 
 // Reload runtime settings cache after the user closes the settings dialog.

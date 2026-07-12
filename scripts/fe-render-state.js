@@ -134,6 +134,15 @@ function feGetMessageUserColor(message) {
   }
 }
 
+function feGetActiveGmColor() {
+  try {
+    const gm = Array.from(game?.users ?? []).find((user) => user?.isGM && user?.active && user?.color);
+    return gm?.color ? String(gm.color) : null;
+  } catch {
+    return null;
+  }
+}
+
 function feGetMessageUserColorForData(message, data = {}, userId = null) {
   try {
     const actor = feGetSpeakerActorFromLike(message, data);
@@ -468,6 +477,7 @@ function feUserColorBgFeatureActive() {
 function feApplyUserColorBgToMessageElement(message, messageEl) {
   try {
     const tintEnabled = !!feSetting(S.USE_USER_COLOR_BG);
+    const systemGmTintEnabled = !!feSetting(S.SYSTEM_MSG_COLOR);
     const enabled = feUserColorBgFeatureActive();
     const el0 = messageEl?.[0] ?? messageEl;
     if (!el0?.classList || !el0?.style) return;
@@ -489,12 +499,25 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
       return;
     }
 
-    // Resolve the character (author/owner) color ONCE and reuse it below. null →
-    // a "system" message (GM NPC/narration, author-less, Foundry system) which
-    // gets the optional neutral system color via body.fe-system-msg-color.
-    // (Narration is handled separately by .fe-narrator-chat in the same rule.)
+    // Resolve the character (author/owner) color once. null identifies a system
+    // message (GM NPC/narration, author-less, Foundry system).
     const charColor = feGetMessageUserColor(message);
-    el0.classList.toggle("fe-system-msg", charColor == null);
+    const isSystemMessage = charColor == null;
+    el0.classList.toggle("fe-system-msg", isSystemMessage);
+    el0.classList.remove("fe-system-gm-tint");
+
+    // System messages can optionally reuse the active GM's user-color tint.
+    // They intentionally remain independent of the ordinary player tint/base
+    // settings, so enabling this does not recolor normal chat messages.
+    if (isSystemMessage && systemGmTintEnabled) {
+      const parsed = feParseHexColorToRgb(feGetActiveGmColor());
+      if (parsed) {
+        el0.classList.remove("fe-has-user-color");
+        el0.classList.add("fe-system-gm-tint");
+        el0.style.setProperty("--fe-user-color-rgb", `${parsed.r} ${parsed.g} ${parsed.b}`);
+        return;
+      }
+    }
 
     if (!enabled) {
       el0.classList.remove("fe-has-user-color");

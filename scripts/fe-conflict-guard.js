@@ -47,7 +47,7 @@ const FE_CG_SELF_GUARD = ["female_edition", "_FET_", "FemaleEdition"];
 const FE_CG_CONFLICTS = [
   {
     id: "narrator-tools",
-    feature: "내레이터 채널",
+    feature: "내레이터 채팅",
     detail: "내레이션 오버레이와 슬래시 명령이 이중으로 실행됩니다.",
     // Verified live: arrow handlers carry "NarratorTools" in source; the three
     // chat hooks are `Method.bind(NarratorTools)` → identified by fn.name
@@ -163,9 +163,9 @@ const FE_CG_CONFLICTS = [
     // pattern as chatlog-prune. Carousel is actively maintained, so we never
     // neutralize it.
     id: "combat-tracker-dock",
-    feature: "배틀 트래커",
+    feature: "컴뱃 트래커",
     mode: "yield",
-    detail: "female_edition이 내장 배틀 트래커를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
+    detail: "female_edition이 내장 컴뱃 트래커를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
   },
 ];
 

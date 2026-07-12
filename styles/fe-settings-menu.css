@@ -1,9 +1,12 @@
 /* Female-cupwhi: Settings Menu */
 
 /* 통합 설정 패널 스크롤 — AppV2 form 창의 window-content 가 overflow-y:hidden 이라
- * 내용이 뷰포트보다 길면 아래 항목이 잘려 접근 불가했다. 세로 스크롤 허용. */
+ * 내용이 뷰포트보다 길면 아래 항목이 잘려 접근 불가했다. 세로 스크롤 허용.
+ * 탭별 세로 길이 차이로 스크롤바가 나타나거나 사라져도, 거터를 항상 확보해
+ * 자동 크기 조절 창의 폭이 탭 전환마다 흔들리지 않게 한다. */
 .fe-settings-menu .window-content {
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .fe-settings-menu .fe-settings__topbar {
@@ -18,23 +21,24 @@
 }
 
 .fe-settings-menu .fe-settings__tabs {
-  display: flex;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px 2px;
   margin: 12px 0;
-  padding: 3px 3px 0;
+  padding: 3px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  overflow-x: auto;
 }
 
 .fe-settings-menu .fe-settings__tab {
-  flex: 0 0 auto;
+  min-width: 0;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 7px 10px;
+  padding: 7px 6px;
   background: transparent;
   color: inherit;
   opacity: 0.7;
+  white-space: nowrap;
 }
 
 .fe-settings-menu .fe-settings__tab:hover,

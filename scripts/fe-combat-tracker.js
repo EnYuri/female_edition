@@ -253,8 +253,8 @@ function feCtBtnHTML(action, icon, label) {
 function feCtCollapseBtnHTML() {
   // 트래커 UI 끄기/최소화 — GM·플레이어 공통(개인 UI 토글이므로 권한 무관).
   const label = _ctCollapsed
-    ? feCtL("FECT.Expand", "배틀 트래커 펼치기")
-    : feCtL("FECT.Collapse", "배틀 트래커 최소화");
+    ? feCtL("FECT.Expand", "컴뱃 트래커 펼치기")
+    : feCtL("FECT.Collapse", "컴뱃 트래커 최소화");
   return feCtBtnHTML("toggle-collapse", _ctCollapsed ? "fa-window-maximize" : "fa-window-minimize", label);
 }
 
@@ -886,7 +886,7 @@ Hooks.once("ready", () => {
   if (feCtOriginalActive()) {
     console.warn(
       `[female_edition] combat-tracker: 「Carousel Combat Tracker」(${CTD_ID}) 활성 — ` +
-        `내장 배틀 트래커를 끄고 원본에 양보합니다.`
+        `내장 컴뱃 트래커를 끄고 원본에 양보합니다.`
     );
     return;
   }

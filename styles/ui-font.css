@@ -638,7 +638,7 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
 }
 
 body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  .chat-message :is(.dice-roll, .dice-result, .dice-formula, .dice-total) {
+  .chat-message :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total) {
   font-family: var(--fe-chat-font-family) !important;
 }
 

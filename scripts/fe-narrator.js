@@ -38,7 +38,6 @@ const _FN_TYPE_FLAG     = "narratorType";
 // ── Settings cache ───────────────────────────────────────────────────────────
 let _fnEnabled       = true;
 let _fnDurationMult  = 1;
-let _fnStartPaused   = false;
 let _fnAllowCopy     = true;
 let _fnPermNarrate   = 4; // CONST.USER_ROLES.GAMEMASTER
 let _fnPermDescribe  = 4;
@@ -86,11 +85,6 @@ function _fnRegisterSettings() {
     scope: "world", config: false, restricted: true, type: Number,
     range: { min: 0.25, max: 4, step: 0.25 }, default: 1,
     onChange: (v) => { _fnDurationMult = v; },
-  });
-  game.settings.register(_FN_MODULE, "narratorStartPaused", {
-    name: "내레이터: 항상 일시정지 상태로 시작",
-    scope: "world", config: false, restricted: true, type: Boolean, default: false,
-    onChange: (v) => { _fnStartPaused = v; },
   });
   game.settings.register(_FN_MODULE, "narratorAllowCopy", {
     name: "내레이터: 복사 버튼 표시",
@@ -141,7 +135,6 @@ function _fnRoleChoices() {
 function _fnLoadSettings() {
   _fnEnabled      = game.settings.get(_FN_MODULE, "narratorEnabled");
   _fnDurationMult = game.settings.get(_FN_MODULE, "narratorDurationMult");
-  _fnStartPaused  = game.settings.get(_FN_MODULE, "narratorStartPaused");
   _fnAllowCopy    = game.settings.get(_FN_MODULE, "narratorAllowCopy");
   _fnPermNarrate  = Number(game.settings.get(_FN_MODULE, "narratorPermNarrate"));
   _fnPermDescribe = Number(game.settings.get(_FN_MODULE, "narratorPermDescribe"));
@@ -307,7 +300,7 @@ function _fnController(state) {
     _fn.bg.style.height = `${h * 3}px`;
     _fn.buttons.style.opacity = "1";
     _fn.visible = true;
-    const paused = n.paused || _fnStartPaused;
+    const paused = !!n.paused;
     _fnUpdatePauseButton(paused);
     _fnRunNarration(n, paused);
     return;
@@ -420,7 +413,7 @@ function _fnCreateMessage(type, message, options = {}) {
 
   if (type === "narration") {
     const prev = _fnGetState().narration;
-    _fnSetNarration({ id: (prev.id ?? 0) + 1, display: true, message: rendered, paused: _fnStartPaused });
+    _fnSetNarration({ id: (prev.id ?? 0) + 1, display: true, message: rendered, paused: false });
   }
   return ChatMessage.create(chatData, {});
 }

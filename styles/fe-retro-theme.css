@@ -168,6 +168,53 @@ body.fe-retro-theme.fe-msg-bg-usercolor
   background-color: rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-user-color-alpha, 0.22)) !important;
 }
 
+/* Expanded roll details are a real panel, not a continuation of the message
+ * background.  Give it the same hard-edged pixel treatment and color family
+ * as its owning chat message; otherwise retro chat abruptly falls back to the
+ * core parchment/transparent tooltip surface. */
+body.fe-retro-theme
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(.chat-message, .message) .dice-roll.expanded > .dice-tooltip {
+  --fe-retro-dice-panel-border: var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff));
+  box-sizing: border-box;
+  border: 1px solid var(--fe-retro-dice-panel-border) !important;
+  background-color: rgb(0 0 0 / 0.76) !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, #e6e6e6) !important;
+  transition: none !important;
+}
+
+body.fe-retro-theme.fe-msg-bg-usercolor
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(.chat-message, .message).fe-has-user-color .dice-roll.expanded > .dice-tooltip {
+  --fe-retro-dice-panel-border: rgb(var(--fe-user-color-rgb, 255 255 255));
+  background-color: rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-user-color-alpha, 0.22)) !important;
+}
+
+/* The retro blanket rule intentionally removes box-shadows, so the normal
+ * solid-base tint cannot use its inset-shadow implementation here.  Paint the
+ * equivalent two layers directly on the dice panel instead. */
+body.fe-retro-theme:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(.chat-message, .message) .dice-roll.expanded > .dice-tooltip {
+  background-color: rgb(var(--fe-dice-tooltip-bg-rgb) / 1) !important;
+}
+
+body.fe-retro-theme:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(.chat-message, .message).fe-has-user-color .dice-roll.expanded > .dice-tooltip {
+  background-image: linear-gradient(
+    rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)),
+    rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22))
+  ) !important;
+}
+
+body.fe-retro-theme
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(.chat-message, .message) .dice-roll.expanded .dice-tooltip .part-header {
+  border-color: var(--fe-retro-dice-panel-border, var(--fe-dx3rd-accent, #ffffff)) !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 5  SVG 아이콘만 픽셀 렌더링 — <img> 포트레이트/토큰/저널은 제외

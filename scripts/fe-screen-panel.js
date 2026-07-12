@@ -454,6 +454,72 @@ function applyPanelTileVisibility(tile) {
 
 const FE_OVERLAY_TEXT_CLASS = foundry.canvas?.containers?.PreciseText ?? PIXI.Text;
 
+// Canvas-local reverse indexes used by updateActor.  A normal Actor update (HP,
+// resources, effects, etc.) used to scan every Tile on the current scene and
+// resolve every overlay UUID just to discover whether that Actor was displayed
+// anywhere.  Keep the lookup work at Tile draw/update time instead, when the
+// panel's current face is already being refreshed.  These contain Placeable
+// objects only, so they are cleared whenever the canvas is redrawn.
+const fePanelTilesByActorId = new Map();
+const fePanelTilesByLinkedActorId = new Map();
+const fePanelTileIndexEntries = new WeakMap();
+let fePanelTileIndexReady = false;
+
+function feRemovePanelTileFromIndex(tile) {
+  const entry = fePanelTileIndexEntries.get(tile);
+  if (!entry) return;
+  const remove = (map, id) => {
+    const tiles = map.get(id);
+    if (!tiles) return;
+    tiles.delete(tile);
+    if (!tiles.size) map.delete(id);
+  };
+  remove(fePanelTilesByActorId, entry.panelActorId);
+  for (const actorId of entry.linkedActorIds) remove(fePanelTilesByLinkedActorId, actorId);
+  fePanelTileIndexEntries.delete(tile);
+}
+
+function feIndexPanelTile(tile) {
+  feRemovePanelTileFromIndex(tile);
+  try {
+    const flag = tile?.document?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
+    const panelActorId = flag?.actorId;
+    const panelActor = panelActorId ? game.actors.get(panelActorId) : null;
+    if (!panelActor) return;
+
+    const linkedActorIds = new Set();
+    const face = fePanelFace(panelActor, flag.currentFace ?? 0);
+    for (const overlay of face.overlays ?? []) {
+      if (!overlay?.linkedActorUuid) continue;
+      try {
+        const linked = fromUuidSync(overlay.linkedActorUuid);
+        if (linked?.id) linkedActorIds.add(linked.id);
+      } catch { /* stale UUID: no live label to refresh */ }
+    }
+
+    const add = (map, id) => {
+      let tiles = map.get(id);
+      if (!tiles) map.set(id, tiles = new Set());
+      tiles.add(tile);
+    };
+    add(fePanelTilesByActorId, panelActorId);
+    for (const actorId of linkedActorIds) add(fePanelTilesByLinkedActorId, actorId);
+    fePanelTileIndexEntries.set(tile, { panelActorId, linkedActorIds });
+  } catch { /* no-op */ }
+}
+
+function feBuildPanelTileIndex() {
+  fePanelTilesByActorId.clear();
+  fePanelTilesByLinkedActorId.clear();
+  for (const tile of canvas?.tiles?.placeables ?? []) feIndexPanelTile(tile);
+  fePanelTileIndexReady = true;
+}
+
+function feGetIndexedPanelTiles(actorId, { linked = false } = {}) {
+  if (!fePanelTileIndexReady) feBuildPanelTileIndex();
+  return Array.from((linked ? fePanelTilesByLinkedActorId : fePanelTilesByActorId).get(actorId) ?? []);
+}
+
 function feClearPanelOverlays(tile) {
   const list = tile?._fePanelOverlays;
   if (list?.length) {
@@ -1040,7 +1106,11 @@ Hooks.once("ready", () => {
   if (canvas?.ready) attachBoardListeners();
 });
 
-Hooks.on("canvasReady", attachBoardListeners);
+Hooks.on("canvasReady", () => {
+  fePanelTileIndexReady = false;
+  attachBoardListeners();
+  feBuildPanelTileIndex();
+});
 // drawTile fires on initial draw, full redraw, AND face flips (texture.src sets
 // the redraw flag), each time with the new texture loaded — so it is the only
 // hook the aspect resize needs.
@@ -1048,12 +1118,21 @@ Hooks.on("drawTile", enforcePanelTileSize);
 // Must run AFTER enforcePanelTileSize — it reads the tile's just-resized mesh
 // (via panelTileRect) to position labels against the actually-drawn art.
 Hooks.on("drawTile", feRebuildPanelOverlays);
+Hooks.on("drawTile", feIndexPanelTile);
 Hooks.on("drawTile", applyPanelTileVisibility);
 Hooks.on("refreshTile", feRepositionPanelOverlays);
 Hooks.on("refreshTile", applyPanelTileVisibility);
 // Orphaned overlay PIXI objects aren't covered by core's own Tile teardown
 // (canvas.primary.removeTile only destroys the mesh it tracks itself).
-Hooks.on("deleteTile", (doc) => { if (doc?.object) feClearPanelOverlays(doc.object); });
+Hooks.on("deleteTile", (doc) => {
+  if (!doc?.object) return;
+  feClearPanelOverlays(doc.object);
+  feRemovePanelTileFromIndex(doc.object);
+});
+// Face flips and panel-flag changes are document updates. Reindex immediately
+// so a linked Actor update in the same render cycle still finds the right tile;
+// drawTile repeats this harmlessly once the new texture is ready.
+Hooks.on("updateTile", (doc) => { if (doc?.object) feIndexPanelTile(doc.object); });
 
 // Force the screenPanel option to the BOTTOM of the Actor-create type dropdown.
 // Core sorts types alphabetically by label (ClientDocument.createDialog), which
@@ -1124,18 +1203,24 @@ Hooks.on("updateActor", (actor, changes) => {
   }
 
   // ── Canvas tile updates (all clients) ──
-  for (const tile of canvas?.tiles?.placeables ?? []) {
-    const flag = tile.document.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+  // Look up only tiles owned by this panel Actor, or tiles whose CURRENT face
+  // displays the changed Actor. This replaces the former every-Actor-update ×
+  // every-Tile × every-overlay scan. The index is refreshed on drawTile,
+  // updateTile, canvasReady, and panel-system changes below.
+  const isUpdatedPanelActor = actor.type === FE_PANEL_TYPE;
+  const tiles = isUpdatedPanelActor
+    ? feGetIndexedPanelTiles(actor.id)
+    : feGetIndexedPanelTiles(actor.id, { linked: true });
+  for (const tile of tiles) {
+    const flag = tile?.document?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
     if (!flag?.actorId) continue;
     const panelActor = game.actors.get(flag.actorId);
     if (!panelActor) continue;
-    const isPanelActor = panelActor.id === actor.id;
-
-    if (isPanelActor && "ownership" in (changes ?? {}))
+    if ("ownership" in (changes ?? {}))
       tile.renderFlags?.set?.({ refreshState: true });
 
     // Sync tile texture with current face image when faces data changed.
-    if (isPanelActor && isGM && facesChanged) {
+    if (isGM && facesChanged) {
       const curFace = fePanelFace(panelActor, flag.currentFace ?? 0);
       const tileSrc = tile.document.texture?.src ?? "";
       if (curFace.img && tileSrc !== curFace.img) {
@@ -1147,18 +1232,17 @@ Hooks.on("updateActor", (actor, changes) => {
 
     // Overlay rebuild: only when system data actually changed (skip pure
     // prototypeToken / img-only updates triggered by our own sync above).
-    if (isPanelActor && changes.system !== undefined) feRebuildPanelOverlays(tile);
-
-    if (!isPanelActor) {
-      const isLinkedActor = (panelActor.system?.faces ?? []).some((face) =>
-        (face.overlays ?? []).some((ov) => {
-          if (!ov.linkedActorUuid) return false;
-          try { return fromUuidSync(ov.linkedActorUuid)?.id === actor.id; }
-          catch { return false; }
-        })
-      );
-      if (isLinkedActor) feRebuildPanelOverlays(tile);
+    if (changes.system !== undefined) {
+      // A face/overlay edit may add or remove linked Actors; update the reverse
+      // mapping before the next Actor update can arrive.
+      feIndexPanelTile(tile);
+      feRebuildPanelOverlays(tile);
     }
+
+    // A tile returned by the linked-Actor index is known to display this Actor
+    // on its current face, so rebuilding it is the complete equivalent of the
+    // old per-overlay UUID scan.
+    if (!isUpdatedPanelActor) feRebuildPanelOverlays(tile);
   }
 });
 

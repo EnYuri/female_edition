@@ -527,16 +527,56 @@ body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) .chat-message {
+/* Tooltip details use the same hard black panel and accent outline as the
+ * roll's formula/total.  This is deliberately scoped to the chat surfaces
+ * (including popouts and notifications), not to .expanded: Foundry can create
+ * a dice-tooltip directly for an inline roll before its display state updates. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .dice-tooltip {
+  box-sizing: border-box;
+  border: 1px solid var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
+  background-color: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, #e6e6e6) !important;
+  transition: none !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .dice-tooltip .part-header {
+  border-color: var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .dice-tooltip .part-total {
+  border-color: var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
+  background-color: #000000 !important;
+  color: inherit !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) {
   --fe-dice-outline: #ffffff;
 }
 
-body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-has-user-color {
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color {
   --fe-dice-outline: rgb(var(--fe-user-color-rgb));
 }
 
 body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color .dice-tooltip {
+  border-color: rgb(var(--fe-user-color-rgb)) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li:not(.clear), li:not(.clear) > span) {
   text-shadow:
     -1px -1px 0 #000000, 0 -1px 0 #000000, 1px -1px 0 #000000,
@@ -553,7 +593,8 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.dice.exploded, li.dice.exploded > span) {
   color: #00aa22 !important;
   text-shadow: 0 0 6px #99ffbb, 0 0 3px #99ffbb, 1px 0 0 #99ffbb,
@@ -563,7 +604,8 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.dice.fumble, li.dice.fumble > span) {
   color: #cc2020 !important;
   text-shadow: 0 0 6px #ff9999, 0 0 3px #ff9999, 1px 0 0 #ff9999,
@@ -573,14 +615,16 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log) .chat-message a.inline-roll {
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) a.inline-roll {
   color: var(--fe-ac-90) !important;
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
 }
 
 body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log) .chat-message a.inline-roll:hover {
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) a.inline-roll:hover {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
 }

@@ -475,16 +475,6 @@ Hooks.once("init", () => {
     onChange: () => feApplyStyleVarsFromSettings(document),
   });
 
-  game.settings.register(MODULE_ID, S.CHATCARD_USE_CUSTOM_FONT, {
-    name: "채팅 카드(설명) 커스텀 폰트 적용",
-    hint: "주문/아이템/피처 설명 박스(Details/Description)에도 UI 커스텀 폰트(CookieRun/그림일기)를 적용합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다. 아이콘/특수문자 표시가 깨지면 끄세요.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => feSetChatCardFontClass(),
-  });
-
   game.settings.register(MODULE_ID, S.CHAT_FONT_CHOICE, {
     name: "채팅/UI 글꼴 선택",
     hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '쿠키런 + 그림일기'는 UI/시트 기본 글꼴도 그림일기로 처리합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
@@ -501,6 +491,7 @@ Hooks.once("init", () => {
     },
     default: FE_DEFAULTS[S.CHAT_FONT_CHOICE],
     onChange: () => {
+      feSetChatCardFontClass(document);
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
@@ -526,6 +517,7 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.UI_USE_USER_FONT],
     onChange: () => {
       feSetUserFontMode(document);
+      feSetChatCardFontClass(document);
       // Suppress/restore the module chat-font-choice classes (see feUserFontActive).
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
@@ -542,6 +534,7 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.USER_FONT_FAMILY],
     onChange: () => {
       feSetUserFontMode(document);
+      feSetChatCardFontClass(document);
       // Family going empty/non-empty flips feUserFontActive → refresh module classes.
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
@@ -654,21 +647,31 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.SYSTEM_MSG_COLOR, {
-    name: "시스템 메시지에 배경색 적용",
-    hint: "화자(캐릭터)가 없는 메시지(GM의 NPC/내레이션, 시스템 메시지)에 아래에서 지정한 배경색을 입힙니다. 내레이터 채팅(/narrate·/describe·/note)은 글씨가 흰색이라 제외되며 자체 어두운 배경을 유지합니다. 레트로 테마 + 텍스트 색조 오버라이드가 켜져 있으면 강조색 톤을 사용합니다.",
+    name: "시스템 메시지에도 GM 유저 색상 틴트 적용",
+    hint: "화자(캐릭터)가 없는 시스템 메시지에 GM의 유저 색상과 틴트 농도를 적용합니다. 내레이터 채팅(/narrate·/describe·/note)은 제외됩니다.",
     scope: "client",
     config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.SYSTEM_MSG_COLOR],
     onChange: () => {
       feSetSystemMsgColorClass(document);
-      feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
+      feApplyUserColorBgToAllLogs(document);
     },
   });
 
+  game.settings.register(MODULE_ID, S.SYSTEM_MSG_BG_ENABLED, {
+    name: "시스템 메시지 하부 배경색 적용",
+    hint: "화자 없는 시스템 메시지에 지정한 불투명 하부 배경색을 적용합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.SYSTEM_MSG_BG_ENABLED],
+    onChange: () => feSetSystemMsgColorClass(document),
+  });
+
   game.settings.register(MODULE_ID, S.SYSTEM_MSG_BG_COLOR, {
-    name: "시스템 메시지 배경색",
-    hint: "'시스템 메시지에 배경색 적용'이 켜져 있을 때 화자 없는 메시지에 사용할 배경색입니다. 기본값은 흰색.",
+    name: "시스템 메시지 하부 배경색",
+    hint: "시스템 메시지 하부 배경색 적용이 켜져 있을 때 사용할 색입니다.",
     scope: "client",
     config: false,
     type: String,

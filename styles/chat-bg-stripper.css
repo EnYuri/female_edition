@@ -199,6 +199,63 @@ body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
   background-blend-mode: normal !important;
 }
 
+/* --------------------------------
+ * 1g) Dice tooltip surface parity
+ * --------------------------------
+ * A Roll's .dice-tooltip is an independent panel inside the message rather
+ * than part of .message-content's painted surface.  In particular, inline
+ * rolls give it Foundry's parchment background directly.  Carry the parent
+ * message's user-color treatment into that panel so expanding a roll never
+ * creates an unrelated light rectangle in an otherwise tinted chat card.  The
+ * opaque lower-background setting is intentionally applied even to messages
+ * without a resolvable user color: it is the panel's base, not the tint.
+ */
+body.fe-userbg-base-white {
+  --fe-dice-tooltip-bg-rgb: 255 255 255;
+}
+
+body.fe-userbg-base-black {
+  --fe-dice-tooltip-bg-rgb: 0 0 0;
+}
+
+body.fe-userbg-base-custom {
+  --fe-dice-tooltip-bg-rgb: var(--fe-user-bg-base-rgb, 27 27 27);
+}
+
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dice-tooltip {
+  background-color: rgb(var(--fe-dice-tooltip-bg-rgb) / 1) !important;
+  background-blend-mode: normal !important;
+}
+
+body.fe-msg-bg-usercolor:not(.fe-userbg-base-white):not(.fe-userbg-base-black):not(.fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  .dice-tooltip {
+  background-color: rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
+  background-blend-mode: screen !important;
+}
+
+body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  .dice-tooltip {
+  box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha)) !important;
+}
+
+/* Foundry gives every inline roll a -1px vertical margin.  On an inline-result
+ * that moves the top border outside the line box; chat cards that clip their
+ * content then shave it off.  The result link is the visible "dice box", not
+ * .dice-tooltip, so normalize this element itself. */
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) a.inline-roll.inline-result {
+  box-sizing: border-box;
+  display: inline-block;
+  margin-block: 0 !important;
+  vertical-align: baseline;
+}
+
 /* Repaint chat-message context menus from the message surface instead of
  * Foundry's default canvas menu colors so texture stripping, system-message
  * color, and user-color tint remain visually continuous while the dropdown is
@@ -271,46 +328,35 @@ body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
     0 3px 6px rgb(0 0 0 / 0.45) !important;
 }
 
-/* Optional: configurable "system color" background for system messages
- * (messages with no character color). Toggled by body.fe-system-msg-color, color
- * via --fe-system-msg-bg (default white). The extra body class makes this win.
- * NOTE: 내레이터 채팅(/narrate /describe /note)은 의도적으로 제외 — 글씨색이 흰색이라
- * 밝은 배경에서 안 보이므로 자체 어두운 배경(--fe-narrator-bg)을 유지한다. */
-body.fe-system-msg-color
+/* Optional opaque base for speakerless system messages. */
+body.fe-system-msg-bg
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-system-msg,
-body.fe-system-msg-color #chat-notifications
+body.fe-system-msg-bg #chat-notifications
   .message.fe-system-msg {
   background: var(--fe-system-msg-bg, #ffffff) !important;
   background-blend-mode: normal !important;
 }
 
-/* Retro theme + accent override → accent-toned dark system color. */
-body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override
-  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
-  .chat-message.fe-system-msg,
-body.fe-system-msg-color.fe-retro-theme.fe-accent-text-override #chat-notifications
-  .message.fe-system-msg {
-  background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 14%) !important;
-}
-
-/* Paired TEXT color for system messages — contrasts with --fe-system-msg-bg
- * (both computed together in fe-style.js). Without this, a dark chosen background
- * left the default (dark) message text invisible, and a light one left the dx3rd
- * combat h3 (hardcoded white — un-hardcoded to `inherit` in fe-dx3rd-compat.css)
- * invisible. Now every system message body follows a background-contrasting color,
- * and the dx3rd combat h3 inherits it. Retro theme's §14 (layouts) intentionally
- * wins over this for its own light-on-dark scheme. Scoped to the message body so
- * descendants with their own explicit color (inline rolls, links) keep it. */
-body.fe-system-msg-color
+body.fe-system-msg-bg
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-system-msg > .message-content,
-body.fe-system-msg-color
+body.fe-system-msg-bg
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-system-msg .message-header .message-sender,
-body.fe-system-msg-color #chat-notifications
+body.fe-system-msg-bg #chat-notifications
   .message.fe-system-msg .message-content {
   color: var(--fe-system-msg-text, inherit) !important;
+}
+
+/* Optional GM-color tint for speakerless system messages. This is independent
+ * from the ordinary user-color tint, so it never recolors normal chat cards. */
+body.fe-system-msg-color
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-system-msg.fe-system-gm-tint,
+body.fe-system-msg-color #chat-notifications
+  .message.fe-system-msg.fe-system-gm-tint {
+  box-shadow: inset 0 0 0 9999px rgb(var(--fe-user-color-rgb) / var(--fe-user-color-alpha, 0.22)) !important;
 }
 
 
@@ -462,5 +508,15 @@ body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-messag
 body.fe-strip-chat-textures
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
   :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  background-image: none !important;
+}
+
+/* Inline-roll tooltips carry Foundry's parchment on the tooltip element
+ * itself, outside the message/pseudo-element rules above.  Do not target its
+ * descendant dice faces: their SVG backgrounds communicate die type. */
+body.fe-strip-chat-textures
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
+  :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker))
+  .dice-tooltip {
   background-image: none !important;
 }
