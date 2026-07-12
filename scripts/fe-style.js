@@ -135,7 +135,21 @@ function feSetUserFontMode(doc = document) {
 function feSetRetroThemeClass(doc = document) {
   try {
     const enabled = !!feSetting(S.UI_RETRO_THEME);
-    doc?.body?.classList?.toggle("fe-retro-theme", enabled);
+    const body = doc?.body;
+    if (!body?.classList) return;
+
+    body.classList.toggle("fe-retro-theme", enabled);
+
+    // The master switch remains deliberately singular. These are implementation
+    // scope markers, not user-facing settings: system CSS can opt in only where
+    // its markup actually exists instead of treating every retro world as DX3rd.
+    // Keep both known DX3rd package IDs: older worlds still use double-cross-3rd.
+    const systemId = String(globalThis.game?.system?.id ?? "");
+    body.classList.toggle("fe-retro-system-dnd5e", enabled && systemId === "dnd5e");
+    body.classList.toggle(
+      "fe-retro-system-dx3rd",
+      enabled && (systemId === "dx3rd-emanim" || systemId === "double-cross-3rd"),
+    );
   } catch {}
 }
 

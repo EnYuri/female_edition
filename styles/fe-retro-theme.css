@@ -8,6 +8,9 @@
  * 공통 원시 규칙만 담는다. 시스템 전용 강조색·시트 오버라이드는
  * fe-dx3rd-compat.css / fe-dnd5e-compat.css 에, 각 기능(전투 트래커·
  * 내레이터·무대 등) 전용 튜닝은 해당 기능 CSS 에 colocate 되어 있다.
+ * 런타임은 body에 fe-retro-system-dnd5e 또는 fe-retro-system-dx3rd를
+ * 추가한다. 이것들은 별도 설정이 아니라 시스템 전용 표면이 다른 시스템으로
+ * 새지 않게 하는 내부 범위 표식이다.
  *
  * 담는 것:
  *   · § 1  안티에일리어싱 OFF
@@ -208,59 +211,14 @@ body.fe-retro-theme :focus:not(:focus-visible) {
  * ══════════════════════════════════════════════════════════════ */
 
 /* 인터랙티브 요소 hover: 소프트 ring 대신 1px 하드 outline */
-body.fe-retro-theme :is(button, input:not([type="checkbox"]), select, textarea):not([disabled]):hover {
+body.fe-retro-theme :is(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea):not([disabled]):hover {
   outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   outline-offset: 0 !important;
 }
 
-/* 체크박스는 브라우저 네이티브 glyph와 Foundry의 20px 레이아웃 상자가
-   어긋나지 않도록, 테마가 실제 표시 사각형을 직접 소유한다. 글꼴 크기가
-   작은 조밀한 폼에서는 16px, 보통 폼에서는 18px, 큰 폼에서는 최대 20px로
-   맞춰 행 높이를 넘지 않는다. */
-body.fe-retro-theme input[type="checkbox"] {
-  --fe-retro-checkbox-size: clamp(16px, calc(1em + 2px), 20px);
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  box-sizing: border-box !important;
-  flex: 0 0 var(--fe-retro-checkbox-size) !important;
-  inline-size: var(--fe-retro-checkbox-size) !important;
-  block-size: var(--fe-retro-checkbox-size) !important;
-  min-inline-size: var(--fe-retro-checkbox-size) !important;
-  min-block-size: var(--fe-retro-checkbox-size) !important;
-  margin: 0 !important;
-  align-self: center;
-  vertical-align: middle;
-  border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.68) !important;
-  background-color: rgb(0 0 0 / 0.42) !important;
-  background-image: none !important;
-}
-
-/* 인라인 label은 텍스트와의 최소 간격만 별도로 복원한다. */
-body.fe-retro-theme label.checkbox > input[type="checkbox"] {
-  margin-inline-end: 4px !important;
-}
-
-body.fe-retro-theme label.checkbox.right > input[type="checkbox"] {
-  margin-inline: 4px 0 !important;
-}
-
-body.fe-retro-theme input[type="checkbox"]:checked {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24) !important;
-  background-image:
-    linear-gradient(45deg, transparent 44%, var(--fe-dx3rd-accent, #ffffff) 44% 58%, transparent 58%) 18% 56% / 48% 54% no-repeat,
-    linear-gradient(-45deg, transparent 44%, var(--fe-dx3rd-accent, #ffffff) 44% 58%, transparent 58%) 55% 38% / 74% 76% no-repeat !important;
-}
-
-body.fe-retro-theme input[type="checkbox"]:not([disabled]):hover {
-  outline: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline-offset: 1px !important;
-}
-
-body.fe-retro-theme input[type="checkbox"]:disabled {
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
-  background-color: rgb(0 0 0 / 0.22) !important;
-}
+/* 체크박스/라디오는 공통 레이어에서 꾸미지 않는다. 코어 폼, DX3rd 시트·전용
+   다이얼로그, D&D의 dnd5e-checkbox 웹 컴포넌트가 서로 다른 glyph·크기·여백
+   계약을 사용한다. 색상도 각 시스템 호환 파일에서 해당 구조에만 적용한다. */
 
 /* Foundry 윈도우 테두리 강화 */
 body.fe-retro-theme .window-app,
@@ -357,7 +315,7 @@ body.fe-retro-theme .application::after {
           mask-border: none !important;
 }
 
-/* ── 최소화(minimized) 윈도우: 콘텐츠 클리핑 + 솔리드 테두리 ──────────
+/* ── 최소화(minimized) 윈도우: 콘텐츠 클리핑 + 안쪽 픽셀 프레임 ────────
    [근본 원인 — 라이브 v14.363 실측]
    Foundry v14 는 AppV1 처럼 window-content 를 display:none 으로 숨기지 않고,
    창을 max-height:header-height 로 클램프한 뒤 `.application { overflow:hidden }`
@@ -372,23 +330,38 @@ body.fe-retro-theme .application::after {
    ① 최소화 상태에서만 overflow:hidden 을 복원 → 본문 클리핑 정상화(넓은 띠 제거).
       같은 layouts 레이어의 §16 overflow:visible(0,2,1)보다 .minimized 로 특이도
       (0,3,1)가 높아 확실히 이긴다.
-   ② overflow:hidden 이면 element 바깥(inset:-10px)의 픽셀 액자 ::before/::after 는
-      어차피 잘려 안 보인다 → 픽셀 액자를 끄고, element 자체(border-box, 클리핑
-      대상 아님)에 실제 솔리드 액센트 테두리를 준다. 라운딩 없는 하드 엣지라
-      픽셀 테마 미감과도 일치하며, 어떤 크기에서도 떨어지거나 삐져나올 수 없다. */
+   ② 바깥(inset:-10px) 프레임은 잘리므로, 최소화 때에는 같은 9-슬라이스를
+      창 내부 6px에 다시 그린다. 36px 높이의 AppV2 제목줄에서도 장식이 남고,
+      본문 클리핑에는 관여하지 않는다. 헤더를 한 단계 위에 두어 제목·닫기
+      버튼 위로 장식이 겹치지 않게 한다. */
 body.fe-retro-theme .application.minimized,
 body.fe-retro-theme .window-app.minimized {
   overflow: hidden !important;
-  border: 2px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  border: none !important;
   border-radius: 0 !important;
 }
 
+body.fe-retro-theme :is(.application, .window-app).minimized > .window-header {
+  position: relative !important;
+  z-index: 4 !important;
+}
+
 body.fe-retro-theme .application.minimized::before,
+body.fe-retro-theme .window-app.minimized::before {
+  content: '' !important;
+  display: block !important;
+  inset: 0 !important;
+  border-width: 6px !important;
+}
+
 body.fe-retro-theme .application.minimized::after,
-body.fe-retro-theme .window-app.minimized::before,
 body.fe-retro-theme .window-app.minimized::after {
-  content: none !important;
-  display: none !important;
+  content: '' !important;
+  display: block !important;
+  inset: 0 !important;
+  z-index: 3 !important;
+  border-width: 6px !important;
+  border-image-width: 6px !important;
 }
 
 /* #sidebar-content: accent 백드롭 — 좌측 6px 띠에 accent 색 공급

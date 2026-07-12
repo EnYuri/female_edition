@@ -2,7 +2,8 @@
  * fe-dx3rd-compat.css
  * female_edition — DX3rd / dx3rd-emanim 픽셀 고대비 테마
  *
- * 활성화: body.fe-retro-theme
+ * 활성화: body.fe-retro-theme. DX3rd 전용 표면은
+ *         body.fe-retro-theme.fe-retro-system-dx3rd로 한정한다.
  *   NeoDGM 폰트 오버라이드(fe-neodgm-mode)와 함께 사용 권장.
  *
  * ⚠️ CASCADE LAYER (필수): 이 파일은 module.json 에서
@@ -127,6 +128,24 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) :is(input, select, tex
   outline-offset: 0 !important;
 }
 
+/* DX3rd 네이티브 체크박스/라디오 전용 색상. AppV1·AppV2 시트와 시스템
+   다이얼로그만 대상으로 하며, 16/20/22px 크기·margin·filter는 시스템 CSS가
+   소유한다. 전역 checkbox 규칙을 두지 않아 표 셀과 아이템 제어가 붕괴하지 않는다. */
+body.fe-retro-theme.fe-retro-system-dx3rd
+  :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
+  :is(input[type="checkbox"], input[type="radio"]) {
+  --checkbox-background-color: rgb(0 0 0 / 0.42) !important;
+  --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  --checkbox-checkmark-color: transparent !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd
+  :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
+  :is(input[type="checkbox"], input[type="radio"]):disabled {
+  --checkbox-background-color: rgb(0 0 0 / 0.22) !important;
+  --checkbox-checked-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 12  드롭 존 — 픽셀 스타일 점선 → 실선
@@ -157,9 +176,9 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
    html 인라인 스타일의 상속보다 body 자체 선언이 우선하므로 JS 세팅이 무시됨 → 선언 없음. */
 
 /* 채팅 사이드바 패널 + 스크롤 컨테이너 + 로그 영역 */
-body.fe-retro-theme :is(#sidebar #chat, .tab.chat, .chat-sidebar, chat-sidebar),
-body.fe-retro-theme .chat-scroll,
-body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) {
+body.fe-retro-theme.fe-retro-system-dx3rd :is(#sidebar #chat, .tab.chat, .chat-sidebar, chat-sidebar),
+body.fe-retro-theme.fe-retro-system-dx3rd .chat-scroll,
+body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log) {
   background:       #000000 !important;
   background-image: none    !important;
 }
@@ -173,7 +192,7 @@ body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) {
  *  유저 색상 없는 메시지:      외곽선 = 액센트(흰색) / 1.0
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background:       #000000 !important;
@@ -183,14 +202,14 @@ body.fe-retro-theme
 }
 
 /* 유저 색상 있는 메시지 → 외곽선만 유저 색 / 0.5 알파로 오버라이드 */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   border-color: rgb(var(--fe-user-color-rgb) / 0.5) !important;
 }
 
 /* 메시지 헤더 · 콘텐츠 서브 영역 — 투명(검정 상속) */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   > :is(.message-header, .message-content) {
@@ -202,14 +221,14 @@ body.fe-retro-theme
  * --fe-dx3rd-accent-h / -s 는 fe-style.js feApplyStyleVarsFromSettings() 에서 설정.
  * 주 텍스트: --fe-ac-90 사용 (알파 0.82 — 가시성 완화).
  * 부 텍스트: 동일 명도·색조, 알파 0.6 으로 계층 표현. */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   :is(.message-sender, .message-content) {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   :is(.message-metadata, .message-flavor, .flavor-text) {
@@ -217,10 +236,10 @@ body.fe-retro-theme
 }
 
 /* 메시지 텍스처 pseudo-element 완전 제거 */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message::before,
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message::after {
   background:       transparent none !important;
@@ -238,23 +257,23 @@ body.fe-retro-theme
    반투명 배경이 픽셀당 한 번만 칠해져 이음새가 사라진다. layouts 레이어라
    fe-chat-enhance.css(modules)의 margin !important 를 이긴다. simple 모드의 의도된
    간격은 건드리지 않도록 standard 모드로 한정. */
-body.fe-retro-theme.fe-chat-merge.fe-merge-mode-standard
+body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
   margin-top: 0 !important;
 }
-body.fe-retro-theme.fe-chat-merge.fe-merge-mode-standard
+body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
   margin-bottom: 0 !important;
 }
 /* 내부 경계 테두리도 0 으로 (simple 모드 및 방어용 — standard 는 이미 접힘) */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
   border-bottom-width: 0 !important;
 }
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
   border-top-width: 0 !important;
@@ -272,7 +291,7 @@ body.fe-retro-theme
  * ══════════════════════════════════════════════════════════════ */
 
 /* 채팅카드 전체 — 검정 배경 · 액센트 글씨 */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
@@ -282,7 +301,7 @@ body.fe-retro-theme
 
 /* 채팅카드 내 서브 영역 — 투명(검정 상속).
    description 박스의 --fe-chat-desc-bg 회색도 제거. */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
@@ -292,7 +311,7 @@ body.fe-retro-theme
 }
 
 /* 유저 색상 있는 메시지 → 카드 테두리 = 유저 색상 + 알파 */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
@@ -300,7 +319,7 @@ body.fe-retro-theme
 }
 
 /* 유저 색상 없는 메시지 → 카드 테두리 = 액센트(흰색) + 알파 */
-body.fe-retro-theme
+body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.fe-has-user-color)
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
@@ -758,171 +777,6 @@ body.fe-retro-theme .fedr-ctx-item {
 body.fe-retro-theme .fedr-ctx-item:hover {
   background: var(--fe-dx3rd-accent, #ffffff);
   color: #000000;
-}
-
-/* ══════════════════════════════════════════════════════════════
- * § 18  드롭다운 · 컨텍스트 메뉴 · 툴팁 — 픽셀 외각선
- *        검정 배경 + 액센트 1px 내선 + 검정 1px 외선
- *        hover: 반전(흰 배경 + 검정 글씨)
- * ══════════════════════════════════════════════════════════════ */
-
-/* ── Foundry 컨텍스트 메뉴 컨테이너 ─────────────────────────── */
-
-body.fe-retro-theme
-  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu) {
-  background:     #000000 !important;
-  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline:        1px solid #000000 !important;
-  outline-offset: 0px !important;
-}
-
-/* 컨텍스트 메뉴 항목 기본 */
-body.fe-retro-theme
-  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li) {
-  color:      var(--fe-ac-90) !important;
-  background: transparent !important;
-  border:     none !important;
-}
-
-/* hover: 반전 */
-body.fe-retro-theme
-  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li):hover {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  color:      #000000 !important;
-  outline: 1px solid #ffffff !important;
-  outline-offset: 0 !important;
-}
-
-body.fe-retro-theme
-  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li):hover * {
-  color: inherit !important;
-}
-
-/* ── <select> 요소 ───────────────────────────────────────────── */
-/* appearance:none → 네이티브 크롬(화살표·배경) 완전 제거.
-   SVG 화살표: fill='currentColor' → color(=accent) 자동 상속 → 색조 오버라이드 전파.
-   background-color(단축이 아닌 개별 속성) 사용 — background 단축을 쓰는 상위 규칙이
-   background-image를 none으로 리셋하지 않도록, 화살표가 필요한 컨텍스트 규칙도
-   모두 background-color로 통일(§E, §dx3rd select, §stage-select). */
-body.fe-retro-theme select {
-  appearance:          none !important;
-  -webkit-appearance:  none !important;
-  background-color:    #000000 !important;
-  background-image:    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4'%3E%3Cpath d='M0,0h7v1H0zM1,1h5v1H1zM2,2h3v1H2zM3,3h1v1H3z' fill='currentColor'/%3E%3C/svg%3E") !important;
-  background-repeat:   no-repeat !important;
-  background-position: right 6px center !important;
-  background-size:     7px 4px !important;
-  color:               var(--fe-dx3rd-accent, #ffffff) !important;
-  border:              1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline:             1px solid #000000 !important;
-  outline-offset:      0px !important;
-  padding-right:       20px !important;
-}
-
-/* <option> — Firefox 적용됨; Chrome은 OS 네이티브가 우선 */
-body.fe-retro-theme option {
-  background: #000000 !important;
-  color:      var(--fe-ac-90) !important;
-}
-
-/* ── Foundry 툴팁 ────────────────────────────────────────────── */
-
-body.fe-retro-theme
-  :is(#tooltip, .tooltip, .toolclip, foundry-tooltip, [data-tooltip-content]) {
-  background:     #000000 !important;
-  color:          var(--fe-ac-90) !important;
-  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline:        1px solid #000000 !important;
-  outline-offset: 0px !important;
-}
-
-/* ── Theatre 이모트 피커 메뉴 ────────────────────────────────── */
-
-body.fe-retro-theme .fe-stage-emote-menu {
-  background:     #000000 !important;
-  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline:        1px solid #000000 !important;
-  outline-offset: 0px !important;
-}
-
-body.fe-retro-theme .fe-stage-emote-item {
-  color: var(--fe-ac-90) !important;
-}
-
-body.fe-retro-theme .fe-stage-emote-item:hover,
-body.fe-retro-theme .fe-stage-emote-item.active {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  color:      #000000 !important;
-  outline: 1px solid #ffffff !important;
-  outline-offset: 0 !important;
-}
-
-/* ── Theatre 대사 박스 — 픽셀 테마 오버라이드 ─────────────────── */
-
-/* overflow:hidden이 inset:-10px 확장을 잘라내지 않도록 visible로 전환.
-   flex 자식(.fe-stage-textbox-content)은 자체 overflow-y:auto로 텍스트를 제한.
-   isolation: isolate — ::after mix-blend-mode multiply가 대사창 외부와 혼합되지 않도록. */
-body.fe-retro-theme .fe-stage-textbox {
-  overflow: visible !important;
-  isolation: isolate !important;
-}
-
-/* 대사창 테두리 accent 백드롭 — ::after pixel-border mix-blend-mode: multiply의 배경색 공급.
-   .window-app::before / .fedr-actor-card::before 와 동일한 패턴.
-   기존 fe-theatre.css 사선 줄무늬(repeating-linear-gradient + ring mask)를 대체. */
-body.fe-retro-theme .fe-stage-textbox::before {
-  content: '' !important;
-  position: absolute !important;
-  inset: -10px !important;
-  box-sizing: border-box !important;
-  pointer-events: none !important;
-  border: 10px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  background: transparent !important;
-  -webkit-mask: none !important;
-          mask: none !important;
-  -webkit-mask-box-image: none !important;
-          mask-border: none !important;
-}
-
-/* 대사창 테두리 — 9-슬라이스 pixel-border, 외각 배치.
-   mix-blend-mode: multiply — 흰 픽셀 × ::before accent = accent, 검정 픽셀 = 검정.
-   기존 삼각 꼬리(::after)를 픽셀 테두리로 교체 — 픽셀 테마에서 꼬리 제거. */
-body.fe-retro-theme .fe-stage-textbox::after {
-  content: '' !important;
-  position: absolute !important;
-  inset: -10px !important;
-  box-sizing: border-box !important;
-  pointer-events: none !important;
-  z-index: 0 !important;
-  /* 삼각 꼬리 속성 완전 초기화 — 단, left 는 inset:-10px 값을 다시 못박는다.
-     기존 삼각 꼬리 ::after 의 `left:70px` 를 풀려고 `left:auto` 를 쓰면, 같은
-     블록 내 뒤 선언이라 inset 의 left:-10px 를 덮어쓴다. content 가 빈 채로
-     left:auto + right:-10px 가 되면 ::after 가 border 폭(20px)으로 shrink-to-fit
-     되어 우측 20px 띠로 붕괴 → 픽셀 테두리가 오른쪽에만 보였다(나머지 3변은
-     ::before accent 백드롭만 노출). left 를 -10px 로 명시해 4변 전체 커버. */
-  border: 10px solid transparent !important;
-  border-top: 10px solid transparent !important;
-  border-bottom: 10px solid transparent !important;
-  border-bottom-color: transparent !important;
-  left: -10px !important;
-  transform: none !important;
-  /* 픽셀 패턴 */
-  border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
-  image-rendering: pixelated !important;
-  mix-blend-mode: multiply !important;
-  background: none !important;
-  -webkit-mask: none !important;
-          mask: none !important;
-  -webkit-mask-box-image: none !important;
-          mask-border: none !important;
-}
-
-/* 포트레이트를 테두리(inset:-10px = 10px 외각) 위로 띄움 */
-body.fe-retro-theme .fe-stage-portrait-wrap {
-  bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1643,22 +1497,6 @@ body.fe-retro-theme {
 
 /* ── B. 윈도우 chrome ───────────────────────────────────────── */
 
-body.fe-retro-theme :is(.window-app, .application) {
-  background:       #000 !important;
-  background-image: none !important;
-  backdrop-filter:         none !important;
-  -webkit-backdrop-filter: none !important;
-  /* Window dragging updates left/top every frame. If a system or core rule
-     leaves transition-property: all on the frame, the retro 1ms duration still
-     makes every move schedule a transition. Keep minimize/maximize transitions
-     below, but do not transition ordinary frame position changes. */
-  transition-property: none !important;
-}
-
-body.fe-retro-theme :is(.application.minimizing, .application.maximizing) {
-  transition-property: max-height, max-width !important;
-}
-
 /* DX3rd AppV2 actor sheets enforce min-width:850px so the fixed-width sheet
    grid does not wrap. That is correct while open, but it prevents Foundry's
    AppV2 minimize path from shrinking to --minimized-width. */
@@ -1667,94 +1505,12 @@ body.fe-retro-theme .application.sheet.dx3rd-emanim.actor.actor-sheet-v2:is(.min
   min-height: unset !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application) .window-header,
-body.fe-retro-theme :is(.window-app, .application) header.window-header {
-  background:          #000 !important;
-  background-image:    none !important;
-  border-bottom-color: var(--fe-ac-22) !important;
-  color:               var(--fe-ac-57) !important;
-}
-
-/* 창 제목 — 최상위 강조 텍스트이므로 밝은 원색 accent(§31과 동일).
-   이 규칙(0,3,x)이 §31(0,2,x)보다 명시도가 높아 실제로 이기는 위치이므로
-   여기서 직접 accent를 지정한다(이전엔 ac-70이라 §31의 accent 의도가 무효였음). */
-body.fe-retro-theme :is(.window-app, .application) .window-title,
-body.fe-retro-theme :is(.window-app, .application) h1.window-title {
-  color: var(--fe-dx3rd-accent, #ffffff) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application) .window-content,
-body.fe-retro-theme :is(.window-app, .application) section.window-content {
-  background:       #000 !important;
-  background-image: none !important;
-  backdrop-filter:         none !important;
-  -webkit-backdrop-filter: none !important;
-  color:            var(--fe-ac-90) !important;
-}
-
-/* v14 ApplicationV2 footer · nav */
-body.fe-retro-theme .application footer,
-body.fe-retro-theme .application nav.tabs {
-  background:       #000 !important;
-  background-image: none !important;
-}
-
-/* 헤더 컨트롤 버튼 (닫기 등) — v13 .header-button + v14 .header-control 모두 커버 */
-body.fe-retro-theme :is(.window-app, .application)
-  :is(.header-control, .close, .minimize, .header-button):not([disabled]) {
-  color: var(--fe-ac-57) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application)
-  :is(.header-control, .close, .minimize, .header-button):not([disabled]):hover {
-  color: var(--fe-ac-90) !important;
-}
-
 /* DX3rd injects text buttons directly into the AppV2 header and makes them
    display:inline-flex with a system-level selector. Core's minimized rule is
    less specific, so these buttons otherwise remain visible in the collapsed
    title bar. */
-body.fe-retro-theme .application.minimized .window-header
-  :is(.dx3rd-header-btn, .fedr-sheet-btn, .fet-stage-btn, .header-control:not([data-action="close"])) {
+body.fe-retro-theme.fe-retro-system-dx3rd .application.minimized .window-header .dx3rd-header-btn {
   display: none !important;
-}
-
-body.fe-retro-theme .application.minimized .window-header .header-control[data-action="close"] {
-  display: inline-flex !important;
-}
-
-body.fe-retro-theme :is(.window-content.ve-app-window, .ve-app-window) {
-  background: #000000 !important;
-  background-image: none !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme :is(.app, .window-app, .application)
-  :is(.window-content.ve-app-window, section.window-content.ve-app-window, .ve-app-window),
-body.fe-retro-theme :is(.window-content.ve-app-window, section.window-content.ve-app-window, .ve-app-window)
-  :is(.window-content, .content, .body, .main, .standard-form, form, section, article):not(.editor-content):not(.prosemirror) {
-  background: #000000 !important;
-  background-color: #000000 !important;
-  background-image: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme
-  :is(.dialog, .filepicker, .file-picker, .document-sheet, .journal-sheet, .journal-entry-page)
-  :is(.window-content, .standard-form, .editor-content) {
-  background-color: #000000 !important;
-  background-image: none !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme
-  :is(.dialog, .filepicker, .file-picker, .document-sheet, .journal-sheet, .journal-entry-page)
-  :is(nav.tabs, footer, .form-footer, .window-footer) {
-  background-color: #000000 !important;
-  background-image: none !important;
-  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
 }
 
 /* Plutonium/5etools AppV2 windows put their visible surface one level inside
@@ -1836,248 +1592,6 @@ body.fe-retro-theme .window-content.ve-app-window
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   box-shadow: inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22) !important;
   color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-/* The status UI sheet buttons are injected as text-bearing header controls.
-   On narrow dnd5e/Tidy headers they must shrink horizontally, not wrap into a
-   vertical column that spills out of the sheet frame. */
-:is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor)
-  .window-header
-  .fedr-sheet-btn {
-  align-items: center !important;
-  background: var(--fe-ac-06, #0d0d0d) !important;
-  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
-  box-sizing: border-box !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-  display: inline-flex !important;
-  flex: 0 0 20px !important;
-  gap: 4px !important;
-  block-size: 20px !important;
-  inline-size: auto !important;
-  justify-content: center !important;
-  line-height: 1 !important;
-  max-inline-size: 20px !important;
-  min-inline-size: 20px !important;
-  overflow: hidden !important;
-  padding: 0 !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  writing-mode: horizontal-tb !important;
-  font-size: 0 !important;
-}
-
-body.fe-retro-theme .dnd5e2.application.sheet.actor
-  .window-header
-  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]) {
-  background: var(--fe-ac-06, #0d0d0d) !important;
-  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme .dnd5e2.application.sheet.actor
-  .window-header
-  :is(button.header-control, a.header-button, .header-control, .header-button):not([hidden]):is(:hover, :focus, :focus-visible) {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow:
-    inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45),
-    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.26) !important;
-  color: var(--fe-ac-90, #ffffff) !important;
-}
-
-:is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor)
-  .window-header
-  .fedr-sheet-btn
-  i {
-  flex: 0 0 auto !important;
-  font-size: 13px !important;
-  line-height: 1 !important;
-}
-
-/* ── C. 내비게이션 · 툴 컨트롤 ────────────────────────────── */
-
-body.fe-retro-theme #navigation {
-  background: transparent !important;
-}
-
-body.fe-retro-theme #navigation :is(.nav-item, .scene.nav-item) {
-  background:   #000 !important;
-  color:        var(--fe-ac-57) !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-body.fe-retro-theme #navigation :is(.nav-item.active, .nav-item:hover) {
-  background:   var(--fe-ac-06) !important;
-  color:        var(--fe-ac-80) !important;
-  border-color: var(--fe-ac-57) !important;
-}
-
-/* 툴 컨트롤 버튼 */
-body.fe-retro-theme .control-tool {
-  background: transparent !important;
-  color:      var(--fe-ac-t33) !important;
-}
-
-body.fe-retro-theme :is(.control-tool.active, .control-tool:hover) {
-  background: var(--fe-ac-12) !important;
-  color:      var(--fe-ac-70) !important;
-}
-
-/* 툴 드롭다운 배경 */
-body.fe-retro-theme :is(.control-tool-wrapper, .controls-dropdown) {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-/* 핫바 */
-body.fe-retro-theme #hotbar {
-  background:       #000 !important;
-  background-image: none !important;
-}
-
-body.fe-retro-theme :is(.macro, .hotbar-slot) {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-  color:        var(--fe-ac-57) !important;
-}
-
-/* 플레이어 목록 */
-body.fe-retro-theme #players-active,
-body.fe-retro-theme #players {
-  background:       #000 !important;
-  background-image: none !important;
-}
-
-body.fe-retro-theme .player-active :is(.player-name, .player-character) {
-  color: var(--fe-ac-57) !important;
-}
-
-/* ── D. 사이드바 전체 (채팅 포함) ──────────────────────────── */
-
-body.fe-retro-theme .sidebar-tab {
-  background:       #000 !important;
-  background-image: none !important;
-  color:            var(--fe-ac-90) !important;
-}
-
-/* 사이드바 탭 전환 버튼 */
-body.fe-retro-theme :is(#sidebar-tabs, .sidebar-tabs) .item {
-  background:   #000 !important;
-  color:        var(--fe-ac-t33) !important;
-  border-color: var(--fe-ac-12) !important;
-}
-
-body.fe-retro-theme :is(#sidebar-tabs, .sidebar-tabs) .item.active {
-  color:        var(--fe-ac-70) !important;
-  border-color: var(--fe-ac-70) !important;
-}
-
-/* 사이드바 내 헤딩 */
-body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
-  color:        var(--fe-ac-70) !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-/* 사이드바 내 링크·항목 */
-body.fe-retro-theme .sidebar-tab :is(a, li, label) {
-  color: var(--fe-ac-57) !important;
-}
-
-body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) {
-  color: var(--fe-ac-80) !important;
-}
-
-/* ── D-2. 채팅 입력창 ───────────────────────────────────────── */
-
-/* 채팅 폼 컨테이너 + v14 footer 계열 */
-body.fe-retro-theme #chat-form,
-body.fe-retro-theme :is(chat-sidebar, .chat-sidebar) footer,
-body.fe-retro-theme :is(chat-sidebar, .chat-sidebar) .chat-footer {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-/* 채팅 텍스트영역 — 밝은 강조색 테두리로 구분 */
-body.fe-retro-theme #chat-message,
-body.fe-retro-theme textarea[name="content"],
-body.fe-retro-theme chat-message-input {
-  background:   #000 !important;
-  color:        var(--fe-ac-90) !important;
-  border:       1px solid var(--fe-ac-45) !important;
-}
-
-/* v14 <chat-message-input> 내부 textarea 명시 타겟 */
-body.fe-retro-theme chat-message-input textarea {
-  background: #000 !important;
-  color:      var(--fe-ac-90) !important;
-  border:     1px solid var(--fe-ac-45) !important;
-}
-
-/* 입력란 placeholder — 흐린 강조색 틴트 */
-body.fe-retro-theme #chat-message::placeholder,
-body.fe-retro-theme textarea[name="content"]::placeholder,
-body.fe-retro-theme chat-message-input textarea::placeholder {
-  color:   var(--fe-ac-t33) !important;
-  opacity: 1 !important;
-}
-
-body.fe-retro-theme .chat-control-bar,
-body.fe-retro-theme .chat-controls {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-body.fe-retro-theme .chat-control-bar :is(button, select),
-body.fe-retro-theme .chat-controls :is(button, select) {
-  background-color: #000 !important;
-  color:            var(--fe-ac-57) !important;
-  border-color:     var(--fe-ac-22) !important;
-}
-
-/* 채팅 전송 버튼 — 약간 돋보이도록 */
-body.fe-retro-theme :is(#chat-form, .chat-controls) button[type="submit"],
-body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, .send-button) {
-  background:   var(--fe-ac-06) !important;
-  color:        var(--fe-ac-80) !important;
-  border:       1px solid var(--fe-ac-45) !important;
-}
-
-body.fe-retro-theme :is(#chat-form, .chat-controls) button[type="submit"]:hover,
-body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, .send-button):hover {
-  background:   var(--fe-ac-22) !important;
-  color:        var(--fe-ac-90) !important;
-  border-color: var(--fe-ac-70) !important;
-}
-
-/* ── E. 폼 요소 (비-DX3rd 윈도우) ──────────────────────────── */
-
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) :is(input, select, textarea) {
-  background-color: #000 !important;
-  color:            var(--fe-ac-90) !important;
-  border-color:     var(--fe-ac-33) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab) {
-  background:   #000 !important;
-  color:        var(--fe-ac-70) !important;
-  border-color: var(--fe-ac-33) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):hover {
-  background:   var(--fe-ac-12) !important;
-  border-color: var(--fe-ac-70) !important;
-}
-
-/* 설정 윈도우 헤딩 */
-body.fe-retro-theme :is(.window-app, .application) :is(h2, h3, h4):not(.window-title) {
-  color:        var(--fe-ac-70) !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-/* 일반 텍스트 레이블·단락 */
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) :is(p, span, label, li, td, th) {
-  color: var(--fe-ac-57) !important;
 }
 
 /* ── F. DX3rd 시트 배경 오버라이드 ─────────────────────────── */
@@ -2377,41 +1891,6 @@ body.fe-retro-theme
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 21  아이콘 강조색 상속
- *        font-awesome <i> 요소를 부모 색상으로 통일.
- *        의미 색상 아이콘(삭제=빨강·추가=초록)은 기존 규칙에서 복원.
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme i[class*="fa"] {
-  color: inherit !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 22  사이드바 버튼 강조색 적용
- *        게임 설정 탭의 button 요소가 강조색을 받지 못하는 문제 수정.
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme .sidebar-tab button,
-body.fe-retro-theme :is(#sidebar, #sidebar-content) > button {
-  background:   transparent !important;
-  color:        var(--fe-ac-57) !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-body.fe-retro-theme .sidebar-tab button:hover,
-body.fe-retro-theme :is(#sidebar, #sidebar-content) > button:hover {
-  color:      var(--fe-ac-90) !important;
-  background: var(--fe-ac-06) !important;
-}
-
-/* 사이드바 탭 내 span — 부모 색상 상속 */
-body.fe-retro-theme .sidebar-tab span {
-  color: inherit !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
  * § 23  DX3rd 시트 대비 보정
  *        (1) cell--title 흰 배경 addon → 검은 강조색 배경 (텍스트 대비 보존)
  *        (2) 커버·출신 등 특성 입력칸 — 밝은 강조색 윤곽선으로 구분
@@ -2429,27 +1908,6 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell select,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell textarea {
   border: 1px solid var(--fe-ac-57) !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 24  Theatre 시트 헤더 버튼 — 픽셀 테마 색상 통합
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme :is(.window-app, .application) .fet-stage-btn {
-  color: var(--fe-ac-57) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application) .fet-stage-btn:hover {
-  color: var(--fe-ac-90) !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove {
-  color: #c94444 !important;
-}
-
-body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove:hover {
-  color: #ff6b6b !important;
 }
 
 
@@ -2661,96 +2119,6 @@ body.fe-retro-theme .fe-stage-nav-remove-cur:hover {
 }
 
 
-/* ══════════════════════════════════════════════════════════════
- * § 28  ProseMirror 에디터 드롭다운 (#prosemirror-dropdown)
- *        에디터 툴바 서식 드롭다운 항목에 강조색 색조 적용.
- *        구조: #prosemirror-dropdown > ul > li (서브메뉴: li > ul > li)
- *
- *  ⚠ 명시도 주의: Foundry의 .themed.theme-light#prosemirror-dropdown (1,2,0)이
- *     --button-text-color 등을 직접 선언하므로, 드롭다운 루트에서 !important로
- *     CSS 변수를 재정의한 뒤 color를 직접 설정해야 한다.
- * ══════════════════════════════════════════════════════════════ */
-
-/* 루트 — CSS 변수 재정의 + 직접 color 설정
-   !important 변수 선언은 같은 엘리먼트에 대한 Foundry 무-important 선언보다 우선. */
-body.fe-retro-theme #prosemirror-dropdown {
-  color:                    var(--fe-ac-90) !important;
-  --dropdown-background:    #000000 !important;
-  --dropdown-border:        var(--fe-dx3rd-accent, #ffffff) !important;
-  --button-text-color:      var(--fe-ac-90) !important;
-  --color-control-hover:    var(--fe-ac-12) !important;
-  --color-form-label-hover: var(--fe-ac-90) !important;
-}
-
-/* ul 컨테이너 */
-body.fe-retro-theme #prosemirror-dropdown ul {
-  background:   #000000 !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow:   none !important;
-}
-
-/* 각 항목 */
-body.fe-retro-theme #prosemirror-dropdown li {
-  color:      var(--fe-ac-80) !important;
-  background: transparent !important;
-}
-
-/* 직계 자식 span/i — 상속 강제 (level1~6 서식 미리보기 포함) */
-body.fe-retro-theme #prosemirror-dropdown li > span,
-body.fe-retro-theme #prosemirror-dropdown li > i {
-  color: inherit !important;
-}
-
-/* hover */
-body.fe-retro-theme #prosemirror-dropdown li:hover {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  color:      #000000 !important;
-  outline: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  outline-offset: 0 !important;
-}
-
-body.fe-retro-theme #prosemirror-dropdown li:hover > span,
-body.fe-retro-theme #prosemirror-dropdown li:hover > i {
-  color: inherit !important;
-}
-
-/* 구분선 */
-body.fe-retro-theme #prosemirror-dropdown li.divider {
-  border-bottom-color: var(--fe-ac-22) !important;
-}
-
-/* 에디터 툴바 menu 위아래 여백 축소 — 코어 --menu-padding:8px(상하 8px) 가 과하다.
-   바 높이도 --menu-height = 버튼(26px) + --menu-padding*2 이므로 함께 28px 로 줄어든다.
-   --menu-height 계산은 .menu-container 에서 일어나므로 --menu-padding 은 그 조상
-   (.prosemirror)에 둬야 바 높이가 실제로 축소된다(헤드리스 확인: 42px→28px). */
-body.fe-retro-theme :is(.prosemirror, prose-mirror) {
-  --menu-padding: 4px !important;
-}
-
-/* 에디터 툴바 menu 컨테이너 — 위아래 4px, 좌우 6px 유지 */
-body.fe-retro-theme :is(.prosemirror, prose-mirror) menu {
-  background: #000 !important;
-  padding: 4px 6px !important;
-}
-
-/* 툴바 버튼 */
-body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button {
-  color: var(--fe-ac-57) !important;
-}
-
-body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button:hover,
-body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button.active {
-  background: var(--fe-ac-12) !important;
-  color:      var(--fe-ac-90) !important;
-  outline: 1px solid #ffffff !important;
-  outline-offset: 0 !important;
-}
-
-/* pm-dropdown 서식 레이블 span */
-body.fe-retro-theme :is(.prosemirror, prose-mirror) menu .pm-dropdown > span {
-  color: var(--fe-ac-70) !important;
-}
-
 /* 에디터 편집 연필(prose-mirror > button.icon.toggle) — 전역 button 규칙(§30)의
    1px 테두리가 Foundry 기본 좌우 패딩(0 8px)과 겹쳐 작은 연필 아이콘보다
    헐거운 사각 외곽선을 만든다. 패딩 제거 + 정사각으로 외곽선을 아이콘에 맞춘다. */
@@ -2766,219 +2134,6 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) prose-mirror.editor bu
   justify-content: center !important;
 }
 
-/* ── 이미지/링크/표/색상 삽입 프롬프트 오버레이 (menu-dialog) ──────────
-   코어 _showDialog 는 <dialog class="application menu-dialog prosemirror"> 를
-   만들고, foundry2.css 가 이를 position:fixed; 100vw×100vh; background:transparent
-   인 "전체 화면 투명 클릭-닫기 오버레이"로 둔다(실제 보이는 박스는 안쪽 form).
-   §16-B 의 .application { background:#000 } / ::before·::after 픽셀 보더가 여기
-   걸리면 오버레이가 화면 전체를 시커멓게 덮고 화면 가장자리에 액자가 생긴다.
-   → 이 오버레이만 투명·무장식으로 되돌린다. 내부 form 은 코어 --dialog-background
-   를 그대로 쓰고, 그 안의 input/button 은 §16-B 입력 규칙이 정상 적용된다.
-   selector 에 dialog 엘리먼트를 더해 §16-B(0,3,1)보다 명시도를 높여 확실히 이긴다. */
-body.fe-retro-theme dialog.menu-dialog.prosemirror {
-  background: transparent !important;
-  background-image: none !important;
-  border: none !important;
-}
-body.fe-retro-theme dialog.menu-dialog.prosemirror::before,
-body.fe-retro-theme dialog.menu-dialog.prosemirror::after {
-  content: none !important;
-  display: none !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 28-b  주사위 결과창 테두리 — 고정 회색(#999) → 액센트색
- *          foundry2.css: .dice-roll .dice-formula, .dice-roll .dice-total
- *          { border: 1px solid #999 } 오버라이드.
- *          §2(border-radius:0), §4(box-shadow:none) 가 나머지 처리.
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 29  주사위 굴림 텍스트 — 2겹 윤곽선
- *        내측 흑색(±1px) + 외측 액센트(±2px) 2겹 구조.
- *        검은 내측이 텍스트와 외측 링을 시각적으로 분리하여
- *        어떤 배경에서도 다이스 수치 가독성 확보.
- *
- *        --fe-dice-outline: .chat-message 레벨에서 정의 → 상속으로 하위 전달.
- *        text-shadow !important 는 §4(0-1-1) 대비 1-4-4 로 이김.
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message {
-  --fe-dice-outline: #ffffff;
-}
-
-/* 플레이어 컬러 있는 메시지: 플레이어 컬러로 덮어씀 */
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message.fe-has-user-color {
-  --fe-dice-outline: rgb(var(--fe-user-color-rgb));
-}
-
-/* ol.dice-rolls 내 모든 주사위 li (d10/d6/d20 등 면수 무관) + 그 직계 span.
-   span 포함 이유: fumble/exploded 텍스트가 <li><span style="text-shadow:none"> 에 있어
-   text-shadow 비상속 속성상 li 에만 적용하면 span 텍스트엔 무효.
-   명시도: 전체 1-4-4 > §4 의 0-1-1. 인라인 text-shadow:none(no !important) 도 이김.
-   .clear 제외: 제외 주사위는 윤곽선 강조 불필요.
-   2겹 구조: 내측(±1px) 흑색이 텍스트에 딱 붙고,
-             외측(±2px 전 방향) 액센트가 흑색 바깥에 배치. */
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message
-  .dice-roll
-  ol.dice-rolls
-  :is(li:not(.clear), li:not(.clear) > span) {
-  text-shadow:
-    /* 내측 흑색 윤곽 (±1px) */
-    -1px -1px 0 #000000,
-     0   -1px 0 #000000,
-     1px -1px 0 #000000,
-    -1px  0   0 #000000,
-     1px  0   0 #000000,
-    -1px  1px 0 #000000,
-     0    1px 0 #000000,
-     1px  1px 0 #000000,
-    /* 외측 액센트 윤곽 (±2px 전 방향) */
-    -2px -2px 0 var(--fe-dice-outline),
-    -1px -2px 0 var(--fe-dice-outline),
-     0   -2px 0 var(--fe-dice-outline),
-     1px -2px 0 var(--fe-dice-outline),
-     2px -2px 0 var(--fe-dice-outline),
-    -2px -1px 0 var(--fe-dice-outline),
-     2px -1px 0 var(--fe-dice-outline),
-    -2px  0   0 var(--fe-dice-outline),
-     2px  0   0 var(--fe-dice-outline),
-    -2px  1px 0 var(--fe-dice-outline),
-     2px  1px 0 var(--fe-dice-outline),
-    -2px  2px 0 var(--fe-dice-outline),
-    -1px  2px 0 var(--fe-dice-outline),
-     0    2px 0 var(--fe-dice-outline),
-     1px  2px 0 var(--fe-dice-outline),
-     2px  2px 0 var(--fe-dice-outline) !important;
-}
-
-/* exploded — 선명한 녹색 텍스트 + 채도를 낮춘 연녹 글로우로 구분. */
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message
-  .dice-roll
-  ol.dice-rolls
-  :is(li.dice.exploded, li.dice.exploded > span) {
-  color: #00aa22 !important;
-  text-shadow:
-     0    0   6px #99ffbb,
-     0    0   3px #99ffbb,
-     1px  0   0   #99ffbb,
-    -1px  0   0   #99ffbb,
-     0    1px 0   #99ffbb,
-     0   -1px 0   #99ffbb,
-     1px  1px 0   #99ffbb,
-    -1px  1px 0   #99ffbb,
-     1px -1px 0   #99ffbb,
-    -1px -1px 0   #99ffbb !important;
-}
-
-/* fumble — 진한 적색 텍스트 + 채도를 낮춘 연적 글로우로 구분. */
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message
-  .dice-roll
-  ol.dice-rolls
-  :is(li.dice.fumble, li.dice.fumble > span) {
-  color: #cc2020 !important;
-  text-shadow:
-     0    0   6px #ff9999,
-     0    0   3px #ff9999,
-     1px  0   0   #ff9999,
-    -1px  0   0   #ff9999,
-     0    1px 0   #ff9999,
-     0   -1px 0   #ff9999,
-     1px  1px 0   #ff9999,
-    -1px  1px 0   #ff9999,
-     1px -1px 0   #ff9999,
-    -1px -1px 0   #ff9999 !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 30  버튼 · 플레이스홀더 · subtle 텍스트 직접 오버라이드
- *        CSS 변수 재정의가 Foundry의 !important 속성 선언을
- *        우회하지 못하는 경우를 위한 속성 직접 적용.
- *        더 구체적인 기존 버튼 규칙(§8·§22·§28)이 이 규칙보다
- *        명시도가 높으므로 충돌 없음.
- * ══════════════════════════════════════════════════════════════ */
-
-/* 전역 버튼 기본값.
-   스크린 패널의 면 탭은 활성 상태에서 아래 패널의 상단선을 가리지 않도록
-   자체적으로 투명 배경을 관리하므로 이 공통 배경 규칙에서 제외한다. */
-body.fe-retro-theme button:not(.fe-sp-face-tab) {
-  background-color: #000000 !important;
-  border-color:     rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
-  color:            var(--fe-ac-90) !important;
-}
-
-/* 전역 버튼 호버 */
-body.fe-retro-theme button:not(.fe-sp-face-tab):hover:not(:disabled) {
-  background-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  border-color:     var(--fe-dx3rd-accent, #ffffff) !important;
-  color:            #000000 !important;
-}
-
-/* 전역 버튼 클릭(active) — 글로우로 피드백 */
-body.fe-retro-theme button:not(.fe-sp-face-tab):active:not(:disabled) {
-  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
-  border-color:     var(--fe-dx3rd-accent, #ffffff) !important;
-  color:            var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow:
-    0 0 8px 2px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.85),
-    0 0 3px 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
-}
-
-/* sound-controls 반복재생 버튼.
-   FVTT v14: 반복 ON = 클래스 없음, 반복 OFF = .inactive 추가. */
-
-/* 비활성(OFF): .inactive 클래스 → 흐리게 */
-body.fe-retro-theme .sound-controls
-  :is(button[data-action="soundRepeat"].inactive,
-      a[data-action="soundRepeat"].inactive) {
-  color:      rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28) !important;
-  filter:     none !important;
-  box-shadow: none !important;
-}
-
-/* 활성(ON): .inactive 없음 → 밝은 색으로 구분. */
-body.fe-retro-theme .sound-controls
-  :is(button[data-action="soundRepeat"]:not(.inactive),
-      a[data-action="soundRepeat"]:not(.inactive)) {
-  color:      var(--fe-ac-80) !important;
-  filter:     none !important;
-  box-shadow: none !important;
-}
-
-/* subtle / secondary 텍스트 직접 적용 */
-body.fe-retro-theme [class*="subtle"],
-body.fe-retro-theme .hint,
-body.fe-retro-theme .notes {
-  color: var(--fe-ac-t33) !important;
-}
-
-body.fe-retro-theme [class*="secondary"] {
-  color: var(--fe-ac-57) !important;
-}
-
-/* 플레이스홀더 */
-body.fe-retro-theme ::placeholder {
-  color:   var(--fe-ac-t22) !important;
-  opacity: 1 !important;
-}
-
 
 /* ══════════════════════════════════════════════════════════════
  * § 31  주요 강조 텍스트 — accent 직접 적용
@@ -2987,14 +2142,9 @@ body.fe-retro-theme ::placeholder {
  *        · --fe-ac-90(L=90%/α=0.82)보다 선명한 accent 원색으로 계층 최상위 표현.
  * ══════════════════════════════════════════════════════════════ */
 
-/* 채팅 발신자(캐릭터명) · 윈도우 제목 · 스테이터스 카드 이름 ·
-   DX3rd 액션 UI 제목 · Theatre 대사창 액터 이름 */
-body.fe-retro-theme .message-sender,
-body.fe-retro-theme .window-title,
-body.fe-retro-theme h1.window-title,
+/* DX3rd 스테이터스 카드 이름 · 액션 UI 제목 */
 body.fe-retro-theme .fedr-name,
-body.fe-retro-theme .dx3rd-action-ui-title,
-body.fe-retro-theme .fe-stage-textbox-name {
+body.fe-retro-theme .dx3rd-action-ui-title {
   color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
@@ -3006,22 +2156,6 @@ body.fe-retro-theme .fe-stage-textbox-name {
  *        §14의 .message-content color 상속이 inline-roll에 도달하지
  *        못하는 경우를 대비해 속성을 직접 적용.
  * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message a.inline-roll {
-  color:        var(--fe-ac-90) !important;
-  background:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
-}
-
-body.fe-retro-theme
-  :is(#chat-log, .chat-log, ol.chat-log)
-  .chat-message a.inline-roll:hover {
-  background:   rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
-}
-
 
 /* ══════════════════════════════════════════════════════════════
  * § 33  DX3rd 강조 텍스트 클래스

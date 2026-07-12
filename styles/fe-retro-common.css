@@ -1,0 +1,596 @@
+/*
+ * fe-retro-common.css
+ * female_edition — 시스템과 무관하게 적용되는 레트로 표면 보정
+ *
+ * 이 파일은 fe-dx3rd-compat.css 뒤, fe-dnd5e-compat.css 앞에 layouts
+ * 레이어로 로드된다. 기존의 실제 우선순위를 보존하면서, DX3rd 파일이
+ * Theatre·툴팁·주사위 같은 공통 기능의 의존점이 되는 것을 막는다.
+ */
+
+/* ── <select> 요소 ─────────────────────────────────────────────
+ * 셀렉트는 화살표·내부 여백·option 팝업이 하나의 레이아웃 계약이다. 전역
+ * appearance:none과 20px 우측 패딩은 DX3rd AppV2의 좁은 행 및 dnd5e의
+ * 변수 기반 컨트롤을 덮어쓴다. 공통 레이어에서는 소유하지 않고, DX3rd·D&D
+ * 및 Theatre처럼 구조를 아는 규칙만 각자 범위에서 꾸민다. */
+
+/* ── Foundry 툴팁 ────────────────────────────────────────────── */
+body.fe-retro-theme
+  :is(#tooltip, .tooltip, .toolclip, foundry-tooltip, [data-tooltip-content]) {
+  background:     #000000 !important;
+  color:          var(--fe-ac-90) !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+/* ── Foundry 컨텍스트 메뉴 ─────────────────────────────────── */
+body.fe-retro-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu) {
+  background: #000000 !important;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline: 1px solid #000000 !important;
+  outline-offset: 0 !important;
+}
+
+body.fe-retro-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li) {
+  color: var(--fe-ac-90) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+body.fe-retro-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li):hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  outline: 1px solid #ffffff !important;
+  outline-offset: 0 !important;
+}
+
+body.fe-retro-theme
+  :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
+  :is(.context-item, li):hover * {
+  color: inherit !important;
+}
+
+/* ── Foundry 캔버스 제어 ───────────────────────────────────── */
+body.fe-retro-theme #navigation { background: transparent !important; }
+
+/* ── Foundry 창 프레임 ─────────────────────────────────────── */
+body.fe-retro-theme :is(.window-app, .application) {
+  background: #000 !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  /* 창 드래그 중 위치 변화에는 전환을 걸지 않는다. */
+  transition-property: none !important;
+}
+
+body.fe-retro-theme :is(.application.minimizing, .application.maximizing) {
+  transition-property: max-height, max-width !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application) :is(.window-header, header.window-header) {
+  background: #000 !important;
+  background-image: none !important;
+  border-bottom-color: var(--fe-ac-22) !important;
+  color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application) :is(.window-content, section.window-content) {
+  background: #000 !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .application :is(footer, nav.tabs) {
+  background: #000 !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application)
+  :is(.header-control, .close, .minimize, .header-button):not([disabled]) {
+  color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application)
+  :is(.header-control, .close, .minimize, .header-button):not([disabled]):hover {
+  color: var(--fe-ac-90) !important;
+}
+
+/* 모듈이 주입한 헤더 버튼은 코어 최소화 상태에서 숨긴다. */
+body.fe-retro-theme .application.minimized .window-header
+  :is(.fedr-sheet-btn, .fet-stage-btn, .header-control:not([data-action="close"])) {
+  display: none !important;
+}
+
+body.fe-retro-theme .application.minimized .window-header .header-control[data-action="close"] {
+  display: inline-flex !important;
+}
+
+body.fe-retro-theme
+  :is(.dialog, .filepicker, .file-picker, .document-sheet, .journal-sheet, .journal-entry-page)
+  :is(.window-content, .standard-form, .editor-content) {
+  background-color: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme
+  :is(.dialog, .filepicker, .file-picker, .document-sheet, .journal-sheet, .journal-entry-page)
+  :is(nav.tabs, footer, .form-footer, .window-footer) {
+  background-color: #000000 !important;
+  background-image: none !important;
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+/* Plutonium/5etools의 내부 창 표면은 특정 게임 시스템에 종속되지 않는다. */
+body.fe-retro-theme :is(.window-content.ve-app-window, .ve-app-window) {
+  background: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme :is(.app, .window-app, .application)
+  :is(.window-content.ve-app-window, section.window-content.ve-app-window, .ve-app-window),
+body.fe-retro-theme :is(.window-content.ve-app-window, section.window-content.ve-app-window, .ve-app-window)
+  :is(.window-content, .content, .body, .main, .standard-form, form, section, article):not(.editor-content):not(.prosemirror) {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .application.ve-app > .window-content.ve-app-window, .application.ve-app > .window-content.ve-app-window > .ve-window),
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(.veapp__bg-foundry, .veapp-loading__wrp-outer, .ve-ui-modal__inner, .ve-ui-tab__wrp-tab-body--background, .ve-ui-ctx__wrp, .veapp-ctx-menu__wrp, .ve-window) {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(.veapp__list-row, .cfg__row, .permu__row-ent, .veapp__ele-hoverable):hover {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(hr, .cfg__hr-tab-section, .permu__hr-head, .veapp__list-row, .permu__row-ent) {
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(.ve-fltr__mini-view, .ve-btn-group) {
+  background: linear-gradient(to top, var(--fe-ac-22, rgba(255, 255, 255, 0.22)), var(--fe-ac-12, rgba(255, 255, 255, 0.12)) 1px) !important;
+  background-color: #000000 !important;
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  background-image: none !important;
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  box-shadow: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme :is(.application.ve-app, .window-content.ve-app-window) :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default):is(:hover, :focus, .active, .ve-active) {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
+  box-shadow: inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme #navigation :is(.nav-item, .scene.nav-item) {
+  background: #000 !important;
+  color: var(--fe-ac-57) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme #navigation :is(.nav-item.active, .nav-item:hover) {
+  background: var(--fe-ac-06) !important;
+  color: var(--fe-ac-80) !important;
+  border-color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme .control-tool {
+  background: transparent !important;
+  color: var(--fe-ac-t33) !important;
+}
+
+body.fe-retro-theme :is(.control-tool.active, .control-tool:hover) {
+  background: var(--fe-ac-12) !important;
+  color: var(--fe-ac-70) !important;
+}
+
+body.fe-retro-theme :is(.control-tool-wrapper, .controls-dropdown) {
+  background: #000 !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+/* ── Foundry 핫바·플레이어·사이드바 ────────────────────────── */
+body.fe-retro-theme #hotbar {
+  background: #000 !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme :is(.macro, .hotbar-slot) {
+  background: #000 !important;
+  border-color: var(--fe-ac-22) !important;
+  color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme :is(#players-active, #players) {
+  background: #000 !important;
+  background-image: none !important;
+}
+
+body.fe-retro-theme .player-active :is(.player-name, .player-character) {
+  color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme .sidebar-tab {
+  background: #000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme :is(#sidebar-tabs, .sidebar-tabs) .item {
+  background: #000 !important;
+  color: var(--fe-ac-t33) !important;
+  border-color: var(--fe-ac-12) !important;
+}
+
+body.fe-retro-theme :is(#sidebar-tabs, .sidebar-tabs) .item.active {
+  color: var(--fe-ac-70) !important;
+  border-color: var(--fe-ac-70) !important;
+}
+
+body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
+  color: var(--fe-ac-70) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .sidebar-tab :is(a, li, label) { color: var(--fe-ac-57) !important; }
+body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) { color: var(--fe-ac-80) !important; }
+
+/* ── 채팅 입력 및 시스템 중립 창 ───────────────────────────── */
+body.fe-retro-theme :is(#chat-form, :is(chat-sidebar, .chat-sidebar) footer, :is(chat-sidebar, .chat-sidebar) .chat-footer) {
+  background: #000 !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme :is(#chat-message, textarea[name="content"], chat-message-input),
+body.fe-retro-theme chat-message-input textarea {
+  background: #000 !important;
+  color: var(--fe-ac-90) !important;
+  border: 1px solid var(--fe-ac-45) !important;
+}
+
+body.fe-retro-theme :is(#chat-message::placeholder, textarea[name="content"]::placeholder, chat-message-input textarea::placeholder) {
+  color: var(--fe-ac-t33) !important;
+  opacity: 1 !important;
+}
+
+body.fe-retro-theme :is(.chat-control-bar, .chat-controls) {
+  background: #000 !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme :is(.chat-control-bar, .chat-controls) :is(button, select) {
+  background-color: #000 !important;
+  color: var(--fe-ac-57) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme :is(#chat-form, .chat-controls) button[type="submit"],
+body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, .send-button) {
+  background: var(--fe-ac-06) !important;
+  color: var(--fe-ac-80) !important;
+  border: 1px solid var(--fe-ac-45) !important;
+}
+
+body.fe-retro-theme :is(#chat-form, .chat-controls) button[type="submit"]:hover,
+body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, .send-button):hover {
+  background: var(--fe-ac-22) !important;
+  color: var(--fe-ac-90) !important;
+  border-color: var(--fe-ac-70) !important;
+}
+
+/* DX3rd 자체 시트는 구조별 호환 규칙이 소유한다. */
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+  :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  background-color: #000 !important;
+  color: var(--fe-ac-90) !important;
+  border-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab) {
+  background: #000 !important;
+  color: var(--fe-ac-70) !important;
+  border-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):hover {
+  background: var(--fe-ac-12) !important;
+  border-color: var(--fe-ac-70) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application) :is(h2, h3, h4):not(.window-title) {
+  color: var(--fe-ac-70) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) :is(p, span, label, li, td, th) {
+  color: var(--fe-ac-57) !important;
+}
+
+/* ── 공통 아이콘·사이드바 버튼·Theatre 헤더 ─────────────────── */
+body.fe-retro-theme i[class*="fa"] { color: inherit !important; }
+
+body.fe-retro-theme .sidebar-tab button,
+body.fe-retro-theme :is(#sidebar, #sidebar-content) > button {
+  background: transparent !important;
+  color: var(--fe-ac-57) !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .sidebar-tab button:hover,
+body.fe-retro-theme :is(#sidebar, #sidebar-content) > button:hover {
+  color: var(--fe-ac-90) !important;
+  background: var(--fe-ac-06) !important;
+}
+
+body.fe-retro-theme .sidebar-tab span { color: inherit !important; }
+
+body.fe-retro-theme :is(.window-app, .application) .fet-stage-btn { color: var(--fe-ac-57) !important; }
+body.fe-retro-theme :is(.window-app, .application) .fet-stage-btn:hover { color: var(--fe-ac-90) !important; }
+body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove { color: #c94444 !important; }
+body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove:hover { color: #ff6b6b !important; }
+
+/* ── 전역 버튼 및 보조 텍스트 ──────────────────────────────────
+ * 스크린 패널 면 탭은 활성 상태에서 자체 배경을 관리하므로 제외한다. */
+body.fe-retro-theme button:not(.fe-sp-face-tab) {
+  background-color: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme button:not(.fe-sp-face-tab):hover:not(:disabled) {
+  background-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+body.fe-retro-theme button:not(.fe-sp-face-tab):active:not(:disabled) {
+  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow:
+    0 0 8px 2px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.85),
+    0 0 3px 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
+}
+
+body.fe-retro-theme .sound-controls
+  :is(button[data-action="soundRepeat"].inactive, a[data-action="soundRepeat"].inactive) {
+  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28) !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .sound-controls
+  :is(button[data-action="soundRepeat"]:not(.inactive), a[data-action="soundRepeat"]:not(.inactive)) {
+  color: var(--fe-ac-80) !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme :is([class*="subtle"], .hint, .notes) { color: var(--fe-ac-t33) !important; }
+body.fe-retro-theme [class*="secondary"] { color: var(--fe-ac-57) !important; }
+body.fe-retro-theme ::placeholder { color: var(--fe-ac-t22) !important; opacity: 1 !important; }
+
+/* ── ProseMirror 공통 UI ────────────────────────────────────── */
+body.fe-retro-theme #prosemirror-dropdown {
+  color: var(--fe-ac-90) !important;
+  --dropdown-background: #000000 !important;
+  --dropdown-border: var(--fe-dx3rd-accent, #ffffff) !important;
+  --button-text-color: var(--fe-ac-90) !important;
+  --color-control-hover: var(--fe-ac-12) !important;
+  --color-form-label-hover: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme #prosemirror-dropdown ul {
+  background: #000000 !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme #prosemirror-dropdown li {
+  color: var(--fe-ac-80) !important;
+  background: transparent !important;
+}
+
+body.fe-retro-theme #prosemirror-dropdown li > :is(span, i) { color: inherit !important; }
+
+body.fe-retro-theme #prosemirror-dropdown li:hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  outline: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline-offset: 0 !important;
+}
+
+body.fe-retro-theme #prosemirror-dropdown li:hover > :is(span, i) { color: inherit !important; }
+body.fe-retro-theme #prosemirror-dropdown li.divider { border-bottom-color: var(--fe-ac-22) !important; }
+
+body.fe-retro-theme :is(.prosemirror, prose-mirror) { --menu-padding: 4px !important; }
+
+body.fe-retro-theme :is(.prosemirror, prose-mirror) menu {
+  background: #000 !important;
+  padding: 4px 6px !important;
+}
+
+body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button { color: var(--fe-ac-57) !important; }
+
+body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button:is(:hover, .active) {
+  background: var(--fe-ac-12) !important;
+  color: var(--fe-ac-90) !important;
+  outline: 1px solid #ffffff !important;
+  outline-offset: 0 !important;
+}
+
+body.fe-retro-theme :is(.prosemirror, prose-mirror) menu .pm-dropdown > span { color: var(--fe-ac-70) !important; }
+
+/* 코어의 전체 화면 클릭-닫기 오버레이는 창 배경·픽셀 외곽선을 받지 않는다. */
+body.fe-retro-theme dialog.menu-dialog.prosemirror {
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+}
+
+body.fe-retro-theme dialog.menu-dialog.prosemirror::before,
+body.fe-retro-theme dialog.menu-dialog.prosemirror::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* ── Theatre 이모트·대사 박스 ───────────────────────────────── */
+body.fe-retro-theme .fe-stage-emote-menu {
+  background:     #000000 !important;
+  border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline:        1px solid #000000 !important;
+  outline-offset: 0px !important;
+}
+
+body.fe-retro-theme .fe-stage-emote-item { color: var(--fe-ac-90) !important; }
+
+body.fe-retro-theme .fe-stage-emote-item:hover,
+body.fe-retro-theme .fe-stage-emote-item.active {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  outline: 1px solid #ffffff !important;
+  outline-offset: 0 !important;
+}
+
+/* 9-슬라이스 테두리가 컨테이너에 잘리지 않도록 한다. */
+body.fe-retro-theme .fe-stage-textbox {
+  overflow: visible !important;
+  isolation: isolate !important;
+}
+
+body.fe-retro-theme .fe-stage-textbox::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+  border: 10px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  background: transparent !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
+}
+
+body.fe-retro-theme .fe-stage-textbox::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: -10px !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  border: 10px solid transparent !important;
+  border-top: 10px solid transparent !important;
+  border-bottom: 10px solid transparent !important;
+  border-bottom-color: transparent !important;
+  left: -10px !important;
+  transform: none !important;
+  border-image: url('./assets/pixel-border.png') 10 / 10px / 0 repeat !important;
+  image-rendering: pixelated !important;
+  mix-blend-mode: multiply !important;
+  background: none !important;
+  -webkit-mask: none !important;
+          mask: none !important;
+  -webkit-mask-box-image: none !important;
+          mask-border: none !important;
+}
+
+body.fe-retro-theme .fe-stage-portrait-wrap {
+  bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
+}
+
+/* ── 주사위·인라인 롤 ───────────────────────────────────────── */
+body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) .chat-message {
+  --fe-dice-outline: #ffffff;
+}
+
+body.fe-retro-theme :is(#chat-log, .chat-log, ol.chat-log) .chat-message.fe-has-user-color {
+  --fe-dice-outline: rgb(var(--fe-user-color-rgb));
+}
+
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(li:not(.clear), li:not(.clear) > span) {
+  text-shadow:
+    -1px -1px 0 #000000, 0 -1px 0 #000000, 1px -1px 0 #000000,
+    -1px 0 0 #000000, 1px 0 0 #000000,
+    -1px 1px 0 #000000, 0 1px 0 #000000, 1px 1px 0 #000000,
+    -2px -2px 0 var(--fe-dice-outline), -1px -2px 0 var(--fe-dice-outline),
+    0 -2px 0 var(--fe-dice-outline), 1px -2px 0 var(--fe-dice-outline),
+    2px -2px 0 var(--fe-dice-outline), -2px -1px 0 var(--fe-dice-outline),
+    2px -1px 0 var(--fe-dice-outline), -2px 0 0 var(--fe-dice-outline),
+    2px 0 0 var(--fe-dice-outline), -2px 1px 0 var(--fe-dice-outline),
+    2px 1px 0 var(--fe-dice-outline), -2px 2px 0 var(--fe-dice-outline),
+    -1px 2px 0 var(--fe-dice-outline), 0 2px 0 var(--fe-dice-outline),
+    1px 2px 0 var(--fe-dice-outline), 2px 2px 0 var(--fe-dice-outline) !important;
+}
+
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(li.dice.exploded, li.dice.exploded > span) {
+  color: #00aa22 !important;
+  text-shadow: 0 0 6px #99ffbb, 0 0 3px #99ffbb, 1px 0 0 #99ffbb,
+    -1px 0 0 #99ffbb, 0 1px 0 #99ffbb, 0 -1px 0 #99ffbb,
+    1px 1px 0 #99ffbb, -1px 1px 0 #99ffbb, 1px -1px 0 #99ffbb,
+    -1px -1px 0 #99ffbb !important;
+}
+
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log) .chat-message .dice-roll ol.dice-rolls
+  :is(li.dice.fumble, li.dice.fumble > span) {
+  color: #cc2020 !important;
+  text-shadow: 0 0 6px #ff9999, 0 0 3px #ff9999, 1px 0 0 #ff9999,
+    -1px 0 0 #ff9999, 0 1px 0 #ff9999, 0 -1px 0 #ff9999,
+    1px 1px 0 #ff9999, -1px 1px 0 #ff9999, 1px -1px 0 #ff9999,
+    -1px -1px 0 #ff9999 !important;
+}
+
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log) .chat-message a.inline-roll {
+  color: var(--fe-ac-90) !important;
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
+}
+
+body.fe-retro-theme
+  :is(#chat-log, .chat-log, ol.chat-log) .chat-message a.inline-roll:hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
+}
+
+/* ── 공통 최상위 강조 텍스트 ────────────────────────────────── */
+body.fe-retro-theme :is(.window-app, .application) .window-title,
+body.fe-retro-theme :is(.window-app, .application) h1.window-title,
+body.fe-retro-theme .message-sender,
+body.fe-retro-theme .window-title,
+body.fe-retro-theme h1.window-title,
+body.fe-retro-theme .fe-stage-textbox-name {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}

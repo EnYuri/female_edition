@@ -551,7 +551,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.UI_RETRO_THEME, {
     name: "레트로 테마 (픽셀 고대비)",
-    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용 가능하며 DX3rd 전용 레이아웃 보정도 함께 적용됩니다. NeoDGM 폰트 모드와 함께 사용 권장.",
+    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용할 수 있으며, DX3rd·D&D 5e 전용 레이아웃 보정은 해당 시스템에서만 적용됩니다. NeoDGM 폰트 모드와 함께 사용 권장.",
     scope: "client",
     config: false,
     type: Boolean,
