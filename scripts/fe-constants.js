@@ -255,7 +255,7 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
 const FE_RENDER_STATE_FLAG = "renderState";
 const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
 const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
-const FE_RENDER_STATE_VERSION = 3;
+const FE_RENDER_STATE_VERSION = 4;
 
 const FE_TEX_RE = /(parchment\.jpg|\/ui\/texture[^"' )]*\.(?:webp|png|jpg|jpeg)|texture[^"' )]*\.(?:webp|png|jpg|jpeg))/i;
 const FE_OVERLAY_LAYER = "var(--fe-parchment-overlay)";
