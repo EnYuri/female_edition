@@ -34,6 +34,7 @@ import { ScreenPanelSheet } from "./fe-screen-panel-sheet.js";
 import {
   feSetPanelMenuActions,
   feOpenPanelMenu,
+  closePanelMenu,
   isPanelMenuOpen,
   feShowPanelTooltip,
   feHidePanelTooltip,
@@ -223,6 +224,7 @@ function tokenOccludesAt(world, panelDoc) {
 
 let _boardEl = null;
 let _lastMove = 0;
+let _cancelPanelPointer = null;
 
 function attachBoardListeners() {
   const view = canvas?.app?.view;
@@ -303,6 +305,9 @@ function onBoardContextMenu(event) {
  * release); below the threshold it is a click that opens the dropdown menu.
  */
 function startPanelPointer(hit, downEvent, canDrag) {
+  // A second press or a scene teardown must never leave the previous drag's
+  // window listeners alive to commit a stale tile after the canvas has changed.
+  _cancelPanelPointer?.();
   const start = { x: downEvent.clientX, y: downEvent.clientY };
   const startWorld = clientToWorld(start.x, start.y);
   const origin = { x: hit.doc.x, y: hit.doc.y };
@@ -327,6 +332,7 @@ function startPanelPointer(hit, downEvent, canDrag) {
     window.removeEventListener("pointermove", onMove, true);
     window.removeEventListener("pointerup", onUp, true);
     window.removeEventListener("pointercancel", onCancel, true);
+    if (_cancelPanelPointer === onCancel) _cancelPanelPointer = null;
   };
   const onUp = (e) => {
     cleanup();
@@ -365,6 +371,7 @@ function startPanelPointer(hit, downEvent, canDrag) {
   window.addEventListener("pointermove", onMove, true);
   window.addEventListener("pointerup", onUp, true);
   window.addEventListener("pointercancel", onCancel, true);
+  _cancelPanelPointer = onCancel;
 }
 
 function onBoardMouseMove(event) {
@@ -513,6 +520,27 @@ function feBuildPanelTileIndex() {
   fePanelTilesByLinkedActorId.clear();
   for (const tile of canvas?.tiles?.placeables ?? []) feIndexPanelTile(tile);
   fePanelTileIndexReady = true;
+}
+
+/**
+ * Canvas teardown happens before core destroys the old scene's primary group.
+ * Dispose of our independently-added PIXI labels and all DOM/drag state here:
+ * otherwise a scene switch can leave an old menu callback or pointer-up listener
+ * holding a dead Tile object until the next user interaction.
+ */
+function feResetPanelCanvasState() {
+  _cancelPanelPointer?.();
+  _cancelPanelPointer = null;
+  _lastPanelClick = null;
+  closePanelMenu();
+  feHidePanelTooltip();
+  for (const tile of canvas?.tiles?.placeables ?? []) {
+    feClearPanelOverlays(tile);
+    feRemovePanelTileFromIndex(tile);
+  }
+  fePanelTilesByActorId.clear();
+  fePanelTilesByLinkedActorId.clear();
+  fePanelTileIndexReady = false;
 }
 
 function feGetIndexedPanelTiles(actorId, { linked = false } = {}) {
@@ -1105,6 +1133,8 @@ Hooks.once("ready", () => {
 
   if (canvas?.ready) attachBoardListeners();
 });
+
+Hooks.on("canvasTearDown", () => feResetPanelCanvasState());
 
 Hooks.on("canvasReady", () => {
   fePanelTileIndexReady = false;

@@ -49,6 +49,12 @@ const MASK_FLAG        = "maskResourceValues"; // 수치 값을 ??로 숨김
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
 const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 
+// Accent H/S variables feed a large portion of the retro stylesheet. Native color
+// pickers can emit input events faster than the browser can recalculate that CSS,
+// so keep the preview responsive without recalculating the entire UI per event.
+let _accentPreviewTimer = null;
+let _pendingAccentPreview = null;
+
 // ─── guards ────────────────────────────────────────────────────────────────
 
 const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
@@ -566,6 +572,35 @@ async function _setAccent(color) {
   }
 }
 
+function _applyAccentPreview(color) {
+  const root = document.documentElement;
+  root.style.setProperty("--fe-dx3rd-accent", color);
+  const { h, s } = _hexToHs(color);
+  root.style.setProperty("--fe-dx3rd-accent-h", `${Math.round(h)}deg`);
+  root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
+}
+
+function _queueAccentPreview(color) {
+  _pendingAccentPreview = color;
+  if (_accentPreviewTimer) return;
+  // 30fps is visually continuous for a colour swatch while leaving enough time
+  // for the expensive variable-driven style recalculation to finish.
+  _accentPreviewTimer = setTimeout(() => {
+    _accentPreviewTimer = null;
+    const next = _pendingAccentPreview;
+    _pendingAccentPreview = null;
+    if (next) _applyAccentPreview(next);
+  }, 33);
+}
+
+function _flushAccentPreview() {
+  if (_accentPreviewTimer) clearTimeout(_accentPreviewTimer);
+  _accentPreviewTimer = null;
+  const next = _pendingAccentPreview;
+  _pendingAccentPreview = null;
+  if (next) _applyAccentPreview(next);
+}
+
 function _injectAccentBtn() {
   // 액센트 색 선택기는 레트로 테마 전용(비-레트로엔 액센트 오버라이드가 없음).
   // 레트로 테마는 전 시스템 공용이므로 시스템 게이트 없이, 테마 ON + GM 이면 주입한다.
@@ -597,18 +632,20 @@ function _injectAccentBtn() {
   input.type  = "color";
   input.value = color;
 
-  // real-time preview while dragging the picker — §20 palette(H·S)도 즉시 반영
+  // Live preview is rate-limited because these root variables recolour a large
+  // part of the DOM. The swatch itself still follows every native input event.
   input.addEventListener("input", (e) => {
     const color = e.target.value;
     label.style.setProperty("--fe-accent-swatch", color);
-    const root = document.documentElement;
-    root.style.setProperty("--fe-dx3rd-accent", color);
-    const { h, s } = _hexToHs(color);
-    root.style.setProperty("--fe-dx3rd-accent-h", `${Math.round(h)}deg`);
-    root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
+    _queueAccentPreview(color);
   });
-  // commit: persist to setting (triggers feApplyStyleVarsFromSettings via onChange)
-  input.addEventListener("change", (e) => _setAccent(e.target.value));
+  // Commit the last queued preview first, then persist it once. The setting's
+  // onChange performs the authoritative full style-variable refresh.
+  input.addEventListener("change", (e) => {
+    _pendingAccentPreview = e.target.value;
+    _flushAccentPreview();
+    void _setAccent(e.target.value);
+  });
 
   label.appendChild(input);
   controls.append(label);

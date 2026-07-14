@@ -66,6 +66,65 @@ body.fe-retro-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
   outline-offset: 0 !important;
 }
 
+/* 전투 프로세스 액션 트래커 — 시스템 쪽은 반투명 청회색 패널과 하드코드
+   텍스트 색을 사용한다. 레트로에서는 불투명 검정 패널과 accent 계열만 쓴다. */
+body.fe-retro-theme .dx3rd-action-ui.dx3rd-action-tracker {
+  background: #000000 !important;
+  border-left-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-actor {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-status {
+  color: var(--fe-ac-t33) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-step {
+  color: var(--fe-ac-t22) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-step.is-active {
+  color: var(--fe-ac-90) !important;
+  background: var(--fe-ac-12) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-step.is-active:hover:not(:disabled) {
+  color: #000000 !important;
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-step.is-spent {
+  color: var(--fe-ac-t22) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-light {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-step.is-active .dx3rd-action-tracker-light {
+  box-shadow: inset 0 0 0 1px #000000 !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-turn-controls {
+  border-top-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-turn-controls button {
+  background: #000000 !important;
+  border-color: var(--fe-ac-45) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .dx3rd-action-tracker-turn-controls button:hover:not(:disabled) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 9  dx3rd 아이템 선택 팝업
