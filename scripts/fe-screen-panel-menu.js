@@ -20,13 +20,14 @@ let _actions = {
   toggleShowHide: null, // (tile)
   toggleDisable: null,  // (tile)
   toggleLock: null,     // (tile)
+  sort: null,           // (tile, dir) — dir>0 forward, dir<0 backward (tokenized panels only)
   remove: null,         // (tile)
   openSheet: null,      // (actor)
   grantRights: null,    // (actor) — GM only
   gridSnapState: null,  // () => boolean — current local snap preference
   toggleGridSnap: null, // () => toggles the local snap preference
-  dblclickCycleState: null, // () => boolean
-  toggleDblclickCycle: null, // () => toggles dblclick face cycling
+  dblclickCycleState: null, // (actor) => boolean — per-panel (actor.system.dblclickCycle)
+  toggleDblclickCycle: null, // (actor) => toggles dblclick face cycling for THIS panel
 };
 
 function feSetPanelMenuActions(actions) {
@@ -191,6 +192,14 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
         locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
         () => _actions.toggleLock?.(tile));
 
+    // Layer ordering — TOKENIZED panels only. A tile panel is reachable through core's own
+    // Tiles-layer tools (which have send-to-back/front); a token has no such UI, and core's
+    // Token HUD is vetoed for panels, so this menu is the only place to reorder one.
+    if (tile.document?.documentName === "Token") {
+      add("fa-arrow-up", "FESP.Menu.SortForward", () => _actions.sort?.(tile, 1));
+      add("fa-arrow-down", "FESP.Menu.SortBackward", () => _actions.sort?.(tile, -1));
+    }
+
     // Grid-snap is a LOCAL drag preference (client setting, no GM relay), so this
     // item stays enabled even when no GM is online. It toggles snapping for THIS
     // user's panel drags globally.
@@ -203,13 +212,16 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
     snapItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleGridSnap?.(); });
     ownerSection.appendChild(snapItem);
 
-    const dblOn = !!_actions.dblclickCycleState?.();
+    // Per-panel (actor.system.dblclickCycle) → world data, so it applies to every
+    // user, not just this client. Writing it needs OWNER on the actor, which this
+    // whole section is already gated on.
+    const dblOn = !!_actions.dblclickCycleState?.(actor);
     const dblItem = document.createElement("button");
     dblItem.type = "button";
     dblItem.className = "fe-sp-menu-item";
     dblItem.innerHTML = `<i class="fa-solid ${dblOn ? "fa-toggle-on" : "fa-toggle-off"}"></i>`
       + `<span>${game.i18n.localize(dblOn ? "FESP.Menu.DblclickOff" : "FESP.Menu.DblclickOn")}</span>`;
-    dblItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleDblclickCycle?.(); });
+    dblItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleDblclickCycle?.(actor); });
     ownerSection.appendChild(dblItem);
 
     add("fa-trash", "FESP.Menu.Remove", () => _actions.remove?.(tile), { danger: true });

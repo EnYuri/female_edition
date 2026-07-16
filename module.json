@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "authors": [
     {
       "name": "nayuri",
@@ -56,6 +56,7 @@
     { "src": "styles/fe-retro-theme.css", "layer": "layouts" },
     { "src": "styles/fe-dx3rd-compat.css", "layer": "layouts" },
     { "src": "styles/fe-retro-common.css", "layer": "layouts" },
+    { "src": "styles/fe-retro-forms.css", "layer": "layouts" },
     { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" },
     { "src": "styles/fe-crlngn-compat.css", "layer": "layouts" },
     "styles/fe-image-hover.css",
@@ -89,7 +90,7 @@
   ],
   "compatibility": {
     "minimum": "13",
-    "verified": "14.364",
+    "verified": "14.365",
     "maximum": "14"
   },
   "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd and dnd5e. 「부레옥잠-!」",

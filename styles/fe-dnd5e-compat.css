@@ -33,7 +33,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   input[type="checkbox"] {
   --checkbox-background-color: rgb(0 0 0 / 0.42) !important;
   --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  --checkbox-checkmark-color: transparent !important;
+  --checkbox-checkmark-color: #000 !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e

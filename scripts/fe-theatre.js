@@ -1634,6 +1634,17 @@ function _fetRegisterContextOptions(_html, options) {
   // Guard against both hooks firing simultaneously (V13 + V14 compat shim)
   if (options.some((o) => o.name === "무대에 추가")) return;
 
+  // 스크린 패널(female_edition.screenPanel)은 캐릭터가 아니라 표시용 보드라
+  // 무대·무대 채팅의 대상이 아니다(_fetInjectSheetButtons 가 시트 헤더 버튼을
+  // 빼는 것과 같은 이유). 여기서도 같은 제외를 걸어야 액터 디렉토리 우클릭에
+  // "무대에 추가"가 뜨지 않는다.
+  const _fetActorForMenu = (li) => {
+    const id = _fetGetActorIdFromLi(li);
+    const actor = id ? game.actors.get(id) : null;
+    if (!actor || actor.type === "female_edition.screenPanel") return null;
+    return actor;
+  };
+
   // 무대 추가/제거 — "편집"(SIDEBAR.Edit) 항목 바로 아래에 끼워 넣는다.
   const stageItems = [
     {
@@ -1641,10 +1652,10 @@ function _fetRegisterContextOptions(_html, options) {
       icon: '<i class="fas fa-theater-masks"></i>',
       condition: (li) => {
         if (!_fetEnabled) return false;
-        const id = _fetGetActorIdFromLi(li);
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
-        if (!id || !game.actors.get(id)?.isOwner) return false;
-        return !_fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + id));
+        const actor = _fetActorForMenu(li);
+        if (!actor?.isOwner) return false;
+        return !_fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + actor.id));
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
@@ -1656,10 +1667,10 @@ function _fetRegisterContextOptions(_html, options) {
       icon: '<i class="fas fa-door-open"></i>',
       condition: (li) => {
         if (!_fetEnabled) return false;
-        const id = _fetGetActorIdFromLi(li);
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
-        if (!id || !game.actors.get(id)?.isOwner) return false;
-        return _fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + id));
+        const actor = _fetActorForMenu(li);
+        if (!actor?.isOwner) return false;
+        return _fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + actor.id));
       },
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
@@ -1670,7 +1681,7 @@ function _fetRegisterContextOptions(_html, options) {
     {
       name: "무대 설정",
       icon: '<i class="fas fa-cog"></i>',
-      condition: (li) => _fetEnabled && game.user.isGM && !!_fetGetActorIdFromLi(li),
+      condition: (li) => _fetEnabled && game.user.isGM && !!_fetActorForMenu(li),
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetOpenActorConfig(id);
@@ -1727,6 +1738,17 @@ function _fetResolveEl(app, html) {
   return html?.element?.[0] ?? null;
 }
 
+/**
+ * Return the Actor directly managed by an Actor sheet, never an owning Actor
+ * exposed by some other document sheet. Both core ItemSheet and ItemSheetV2
+ * provide `app.actor` for embedded items, so actor-first resolution causes their
+ * header controls to be mistaken for Actor-sheet controls.
+ */
+function _fetGetActorSheetActor(app) {
+  const document = app?.document ?? app?.object ?? null;
+  return document?.documentName === "Actor" ? document : null;
+}
+
 // ApplicationV2 sheets already ship their own header-controls dropdown (the
 // "⋯" button, `data-action="toggleControls"` — core
 // application.mjs `_getHeaderControls()` / `_headerControlButtons()`). Rather
@@ -1740,8 +1762,8 @@ function _fetResolveEl(app, html) {
 // button (see the windowHeader fallback branch in _fetInjectSheetButtons).
 function _fetOnGetHeaderControls(app, controls) {
   if (!_fetEnabled || !game.user?.isGM) return;
-  const actor = app.actor ?? app.document;
-  if (actor?.documentName !== "Actor") return;
+  const actor = _fetGetActorSheetActor(app);
+  if (!actor) return;
   if (actor.type === "female_edition.screenPanel") return;
   controls.push({
     action: "fetStageConfig",
@@ -1754,8 +1776,8 @@ Hooks.on("getHeaderControlsApplicationV2", _fetOnGetHeaderControls);
 
 function _fetInjectSheetButtons(app, el) {
   if (!_fetEnabled) return;
-  const actor = app.actor ?? app.document;
-  if (actor?.documentName !== "Actor") return;
+  const actor = _fetGetActorSheetActor(app);
+  if (!actor) return;
   // A screen panel (female_edition.screenPanel) is a display board, not a
   // character — stage add/switch/config buttons here would just be confusing.
   if (actor.type === "female_edition.screenPanel") return;
@@ -1842,7 +1864,7 @@ function _fetInjectSheetButtons(app, el) {
 
 function _fetRefreshSheetHeaders() {
   const process = (app) => {
-    if ((app.actor ?? app.document)?.documentName !== "Actor") return;
+    if (!_fetGetActorSheetActor(app)) return;
     const raw = app.element;
     const el  = raw instanceof HTMLElement ? raw : (raw?.[0] ?? null);
     if (el && document.contains(el)) _fetInjectSheetButtons(app, el);

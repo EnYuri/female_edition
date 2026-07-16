@@ -1,0 +1,163 @@
+/* ================================================================
+ * fe-retro-forms.css
+ * female_edition — 레트로 테마의 "코어 폼 컨트롤 표면" 전담
+ *
+ * 활성화: body.fe-retro-theme
+ *
+ * 이 파일은 Foundry 코어가 제공하는 입력 컨트롤의 표면만 소유한다.
+ * 창 프레임·사이드바·채팅·ProseMirror·Theatre 등 나머지 공통 표면은
+ * fe-retro-common.css 가, 시스템 전용 시트는 fe-dx3rd-compat.css /
+ * fe-dnd5e-compat.css 가 계속 소유한다.
+ *
+ * 담는 것:
+ *   · § F1  텍스트류 input · select · textarea 표면
+ *   · § F2  입력 래퍼 커스텀 엘리먼트 (color-picker 등)
+ *   · § F3  체크박스 — 코어 FA 상태 아이콘 + 레트로 팔레트
+ *   · § F4  라디오 — 의도적으로 손대지 않음
+ *   · § F5  ::placeholder
+ *
+ * 담지 않는 것:
+ *   · button — fe-retro-common.css 가 계속 소유한다. 전역 button 규칙과
+ *     채팅 컨트롤 button 규칙이 동일 명시도 동률이라 소스 순서로 승자가
+ *     갈린다. 다른 파일로 옮기면 그 동률이 조용히 뒤집힌다.
+ *
+ * ⚠️ CASCADE LAYER (필수): module.json 에서
+ *      { "src": "styles/fe-retro-forms.css", "layer": "layouts" } 로,
+ *    fe-retro-common.css "뒤" · fe-dnd5e-compat.css "앞"에 등록한다.
+ *    이 위치는 fe-retro-common.css 에서 이관해 온 § F1 이 DX3rd/D&D 파일에
+ *    대해 갖던 원래 상대 순서를 그대로 보존한다.
+ *
+ * ── 시스템 소유 영역 가드 (이 파일 전체의 전제) ──────────────
+ * 코어 폼 · DX3rd 시트/전용 다이얼로그 · D&D 시트는 체크 제어의 glyph·크기·
+ * 여백 계약이 서로 다르다. 각 시스템 호환 파일이 자기 영역의 --checkbox-*
+ * 색 변수만 바꾸고 구조는 시스템 CSS 에 맡기는 방식으로 이미 소유 중이므로,
+ * 이 파일은 그 바깥(= 순수 코어 폼)만 건드린다. 가드 목록은 아래 두 곳의
+ * 스코프를 합집합한 것이다:
+ *   · fe-dx3rd-compat.css  § DX3rd 네이티브 체크박스/라디오 전용 색상
+ *   · fe-dnd5e-compat.css  § D&D 5e 체크 제어
+ * 가드를 `:not(<앱 루트 클래스>)` 가 아니라 `:not(<클래스> *)` 로 쓰는 이유:
+ * DX3rd 전용 다이얼로그처럼 표식 클래스가 .application 루트가 아니라 내부
+ * 컨테이너에 붙는 경우가 있어, 조상 어디에 붙든 걸러내야 한다.
+ * ================================================================ */
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § F1  텍스트류 input · select · textarea 표면
+ *        (fe-retro-common.css 에서 이관 — 셀렉터·선언 원문 그대로)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* DX3rd 자체 시트는 구조별 호환 규칙이 소유한다. */
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+  :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  background-color: #000 !important;
+  color: var(--fe-ac-90) !important;
+  border-color: var(--fe-ac-33) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § F2  입력 래퍼 커스텀 엘리먼트 — 껍데기도 같이 칠한다
+ *
+ *  코어(foundry2.css)는 color-picker / file-picker / formula-input /
+ *  document-tags·string-tags > .input-group 을 한 규칙으로 묶어
+ *  `background: var(--input-background-color); border: 1px solid …` 를 주는
+ *  "입력 껍데기"로 만든다. 안쪽 <input type=text> 는 오히려
+ *  `--input-background-color: transparent; border: none` 으로 껍데기에
+ *  녹아들게 되어 있다 — 즉 실제로 칠해지는 면은 껍데기 쪽이다.
+ *
+ *  § F1 의 셀렉터는 input/select/textarea 만 잡으므로 껍데기는 코어의
+ *  회색(dark 테마 기준 rgb(56,56,56))을 그대로 유지한다. 그 결과 안쪽만
+ *  검게 칠해지고, 자식이 덮지 못하는 가장자리로 회색이 새어 나온다.
+ *  color-picker 에서 특히 두드러진다: 호스트는 32px 높이인데 스와치는
+ *  20px + margin-right 4px 라, 흰 스와치 둘레에 회색 액자가 생긴다
+ *  (v14.365 토큰 설정 → 비주얼 탭 "색조"에서 실측 확인).
+ *
+ *  ⚠️ 껍데기를 칠하는 것만으로는 부족하다. 자식을 불투명하게 두면 이번엔
+ *     껍데기의 "테두리"가 잘린다 — 안쪽 <input type=text> 는 껍데기와 동일한
+ *     32px 높이(= --input-height)라, 껍데기의 border-box 를 위아래로 1px 씩
+ *     넘어 덮는다. 그래서 왼쪽 세로변(자식이 1px 오른쪽에서 시작)과 스와치
+ *     뒤쪽 아래변 조각만 살아남는다. 코어에서 이 문제가 없는 이유가 바로
+ *     자식을 투명하게 둔 것이므로, 여기서도 그 계약을 그대로 복원한다:
+ *     면과 테두리는 껍데기가 소유하고, 자식은 투명하게 얹힌다.
+ *     (v14.365 "고리 색상"에서 실측 확인 — border-color 를 빨강으로 바꿔
+ *      아래변 오른쪽 30px 만 남는 것을 눈으로 확인했다.)
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+  :is(color-picker, file-picker, formula-input,
+      :is(document-tags, string-tags) > .input-group) {
+  background: #000 !important;
+  border-color: var(--fe-ac-33) !important;
+  box-shadow: none !important;
+}
+
+/* 껍데기 안쪽 컨트롤은 § F1 의 검정 채움에서 되돌려 코어대로 투명하게 둔다.
+   이 규칙은 § F1 보다 명시도가 높아야 한다 (자식 결합자 + 호스트 타입 선택자).
+
+   button 이 여기 포함되는 것은 파일 상단의 "button 은 fe-retro-common 이 소유"
+   원칙의 의도적 예외다. 이 버튼들은 자유 버튼이 아니라 껍데기의 구성 부품이고
+   (코어가 `--button-background-color: transparent; border: none` 으로 명시),
+   file-picker 의 버튼은 높이 32px 로 껍데기 border-box 를 정확히 채워서
+   불투명하면 위·아래·오른쪽 테두리를 전부 덮는다 (실측 확인). 껍데기의 표면
+   계약에 속하므로 § F2 가 소유한다. */
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+  :is(color-picker, file-picker, formula-input,
+      :is(document-tags, string-tags) > .input-group)
+  > :is(input[type="text"], input[type="color"], button) {
+  background:       transparent !important;
+  background-color: transparent !important;
+  border-color:     transparent !important;
+}
+
+/* 껍데기 부품 버튼의 hover 피드백은 면이 아니라 글자색으로 준다 — 면을 칠하면
+   위 문제가 hover 시에만 재발한다. */
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+  :is(color-picker, file-picker, formula-input,
+      :is(document-tags, string-tags) > .input-group)
+  > button:hover:not([disabled]) {
+  background:       transparent !important;
+  background-color: transparent !important;
+  color:            var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § F3  체크박스 — 코어 FA 상태 아이콘 + 레트로 팔레트
+ *
+ *  코어 체크박스는 Font Awesome 글리프로 빈 사각형, 체크, 혼합 상태를 각각
+ *  그린다. 이전의 하드 픽셀 박스 대체 규칙은 글리프를 지워 체크 상태를 단순한
+ *  면 채움으로만 표시했으므로 제거한다. 크기·여백·포커스 링은 코어 계약을
+ *  그대로 두고 색 변수만 레트로 팔레트로 바꾼다.
+ *
+ *  Foundry 다크 테마의 기본 --checkbox-checkmark-color 는 transparent 이므로
+ *  검은 전경을 명시해 강조색 면 위의 체크/혼합 아이콘을 복원한다.
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-retro-theme :is(.window-app, .application)
+  input[type="checkbox"]:not(
+    :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog,
+        .dx3rd-scene-open-dialog, .dnd5e, .dnd5e2, .tidy5e-sheet) *
+  ) {
+  --checkbox-background-color: var(--fe-ac-70) !important;
+  --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  --checkbox-checkmark-color: #000 !important;
+  --checkbox-disabled-color: var(--fe-ac-33) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § F4  라디오 — 의도적으로 손대지 않는다
+ *
+ *  라디오의 원형(\f111 / \f192)은 "하나만 고른다"는 의미를 전달하는 관습이지
+ *  테마가 못 지운 둥근 모서리가 아니다. 체크박스와 나란히 두었을 때 사각/원형
+ *  대비는 정상적인 UI 신호이므로 글리프를 그대로 둔다. 색은 각 시스템 호환
+ *  파일이 --checkbox-* 변수로 이미 맞춘다.
+ * ══════════════════════════════════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § F5  ::placeholder
+ *        (fe-retro-common.css 에서 이관 — 선언 원문 그대로)
+ * ══════════════════════════════════════════════════════════════ */
+
+body.fe-retro-theme ::placeholder { color: var(--fe-ac-t22) !important; opacity: 1 !important; }

@@ -8,7 +8,50 @@
 // AppV2 so it is forward-clean for v14; it also runs on v13.
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_COMMON_ATTR_NAMES, feSortAttrItems } from "./fe-screen-panel-data.js";
+import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feSortAttrItems } from "./fe-screen-panel-data.js";
+
+/**
+ * Core's own PrototypeTokenConfig, retargeted at ONE FACE's token settings instead of the
+ * actor's prototype token.
+ *
+ * Why subclass rather than rebuild: a face is effectively its own token, and the user asked
+ * for the real thing — every core tab/field, kept correct across versions for free.
+ *
+ * Two overrides are all it takes:
+ * - `form.handler` — core's own submit does `this.actor.update({prototypeToken: submitData})`
+ *   (`sheets/token/prototype-config.mjs`), which would write the ACTOR's prototype token. Ours
+ *   hands the submit data to the caller's `feCommit` instead, so it lands on the face.
+ * - `_initializeApplicationOptions` — core derives the window id from the parent actor's uuid
+ *   alone, so two faces of the same panel would collide on one window. Append the face index.
+ *
+ * The `prototype` option is a detached `PrototypeToken` built from the face's stored object with
+ * the panel actor as parent (core requires an identifiable parent, and reads `actor` off it for
+ * the title/permission checks). Nothing writes through it — we never call its `update`.
+ */
+function feFaceTokenConfigClass() {
+  const Base = foundry.applications.sheets?.PrototypeTokenConfig;
+  if (!Base) return null;
+  return class FeFaceTokenConfig extends Base {
+    static DEFAULT_OPTIONS = {
+      form: { handler: FeFaceTokenConfig._feOnSubmit },
+    };
+
+    static async _feOnSubmit(event, form, formData) {
+      const submitData = this._processFormData(event, form, formData);
+      await this.options.feCommit?.(submitData);
+    }
+
+    _initializeApplicationOptions(options) {
+      const initialized = super._initializeApplicationOptions(options);
+      initialized.id = `${initialized.id}-face-${options.feFaceIndex ?? 0}`;
+      return initialized;
+    }
+
+    get title() {
+      return `${game.i18n.localize("FESP.Sheet.FaceTokenTitle")}: ${this.options.feFaceLabel ?? ""}`;
+    }
+  };
+}
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -37,6 +80,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       feClearFaceLinkedActor: ScreenPanelSheet.#onClearFaceLinkedActor,
       feCopyAttrPath: ScreenPanelSheet.#onCopyAttrPath,
       feSwitchFace: ScreenPanelSheet.#onSwitchFace,
+      feToggleTokenize: ScreenPanelSheet.#onToggleTokenize,
+      feEditFaceToken: ScreenPanelSheet.#onEditFaceToken,
+      feClearFaceToken: ScreenPanelSheet.#onClearFaceToken,
     },
   };
 
@@ -78,6 +124,15 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   _getFrameButtons(options) {
     const buttons = super._getFrameButtons?.(options) ?? [];
     if (this.isEditable && !this.document.isToken) {
+      // Tokenize is the panel's most consequential switch (it decides whether the panel
+      // is placed as a Token or a Tile, and converts existing placements), so it lives
+      // in the header rather than buried in a tab. Reflects state via its own icon.
+      const on = !!this.document.system.tokenize;
+      buttons.unshift({
+        action: "feToggleTokenize",
+        icon: on ? "fa-solid fa-chess-pawn" : "fa-regular fa-square",
+        label: on ? "FESP.Sheet.TokenizeOn" : "FESP.Sheet.TokenizeOff",
+      });
       buttons.unshift({
         action: "configurePrototypeToken",
         icon: "fa-solid fa-circle-user",
@@ -216,6 +271,12 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         linkedActorName: faceActor?.name ?? "",
         linkedActorImg: faceActor?.img ?? "",
         linkMode: face.linkMode ?? "copy",
+        // This face's own Token settings. `tokenJson` feeds a hidden `data-dtype="JSON"`
+        // input so the object survives the faces-array auto-submit intact (FormDataExtended
+        // JSON.parses it back) — see the ArrayField rule; without it every unrelated edit
+        // would reset the face's token settings to {}.
+        tokenJson: JSON.stringify(face.token ?? {}),
+        tokenConfigured: Object.keys(face.token ?? {}).length > 0,
         attrs: this.#extractActorAttributes(faceActor),
         // Copied per-face attributes — rendered as hidden inputs in the faces
         // template so the faces-array auto-submit stays COMPLETE (otherwise the
@@ -274,11 +335,14 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       width: sys.width,
       height: sys.height,
       locked: sys.locked,
+      dblclickCycle: sys.dblclickCycle !== false,
       editable: this.isEditable,
       faceCount: faces.length,
       customAttributes,
       activeFace,
-      tokenize: sys.tokenize ?? false,
+      // Drives the per-face Token settings row: those settings only ever apply to a
+      // tokenized panel, so showing the button on a tile panel would be a lie.
+      tokenize: !!sys.tokenize,
       actorName: this.document.name ?? "",
     };
     return context;
@@ -373,6 +437,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   /** @override */
   _onRender(context, options) {
     super._onRender?.(context, options);
+    this.#syncTokenizeButton();
     if (!this.isEditable) return;
     const root = this.element;
 
@@ -605,6 +670,77 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const i = Number(target.dataset.index);
     if (!Number.isInteger(i) || i < 0) return;
     this.#activeFaceIndex = i;
+    this.render();
+  }
+
+  /**
+   * Header toggle for `system.tokenize`. Deliberately immediate — no confirmation:
+   * the updateActor hook converts every placed instance between a Token and a Tile
+   * (feSyncPanelTokenization) preserving position, size and current face, and clicking
+   * again converts straight back, so there is nothing to lose and nothing to confirm.
+   */
+  static async #onToggleTokenize() {
+    if (!this.isEditable) return;
+    await this.document.update({ "system.tokenize": !this.document.system.tokenize });
+  }
+
+  /**
+   * Frame buttons are built once when the window frame is created and are NOT rebuilt by
+   * subsequent renders, so the tokenize button would keep the icon and tooltip it was
+   * born with even after the state flips. Re-sync it on every render instead.
+   */
+  #syncTokenizeButton() {
+    const btn = this.element?.querySelector('[data-action="feToggleTokenize"]');
+    if (!btn) return;
+    const on = !!this.document.system.tokenize;
+    btn.classList.toggle("fa-chess-pawn", on);
+    btn.classList.toggle("fa-square", !on);
+    btn.classList.toggle("fa-solid", on);
+    btn.classList.toggle("fa-regular", !on);
+    const label = game.i18n.localize(on ? "FESP.Sheet.TokenizeOn" : "FESP.Sheet.TokenizeOff");
+    btn.setAttribute("aria-label", label);
+    btn.dataset.tooltip = label;
+  }
+
+  /** Open core's TokenConfig for ONE face's token settings. */
+  static async #onEditFaceToken(event, target) {
+    if (!this.isEditable) return;
+    const i = Number(target.dataset.index);
+    const face = this.document.system.faces?.[i];
+    if (!face) return;
+    const Cls = feFaceTokenConfigClass();
+    if (!Cls) { ui.notifications?.warn(game.i18n.localize("FESP.Sheet.FaceTokenUnavailable")); return; }
+
+    // A detached PrototypeToken seeded with this face's stored settings — the face's own
+    // image is the default so the config previews what the face actually shows.
+    const seed = foundry.utils.mergeObject(
+      { name: this.document.name, texture: { src: face.img || "" } },
+      feCleanFaceTokenData(face.token),
+      { inplace: false }
+    );
+    const prototype = new foundry.data.PrototypeToken(seed, { parent: this.document });
+    new Cls({
+      prototype,
+      feFaceIndex: i,
+      feFaceLabel: face.name || game.i18n.format("FESP.Sheet.FaceN", { n: i + 1 }),
+      feCommit: (submitData) => this.#updateFaceToken(i, submitData),
+    }).render(true);
+  }
+
+  /** Reset one face's token settings back to "inherit the panel's defaults". */
+  static async #onClearFaceToken(event, target) {
+    if (!this.isEditable) return;
+    const i = Number(target.dataset.index);
+    if (!Number.isInteger(i)) return;
+    await this.#updateFaceToken(i, {});
+  }
+
+  /** Full-array-clone write, per the AppV2 Auto-Submit vs ArrayField rule. */
+  async #updateFaceToken(index, submitData) {
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    if (!faces[index]) return;
+    faces[index].token = feCleanFaceTokenData(submitData);
+    await this.document.update({ "system.faces": faces });
     this.render();
   }
 

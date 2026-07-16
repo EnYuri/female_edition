@@ -32,6 +32,7 @@ const FE_PANEL_SOCKET = Object.freeze({
   DISABLE: "panelDisable",
   MOVE: "panelMove",
   LOCK: "panelLock",
+  SORT: "panelSort",
 });
 
 const FE_PANEL_DEFAULT_SIZE = 400;
@@ -111,6 +112,18 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
           description: new f.HTMLField({ required: false, blank: true }),
           linkedActorUuid: new f.StringField({ required: false, blank: true, initial: "" }),
           linkMode: new f.StringField({ required: true, blank: false, initial: "copy", choices: ["copy", "linked"] }),
+          // This face's own Token settings, as a PrototypeToken-shaped source object —
+          // each face is effectively its own token, so a status board's "alert" face can
+          // carry a different name/size/disposition/bars than its "calm" face. Edited with
+          // CORE's own PrototypeTokenConfig (see FeFaceTokenConfig in the sheet) and applied
+          // on placement and on every face flip, but ONLY when the panel is tokenized.
+          //
+          // An untyped ObjectField rather than a mirror of the token schema: core owns that
+          // schema and it changes between versions — cleaning/validating happens for free
+          // when the object is handed to `new PrototypeToken(data, {parent: actor})`.
+          // Position keys (x/y/_id/actorId) are stripped before it is stored: those are
+          // per-placement, not per-face.
+          token: new f.ObjectField({ required: false, initial: () => ({}) }),
           // Per-face attributes copied from this face's linked actor, snapshot
           // on link (system-agnostic — see ScreenPanelSheet#extractCopiedAttributes).
           // Kept PER-FACE so different faces linking different actors retain
@@ -161,6 +174,11 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
       width: new f.NumberField({ required: true, integer: true, min: 1, initial: FE_PANEL_DEFAULT_SIZE, nullable: false }),
       height: new f.NumberField({ required: true, integer: true, min: 1, initial: FE_PANEL_DEFAULT_SIZE, nullable: false }),
       locked: new f.BooleanField({ initial: false }),
+      // Whether double-clicking this panel on the canvas cycles to the next face.
+      // Lives on the ACTOR (world data) rather than a client setting so a GM turning
+      // it off applies to every user, not just themselves — and so each panel can
+      // differ (a decorative board vs. an interactive one).
+      dblclickCycle: new f.BooleanField({ initial: true }),
       customAttributes: new f.ArrayField(
         new f.SchemaField({
           name: new f.StringField({ required: true, blank: false, initial: "attr" }),
@@ -175,9 +193,12 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
           ],
         }
       ),
-      // When true, placing this panel on a scene also creates a companion Token
-      // (same position/face image) so it participates in core token mechanics
-      // (selectable, combat tracker, etc). See feScreenPanelPlaceOnScene.
+      // How this panel is placed on a scene: as a TOKEN when true, as a TILE when
+      // false — one placeable, never both. A tokenized panel participates in core
+      // token mechanics (selectable, combat tracker, native drag/snap) and core owns
+      // its interaction; female_edition only adds the right-click face menu, the
+      // overlays and the sheet. Toggling this CONVERTS existing placements in place
+      // (feSyncPanelTokenization), preserving position, size and per-placement flags.
       tokenize: new f.BooleanField({ initial: false }),
     };
   }
@@ -203,7 +224,7 @@ function fePanelFace(actor, index) {
   const faces = actor?.system?.faces ?? [];
   const count = faces.length;
   let i = Number.isInteger(index) ? index : 0;
-  if (count === 0) return { name: "", img: "", description: "", overlays: [], linkedActorUuid: "", linkMode: "copy", index: 0, count: 0 };
+  if (count === 0) return { name: "", img: "", description: "", overlays: [], linkedActorUuid: "", linkMode: "copy", token: {}, index: 0, count: 0 };
   if (i < 0) i = 0;
   if (i >= count) i = count - 1;
   const face = faces[i] ?? {};
@@ -214,9 +235,29 @@ function fePanelFace(actor, index) {
     overlays: face.overlays ?? [],
     linkedActorUuid: face.linkedActorUuid ?? "",
     linkMode: face.linkMode ?? "copy",
+    token: face.token ?? {},
     index: i,
     count,
   };
+}
+
+/**
+ * Keys that must never survive into a face's stored Token settings: they identify a
+ * specific placement (or document), not the face's appearance.
+ */
+const FE_PANEL_FACE_TOKEN_STRIP = ["_id", "x", "y", "actorId", "tokenId", "delta", "elevation", "sort", "hidden"];
+
+/** Strip per-placement keys from a PrototypeToken-shaped object before storing it on a face. */
+function feCleanFaceTokenData(data) {
+  const out = foundry.utils.deepClone(data ?? {});
+  for (const k of FE_PANEL_FACE_TOKEN_STRIP) delete out[k];
+  return out;
+}
+
+/** Whether a face's Token settings explicitly pin a size (→ the aspect auto-fit must stand down). */
+function feFaceTokenPinsSize(face) {
+  const t = face?.token;
+  return Number.isFinite(t?.width) && Number.isFinite(t?.height);
 }
 
 export {
@@ -228,6 +269,8 @@ export {
   FE_PANEL_COMMON_ATTR_NAMES,
   feSortAttrItems,
   feEnsureScreenPanelDnd5eActorCompat,
+  feCleanFaceTokenData,
+  feFaceTokenPinsSize,
   ScreenPanelData,
   fePanelFace,
 };

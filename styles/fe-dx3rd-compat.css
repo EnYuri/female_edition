@@ -195,7 +195,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   :is(input[type="checkbox"], input[type="radio"]) {
   --checkbox-background-color: rgb(0 0 0 / 0.42) !important;
   --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  --checkbox-checkmark-color: transparent !important;
+  --checkbox-checkmark-color: #000 !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dx3rd
@@ -1761,7 +1761,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
               0 0 6px var(--fe-ac-12) !important;
 }
 
-/* DX3rd 시트 탭 — 비활성(#bcc8de L≈80) · 활성(#fff L≈90) */
+/* DX3rd 시트 탭 — 비활성(--fe-ac-80) · 활성(--fe-ac-90) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .tabs .item {
   background:   #000000 !important;
   color:        var(--fe-ac-80) !important;
@@ -1770,8 +1770,8 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .tabs .item {
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .tabs .item.active {
   color:        #000000 !important;
-  background:   var(--fe-dx3rd-accent, #ffffff) !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  background:   var(--fe-ac-90) !important;
+  border-color: var(--fe-ac-90) !important;
 }
 
 /* DX3rd 시트 일반 텍스트 (레이블·셀·단락) */

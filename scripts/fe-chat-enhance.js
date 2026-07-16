@@ -1244,7 +1244,7 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
     if (userId !== game.user.id) return;
 
     // Screen panel actors are display boards, not characters — never let them be chat speakers.
-    // Main risk: companion token selected on canvas → getSpeaker() resolves to the panel actor.
+    // Main risk: a tokenized panel selected on canvas → getSpeaker() resolves to the panel actor.
     try {
       const sp = data?.speaker ?? message?.speaker ?? {};
       let spActor = sp.actor ? (game.actors?.get(sp.actor) ?? null) : null;

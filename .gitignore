@@ -1,6 +1,7 @@
 # AI tooling / agent scratch (local-only)
 .codex/
 .claude/
+docs/
 
 # Local-only tests
 test/

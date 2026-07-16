@@ -308,7 +308,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.SCREEN_PANEL_ENABLED]: feRead(S.SCREEN_PANEL_ENABLED),
       // Screen Panel grid-snap (client-scoped; GM-priority-forced unless excluded)
       [S.SCREEN_PANEL_GRID_SNAP]: feRead(S.SCREEN_PANEL_GRID_SNAP),
-      [S.SCREEN_PANEL_DBLCLICK_CYCLE]: feRead(S.SCREEN_PANEL_DBLCLICK_CYCLE),
       // Attribute name helper (client-scoped; GM-priority-forced unless excluded)
       [S.ATTR_PATH_HELPER]: feRead(S.ATTR_PATH_HELPER),
       [S.ATTR_PATH_HELPER_SOURCE]: feRead(S.ATTR_PATH_HELPER_SOURCE),
@@ -755,7 +754,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
         // Screen Panel grid-snap — client-scoped (always saved for every user)
         bool(S.SCREEN_PANEL_GRID_SNAP),
-        bool(S.SCREEN_PANEL_DBLCLICK_CYCLE),
         // Attribute name helper — client-scoped (always saved for every user)
         bool(S.ATTR_PATH_HELPER), ...(saveAttrSource ? [bool(S.ATTR_PATH_HELPER_SOURCE)] : []),
 

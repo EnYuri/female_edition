@@ -5,13 +5,19 @@
  * 이 파일은 fe-dx3rd-compat.css 뒤, fe-dnd5e-compat.css 앞에 layouts
  * 레이어로 로드된다. 기존의 실제 우선순위를 보존하면서, DX3rd 파일이
  * Theatre·툴팁·주사위 같은 공통 기능의 의존점이 되는 것을 막는다.
+ *
+ * 코어 폼 컨트롤의 표면(input·select·textarea, color-picker 등 입력 래퍼
+ * 커스텀 엘리먼트, 체크박스, ::placeholder)은 이 파일이 아니라
+ * fe-retro-forms.css 가 소유한다. 그 파일은 이 파일 바로 뒤에 로드된다.
+ * button 만은 예외로 여기 남아 있다 — 이유는 § 전역 버튼 절의 주석 참고.
  */
 
 /* ── <select> 요소 ─────────────────────────────────────────────
  * 셀렉트는 화살표·내부 여백·option 팝업이 하나의 레이아웃 계약이다. 전역
  * appearance:none과 20px 우측 패딩은 DX3rd AppV2의 좁은 행 및 dnd5e의
  * 변수 기반 컨트롤을 덮어쓴다. 공통 레이어에서는 소유하지 않고, DX3rd·D&D
- * 및 Theatre처럼 구조를 아는 규칙만 각자 범위에서 꾸민다. */
+ * 및 Theatre처럼 구조를 아는 규칙만 각자 범위에서 꾸민다.
+ * (배경·글자색·테두리색만 fe-retro-forms.css § F1 이 칠한다.) */
 
 /* ── Foundry 툴팁 ────────────────────────────────────────────── */
 body.fe-retro-theme
@@ -301,21 +307,24 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
   border-color: var(--fe-ac-70) !important;
 }
 
-/* DX3rd 자체 시트는 구조별 호환 규칙이 소유한다. */
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
-  :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-  background-color: #000 !important;
-  color: var(--fe-ac-90) !important;
-  border-color: var(--fe-ac-33) !important;
-}
+/* 텍스트류 input · select · textarea 표면, 입력 래퍼 커스텀 엘리먼트, 체크박스,
+   ::placeholder → fe-retro-forms.css 로 이관. button 은 여기 남는다 — 아래 전역
+   button 규칙과 위 채팅 컨트롤 button 규칙이 동일 명시도 동률이라 소스 순서로
+   승자가 갈리고, 다른 파일로 옮기면 그 동률이 조용히 뒤집힌다.
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab) {
+   단 하나의 예외가 `:not(<입력 래퍼> > *)` 가드다. color-picker / file-picker /
+   formula-input / .input-group 의 직계 자식 버튼은 자유 버튼이 아니라 껍데기의
+   구성 부품이며(코어가 transparent 로 명시), 불투명하게 칠하면 껍데기의 테두리를
+   덮어 잘라 먹는다. 그 표면은 fe-retro-forms.css § F2 가 소유한다. 가드 없이는
+   아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인. */
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
   background: #000 !important;
   color: var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
   background: var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -391,7 +400,6 @@ body.fe-retro-theme .sound-controls
 
 body.fe-retro-theme :is([class*="subtle"], .hint, .notes) { color: var(--fe-ac-t33) !important; }
 body.fe-retro-theme [class*="secondary"] { color: var(--fe-ac-57) !important; }
-body.fe-retro-theme ::placeholder { color: var(--fe-ac-t22) !important; opacity: 1 !important; }
 
 /* ── ProseMirror 공통 UI ────────────────────────────────────── */
 body.fe-retro-theme #prosemirror-dropdown {

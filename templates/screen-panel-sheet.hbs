@@ -27,6 +27,14 @@
         <input type="checkbox" name="system.locked" {{checked fe.locked}} {{#unless fe.editable}}disabled{{/unless}}>
         {{localize "FESP.Sheet.Locked"}}
       </label>
+      <p class="notes">{{localize "FESP.Sheet.LockedHint"}}</p>
+    </div>
+    <div class="fe-sp-field fe-sp-field-checkbox">
+      <label>
+        <input type="checkbox" name="system.dblclickCycle" {{checked fe.dblclickCycle}} {{#unless fe.editable}}disabled{{/unless}}>
+        {{localize "FESP.Sheet.DblclickCycle"}}
+      </label>
+      <p class="notes">{{localize "FESP.Sheet.DblclickCycleHint"}}</p>
     </div>
   </section>
 
@@ -72,6 +80,26 @@
                     placeholder="{{localize "FESP.Sheet.DescPh"}}"
                     {{#unless ../fe.editable}}disabled{{/unless}}>{{face.description}}</textarea>
           <input type="hidden" name="system.faces.{{face.index}}.linkedActorUuid" value="{{face.linkedActorUuid}}">
+          {{!-- Per-face Token settings. data-dtype="JSON" round-trips the object through the
+                faces-array auto-submit (FormDataExtended JSON.parses it) — without this the
+                face's token settings reset on every unrelated edit. --}}
+          <input type="hidden" name="system.faces.{{face.index}}.token" data-dtype="JSON" value="{{face.tokenJson}}">
+
+          {{#if ../fe.tokenize}}
+            <div class="fe-sp-face-token-row">
+              <button type="button" class="fe-sp-btn" data-action="feEditFaceToken" data-index="{{face.index}}"
+                      {{#unless ../fe.editable}}disabled{{/unless}}>
+                <i class="fa-solid fa-chess-pawn"></i> {{localize "FESP.Sheet.FaceTokenEdit"}}
+              </button>
+              {{#if face.tokenConfigured}}
+                <a data-action="feClearFaceToken" data-index="{{face.index}}"
+                   title="{{localize "FESP.Sheet.FaceTokenClear"}}"><i class="fa-solid fa-rotate-left"></i></a>
+                <span class="notes">{{localize "FESP.Sheet.FaceTokenSet"}}</span>
+              {{else}}
+                <span class="notes">{{localize "FESP.Sheet.FaceTokenUnset"}}</span>
+              {{/if}}
+            </div>
+          {{/if}}
           {{!-- Copied per-face attributes: hidden inputs keep the faces-array auto-submit complete (edited live in the Attributes tab). --}}
           {{#each face.attributes as |fa|}}
             <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.name" value="{{fa.name}}">

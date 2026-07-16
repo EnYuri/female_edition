@@ -28,6 +28,8 @@ import {
   FE_PANEL_DEFAULT_SIZE,
   ScreenPanelData,
   feEnsureScreenPanelDnd5eActorCompat,
+  feCleanFaceTokenData,
+  feFaceTokenPinsSize,
   fePanelFace,
 } from "./fe-screen-panel-data.js";
 import { ScreenPanelSheet } from "./fe-screen-panel-sheet.js";
@@ -56,17 +58,18 @@ function isGridSnapEnabled() {
   catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP]; }
 }
 
-function isDblclickCycleEnabled() {
-  try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE); }
-  catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_DBLCLICK_CYCLE]; }
+// Double-click face cycling is a PER-PANEL setting on the actor (system.dblclickCycle),
+// not a client setting: it is world data, so a GM turning it off applies to every user
+// rather than only themselves, and each panel can differ.
+function isDblclickCycleEnabled(actor) {
+  return actor?.system?.dblclickCycle !== false;
 }
 
-async function toggleDblclickCycle() {
-  try {
-    const next = !isDblclickCycleEnabled();
-    await game.settings.set(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE, next);
-    return next;
-  } catch { return isDblclickCycleEnabled(); }
+async function toggleDblclickCycle(actor) {
+  if (!actor?.testUserPermission(game.user, "OWNER")) return isDblclickCycleEnabled(actor);
+  const next = !isDblclickCycleEnabled(actor);
+  try { await actor.update({ "system.dblclickCycle": next }); return next; }
+  catch { return isDblclickCycleEnabled(actor); }
 }
 
 async function toggleGridSnap() {
@@ -164,9 +167,19 @@ function panelTileRect(tile) {
   return { left: doc.x, top: doc.y, right: doc.x + doc.width, bottom: doc.y + doc.height };
 }
 
-/** Topmost panel tile (by elevation, sort) at a world point that this user may see. */
-function pickPanelTileAt(world) {
-  const placeables = canvas?.tiles?.placeables ?? [];
+/**
+ * Topmost panel placeable (by elevation, sort) at a world point that this user may see.
+ *
+ * A panel is a Tile OR a Token (see ScreenPanelData.tokenize), and the two are treated
+ * very differently by the caller, hence the opt-in: **core** owns a tokenized panel's
+ * interaction (drag, select, grid snap), so the left-click/drag path scans tiles only
+ * and lets token panels fall through, while the right-click menu scans both.
+ */
+function pickPanelTileAt(world, { tiles = true, tokens = false } = {}) {
+  const placeables = [
+    ...(tiles ? canvas?.tiles?.placeables ?? [] : []),
+    ...(tokens ? canvas?.tokens?.placeables ?? [] : []),
+  ];
   let best = null;
   let bestKey = -Infinity;
   for (const tile of placeables) {
@@ -254,6 +267,21 @@ function onBoardPointerDown(event) {
   if (!isPanelFeatureEnabled() || event.button !== 0 || !canvas?.ready) return;
   const world = clientToWorld(event.clientX, event.clientY);
   if (!world) return;
+
+  // Tokenized panel: core owns left-click (select, drag, grid snap) — do NOT intercept,
+  // or we would fight its MouseInteractionManager. The one exception is a value bar,
+  // which is a tiny explicit target that could not plausibly mean "drag me".
+  const tokenHit = pickPanelTileAt(world, { tiles: false, tokens: true });
+  if (tokenHit) {
+    const bar = pickPanelBarAt(tokenHit.tile, world);
+    if (!bar) return; // core drags it
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    feHidePanelTooltip();
+    feOpenBarValueEditor(bar.linkedActor, bar.attr, bar.value);
+    return;
+  }
+
   const hit = pickPanelTileAt(world);
   if (!hit || tokenOccludesAt(world, hit.doc)) return; // let core handle non-panel / token clicks
   event.preventDefault();
@@ -291,8 +319,14 @@ function onBoardContextMenu(event) {
   if (!isPanelFeatureEnabled() || !canvas?.ready) return;
   const world = clientToWorld(event.clientX, event.clientY);
   if (!world) return;
-  const hit = pickPanelTileAt(world);
-  if (!hit || tokenOccludesAt(world, hit.doc)) return; // let core handle elsewhere
+  // Tokenized panels get the panel menu too — it is their ONLY way to switch faces,
+  // lock position or open the sheet, since core owns everything else about them.
+  const hit = pickPanelTileAt(world, { tokens: true });
+  if (!hit) return;
+  // A token sitting on top of a TILE panel means the user is aiming at that token, so
+  // core should handle it. Never applies when the panel IS the token (it would find
+  // itself and always bail).
+  if (!feIsPanelToken(hit.tile) && tokenOccludesAt(world, hit.doc)) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   feHidePanelTooltip();
@@ -355,7 +389,7 @@ function startPanelPointer(hit, downEvent, canDrag) {
     // nothing — the menu is on right-click.
     const tileId = hit.tile.document.id;
     const now = performance.now();
-    if (isDblclickCycleEnabled() && _lastPanelClick && _lastPanelClick.tileId === tileId && (now - _lastPanelClick.t) < FE_PANEL_DBLCLICK_MS) {
+    if (isDblclickCycleEnabled(hit.actor) && _lastPanelClick && _lastPanelClick.tileId === tileId && (now - _lastPanelClick.t) < FE_PANEL_DBLCLICK_MS) {
       _lastPanelClick = null;
       feCyclePanelFace(hit.tile, hit.actor);
     } else {
@@ -382,8 +416,9 @@ function onBoardMouseMove(event) {
   if (isPanelMenuOpen()) { feHidePanelTooltip(); return; }
   const world = clientToWorld(event.clientX, event.clientY);
   if (!world) { feHidePanelTooltip(); return; }
-  const hit = pickPanelTileAt(world);
-  if (!hit || tokenOccludesAt(world, hit.doc)) { feHidePanelTooltip(); return; }
+  const hit = pickPanelTileAt(world, { tokens: true });
+  if (!hit) { feHidePanelTooltip(); return; }
+  if (!feIsPanelToken(hit.tile) && tokenOccludesAt(world, hit.doc)) { feHidePanelTooltip(); return; }
   const face = fePanelFace(hit.actor, hit.flag.currentFace ?? 0);
   feShowPanelTooltip(face.description, event.clientX, event.clientY);
 }
@@ -417,6 +452,24 @@ function enforcePanelTileSize(tile) {
     const boxW = actor?.system?.width || FE_PANEL_DEFAULT_SIZE;
     const boxH = actor?.system?.height || FE_PANEL_DEFAULT_SIZE;
     const { w, h } = feAspectFit(boxW, boxH, natW, natH);
+
+    // Tokenized panel: width/height are GRID UNITS, not pixels, and there is no
+    // `fit` to enforce (core scales a token's texture to its box). Convert the same
+    // aspect-fitted pixel box through the grid so a face flip to a differently-shaped
+    // image reshapes the token exactly like it reshapes a tile.
+    if (feIsPanelToken(tile)) {
+      // A face whose Token settings pin an explicit size owns it — the user set it through
+      // core's TokenConfig, so the aspect auto-fit must not fight them every draw.
+      if (feFaceTokenPinsSize(fePanelFace(actor, flag.currentFace ?? 0))) return;
+      const size = feCompanionTokenSize(doc.parent, w, h, isGridSnapEnabled());
+      // Tolerance in grid units: ±1px worth, so rounding cannot loop.
+      const tol = 1 / (doc.parent?.grid?.size || canvas?.grid?.size || 100);
+      if (Math.abs(doc.width - size.width) <= tol && Math.abs(doc.height - size.height) <= tol) return;
+      doc.updateSource(size);
+      tile.renderFlags?.set?.({ refreshSize: true });
+      return;
+    }
+
     const fitOk = doc.texture?.fit === "contain";
     // ±1px tolerance prevents rounding from causing an endless resize loop.
     if (Math.abs(doc.width - w) <= 1 && Math.abs(doc.height - h) <= 1 && fitOk) return;
@@ -515,10 +568,18 @@ function feIndexPanelTile(tile) {
   } catch { /* no-op */ }
 }
 
+/**
+ * Every placeable a panel can be drawn as, on the current canvas: Tiles (plain panels)
+ * AND Tokens (tokenized panels). Callers filter by the panel flag themselves.
+ */
+function fePanelPlaceables() {
+  return [...(canvas?.tiles?.placeables ?? []), ...(canvas?.tokens?.placeables ?? [])];
+}
+
 function feBuildPanelTileIndex() {
   fePanelTilesByActorId.clear();
   fePanelTilesByLinkedActorId.clear();
-  for (const tile of canvas?.tiles?.placeables ?? []) feIndexPanelTile(tile);
+  for (const tile of fePanelPlaceables()) feIndexPanelTile(tile);
   fePanelTileIndexReady = true;
 }
 
@@ -534,7 +595,7 @@ function feResetPanelCanvasState() {
   _lastPanelClick = null;
   closePanelMenu();
   feHidePanelTooltip();
-  for (const tile of canvas?.tiles?.placeables ?? []) {
+  for (const tile of fePanelPlaceables()) {
     feClearPanelOverlays(tile);
     feRemovePanelTileFromIndex(tile);
   }
@@ -592,6 +653,18 @@ function feDrawBarGraphics(bar, w, h, pct, color) {
  * both — texture.src changes set the redraw flag), and whenever the panel
  * actor's faces/overlays or the linked actor's data is edited.
  */
+/** Is this panel placeable a Token (tokenized panel) rather than a Tile? */
+function feIsPanelToken(placeable) {
+  return placeable?.document?.documentName === "Token";
+}
+
+/** The primary-group sort layer of the placeable a panel is drawn as. */
+function fePanelSortLayer(doc) {
+  const L = canvas.primary?.constructor?.SORT_LAYERS;
+  if (!L) return 0;
+  return doc?.documentName === "Token" ? (L.TOKENS ?? 0) : (L.TILES ?? 0);
+}
+
 function feRebuildPanelOverlays(tile) {
   feClearPanelOverlays(tile);
   try {
@@ -623,14 +696,16 @@ function feRebuildPanelOverlays(tile) {
       text.position.set(rect.left + item.x * mw, rect.top + item.y * mh);
       text.elevation = doc.elevation ?? 0;
       // PrimaryCanvasGroup._compareObjects ties on elevation, THEN sortLayer,
-      // THEN sort/zIndex. Tile meshes carry sortLayer = SORT_LAYERS.TILES (500,
-      // assigned by core Tile#_refreshState); leaving the label's sortLayer at
-      // the default 0 means it always loses that comparison and renders BEHIND
-      // the tile's own image regardless of sort/zIndex. Use the SORT_LAYERS
-      // constant directly rather than reading tile.mesh.sortLayer — at the
-      // drawTile hook (when this runs) _refreshState may not have fired yet, so
-      // the mesh's own sortLayer can still read its just-constructed 0.
-      text.sortLayer = canvas.primary?.constructor?.SORT_LAYERS?.TILES ?? 0;
+      // THEN sort/zIndex. A placeable's mesh carries sortLayer = SORT_LAYERS.TILES
+      // (500) or SORT_LAYERS.TOKENS (700), assigned by core's own _refreshState;
+      // leaving the label's sortLayer at the default 0 means it always loses that
+      // comparison and renders BEHIND the panel's image regardless of sort/zIndex.
+      // Match the layer of whichever placeable this panel is (a tokenized panel is a
+      // Token, so TILES would put its labels under every token on the scene). Use the
+      // SORT_LAYERS constants directly rather than reading mesh.sortLayer — at the
+      // draw hook (when this runs) _refreshState may not have fired yet, so the
+      // mesh's own sortLayer can still read its just-constructed 0.
+      text.sortLayer = fePanelSortLayer(doc);
       text.sort = (doc.sort ?? 0) + 1; // win ties against the tile's own mesh (same sort by default)
       text.zIndex = (tile.mesh?.zIndex ?? 0) + 1;
       // Stashed for the cheap reposition path below (authoritative source, since
@@ -755,6 +830,8 @@ function feCyclePanelFace(tile, actor) {
   return true;
 }
 async function feActionMove(tile, x, y) { return feRelayPanelOp(FE_PANEL_SOCKET.MOVE, { ...tileRef(tile), x, y }); }
+/** dir > 0 = bring forward (in front of every sibling), dir < 0 = send backward. */
+async function feActionSort(tile, dir) { return feRelayPanelOp(FE_PANEL_SOCKET.SORT, { ...tileRef(tile), dir }); }
 async function feActionShowHide(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.SHOW_HIDE, tileRef(tile)); }
 async function feActionDisable(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.DISABLE, tileRef(tile)); }
 async function feActionLock(tile) { return feRelayPanelOp(FE_PANEL_SOCKET.LOCK, tileRef(tile)); }
@@ -833,7 +910,14 @@ async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
   });
 }
 
-async function feScreenPanelPlaceOnScene(actor) {
+/**
+ * Place a panel actor on the current scene as a panel Tile.
+ * @param {Actor} actor
+ * @param {{x?: number, y?: number}} [center]  Canvas-coordinate center point for the
+ *   placement. Defaults to the viewport center (the Actor-directory menu entry has no
+ *   drop point); the canvas drop guard passes the cursor position instead.
+ */
+async function feScreenPanelPlaceOnScene(actor, center = {}) {
   if (!canvas?.scene) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoScene")); return; }
   if (!actor?.testUserPermission(game.user, "OWNER")) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoPerm")); return; }
   const faceCount = actor.system.faces?.length ?? 0;
@@ -847,11 +931,13 @@ async function feScreenPanelPlaceOnScene(actor) {
   const nat = await feLoadImageSize(face.img);
   const { w, h } = feAspectFit(boxW, boxH, nat?.w, nat?.h);
   const pivot = canvas.stage.pivot;
+  const cx = Number.isFinite(center.x) ? center.x : pivot.x;
+  const cy = Number.isFinite(center.y) ? center.y : pivot.y;
   await feRelayPanelOp(FE_PANEL_SOCKET.PLACE, {
     sceneId: canvas.scene.id,
     actorId: actor.id,
-    x: Math.round(pivot.x - w / 2),
-    y: Math.round(pivot.y - h / 2),
+    x: Math.round(cx - w / 2),
+    y: Math.round(cy - h / 2),
     width: w,
     height: h,
     img: face.img,
@@ -865,17 +951,7 @@ async function feScreenPanelPlaceOnScene(actor) {
 // --------------------------------
 
 /**
- * The companion Token created for a "tokenized" panel (see ScreenPanelData.tokenize)
- * is found via the Tile's own flag (set right after creation) — not by re-scanning
- * tokens by actorId, since the same actor may be placed more than once.
- */
-function feFindCompanionToken(scene, flag) {
-  const id = flag?.companionTokenId;
-  return id ? scene?.tokens?.get(id) ?? null : null;
-}
-
-/**
- * Companion Token size (in GRID UNITS — token width/height are grid units, NOT
+ * Panel Token size (in GRID UNITS — token width/height are grid units, NOT
  * pixels; a NumberField that is positive & fractional-allowed, see core token.mjs).
  * Two branches, selected by the grid-snap toggle (the SAME preference that snaps
  * panel dragging):
@@ -897,52 +973,155 @@ function feCompanionTokenSize(scene, pxWidth, pxHeight, snap) {
 }
 
 /**
- * Create a companion Token for one already-placed panel Tile, mirroring its
- * current position/face image and its pixel size (converted to grid units per
- * feCompanionTokenSize). Tags the token back to this specific Tile and stores
- * companionTokenId on the Tile's flag so feFindCompanionToken can resolve it.
- * GM-only (embedded writes). `snap` defaults to the local grid-snap preference;
- * PLACE passes the initiator's own flag through so their intent is honored.
+ * A Tile's visible TOP-LEFT corner in scene pixels.
+ *
+ * MUST use this instead of reading `tileDoc.x/y` whenever the value is handed to
+ * something that expects a top-left (notably a Token's x/y, which IS the top-left on
+ * every version). On **v14** a Tile's x,y is its texture ANCHOR point, not its corner:
+ * `client/documents/tile.mjs` builds `TileDocument#shape` as
+ * `{x, y, anchorX: texture.anchorX, anchorY: texture.anchorY}` and `Tile#_refreshPosition`
+ * renders `mesh.position.set(shape.x, shape.y)` with `mesh.anchor.set(anchorX, anchorY)`.
+ * Core's TextureData defaults the anchor to **0.5** (`common/documents/tile.mjs`), i.e.
+ * x,y = the tile's CENTER. **v13** has no anchor and x,y is always the top-left.
+ *
+ * Copying `tileDoc.x/y` straight onto a companion Token therefore put the token's corner
+ * at the panel's centre — the panel appeared duplicated, offset by exactly half its size.
+ * New panel tiles pin the anchor to 0 (see applyPanelOp PLACE) so both versions agree,
+ * but tiles placed before that fix still carry 0.5, so the conversion stays anchor-aware.
  */
-async function feCreateCompanionTokenFor(scene, tileDoc, actor, snap = isGridSnapEnabled()) {
-  const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-  const face = fePanelFace(actor, flag?.currentFace ?? 0);
-  const { width, height } = feCompanionTokenSize(scene, tileDoc.width, tileDoc.height, snap);
-  const tokenDoc = await actor.getTokenDocument({
-    x: tileDoc.x, y: tileDoc.y, width, height,
-    hidden: tileDoc.hidden,
-    texture: { src: face.img || tileDoc.texture?.src || "" },
-    flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: actor.id, companion: true, tileId: tileDoc.id } } },
-  }, { parent: scene });
-  const [created] = await scene.createEmbeddedDocuments("Token", [tokenDoc.toObject()]);
-  if (created) await tileDoc.setFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`, created.id);
+function feTileTopLeft(tileDoc) {
+  const ax = tileDoc?.texture?.anchorX ?? 0;
+  const ay = tileDoc?.texture?.anchorY ?? 0;
+  return {
+    x: Math.round(tileDoc.x - (ax * tileDoc.width)),
+    y: Math.round(tileDoc.y - (ay * tileDoc.height)),
+  };
 }
 
 /**
- * Reactively reconcile every placed instance of `panelActor` (across ALL scenes)
- * with its current `system.tokenize` setting: spawn a companion Token where one
- * is now wanted but missing, and remove the companion where tokenize was turned
- * off. This makes the tokenize toggle take effect on already-placed panels
- * instead of only at placement time. GM-only; runs from the updateActor hook.
+ * Texture data shared by every panel Tile we create.
+ *
+ * anchorX/anchorY 0 = the tile's x,y is its TOP-LEFT. On **v14** a Tile's x,y is its
+ * texture ANCHOR point and core's TextureData defaults that to 0.5 (= the CENTER); on
+ * v13 there is no anchor and x,y is always the top-left. Pinning it to 0 makes both
+ * versions agree with the rest of this module's math — and with a Token's x,y, which is
+ * the top-left everywhere, so a panel converts between Tile and Token without moving.
+ * v13 has no anchorX/anchorY field, so schema cleaning simply drops these keys there.
+ */
+function fePanelTileTextureData(img) {
+  return { texture: { src: img || "", fit: "contain", anchorX: 0, anchorY: 0 } };
+}
+
+/**
+ * Token creation data for a panel placed as a TOKEN (ScreenPanelData.tokenize).
+ *
+ * A tokenized panel IS the token — there is no Tile behind it. It carries the same
+ * `flags.female_edition.panel` payload a panel Tile would (actorId / currentFace /
+ * disabled / locked), so every panel feature keys off the placeable it is actually
+ * looking at. Core owns the interaction (drag, select, grid snap, combat tracker);
+ * female_edition only adds the right-click face menu, the overlays and the sheet.
+ *
+ * `corner` is a TOP-LEFT in scene pixels (a Token's x,y is its top-left on every
+ * version — unlike a Tile's, see feTileTopLeft).
+ */
+async function fePanelTokenData(scene, actor, { corner, pxWidth, pxHeight, flag, hidden = false, snap = isGridSnapEnabled() }) {
+  const face = fePanelFace(actor, flag?.currentFace ?? 0);
+  const { width, height } = feCompanionTokenSize(scene, pxWidth, pxHeight, snap);
+  const tokenDoc = await actor.getTokenDocument({
+    x: corner.x, y: corner.y, width, height, hidden,
+    texture: { src: face.img || "" },
+    // The face's own Token settings win over our defaults — the user configured them
+    // explicitly through core's TokenConfig. Position is NOT among them (stripped on save,
+    // see feCleanFaceTokenData), so `corner` always stands.
+    ...feCleanFaceTokenData(face.token),
+    flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { ...flag, actorId: actor.id } } },
+  }, { parent: scene });
+  return tokenDoc.toObject();
+}
+
+/**
+ * The document changes that apply a face to an already-placed panel: its image, the
+ * per-placement current-face flag, and — for a tokenized panel — that face's own Token
+ * settings. Position keys never appear (see feCleanFaceTokenData).
+ */
+function fePanelFaceChanges(face, isToken) {
+  const changes = {
+    "texture.src": face.img || "",
+    [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.currentFace`]: face.index,
+  };
+  if (!isToken) return changes;
+  // Expanded, not dot-flattened: a face's stored token data is a partial source object and
+  // `update` merges nested objects, so passing it wholesale keeps unset keys untouched.
+  return foundry.utils.mergeObject(feCleanFaceTokenData(face.token), changes, { inplace: false });
+}
+
+/**
+ * Reconcile every placed instance of `panelActor` (across ALL scenes) with its current
+ * `system.tokenize` setting by CONVERTING the placement between a Tile and a Token —
+ * a panel is one or the other, never both.
+ *
+ * The old model created a companion Token *in addition to* the Tile, which drew the
+ * same art in the same spot (the panel looked duplicated) and left an orphaned Tile
+ * behind whenever the token was deleted. Converting keeps the per-placement flag
+ * (current face, disabled, locked) and the position/size across the swap.
+ *
+ * GM-only (embedded writes); runs from the updateActor hook.
  */
 async function feSyncPanelTokenization(panelActor) {
   if (game.user !== game.users.activeGM) return;
   const want = !!panelActor.system.tokenize;
   for (const scene of game.scenes ?? []) {
-    for (const tileDoc of scene.tiles ?? []) {
-      const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-      if (!flag || flag.actorId !== panelActor.id) continue;
-      const companion = feFindCompanionToken(scene, flag);
+    const placements = fePanelPlacementsIn(scene, panelActor.id);
+    for (const { doc, isToken } of placements) {
+      if (isToken === want) continue; // already the right kind
       try {
-        if (want && !companion) {
-          await feCreateCompanionTokenFor(scene, tileDoc, panelActor);
-        } else if (!want && companion) {
-          await scene.deleteEmbeddedDocuments("Token", [companion.id]);
-          await tileDoc.unsetFlag(MODULE_ID, `${FE_PANEL_TILE_FLAG}.companionTokenId`);
-        }
-      } catch (err) { console.warn(`${MODULE_ID} | screen panel tokenize sync failed`, err); }
+        if (want) await feConvertPanelTileToToken(scene, doc, panelActor);
+        else await feConvertPanelTokenToTile(scene, doc, panelActor);
+      } catch (err) { console.warn(`${MODULE_ID} | screen panel tokenize conversion failed`, err); }
     }
   }
+}
+
+/** Every placement of a panel actor in a scene, as Tiles AND Tokens. */
+function fePanelPlacementsIn(scene, actorId) {
+  const out = [];
+  for (const doc of scene?.tiles ?? []) {
+    const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+    if (flag?.actorId === actorId) out.push({ doc, flag, isToken: false });
+  }
+  for (const doc of scene?.tokens ?? []) {
+    const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+    if (flag?.actorId === actorId) out.push({ doc, flag, isToken: true });
+  }
+  return out;
+}
+
+/** Tile placement → Token placement (same spot, same flag). GM-only. */
+async function feConvertPanelTileToToken(scene, tileDoc, actor) {
+  const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG) ?? {};
+  const data = await fePanelTokenData(scene, actor, {
+    corner: feTileTopLeft(tileDoc),
+    pxWidth: tileDoc.width, pxHeight: tileDoc.height,
+    flag, hidden: tileDoc.hidden,
+  });
+  await scene.createEmbeddedDocuments("Token", [data]);
+  await scene.deleteEmbeddedDocuments("Tile", [tileDoc.id]);
+}
+
+/** Token placement → Tile placement (same spot, same flag). GM-only. */
+async function feConvertPanelTokenToTile(scene, tokenDoc, actor) {
+  const flag = tokenDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG) ?? {};
+  const face = fePanelFace(actor, flag.currentFace ?? 0);
+  const gridSize = scene?.grid?.size || canvas?.grid?.size || 100;
+  await scene.createEmbeddedDocuments("Tile", [{
+    ...fePanelTileTextureData(face.img),
+    x: Math.round(tokenDoc.x), y: Math.round(tokenDoc.y),
+    width: Math.max(1, Math.round(tokenDoc.width * gridSize)),
+    height: Math.max(1, Math.round(tokenDoc.height * gridSize)),
+    hidden: tokenDoc.hidden,
+    flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { ...flag, actorId: actor.id } } },
+  }]);
+  await scene.deleteEmbeddedDocuments("Token", [tokenDoc.id]);
 }
 
 async function applyPanelOp(type, data) {
@@ -953,54 +1132,65 @@ async function applyPanelOp(type, data) {
     if (!actor || !actor.testUserPermission(requester, "OWNER")) return;
     const scene = game.scenes.get(data.sceneId);
     if (!scene) return;
-    const [tileDoc] = await scene.createEmbeddedDocuments("Tile", [{
-      texture: { src: data.img || "", fit: "contain" },
-      x: data.x, y: data.y, width: data.width, height: data.height,
-      flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: { actorId: data.actorId, currentFace: data.currentFace ?? 0, disabled: false } } },
-    }]);
-    // Optional companion Token (ScreenPanelData.tokenize) — same position/face
-    // image, tagged back to this specific Tile placement (not just the actor,
-    // since the same panel actor may be placed more than once). Token size is
-    // grid-unit-converted from the tile's pixel box, honoring the INITIATOR's
-    // own grid-snap preference (data.gridSnap) rather than the GM's.
-    if (actor.system.tokenize && tileDoc) {
-      try { await feCreateCompanionTokenFor(scene, tileDoc, actor, !!data.gridSnap); }
-      catch (err) { console.warn(`${MODULE_ID} | screen panel companion token creation failed`, err); }
+    const flag = { actorId: data.actorId, currentFace: data.currentFace ?? 0, disabled: false };
+
+    // A panel is placed as EXACTLY ONE placeable — a Token when tokenized, a Tile
+    // otherwise. (The old model made a Tile plus a "companion" Token, which drew the
+    // same art twice in the same spot and orphaned the Tile when the token was
+    // deleted.) Token size is grid-unit-converted from the panel's pixel box honoring
+    // the INITIATOR's grid-snap preference (data.gridSnap), not the GM's.
+    if (actor.system.tokenize) {
+      const tokenData = await fePanelTokenData(scene, actor, {
+        corner: { x: data.x, y: data.y },
+        pxWidth: data.width, pxHeight: data.height,
+        flag, snap: !!data.gridSnap,
+      });
+      await scene.createEmbeddedDocuments("Token", [tokenData]);
+      return;
     }
+    await scene.createEmbeddedDocuments("Tile", [{
+      ...fePanelTileTextureData(data.img),
+      x: data.x, y: data.y, width: data.width, height: data.height,
+      flags: { [MODULE_ID]: { [FE_PANEL_TILE_FLAG]: flag } },
+    }]);
     return;
   }
 
   const scene = game.scenes.get(data.sceneId);
-  const doc = scene?.tiles?.get(data.tileId);
+  // A panel placement is a Tile OR a Token (never both — see fePanelTokenData), so
+  // resolve against whichever collection holds this id.
+  const doc = scene?.tiles?.get(data.tileId) ?? scene?.tokens?.get(data.tileId);
   if (!doc) return;
+  const isToken = doc.documentName === "Token";
   const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
   const actor = game.actors.get(flag?.actorId);
   if (!actor) return;
 
   const level = type === FE_PANEL_SOCKET.FLIP ? "OBSERVER" : "OWNER";
   if (!actor.testUserPermission(requester, level)) return;
-  const companion = feFindCompanionToken(scene, flag);
 
   if (type === FE_PANEL_SOCKET.FLIP) {
     const face = fePanelFace(actor, data.faceIndex);
-    await doc.update({
-      "texture.src": face.img || "",
-      [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.currentFace`]: face.index,
-    });
-    if (companion) await companion.update({ "texture.src": face.img || "" });
+    await doc.update(fePanelFaceChanges(face, isToken));
   } else if (type === FE_PANEL_SOCKET.MOVE) {
     await doc.update({ x: Math.round(data.x), y: Math.round(data.y) });
-    if (companion) await companion.update({ x: Math.round(data.x), y: Math.round(data.y) });
   } else if (type === FE_PANEL_SOCKET.SHOW_HIDE) {
     await doc.update({ hidden: !doc.hidden });
-    if (companion) await companion.update({ hidden: !companion.hidden });
   } else if (type === FE_PANEL_SOCKET.DISABLE) {
     await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.disabled`]: !flag?.disabled });
+  } else if (type === FE_PANEL_SOCKET.SORT) {
+    // Jump clear of every sibling in the same collection rather than stepping by 1: core's
+    // PrimaryCanvasGroup sort is per-layer, so "in front" only has to beat the other tokens
+    // (or tiles) — and a single step would be a no-op whenever siblings share a sort value,
+    // which they do by default (all 0).
+    const siblings = (isToken ? scene.tokens : scene.tiles) ?? [];
+    const sorts = [...siblings].filter(d => d.id !== doc.id).map(d => d.sort ?? 0);
+    const bound = data.dir > 0 ? Math.max(0, ...sorts) + 1 : Math.min(0, ...sorts) - 1;
+    await doc.update({ sort: bound });
   } else if (type === FE_PANEL_SOCKET.LOCK) {
     await doc.update({ [`flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}.locked`]: !flag?.locked });
   } else if (type === FE_PANEL_SOCKET.REMOVE) {
-    await scene.deleteEmbeddedDocuments("Tile", [doc.id]);
-    if (companion) await scene.deleteEmbeddedDocuments("Token", [companion.id]);
+    await scene.deleteEmbeddedDocuments(isToken ? "Token" : "Tile", [doc.id]);
   }
 }
 
@@ -1096,18 +1286,11 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP],
   });
 
-  game.settings.register(MODULE_ID, S.SCREEN_PANEL_DBLCLICK_CYCLE, {
-    name: "FESP.Settings.DblclickCycleName",
-    hint: "FESP.Settings.DblclickCycleHint",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SCREEN_PANEL_DBLCLICK_CYCLE],
-  });
 });
 
 Hooks.once("setup", () => {
   for (const actor of game.actors ?? []) feEnsureScreenPanelDnd5eActorCompat(actor);
+  feInstallPanelHudVeto(); // must precede the first canvas draw — see the function's comment
 });
 
 Hooks.once("ready", () => {
@@ -1117,6 +1300,7 @@ Hooks.once("ready", () => {
     toggleShowHide: feActionShowHide,
     toggleDisable: feActionDisable,
     toggleLock: feActionLock,
+    sort: feActionSort,
     remove: feActionRemove,
     openSheet: (actor) => actor?.sheet?.render(true),
     grantRights: feScreenPanelGrantRights,
@@ -1152,6 +1336,24 @@ Hooks.on("drawTile", feIndexPanelTile);
 Hooks.on("drawTile", applyPanelTileVisibility);
 Hooks.on("refreshTile", feRepositionPanelOverlays);
 Hooks.on("refreshTile", applyPanelTileVisibility);
+
+// A tokenized panel is a Token, so the same overlay/index/visibility work must run off
+// the Token draw cycle too — otherwise a tokenized panel shows no overlay labels and is
+// missing from the linked-actor index. The handlers are placeable-shape-agnostic
+// (panelTileRect reads the mesh; the panel flag lives on either document), and they
+// no-op immediately on any placeable without a panel flag — i.e. on every ordinary
+// token in the scene.
+Hooks.on("drawToken", enforcePanelTileSize);
+Hooks.on("drawToken", feRebuildPanelOverlays);
+Hooks.on("drawToken", feIndexPanelTile);
+Hooks.on("drawToken", applyPanelTileVisibility);
+Hooks.on("refreshToken", feRepositionPanelOverlays);
+Hooks.on("refreshToken", applyPanelTileVisibility);
+Hooks.on("destroyToken", (token) => {
+  if (!token) return;
+  feClearPanelOverlays(token);
+  feRemovePanelTileFromIndex(token);
+});
 // Orphaned overlay PIXI objects aren't covered by core's own Tile teardown
 // (canvas.primary.removeTile only destroys the mesh it tracks itself).
 Hooks.on("deleteTile", (doc) => {
@@ -1206,8 +1408,8 @@ Hooks.on("updateActor", (actor, changes) => {
 
   // ── GM-only actor-level syncs (prototype token, linkMode, portrait) ──
   if (actor.type === FE_PANEL_TYPE && isGM) {
-    // Reactive tokenize: turning the setting on/off adds/removes the companion
-    // token for every already-placed instance (not just at placement time).
+    // Reactive tokenize: turning the setting on/off CONVERTS every already-placed
+    // instance between a Tile and a Token (not just at placement time).
     if (changes.system?.tokenize !== undefined) feSyncPanelTokenization(actor);
     if (facesChanged || changes.system?.defaultFace !== undefined) {
       const face = fePanelFace(actor, actor.system.defaultFace ?? 0);
@@ -1253,11 +1455,7 @@ Hooks.on("updateActor", (actor, changes) => {
     if (isGM && facesChanged) {
       const curFace = fePanelFace(panelActor, flag.currentFace ?? 0);
       const tileSrc = tile.document.texture?.src ?? "";
-      if (curFace.img && tileSrc !== curFace.img) {
-        tile.document.update({ "texture.src": curFace.img });
-        const companion = feFindCompanionToken(canvas.scene, flag);
-        if (companion) companion.update({ "texture.src": curFace.img });
-      }
+      if (curFace.img && tileSrc !== curFace.img) tile.document.update({ "texture.src": curFace.img });
     }
 
     // Overlay rebuild: only when system data actually changed (skip pure
@@ -1276,24 +1474,112 @@ Hooks.on("updateActor", (actor, changes) => {
   }
 });
 
-// Add "Place on current scene" to the Actor directory context menu for panels.
+// A tokenized panel's right-click must show OUR panel menu and ONLY ours — core's Token HUD
+// (the orbiting icon ring) is meaningless for a display board and just overlaps the dropdown.
+//
+// Core opens it from `PlaceableObject#_onClickRight` → `if (this._canHUD(...)) this.layer.hud.bind(this)`,
+// driven by PIXI FEDERATED events. Racing it from our capture-phase DOM listener does not work:
+// PIXI's EventSystem registered its own listener on the same <canvas> first, so it dispatches (and
+// core reacts) before our `stopImmediatePropagation` lands — the same race the marquee reset in
+// onBoardPointerDown works around. Veto at core's own gate instead, which is race-free.
+//
+// A cooperative prototype wrap (calls through to the original) rather than libWrapper: this file
+// has no libWrapper dependency, and the override is one boolean.
+//
+// MUST be installed before the canvas draws (we do it at `setup`, NOT `ready`): each placeable's
+// `_createInteractionManager` captures `this._canHUD` as a direct **reference** into its permissions
+// map (`placeable-object.mjs`: `permissions = {clickRight: this._canHUD, …}`) when its listeners are
+// activated at draw time. Tokens are drawn before the `ready` hook, so a wrap installed there is
+// captured by nobody and the HUD still opens.
+function feInstallPanelHudVeto() {
+  const proto = CONFIG.Token?.objectClass?.prototype;
+  if (!proto || proto._feHudVetoInstalled) return;
+  proto._feHudVetoInstalled = true;
+  const original = proto._canHUD;
+  proto._canHUD = function (...args) {
+    if (isPanelFeatureEnabled() && this.document?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG)?.actorId) return false;
+    return original.apply(this, args);
+  };
+}
+
+// Position lock for TOKENIZED panels. A Tile has a real `locked` field that core's own
+// tile tools honour, but a Token has none — and core owns a tokenized panel's dragging,
+// so the only place to enforce the panel's lock is the update itself. Cancelling the
+// pre-hook makes core snap the token back to where it was. Mirrors the tile lock:
+// per-placement (`flag.locked`, the right-click menu) OR per-panel
+// (`actor.system.locked`, the sheet's 위치 고정). GMs are not exempt — the lock is a
+// deliberate "don't nudge this board" guard; unlock it to move it.
+Hooks.on("preUpdateToken", (doc, changes) => {
+  if ((changes.x === undefined) && (changes.y === undefined)) return;
+  const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+  if (!flag?.actorId) return;
+  const actor = game.actors.get(flag.actorId);
+  if (!flag.locked && !actor?.system?.locked) return;
+  ui.notifications?.warn(game.i18n.localize("FESP.Menu.LockedWarn"));
+  return false;
+});
+
+// Dragging a panel actor onto the canvas must go through feScreenPanelPlaceOnScene.
+// Without this guard core's default Actor drop (board.mjs `#onDrop` → tokens._onDropActor)
+// creates an ordinary Token from the panel actor: it carries no panel flag, so it is not
+// a panel at all — no face cycle, no panel menu, no overlays, and core's "double-click an
+// owned token" opens the sheet instead. Our placement produces the right placeable for
+// the panel's own tokenize setting (a Token or a Tile, never both) with the flag attached.
+// Returning false aborts core's own handling (board.mjs: `if (allowed === false) return`).
+// data.x/data.y are already canvas coordinates, so the panel lands under the cursor.
+Hooks.on("dropCanvasData", (_canvas, data) => {
+  if (data?.type !== "Actor") return;
+  let actor = null;
+  try { actor = data.uuid ? fromUuidSync(data.uuid) : game.actors.get(data.id); } catch { /* no-op */ }
+  if (actor?.type !== FE_PANEL_TYPE) return; // not a panel → core handles it normally
+  feScreenPanelPlaceOnScene(actor, { x: data.x, y: data.y });
+  return false;
+});
+
+// Add panel entries to the Actor directory context menu.
 Hooks.on("getActorContextOptions", (directory, options) => {
-  options.push({
-    name: game.i18n.localize("FESP.Menu.PlaceOnScene"),
-    icon: '<i class="fa-solid fa-image"></i>',
-    condition: (li) => {
-      const el = li instanceof HTMLElement ? li : li?.[0];
-      const id = el?.dataset?.entryId ?? el?.dataset?.documentId;
-      const actor = game.actors.get(id);
-      return !!actor && actor.type === FE_PANEL_TYPE && actor.testUserPermission(game.user, "OWNER") && !!canvas?.scene;
+  const actorOf = (li) => {
+    const el = li instanceof HTMLElement ? li : li?.[0];
+    return game.actors.get(el?.dataset?.entryId ?? el?.dataset?.documentId);
+  };
+  const isOwnedPanel = (li) => {
+    const actor = actorOf(li);
+    return !!actor && actor.type === FE_PANEL_TYPE && actor.testUserPermission(game.user, "OWNER");
+  };
+
+  // Tokenize toggle, mirrored from the sheet header — reachable without opening the
+  // sheet at all. Two mutually exclusive entries rather than one that changes label:
+  // a ContextMenu entry's `name` is read once when the menu is built, so a single
+  // stateful label would go stale. Each names the ACTION, not the current state.
+  const items = [
+    {
+      name: game.i18n.localize("FESP.Menu.TokenizeOn"),
+      icon: '<i class="fa-solid fa-chess-pawn"></i>',
+      condition: (li) => isOwnedPanel(li) && !actorOf(li).system.tokenize,
+      callback: (li) => actorOf(li)?.update({ "system.tokenize": true }),
     },
-    callback: (li) => {
-      const el = li instanceof HTMLElement ? li : li?.[0];
-      const id = el?.dataset?.entryId ?? el?.dataset?.documentId;
-      const actor = game.actors.get(id);
-      if (actor) feScreenPanelPlaceOnScene(actor);
+    {
+      name: game.i18n.localize("FESP.Menu.TokenizeOff"),
+      icon: '<i class="fa-regular fa-square"></i>',
+      condition: (li) => isOwnedPanel(li) && !!actorOf(li).system.tokenize,
+      callback: (li) => actorOf(li)?.update({ "system.tokenize": false }),
     },
-  });
+    {
+      name: game.i18n.localize("FESP.Menu.PlaceOnScene"),
+      icon: '<i class="fa-solid fa-image"></i>',
+      condition: (li) => isOwnedPanel(li) && !!canvas?.scene,
+      callback: (li) => { const a = actorOf(li); if (a) feScreenPanelPlaceOnScene(a); },
+    },
+  ];
+
+  // Sit directly under core's "편집" (SIDEBAR.Edit) — the slot fe-theatre.js uses for its
+  // own stage entries, which are excluded for panels (a panel is a display board, not a
+  // character). v14 core labels the entry with the un-localized key, v13 and some modules
+  // use `name` already localized, so match both. Fall back to the top when not found.
+  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+  const isEdit = (o) => [o?.label, o?.name].some(v => v === "SIDEBAR.Edit" || v === editLabel);
+  const editIdx = options.findIndex(isEdit);
+  options.splice(editIdx >= 0 ? editIdx + 1 : 0, 0, ...items);
 });
 
 export { feScreenPanelPlaceOnScene };

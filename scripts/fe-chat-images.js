@@ -322,6 +322,9 @@ function ciOpenImageInBrowser(src) {
   }
 }
 
+// 현재 열려 있는 이미지 창: src → app. ciOpenImagePopout 의 토글 판정에 쓴다.
+const _ciOpenPopouts = new Map();
+
 // ImagePopout(AppV2) 서브클래스 — 닫기 버튼 바로 왼쪽에 "새 창으로 보기" 프레임 버튼을
 // 추가한다(_getFrameButtons → frame-buttons.hbs → close 앞 beforebegin 삽입).
 let _ciImagePopoutSub = null;
@@ -359,18 +362,46 @@ function ciGetImagePopoutSubclass() {
         }
       } catch {}
     }
+    // X 버튼·ESC 등 어떤 경로로 닫히든 추적 항목을 지운다(다음 클릭이 다시 열도록).
+    // _onClose 가 아니라 _preClose 인 이유: 코어의 #close 는 닫기 애니메이션
+    // (_awaitTransition, 최대 1000ms)을 기다린 뒤에야 _onClose 를 호출한다. 그 사이 채팅
+    // 이미지를 다시 클릭하면 아직 남아 있는 항목 때문에 "열기"가 아니라 "닫기"로 소모된다.
+    // _preClose 는 애니메이션 전에 실행되므로 닫기 시작 즉시 항목이 사라진다.
+    async _preClose(options) {
+      await super._preClose?.(options);
+      if (_ciOpenPopouts.get(this.options?.src) === this) _ciOpenPopouts.delete(this.options.src);
+    }
   };
   return _ciImagePopoutSub;
 }
 
 // 채팅 이미지를 FVTT 내부 창(ImagePopout)에 큰 크기로 띄운다(클릭 동작).
+// 같은 이미지를 이미 띄운 창이 있으면 새로 열지 않고 그 창을 닫는다(클릭 = 토글).
+// 그러지 않으면 클릭하는 대로 동일 이미지 창이 무한정 쌓인다.
 function ciOpenImagePopout(src) {
   try {
+    // 맵에 있으면 = 열려 있거나 여는 중 → 무조건 닫는다. `rendered` 로 판정하면 안 된다:
+    // render(true) 는 비동기라 아직 렌더 중인 창은 rendered=false 라서 "이미 닫힘"으로
+    // 오판하고 창을 하나 더 만든다(연타 시 누수).
+    const open = _ciOpenPopouts.get(src);
+    if (open) { _ciOpenPopouts.delete(src); open.close(); return; }
+
     const Sub = ciGetImagePopoutSubclass();
-    if (Sub) { new Sub({ src, editable: false, shareable: true }).render(true); return; }
-    // 레거시 폴백 (v11/v12): (src, options) 시그니처
-    const Popout = ciGetImagePopoutClass();
-    if (Popout) new Popout(src, { editable: false, shareable: true }).render(true);
+    let app = null;
+    if (Sub) app = new Sub({ src, editable: false, shareable: true });
+    else {
+      // 레거시 폴백 (v11/v12): (src, options) 시그니처
+      const Popout = ciGetImagePopoutClass();
+      if (Popout) app = new Popout(src, { editable: false, shareable: true });
+      // AppV1 에는 _onClose 훅이 없으므로 인스턴스의 close 를 감싸 항목을 정리한다.
+      if (app) {
+        const close = app.close.bind(app);
+        app.close = (...args) => { _ciOpenPopouts.delete(src); return close(...args); };
+      }
+    }
+    if (!app) return;
+    _ciOpenPopouts.set(src, app);
+    app.render(true);
   } catch {}
 }
 
