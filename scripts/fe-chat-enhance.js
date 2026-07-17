@@ -372,6 +372,15 @@ Hooks.once("init", () => {
     default: true,
   });
 
+  game.settings.register(MODULE_ID, S.EXPORT_EXCLUDE_WHISPERS, {
+    name: "아카이브: 귓속말 제외",
+    hint: "아카이브/저장/인쇄에서 귓속말을 제외합니다. GM은 모든 귓속말을 볼 수 있으므로, 켜지 않으면 GM이 저장한 로그에는 비공개 대화가 그대로 포함됩니다. 로그를 다른 사람과 공유할 예정이라면 켜세요.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   game.settings.register(MODULE_ID, S.EXPORT_PRINT_IMAGE_MODE, {
     name: "PDF/인쇄: 이미지 처리",
     hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나 다운스케일할 수 있습니다.",

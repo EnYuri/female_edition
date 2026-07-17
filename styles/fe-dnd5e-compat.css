@@ -176,13 +176,25 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * 뿐이다(.chat-card{background:#000}). fe-userbg-base-black 은 메시지(li) 틴트의
  * 하부 베이스일 뿐 카드 배경을 어둡게 하지 않으므로, 그 스코프로 글씨를 밝게 하면
  * 레트로 OFF 시 "밝은 카드 위 밝은 글씨"로 사라진다. */
-body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat) .chat-card {
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card {
   color: #e6e6e6 !important;
 }
 
 /* dnd5e 가 어두운 잉크/회색을 "직접" 지정하는 본문 요소들을 덮어쓴다.
- * a / button / .inline-roll / [data-action] 등 상호작용·색상 요소는 제외. */
-body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat) .chat-card
+ * a / button / .inline-roll / [data-action] 등 상호작용·색상 요소는 제외.
+ *
+ * 조상 목록에 로그(.chat-log / #fe-chat-export-log)를 반드시 포함할 것: 아카이브 셸은
+ * #fe-chat-export-sidebar / #fe-chat-export-chat 이라 `#sidebar #chat` 으로는 닿지 않는다.
+ * 위 컨테이너 규칙은 fe-chat-archive.css 가 .chat-card 에 색을 직접 걸어 우연히 메워주지만,
+ * 이 규칙의 대상은 자기 color 를 "직접" 가진 자손들이라 상속으로는 구제되지 않는다 →
+ * 닿지 못하면 아카이브에서 검정 카드 위에 dnd5e 의 어두운 잉크가 남아 글자가 사라진다.
+ * `#sidebar #chat` 을 :is() 안에 남겨 특이도를 (2,0,0) 으로 고정한다(:is() 는 인자 중
+ * 최댓값을 취하므로 라이브 캐스케이드는 그대로다). */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card
   :is(p, i, em, b, strong, u, s, small, li, td, th, dt, dd, label,
       h1, h2, h3, h4, h5, h6,
       .description, .card-content, .card-footer, .supplement,

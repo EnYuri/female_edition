@@ -62,6 +62,9 @@ const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 2;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 40;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
 const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
+// Matches a browser's own per-host connection limit — more in-flight fetches would just
+// queue in the network stack while holding decoded blobs alive in JS.
+const FE_EXPORT_EMBED_CONCURRENCY = 6;
 const FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT = 4500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
@@ -87,14 +90,24 @@ function feSanitizeExportFilename(name, fallback = "chat-log") {
 async function feShowArchiveRangeDialog(totalCount = 0) {
   const readRange = (root) => {
     try {
-      // DialogV2 supplies an HTMLElement while v13's Dialog callback supplies
-      // a jQuery collection.  Normalize both without making the range picker
-      // depend on either application framework.
-      const el = root?.[0] ?? root;
-      const form = el?.querySelector?.("form") ?? el;
-      const mode = form?.querySelector?.("input[name='fe-range-mode']:checked")?.value ?? "all";
-      const from = Math.max(1, parseInt(form?.querySelector?.("#fe-range-from")?.value ?? "1", 10) || 1);
-      const to = Math.max(from, parseInt(form?.querySelector?.("#fe-range-to")?.value ?? String(totalCount), 10) || totalCount);
+      // DialogV2 hands us an HTMLElement (often the <form> itself, via `button.form`),
+      // while v13's legacy Dialog callback hands us a jQuery collection.
+      //
+      // Unwrap ONLY jQuery. A bare `root?.[0] ?? root` looks like a harmless normalization
+      // but silently breaks the DialogV2 path: HTMLFormElement exposes indexed access to
+      // its own controls, so `form[0]` returns the FIRST RADIO INPUT rather than undefined.
+      // Every querySelector on that input then returns null, `mode` fell back to its "all"
+      // default, and the range dialog became a no-op that always exported everything.
+      // jQuery objects are identified by their `.jquery` version string.
+      const el = (root && typeof root.jquery === "string") ? root[0] : root;
+
+      // `el` may be the dialog root or the <form>; the controls are inside either, so query
+      // directly and do not try to re-resolve a <form> ancestor/descendant.
+      const q = (sel) => el?.querySelector?.(sel) ?? null;
+
+      const mode = q("input[name='fe-range-mode']:checked")?.value ?? "all";
+      const from = Math.max(1, parseInt(q("#fe-range-from")?.value ?? "1", 10) || 1);
+      const to = Math.max(from, parseInt(q("#fe-range-to")?.value ?? String(totalCount), 10) || totalCount);
       return { mode, from, to };
     } catch {
       return { mode: "all", from: 1, to: Math.max(1, totalCount) };
@@ -1117,18 +1130,33 @@ async function feFetchAllChatMessagesFromDatabase() {
     // path does not require a private context object). Passing `{userId}` here
     // can make v13 permission-aware retrieval fail or omit older messages.
     const rows = await backend.get(docClass, { query: {}, sort: { timestamp: 1 } }, game?.user);
-    if (!Array.isArray(rows)) return [];
-    return rows.map((row) => {
-      if (!row) return null;
-      if (typeof row.getFlag === "function" || row.documentName === "ChatMessage") return row;
-      try {
-        return docClass.fromSource ? docClass.fromSource(row) : new docClass(row, {});
-      } catch {
-        try { return new docClass(row, {}); } catch { return null; }
-      }
-    }).filter(Boolean);
+    if (!Array.isArray(rows)) return { rows: [], docClass: null };
+    return { rows: rows.filter(Boolean), docClass };
   } catch {
-    return [];
+    return { rows: [], docClass: null };
+  }
+}
+
+// Turn one DB row into a ChatMessage document. `backend.get` sometimes hands back real
+// documents already (the check below), in which case this is a pass-through.
+//
+// This is deliberately NOT done eagerly for every row: a large world returns thousands of
+// rows and the user is usually about to pick a range that discards almost all of them.
+// feCollectVisibleChatMessages defers each call behind a lazy `msg` getter so only rows
+// that survive feApplyMessageRange ever become documents.
+function feMaterializeChatMessage(row, docClass = null) {
+  if (!row) return null;
+  if (typeof row.getFlag === "function" || row.documentName === "ChatMessage") return row;
+  const cls = docClass
+    || game?.messages?.documentClass
+    || CONFIG?.ChatMessage?.documentClass
+    || globalThis.ChatMessage?.implementation
+    || globalThis.ChatMessage;
+  if (!cls) return null;
+  try {
+    return cls.fromSource ? cls.fromSource(row) : new cls(row, {});
+  } catch {
+    try { return new cls(row, {}); } catch { return null; }
   }
 }
 
@@ -1145,14 +1173,17 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
   report("메시지 수집 중…");
 
   let all = Array.from(game.messages?.contents ?? []);
+  // Set only when `all` holds raw DB rows; the lazy `msg` getter needs it to materialize.
+  let rowDocClass = null;
   // Archive/export should prefer the fullest document source available.
   // Some worlds/clients may only have the most recent chat page hydrated in memory,
   // so always probe the backend and keep whichever source is longer.
   try {
     report("메시지 DB 확인 중…");
-    const dbAll = await feFetchAllChatMessagesFromDatabase();
+    const { rows: dbAll, docClass } = await feFetchAllChatMessagesFromDatabase();
     if (dbAll.length > all.length) {
       all = dbAll;
+      rowDocClass = docClass;
     } else if (dbAll.length === 0 && all.length > 0) {
       console.warn("female_edition | archive: DB query returned 0 messages — falling back to in-memory messages. Some older messages may be missing.");
     }
@@ -1202,8 +1233,14 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
 
   report("메시지 정렬 중…");
 
+  // Applied here — inside collection — rather than alongside feApplyMessageRange, so the
+  // count handed to the range dialog is the already-filtered count. Filtering later would
+  // make "1~100번째" refer to a list the user never saw.
+  const excludeWhispers = !!feSetting(S.EXPORT_EXCLUDE_WHISPERS);
+
   const visibleDocs = all
     .filter((m) => feCanUserSeeChatMessage(m, user))
+    .filter((m) => !(excludeWhispers && feArchiveIsWhisperMessage(m)))
     .sort((a, b) => {
       const ao = Number(a?.sort ?? a?.timestamp ?? 0);
       const bo = Number(b?.sort ?? b?.timestamp ?? 0);
@@ -1211,14 +1248,34 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
       return String(a?.id ?? a?._id ?? '').localeCompare(String(b?.id ?? b?._id ?? ''));
     });
 
+  // `msg` is a lazy getter, not a value. Everything above this point (visibility, whisper
+  // filter, sort) reads only plain fields that a raw DB row already carries, and every
+  // caller applies feApplyMessageRange to this array before touching `.msg` — so exporting
+  // the last 50 of a 5000-message world constructs 50 ChatMessage documents instead of
+  // 5000. Items dropped by the range slice are never materialized at all.
+  //
+  // If you add a step between collection and feApplyMessageRange, keep it off `.msg`, or
+  // this degrades back to eager materialization without any visible symptom.
   const items = visibleDocs.map((m) => {
     const id = String(m?.id ?? m?._id ?? '');
-    return {
+    const item = {
       key: id || `__msg__${Math.random()}`,
       id,
-      msg: m,
       liveEl: id ? (liveMap.get(id) || null) : null,
     };
+    let cached;
+    Object.defineProperty(item, "msg", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (cached === undefined) cached = feMaterializeChatMessage(m, rowDocClass);
+        return cached;
+      },
+      // Present so an assignment can't throw in this strict-mode module; nothing writes
+      // `.msg` today, but a getter-only property would fail loudly if that ever changed.
+      set(value) { cached = value; },
+    });
+    return item;
   });
 
   if (!items.length && harvested?.orderedIds?.length) {
@@ -1227,7 +1284,8 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
       id,
       msg: null,
       liveEl: id ? (liveMap.get(id) || null) : null,
-    })).filter((it) => it.liveEl);
+    })).filter((it) => it.liveEl)
+      .filter((it) => !(excludeWhispers && feArchiveIsWhisperMessage(null, it.liveEl)));
     report(`메시지 ${out.length}개 준비 완료`);
     return out;
   }
@@ -2329,7 +2387,8 @@ async function feRenderChatArchiveWindow(win, {
 
 /**
  * Prepare content images for print pagination.
- * - Images taller than one page: shrink to fit.
+ * - Images taller than one page: shrink to fit one page and never split — pushed to
+ *   the next page when the current one no longer has room for the shrunk image.
  * - Images crossing a page boundary with < 50% overflow: shrink to fit current page.
  * - Images crossing a page boundary with >= 50% overflow: split into two clipped
  *   fragments so the image spans both pages without blank space.
@@ -2345,6 +2404,7 @@ function fePrepareImagesForPageBreaks(doc, logEl) {
 
   // A4 = 297mm, @page margin = 10mm each → 277mm content ≈ 1047px at 96 dpi.
   const PAGE_H = 1047;
+  const MAX_IMG_H = PAGE_H - 20;
   let restored = false;
   const changes = [];
 
@@ -2374,12 +2434,27 @@ function fePrepareImagesForPageBreaks(doc, logEl) {
 
       if (imgH <= 0 || imgW <= 0) continue;
 
-      if (imgH > PAGE_H) {
+      if (imgH > MAX_IMG_H) {
+        // Shrink to at most one page, then keep it whole: a shrunk image still
+        // straddling a boundary would be sliced by the printer.
         const prevStyle = img.getAttribute("style") || "";
-        img.style.maxHeight = `${PAGE_H - 20}px`;
+        img.style.maxHeight = `${MAX_IMG_H}px`;
         img.style.width = "auto";
+        img.style.height = "auto";
         img.style.objectFit = "contain";
+        img.style.display = "block";
+        img.style.breakInside = "avoid";
+        img.style.pageBreakInside = "avoid";
         changes.push({ type: "shrink", img, prevStyle });
+
+        void logEl.offsetHeight;
+        const shrunk = img.getBoundingClientRect();
+        const shrunkTop = shrunk.top + scrollY;
+        const shrunkRemaining = PAGE_H - (((shrunkTop % PAGE_H) + PAGE_H) % PAGE_H);
+        if (shrunk.height > shrunkRemaining) {
+          img.style.breakBefore = "page";
+          img.style.pageBreakBefore = "always";
+        }
         continue;
       }
 
@@ -3380,14 +3455,91 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
 
   const cache = new Map();
 
+  // Resolve each img to the URL it would be embedded from — LAZILY, at most once per img.
+  // A big log can hold thousands of <img> while the commit loop stops at MAX_IMAGES, so
+  // resolving them all up front would spend unbounded synchronous time parsing URLs that are
+  // never used, before the first yield. Resolution stays just ahead of the prefetch window.
+  //
+  // Reading an img's src before its own turn is safe: an img is mutated only when the commit
+  // loop reaches it, which is always at or after the point we resolve it.
+  //
+  // planCache[i]: `undefined` = unresolved, `null` = not embeddable (already a data: URL,
+  // unparseable, or cross-origin), else { img, abs }.
+  const planCache = new Array(imgs.length);
+  const entryAt = (i) => {
+    let entry = planCache[i];
+    if (entry !== undefined) return entry;
+
+    entry = null;
+    try {
+      const img = imgs[i];
+      const src = img.getAttribute("src") || img.src;
+      if (src && !src.startsWith("data:")) {
+        const abs = new URL(src, window.location.href).href;
+        // Only embed same-origin resources (avoid CORS failures).
+        if (new URL(abs).origin === window.location.origin) entry = { img, abs };
+      }
+    } catch {
+      entry = null;
+    }
+
+    planCache[i] = entry;
+    return entry;
+  };
+
+  // Fetches run ahead of the commit loop (network overlap), but the DECISIONS below stay
+  // strictly in document order. That ordering is load-bearing, not incidental:
+  //   - the byte budget is spent in a deterministic prefix, so the same log exports the
+  //     same way every time — with completion-order accounting, which images make the cut
+  //     would vary run to run;
+  //   - `cache` (first occurrence embeds, later ones reuse) stays well-defined.
+  const fetches = new Map(); // abs -> Promise<{ dataUrl, size } | null>
+  let inflight = 0;
+  let prefetchIdx = 0;
+
+  const startFetch = (abs) => {
+    const existing = fetches.get(abs);
+    if (existing) return existing;
+
+    inflight += 1;
+    const p = (async () => {
+      try {
+        const res = await fetch(abs, { credentials: "include" });
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        // Per-image limit. Order-independent, so it belongs here rather than at commit.
+        if (blob.size > MAX_PER_IMAGE) return null;
+        return { dataUrl: await feBlobToDataURL(blob), size: blob.size };
+      } catch (err) {
+        console.warn("female_edition | HTML export: failed to embed image", abs, err);
+        return null;
+      } finally {
+        inflight -= 1;
+      }
+    })();
+
+    fetches.set(abs, p);
+    return p;
+  };
+
+  // Keep the window topped up with distinct URLs the commit loop is about to need.
+  const pumpPrefetch = () => {
+    while (prefetchIdx < imgs.length && inflight < FE_EXPORT_EMBED_CONCURRENCY) {
+      const entry = entryAt(prefetchIdx);
+      prefetchIdx += 1;
+      if (entry && !fetches.has(entry.abs)) startFetch(entry.abs);
+    }
+  };
+
   try {
     let embeddedCount = 0;
     let embeddedBytes = 0;
-    let i = 0;
-    for (const img of imgs) {
-      i++;
-      const src = img.getAttribute("src") || img.src;
-      if (!src || src.startsWith("data:")) continue;
+
+    for (let i = 0; i < imgs.length; i += 1) {
+      pumpPrefetch();
+
+      const entry = entryAt(i);
+      if (!entry) continue;
 
       // Stop when reaching limits
       if (embeddedCount >= MAX_IMAGES || embeddedBytes >= MAX_TOTAL_BYTES) {
@@ -3401,21 +3553,7 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
         break;
       }
 
-      // Resolve URL
-      let abs;
-      try {
-        abs = new URL(src, window.location.href).href;
-      } catch {
-        continue;
-      }
-
-      // Only embed same-origin resources (avoid CORS failures).
-      try {
-        const u = new URL(abs);
-        if (u.origin !== window.location.origin) continue;
-      } catch {
-        continue;
-      }
+      const { img, abs } = entry;
 
       if (cache.has(abs)) {
         // For duplicate archive images, keep the original absolute src instead of repeating
@@ -3435,32 +3573,32 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
         continue;
       }
 
-      setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i}/${imgs.length})`);
+      setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i + 1}/${imgs.length})`);
+
+      const result = await startFetch(abs);
+      if (!result) continue;
+
+      // Total limit. A too-large image is skipped while smaller ones after it still fit,
+      // so this cannot short-circuit the loop.
+      if (embeddedBytes + result.size > MAX_TOTAL_BYTES) {
+        // Release the decoded data URL: the budget only ever grows, so a later duplicate of
+        // this URL would be skipped here too. Holding it would pin megabytes precisely when
+        // we are already at the cap.
+        fetches.set(abs, Promise.resolve(null));
+        continue;
+      }
+
+      cache.set(abs, result.dataUrl);
 
       try {
-        const res = await fetch(abs, { credentials: "include" });
-        if (!res.ok) continue;
-        const blob = await res.blob();
-
-        // Per-image limit
-        if (blob.size > MAX_PER_IMAGE) continue;
-
-        // Total limit
-        if (embeddedBytes + blob.size > MAX_TOTAL_BYTES) continue;
-
-        const dataUrl = await feBlobToDataURL(blob);
-        cache.set(abs, dataUrl);
-
         recordBeforeMutate(img);
-        img.setAttribute("src", dataUrl);
+        img.setAttribute("src", result.dataUrl);
         img.removeAttribute("srcset");
         img.removeAttribute("loading");
+      } catch {}
 
-        embeddedCount++;
-        embeddedBytes += blob.size;
-      } catch (err) {
-        console.warn("female_edition | HTML export: failed to embed image", abs, err);
-      }
+      embeddedCount++;
+      embeddedBytes += result.size;
 
       // Yield periodically so Chromium doesn't freeze.
       if (i % 10 === 0) await feNextTick();
@@ -4064,6 +4202,39 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
 //                        image output, font injection, image/font wait helpers)
 // ===========================================================================
 
+// Whisper detection for the archive's "exclude whispers" preference.
+//
+// This is deliberately NOT folded into feCanUserSeeChatMessage: that predicate answers
+// "is this user allowed to see it", while this answers "does the user want it in the
+// output". A GM passes the visibility check for every whisper in the world, so without
+// this filter a GM-saved log carries every private conversation into a file that is
+// usually made in order to be shared.
+//
+// `liveEl` is a fallback for the harvest-only path, where a rendered <li> may be all we
+// have (no ChatMessage document). Both core and feFallbackRenderChatMessage put the
+// `whisper` class on whispered messages.
+function feArchiveIsWhisperMessage(msg, liveEl = null) {
+  try {
+    const whisper = msg?.whisper;
+    if (Array.isArray(whisper) && whisper.length) return true;
+    if (!msg && feIsElement(liveEl)) return !!liveEl.classList?.contains?.("whisper");
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
+// A ChatMessage *document* exposes `author` as a User document, so `.id` reads the user id.
+// A raw DB *row* stores the same field as a plain user-id string (pre-v13 rows use `user`).
+// Since the archive now filters raw rows before materializing them, both shapes reach the
+// predicate below — reading `.id` off a string would silently yield undefined and drop the
+// author's own whispers from their export.
+function feMessageAuthorId(msg) {
+  const author = msg?.author ?? msg?.user;
+  if (!author) return null;
+  return typeof author === "string" ? author : (author.id ?? null);
+}
+
 function feCanUserSeeChatMessage(msg, user) {
   try {
     if (!msg) return false;
@@ -4073,7 +4244,8 @@ function feCanUserSeeChatMessage(msg, user) {
     if (Array.isArray(whisper) && whisper.length) {
       if (user?.isGM) return true;
       if (whisper.includes(user?.id)) return true;
-      if ((msg.author ?? msg.user)?.id === user?.id) return true;
+      const authorId = feMessageAuthorId(msg);
+      if (authorId && authorId === user?.id) return true;
       return false;
     }
 

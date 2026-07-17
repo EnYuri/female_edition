@@ -222,6 +222,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.EXPORT_OPTIMIZE]:              feRead(S.EXPORT_OPTIMIZE),
       [S.EXPORT_EMBED_FONTS]:           feRead(S.EXPORT_EMBED_FONTS),
       [S.EXPORT_EMBED_IMAGES]:          feRead(S.EXPORT_EMBED_IMAGES),
+      [S.EXPORT_EXCLUDE_WHISPERS]:      feRead(S.EXPORT_EXCLUDE_WHISPERS),
       [S.EXPORT_PRINT_IMAGE_MODE]:      feRead(S.EXPORT_PRINT_IMAGE_MODE),
 
       // Fonts
@@ -673,6 +674,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Export
         bool(S.EXPORT_ENABLED), bool(S.EXPORT_AUTO_PRINT), bool(S.EXPORT_OPTIMIZE),
         bool(S.EXPORT_EMBED_FONTS), bool(S.EXPORT_EMBED_IMAGES),
+        bool(S.EXPORT_EXCLUDE_WHISPERS),
         str(S.EXPORT_PRINT_IMAGE_MODE),
         // Hidden legacy preference: preserve it on ordinary saves, but honour
         // the reset action's promise to restore every registered setting.

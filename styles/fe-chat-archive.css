@@ -395,7 +395,7 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   max-inline-size: none !important;
   font-size: var(--fe-chat-title-size) !important;
   line-height: 1.05 !important;
-  font-weight: 700 !important;
+  /* NO font-weight here — see the .name-stacked .title note below. */
   color: var(--color-text-dark-primary, #191813) !important;
   white-space: normal !important;
   overflow: visible !important;
@@ -525,13 +525,21 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   justify-items: stretch !important;
 }
 
-#fe-chat-export-container .chat-message .message-sender .name-stacked .title {
-  font-weight: 700 !important;
-}
-
-#fe-chat-export-container .chat-message .message-sender .name-stacked .subtitle {
-  font-weight: 400 !important;
-}
+/* Sender-name font-weight is deliberately NOT set here (and not on .message-sender
+ * above). Do not re-add it — it printed names one whole face heavier than the sidebar.
+ *
+ * `.message-sender` IS the `<h4>`, and core kills the UA's h4 bold explicitly
+ * (foundry2.css: `.chat-message .message-header h4 { font-size: inherit; font-weight:
+ * inherit; }`). So a live sender name inherits NORMAL weight, not bold. Forcing 700 here
+ * made the archive pick CookieRun's real Bold face while the sidebar rendered Regular —
+ * CookieRun is a chunky display font, so Regular already reads as "bold" and the forced
+ * Bold read as "extra bold".
+ *
+ * Nothing needs to replace it: feBuildArchiveHeadHTML copies EVERY `link[rel=stylesheet]`
+ * from the live head, core's h4 rule included, so the natural cascade reproduces the live
+ * weight on its own — for mirrored and fallback-rendered messages alike. Any forced value
+ * here is a divergence from the sidebar, which is the archive's whole spec.
+ */
 
 #fe-chat-export-container .chat-message :is(.message-sender .name-stacked .title,
   .message-sender .title,

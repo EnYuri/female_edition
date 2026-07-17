@@ -55,29 +55,42 @@ function feParseRGBAFromCSS(cssColor) {
   return { r, g, b, a };
 }
 
-function feParseRGBTriplet(raw) {
-  try {
-    const parts = String(raw ?? "")
-      .trim()
-      .split(/[^\d.]+/)
-      .filter(Boolean)
-      .map((v) => Number(v));
-    if (parts.length < 3) return null;
-    const [r, g, b] = parts;
-    if (![r, g, b].every((v) => Number.isFinite(v))) return null;
-    return {
-      r: clampByte(r),
-      g: clampByte(g),
-      b: clampByte(b),
-    };
-  } catch {
-    return null;
-  }
-}
-
 function feScreenBlendChannel(base, overlay) {
   // base/overlay in [0..255]
   return 255 - ((255 - base) * (255 - overlay)) / 255;
+}
+
+// The user-color tint is painted as a full-surface inset box-shadow
+// (chat-bg-stripper.css: `box-shadow: inset 0 0 0 9999px rgb(tint / alpha)`), which sits
+// ABOVE background-color/background-image. The freeze strips box-shadow, so it must be
+// composited in first or the tint disappears from print.
+//
+// Only a shadow whose spread actually covers the element counts: a decorative inset
+// outline must not be baked across the whole surface. Returns {r,g,b,a} or null.
+function feParseCoveringInsetShadow(win, el, cs) {
+  try {
+    const raw = String(cs.boxShadow ?? "");
+    if (!raw || raw === "none" || !/inset/i.test(raw)) return null;
+
+    // Computed form: "rgba(0, 255, 0, 0.22) 0px 0px 0px 9999px inset"
+    const m = raw.match(
+      /(rgba?\([^)]*\))\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+inset/i
+    );
+    if (!m) return null;
+
+    const color = feParseRGBAFromCSS(m[1]);
+    if (!color || color.a <= 0) return null;
+
+    const spread = Number(m[5]);
+    if (!Number.isFinite(spread)) return null;
+
+    const cover = Math.max(el.offsetWidth || 0, el.offsetHeight || 0);
+    if (spread < cover) return null;
+
+    return color;
+  } catch {
+    return null;
+  }
 }
 
 // Walk ancestors from `startEl` upward and return the first FULLY OPAQUE
@@ -129,10 +142,6 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
 
   const changed = [];
 
-  const body = doc.body;
-  const hasUserColor = !!body?.classList?.contains?.("fe-msg-bg-usercolor");
-  const hasUserBase = !!(body?.classList?.contains?.("fe-userbg-base-white") || body?.classList?.contains?.("fe-userbg-base-black") || body?.classList?.contains?.("fe-userbg-base-custom"));
-
   // Read phase: collect all computed styles before any writes.
   // Separating reads from writes avoids layout thrashing — each write would otherwise
   // invalidate the layout and force a full recalculation on the next getComputedStyle call.
@@ -147,52 +156,56 @@ export function feFreezeMessageBackgroundsForPrint(win, logEl) {
       const bg = feParseRGBAFromCSS(cs.backgroundColor);
       if (!bg || bg.a <= 0) continue;
 
-      let outR;
-      let outG;
-      let outB;
+      // Composite strictly in paint order, using ONLY what the browser actually rendered:
+      //   backdrop → background-color → background-image (parchment) → inset box-shadow (tint)
+      //
+      // Do NOT re-derive the user-color tint from --fe-user-color-rgb/-alpha. That is what
+      // the old branch did, and it was only correct while `background-color` happened to hold
+      // the opaque base (chat-bg-stripper.css) with the tint in the box-shadow. Under the
+      // retro theme that assumption silently inverts: fe-retro-theme.css is loaded into
+      // layer(layouts) while chat-bg-stripper.css is unlayered, and for `!important`
+      // declarations layer order is REVERSED — so the layered rule wins and paints the tint
+      // straight into `background-color`. The old formula then reduced to an identity
+      //   (bg.r*(1-a) + tint.r*a  where bg.r === tint.r  →  tint.r)
+      // and printed a fully saturated user color instead of a 22%-alpha tint over black.
+      // Reading the rendered result cannot drift with the cascade like that.
+      const backdrop = feResolveBackdropColor(win, el.parentElement);
+      let outR = bg.r * bg.a + backdrop.r * (1 - bg.a);
+      let outG = bg.g * bg.a + backdrop.g * (1 - bg.a);
+      let outB = bg.b * bg.a + backdrop.b * (1 - bg.a);
 
-      if (hasUserColor && hasUserBase && el.classList?.contains?.("fe-has-user-color")) {
-        const tint = feParseRGBTriplet(cs.getPropertyValue("--fe-user-color-rgb"));
-        const alphaRaw = Number(String(cs.getPropertyValue("--fe-user-color-alpha") || rootCS.getPropertyValue("--fe-user-color-alpha") || "0.22").trim());
-        const tintAlpha = Number.isFinite(alphaRaw) ? clampAlpha(alphaRaw) : 0.22;
-        if (tint) {
-          outR = Math.round(bg.r * (1 - tintAlpha) + tint.r * tintAlpha);
-          outG = Math.round(bg.g * (1 - tintAlpha) + tint.g * tintAlpha);
-          outB = Math.round(bg.b * (1 - tintAlpha) + tint.b * tintAlpha);
-        }
+      // Only bake the cream "paper" overlay when it is ACTUALLY part of the
+      // rendered background-image of this message. Applying it unconditionally
+      // (the old behavior) turned solid dark themes into cream-beige at print
+      // time even though the live archive rendered them correctly.
+      const bgImg = String(cs.backgroundImage || "");
+      const hasParchment = /gradient/i.test(bgImg) && bgImg.replace(/\s+/g, "").includes(paperSig);
+
+      if (hasParchment) {
+        const sr = feScreenBlendChannel(outR, paper.r);
+        const sg = feScreenBlendChannel(outG, paper.g);
+        const sb = feScreenBlendChannel(outB, paper.b);
+        outR = outR * (1 - paperAlpha) + sr * paperAlpha;
+        outG = outG * (1 - paperAlpha) + sg * paperAlpha;
+        outB = outB * (1 - paperAlpha) + sb * paperAlpha;
       }
 
-      if (outR == null || outG == null || outB == null) {
-        // Composite the (possibly semi-transparent) message background over the
-        // first opaque ancestor so the baked solid matches what is actually
-        // visible — essential for dark/pixel themes sitting on a black backdrop.
-        const backdrop = feResolveBackdropColor(win, el.parentElement);
-        const baseR = bg.r * bg.a + backdrop.r * (1 - bg.a);
-        const baseG = bg.g * bg.a + backdrop.g * (1 - bg.a);
-        const baseB = bg.b * bg.a + backdrop.b * (1 - bg.a);
-
-        // Only bake the cream "paper" overlay when it is ACTUALLY part of the
-        // rendered background-image of this message. Applying it unconditionally
-        // (the old behavior) turned solid dark themes into cream-beige at print
-        // time even though the live archive rendered them correctly.
-        const bgImg = String(cs.backgroundImage || "");
-        const hasParchment = /gradient/i.test(bgImg) && bgImg.replace(/\s+/g, "").includes(paperSig);
-
-        if (hasParchment) {
-          const sr = feScreenBlendChannel(baseR, paper.r);
-          const sg = feScreenBlendChannel(baseG, paper.g);
-          const sb = feScreenBlendChannel(baseB, paper.b);
-          outR = Math.round(baseR * (1 - paperAlpha) + sr * paperAlpha);
-          outG = Math.round(baseG * (1 - paperAlpha) + sg * paperAlpha);
-          outB = Math.round(baseB * (1 - paperAlpha) + sb * paperAlpha);
-        } else {
-          outR = Math.round(baseR);
-          outG = Math.round(baseG);
-          outB = Math.round(baseB);
-        }
+      // The tint overlay paints above the background layers, and the write phase below
+      // strips box-shadow — so it has to be folded in here or it is simply lost.
+      const shadow = feParseCoveringInsetShadow(win, el, cs);
+      if (shadow) {
+        outR = shadow.r * shadow.a + outR * (1 - shadow.a);
+        outG = shadow.g * shadow.a + outG * (1 - shadow.a);
+        outB = shadow.b * shadow.a + outB * (1 - shadow.a);
       }
 
-      plan.push({ el, outR, outG, outB, prevStyle: el.getAttribute("style") });
+      plan.push({
+        el,
+        outR: Math.round(clampByte(outR)),
+        outG: Math.round(clampByte(outG)),
+        outB: Math.round(clampByte(outB)),
+        prevStyle: el.getAttribute("style"),
+      });
     } catch {
       // ignore
     }

@@ -401,15 +401,27 @@ body.fe-system-msg-color #chat-notifications
 
 /* --------------------------------
  * 1d) Chat header font sizes (Actor + Player name)
- * -------------------------------- */
-#sidebar #chat :is(.chat-message .message-sender .name-stacked .title,
-                   .chat-message .message-sender .title) {
+ * --------------------------------
+ * The ancestor list mirrors 1c above and MUST stay archive-reachable. `#sidebar #chat` exists
+ * only in the live sidebar; the archive shell is #fe-chat-export-sidebar / #fe-chat-export-chat,
+ * so an id-only selector silently skips it and the name sizes fall back to core/system defaults.
+ * That gap used to be masked by feMirrorLiveMessageStyles, which copies the computed font-size
+ * inline for exactly these selectors — but only for messages that still have a live element to
+ * clone, so large logs (no live clone for old messages) rendered them at the wrong size.
+ *
+ * Keeping `#sidebar #chat` INSIDE :is() pins the whole selector at its (2,0,0): :is() takes the
+ * highest specificity among its arguments. The live cascade is therefore unchanged and only the
+ * archive/popout gain a match. */
+:is(#sidebar #chat, #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message .message-sender .name-stacked .title,
+      .chat-message .message-sender .title) {
   font-size: var(--fe-chat-title-size) !important;
   line-height: 1.05;
 }
 
-#sidebar #chat :is(.chat-message .message-sender .name-stacked .subtitle,
-                   .chat-message .message-sender .subtitle) {
+:is(#sidebar #chat, #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message .message-sender .name-stacked .subtitle,
+      .chat-message .message-sender .subtitle) {
   font-size: var(--fe-chat-subtitle-size) !important;
   line-height: 1.05;
 }

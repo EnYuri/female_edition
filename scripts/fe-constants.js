@@ -16,6 +16,7 @@ const S = {
   EXPORT_OPTIMIZE: "ceExportOptimize",
   EXPORT_EMBED_FONTS: "ceExportEmbedFonts",
   EXPORT_EMBED_IMAGES: "ceExportEmbedImages",
+  EXPORT_EXCLUDE_WHISPERS: "ceExportExcludeWhispers",
   EXPORT_PRINT_IMAGE_MODE: "ceExportPrintImageMode",
   EXPORT_DESKTOP_EXTERNAL_MODE: "ceExportDesktopExternalMode",
   CHAT_FONT_CHOICE: "ceChatFontChoice",
@@ -123,6 +124,7 @@ const FE_DEFAULTS = {
   [S.EXPORT_OPTIMIZE]: true,
   [S.EXPORT_EMBED_FONTS]: true,
   [S.EXPORT_EMBED_IMAGES]: true,
+  [S.EXPORT_EXCLUDE_WHISPERS]: false,
   [S.EXPORT_PRINT_IMAGE_MODE]: "downscaleLite",
   [S.EXPORT_DESKTOP_EXTERNAL_MODE]: "button",
   [S.CHAT_FONT_CHOICE]: "cookie",
@@ -234,6 +236,7 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_OPTIMIZE,
   S.EXPORT_EMBED_FONTS,
   S.EXPORT_EMBED_IMAGES,
+  S.EXPORT_EXCLUDE_WHISPERS,
   S.EXPORT_PRINT_IMAGE_MODE,
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
   // 커스텀 폰트 유무 — players opt in individually.

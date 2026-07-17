@@ -465,6 +465,14 @@
     </div>
 
     <div class="form-group">
+      <label>아카이브: 귓속말 제외</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceExportExcludeWhispers" data-dtype="Boolean" {{checked values.ceExportExcludeWhispers}} />
+      </div>
+      <p class="notes">GM은 모든 귓속말을 볼 수 있어, 끄면 GM이 저장한 로그에 비공개 대화가 그대로 포함됩니다. 로그를 공유할 예정이라면 켜세요.</p>
+    </div>
+
+    <div class="form-group">
       <label>PDF/인쇄: 이미지 처리</label>
       <div class="form-fields">
         <select name="ceExportPrintImageMode" data-dtype="String">
