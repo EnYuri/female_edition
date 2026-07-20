@@ -186,7 +186,6 @@ function feStripChatTexturesInWindow(win, rootEl) {
 
 export {
   feSplitBgLayers,
-  feHasOverlayLayer,
   feIsTextureLayer,
   feStripTextureLayers,
   feSanitizeElementBackgroundInWindow,
