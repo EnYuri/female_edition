@@ -307,17 +307,32 @@ function ciDataUrlToBlobUrl(dataUrl) {
 function ciOpenImageInBrowser(src) {
   if (!src) return;
   let url = String(src);
+  let ownedBlobUrl = null;
+  let browserWin = null;
   try {
-    if (url.startsWith("data:")) url = ciDataUrlToBlobUrl(url) || url;
+    if (url.startsWith("data:")) {
+      ownedBlobUrl = ciDataUrlToBlobUrl(url);
+      url = ownedBlobUrl || url;
+    }
     else url = new URL(url, document.baseURI).href;
   } catch {}
   try {
-    // noopener 를 쓰면 명세상 성공해도 null 을 반환해 차단 감지가 불가능하다.
-    // 대상은 스크립트 없는 이미지 파일이라 opener 악용 위험이 없으므로 생략하고,
-    // null = 팝업 차단으로 정확히 판정한다.
-    const win = window.open(url, "_blank");
-    if (!win) ui?.notifications?.warn?.("팝업이 차단되어 새 창을 열 수 없습니다.");
+    // Open a same-origin blank page first so popup blocking remains detectable,
+    // sever its access to the Foundry window, then navigate to the image URL.
+    browserWin = window.open("about:blank", "_blank");
+    if (!browserWin) {
+      if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
+      ui?.notifications?.warn?.("팝업이 차단되어 새 창을 열 수 없습니다.");
+      return;
+    }
+    browserWin.opener = null;
+    browserWin.location.replace(url);
+    // The new document only needs the object URL while loading. Delay revocation
+    // enough for large embedded images and slow local clients to finish.
+    if (ownedBlobUrl) setTimeout(() => URL.revokeObjectURL(ownedBlobUrl), 60_000);
   } catch {
+    try { browserWin?.close?.(); } catch { /* no-op */ }
+    if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
     ui?.notifications?.warn?.("새 창을 열 수 없습니다.");
   }
 }

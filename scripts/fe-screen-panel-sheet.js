@@ -358,11 +358,11 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   /**
    * The default AppV2 auto-submit (`form.submitOnChange`) only carries values
-   * for fields that have a named `<input>`/`<select>` in the DOM — face
-   * name/img/description and overlay attr/text/fontSize/color. Overlay x/y and
-   * linkedActorUuid have NO corresponding input (they are JS-driven via
-   * click-to-place/drag/drop). Merging that partial object onto the document is
-   * unsafe for two compounding reasons:
+   * for fields that have a named `<input>`/`<select>` in the DOM. Several face
+   * and overlay fields are JS-driven rather than visibly editable; without the
+   * hidden inputs in screen-panel-sheet.hbs they would be absent from the
+   * submitted ArrayField elements. Merging such a partial object onto the
+   * document is unsafe for two compounding reasons:
    *  1. `document.update()` itself does not merge partial ArrayField elements —
    *     untouched sibling fields reset to schema defaults (documented on
    *     `#updateOverlayPos` below).
@@ -370,8 +370,8 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    *     `this.document.validate({changes, clean: {copy: false}})` BEFORE
    *     `_processSubmitData` ever runs. `copy:false` means that clean() pass
    *     mutates the partial `changes` object IN PLACE, filling in schema
-   *     defaults for whatever fields are "missing" from each overlay (x, y,
-   *     linkedActorUuid) — so by the time `_processSubmitData` sees the data,
+   *     defaults for whatever fields are "missing" from each face/overlay — so
+   *     by the time `_processSubmitData` sees the data,
    *     the defaults are already baked in as if they had been submitted.
    *     Overriding `_processSubmitData` alone (tried first; did not work) is
    *     too late to prevent this.

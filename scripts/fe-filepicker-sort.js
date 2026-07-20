@@ -30,9 +30,24 @@ function setDir(key, v) { localStorage.setItem(LS_DIR(key), v); }
 
 // ─── 파일 메타데이터 (HEAD 요청, 동시성 제한, 캐시) ──────────────────────────
 const _metaCache = new Map();   // url → {size, mtime} | Promise<{size,mtime}>
+const _META_CACHE_MAX = 512;
 const _MAX_CONCURRENT = 8;
 let _active = 0;
 const _queue = [];
+
+function _getCachedMeta(url) {
+  if (!_metaCache.has(url)) return null;
+  const value = _metaCache.get(url);
+  _metaCache.delete(url);
+  _metaCache.set(url, value);
+  return value;
+}
+
+function _setCachedMeta(url, value) {
+  _metaCache.delete(url);
+  _metaCache.set(url, value);
+  while (_metaCache.size > _META_CACHE_MAX) _metaCache.delete(_metaCache.keys().next().value);
+}
 
 function _pump() {
   while (_active < _MAX_CONCURRENT && _queue.length) {
@@ -43,7 +58,7 @@ function _pump() {
 }
 
 function _fetchMeta(url) {
-  const cached = _metaCache.get(url);
+  const cached = _getCachedMeta(url);
   if (cached) return Promise.resolve(cached); // 값이든 Promise든 그대로 await 가능
   const p = new Promise(resolve => {
     _queue.push(() => fetch(url, { method: "HEAD" }).then(r => {
@@ -51,7 +66,7 @@ function _fetchMeta(url) {
       const lm = r.headers.get("last-modified");
       const mtime = lm ? (Date.parse(lm) || 0) : 0;
       const m = { size, mtime };
-      _metaCache.set(url, m);
+      if (_metaCache.get(url) === p) _setCachedMeta(url, m);
       resolve(m);
     }).catch(() => {
       // 실패(CORS/네트워크) → 이번 정렬에선 0 처리(뒤로 밀림)하되, 영구 캐시하지 않는다.
@@ -61,7 +76,7 @@ function _fetchMeta(url) {
     }));
     _pump();
   });
-  _metaCache.set(url, p);
+  _setCachedMeta(url, p);
   return p;
 }
 
@@ -94,7 +109,10 @@ async function _applySort(element) {
 
   // date / size — 메타데이터 필요
   ul.classList.add("fe-fp-sorting");
-  await Promise.all(lis.map(li => _fetchMeta(li.dataset.path)));
+  const fetched = await Promise.all(lis.map(async li => [li.dataset.path, await _fetchMeta(li.dataset.path)]));
+  // Keep this sort pass complete even when a very large directory exceeds the
+  // bounded cross-directory LRU cache.
+  const passMeta = new Map(fetched);
   if (!ul.isConnected) return; // 그 사이 폴더 이동/재렌더 → 이 ul 은 폐기됨
   ul.classList.remove("fe-fp-sorting");
 
@@ -104,7 +122,7 @@ async function _applySort(element) {
   if (k2 === "name") { _reorder(ul, cur, _cmpName, d2); return; }
   const field = k2 === "date" ? "mtime" : "size";
   _reorder(ul, cur, (a, b) =>
-    ((_metaCache.get(a.dataset.path)?.[field]) || 0) - ((_metaCache.get(b.dataset.path)?.[field]) || 0), d2);
+    ((passMeta.get(a.dataset.path)?.[field]) || 0) - ((passMeta.get(b.dataset.path)?.[field]) || 0), d2);
 }
 
 // ─── 컨트롤 주입 / 갱신 ──────────────────────────────────────────────────────

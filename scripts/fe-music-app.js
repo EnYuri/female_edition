@@ -202,6 +202,7 @@ export async function resendMissingChunks({ uploadId, missing, attempt }) {
     game.socket.emit(MUSIC_SOCKET, {
       type: MUSIC_MSG.UP_CHUNK,
       uploadId,
+      fromUserId: game.user.id,
       index: idx,
       data: buf
     });
@@ -544,6 +545,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
       game.socket.emit(MUSIC_SOCKET, {
         type: MUSIC_MSG.UP_CHUNK,
         uploadId,
+        fromUserId: game.user.id,
         index: i,
         data: buf,
       });

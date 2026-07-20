@@ -27,6 +27,7 @@ import {
   feIsRoundMarkerMessage,
   feEscapeHTML,
 } from "./fe-chat-enhance.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 
 // Chat portrait: ensure exported/archive-rendered messages receive the same portrait injection.
 import {
@@ -40,6 +41,26 @@ import {
   feFreezeMessageBackgroundsForPrint,
   feDownscaleImagesForPrint,
 } from "./fe-archive-image.js";
+import {
+  feOptimizeArchiveNodeImages,
+  feMirrorLiveMessageStyles,
+} from "./fe-archive-clone.js";
+import {
+  feRestoreOriginalPortraitSources,
+  feRestorePrintBlobSources,
+  fePatchInlineFontFamiliesForExport,
+  feInjectExportFontReadyBootstrap,
+  feWaitForFonts,
+  feArchiveIsWhisperMessage,
+  feCanUserSeeChatMessage,
+  feNormalizeExportNode,
+  feNormalizeArchiveShellLayout,
+  fePrepareArchiveImagesForOutput,
+  feNormalizeArchiveMessageLayout,
+  feIsElement,
+  feNextTick,
+  feWaitForImages,
+} from "./fe-archive-output.js";
 
 // ===========================================================================
 // Constants
@@ -61,7 +82,6 @@ const FE_EXPORT_RENDER_CONCURRENCY_LARGE = 4;
 const FE_EXPORT_RENDER_CONCURRENCY_HUGE = 2;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_LARGE = 40;
 const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
-const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
 // Matches a browser's own per-host connection limit — more in-flight fetches would just
 // queue in the network stack while holding decoded blobs alive in JS.
 const FE_EXPORT_EMBED_CONCURRENCY = 6;
@@ -1124,7 +1144,7 @@ async function feFetchAllChatMessagesFromDatabase() {
   try {
     const docClass = game?.messages?.documentClass || CONFIG?.ChatMessage?.documentClass || foundry?.documents?.ChatMessage || globalThis.ChatMessage?.implementation || globalThis.ChatMessage;
     const backend = docClass?.database;
-    if (!docClass || !backend?.get) return [];
+    if (!docClass || !backend?.get) return { rows: [], docClass: null };
     // The public v13 API defines the third argument as the requesting User
     // document. v14 continues to accept that argument (and its client get
     // path does not require a private context object). Passing `{userId}` here
@@ -1430,99 +1450,6 @@ function feFireArchiveRenderUpdated(targetDoc, logEl) {
   }
 }
 
-// ===========================================================================
-// Image Registry & Deduplication
-// ===========================================================================
-
-function feArchiveGetImageSourceKey(img, baseHref = null) {
-  try {
-    const raw = img?.getAttribute?.("src") || img?.currentSrc || img?.src || "";
-    if (!raw) return "";
-    if (/^(?:data:|blob:)/i.test(raw)) return raw;
-    return new URL(raw, baseHref || img?.ownerDocument?.baseURI || document.baseURI).href;
-  } catch {
-    return String(img?.getAttribute?.("src") || img?.currentSrc || img?.src || "");
-  }
-}
-
-function feArchiveIsProtectedImage(img) {
-  try {
-    if (!img) return true;
-    // dnd5e item card header icons only — small UI ornaments inside card frames.
-    // Avatars, portraits, and small images are no longer protected: A-1/A-2
-    // dedup now handles them across messages and small icons benefit the most
-    // from collapsing.
-    if (img.closest?.('.chat-card .card-header, .midi-chat-card .card-header, .dnd5e.chat-card .card-header, .dnd5e2.chat-card .card-header')) return true;
-  } catch {
-    /* no-op */
-  }
-  return false;
-}
-
-function feArchiveShouldCollapseDuplicateImage(img, renderProfile = null) {
-  try {
-    if (!renderProfile?.collapseDuplicateImages) return false;
-    const src = feArchiveGetImageSourceKey(img);
-    if (!src || /^(?:data:|blob:)/i.test(src)) return false;
-    if (feArchiveIsProtectedImage(img)) return false;
-    if (renderProfile?.collapseDuplicateImagesAggressive) return true;
-    if (img.classList?.contains("ci-message-image")) return true;
-    if (img.closest?.('.chat-images-container, .ci-message-image, .message-content, figure, .editor-content')) return true;
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-
-function fePrepareArchiveSharedImage(img, src, occurrence = 2) {
-  try {
-    if (!img || !src) return;
-    img.classList?.add?.("fe-archive-shared-image");
-    img.dataset.feArchiveSharedImage = "1";
-    img.dataset.feArchiveSharedSrc = src;
-    img.dataset.feArchiveSharedOccurrence = String(Math.max(2, Number(occurrence) || 2));
-    img.setAttribute("src", src);
-    img.removeAttribute("srcset");
-    if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
-    if (!img.getAttribute("decoding")) img.setAttribute("decoding", "async");
-
-    const label = String(img.getAttribute("title") || img.getAttribute("alt") || "").trim();
-    const suffix = occurrence > 1 ? ` (shared ×${occurrence})` : "";
-    if (label) img.setAttribute("title", `${label}${suffix}`);
-    else img.setAttribute("title", `shared image${suffix}`);
-  } catch {
-    /* no-op */
-  }
-}
-
-function feOptimizeArchiveNodeImages(rootEl, { targetDoc = document, renderProfile = null, imageRegistry = null } = {}) {
-  try {
-    if (!imageRegistry || !renderProfile?.collapseDuplicateImages || !rootEl?.querySelectorAll) return 0;
-    let collapsed = 0;
-    const imgs = Array.from(rootEl.querySelectorAll('img[src]'));
-    for (const img of imgs) {
-      if (!feArchiveShouldCollapseDuplicateImage(img, renderProfile)) continue;
-      const srcKey = feArchiveGetImageSourceKey(img, targetDoc?.baseURI || rootEl?.ownerDocument?.baseURI || document.baseURI);
-      if (!srcKey || /^(?:data:|blob:)/i.test(srcKey)) continue;
-
-      const entry = imageRegistry.get(srcKey) ?? { count: 0 };
-      entry.count += 1;
-      imageRegistry.set(srcKey, entry);
-      if (entry.count <= FE_ARCHIVE_DUPLICATE_IMAGE_KEEP) continue;
-
-      try {
-        fePrepareArchiveSharedImage(img, srcKey, entry.count);
-        collapsed += 1;
-      } catch {
-        /* no-op */
-      }
-    }
-    return collapsed;
-  } catch {
-    return 0;
-  }
-}
 
 // ===========================================================================
 // Message Rendering Pipeline  (batch render, live-clone, system render, fallback)
@@ -3745,149 +3672,6 @@ function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false } = {}) {
   };
 }
 
-function feRestoreOriginalPortraitSources(root) {
-  const changed = [];
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    const imgs = root.querySelectorAll('img.fe-chat-portrait, img.chat-portrait-message-portrait, img[data-fe-portrait-orig-src]');
-    for (const img of imgs) {
-      const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.('data-fe-portrait-orig-src') || '';
-      if (!orig) continue;
-      const prevSrc = img.getAttribute('src');
-      const prevSrcset = img.getAttribute('srcset');
-      const prevLoading = img.getAttribute('loading');
-      if (prevSrc === orig && !prevSrcset) continue;
-      changed.push({ img, prevSrc, prevSrcset, prevLoading });
-      img.setAttribute('src', orig);
-      img.removeAttribute('srcset');
-      img.setAttribute('loading', 'eager');
-    }
-  } catch {}
-  return () => {
-    for (const it of changed) {
-      try {
-        if (it.prevSrc == null) it.img.removeAttribute('src');
-        else it.img.setAttribute('src', it.prevSrc);
-        if (it.prevSrcset == null) it.img.removeAttribute('srcset');
-        else it.img.setAttribute('srcset', it.prevSrcset);
-        if (it.prevLoading == null) it.img.removeAttribute('loading');
-        else it.img.setAttribute('loading', it.prevLoading);
-      } catch {}
-    }
-  };
-}
-
-// Reverts blob: URLs (set by feDownscaleImagesForPrint when useBlobURL=true) back to
-// the original src stashed on data-fe-print-orig-src. Used by HTML snapshot paths
-// so saved HTML never contains blob: URLs that would die with the popup window.
-function feRestorePrintBlobSources(root) {
-  const changed = [];
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    const imgs = root.querySelectorAll('img[data-fe-print-orig-src]');
-    for (const img of imgs) {
-      const orig = img.dataset?.fePrintOrigSrc || img.getAttribute?.('data-fe-print-orig-src') || '';
-      if (!orig) continue;
-      const prevSrc = img.getAttribute('src');
-      const prevSrcset = img.getAttribute('srcset');
-      if (prevSrc === orig && !prevSrcset) continue;
-      changed.push({ img, prevSrc, prevSrcset });
-      img.setAttribute('src', orig);
-      img.removeAttribute('srcset');
-    }
-  } catch {}
-  return () => {
-    for (const it of changed) {
-      try {
-        if (it.prevSrc == null) it.img.removeAttribute('src');
-        else it.img.setAttribute('src', it.prevSrc);
-        if (it.prevSrcset == null) it.img.removeAttribute('srcset');
-        else it.img.setAttribute('srcset', it.prevSrcset);
-      } catch {}
-    }
-  };
-}
-
-function fePatchInlineFontFamiliesForExport(root) {
-  const changed = [];
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    for (const el of root.querySelectorAll('[style]')) {
-      let ff = '';
-      try {
-        ff = el.style.getPropertyValue('font-family') || '';
-      } catch {}
-      if (!ff) continue;
-
-      let next = ff;
-      if (/FE\s+Geurimilgi/i.test(next)) {
-        next = next.replace(/"?FE\s+Geurimilgi(?:\s+Embedded)?"?/gi, '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, sans-serif');
-      }
-      if (/FE\s+CookieRun/i.test(next) && !/FE\s+CookieRun\s+Embedded/i.test(next)) {
-        next = next.replace(/FE\s+CookieRun/gi, '"FE CookieRun Embedded", "FE CookieRun"');
-      }
-      if (!/FE\s+CookieRun\s+Embedded/i.test(next) && !/FE\s+Geurimilgi\s+Embedded/i.test(next) && /\bSignika\b/i.test(next)) {
-        next = '"FE CookieRun Embedded", "FE CookieRun", ' + next;
-      }
-      if (next === ff) continue;
-
-      const prev = ff;
-      const prevPriority = el.style.getPropertyPriority('font-family');
-      changed.push({ el, prev, prevPriority });
-      el.style.setProperty('font-family', next, 'important');
-    }
-  } catch {}
-  return () => {
-    for (const it of changed) {
-      try {
-        if (it.prev) it.el.style.setProperty('font-family', it.prev, it.prevPriority || '');
-        else it.el.style.removeProperty('font-family');
-      } catch {}
-    }
-  };
-}
-
-function feInjectExportFontReadyBootstrap(headClone, doc) {
-  try {
-    const styleEl = doc.createElement('style');
-    styleEl.id = 'fe-export-font-ready-gate';
-    styleEl.textContent = 'html.fe-fonts-loading #fe-chat-export-container{visibility:hidden !important;}';
-    headClone.appendChild(styleEl);
-
-    const scriptEl = doc.createElement('script');
-    scriptEl.id = 'fe-export-font-ready-script';
-    scriptEl.textContent = `(function(){try{document.documentElement.classList.add("fe-fonts-loading");var done=function(){try{document.documentElement.classList.remove("fe-fonts-loading");}catch(_e){}};if(document.fonts&&document.fonts.ready){Promise.race([document.fonts.ready,new Promise(function(resolve){setTimeout(resolve,5000);})]).then(done,done);}else{done();}}catch(_err){}})();`;
-    headClone.appendChild(scriptEl);
-  } catch {}
-}
-
-async function feWaitForFonts(doc, timeoutMs = FE_EXPORT_WAIT_FONTS_TIMEOUT) {
-  try {
-    const fonts = doc?.fonts;
-    if (!fonts?.ready) return;
-
-    const loads = [fonts.ready.catch(() => {})];
-    const families = [
-      '400 16px "FE CookieRun Embedded"',
-      '700 16px "FE CookieRun Embedded"',
-      '900 16px "FE CookieRun Embedded"',
-      '400 16px "FE Geurimilgi Embedded"',
-      '400 16px "FE CookieRun"',
-      '700 16px "FE CookieRun"',
-      '400 16px "FE Geurimilgi"',
-    ];
-    for (const spec of families) {
-      try {
-        loads.push(fonts.load(spec, '가나다ABC123').catch(() => {}));
-      } catch {}
-    }
-
-    await Promise.race([
-      Promise.all(loads),
-      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
-    ]);
-  } catch {}
-}
 
 // ---------------------------------------------------------------------------
 // Inline Export — download from current (non-popup) document
@@ -3958,244 +3742,6 @@ function feApplyChatMergeInWindow(win) {
   }
 }
 
-const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
-  "color",
-  "background-color",
-  "background-image",
-  "background-size",
-  "background-position",
-  "background-repeat",
-  "background-blend-mode",
-  "border",
-  "border-color",
-  "border-style",
-  "border-width",
-  "border-top",
-  "border-right",
-  "border-bottom",
-  "border-left",
-  "border-radius",
-  "box-shadow",
-  "outline",
-  "outline-color",
-  "outline-style",
-  "outline-width",
-  "filter",
-  "opacity",
-  "display",
-  "padding",
-  "margin",
-  "align-items",
-  "justify-content",
-  "align-self",
-  "justify-self",
-  "justify-items",
-  "align-content",
-  "place-items",
-  "place-content",
-  "grid-template-columns",
-  "grid-template-rows",
-  "grid-template-areas",
-  "grid-auto-columns",
-  "grid-auto-rows",
-  "grid-auto-flow",
-  "grid-area",
-  "grid-column",
-  "grid-column-start",
-  "grid-column-end",
-  "grid-row",
-  "grid-row-start",
-  "grid-row-end",
-  "gap",
-  "column-gap",
-  "row-gap",
-  "white-space",
-  "overflow",
-  "text-overflow",
-  "position",
-  "top",
-  "right",
-  "bottom",
-  "left",
-  "z-index",
-  "width",
-  "height",
-  "min-width",
-  "min-height",
-  "max-width",
-  "max-height",
-  "box-sizing",
-  "flex",
-  "flex-direction",
-  "flex-wrap",
-  "flex-grow",
-  "flex-shrink",
-  "flex-basis",
-  "transform",
-  "transform-origin",
-  "translate",
-  "scale",
-  "rotate",
-  "vertical-align",
-];
-
-const FE_ARCHIVE_TEXT_STYLE_PROPS = [
-  "color",
-  "font-family",
-  "font-size",
-  "font-style",
-  "font-weight",
-  "line-height",
-  "letter-spacing",
-  "text-shadow",
-  "text-transform",
-  "text-align",
-  "white-space",
-];
-
-const FE_ARCHIVE_FIXED_SIZE_PROPS = ["width", "height", "min-width", "min-height", "max-width", "max-height"];
-const FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_CONTAINER_STYLE_PROPS.filter((p) => !FE_ARCHIVE_FIXED_SIZE_PROPS.includes(p));
-const FE_ARCHIVE_TREE_STYLE_PROPS = Array.from(new Set([
-  ...FE_ARCHIVE_CONTAINER_STYLE_PROPS,
-  ...FE_ARCHIVE_TEXT_STYLE_PROPS,
-]));
-const FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE = Array.from(new Set([
-  ...FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE,
-  ...FE_ARCHIVE_TEXT_STYLE_PROPS,
-]));
-const FE_ARCHIVE_CARD_TREE_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
-const FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
-const FE_ARCHIVE_MIXED_STYLE_PROPS = FE_ARCHIVE_TREE_STYLE_PROPS;
-const FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
-const FE_ARCHIVE_TREE_MAX_SIMPLE = 72;
-const FE_ARCHIVE_TREE_MAX_PORTRAIT = 112;
-const FE_ARCHIVE_TREE_MAX_COMPLEX = 260;
-
-function feGetArchiveTreeMirrorBudget(liveEl) {
-  try {
-    const hasCard = !!liveEl?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .details.card-content, .details.collapsible-content.card-content');
-    if (hasCard) return FE_ARCHIVE_TREE_MAX_COMPLEX;
-    const hasPortraitHeader = !!liveEl?.classList?.contains?.('fe-has-chat-portrait');
-    if (hasPortraitHeader) return FE_ARCHIVE_TREE_MAX_PORTRAIT;
-  } catch {
-    /* no-op */
-  }
-  return FE_ARCHIVE_TREE_MAX_SIMPLE;
-}
-
-function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
-  try {
-    if (!srcEl || !dstEl) return;
-    const view = srcEl?.ownerDocument?.defaultView ?? window;
-    const cs = view.getComputedStyle?.(srcEl);
-    if (!cs) return;
-    for (const prop of propNames) {
-      const value = cs.getPropertyValue?.(prop);
-      if (!value) continue;
-      dstEl.style.setProperty(prop, value.trim());
-    }
-  } catch {
-    /* no-op */
-  }
-}
-
-function feSelectScoped(root, selector) {
-  try {
-    if (!root) return [];
-    if (selector === ":scope") return [root];
-    return Array.from(root.querySelectorAll?.(selector) ?? []);
-  } catch {
-    return [];
-  }
-}
-
-
-function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80, propNames = FE_ARCHIVE_TREE_STYLE_PROPS } = {}) {
-  try {
-    if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
-    const liveDoc = liveEl.ownerDocument ?? document;
-    const cloneDoc = cloneEl.ownerDocument ?? document;
-    const liveWalker = liveDoc.createTreeWalker(liveEl, NodeFilter.SHOW_ELEMENT);
-    const cloneWalker = cloneDoc.createTreeWalker(cloneEl, NodeFilter.SHOW_ELEMENT);
-
-    let liveNode = liveWalker.currentNode;
-    let cloneNode = cloneWalker.currentNode;
-    let count = 0;
-
-    while (liveNode && cloneNode && count < maxNodes) {
-      feCopyComputedStyleSubset(liveNode, cloneNode, propNames);
-      liveNode = liveWalker.nextNode();
-      cloneNode = cloneWalker.nextNode();
-      count += 1;
-    }
-  } catch {
-    /* no-op */
-  }
-}
-
-function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {}) {
-  try {
-    if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
-
-    const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
-    const lean = !!renderProfile?.lean;
-    const mirrorTree = renderProfile?.mirrorTree !== false;
-    const mirrorCardTree = renderProfile?.mirrorCardTree !== false;
-
-    // First, mirror a broad-but-safe subset of computed styles across the cloned tree.
-    // For complex chat cards (notably midi-qol), preserve more layout properties so saved HTML/PDF
-    // stays close to the live sidebar rendering even without the full live stylesheet environment.
-    if (mirrorTree && (!hasCard || mirrorCardTree)) {
-      feMirrorLiveTreeStyles(liveEl, cloneEl, {
-        maxNodes: feGetArchiveTreeMirrorBudget(liveEl),
-        propNames: hasCard ? FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE : FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE,
-      });
-    }
-
-    const sync = (selector, props) => {
-      const srcList = feSelectScoped(liveEl, selector);
-      const dstList = feSelectScoped(cloneEl, selector);
-      const n = Math.min(srcList.length, dstList.length);
-      for (let i = 0; i < n; i++) feCopyComputedStyleSubset(srcList[i], dstList[i], props);
-    };
-
-    sync(":scope", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-header .message-sender", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-header .message-sender .name-stacked", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-header .message-sender .name-stacked .title, :scope > .message-header .message-sender .title", FE_ARCHIVE_TEXT_STYLE_PROPS);
-    sync(":scope > .message-header .message-sender .name-stacked .subtitle, :scope > .message-header .message-sender .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
-    sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
-    sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
-
-    if (hasCard) {
-      sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-      sync(":scope .chat-card .card-header, :scope .midi-chat-card .card-header, :scope .dnd5e.chat-card .card-header, :scope .dnd5e2.chat-card .card-header", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-      sync(":scope .chat-card .card-content, :scope .midi-chat-card .card-content, :scope .dnd5e.chat-card .card-content, :scope .dnd5e2.chat-card .card-content, :scope .details.card-content, :scope .details.collapsible-content.card-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-      sync(":scope .chat-card .name-stacked .title, :scope .midi-chat-card .name-stacked .title, :scope .chat-card .name-stacked .subtitle, :scope .midi-chat-card .name-stacked .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
-      sync(":scope .chat-card button, :scope .midi-chat-card button, :scope .dnd5e.chat-card button, :scope .dnd5e2.chat-card button, :scope .chat-card .pill, :scope .midi-chat-card .pill", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);
-      const midiSelector = lean
-        ? ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target)"
-        : ":scope .midi-chat-card :is(.dice-roll, .dice-result, .dice-formula, .dice-tooltip, .dice-total, .dice-flavor, .dice-target, .dice-targets, .targets, .target, [class*=\"midi\"], [class*=\"roll\"], [class*=\"damage\"], [class*=\"attack\"] )";
-      sync(midiSelector, lean ? FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE : FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE);
-    }
-
-    const isNarratorLike = !!(liveEl.classList?.contains?.("narrator-chat") || liveEl.classList?.contains?.("fe-narrator-chat"));
-    const isRoundMarkerLike = !!(
-      liveEl.classList?.contains?.("round-marker") ||
-      liveEl.classList?.contains?.("fe-round-marker-chat") ||
-      liveEl.dataset?.feIsRoundMarker === "1" ||
-      liveEl.querySelector?.(".round-marker")
-    );
-    if (isNarratorLike || isRoundMarkerLike) {
-      sync(":scope, :scope > .message-header, :scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
-      sync(":scope .message-content, :scope .round-marker", FE_ARCHIVE_TEXT_STYLE_PROPS);
-    }
-  } catch {
-    /* no-op */
-  }
-}
 
 // ===========================================================================
 // Layout Normalization  (visibility, export node prep, shell/message layout,
@@ -4213,282 +3759,6 @@ function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {
 // `liveEl` is a fallback for the harvest-only path, where a rendered <li> may be all we
 // have (no ChatMessage document). Both core and feFallbackRenderChatMessage put the
 // `whisper` class on whispered messages.
-function feArchiveIsWhisperMessage(msg, liveEl = null) {
-  try {
-    const whisper = msg?.whisper;
-    if (Array.isArray(whisper) && whisper.length) return true;
-    if (!msg && feIsElement(liveEl)) return !!liveEl.classList?.contains?.("whisper");
-  } catch {
-    /* no-op */
-  }
-  return false;
-}
-
-// A ChatMessage *document* exposes `author` as a User document, so `.id` reads the user id.
-// A raw DB *row* stores the same field as a plain user-id string (pre-v13 rows use `user`).
-// Since the archive now filters raw rows before materializing them, both shapes reach the
-// predicate below — reading `.id` off a string would silently yield undefined and drop the
-// author's own whispers from their export.
-function feMessageAuthorId(msg) {
-  const author = msg?.author ?? msg?.user;
-  if (!author) return null;
-  return typeof author === "string" ? author : (author.id ?? null);
-}
-
-function feCanUserSeeChatMessage(msg, user) {
-  try {
-    if (!msg) return false;
-
-    // Whispers: visible to GM and recipients (and the author).
-    const whisper = msg.whisper ?? [];
-    if (Array.isArray(whisper) && whisper.length) {
-      if (user?.isGM) return true;
-      if (whisper.includes(user?.id)) return true;
-      const authorId = feMessageAuthorId(msg);
-      if (authorId && authorId === user?.id) return true;
-      return false;
-    }
-
-    // Hidden messages are still visible to GMs.
-    if (msg.hidden && !user?.isGM) return false;
-
-    return true;
-  } catch {
-    return true;
-  }
-}
-
-function feNormalizeExportNode(rootEl, { loading = "eager", decoding = "sync" } = {}) {
-  try {
-    const baseHref = rootEl?.ownerDocument?.baseURI || window.location.href;
-
-    // Normalize image URLs to absolute so print reliably loads them
-    for (const img of rootEl.querySelectorAll("img")) {
-      const src = img.getAttribute("src");
-      if (!src) continue;
-      try {
-        img.src = new URL(src, baseHref).href;
-      } catch {}
-      // Keep archive rendering memory-friendly for large logs.
-      if (!img.getAttribute("loading")) img.setAttribute("loading", loading || "eager");
-      if (!img.getAttribute("decoding")) img.setAttribute("decoding", decoding || "sync");
-    }
-
-    // Normalize anchor URLs too
-    for (const a of rootEl.querySelectorAll("a[href]")) {
-      const href = a.getAttribute("href");
-      if (!href) continue;
-      try {
-        a.href = new URL(href, baseHref).href;
-      } catch {}
-      a.setAttribute("target", "_blank");
-      a.setAttribute("rel", "noopener");
-    }
-  } catch {}
-}
-
-function feNormalizeArchiveShellLayout(doc, { restore = false } = {}) {
-  const changed = [];
-  try {
-    if (!doc?.querySelectorAll) return () => {};
-    const targets = [
-      doc.getElementById?.("fe-chat-export-container"),
-      doc.getElementById?.("fe-chat-export-sidebar"),
-      doc.getElementById?.("fe-chat-export-chat"),
-      doc.getElementById?.("fe-chat-export-log"),
-      doc.getElementById?.("sidebar"),
-      doc.getElementById?.("chat"),
-      doc.getElementById?.("chat-log"),
-    ].filter(Boolean);
-    for (const el of targets) {
-      try {
-        const prevStyle = restore ? el.getAttribute("style") : null;
-        if (restore) changed.push({ el, prevStyle });
-        el.style.setProperty("display", "block", "important");
-        el.style.setProperty("width", "100%", "important");
-        el.style.setProperty("inline-size", "100%", "important");
-        el.style.setProperty("min-width", "0", "important");
-        el.style.setProperty("min-inline-size", "0", "important");
-        el.style.setProperty("max-width", "none", "important");
-        el.style.setProperty("max-inline-size", "none", "important");
-        el.style.setProperty("flex", "none", "important");
-        el.style.setProperty("flex-basis", "auto", "important");
-        el.style.setProperty("overflow", "visible", "important");
-        el.style.setProperty("height", "auto", "important");
-        el.style.setProperty("max-height", "none", "important");
-      } catch {
-        /* no-op */
-      }
-    }
-  } catch {
-    /* no-op */
-  }
-  return () => {
-    for (let i = changed.length - 1; i >= 0; i -= 1) {
-      const it = changed[i];
-      try {
-        if (it.prevStyle == null) it.el.removeAttribute("style");
-        else it.el.setAttribute("style", it.prevStyle);
-      } catch {
-        /* no-op */
-      }
-    }
-  };
-}
-
-function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true, decoding = "sync" } = {}) {
-  try {
-    if (!rootEl?.querySelectorAll) return;
-    if (restorePortraits) {
-      try {
-        feRestoreOriginalPortraitSources(rootEl);
-      } catch {}
-    }
-    // decoding:
-    //  · "sync"  — originals will be printed as-is; force decode before win.print().
-    //  · "async" — originals are about to be replaced by downscaled blobs, so a
-    //              main-thread sync-decode storm is pure waste (and jank on large
-    //              logs). Let Chromium decode off-thread; canvas drawImage still
-    //              forces the decode it actually needs, one group at a time.
-    const wantSync = decoding !== "async";
-    for (const img of rootEl.querySelectorAll("img")) {
-      try {
-        img.setAttribute("loading", "eager");
-        const cur = img.getAttribute("decoding");
-        if (wantSync) {
-          if (!cur || cur === "async") img.setAttribute("decoding", "sync");
-        } else if (cur === "sync") {
-          img.setAttribute("decoding", "async");
-        }
-      } catch {
-        /* no-op */
-      }
-    }
-  } catch {
-    /* no-op */
-  }
-}
-
-function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {
-  const changed = [];
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    const targets = [];
-    const push = (el) => {
-      if (el && !targets.includes(el)) targets.push(el);
-    };
-    const messages = root.matches?.("li.chat-message") ? [root] : Array.from(root.querySelectorAll("li.chat-message"));
-    for (const msg of messages) {
-      push(msg);
-      push(msg.querySelector?.(":scope > .message-header"));
-      push(msg.querySelector?.(":scope > .message-content"));
-      push(msg.querySelector?.(":scope > .message-header .message-sender"));
-      push(msg.querySelector?.(":scope > .message-header .message-flavor"));
-      push(msg.querySelector?.(":scope > .message-header .flavor-text"));
-      push(msg.querySelector?.(":scope > .message-header .message-metadata"));
-      // NOTE: .dice-roll INTERNALS (.dice-result/.dice-formula/.dice-tooltip) are
-      // intentionally NOT listed here. Core renders the dice card as a self-contained
-      // flex-column + grid widget (the tooltip collapses via grid-template-rows:0fr).
-      // Forcing width:100%/height:auto/flex:none onto those internals breaks the
-      // collapse and makes the hidden die-breakdown overflow and overlap the
-      // formula/total. The outer .dice-roll is still matched via ".message-content > *"
-      // / ".card-content > *", so its width handling is preserved while the internal
-      // layout is left to core CSS.
-      for (const el of msg.querySelectorAll?.(":scope > .message-content > *, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content, .card-content > *, .details.card-content > *, .details.collapsible-content.card-content > *, .dice-roll") || []) push(el);
-    }
-
-    for (const el of targets) {
-      try {
-        const prevStyle = restore ? el.getAttribute("style") : null;
-        if (restore) changed.push({ el, prevStyle });
-        const isMessage = el.classList?.contains?.("chat-message");
-        const isHeader = el.classList?.contains?.("message-header");
-        const isContent = el.classList?.contains?.("message-content");
-        const isPlainContent = el.classList?.contains?.("fe-archive-standard-content");
-        const isCard = el.classList?.contains?.("chat-card") || el.classList?.contains?.("midi-chat-card") || el.classList?.contains?.("card-header") || el.classList?.contains?.("card-content") || el.classList?.contains?.("dice-roll") || el.classList?.contains?.("dice-result") || el.classList?.contains?.("dice-formula") || el.classList?.contains?.("dice-tooltip");
-        const tag = String(el.tagName || '').toUpperCase();
-        const isStructural = ["DIV", "SECTION", "ARTICLE", "ASIDE", "NAV", "FORM", "TABLE", "FIELDSET"].includes(tag);
-        const isMedia = ["IMG", "VIDEO", "CANVAS", "SVG"].includes(tag);
-        const isWideContainer = isMessage || isHeader || isContent || isCard || isStructural;
-        el.style.setProperty("max-width", "none", "important");
-        el.style.setProperty("max-inline-size", "none", "important");
-        if (isWideContainer) {
-          if (isMessage) {
-            el.style.setProperty("display", "block", "important");
-            el.style.setProperty("width", "100%", "important");
-            el.style.setProperty("inline-size", "100%", "important");
-            el.style.setProperty("min-width", "0", "important");
-            el.style.setProperty("min-inline-size", "0", "important");
-            el.style.setProperty("height", "auto", "important");
-            el.style.setProperty("min-height", "0", "important");
-            el.style.setProperty("max-height", "none", "important");
-            el.style.setProperty("flex", "none", "important");
-            el.style.setProperty("flex-basis", "auto", "important");
-            el.style.setProperty("align-self", "stretch", "important");
-            el.style.setProperty("justify-self", "stretch", "important");
-          } else {
-            // Keep header/card display modes from CSS (grid/flex/none). Overwriting display here breaks
-            // merge follow-hides, portrait header grids, and round-marker headers.
-            if (!isMedia) {
-              el.style.setProperty("width", "100%", "important");
-              el.style.setProperty("inline-size", "100%", "important");
-              el.style.setProperty("min-width", "0", "important");
-              el.style.setProperty("min-inline-size", "0", "important");
-              el.style.setProperty("max-width", "none", "important");
-              el.style.setProperty("max-inline-size", "none", "important");
-              el.style.setProperty("height", "auto", "important");
-              el.style.setProperty("min-height", "0", "important");
-              el.style.setProperty("max-height", "none", "important");
-            }
-            if (isContent || isPlainContent) {
-              el.style.setProperty("display", "block", "important");
-              el.style.setProperty("justify-content", "flex-start", "important");
-              el.style.setProperty("align-content", "stretch", "important");
-              el.style.setProperty("gap", "0", "important");
-              el.style.setProperty("column-gap", "0", "important");
-              el.style.setProperty("row-gap", "0", "important");
-            }
-            if (isCard || isContent || isStructural) {
-              el.style.setProperty("flex", "none", "important");
-              el.style.setProperty("flex-basis", "auto", "important");
-              el.style.setProperty("box-sizing", "border-box", "important");
-            }
-          }
-        } else {
-          if (el.classList?.contains?.("message-sender") || el.classList?.contains?.("name-stacked") || el.classList?.contains?.("title") || el.classList?.contains?.("subtitle")) {
-            el.style.setProperty("width", "100%", "important");
-            el.style.setProperty("inline-size", "100%", "important");
-            el.style.setProperty("min-width", "0", "important");
-            el.style.setProperty("min-inline-size", "0", "important");
-            el.style.setProperty("max-width", "none", "important");
-            el.style.setProperty("max-inline-size", "none", "important");
-          } else if (!isMedia) {
-            el.style.setProperty("width", "auto", "important");
-            if (el.classList?.contains?.("message-flavor") || el.classList?.contains?.("message-metadata")) {
-              el.style.setProperty("min-width", "0", "important");
-              el.style.setProperty("min-inline-size", "0", "important");
-            }
-          }
-        }
-      } catch {
-        /* no-op */
-      }
-    }
-  } catch {
-    /* no-op */
-  }
-  return () => {
-    for (let i = changed.length - 1; i >= 0; i -= 1) {
-      const it = changed[i];
-      try {
-        if (it.prevStyle == null) it.el.removeAttribute("style");
-        else it.el.setAttribute("style", it.prevStyle);
-      } catch {
-        /* no-op */
-      }
-    }
-  };
-}
 
 async function feEnsureArchiveEmbeddedFonts(win) {
   try {
@@ -4517,74 +3787,6 @@ async function feEnsureArchiveEmbeddedFonts(win) {
   }
 }
 
-function feIsElement(node) {
-  // Cross-window safe element check (avoid instanceof HTMLElement which fails across Window realms).
-  return !!node && node.nodeType === 1;
-}
-
-function feNextTick() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-// Returns a Promise that resolves to the number of images that failed to load
-// within the timeout (0 = all loaded successfully, >0 = some timed out or errored).
-function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } = {}) {
-  try {
-    if (!rootEl?.querySelectorAll) return Promise.resolve(0);
-
-    // Avoid materializing a giant array for huge chat logs.
-    const nodeList = rootEl.querySelectorAll("img[src]");
-    if (!nodeList?.length) return Promise.resolve(0);
-
-    // Hard cap: waiting on thousands of images can allocate too many listeners and stall.
-    const imgs = [];
-    let count = 0;
-    for (const img of nodeList) {
-      imgs.push(img);
-      count++;
-      if (count >= maxImages) break;
-    }
-
-    if (!imgs.length) return Promise.resolve(0);
-
-    return new Promise((resolve) => {
-      let done = false;
-      let remaining = imgs.length;
-
-      const timer = setTimeout(() => {
-        if (done) return;
-        done = true;
-        resolve(remaining); // return count of images still waiting
-      }, timeoutMs);
-
-      const onOne = () => {
-        remaining--;
-        if (remaining > 0) return;
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        resolve(0);
-      };
-
-      for (const img of imgs) {
-        try {
-          // `complete` is true for both successfully loaded and permanently failed images.
-          // Missing/404 images must NOT stall export until timeout.
-          if (img.complete) {
-            onOne();
-            continue;
-          }
-          img.addEventListener?.("load", onOne, { once: true });
-          img.addEventListener?.("error", onOne, { once: true });
-        } catch {
-          onOne();
-        }
-      }
-    });
-  } catch {
-    return Promise.resolve(0);
-  }
-}
 
 function feBuildLiveChatMessageElementMap() {
   const map = new Map();
@@ -4627,19 +3829,14 @@ function feCloneChatMessageElement(el) {
 async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, timeBudgetMs = 0, progress = null } = {}) {
   const cloneMap = new Map();
   let orderedIds = [];
-  // Declared outside try so the finally block can always restore scroll positions,
-  // even if an error is thrown before or during the harvest loop.
-  let logStates = null;
+  // renderBatch prepends messages and changes the real `.chat-scroll` height.
+  // Reuse the ordinary live-chat sticky-scroll contract so bottom-follow stays
+  // pinned while a reader browsing older history keeps their current viewport.
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
   try {
     const chat = game?.messages?.directory || ui?.chat;
     const logs = feGetChatLogs?.() ?? [];
     if (!chat?.renderBatch || !logs.length) return { cloneMap, orderedIds };
-
-    logStates = logs.map((log) => ({
-      log,
-      top: Number(log?.scrollTop ?? 0),
-      height: Number(log?.scrollHeight ?? 0),
-    }));
 
     const harvestOnce = () => {
       const visibleIds = [];
@@ -4695,30 +3892,16 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, t
         /* no-op */
       }
 
-      for (const st of logStates) {
-        try {
-          st.log.scrollTop = 0;
-          st.log.dispatchEvent?.(new Event('scroll'));
-        } catch {}
-      }
-      await feMaybeYieldForUI(window);
-
       try {
-        const remaining = timeBudgetMs > 0 ? Math.max(250, timeBudgetMs - (Date.now() - startedAt)) : 0;
-        if (remaining > 0) {
-          let expired = false;
-          await Promise.race([
-            Promise.resolve(chat.renderBatch(batchSize)),
-            new Promise((resolve) => setTimeout(() => { expired = true; resolve(null); }, remaining)),
-          ]);
-          if (expired) {
-            timedOut = true;
-            break;
-          }
-        } else {
-          await chat.renderBatch(batchSize);
-        }
+        // A started renderBatch cannot be cancelled. Always let this one settle
+        // before restoring sticky state; otherwise a timed-out batch can mutate
+        // the log after the finally block and invalidate the restoration.
+        await chat.renderBatch(batchSize);
       } catch {
+        break;
+      }
+      if (timeBudgetMs > 0 && (Date.now() - startedAt) >= timeBudgetMs) {
+        timedOut = true;
         break;
       }
       await feMaybeYieldForUI(window);
@@ -4748,10 +3931,8 @@ async function feHarvestFullChatHistory({ batchSize = 100, maxIterations = 80, t
   } catch {
     // swallow and return best-effort partial history
   } finally {
-    // Always restore scroll positions — even if an error interrupted the harvest loop.
-    for (const st of logStates ?? []) {
-      try { st.log.scrollTop = st.top; } catch {}
-    }
+    // Always restore follow intent — even if an error interrupted the harvest loop.
+    restoreStickyScroll();
   }
   return { cloneMap, orderedIds };
 }

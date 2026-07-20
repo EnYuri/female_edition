@@ -57,10 +57,6 @@ body.fe-retro-theme .fe-settings-menu .fe-settings__tab:is(:hover, .active) {
   text-shadow: 0 0 3px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
 }
 
-.fe-settings-menu .fe-settings__actions {
-  gap: 8px;
-}
-
 .fe-settings-menu .fe-settings__section {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;

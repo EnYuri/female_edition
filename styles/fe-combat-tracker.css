@@ -22,16 +22,31 @@
 }
 
 /* horizontal alignment of the whole tracker */
-#fe-combat-tracker.fe-ct-align-center { left: 50%; transform: translateX(-50%); }
-#fe-combat-tracker.fe-ct-align-left   { left: 8px; }
-#fe-combat-tracker.fe-ct-align-right  { right: 8px; }
-#fe-combat-tracker.fe-ct-align-left  .fe-ct-inner { align-items: flex-start; }
-#fe-combat-tracker.fe-ct-align-right .fe-ct-inner { align-items: flex-end; }
+#fe-combat-tracker.fe-ct-align-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+#fe-combat-tracker.fe-ct-align-left {
+  left: 8px;
+}
+#fe-combat-tracker.fe-ct-align-right {
+  right: 8px;
+}
+#fe-combat-tracker.fe-ct-align-left .fe-ct-inner {
+  align-items: flex-start;
+}
+#fe-combat-tracker.fe-ct-align-right .fe-ct-inner {
+  align-items: flex-end;
+}
 
-#fe-combat-tracker.fe-ct-active { display: block; }
+#fe-combat-tracker.fe-ct-active {
+  display: block;
+}
 
 /* minimized: hide the portrait strip, keep the (small) control bar to restore */
-#fe-combat-tracker.fe-ct-collapsed .fe-ct-combatants-wrap { display: none; }
+#fe-combat-tracker.fe-ct-collapsed .fe-ct-combatants-wrap {
+  display: none;
+}
 
 #fe-combat-tracker .fe-ct-inner {
   display: flex;
@@ -73,10 +88,14 @@
   position: relative;
   z-index: 1;
 }
-#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait { transform: scaleY(-1); }
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait {
+  transform: scaleY(-1);
+}
 
 /* thin scrollbar for overflow when many combatants */
-#fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar { height: 6px; }
+#fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar {
+  height: 6px;
+}
 #fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.25);
   border-radius: 3px;
@@ -141,8 +160,12 @@
   }
 }
 
-.fe-ct-portrait.is-defeated .fe-ct-frame img { filter: grayscale(1) brightness(0.5); }
-.fe-ct-portrait.is-hidden { opacity: 0.5; }
+.fe-ct-portrait.is-defeated .fe-ct-frame img {
+  filter: grayscale(1) brightness(0.5);
+}
+.fe-ct-portrait.is-hidden {
+  opacity: 0.5;
+}
 
 /* 호버 시 나타나는 「턴 종료」 >> 표식 — 현재 턴이면서 권한이 있는 유저의 포트레이트에만
    렌더된다(JS). 배경 채우기 없이, 프레임 전체를 덮는 컨테이너 중앙에 큰 글로우 글자만
@@ -172,10 +195,17 @@
   pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.12s ease;
 }
-.fe-ct-portrait:hover .fe-ct-endturn > * { opacity: 0.85; }
-.fe-ct-endturn > *:hover { opacity: 1; transform: scale(1.12); }
+.fe-ct-portrait:hover .fe-ct-endturn > * {
+  opacity: 0.85;
+}
+.fe-ct-endturn > *:hover {
+  opacity: 1;
+  transform: scale(1.12);
+}
 /* 기본 테마는 fa 벡터 아이콘, 픽셀 글자는 숨김 */
-.fe-ct-endturn .fe-ct-endturn-px { display: none; }
+.fe-ct-endturn .fe-ct-endturn-px {
+  display: none;
+}
 
 .fe-ct-init {
   position: absolute;
@@ -243,7 +273,10 @@
   border-radius: 2px;
   overflow: hidden;
 }
-.fe-ct-hp-fill { height: 100%; transition: width 0.25s ease; }
+.fe-ct-hp-fill {
+  height: 100%;
+  transition: width 0.25s ease;
+}
 
 /* control bar (GM) — sits at the BOTTOM-LEFT of the tracker, under the strip */
 .fe-ct-controlbar {
@@ -275,24 +308,18 @@
   padding: 0;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.fe-ct-btn:hover { background: rgba(255, 255, 255, 0.18); }
-.fe-ct-btn.is-on { color: var(--fe-dx3rd-accent, #ffd54a); }
+.fe-ct-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.fe-ct-btn.is-on {
+  color: var(--fe-dx3rd-accent, #ffd54a);
+}
 
 .fe-ct-round {
   color: #fff;
   font-weight: bold;
   min-width: 38px;
   text-align: center;
-  font-size: 12px;
-}
-
-.fe-ct-roundonly {
-  pointer-events: none;
-  color: #fff;
-  font-weight: bold;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 12px;
-  border-radius: 10px;
   font-size: 12px;
 }
 
@@ -315,14 +342,22 @@ body.fe-retro-theme .fe-ct-portrait .fe-ct-frame {
   border-radius: 0;
   border-color: var(--fe-ac-45, #fff);
 }
-body.fe-retro-theme .fe-ct-name { color: var(--fe-ac-90, #fff); }
-body.fe-retro-theme .fe-ct-round,
-body.fe-retro-theme .fe-ct-roundonly,
-body.fe-retro-theme .fe-ct-btn { color: var(--fe-ac-90, #fff); }
-body.fe-retro-theme .fe-ct-btn:hover { background: var(--fe-ac-12, rgba(255,255,255,0.18)); }
-body.fe-retro-theme .fe-ct-btn.is-on { color: var(--fe-dx3rd-accent, #fff); }
-body.fe-retro-theme .fe-ct-init { background: var(--fe-ac-45, #fff); color: #000; }
-body.fe-retro-theme .fe-ct-hp { border: 1px solid var(--fe-ac-33, rgba(255,255,255,0.3)); }
+body.fe-retro-theme :is(.fe-ct-name, .fe-ct-round, .fe-ct-btn) {
+  color: var(--fe-ac-90, #fff);
+}
+body.fe-retro-theme .fe-ct-btn:hover {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.18));
+}
+body.fe-retro-theme .fe-ct-btn.is-on {
+  color: var(--fe-dx3rd-accent, #fff);
+}
+body.fe-retro-theme .fe-ct-init {
+  background: var(--fe-ac-45, #fff);
+  color: #000;
+}
+body.fe-retro-theme .fe-ct-hp {
+  border: 1px solid var(--fe-ac-33, rgba(255, 255, 255, 0.3));
+}
 body.fe-retro-theme .fe-ct-portrait.is-active .fe-ct-frame {
   /* glow keeps coming from the filter animation above (box-shadow would be
      stripped by §4); add a hard pixel outline as the retro accent */
@@ -331,8 +366,9 @@ body.fe-retro-theme .fe-ct-portrait.is-active .fe-ct-frame {
 }
 body.fe-retro-theme .fe-ct-init,
 body.fe-retro-theme .fe-ct-btn,
-body.fe-retro-theme .fe-ct-roundonly,
-body.fe-retro-theme .fe-ct-hp { border-radius: 0; }
+body.fe-retro-theme .fe-ct-hp {
+  border-radius: 0;
+}
 
 body.fe-retro-theme .fe-ct-name {
   /* survive §4's global text-shadow:none !important → hard pixel outline */
@@ -346,7 +382,9 @@ body.fe-retro-theme .fe-ct-endturn {
   font-family: var(--fe-font-primary, monospace);
   image-rendering: pixelated;
 }
-body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-icon { display: none; }
+body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-icon {
+  display: none;
+}
 body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-px {
   display: inline;
   font-weight: bold;

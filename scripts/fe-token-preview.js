@@ -13,6 +13,23 @@ const _FE_TP_SHEET_BASE_WIDTH = 544;
 const _FE_TP_SHEET_MIN_HEIGHT = 720;
 const _FE_TP_STORAGE_KEY = "fe-tp-preview-size";
 const _FE_TP_IMG_CACHE = new Map();
+const _FE_TP_IMG_CACHE_MAX = 512;
+
+function feTpGetCachedImageSize(src) {
+  if (!_FE_TP_IMG_CACHE.has(src)) return null;
+  const value = _FE_TP_IMG_CACHE.get(src);
+  _FE_TP_IMG_CACHE.delete(src);
+  _FE_TP_IMG_CACHE.set(src, value);
+  return value;
+}
+
+function feTpSetCachedImageSize(src, value) {
+  _FE_TP_IMG_CACHE.delete(src);
+  _FE_TP_IMG_CACHE.set(src, value);
+  while (_FE_TP_IMG_CACHE.size > _FE_TP_IMG_CACHE_MAX) {
+    _FE_TP_IMG_CACHE.delete(_FE_TP_IMG_CACHE.keys().next().value);
+  }
+}
 
 function feTokenConfigTwoColumnEnabled() {
   try { return !!game.settings.get(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN); }
@@ -36,11 +53,15 @@ function _feTPParseOr(val, fallback) {
 
 function feLoadImage(src) {
   if (!src) return Promise.resolve(null);
-  const cached = _FE_TP_IMG_CACHE.get(src);
+  const cached = feTpGetCachedImageSize(src);
   if (cached) return Promise.resolve(cached);
   return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => { _FE_TP_IMG_CACHE.set(src, { w: img.naturalWidth, h: img.naturalHeight }); resolve(_FE_TP_IMG_CACHE.get(src)); };
+    img.onload = () => {
+      const value = { w: img.naturalWidth, h: img.naturalHeight };
+      feTpSetCachedImageSize(src, value);
+      resolve(value);
+    };
     img.onerror = () => resolve(null);
     img.src = src;
   });

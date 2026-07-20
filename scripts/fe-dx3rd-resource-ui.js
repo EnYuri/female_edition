@@ -897,7 +897,7 @@ Hooks.on("init", () => {
   });
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
     name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
-    hint: "포트레이트 이미지 영역의 너비. 기본 98.",
+    hint: "포트레이트 이미지 영역의 너비. 기본 100.",
     scope: "client", config: false, type: Number,
     default: 100,
     range: { min: 32, max: 256, step: 4 },
@@ -905,7 +905,7 @@ Hooks.on("init", () => {
   });
   game.settings.register(MODULE_ID, S.DX3RD_RUI_PANEL_WIDTH, {
     name: "[DX3rd] 캐릭터 스테이터스 자원 칸 너비(px)",
-    hint: "HP·침식률 바가 표시되는 패널의 너비. 기본 110.",
+    hint: "HP·침식률 바가 표시되는 패널의 너비. 기본 128.",
     scope: "client", config: false, type: Number,
     default: 128,
     range: { min: 60, max: 300, step: 4 },

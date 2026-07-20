@@ -127,6 +127,9 @@
                   <span class="fe-sp-face-actor-clear-hint notes">{{localize "FESP.Sheet.FaceActorClear"}}</span>
                 </div>
               {{else}}
+                {{!-- Keep every face ArrayField element complete during AppV2
+                      auto-submit even while no linked Actor is resolved. --}}
+                <input type="hidden" name="system.faces.{{face.index}}.linkMode" value="{{face.linkMode}}">
                 <span class="fe-sp-face-actor-drophint">{{localize "FESP.Sheet.FaceActorDropHintBig"}}</span>
               {{/if}}
             </div>

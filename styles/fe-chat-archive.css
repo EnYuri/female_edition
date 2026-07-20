@@ -1029,33 +1029,3 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
   min-inline-size: 0 !important;
   box-sizing: border-box !important;
 }
-
-
-/* Large archive logs: collapse repeated heavy images into lightweight source references. */
-#fe-chat-export-container .fe-archive-image-reference {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  max-width: 100%;
-  margin: 0.35rem 0;
-  padding: 0.35rem 0.55rem;
-  border: 1px dashed rgba(0, 0, 0, 0.24);
-  border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.035);
-  color: var(--color-text-dark-primary, #191813);
-  font-size: 12px;
-  line-height: 1.35;
-  text-decoration: none;
-  word-break: break-all;
-}
-
-#fe-chat-export-container .fe-archive-image-reference::before {
-  content: "이미지";
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-#fe-chat-export-container a.fe-archive-image-reference:hover {
-  background: rgba(0, 0, 0, 0.06);
-}

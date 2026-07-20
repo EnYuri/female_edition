@@ -20,6 +20,7 @@
  * own CSS (styles/fe-combat-tracker.css, unlayered — no system-layer conflict).
  */
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import { feResolveSocketSender } from "./fe-socket-auth.js";
 // 포트레이트는 거대한 원본을 작게 표시 → CSS image-rendering 으로는 고품질 축소가
 // 불가능하다(fe-portrait-hq.js 주석 참고). 트래커 포트레이트(편집 불가 표시용 img)는
 // 안전한 src 스왑 HQ 경로를 그대로 쓸 수 있어 안티에일리어싱이 살아난다.
@@ -615,7 +616,7 @@ async function feCtRequestEndTurn(combat, c) {
   };
 
   if (game.user?.isGM) {
-    await feCtApplyEndTurn(payload);
+    await feCtApplyEndTurn(payload, game.user);
     return;
   }
 
@@ -634,8 +635,7 @@ async function feCtRequestEndTurn(combat, c) {
   game.socket.emit(SOCKET_CHANNEL, payload);
 }
 
-async function feCtApplyEndTurn(data) {
-  const requester = game.users?.get?.(data.requesterId) ?? null;
+async function feCtApplyEndTurn(data, requester) {
   if (!requester) return;
   const combat = game.combats?.get?.(data.combatId) ?? null;
   const c = combat?.combatants?.get?.(data.combatantId) ?? null;
@@ -643,10 +643,12 @@ async function feCtApplyEndTurn(data) {
   await combat.nextTurn();
 }
 
-function feCtOnSocket(data) {
+function feCtOnSocket(data, senderId) {
   if (data?.type !== CT_SOCKET_END_TURN) return;
   if (!feCtIsPrimaryGm()) return;
-  feCtApplyEndTurn(data).catch((e) => {
+  const requester = feResolveSocketSender(senderId, data.requesterId, "combat-tracker");
+  if (!requester) return;
+  feCtApplyEndTurn(data, requester).catch((e) => {
     console.error("[female_edition] combat-tracker end-turn request failed", e);
   });
 }

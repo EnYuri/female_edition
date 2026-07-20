@@ -21,6 +21,7 @@
 //   - hidden  : per-user "disabled" hiding is pure client-side render gating.
 
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import { feResolveSocketSender } from "./fe-socket-auth.js";
 import {
   FE_PANEL_TYPE,
   FE_PANEL_TILE_FLAG,
@@ -116,16 +117,34 @@ function clientToWorld(cx, cy) {
 
 const _panelImgSizeCache = new Map();   // src -> {w,h} | null
 const _panelImgSizePending = new Map(); // src -> Promise
+const FE_PANEL_IMG_SIZE_CACHE_MAX = 512;
+
+function feGetCachedImageSize(src) {
+  if (!_panelImgSizeCache.has(src)) return { hit: false, value: null };
+  const value = _panelImgSizeCache.get(src);
+  _panelImgSizeCache.delete(src);
+  _panelImgSizeCache.set(src, value);
+  return { hit: true, value };
+}
+
+function feSetCachedImageSize(src, value) {
+  _panelImgSizeCache.delete(src);
+  _panelImgSizeCache.set(src, value);
+  while (_panelImgSizeCache.size > FE_PANEL_IMG_SIZE_CACHE_MAX) {
+    _panelImgSizeCache.delete(_panelImgSizeCache.keys().next().value);
+  }
+}
 
 /** Natural pixel size of an image src (cached; null on failure / empty). */
 function feLoadImageSize(src) {
   if (!src) return Promise.resolve(null);
-  if (_panelImgSizeCache.has(src)) return Promise.resolve(_panelImgSizeCache.get(src));
+  const cached = feGetCachedImageSize(src);
+  if (cached.hit) return Promise.resolve(cached.value);
   if (_panelImgSizePending.has(src)) return _panelImgSizePending.get(src);
   const p = new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => { const r = { w: img.naturalWidth, h: img.naturalHeight }; _panelImgSizeCache.set(src, r); resolve(r); };
-    img.onerror = () => { _panelImgSizeCache.set(src, null); resolve(null); };
+    img.onload = () => { const r = { w: img.naturalWidth, h: img.naturalHeight }; feSetCachedImageSize(src, r); resolve(r); };
+    img.onerror = () => { feSetCachedImageSize(src, null); resolve(null); };
     img.src = src;
   }).finally(() => _panelImgSizePending.delete(src));
   _panelImgSizePending.set(src, p);
@@ -804,7 +823,7 @@ function tileRef(tile) {
 }
 
 async function feRelayPanelOp(type, payload) {
-  if (game.user.isGM) return applyPanelOp(type, { ...payload, requesterId: game.user.id });
+  if (game.user.isGM) return applyPanelOp(type, payload, game.user);
   if (!game.users.activeGM) {
     ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoGM"));
     return;
@@ -1124,8 +1143,8 @@ async function feConvertPanelTokenToTile(scene, tokenDoc, actor) {
   await scene.deleteEmbeddedDocuments("Token", [tokenDoc.id]);
 }
 
-async function applyPanelOp(type, data) {
-  const requester = game.users.get(data.requesterId) ?? game.user;
+async function applyPanelOp(type, data, requester) {
+  if (!requester) return;
 
   if (type === FE_PANEL_SOCKET.PLACE) {
     const actor = game.actors.get(data.actorId);
@@ -1194,10 +1213,12 @@ async function applyPanelOp(type, data) {
   }
 }
 
-function onPanelSocket(data) {
+function onPanelSocket(data, senderId) {
   if (!data?.type || !PANEL_SOCKET_TYPES.has(data.type)) return; // foreign type — ignore
   if (game.user !== game.users.activeGM) return; // only the primary GM applies
-  applyPanelOp(data.type, data).catch(err => console.error(`${MODULE_ID} | screen panel op failed`, err));
+  const requester = feResolveSocketSender(senderId, data.requesterId, "screen-panel");
+  if (!requester) return;
+  applyPanelOp(data.type, data, requester).catch(err => console.error(`${MODULE_ID} | screen panel op failed`, err));
 }
 
 /**

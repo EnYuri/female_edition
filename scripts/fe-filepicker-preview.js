@@ -55,13 +55,30 @@ function _fmtSize(bytes) {
 
 // ─── HEAD 메타데이터(크기/수정일) — 선택 파일용. 동시성/캐시 ──────────────────
 const _metaCache = new Map();
+const _META_CACHE_MAX = 512;
+
+function _getCachedMeta(url) {
+  if (!_metaCache.has(url)) return null;
+  const value = _metaCache.get(url);
+  _metaCache.delete(url);
+  _metaCache.set(url, value);
+  return value;
+}
+
+function _setCachedMeta(url, value) {
+  _metaCache.delete(url);
+  _metaCache.set(url, value);
+  while (_metaCache.size > _META_CACHE_MAX) _metaCache.delete(_metaCache.keys().next().value);
+}
+
 async function _headMeta(url) {
-  if (_metaCache.has(url)) return _metaCache.get(url);
+  const cached = _getCachedMeta(url);
+  if (cached) return cached;
   const p = fetch(url, { method: "HEAD" }).then(r => ({
     size: Number(r.headers.get("content-length")) || 0,
     mtime: Date.parse(r.headers.get("last-modified") || "") || 0
   })).catch(() => ({ size: 0, mtime: 0 }));
-  _metaCache.set(url, p);
+  _setCachedMeta(url, p);
   return p;
 }
 

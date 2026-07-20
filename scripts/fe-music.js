@@ -16,6 +16,7 @@
 // socket vocabulary live in fe-music-shared.js.
 
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import { feResolveSocketSender } from "./fe-socket-auth.js";
 import {
   MUSIC_SOCKET, MUSIC_MSG, SHARED_FLAG,
   isAnyGMOnline, pickSharedPlaylist, sanitizeFileName, stripExt, normalizeDataDir, allowedAudio,
@@ -27,6 +28,25 @@ import {
 } from "./fe-music-app.js";
 
 const AUTO_INIT_KEY = "ceMusicAutoInitDone";
+
+/**
+ * Only one GM may perform authoritative music work. The check is evaluated for
+ * every socket message so a backup GM handles new requests if the current
+ * active GM disconnects.
+ */
+function isPrimaryActiveGm() {
+  if (!game.user?.isGM) return false;
+  const activeGM = game.users?.activeGM;
+  if (activeGM) return activeGM.id === game.user.id;
+
+  // `activeGM` can be briefly unavailable while presence state is settling.
+  // Pick the same deterministic fallback on every client rather than allowing
+  // every connected GM to process the request.
+  const activeGms = Array.from(game.users ?? [])
+    .filter((user) => user?.active && user?.isGM)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  return activeGms[0]?.id === game.user.id;
+}
 
 function musicSetting(key) {
   try { return game.settings.get(MODULE_ID, key); } catch { return FE_DEFAULTS[key]; }
@@ -40,7 +60,7 @@ function musicUploadDir() {
 
 /** GM이 실행: 단일 공용 플레이리스트 생성 / 권한(default:OWNER) 보정. 이름은 생성 시에만 사용. */
 async function ensureSharedPlaylist({ notify = true } = {}) {
-  if (!game.user.isGM) return null;
+  if (!isPrimaryActiveGm()) return null;
 
   const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
   const name = musicSetting(S.MUSIC_PLAYLIST_NAME) || "player-uploads";
@@ -65,7 +85,7 @@ async function ensureSharedPlaylist({ notify = true } = {}) {
 }
 
 async function ensureMusicUploadDirectory({ notify = false } = {}) {
-  if (!game.user?.isGM) return false;
+  if (!isPrimaryActiveGm()) return false;
   const dir = musicUploadDir();
   try {
     await ensureDirectory("data", dir);
@@ -166,13 +186,15 @@ function notifyClientRefresh() {
 }
 
 function registerSocket() {
-  game.socket.on(MUSIC_SOCKET, async (msg) => {
+  game.socket.on(MUSIC_SOCKET, async (msg, senderId) => {
     // Coexist with other female_edition socket listeners (screen-panel, token-glow,
     // typing-indicator): only handle the `music:`-namespaced types, bail on the rest.
     if (!msg?.type || !String(msg.type).startsWith("music:")) return;
 
     /** ===== 플레이어 수신 ===== */
     if (!game.user.isGM) {
+      const authority = feResolveSocketSender(senderId, msg.authorityId, "music-response");
+      if (!authority?.isGM) return;
       if (msg.type === MUSIC_MSG.ENSURE_DIR_ACK && msg.toUserId === game.user.id) {
         markEnsureDirAck(msg.reqId, !!msg.ok, msg.reason);
         return;
@@ -205,14 +227,24 @@ function registerSocket() {
       return;
     }
 
-    /** ===== GM 처리 (프록시 업로드만) ===== */
+    // Every GM receives the module socket broadcast. Only the current active GM
+    // may create folders, allocate upload sessions, or write the finished file.
+    // This guard is dynamic, so authority transfers without re-registering the
+    // listener when the active GM changes.
+    if (!isPrimaryActiveGm()) return;
+
+    const sender = feResolveSocketSender(senderId, msg.fromUserId, "music-request");
+    if (!sender) return;
+
+    /** ===== 대표 GM 처리 (프록시 업로드만) ===== */
 
     // 폴더 생성 요청: 플레이어가 브라우즈/생성 권한이 없어도 GM 권한으로 업로드 폴더 생성.
     // 클라이언트가 보낸 경로는 무시하고, GM 자신의 설정(musicUploadDir)만 사용 —
     // 임의 폴더 생성을 유도당하지 않기 위함.
     if (msg.type === MUSIC_MSG.ENSURE_DIR) {
-      const { reqId, fromUserId } = msg;
-      if (!reqId || !fromUserId || !game.users.get(fromUserId)) return;
+      const { reqId } = msg;
+      const fromUserId = sender.id;
+      if (!reqId) return;
       let ok = false, reason = "";
       try {
         await ensureDirectory("data", musicUploadDir());
@@ -220,17 +252,17 @@ function registerSocket() {
       } catch (e) {
         reason = e?.message || "폴더 생성 실패";
       }
-      game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.ENSURE_DIR_ACK, toUserId: fromUserId, reqId, ok, reason });
+      game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.ENSURE_DIR_ACK, authorityId: game.user.id, toUserId: fromUserId, reqId, ok, reason });
       return;
     }
 
     // 업로드 INIT
     if (msg.type === MUSIC_MSG.UP_INIT) {
-      const { uploadId, fromUserId, fileName, fileType, fileSize, chunkSize: chunkSizeRaw } = msg;
-      if (!uploadId || !fromUserId) return;
-      if (!game.users.get(fromUserId)) return;
+      const { uploadId, fileName, fileType, fileSize, chunkSize: chunkSizeRaw } = msg;
+      const fromUserId = sender.id;
+      if (!uploadId) return;
 
-      const err = (reason) => game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, toUserId: fromUserId, uploadId, reason });
+      const err = (reason) => game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: fromUserId, uploadId, reason });
 
       if (!allowedAudio(fileName)) return void err("지원하지 않는 오디오 확장자");
 
@@ -254,7 +286,7 @@ function registerSocket() {
       const target = await resolveUploadTarget(dir, cleanName, size);
       if (target.reused) {
         try { await ensureTrack(pl, target.path, displayName); } catch (_) {}
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_INIT_ACK, toUserId: fromUserId, uploadId, reused: true, trackName: displayName });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_INIT_ACK, authorityId: game.user.id, toUserId: fromUserId, uploadId, reused: true, trackName: displayName });
         return;
       }
 
@@ -275,7 +307,7 @@ function registerSocket() {
       });
       uploadsByUser.set(fromUserId, uploadId);
 
-      game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_INIT_ACK, toUserId: fromUserId, uploadId, reused: false });
+      game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_INIT_ACK, authorityId: game.user.id, toUserId: fromUserId, uploadId, reused: false });
       return;
     }
 
@@ -284,6 +316,7 @@ function registerSocket() {
       const { uploadId, index, data } = msg;
       const rec = uploads.get(uploadId);
       if (!rec) return;
+      if (sender.id !== rec.fromUserId) return;
 
       const idx = Number(index);
       if (!Number.isInteger(idx) || idx < 0 || idx >= rec.chunksTotal) return;
@@ -308,29 +341,29 @@ function registerSocket() {
       const rec = uploads.get(uploadId);
 
       if (!rec) {
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, toUserId: msg.fromUserId, uploadId, reason: "업로드 세션 없음(다시 업로드 시작)" });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: sender.id, uploadId, reason: "업로드 세션 없음(다시 업로드 시작)" });
         return;
       }
-      if (msg.fromUserId && msg.fromUserId !== rec.fromUserId) return;
+      if (sender.id !== rec.fromUserId) return;
 
       const missing = listMissingIndices(rec);
       if (missing.length > 0) {
         rec.retryCount++;
         if (rec.retryCount > MAX_RETRY) {
           cleanupUpload(uploadId);
-          game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, toUserId: rec.fromUserId, uploadId, reason: `전송 누락 반복(누락 ${missing.length}개). 파일 다시 선택` });
+          game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, reason: `전송 누락 반복(누락 ${missing.length}개). 파일 다시 선택` });
           return;
         }
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_REQ_MISSING, toUserId: rec.fromUserId, uploadId, attempt: rec.retryCount, missing });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_REQ_MISSING, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, attempt: rec.retryCount, missing });
         return;
       }
 
       try {
         const { trackName, playlistId } = await gmHandleUploadFinish(rec);
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ACK, toUserId: rec.fromUserId, uploadId, trackName, playlistId, reused: false });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ACK, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, trackName, playlistId, reused: false });
       } catch (e) {
         const reason = e?.message === "NO_PLAYLIST" ? "공용 플레이리스트 없음" : "서버 업로드 실패";
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, toUserId: rec.fromUserId, uploadId, reason });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, reason });
       } finally {
         cleanupUpload(uploadId);
       }
@@ -488,7 +521,7 @@ Hooks.once("ready", async () => {
   registerDeleteGuards();
   registerLiveRefresh();
 
-  if (game.user.isGM) {
+  if (isPrimaryActiveGm()) {
     // 공용 플레이리스트 생성/권한 보정(이름은 생성 시에만). 첫 부트스트랩 1회 알림.
     const done = game.settings.get(MODULE_ID, AUTO_INIT_KEY);
     await ensureSharedPlaylist({ notify: false });
