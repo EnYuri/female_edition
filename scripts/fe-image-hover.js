@@ -369,7 +369,11 @@ function _ihResolveHoverArt(target) {
   // Status UI portrait → owning card's actor.img (always the full-res original).
   if (target.closest(".fedr-portrait")) {
     const card = target.closest(".fedr-actor-card");
-    const actor = card?.dataset.actorId && game.actors?.get(card.dataset.actorId);
+    const actorUuid = card?.dataset.actorUuid;
+    const actor = (actorUuid
+      ? Array.from(canvas?.scene?.tokens ?? [], token => token?.actor)
+          .find(candidate => candidate?.uuid === actorUuid)
+      : null) ?? (card?.dataset.actorId ? game.actors?.get(card.dataset.actorId) : null);
     if (actor?.img) return actor.img;
   }
 

@@ -31,6 +31,11 @@
 /* --------------------------- */
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content img {
   max-width: 100%;
+}
+
+/* Respect explicit dimensions supplied by systems/modules. Unspecified/user-authored
+   images remain fluid; narrowly scoped UI-thumbnail rules may still override this. */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content img:not([height]) {
   height: auto;
 }
 

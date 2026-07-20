@@ -149,6 +149,10 @@ function cpSetRootVars(doc = document) {
     const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
     targetDoc.documentElement.style.setProperty("--fe-chat-portrait-size", `${size}px`);
 
+    const cardIconSize = Math.max(0, Number(cpGet(CP.CARD_ICON_SIZE) ?? 36) || 0);
+    targetDoc.documentElement.style.setProperty("--fe-chat-card-icon-size", `${cardIconSize}px`);
+    targetDoc.body?.classList?.toggle("fe-chat-card-icon-sizing", cardIconSize > 0);
+
     const hideWrap = !!cpGet(CP.HIDE_WRAP);
     targetDoc.body?.classList?.toggle("fe-hide-chat-portrait-wrap", hideWrap);
 
@@ -507,8 +511,8 @@ function cpApplyChatCardIconSizing(messageEl) {
       icon.classList.add("fe-chat-card-icon");
     }
 
-    // Some automation modules (monks-tokenbar, midi-qol, etc.) embed large portrait-like
-    // images directly inside message content without using the standard chat-card classes.
+    // Some automation modules embed large portrait-like images directly inside message
+    // content without using the standard chat-card classes.
     // Clamp abnormally large inline images so chat layout remains consistent.
     cpClampLargeInlinePortraits(messageEl, size);
   } catch {
@@ -524,9 +528,11 @@ function cpClampLargeInlinePortraits(messageEl, size) {
     // If this is an explicit image-post style message, don't touch its images.
     if (messageEl.querySelector?.(".message-content .chat-images-container img, .message-content .ci-message-image img")) return;
 
-    const forceClamp = !!messageEl.querySelector?.(
-      ".message-content .monks-tokenbar, .message-content [class*=\"midi-qol\"], .message-content .midi-qol"
-    );
+    // monks-tokenbar is the legacy source this unconditional fallback is for. Do not
+    // use the presence of midi-qol markup as a reason to resize every image: current
+    // midi cards intentionally contain 22px/30px target tokens and may contain images
+    // in their activity description.
+    const forceClamp = !!messageEl.querySelector?.(".message-content .monks-tokenbar");
     const threshold = Math.max(size * 2, size + 32);
 
     for (const img of messageEl.querySelectorAll(".message-content img")) {
@@ -537,6 +543,11 @@ function cpClampLargeInlinePortraits(messageEl, size) {
 
       // Skip dice UI images/tooltips.
       if (img.closest?.(".dice-roll, .dice-tooltip, .dice-result")) continue;
+
+      // Preserve system-managed card/result imagery from the generic outlier clamp.
+      // Standard header icons are handled above, and known midi target thumbnails
+      // have their own narrowly scoped configurable-size CSS rule.
+      if (img.closest?.(".card-content, .collapsible-content, .midi-results, .midi-qol-damage-card, .midi-qol-single-hit-card")) continue;
 
       const wAttr = Number(img.getAttribute?.("width") || 0);
       const hAttr = Number(img.getAttribute?.("height") || 0);
@@ -1395,6 +1406,7 @@ function cpRegisterSettings() {
     range: { min: 0, max: 128, step: 1 },
     default: 36,
     onChange: () => {
+      cpSetRootVars();
       cpScheduleRefreshAllChatMessages({ delay: 0 });
       feFireChatUiUpdated({ reason: "portrait-settings", document });
     },

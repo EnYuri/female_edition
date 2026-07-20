@@ -33,6 +33,25 @@
   margin-right: 0 !important;
 }
 
+/* midi-qol damage-application target thumbnails are UI icons, not rich-content
+ * images. Reassert their configured size in live chat, notifications, and archive
+ * documents because export normalization cannot always retain a height attribute's
+ * computed width for tall token/portrait artwork. */
+body.fe-chat-card-icon-sizing
+  :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(li.chat-message, .message)
+  .message-content
+  img.midi-qol-target-name {
+  width: var(--fe-chat-card-icon-size, 36px) !important;
+  height: var(--fe-chat-card-icon-size, 36px) !important;
+  min-width: var(--fe-chat-card-icon-size, 36px) !important;
+  min-height: var(--fe-chat-card-icon-size, 36px) !important;
+  max-width: var(--fe-chat-card-icon-size, 36px) !important;
+  max-height: var(--fe-chat-card-icon-size, 36px) !important;
+  flex: 0 0 var(--fe-chat-card-icon-size, 36px) !important;
+  object-fit: cover !important;
+}
+
 :is(li.chat-message, #chat-notifications .message).fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
   min-width: 0 !important;

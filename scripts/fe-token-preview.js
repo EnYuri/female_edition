@@ -9,6 +9,8 @@ import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
 
 const _FE_TP_PREVIEW_DEFAULT = 300;
 const _FE_TP_PREVIEW_MIN = 150;
+const _FE_TP_ZOOM_MIN = 0.25;
+const _FE_TP_ZOOM_MAX = 4;
 const _FE_TP_SHEET_BASE_WIDTH = 544;
 const _FE_TP_SHEET_MIN_HEIGHT = 720;
 const _FE_TP_STORAGE_KEY = "fe-tp-preview-size";
@@ -86,13 +88,16 @@ function feReadAppearanceValues(form) {
 function feRenderGridPreview(container, vals, natSize) {
   if (!vals) return;
   const vpSize = _feTPGetPreviewSize();
-  // Grid/image size is always based on the fixed reference, independent of
-  // viewport size. Enlarging the viewport reveals more surrounding area
-  // without scaling the token image.
+  const zoom = Math.min(_FE_TP_ZOOM_MAX, Math.max(_FE_TP_ZOOM_MIN, container._feTPZoom ?? 1));
+  container._feTPZoom = zoom;
+  container._feTPValues = vals;
+  container._feTPNaturalSize = natSize;
+  // Grid/image size starts from the fixed reference and only changes via the
+  // explicit wheel zoom. Resizing the viewport merely reveals more area.
   const maxDim = Math.max(vals.width, vals.height, 1);
-  const cellSize = Math.round(_FE_TP_PREVIEW_DEFAULT / maxDim);
-  const pw = Math.round(cellSize * vals.width);
-  const ph = Math.round(cellSize * vals.height);
+  const cellSize = Math.round(_FE_TP_PREVIEW_DEFAULT / maxDim) * zoom;
+  const pw = cellSize * vals.width;
+  const ph = cellSize * vals.height;
 
   const scaleX = vals.scale * (vals.mirrorX ? -1 : 1);
   const scaleY = vals.scale * (vals.mirrorY ? -1 : 1);
@@ -116,7 +121,8 @@ function feRenderGridPreview(container, vals, natSize) {
   const existingHandle = container.querySelector(".fe-tp-resize-handle");
 
   container.innerHTML = `
-    <div class="fe-tp-viewport" style="width:${vpW}px;height:${vpH}px;">
+    <div class="fe-tp-viewport" style="width:${vpW}px;height:${vpH}px;"
+      title="마우스 휠: 확대/축소 · 우클릭 드래그: 이동">
       <div class="fe-tp-grid-field" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="background-size:${cellSize}px ${cellSize}px;background-position:${gridLeft}px ${gridTop}px;"></div>
       <div class="fe-tp-grid" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="width:${pw}px;height:${ph}px;left:${gridLeft}px;top:${gridTop}px;">
         ${vals.src ? `<img class="fe-tp-img" src="${esc(vals.src)}" alt=""
@@ -139,6 +145,7 @@ function feRenderGridPreview(container, vals, natSize) {
       <span class="fe-tp-info-label">Grid</span>
       <span class="fe-tp-info-value">${vals.width}×${vals.height}</span>
       <span class="fe-tp-info-dim">scale ${vals.scale.toFixed(2)}</span>
+      <span class="fe-tp-info-dim">zoom ${Math.round(zoom * 100)}%</span>
     </div>`;
 
   if (!existingHandle) {
@@ -150,6 +157,7 @@ function feRenderGridPreview(container, vals, natSize) {
     container.appendChild(existingHandle);
   }
   _feTPWirePan(container);
+  _feTPWireZoom(container);
 }
 
 function _feTPApplyPan(panel, pan) {
@@ -207,6 +215,40 @@ function _feTPWirePan(panel) {
     viewport.addEventListener("pointerup", onUp);
     viewport.addEventListener("pointercancel", onUp);
   });
+}
+
+function _feTPWireZoom(panel) {
+  const viewport = panel.querySelector(".fe-tp-viewport");
+  if (!viewport || viewport._feTPZoomWired) return;
+  viewport._feTPZoomWired = true;
+
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const oldZoom = panel._feTPZoom ?? 1;
+    const deltaPixels = e.deltaY * (e.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? 16
+      : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? viewport.clientHeight : 1);
+    const boundedDelta = Math.min(100, Math.max(-100, deltaPixels));
+    const requestedZoom = oldZoom * Math.exp(-boundedDelta * 0.0015);
+    const newZoom = Math.min(_FE_TP_ZOOM_MAX, Math.max(_FE_TP_ZOOM_MIN, requestedZoom));
+    if (Math.abs(newZoom - oldZoom) < 0.0001) return;
+
+    // Keep the grid point beneath the cursor stationary while zooming. The
+    // grid anchor normally sits at viewport center plus the current pan.
+    const rect = viewport.getBoundingClientRect();
+    const pan = panel._feTPPan ?? { x: 0, y: 0 };
+    const cursorFromAnchorX = e.clientX - rect.left - rect.width / 2 - pan.x;
+    const cursorFromAnchorY = e.clientY - rect.top - rect.height / 2 - pan.y;
+    const ratio = newZoom / oldZoom;
+    panel._feTPPan = {
+      x: pan.x + cursorFromAnchorX * (1 - ratio),
+      y: pan.y + cursorFromAnchorY * (1 - ratio),
+    };
+    panel._feTPZoom = newZoom;
+    feRenderGridPreview(panel, panel._feTPValues, panel._feTPNaturalSize);
+  }, { passive: false });
 }
 
 function _feTPWireResize(panel, handle) {

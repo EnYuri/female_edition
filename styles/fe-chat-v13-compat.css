@@ -153,6 +153,12 @@ body.fe-fonts-enabled
   :is(.chat-message, .message)
   .message-content img {
   max-width: 100%;
+}
+
+/* Keep system/module image dimensions intact in notification clones too. */
+#chat-notifications
+  :is(.chat-message, .message)
+  .message-content img:not([height]) {
   height: auto;
 }
 

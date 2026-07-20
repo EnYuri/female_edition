@@ -1,6 +1,6 @@
 // fe-dx3rd-resource-ui.js
 // 픽셀 테마 캐릭터 스테이터스 — 시트 헤더/컨텍스트 메뉴로 직접 핀한 액터를 패널로 표시.
-// 토큰 존재 여부와 완전히 무관.
+// 월드 액터는 토큰 존재 여부와 무관. 비연결 토큰의 합성 액터는 현재 씬에서 별도 수집.
 //
 // 카드 존재: 액터에 SHOW_FLAG가 있는 경우만 (시트 헤더·컨텍스트 메뉴로 토글).
 // 채팅 토글: 전체 가시성 on/off — 카드 DOM은 유지하고 display만 변경.
@@ -14,6 +14,7 @@
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
+import { feResolveSocketSender } from "./fe-socket-auth.js";
 
 // hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0.
 function _hexToHs(hex) {
@@ -113,12 +114,42 @@ function _isPC(actor) {
 }
 
 // ─── pinned actors ─────────────────────────────────────────────────────────
-// 토큰 존재 여부 무관 — SHOW_FLAG가 설정된 액터만 포함.
+// 월드 액터는 토큰 존재 여부와 무관하다. 비연결 토큰의 합성 액터는 game.actors에
+// 들어 있지 않으므로 현재 씬의 TokenDocument.actor도 함께 수집한다.
+
+function _actorKey(actor) {
+  return actor?.uuid ?? actor?.id ?? "";
+}
+
+function _activeSceneTokenActors() {
+  const tokens = canvas?.scene?.tokens ?? game.scenes?.active?.tokens;
+  if (!tokens) return [];
+  return Array.from(tokens, token => token?.actor).filter(actor => actor?.documentName === "Actor");
+}
+
+function _resolveResourceActor(actorRef) {
+  if (actorRef?.documentName === "Actor") return actorRef;
+  const ref = String(actorRef ?? "");
+  if (!ref) return null;
+  const sceneActor = _activeSceneTokenActors().find(actor => _actorKey(actor) === ref);
+  const worldId = ref.startsWith("Actor.") ? ref.slice("Actor.".length) : ref;
+  return sceneActor ?? game.actors?.get(worldId) ?? null;
+}
+
+function _findActorCard(container, actorRef) {
+  const key = typeof actorRef === "string" ? actorRef : _actorKey(actorRef);
+  return Array.from(container?.querySelectorAll?.(".fedr-actor-card") ?? [])
+    .find(card => card.dataset.actorUuid === key) ?? null;
+}
 
 function _pinnedActors() {
   if (!game.actors) return { pcs: [], enemies: [] };
   const pcs = [], enemies = [];
-  for (const actor of game.actors) {
+  const seen = new Set();
+  for (const actor of [...game.actors, ..._activeSceneTokenActors()]) {
+    const key = _actorKey(actor);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
     if (!actor.getFlag(MODULE_ID, SHOW_FLAG)) continue;
     (_isPC(actor) ? pcs : enemies).push(actor);
   }
@@ -277,6 +308,7 @@ function _buildCard(actor, pw, panelW, ch) {
   const card = document.createElement("div");
   card.className = "fedr-actor-card";
   card.dataset.actorId = actor.id;
+  card.dataset.actorUuid = _actorKey(actor);
   card.style.setProperty("--fedr-pw", `${pw}px`);
   card.style.setProperty("--fedr-panel-w", `${panelW}px`);
   card.style.setProperty("--fedr-ph", `${ch}px`);
@@ -309,13 +341,13 @@ function _buildCard(actor, pw, panelW, ch) {
   feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
 
   card.addEventListener("contextmenu", e => {
-    const a = game.actors?.get(card.dataset.actorId);
+    const a = _resolveResourceActor(card.dataset.actorUuid);
     if (!a?.isOwner) return;
     _showCardContextMenu(a, e);
   });
 
   card.addEventListener("dblclick", e => {
-    const a = game.actors?.get(card.dataset.actorId);
+    const a = _resolveResourceActor(card.dataset.actorUuid);
     if (!a?.isOwner) return;
     e.stopPropagation();
     a.sheet?.render(true);
@@ -433,12 +465,12 @@ function _applyContainerDisplay(cnt) {
 }
 
 function _syncContainerCards(cnt, actors, pw, panelW, ch) {
-  const live = new Set(actors.map(a => a.id));
+  const live = new Set(actors.map(_actorKey));
   for (const card of [...cnt.querySelectorAll(".fedr-actor-card")]) {
-    if (!live.has(card.dataset.actorId)) card.remove();
+    if (!live.has(card.dataset.actorUuid)) card.remove();
   }
   for (const actor of actors) {
-    let card = cnt.querySelector(`.fedr-actor-card[data-actor-id="${actor.id}"]`);
+    let card = _findActorCard(cnt, actor);
     if (!card) {
       card = _buildCard(actor, pw, panelW, ch);
       cnt.appendChild(card);
@@ -476,17 +508,17 @@ function feRebuildDx3rdResourceUI() {
 }
 
 // 단일 액터 데이터 갱신 — 핀된 액터의 HP·침식률 업데이트.
-function feUpdateDx3rdResourceUI(actorId) {
+function feUpdateDx3rdResourceUI(actorRef) {
   if (!_isSupported()) return;
 
-  const actor = game.actors?.get(actorId);
+  const actor = _resolveResourceActor(actorRef);
   if (!actor || !_isActorPinned(actor)) return;
 
   const cntId = _isPC(actor) ? CONTAINER_OWN_ID : CONTAINER_ID;
   const cnt   = document.getElementById(cntId);
   if (!cnt) { feRebuildDx3rdResourceUI(); return; }
 
-  let card = cnt.querySelector(`.fedr-actor-card[data-actor-id="${actorId}"]`);
+  let card = _findActorCard(cnt, actor);
   if (!card) {
     // actorType 변경 등으로 컨테이너가 달라진 경우
     card = _buildCard(actor, _portraitW(), _panelW(), _cardH());
@@ -507,7 +539,7 @@ function _addActorCard(actor) {
   const panelW = _panelW();
   const ch     = _cardH();
 
-  let card = cnt.querySelector(`.fedr-actor-card[data-actor-id="${actor.id}"]`);
+  let card = _findActorCard(cnt, actor);
   if (!card) {
     card = _buildCard(actor, pw, panelW, ch);
     cnt.appendChild(card);
@@ -521,11 +553,12 @@ function _addActorCard(actor) {
   _applyContainerDisplay(cnt);
 }
 
-function _removeActorCard(actorId) {
+function _removeActorCard(actorRef) {
+  const key = typeof actorRef === "string" ? actorRef : _actorKey(actorRef);
   for (const id of [CONTAINER_ID, CONTAINER_OWN_ID]) {
     const cnt = document.getElementById(id);
     if (!cnt) continue;
-    cnt.querySelector(`.fedr-actor-card[data-actor-id="${actorId}"]`)?.remove();
+    _findActorCard(cnt, key)?.remove();
     _applyContainerDisplay(cnt);
   }
 }
@@ -538,10 +571,16 @@ function _toggleActorPin(actor) {
     else actor.unsetFlag(MODULE_ID, SHOW_FLAG);
   } else {
     // 직접 수정 불가 — GM에게 소켓으로 요청
-    game.socket.emit(`module.${MODULE_ID}`, { type: "ruiPinToggle", actorId: actor.id, pinned: willPin });
+    game.socket.emit(`module.${MODULE_ID}`, {
+      type: "ruiPinToggle",
+      actorUuid: _actorKey(actor),
+      actorId: actor.id,
+      requesterId: game.user.id,
+      pinned: willPin,
+    });
     // 낙관적 로컬 업데이트 (updateActor로 최종 확정)
     if (willPin) _addActorCard(actor);
-    else _removeActorCard(actor.id);
+    else _removeActorCard(actor);
   }
 }
 
@@ -929,11 +968,16 @@ Hooks.on("ready", () => {
   feRebuildDx3rdResourceUI();
 
   // 다른 클라이언트의 소켓 메시지 수신
-  game.socket.on(`module.${MODULE_ID}`, data => {
+  game.socket.on(`module.${MODULE_ID}`, async (data, senderId) => {
     if (data?.type === "ruiPinToggle" && game.user.isGM) {
       // 직접 수정 권한 없는 플레이어 대신 GM이 플래그 변경 처리
-      const actor = game.actors?.get(data.actorId);
-      if (!actor) return;
+      const requester = feResolveSocketSender(senderId, data.requesterId, "resource-ui");
+      if (!requester) return;
+      let actor = null;
+      try { actor = data.actorUuid ? await fromUuid(data.actorUuid) : null; }
+      catch { /* fall through to the v13/world-actor compatibility path */ }
+      actor ??= game.actors?.get(data.actorId);
+      if (actor?.documentName !== "Actor" || !actor.testUserPermission?.(requester, "OWNER")) return;
       if (data.pinned) actor.setFlag(MODULE_ID, SHOW_FLAG, true);
       else actor.unsetFlag(MODULE_ID, SHOW_FLAG);
     }
@@ -947,9 +991,14 @@ Hooks.on("updateActor", (actor, change) => {
     feRebuildDx3rdResourceUI();
   } else {
     // HP·침식률 등 데이터 변경 → 해당 카드만 갱신
-    feUpdateDx3rdResourceUI(actor.id);
+    feUpdateDx3rdResourceUI(actor);
   }
 });
+
+// 합성 액터는 현재 씬의 TokenDocument를 통해서만 열거할 수 있다. 씬 전환과
+// 비연결 토큰 삭제 시 월드 액터 목록만으로는 남은 카드를 정리할 수 없으므로 재빌드한다.
+Hooks.on("canvasReady", feRebuildDx3rdResourceUI);
+Hooks.on("deleteToken", feRebuildDx3rdResourceUI);
 
 Hooks.on("renderChatLog",   () => { _injectAccentBtn(); });
 Hooks.on("renderChatInput", () => { _injectAccentBtn(); });
