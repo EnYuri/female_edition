@@ -419,6 +419,32 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   padding: 0 !important;
 }
 
+/*
+ * Keep FE's injected portrait visible in the archive/print document.
+ *
+ * Some v13 systems and themes ship broad print rules for header images. The
+ * portrait grid survives those rules (and therefore still reserves the first
+ * column), but the image itself can become display:none/visibility:hidden.
+ * That produces a conspicuous empty portrait column in the PDF. The archive
+ * owns this layout, so reassert the image box here while continuing to honour
+ * FE's explicit portrait/image hiding modes.
+ */
+body:not(.fe-hide-chat-portrait-wrap):not(.fe-print-hide-avatars):not(.fe-print-hide-all)
+  #fe-chat-export-container
+  .chat-message.fe-has-chat-portrait
+  > .message-header
+  > img.fe-chat-portrait {
+  display: block !important;
+  visibility: visible !important;
+  grid-area: portrait !important;
+  width: var(--fe-chat-portrait-size, 64px) !important;
+  height: var(--fe-chat-portrait-size, 64px) !important;
+  min-width: var(--fe-chat-portrait-size, 64px) !important;
+  min-height: var(--fe-chat-portrait-size, 64px) !important;
+  align-self: stretch !important;
+  justify-self: start !important;
+}
+
 #fe-chat-export-container .chat-message.fe-has-chat-portrait > .message-header .message-sender {
   grid-area: sender;
   display: flex !important;

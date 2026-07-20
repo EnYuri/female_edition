@@ -220,19 +220,33 @@ export function feNormalizeExportNode(rootEl, { loading = "eager", decoding = "s
   } catch {}
 }
 
-export function feNormalizeArchiveShellLayout(doc, { restore = false } = {}) {
+export function feNormalizeArchiveShellLayout(doc, { restore = false, root = null } = {}) {
   const changed = [];
   try {
     if (!doc?.querySelectorAll) return () => {};
-    const targets = [
-      doc.getElementById?.("fe-chat-export-container"),
-      doc.getElementById?.("fe-chat-export-sidebar"),
-      doc.getElementById?.("fe-chat-export-chat"),
-      doc.getElementById?.("fe-chat-export-log"),
-      doc.getElementById?.("sidebar"),
-      doc.getElementById?.("chat"),
-      doc.getElementById?.("chat-log"),
-    ].filter(Boolean);
+    const scope = feIsElement(root) ? root : null;
+    const inScope = (selector) => {
+      if (!scope) return null;
+      if (scope.matches?.(selector)) return scope;
+      return scope.querySelector?.(selector) ?? null;
+    };
+    const targets = (scope
+      ? [
+          scope,
+          inScope("#fe-chat-export-sidebar"),
+          inScope("#fe-chat-export-chat"),
+          inScope("#fe-chat-export-log"),
+          inScope("#chat-log"),
+        ]
+      : [
+          doc.getElementById?.("fe-chat-export-container"),
+          doc.getElementById?.("fe-chat-export-sidebar"),
+          doc.getElementById?.("fe-chat-export-chat"),
+          doc.getElementById?.("fe-chat-export-log"),
+          doc.getElementById?.("sidebar"),
+          doc.getElementById?.("chat"),
+          doc.getElementById?.("chat-log"),
+        ]).filter(Boolean);
     for (const el of targets) {
       try {
         const prevStyle = restore ? el.getAttribute("style") : null;
@@ -491,4 +505,3 @@ export function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } =
     return Promise.resolve(0);
   }
 }
-

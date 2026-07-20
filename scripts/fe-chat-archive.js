@@ -394,9 +394,9 @@ function feEnsureExportContainer() {
     });
   }
   if (dlBtn) {
-    dlBtn.addEventListener("click", (ev) => {
+    dlBtn.addEventListener("click", async (ev) => {
       ev.preventDefault();
-      feDownloadExportHTMLFromCurrentDocument();
+      await feDownloadExportHTMLFromCurrentDocument();
     });
   }
 
@@ -672,15 +672,18 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
       renderProfile,
     });
 
-    try { feNormalizeArchiveShellLayout(document); } catch {}
+    // This fallback lives in the real Foundry document. Restrict normalization
+    // to the export subtree so the live sidebar/chat DOM is never left with
+    // archive-only inline width/overflow styles after cleanup.
+    try { feNormalizeArchiveShellLayout(document, { root: container }); } catch {}
 
     // Apply merge styling to export log (our mutation observer is scoped to #sidebar)
     if (feSetting(S.MERGE_ENABLED)) {
       feSyncArchiveMergeBodyClasses(document);
       feApplyChatMerge(logEl, feArchiveMergeOptions());
-      feRefreshPortraitsForLog(logEl);
+      feRefreshPortraitsForLog(logEl, renderProfile);
     } else if (renderProfile.deferPortraits) {
-      feRefreshPortraitsForLog(logEl);
+      feRefreshPortraitsForLog(logEl, renderProfile);
     }
 
     try {
@@ -1032,7 +1035,45 @@ function feSyncArchiveMergeBodyClasses(doc) {
   }
 }
 
-function feRefreshPortraitsForLog(logEl) {
+function feNormalizeArchivePortraitImages(rootEl, renderProfile = null) {
+  try {
+    if (!rootEl?.querySelectorAll) return;
+    const body = rootEl.ownerDocument?.body;
+    const explicitlyHidden = !!(
+      body?.classList?.contains?.("fe-hide-chat-portrait-wrap") ||
+      body?.classList?.contains?.("fe-print-hide-avatars") ||
+      body?.classList?.contains?.("fe-print-hide-all")
+    );
+
+    for (const img of rootEl.querySelectorAll("img.fe-chat-portrait")) {
+      const src = img.getAttribute("src");
+      if (src) {
+        try {
+          img.src = new URL(src, rootEl.ownerDocument?.baseURI || window.location.href).href;
+        } catch {
+          try { img.src = new URL(src, window.location.href).href; } catch {}
+        }
+      }
+      img.setAttribute("loading", renderProfile?.normalizeImageLoading || "eager");
+      img.setAttribute("decoding", renderProfile?.normalizeImageDecoding || "sync");
+      if (!explicitlyHidden) {
+        // Inline !important is intentional: v13 systems/themes can carry their
+        // own broad @media print image rules, which otherwise beat module CSS.
+        img.style.setProperty("display", "block", "important");
+        img.style.setProperty("visibility", "visible", "important");
+      } else {
+        // A live clone may already carry the archive override. Remove it so the
+        // user's explicit hide mode remains authoritative.
+        img.style.removeProperty("display");
+        img.style.removeProperty("visibility");
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feRefreshPortraitsForLog(logEl, renderProfile = null) {
   try {
     if (!logEl?.querySelectorAll) return;
     for (const el of logEl.querySelectorAll("li.chat-message")) {
@@ -1040,6 +1081,7 @@ function feRefreshPortraitsForLog(logEl) {
       const msg = (id ? game.messages?.get(id) : null) || el.__feMessage || null;
       if (!msg) continue;
       feChatPortraitUpsert(msg, el);
+      feNormalizeArchivePortraitImages(el, renderProfile);
     }
   } catch {
     /* no-op */
@@ -1505,6 +1547,10 @@ async function feRenderMessagesIntoLog({
         if (msg && !feHasPortraitMarkup(node)) feChatPortraitUpsert(msg, node);
       } catch {}
     }
+
+    // Portrait upsert can create a new <img> after the first normalization
+    // pass above. Normalize existing clones and newly inserted portraits alike.
+    feNormalizeArchivePortraitImages(node, renderProfile);
 
     return node;
   };
@@ -2253,12 +2299,12 @@ async function feRenderChatArchiveWindow(win, {
   // Apply merge styling in the archive window if enabled.
   if (feSetting(S.MERGE_ENABLED)) {
     try {
-      feApplyChatMergeInWindow(win);
+      feApplyChatMergeInWindow(win, renderProfile);
     } catch (err) {
       console.warn("female_edition | archive merge failed", err);
     }
   } else if (renderProfile.deferPortraits) {
-    feRefreshPortraitsForLog(logEl);
+    feRefreshPortraitsForLog(logEl, renderProfile);
   }
 
   try {
@@ -2309,16 +2355,15 @@ async function feRenderChatArchiveWindow(win, {
 }
 
 // ===========================================================================
-// Print page-break image handling  (shrink / split for page boundaries)
+// Print page-break image handling  (paper-size-adaptive, single-image fidelity)
 // ===========================================================================
 
 /**
  * Prepare content images for print pagination.
- * - Images taller than one page: shrink to fit one page and never split — pushed to
- *   the next page when the current one no longer has room for the shrunk image.
- * - Images crossing a page boundary with < 50% overflow: shrink to fit current page.
- * - Images crossing a page boundary with >= 50% overflow: split into two clipped
- *   fragments so the image spans both pages without blank space.
+ * Keep each source image as one replaced element and let Chromium's paged-media
+ * engine place it on the current or next page. A viewport-relative maximum height
+ * adapts to A4/Letter/custom paper and print scaling; no guessed pixel page height,
+ * document-position modulo, or clipped duplicate is involved.
  *
  * Must be called after all other pre-print mutations (downscale, background freeze,
  * font load) and after a reflow.
@@ -2329,9 +2374,6 @@ async function feRenderChatArchiveWindow(win, {
 function fePrepareImagesForPageBreaks(doc, logEl) {
   if (!logEl) return () => {};
 
-  // A4 = 297mm, @page margin = 10mm each → 277mm content ≈ 1047px at 96 dpi.
-  const PAGE_H = 1047;
-  const MAX_IMG_H = PAGE_H - 20;
   let restored = false;
   const changes = [];
 
@@ -2348,87 +2390,26 @@ function fePrepareImagesForPageBreaks(doc, logEl) {
 
   try {
     void logEl.offsetHeight;
-    const scrollY = doc.defaultView?.scrollY ?? 0;
-
     const imgs = Array.from(logEl.querySelectorAll("img")).filter(isContentImage);
 
     for (const img of imgs) {
-      void logEl.offsetHeight;
       const rect = img.getBoundingClientRect();
-      const imgDocTop = rect.top + scrollY;
-      const imgH = rect.height;
-      const imgW = rect.width;
+      if (rect.height <= 0 || rect.width <= 0) continue;
 
-      if (imgH <= 0 || imgW <= 0) continue;
+      const prevStyle = img.getAttribute("style");
+      changes.push({ img, prevStyle });
 
-      if (imgH > MAX_IMG_H) {
-        // Shrink to at most one page, then keep it whole: a shrunk image still
-        // straddling a boundary would be sliced by the printer.
-        const prevStyle = img.getAttribute("style") || "";
-        img.style.maxHeight = `${MAX_IMG_H}px`;
-        img.style.width = "auto";
-        img.style.height = "auto";
-        img.style.objectFit = "contain";
-        img.style.display = "block";
-        img.style.breakInside = "avoid";
-        img.style.pageBreakInside = "avoid";
-        changes.push({ type: "shrink", img, prevStyle });
-
-        void logEl.offsetHeight;
-        const shrunk = img.getBoundingClientRect();
-        const shrunkTop = shrunk.top + scrollY;
-        const shrunkRemaining = PAGE_H - (((shrunkTop % PAGE_H) + PAGE_H) % PAGE_H);
-        if (shrunk.height > shrunkRemaining) {
-          img.style.breakBefore = "page";
-          img.style.pageBreakBefore = "always";
-        }
-        continue;
-      }
-
-      const posInPage = ((imgDocTop % PAGE_H) + PAGE_H) % PAGE_H;
-      const remaining = PAGE_H - posInPage;
-
-      if (imgH <= remaining) continue;
-
-      const overflow = imgH - remaining;
-      const overflowRatio = overflow / imgH;
-
-      if (overflowRatio < 0.5) {
-        const prevStyle = img.getAttribute("style") || "";
-        const fitH = Math.max(remaining - 4, 40);
-        img.style.maxHeight = `${fitH}px`;
-        img.style.width = "auto";
-        img.style.objectFit = "contain";
-        changes.push({ type: "shrink", img, prevStyle });
-      } else {
-        const prevStyle = img.getAttribute("style") || "";
-        const parent = img.parentNode;
-        const nextSib = img.nextSibling;
-
-        const wrapper = doc.createElement("div");
-        wrapper.className = "fe-print-img-split";
-        wrapper.style.cssText = "display:block;";
-
-        const frag1 = doc.createElement("div");
-        frag1.style.cssText = `width:${imgW}px; height:${remaining}px; overflow:hidden; display:block; break-inside:avoid; page-break-inside:avoid;`;
-        const img1 = img.cloneNode(true);
-        img1.removeAttribute("style");
-        img1.style.cssText = `width:${imgW}px; height:${imgH}px; display:block; max-width:none;`;
-        frag1.appendChild(img1);
-
-        const frag2 = doc.createElement("div");
-        frag2.style.cssText = `width:${imgW}px; height:${overflow}px; overflow:hidden; display:block; break-inside:avoid; page-break-inside:avoid;`;
-        const img2 = img.cloneNode(true);
-        img2.removeAttribute("style");
-        img2.style.cssText = `width:${imgW}px; height:${imgH}px; display:block; margin-top:${-remaining}px; max-width:none;`;
-        frag2.appendChild(img2);
-
-        wrapper.appendChild(frag1);
-        wrapper.appendChild(frag2);
-
-        parent.replaceChild(wrapper, img);
-        changes.push({ type: "split", img, wrapper, parent, nextSib, prevStyle });
-      }
+      // Preserve the archive's already-rendered width, but allow narrower paper
+      // to shrink it. height:auto retains the source aspect ratio. In print media,
+      // 100vh tracks the selected page viewport; subtracting the module's 10mm
+      // top/bottom @page margins keeps a very tall image inside one page box.
+      img.style.setProperty("width", `min(100%, ${Math.ceil(rect.width)}px)`, "important");
+      img.style.setProperty("height", "auto", "important");
+      img.style.setProperty("max-width", "100%", "important");
+      img.style.setProperty("max-height", "calc(100vh - 20mm)", "important");
+      img.style.setProperty("object-fit", "contain", "important");
+      img.style.setProperty("break-inside", "avoid", "important");
+      img.style.setProperty("page-break-inside", "avoid", "important");
     }
   } catch (err) {
     console.warn("female_edition | fePrepareImagesForPageBreaks error", err);
@@ -2439,19 +2420,8 @@ function fePrepareImagesForPageBreaks(doc, logEl) {
     restored = true;
     for (const ch of changes.reverse()) {
       try {
-        if (ch.type === "shrink") {
-          if (ch.prevStyle) ch.img.setAttribute("style", ch.prevStyle);
-          else ch.img.removeAttribute("style");
-        } else if (ch.type === "split") {
-          if (ch.prevStyle) ch.img.setAttribute("style", ch.prevStyle);
-          else ch.img.removeAttribute("style");
-          if (ch.nextSib && ch.nextSib.parentNode === ch.parent) {
-            ch.parent.insertBefore(ch.img, ch.nextSib);
-          } else {
-            ch.parent.appendChild(ch.img);
-          }
-          ch.wrapper.remove();
-        }
+        if (ch.prevStyle == null) ch.img.removeAttribute("style");
+        else ch.img.setAttribute("style", ch.prevStyle);
       } catch {}
     }
   };
@@ -2559,6 +2529,7 @@ async function feArchivePrint(win) {
     doc.body.classList.toggle("fe-print-hide-all", mode === "hideAll");
     doc.body.classList.toggle("fe-print-downscale", mode === "downscale");
     doc.body.classList.toggle("fe-print-downscale-lite", mode === "downscaleLite");
+    feNormalizeArchivePortraitImages(logEl, renderProfile);
   } catch {}
 
   // ---
@@ -2744,11 +2715,29 @@ async function feArchivePrint(win) {
 // HTML Snapshot Export  (blob build, download, external browser)
 // ===========================================================================
 
-async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta } = {}) {
+async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta, bodyRoot = null } = {}) {
   if (!win || win.closed) throw new Error("Archive window is closed");
   const setMeta = typeof meta === "function" ? meta : () => {};
 
   const doc = win.document;
+  const snapshotRoot = feIsElement(bodyRoot) ? bodyRoot : doc.body;
+  const scopedBody = snapshotRoot !== doc.body;
+  const bodyAttrs = (() => {
+    try {
+      const attrs = Array.from(doc.body?.attributes ?? []).map((a) => {
+        const n = String(a?.name ?? "");
+        const v = feEscapeAttr(String(a?.value ?? ""));
+        return n ? `${n}="${v}"` : "";
+      }).filter(Boolean);
+      return attrs.length ? " " + attrs.join(" ") : "";
+    } catch {
+      return "";
+    }
+  })();
+  const serializeSnapshotRoot = () => {
+    const parts = feSerializeBodyToParts(snapshotRoot);
+    return scopedBody ? [`<body${bodyAttrs}>`, ...parts, "</body>"] : parts;
+  };
 
   // IMPORTANT (memory):
   // Do NOT deep-clone the full <html> tree for large logs.
@@ -2759,6 +2748,18 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // Head snapshot
   // ---
   const headClone = (doc.head ? doc.head.cloneNode(true) : doc.createElement("head"));
+
+  // A scoped inline snapshot originates from Foundry's real application
+  // document, whose <head> contains boot/module scripts. The archive needs its
+  // styles and metadata, never executable application code. Popup/iframe heads
+  // are already purpose-built, but applying this only to scoped snapshots keeps
+  // the distinction explicit and prevents a saved chat file from booting Foundry.
+  if (scopedBody) {
+    try {
+      headClone.querySelectorAll?.('script, noscript, link[rel="modulepreload"], link[rel="preload"][as="script"]')
+        .forEach((el) => el.remove());
+    } catch {}
+  }
 
   // Ensure a stable <base> so relative URLs resolve when opening as file://
   try {
@@ -2845,10 +2846,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // ---
   let bodyParts = [""];
   const embedFonts = !!feSetting(S.EXPORT_EMBED_FONTS);
-  const liveLogEl = doc.getElementById("fe-chat-export-log") || doc.getElementById("chat-log") || doc.querySelector("ol.chat-log");
+  const liveLogEl = snapshotRoot.matches?.("#fe-chat-export-log, #chat-log, ol.chat-log")
+    ? snapshotRoot
+    : snapshotRoot.querySelector?.("#fe-chat-export-log, #chat-log, ol.chat-log");
   const restoreBg = feFreezeMessageBackgroundsForPrint(win, liveLogEl);
-  const restoreShell = feNormalizeArchiveShellLayout(doc, { restore: true });
-  const restoreLayout = feNormalizeArchiveMessageLayout(doc.body, { restore: true });
+  const restoreShell = feNormalizeArchiveShellLayout(doc, { restore: true, root: scopedBody ? snapshotRoot : null });
+  const restoreLayout = feNormalizeArchiveMessageLayout(snapshotRoot, { restore: true });
   try {
     if (feSetting(S.EXPORT_EMBED_IMAGES)) {
       // Image embedding mutates img src/srcset to data: URLs. Apply in-place + revert
@@ -2857,7 +2860,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       // string and a Blob).
       try {
         setMeta("Embedding images…");
-        const prepRestore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+        const prepRestore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts });
         // P4: downscale images to small data: URLs BEFORE embedding. feEmbedImagesInNode
         // skips anything already `data:`, so this both shrinks the embedded payload
         // (far more images fit under the byte budget → better offline fidelity) and
@@ -2871,7 +2874,9 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         const dsStats = {};
         let downscaleRestore = () => {};
         try {
-          const embedLogEl = doc.getElementById("fe-chat-export-log") || doc.getElementById("chat-log") || doc.querySelector("ol.chat-log");
+          const embedLogEl = snapshotRoot.matches?.("#fe-chat-export-log, #chat-log, ol.chat-log")
+            ? snapshotRoot
+            : snapshotRoot.querySelector?.("#fe-chat-export-log, #chat-log, ol.chat-log");
           if (embedLogEl) {
             downscaleRestore = await feDownscaleImagesForPrint(win, embedLogEl, {
               meta: setMeta,
@@ -2892,12 +2897,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         } catch (e) {
           console.warn("female_edition | HTML export: pre-embed downscale failed", e);
         }
-        const embedRestore = await feEmbedImagesInNode(doc.body, {
+        const embedRestore = await feEmbedImagesInNode(snapshotRoot, {
           meta: setMeta,
           maxTotalBytes: Math.max(0, HTML_EMBED_TOTAL_BYTES - (dsStats.bytesUsed || 0)),
         });
         try {
-          bodyParts = feSerializeBodyToParts(doc.body);
+          bodyParts = serializeSnapshotRoot();
         } finally {
           try { embedRestore?.(); } catch {}
           try { downscaleRestore?.(); } catch {}
@@ -2906,17 +2911,17 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed images", err);
         // Fallback: still produce a valid snapshot.
-        const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+        const restore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts });
         try {
-          bodyParts = feSerializeBodyToParts(doc.body);
+          bodyParts = serializeSnapshotRoot();
         } finally {
           try { restore(); } catch {}
         }
       }
     } else {
-      const restore = fePrepareBodyForHTMLSnapshot(doc.body, { embedFonts });
+      const restore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts });
       try {
-        bodyParts = feSerializeBodyToParts(doc.body);
+        bodyParts = serializeSnapshotRoot();
       } finally {
         try { restore(); } catch {}
       }
@@ -2950,7 +2955,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   );
 }
 
-async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
+async function feDownloadArchiveHTML(win, titleText = "Chat Log", { bodyRoot = null } = {}) {
   if (!win || win.closed) return false;
   const metaEl = win.document.getElementById("fe-chat-export-meta");
   const originalMeta = (() => {
@@ -2975,7 +2980,7 @@ async function feDownloadArchiveHTML(win, titleText = "Chat Log") {
     const doc = win.document;
 
     setMeta("Preparing HTML…");
-    const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta });
+    const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta, bodyRoot });
 
     setMeta("Downloading…");
     const url = URL.createObjectURL(blob);
@@ -3677,29 +3682,20 @@ function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false } = {}) {
 // Inline Export — download from current (non-popup) document
 // ---------------------------------------------------------------------------
 
-function feDownloadExportHTMLFromCurrentDocument() {
+async function feDownloadExportHTMLFromCurrentDocument() {
   try {
     const container = document.getElementById("fe-chat-export-container");
-    if (!container) return;
+    if (!container) return false;
 
-    const docEl = document.documentElement;
-    const html = "<!doctype html>\n" + docEl.outerHTML;
-
-    const worldName = game.world?.title ?? game.world?.name ?? "chat-log";
-    const safeName = feSanitizeExportFilename(worldName);
-    const filename = `Chat Log - ${safeName}.html`;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const worldName = game.world?.title ?? game.world?.name ?? "";
+    const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+    // Reuse the popup/desktop snapshot pipeline, but serialize only the export
+    // subtree. Head styles and body theme classes are retained; unrelated live
+    // Foundry UI and out-of-range chat DOM never enter the saved file.
+    return await feDownloadArchiveHTML(window, titleText, { bodyRoot: container });
   } catch (err) {
     console.warn("female_edition | failed to download export HTML", err);
+    return false;
   }
 }
 
@@ -3726,7 +3722,7 @@ async function feMaybeYieldForUI(targetWindow = window) {
 //                                   live-tree mirror, message style mirror)
 // ===========================================================================
 
-function feApplyChatMergeInWindow(win) {
+function feApplyChatMergeInWindow(win, renderProfile = null) {
   try {
     const logEl =
       win.document.getElementById("fe-chat-export-log") ||
@@ -3736,7 +3732,7 @@ function feApplyChatMergeInWindow(win) {
 
     feSyncArchiveMergeBodyClasses(win.document);
     feApplyRenderedStateToLog(logEl, feArchiveMergeOptions());
-    feRefreshPortraitsForLog(logEl);
+    feRefreshPortraitsForLog(logEl, renderProfile);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
   }

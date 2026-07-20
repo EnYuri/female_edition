@@ -627,14 +627,14 @@ export async function feDownscaleImagesForPrint(
   // Caller may lower this for huge logs to cap peak memory.
   const ENCODE_CONCURRENCY = Math.max(1, Number(concurrency) || 6);
 
-  const processGroup = async (g) => {
+  const encodeGroup = async (g) => {
     try {
-      if (!g.needsResample) return;
+      if (!g.needsResample) return null;
       const rep = g.imgs.find((img) => img?.complete && img.naturalWidth > 0);
-      if (!rep) return;
+      if (!rep) return null;
       // Budget spent (HTML-embed path) → skip before the (expensive) resample,
       // leaving this group at its original src.
-      if (maxTotalBytes > 0 && totalEncodedBytes >= maxTotalBytes) return;
+      if (maxTotalBytes > 0 && totalEncodedBytes >= maxTotalBytes) return null;
       const outW = Math.max(1, Math.min(g.maxW, Math.round(g.maxW)));
       const outH = Math.max(1, Math.min(g.maxH, Math.round(g.maxH)));
       const spec = computeDrawSpec(rep, outW, outH);
@@ -647,7 +647,7 @@ export async function feDownscaleImagesForPrint(
           maxIntermediateSide: intermediateCap > 0 ? Math.min(baseIntermediate, intermediateCap) : baseIntermediate,
         });
       }
-      if (!canvas) return;
+      if (!canvas) return null;
       const encodeOpts = {
         webpQuality: g.isAvatar ? avatarWebpQuality : webpQuality,
         jpegQuality: g.isAvatar ? avatarJpegQuality : jpegQuality,
@@ -670,18 +670,35 @@ export async function feDownscaleImagesForPrint(
       }
       canvas.width = 0;
       canvas.height = 0;
-      if (!imageUrl) return;
-      totalEncodedBytes += approxBytes;
-      // Swap + release this group's originals right away (see swapGroup).
-      swapGroup(g, imageUrl);
+      if (!imageUrl) return null;
+      return { g, imageUrl, approxBytes };
     } catch {
       // Ignore per-group failures.
+      return null;
     }
   };
 
   for (let start = 0; start < groupList.length; start += ENCODE_CONCURRENCY) {
     const batch = groupList.slice(start, start + ENCODE_CONCURRENCY);
-    await Promise.all(batch.map(processGroup));
+    // Encoding remains parallel, but budget decisions and DOM swaps are committed
+    // in stable document/group order. This prevents every worker in a batch from
+    // observing the same pre-batch byte count and collectively overshooting the
+    // HTML snapshot's hard cap.
+    const encoded = await Promise.all(batch.map(encodeGroup));
+    for (const result of encoded) {
+      if (!result) continue;
+      const { g, imageUrl, approxBytes } = result;
+      if (maxTotalBytes > 0 && totalEncodedBytes + approxBytes > maxTotalBytes) {
+        if (createdBlobURLs?.has(imageUrl)) {
+          try { winURL.revokeObjectURL(imageUrl); } catch {}
+          createdBlobURLs.delete(imageUrl);
+        }
+        continue;
+      }
+      totalEncodedBytes += approxBytes;
+      // Swap + release this group's originals only after its bytes are admitted.
+      swapGroup(g, imageUrl);
+    }
     const gi = Math.min(start + ENCODE_CONCURRENCY, groupList.length);
     setMeta(`Downscaling images… ${gi}/${groupList.length}`);
     await feNextTick();
