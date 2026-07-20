@@ -396,6 +396,239 @@ function registerDeleteGuards() {
   });
 }
 
+/**
+ * Replace Foundry's always-visible per-sound volume slider with a playback seek
+ * slider. The original volume control is preserved inside a button-triggered
+ * popover, so core's own volume handler continues to own volume changes.
+ */
+function registerPlaylistSeekControls() {
+  const SEEK_SELECTOR = ".fe-music-seek";
+  const seekGenerations = new Map();
+
+  const extractElement = (html) => {
+    const el = html?.nodeType ? html : html?.[0];
+    return el?.querySelectorAll ? el : null;
+  };
+
+  const formatTimestamp = (seconds) => {
+    if (!Number.isFinite(seconds)) return "∞";
+    const value = Math.max(0, seconds ?? 0);
+    const minutes = Math.floor(value / 60);
+    const remainder = Math.round(value % 60);
+    return `${minutes}:${String(remainder).padStart(2, "0")}`;
+  };
+
+  const soundForElement = (el) => {
+    const row = el?.closest?.(".sound[data-playlist-id][data-sound-id]");
+    const playlist = row ? game.playlists?.get(row.dataset.playlistId) : null;
+    return { row, playlist, sound: playlist?.sounds?.get(row.dataset.soundId) ?? null };
+  };
+
+  const closeVolumePopovers = (except = null) => {
+    for (const popover of document.querySelectorAll(".fe-music-volume-popover:not([hidden])")) {
+      if (popover === except) continue;
+      popover.hidden = true;
+      popover.closest(".fe-music-volume-control")
+        ?.querySelector(".fe-music-volume-toggle")
+        ?.setAttribute("aria-expanded", "false");
+    }
+  };
+
+  const updateSeekSlider = (slider) => {
+    if (!slider || slider.dataset.seeking === "true") return;
+    if (slider.dataset.dragging === "true") {
+      const current = slider.closest(".sound")?.querySelector(".sound-timer .current");
+      if (current) current.textContent = formatTimestamp(Number(slider.value));
+      return;
+    }
+    const { sound } = soundForElement(slider);
+    if (!sound) return;
+
+    const duration = Number(sound.sound?.duration);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      slider.disabled = true;
+      slider.max = "1";
+      slider.value = "0";
+      slider.setAttribute("aria-valuetext", "재생 시간 불러오는 중");
+      return;
+    }
+
+    const current = Number(sound.playing ? sound.sound?.currentTime : sound.pausedTime) || 0;
+    slider.disabled = !sound.isOwner;
+    slider.max = String(duration);
+    slider.value = String(Math.clamp(current, 0, duration));
+    slider.setAttribute("aria-valuetext", `${formatTimestamp(current)} / ${formatTimestamp(duration)}`);
+  };
+
+  const enhancePlayback = (playback) => {
+    if (playback.querySelector(SEEK_SELECTOR)) return;
+    const row = playback.closest(".sound[data-playlist-id][data-sound-id]");
+    const playlist = row ? game.playlists?.get(row.dataset.playlistId) : null;
+    const sound = playlist?.sounds?.get(row?.dataset.soundId);
+    if (!sound) return;
+
+    const volumeSlider = playback.querySelector(".sound-volume");
+    const volumeControl = volumeSlider?.parentElement?.tagName?.toLowerCase() === "range-picker"
+      ? volumeSlider.parentElement
+      : volumeSlider;
+    const oldVolumeIcon = playback.querySelector(":scope > .volume-icon");
+    if (!volumeControl || !oldVolumeIcon) return;
+
+    const seek = document.createElement("input");
+    seek.type = "range";
+    seek.className = "fe-music-seek";
+    seek.min = "0";
+    seek.max = "1";
+    seek.step = "0.1";
+    seek.setAttribute("aria-label", `${sound.name} 재생 위치`);
+
+    const volume = document.createElement("div");
+    volume.className = "fe-music-volume-control";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "inline-control sound-control icon fe-music-volume-toggle";
+    toggle.setAttribute("aria-label", `${sound.name} 볼륨 조절`);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.innerHTML = '<i class="fa-solid fa-volume-low" inert></i>';
+    const popover = document.createElement("div");
+    popover.className = "fe-music-volume-popover";
+    popover.hidden = true;
+    popover.setAttribute("role", "group");
+    popover.setAttribute("aria-label", `${sound.name} 볼륨`);
+    const maxVolumeIcon = document.createElement("i");
+    maxVolumeIcon.className = "fa-solid fa-volume-high fe-music-volume-max";
+    maxVolumeIcon.setAttribute("aria-hidden", "true");
+
+    oldVolumeIcon.remove();
+    popover.append(volumeControl, maxVolumeIcon);
+    volume.append(toggle, popover);
+    playback.querySelector(".sound-timer")?.after(seek);
+    const pause = playback.querySelector("button.pause");
+    if (pause) pause.before(volume);
+    else playback.append(volume);
+    updateSeekSlider(seek);
+  };
+
+  const enhanceDirectory = (html) => {
+    const root = extractElement(html);
+    if (!root) return;
+    for (const playback of root.querySelectorAll(".playlists-sidebar .sound-playback, .sound-playback")) {
+      enhancePlayback(playback);
+    }
+  };
+
+  Hooks.on("renderPlaylistDirectory", (_app, html) => enhanceDirectory(html));
+  Hooks.on("updatePlaylistSound", async (sound, changed) => {
+    if (!("pausedTime" in changed) || !sound.playing || !sound.sound?.playing) return;
+    const target = Number(changed.pausedTime);
+    const duration = Number(sound.sound.duration);
+    if (!Number.isFinite(target) || !Number.isFinite(duration) || duration <= 0) return;
+
+    // Core only reads PlaylistSound.pausedTime when starting a stopped Sound.
+    // Restart the already-playing local Sound on every client that receives the
+    // document update, keeping the seek synchronized without two server trips.
+    const generation = (seekGenerations.get(sound.uuid) ?? 0) + 1;
+    seekGenerations.set(sound.uuid, generation);
+    const audio = sound.sound;
+    try {
+      await audio.stop({ fade: 0, volume: 0 });
+      if (seekGenerations.get(sound.uuid) !== generation || !sound.playing) return;
+      await audio.play({
+        loop: sound.repeat,
+        volume: sound.volume,
+        fade: 0,
+        offset: Math.clamp(target, 0, Math.max(0, duration - 0.05))
+      });
+    } catch (error) {
+      console.error("female_edition | local playlist seek sync failed", error);
+      sound.sync?.();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const toggle = event.target?.closest?.(".fe-music-volume-toggle");
+    if (toggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      const popover = toggle.parentElement?.querySelector(".fe-music-volume-popover");
+      if (!popover) return;
+      const opening = popover.hidden;
+      closeVolumePopovers(opening ? popover : null);
+      popover.hidden = !opening;
+      toggle.setAttribute("aria-expanded", String(opening));
+      return;
+    }
+    if (!event.target?.closest?.(".fe-music-volume-popover")) closeVolumePopovers();
+  }, true);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeVolumePopovers();
+  }, true);
+
+  document.addEventListener("pointerdown", (event) => {
+    const slider = event.target?.closest?.(SEEK_SELECTOR);
+    if (slider) slider.dataset.dragging = "true";
+  }, true);
+
+  const finishPointerDrag = (event) => {
+    const slider = event.target?.closest?.(SEEK_SELECTOR);
+    if (slider) slider.dataset.dragging = "false";
+  };
+  document.addEventListener("pointerup", finishPointerDrag, true);
+  document.addEventListener("pointercancel", finishPointerDrag, true);
+
+  document.addEventListener("input", (event) => {
+    const slider = event.target?.closest?.(SEEK_SELECTOR);
+    if (!slider) return;
+    slider.dataset.dragging = "true";
+    const row = slider.closest(".sound");
+    const current = row?.querySelector(".sound-timer .current");
+    if (current) current.textContent = formatTimestamp(Number(slider.value));
+    slider.setAttribute(
+      "aria-valuetext",
+      `${formatTimestamp(Number(slider.value))} / ${formatTimestamp(Number(slider.max))}`
+    );
+  }, true);
+
+  document.addEventListener("change", async (event) => {
+    const slider = event.target?.closest?.(SEEK_SELECTOR);
+    if (!slider) return;
+    event.stopPropagation();
+    slider.dataset.dragging = "false";
+    slider.dataset.seeking = "true";
+
+    const { playlist, sound } = soundForElement(slider);
+    const duration = Number(sound?.sound?.duration);
+    if (!playlist || !sound?.isOwner || !Number.isFinite(duration) || duration <= 0) {
+      slider.dataset.seeking = "false";
+      updateSeekSlider(slider);
+      return;
+    }
+
+    const target = Math.clamp(Number(slider.value) || 0, 0, Math.max(0, duration - 0.05));
+    try {
+      // The update hook above restarts an already-playing local Sound at this
+      // offset on every client. A paused Sound keeps the new resume position.
+      await sound.update({ pausedTime: sound.playing ? target : Math.max(0.01, target) });
+    } catch (error) {
+      console.error("female_edition | playlist seek failed", error);
+      ui.notifications?.error?.("재생 위치를 변경하지 못했습니다.");
+    } finally {
+      slider.dataset.seeking = "false";
+      updateSeekSlider(slider);
+    }
+  }, true);
+
+  Hooks.once("ready", () => {
+    enhanceDirectory(ui?.playlists?.element ?? document);
+    setInterval(() => {
+      for (const slider of document.querySelectorAll(`.playlists-sidebar ${SEEK_SELECTOR}`)) {
+        updateSeekSlider(slider);
+      }
+    }, 500);
+  });
+}
+
 /** 사이드바(Playlists 탭) 버튼 자동 삽입 */
 function registerSidebarButton() {
   function getPlaylistDirectoryClass() {
@@ -512,6 +745,7 @@ Hooks.once("init", () => {
   }
 
   registerSidebarButton();
+  registerPlaylistSeekControls();
 });
 
 Hooks.once("ready", async () => {

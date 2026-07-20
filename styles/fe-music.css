@@ -198,3 +198,89 @@ body.fe-retro-theme .fe-music__drop-zone.drag-over {
   font-size: 12px;
   opacity: 0.85;
 }
+
+/* Foundry playlist sidebar: seek is primary; volume lives behind the icon. */
+.playlists-sidebar .sound > header .sound-controls {
+  flex: 0 0 40px;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.playlists-sidebar .sound > header .sound-controls > [data-action="soundRepeat"] {
+  flex: 0 0 24px;
+  width: 24px;
+}
+
+.playlists-sidebar .sound-playback .fe-music-seek {
+  flex: 2 1 72px;
+  min-width: 54px;
+  height: var(--entry-height, 32px);
+  margin: 0;
+}
+
+.playlists-sidebar .fe-music-volume-control {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.playlists-sidebar .sound-playback > button.pause {
+  margin-left: -4px;
+}
+
+.playlists-sidebar .sound-playback .fe-music-volume-toggle {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.playlists-sidebar .fe-music-volume-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 5px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 168px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.35));
+  border-radius: 5px;
+  background: var(--color-cool-5, #20242b);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.playlists-sidebar .fe-music-volume-popover[hidden] {
+  display: none;
+}
+
+.playlists-sidebar .sound-playback .fe-music-volume-popover range-picker,
+.playlists-sidebar .sound-playback .fe-music-volume-popover .sound-volume {
+  display: block;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 18px;
+  line-height: 18px;
+  margin: 0;
+}
+
+.playlists-sidebar .sound-playback .fe-music-volume-popover range-picker {
+  display: flex;
+  align-items: center;
+}
+
+.playlists-sidebar .sound-playback .fe-music-volume-popover range-picker input[type="range"] {
+  width: 100%;
+  height: 18px;
+}
+
+.playlists-sidebar .sound-playback .fe-music-volume-max {
+  flex: 0 0 1rem;
+  width: 1rem;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
