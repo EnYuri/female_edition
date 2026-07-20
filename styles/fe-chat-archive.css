@@ -736,8 +736,11 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
  * This massively reduces print-to-PDF size and prevents Electron/Chromium freezes.
  */
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
-  background-image: var(--fe-parchment-overlay) !important;
+  background-image: none !important;
   filter: none !important;
+}
+body.fe-export-optimized.fe-strip-chat-textures.fe-paper-overlay :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat) {
+  background-image: var(--fe-parchment-overlay) !important;
 }
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)::before,
 body.fe-export-optimized :is(#fe-chat-export-log, #chat-log, #fe-chat-export-container #fe-chat-export-log, #fe-chat-export-container #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)::after {
@@ -875,8 +878,9 @@ body.fe-retro-theme .fe-chat-export-action:hover {
 
 /* ── Pixel theme: individual .chat-message backgrounds in the archive ───────
  *
- * fe-export-optimized sets background-image:var(--fe-parchment-overlay)!important
- * on messages. System CSS (dx3rd, dnd5e) may also set their own backgrounds.
+ * fe-export-optimized clears message background images; the optional paper-tone
+ * correction may replace that with a flat overlay. System CSS (dx3rd, dnd5e)
+ * may also set their own backgrounds.
  *
  * Specificity budget:
  *   fe-export-optimized rule: body.fe-export-optimized (0,1,1)
@@ -901,8 +905,9 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message:no
   color: var(--fe-ac-90) !important;
 }
 
-/* Outer .chat-message element — high-specificity rule (2,9,1) that beats fe-export-optimized's
- * parchment background-image (2,6,1). Needed when fe-export-optimized is also on body. */
+/* Outer .chat-message element — high-specificity rule (2,9,1) that beats the
+ * optimized/paper-tone background-image rule. Needed when both theme and export
+ * optimization classes are present. */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background:       #000000 !important;

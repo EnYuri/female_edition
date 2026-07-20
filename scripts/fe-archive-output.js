@@ -256,8 +256,16 @@ export function feNormalizeArchiveShellLayout(doc, { restore = false, root = nul
         el.style.setProperty("inline-size", "100%", "important");
         el.style.setProperty("min-width", "0", "important");
         el.style.setProperty("min-inline-size", "0", "important");
-        el.style.setProperty("max-width", "none", "important");
-        el.style.setProperty("max-inline-size", "none", "important");
+        if (isMedia) {
+          // Preserve the sidebar's intrinsic media size, but never let a direct
+          // message child overflow the wider standalone archive viewport.
+          el.style.setProperty("max-width", "100%", "important");
+          el.style.setProperty("max-inline-size", "100%", "important");
+          el.style.setProperty("height", "auto", "important");
+        } else {
+          el.style.setProperty("max-width", "none", "important");
+          el.style.setProperty("max-inline-size", "none", "important");
+        }
         el.style.setProperty("flex", "none", "important");
         el.style.setProperty("flex-basis", "auto", "important");
         el.style.setProperty("overflow", "visible", "important");
@@ -357,8 +365,14 @@ export function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) 
         const isStructural = ["DIV", "SECTION", "ARTICLE", "ASIDE", "NAV", "FORM", "TABLE", "FIELDSET"].includes(tag);
         const isMedia = ["IMG", "VIDEO", "CANVAS", "SVG"].includes(tag);
         const isWideContainer = isMessage || isHeader || isContent || isCard || isStructural;
-        el.style.setProperty("max-width", "none", "important");
-        el.style.setProperty("max-inline-size", "none", "important");
+        if (isMedia) {
+          el.style.setProperty("max-width", "100%", "important");
+          el.style.setProperty("max-inline-size", "100%", "important");
+          el.style.setProperty("height", "auto", "important");
+        } else {
+          el.style.setProperty("max-width", "none", "important");
+          el.style.setProperty("max-inline-size", "none", "important");
+        }
         if (isWideContainer) {
           if (isMessage) {
             el.style.setProperty("display", "block", "important");
@@ -470,20 +484,22 @@ export function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } =
     return new Promise((resolve) => {
       let done = false;
       let remaining = imgs.length;
+      let failed = 0;
 
       const timer = setTimeout(() => {
         if (done) return;
         done = true;
-        resolve(remaining); // return count of images still waiting
+        resolve(remaining + failed); // unresolved plus permanently failed images
       }, timeoutMs);
 
-      const onOne = () => {
+      const onOne = (loaded = true) => {
+        if (!loaded) failed++;
         remaining--;
         if (remaining > 0) return;
         if (done) return;
         done = true;
         clearTimeout(timer);
-        resolve(0);
+        resolve(failed);
       };
 
       for (const img of imgs) {
@@ -491,13 +507,13 @@ export function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } =
           // `complete` is true for both successfully loaded and permanently failed images.
           // Missing/404 images must NOT stall export until timeout.
           if (img.complete) {
-            onOne();
+            onOne((img.naturalWidth || 0) > 0);
             continue;
           }
-          img.addEventListener?.("load", onOne, { once: true });
-          img.addEventListener?.("error", onOne, { once: true });
+          img.addEventListener?.("load", () => onOne((img.naturalWidth || 0) > 0), { once: true });
+          img.addEventListener?.("error", () => onOne(false), { once: true });
         } catch {
-          onOne();
+          onOne(false);
         }
       }
     });

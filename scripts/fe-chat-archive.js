@@ -16,6 +16,7 @@ import {
   feSetUiFontClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
+  feSetPaperOverlayClass,
   feSetChatGroupOutlineClass,
   feSetRetroThemeClass,
   feSetNeodgmModeClass,
@@ -85,11 +86,48 @@ const FE_EXPORT_INITIAL_IMAGE_WAIT_HUGE = 16;
 // Matches a browser's own per-host connection limit — more in-flight fetches would just
 // queue in the network stack while holding decoded blobs alive in JS.
 const FE_EXPORT_EMBED_CONCURRENCY = 6;
+const FE_EXPORT_RESOURCE_FETCH_TIMEOUT = 12000;
+const FE_EXPORT_STYLESHEET_FETCH_TIMEOUT = 8000;
+const FE_EXPORT_STYLESHEET_MAX_BYTES = 2_000_000;
+const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
 const FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT = 4500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
+let feArchiveLaunchInProgress = false;
+const feArchiveDocumentOperations = new WeakSet();
+
+async function feFetchWithTimeout(url, options = {}, timeoutMs = FE_EXPORT_RESOURCE_FETCH_TIMEOUT, consume = null) {
+  const controller = new AbortController();
+  const upstream = options?.signal;
+  const abortFromUpstream = () => controller.abort(upstream?.reason);
+  if (upstream?.aborted) abortFromUpstream();
+  else upstream?.addEventListener?.("abort", abortFromUpstream, { once: true });
+
+  const timer = setTimeout(() => controller.abort(new DOMException("Export resource request timed out", "TimeoutError")), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return typeof consume === "function" ? await consume(response, controller) : response;
+  } finally {
+    clearTimeout(timer);
+    upstream?.removeEventListener?.("abort", abortFromUpstream);
+  }
+}
+
+async function feRunArchiveDocumentOperation(doc, task) {
+  if (!doc || typeof task !== "function") return false;
+  if (feArchiveDocumentOperations.has(doc)) {
+    ui.notifications?.warn("female_edition | 이 아카이브에서 다른 인쇄/저장 작업이 진행 중입니다.", { console: false });
+    return false;
+  }
+  feArchiveDocumentOperations.add(doc);
+  try {
+    return await task();
+  } finally {
+    feArchiveDocumentOperations.delete(doc);
+  }
+}
 
 function feSanitizeExportFilename(name, fallback = "chat-log") {
   return (
@@ -485,6 +523,22 @@ function feEnsurePrintCSSOverrides() {
  *     window.print() uses the slow/unreliable OS printer route.
  */
 async function feExportChatLogToPDF() {
+  if (feArchiveLaunchInProgress) {
+    ui.notifications?.warn("female_edition | 채팅 아카이브를 이미 만들고 있습니다.", { console: false });
+    return;
+  }
+  feArchiveLaunchInProgress = true;
+  const buttons = Array.from(document.querySelectorAll(".fe-export-pdf"));
+  for (const button of buttons) button.setAttribute?.("aria-disabled", "true");
+  try {
+    return await feExportChatLogToPDFUnlocked();
+  } finally {
+    feArchiveLaunchInProgress = false;
+    for (const button of buttons) button.removeAttribute?.("aria-disabled");
+  }
+}
+
+async function feExportChatLogToPDFUnlocked() {
   // Step 1: Collect messages BEFORE opening the popup window,
   // so the range dialog appears on its own without the archive window behind it.
   let preCollectedMessages = null;
@@ -693,7 +747,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     // Wait for images (portraits, item icons) to load so they actually print
     metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
     const inlineImgTimeout = await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
-    if (inlineImgTimeout > 0) console.warn(`female_edition | inline export: ${inlineImgTimeout} image(s) did not load within timeout`);
+    if (inlineImgTimeout > 0) console.warn(`female_edition | inline export: ${inlineImgTimeout} image(s) failed or timed out`);
 
     // IMPORTANT: Force a paginatable layout.
     // If any part of the export UI remains a fixed/scroll container, Chromium printing will
@@ -2127,6 +2181,7 @@ async function feRenderChatArchiveWindow(win, {
   feSetChatFontChoiceClass(win.document);
   feSetUiFontClass(win.document);
   feSetUserColorBgClass(win.document);
+  feSetPaperOverlayClass(win.document);
   feSetUserColorBgBaseClass(win.document);
   feSetChatGroupOutlineClass(win.document);
   feSetRetroThemeClass(win.document);
@@ -2182,7 +2237,7 @@ async function feRenderChatArchiveWindow(win, {
       // afterprint restore. (Previously this handler ran a separate, simpler
       // downscale that ignored modes/freeze/quality settings.)
       try {
-        await feArchivePrint(win);
+        await feRunArchiveDocumentOperation(win.document, () => feArchivePrint(win));
       } catch (err) {
         console.warn("female_edition | print failed", err);
       } finally {
@@ -2193,7 +2248,13 @@ async function feRenderChatArchiveWindow(win, {
   if (btnDownload)
     btnDownload.addEventListener("click", async (ev) => {
       ev.preventDefault();
-      await feDownloadArchiveHTML(win, titleText);
+      if (btnDownload.getAttribute("aria-disabled") === "true") return;
+      btnDownload.setAttribute("aria-disabled", "true");
+      try {
+        await feDownloadArchiveHTML(win, titleText);
+      } finally {
+        btnDownload.removeAttribute("aria-disabled");
+      }
     });
 
   if (btnClose)
@@ -2323,7 +2384,7 @@ async function feRenderChatArchiveWindow(win, {
   if (waitForAssets) {
     if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
     const imgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
-    if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) did not load within timeout`);
+    if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) failed or timed out`);
 
     if (metaEl) metaEl.textContent = "Loading fonts…";
     await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
@@ -2350,7 +2411,7 @@ async function feRenderChatArchiveWindow(win, {
     try {
       void win.document.body.offsetHeight;
     } catch {}
-    await feArchivePrint(win);
+    await feRunArchiveDocumentOperation(win.document, () => feArchivePrint(win));
   }
 }
 
@@ -2602,7 +2663,7 @@ async function feArchivePrint(win) {
       // which the straggler-blank pass then neutralizes.
       const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
       const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount) });
-      if (printImgTimeout > 0) console.warn(`female_edition | print: ${printImgTimeout} image(s) did not load within timeout`);
+      if (printImgTimeout > 0) console.warn(`female_edition | print: ${printImgTimeout} image(s) failed or timed out`);
       // Large/huge logs: shrink resolution caps so the pixels Chromium must
       // rasterize into the PDF (and the decoded bitmaps it holds during
       // win.print()) stay within memory. Print-time OOM scales with total
@@ -2655,7 +2716,7 @@ async function feArchivePrint(win) {
   if (logEl && mode !== "hideAll") {
     try {
       restoreStragglers = tempDisableImages((img) => {
-        if (img.complete) return false;
+        if (img.complete && (img.naturalWidth || 0) > 0) return false;
         const s = img.getAttribute("src") || "";
         return !(s.startsWith("blob:") || s.startsWith("data:"));
       });
@@ -2714,6 +2775,99 @@ async function feArchivePrint(win) {
 // ===========================================================================
 // HTML Snapshot Export  (blob build, download, external browser)
 // ===========================================================================
+
+function feRewriteSnapshotCSSURLs(cssText, stylesheetURL) {
+  const resolve = (raw) => {
+    const value = String(raw ?? "").trim();
+    if (!value || value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("#")) return value;
+    try {
+      return new URL(value, stylesheetURL).href;
+    } catch {
+      return value;
+    }
+  };
+
+  let css = String(cssText ?? "");
+  css = css.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (_match, quote, raw) => {
+    const q = quote || '"';
+    return `url(${q}${resolve(raw)}${q})`;
+  });
+  css = css.replace(/(@import\s+)(["'])([^"']+)\2/gi, (_match, prefix, quote, raw) => {
+    return `${prefix}${quote}${resolve(raw)}${quote}`;
+  });
+  return css;
+}
+
+async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
+  let links = [];
+  try {
+    links = Array.from(headClone?.querySelectorAll?.('link[rel="stylesheet"]') ?? []);
+  } catch {
+    return;
+  }
+  if (!links.length) return;
+
+  const baseURL = doc?.baseURI || window.location.href;
+  let admittedBytes = 0;
+  let nextIndex = 0;
+  const results = new Array(links.length).fill(null);
+
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= links.length) return;
+      const link = links[index];
+      try {
+        if (link.getAttribute("data-fe-disabled-link") === "1" || link.getAttribute("media") === "not all") continue;
+        const href = link.getAttribute("href");
+        if (!href) continue;
+        const absolute = new URL(href, baseURL).href;
+        if (new URL(absolute).origin !== window.location.origin) continue;
+
+        const fetched = await feFetchWithTimeout(
+          absolute,
+          { credentials: "include" },
+          FE_EXPORT_STYLESHEET_FETCH_TIMEOUT,
+          async (response) => {
+            if (!response.ok) return null;
+            const declaredBytes = Number(response.headers.get("content-length") || 0);
+            if (Number.isFinite(declaredBytes) && declaredBytes > FE_EXPORT_STYLESHEET_MAX_BYTES) return null;
+            return { cssText: await response.text(), declaredBytes };
+          }
+        );
+        if (!fetched) continue;
+        const cssText = fetched.cssText;
+        const bytes = new TextEncoder().encode(cssText).byteLength;
+        if (bytes > FE_EXPORT_STYLESHEET_MAX_BYTES) continue;
+        results[index] = { absolute, cssText, bytes };
+      } catch {
+        // Keep the original <link> when a stylesheet cannot be captured.
+      }
+    }
+  };
+
+  setMeta("Embedding styles…");
+  await Promise.all(Array.from({ length: Math.min(4, links.length) }, () => worker()));
+
+  // Admission and replacement stay in document order so the byte cap cannot
+  // race and the original cascade order is preserved exactly.
+  for (let index = 0; index < links.length; index += 1) {
+    const result = results[index];
+    if (!result || admittedBytes + result.bytes > FE_EXPORT_STYLESHEET_TOTAL_BYTES) continue;
+    try {
+      const link = links[index];
+      const style = doc.createElement("style");
+      style.setAttribute("data-fe-inline-stylesheet", result.absolute);
+      const media = link.getAttribute("media");
+      if (media) style.setAttribute("media", media);
+      style.textContent = feRewriteSnapshotCSSURLs(result.cssText, result.absolute);
+      link.replaceWith(style);
+      admittedBytes += result.bytes;
+    } catch {
+      // A failed replacement leaves the original link intact.
+    }
+  }
+}
 
 async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta, bodyRoot = null } = {}) {
   if (!win || win.closed) throw new Error("Archive window is closed");
@@ -2823,6 +2977,8 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       });
     }
   } catch {}
+
+  await feInlineSnapshotStylesheets(headClone, doc, setMeta);
 
   // Embed custom fonts (optional).
   if (feSetting(S.EXPORT_EMBED_FONTS)) {
@@ -2957,6 +3113,10 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
 
 async function feDownloadArchiveHTML(win, titleText = "Chat Log", { bodyRoot = null } = {}) {
   if (!win || win.closed) return false;
+  return feRunArchiveDocumentOperation(win.document, () => feDownloadArchiveHTMLUnlocked(win, titleText, { bodyRoot }));
+}
+
+async function feDownloadArchiveHTMLUnlocked(win, titleText = "Chat Log", { bodyRoot = null } = {}) {
   const metaEl = win.document.getElementById("fe-chat-export-meta");
   const originalMeta = (() => {
     try {
@@ -3029,7 +3189,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
   const headSize = async (url) => {
     try {
-      const res = await fetch(url, { method: "HEAD", credentials: "include" });
+      const res = await feFetchWithTimeout(url, { method: "HEAD", credentials: "include" });
       if (!res.ok) return null;
       const len = res.headers.get("content-length");
       const n = Number(len);
@@ -3130,7 +3290,8 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
   // Even if optional local faces fail to load, preserve the NeoDGM Pro webfont
   // rule so the selected pixel-font mode does not silently fall back.
   if (!faces.length) {
-    feEmbeddedFontCssValue = neodgmRule;
+    // Do not cache the fallback-only result: local font requests may have failed
+    // transiently, and a later export should get another chance to embed them.
     return neodgmRule;
   }
 
@@ -3259,7 +3420,8 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
     feEmbeddedFontCssValue = css;
     return css;
   } catch {
-    feEmbeddedFontCssValue = "";
+    // A transient timeout/network failure must not poison every later export in
+    // this Foundry session. Successful CSS is cached; failures remain retryable.
     return "";
   }
   })();
@@ -3278,6 +3440,7 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
   if (!cap) return null;
 
   const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), FE_EXPORT_RESOURCE_FETCH_TIMEOUT);
   try {
     const res = await fetch(url, { credentials: "include", signal: controller.signal });
     if (!res.ok) return null;
@@ -3326,6 +3489,8 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
       controller.abort();
     } catch {}
     return null;
+  } finally {
+    clearTimeout(timeoutTimer);
   }
 }
 
@@ -3436,9 +3601,14 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
     inflight += 1;
     const p = (async () => {
       try {
-        const res = await fetch(abs, { credentials: "include" });
-        if (!res.ok) return null;
-        const blob = await res.blob();
+        const fetched = await feFetchWithTimeout(
+          abs,
+          { credentials: "include" },
+          FE_EXPORT_RESOURCE_FETCH_TIMEOUT,
+          async (res) => res.ok ? res.blob() : null
+        );
+        const blob = fetched;
+        if (!blob) return null;
         // Per-image limit. Order-independent, so it belongs here rather than at commit.
         if (blob.size > MAX_PER_IMAGE) return null;
         return { dataUrl: await feBlobToDataURL(blob), size: blob.size };
@@ -3812,7 +3982,16 @@ function feBuildLiveChatMessageElementMap() {
 function feCloneChatMessageElement(el) {
   try {
     if (!feIsElement(el)) return null;
-    return el.cloneNode(true);
+    const clone = el.cloneNode(true);
+    // Harvested nodes are detached immediately after this pass, so capture the
+    // live sidebar's essential computed appearance now. Use the lean targeted
+    // profile: it preserves the message shell, header/content, portraits,
+    // cards, component sizes, custom variables, and live control state without
+    // multiplying a full descendant-style tree across the entire history.
+    feMirrorLiveMessageStyles(el, clone, {
+      renderProfile: { lean: true, mirrorTree: false, mirrorCardTree: false },
+    });
+    return clone;
   } catch {
     return null;
   }

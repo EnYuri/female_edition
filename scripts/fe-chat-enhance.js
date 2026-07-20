@@ -41,7 +41,7 @@ import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapPro
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
   feSetUiFontClass, feSetNeodgmModeClass, feSetUserFontMode, feSetRetroThemeClass,
-  feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetChatGroupOutlineClass,
+  feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetPaperOverlayClass, feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
@@ -137,6 +137,7 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetUserFontMode(doc); } catch { /* no-op */ }
   try { feSetRetroThemeClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
+  try { feSetPaperOverlayClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
   try { feSetChatGroupOutlineClass(doc); } catch { /* no-op */ }
   try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
@@ -721,9 +722,19 @@ Hooks.once("init", () => {
     onChange: () => feSetAccentTextOverrideClass(document),
   });
 
+  game.settings.register(MODULE_ID, S.STYLE_PAPER_OVERLAY_ENABLED, {
+    name: "채팅: 페이퍼 톤 오버레이",
+    hint: "텍스쳐 제거 시 평면 미색 오버레이를 추가해 채도를 낮춥니다. 별도 선택 기능이며 기본값은 꺼짐입니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.STYLE_PAPER_OVERLAY_ENABLED],
+    onChange: () => feSetPaperOverlayClass(document),
+  });
+
   game.settings.register(MODULE_ID, S.STYLE_BG_SATURATION, {
-    name: "채팅: 배경 채도(페이퍼 오버레이 알파)",
-    hint: "텍스쳐 제거 시 사용하는 '페이퍼 오버레이'의 알파 값입니다. 값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.",
+    name: "채팅: 페이퍼 톤 오버레이 농도",
+    hint: "페이퍼 톤 오버레이를 켰을 때 적용되는 미색층의 알파 값입니다. 값이 높을수록 더 밝고 채도가 약해집니다.",
     scope: "client",
     config: false,
     type: Number,
@@ -870,6 +881,7 @@ Hooks.once("ready", async () => {
   feSetUserFontMode(document);
   feSetRetroThemeClass(document);
   feSetUserColorBgClass(document);
+  feSetPaperOverlayClass(document);
   feSetUserColorBgBaseClass(document);
   feSetChatGroupOutlineClass(document);
   feSetAccentTextOverrideClass(document);
@@ -1385,6 +1397,7 @@ export {
   feSetRetroThemeClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
+  feSetPaperOverlayClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,

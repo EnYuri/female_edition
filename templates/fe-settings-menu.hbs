@@ -205,15 +205,23 @@
       <div class="form-fields">
         <input type="checkbox" name="stripChatTextures" data-dtype="Boolean" {{checked values.stripChatTextures}} />
       </div>
-      <p class="notes">dnd5e 기본 parchment/texture 배경만 제거하고, 색상 오버레이(채도 약화)는 유지합니다.</p>
+      <p class="notes">채팅 카드의 parchment/texture 배경 이미지를 제거합니다. 평면 미색 오버레이는 아래에서 별도로 선택합니다.</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 배경 채도 (페이퍼 오버레이 알파)</label>
+      <label>페이퍼 톤 오버레이</label>
+      <div class="form-fields">
+        <input type="checkbox" name="cePaperOverlayEnabled" data-dtype="Boolean" {{checked values.cePaperOverlayEnabled}} />
+      </div>
+      <p class="notes">텍스쳐 제거 시 평면 미색 오버레이를 추가해 채도를 낮춥니다. 기본값은 꺼짐입니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>페이퍼 톤 오버레이 농도</label>
       <div class="form-fields">
         <input type="number" name="ceMessageBgSaturation" data-dtype="Number" value="{{values.ceMessageBgSaturation}}" step="0.01" min="0.05" max="1" />
       </div>
-      <p class="notes">값이 높을수록 더 밝고(채도 약화), 낮을수록 더 진해집니다.</p>
+      <p class="notes">위 오버레이를 켰을 때만 사용합니다. 값이 높을수록 더 밝고 채도가 약해집니다.</p>
     </div>
 
     <div class="form-group">

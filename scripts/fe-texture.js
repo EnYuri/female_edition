@@ -1,4 +1,4 @@
-import { MODULE_ID, FE_TEX_RE, FE_OVERLAY_LAYER } from "./fe-constants.js";
+import { MODULE_ID, FE_TEX_RE } from "./fe-constants.js";
 import { feGetMessageFromElementOrCollection, feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor } from "./fe-util.js";
 
 function feSplitBgLayers(value) {
@@ -31,10 +31,6 @@ function feSplitBgLayers(value) {
   return out;
 }
 
-function feHasOverlayLayer(layers) {
-  return Array.isArray(layers) && layers.some((l) => /--fe-parchment-overlay/i.test(String(l)));
-}
-
 function feIsTextureLayer(layer) {
   return /url\(/i.test(String(layer)) && FE_TEX_RE.test(String(layer));
 }
@@ -54,9 +50,7 @@ function feSanitizeElementBackgroundInWindow(win, el) {
 
     const layers = feSplitBgLayers(bgImage);
     const stripped = feStripTextureLayers(layers);
-    const nextLayers = stripped.slice();
-    if (!feHasOverlayLayer(nextLayers)) nextLayers.unshift(FE_OVERLAY_LAYER);
-    const finalLayers = nextLayers.length ? nextLayers : [FE_OVERLAY_LAYER];
+    const finalLayers = stripped.length ? stripped : ["none"];
 
     el.style.setProperty("background-image", finalLayers.join(", "), "important");
     el.classList.add("fe-bg-sanitized");
@@ -75,9 +69,7 @@ function feSanitizePseudoInWindow(win, el, pseudo, varName) {
 
     const layers = feSplitBgLayers(bgImage);
     const stripped = feStripTextureLayers(layers);
-    const nextLayers = stripped.slice();
-    if (!feHasOverlayLayer(nextLayers)) nextLayers.unshift(FE_OVERLAY_LAYER);
-    const finalLayers = nextLayers.length ? nextLayers : [FE_OVERLAY_LAYER];
+    const finalLayers = stripped.length ? stripped : ["none"];
 
     el.style.setProperty(varName, finalLayers.join(", "));
     el.classList.add("fe-pseudo-sanitized");

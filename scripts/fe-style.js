@@ -162,6 +162,13 @@ function feSetUserColorBgClass(doc = document) {
   } catch {}
 }
 
+function feSetPaperOverlayClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.STYLE_PAPER_OVERLAY_ENABLED);
+    doc?.body?.classList?.toggle("fe-paper-overlay", enabled);
+  } catch {}
+}
+
 function feSetChatGroupOutlineClass(doc = document) {
   try {
     const enabled = !!feSetting(S.CHAT_GROUP_OUTLINE);
@@ -277,6 +284,7 @@ export {
   feSetUserFontMode,
   feSetRetroThemeClass,
   feSetUserColorBgClass,
+  feSetPaperOverlayClass,
   feSetUserColorBgBaseClass,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,

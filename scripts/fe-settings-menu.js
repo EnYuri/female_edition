@@ -236,6 +236,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.STYLE_HEADER_CONTENT_GAP]:   feRead(S.STYLE_HEADER_CONTENT_GAP),
       [S.MERGE_INNER_GAP]:            feRead(S.MERGE_INNER_GAP),
       [S.STYLE_BG_SATURATION]:        feRead(S.STYLE_BG_SATURATION),
+      [S.STYLE_PAPER_OVERLAY_ENABLED]: feRead(S.STYLE_PAPER_OVERLAY_ENABLED),
       [S.STYLE_ACTOR_NAME_SIZE]:      feRead(S.STYLE_ACTOR_NAME_SIZE),
       [S.STYLE_PLAYER_NAME_SIZE]:     feRead(S.STYLE_PLAYER_NAME_SIZE),
       [S.STYLE_MESSAGE_TEXT_SIZE]:    feRead(S.STYLE_MESSAGE_TEXT_SIZE),
@@ -690,6 +691,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Style
         num(S.STYLE_CHAT_MESSAGE_SPACING), num(S.STYLE_HEADER_CONTENT_GAP),
         num(S.MERGE_INNER_GAP),            num(S.STYLE_BG_SATURATION),
+        bool(S.STYLE_PAPER_OVERLAY_ENABLED),
         num(S.STYLE_ACTOR_NAME_SIZE),      num(S.STYLE_PLAYER_NAME_SIZE),
         num(S.STYLE_MESSAGE_TEXT_SIZE),    num(S.STYLE_CHATCARD_TEXT_SIZE),
 

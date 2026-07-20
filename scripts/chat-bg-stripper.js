@@ -18,7 +18,9 @@
 // What we keep (CSS):
 //   - background-color (player color from Chat Portrait setting)
 //   - background-blend-mode (screen)
-//   - --fe-parchment-overlay (flat desaturation overlay)
+//
+// The optional flat desaturation overlay is controlled independently by
+// cePaperOverlayEnabled; texture removal no longer inserts it implicitly.
 
 import { MODULE_ID, S, FE_DEFAULTS, feSetting } from "./fe-chat-enhance.js";
 
@@ -205,7 +207,7 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, SETTINGS.STRIP_TEXTURES, {
     name: "채팅 카드 텍스쳐 제거",
-    hint: "채팅 카드의 parchment/texture 배경 이미지를 제거하고, 색상 오버레이(채도 약화)는 유지합니다.",
+    hint: "채팅 카드의 parchment/texture 배경 이미지를 제거합니다. 평면 미색 오버레이는 '페이퍼 톤 오버레이'에서 별도로 선택합니다.",
     scope: "client",
     config: false,
     type: Boolean,

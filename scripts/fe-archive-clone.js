@@ -87,11 +87,15 @@ export function feOptimizeArchiveNodeImages(rootEl, { targetDoc = document, rend
 
 const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
   "color", "background-color", "background-image", "background-size",
-  "background-position", "background-repeat", "background-blend-mode",
+  "background-position", "background-position-x", "background-position-y",
+  "background-repeat", "background-attachment", "background-clip",
+  "background-origin", "background-blend-mode",
   "border", "border-color", "border-style", "border-width", "border-top",
   "border-right", "border-bottom", "border-left", "border-radius", "box-shadow",
   "outline", "outline-color", "outline-style", "outline-width", "filter",
-  "opacity", "display", "padding", "margin", "align-items", "justify-content",
+  "backdrop-filter", "clip-path", "mask-image", "mix-blend-mode", "isolation",
+  "opacity", "visibility", "display", "float", "clear", "padding", "margin",
+  "align-items", "justify-content",
   "align-self", "justify-self", "justify-items", "align-content", "place-items",
   "place-content", "grid-template-columns", "grid-template-rows",
   "grid-template-areas", "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
@@ -99,15 +103,48 @@ const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
   "grid-row-start", "grid-row-end", "gap", "column-gap", "row-gap", "white-space",
   "overflow", "text-overflow", "position", "top", "right", "bottom", "left",
   "z-index", "width", "height", "min-width", "min-height", "max-width",
-  "max-height", "box-sizing", "flex", "flex-direction", "flex-wrap", "flex-grow",
+  "max-height", "box-sizing", "overflow-x", "overflow-y", "flex", "flex-direction", "flex-wrap", "flex-grow",
   "flex-shrink", "flex-basis", "transform", "transform-origin", "translate",
-  "scale", "rotate", "vertical-align",
+  "scale", "rotate", "order", "vertical-align", "object-fit", "object-position",
+  "aspect-ratio", "writing-mode",
 ];
 
 const FE_ARCHIVE_TEXT_STYLE_PROPS = [
   "color", "font-family", "font-size", "font-style", "font-weight", "line-height",
-  "letter-spacing", "text-shadow", "text-transform", "text-align", "white-space",
+  "font-variant", "font-stretch", "letter-spacing", "word-spacing", "text-shadow",
+  "text-transform", "text-align", "text-decoration", "text-decoration-color",
+  "text-decoration-line", "text-decoration-style", "text-decoration-thickness",
+  "text-indent", "white-space", "word-break", "overflow-wrap", "hyphens",
+  "direction", "unicode-bidi", "list-style", "list-style-position", "list-style-type",
+  "border-collapse", "border-spacing", "caption-side", "empty-cells",
 ];
+
+// Fixed dimensions are unsafe on the message/card shell because they retain the
+// narrow sidebar width. They are desirable on UI-scale components whose size is
+// part of the chat format: portraits, avatars, icons, badges, and controls.
+const FE_ARCHIVE_COMPONENT_STYLE_PROPS = Array.from(new Set([
+  ...FE_ARCHIVE_CONTAINER_STYLE_PROPS,
+  ...FE_ARCHIVE_TEXT_STYLE_PROPS,
+]));
+
+const FE_ARCHIVE_COMPONENT_SELECTOR = [
+  ':scope .chat-portrait-container',
+  ':scope img[class*="chat-portrait-message-portrait"]',
+  ':scope img[class*="chat-portrait-image-size"]',
+  ':scope img.avatar',
+  ':scope .message-header img',
+  ':scope .message-header :is(i, svg)',
+  ':scope .chat-card .card-header img',
+  ':scope .midi-chat-card .card-header img',
+  ':scope .dnd5e.chat-card .card-header img',
+  ':scope .dnd5e2.chat-card .card-header img',
+  ':scope :is(.icon, .badge, .tag, .pill)',
+].join(", ");
+
+const FE_ARCHIVE_CUSTOM_PROPERTY_PREFIXES = [
+  "--fe-", "--chat-", "--user-", "--color-", "--font-", "--dnd5e-", "--midi-",
+];
+const FE_ARCHIVE_CUSTOM_PROPERTY_MAX = 96;
 
 const FE_ARCHIVE_FIXED_SIZE_PROPS = ["width", "height", "min-width", "min-height", "max-width", "max-height"];
 const FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_CONTAINER_STYLE_PROPS.filter((p) => !FE_ARCHIVE_FIXED_SIZE_PROPS.includes(p));
@@ -134,6 +171,64 @@ function feGetArchiveTreeMirrorBudget(liveEl) {
   return FE_ARCHIVE_TREE_MAX_SIMPLE;
 }
 
+function feCopyComputedCustomProperties(srcEl, dstEl) {
+  try {
+    const view = srcEl?.ownerDocument?.defaultView ?? window;
+    const cs = view.getComputedStyle?.(srcEl);
+    if (!cs) return;
+    let copied = 0;
+    for (let i = 0; i < cs.length && copied < FE_ARCHIVE_CUSTOM_PROPERTY_MAX; i += 1) {
+      const prop = String(cs.item?.(i) ?? cs[i] ?? "");
+      if (!prop.startsWith("--")) continue;
+      if (!FE_ARCHIVE_CUSTOM_PROPERTY_PREFIXES.some((prefix) => prop.startsWith(prefix))) continue;
+      const value = cs.getPropertyValue(prop);
+      if (!value) continue;
+      dstEl.style.setProperty(prop, value.trim(), "important");
+      copied += 1;
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+function feMirrorLiveElementState(srcEl, dstEl) {
+  try {
+    const tag = String(srcEl?.tagName ?? "").toUpperCase();
+    if (!tag || tag !== String(dstEl?.tagName ?? "").toUpperCase()) return;
+
+    if (tag === "INPUT") {
+      dstEl.checked = !!srcEl.checked;
+      if (srcEl.checked) dstEl.setAttribute("checked", "");
+      else dstEl.removeAttribute("checked");
+      if (!["file", "password", "hidden"].includes(String(srcEl.type || "").toLowerCase())) {
+        dstEl.value = srcEl.value;
+        dstEl.setAttribute("value", srcEl.value);
+      }
+    } else if (tag === "TEXTAREA") {
+      dstEl.value = srcEl.value;
+      dstEl.textContent = srcEl.value;
+    } else if (tag === "SELECT") {
+      dstEl.value = srcEl.value;
+      const srcOptions = Array.from(srcEl.options ?? []);
+      const dstOptions = Array.from(dstEl.options ?? []);
+      for (let i = 0; i < Math.min(srcOptions.length, dstOptions.length); i += 1) {
+        dstOptions[i].selected = !!srcOptions[i].selected;
+        if (srcOptions[i].selected) dstOptions[i].setAttribute("selected", "");
+        else dstOptions[i].removeAttribute("selected");
+      }
+    } else if (tag === "DETAILS" || tag === "DIALOG") {
+      dstEl.open = !!srcEl.open;
+      if (srcEl.open) dstEl.setAttribute("open", "");
+      else dstEl.removeAttribute("open");
+    } else if (tag === "PROGRESS" || tag === "METER") {
+      dstEl.value = srcEl.value;
+      dstEl.setAttribute("value", String(srcEl.value));
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
   try {
     if (!srcEl || !dstEl) return;
@@ -142,8 +237,13 @@ function feCopyComputedStyleSubset(srcEl, dstEl, propNames = []) {
     if (!cs) return;
     for (const prop of propNames) {
       const value = cs.getPropertyValue?.(prop);
-      if (value) dstEl.style.setProperty(prop, value.trim());
+      // The mirrored value is the final live computed result. Marking it
+      // important prevents system/module !important rules in the archive
+      // document from undoing that result. Later archive normalization uses
+      // inline !important too and can still intentionally replace it.
+      if (value) dstEl.style.setProperty(prop, value.trim(), "important");
     }
+    feMirrorLiveElementState(srcEl, dstEl);
   } catch {
     /* no-op */
   }
@@ -168,6 +268,10 @@ function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80, propNames = FE
     let cloneNode = cloneWalker.currentNode;
     let count = 0;
     while (liveNode && cloneNode && count < maxNodes) {
+      // Imported live clones should be structurally identical. If a system hook
+      // changed one tree, positional pairing beyond this point would put styles
+      // on the wrong elements, so stop rather than corrupt the remainder.
+      if (liveNode.tagName !== cloneNode.tagName) break;
       feCopyComputedStyleSubset(liveNode, cloneNode, propNames);
       liveNode = liveWalker.nextNode();
       cloneNode = cloneWalker.nextNode();
@@ -181,10 +285,19 @@ function feMirrorLiveTreeStyles(liveEl, cloneEl, { maxNodes = 80, propNames = FE
 export function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = null } = {}) {
   try {
     if (!feIsElement(liveEl) || !feIsElement(cloneEl)) return;
+    // Harvested history entries are detached clones. getComputedStyle() on a
+    // detached source returns incomplete/default geometry and must never be
+    // allowed to overwrite the styles captured while that message was live.
+    if (!liveEl.isConnected) return;
     const hasCard = !!liveEl.querySelector?.(".chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card");
     const lean = !!renderProfile?.lean;
     const mirrorTree = renderProfile?.mirrorTree !== false;
     const mirrorCardTree = renderProfile?.mirrorCardTree !== false;
+
+    // Per-message/user color variables are often inherited from the live
+    // sidebar rather than declared on descendants. Preserve the bounded set on
+    // the archive message root before copying resolved element properties.
+    feCopyComputedCustomProperties(liveEl, cloneEl);
 
     if (mirrorTree && (!hasCard || mirrorCardTree)) {
       feMirrorLiveTreeStyles(liveEl, cloneEl, {
@@ -209,6 +322,10 @@ export function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = nul
     sync(":scope > .message-header .message-sender .name-stacked .subtitle, :scope > .message-header .message-sender .subtitle", FE_ARCHIVE_TEXT_STYLE_PROPS);
     sync(":scope > .message-header .message-flavor, :scope > .message-header .flavor-text", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
     sync(":scope > .message-header .message-metadata", FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE);
+    sync(FE_ARCHIVE_COMPONENT_SELECTOR, FE_ARCHIVE_COMPONENT_STYLE_PROPS);
+    // cloneNode/importNode copy attributes, not every live form/disclosure
+    // property. Preserve the state users actually saw even in lean profiles.
+    sync(":scope :is(input, textarea, select, details, dialog, progress, meter)", []);
 
     if (hasCard) {
       sync(":scope .chat-card, :scope .midi-chat-card, :scope .dnd5e.chat-card, :scope .dnd5e2.chat-card", FE_ARCHIVE_CONTAINER_STYLE_PROPS_NO_FIXED_SIZE);

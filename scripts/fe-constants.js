@@ -49,6 +49,7 @@ const S = {
   STYLE_MESSAGE_TEXT_SIZE: "ceMessageTextSize",
   STYLE_CHATCARD_TEXT_SIZE: "ceChatCardTextSize",
   STYLE_BG_SATURATION: "ceMessageBgSaturation",
+  STYLE_PAPER_OVERLAY_ENABLED: "cePaperOverlayEnabled",
   STYLE_CHAT_MESSAGE_SPACING: "ceChatMessageSpacing",
   STYLE_HEADER_CONTENT_GAP: "ceHeaderContentGap",
   MERGE_INNER_GAP: "ceMergeInnerGap",
@@ -150,6 +151,7 @@ const FE_DEFAULTS = {
   [S.STYLE_MESSAGE_TEXT_SIZE]: 14,
   [S.STYLE_CHATCARD_TEXT_SIZE]: 12,
   [S.STYLE_BG_SATURATION]: 0.5,
+  [S.STYLE_PAPER_OVERLAY_ENABLED]: false,
   [S.STYLE_CHAT_MESSAGE_SPACING]: 3,
   [S.STYLE_HEADER_CONTENT_GAP]: 4,
   [S.MERGE_INNER_GAP]: 4,
@@ -259,7 +261,6 @@ const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
 const FE_RENDER_STATE_VERSION = 4;
 
 const FE_TEX_RE = /(parchment\.jpg|\/ui\/texture[^"' )]*\.(?:webp|png|jpg|jpeg)|texture[^"' )]*\.(?:webp|png|jpg|jpeg))/i;
-const FE_OVERLAY_LAYER = "var(--fe-parchment-overlay)";
 
 const FE_MERGE_CLASS_LIST = ["fe-merge-start", "fe-merge-mid", "fe-merge-end", "fe-merge-follow", "fe-divider-before"];
 const FE_MERGE_CLASS_SORTED = ["fe-divider-before", "fe-merge-end", "fe-merge-follow", "fe-merge-mid", "fe-merge-start"];
@@ -279,7 +280,6 @@ export {
   FE_RENDER_MERGE_HINT_FLAG,
   FE_RENDER_STATE_VERSION,
   FE_TEX_RE,
-  FE_OVERLAY_LAYER,
   FE_MERGE_CLASS_LIST,
   FE_MERGE_CLASS_SORTED,
 };
