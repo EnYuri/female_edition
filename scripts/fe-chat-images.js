@@ -7,6 +7,7 @@
 //  - Click to open image popout
 
 import { MODULE_ID, feCaptureMessageRenderFlagsOnPreCreate } from "./fe-chat-enhance.js";
+import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 
 const CI = Object.freeze({
   ENABLED: "chatImagesEnabled",
@@ -27,9 +28,13 @@ function ciGet(key) {
   return game.settings.get(MODULE_ID, key);
 }
 
+function ciConflictSuppressed() {
+  return feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.CHAT_IMAGES);
+}
+
 function ciEnabled() {
   try {
-    return !!ciGet(CI.ENABLED);
+    return !!ciGet(CI.ENABLED) && !ciConflictSuppressed();
   } catch {
     return false;
   }
@@ -803,6 +808,9 @@ function ciScheduleRefreshUi(rootLike = document, delay = 0) {
 }
 
 function ciRefreshUi(root = document) {
+  // The standalone original uses the same legacy #ci-* identifiers. When it
+  // owns the feature, do not touch those nodes at all.
+  if (ciConflictSuppressed()) return;
   ciEnsureUploadArea(root);
   ciEnsureUploadButton(root);
   ciBindChatForm(root);
@@ -852,6 +860,7 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
+  if (!ciEnabled()) return;
   try {
     await ciEnsureUploadDirectory(ciUploadLocation());
   } catch {}

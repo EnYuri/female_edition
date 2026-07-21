@@ -15,19 +15,20 @@
  *     — breaking when the target updates — does not apply to an abandoned
  *     module. SAFETY GATE: if the module's manifest declares FORWARD
  *     compatibility (`compatibility.maximum` generation > current core), it is
- *     evidently being maintained, so we downgrade to a warning instead of
- *     killing it. (Curation can't be inferred from the manifest alone:
+ *     evidently being maintained, so a full replacement yields female_edition's
+ *     corresponding feature instead of killing the original. (Curation can't be
+ *     inferred from the manifest alone:
  *     narrator-tools/image-hover declare no maximum yet stopped at v13, while
  *     theatre caps at 13 — so the abandoned set is an explicit list here, not a
  *     version formula. The forward-compat gate only protects against a future
  *     revival.)
  *
- *   - mode "warn" (no spec) → a still-maintained duplicate; the GM is warned to
- *     disable the original (female_edition can't safely kill a live module).
+ *   - mode "warn" (no spec) → a partial/soft duplicate; the GM is warned only
+ *     when both modules' conflicting feature toggles are actually enabled.
  *
- *   - mode "yield" → female_edition turns its OWN feature off and lets the
- *     original run (chatlog-prune — other modules may depend on it; see
- *     fe-chat-prune.js). The GM is still informed.
+ *   - mode "yield" → when the original's matching feature setting is enabled,
+ *     female_edition turns only its OWN corresponding feature off for this
+ *     launch. Saved preferences are not overwritten. The GM is still informed.
  *
  * SAFETY: neutralization NEVER removes a handler whose source/name contains a
  * female_edition self-marker (`female_edition`, `_FET_`, `FemaleEdition`) — so
@@ -38,8 +39,16 @@
  * curated targets.
  *
  * Warns the GM at `ready`. Neutralization runs on every client (per-client
- * runtime fix). Self-contained — no imports, no settings, no CSS.
+ * runtime fix). No settings or CSS of its own.
  */
+
+import {
+  FE_CONFLICT_FEATURE,
+  feSuppressConflictFeature,
+  feIsConflictFeatureSuppressed,
+  feClearConflictFeatureSuppressions,
+  feReadRegisteredModuleSetting,
+} from "./fe-conflict-state.js";
 
 // Self-markers that must NEVER be stripped (protects female_edition's own code).
 const FE_CG_SELF_GUARD = ["female_edition", "_FET_", "FemaleEdition"];
@@ -49,6 +58,9 @@ const FE_CG_CONFLICTS = [
     id: "narrator-tools",
     feature: "내레이터 채팅",
     detail: "내레이션 오버레이와 슬래시 명령이 이중으로 실행됩니다.",
+    own: { features: [FE_CONFLICT_FEATURE.NARRATOR], settings: ["narratorEnabled"] },
+    yieldWhenMaintained: true,
+    yieldDetail: "유지보수 중인 원본의 내레이터 기능이 활성화되어 female_edition 내레이터를 런타임에서 껐습니다.",
     // Verified live: arrow handlers carry "NarratorTools" in source; the three
     // chat hooks are `Method.bind(NarratorTools)` → identified by fn.name
     // ("bound _chatMessage" …). Overlay is `<div id="narrator">` + a
@@ -64,12 +76,16 @@ const FE_CG_CONFLICTS = [
         "bound _createSceneryButton",
       ],
       dom: ["#narrator", "#narratorWebFont"],
+      minimumHooks: 1,
     },
   },
   {
     id: "theatre",
     feature: "무대(극장) 채팅",
     detail: "채팅 스피커 라우팅이 정면 충돌합니다.",
+    own: { features: [FE_CONFLICT_FEATURE.STAGE], settings: ["stageEnabled"] },
+    yieldWhenMaintained: true,
+    yieldDetail: "유지보수 중인 원본의 무대 기능이 활성화되어 female_edition 무대를 런타임에서 껐습니다.",
     // Markers are tokens unique to the ORIGINAL theatre (fe-theatre never uses
     // these and is additionally protected by the self-guard).
     neutralize: {
@@ -91,22 +107,32 @@ const FE_CG_CONFLICTS = [
         "#theatre-emote-menu",
         "#theatre-tooltip",
       ],
+      minimumHooks: 1,
     },
   },
   {
     id: "vino",
     feature: "시네마틱 채팅(vino)",
     detail: "오버레이/플래그 처리가 충돌하며, v9 API라 현재 코어에서 깨집니다.",
+    own: { features: [FE_CONFLICT_FEATURE.STAGE], settings: ["stageEnabled"] },
+    externalCheck: "vinoActors",
+    yieldWhenMaintained: true,
+    yieldDetail: "유지보수 중인 원본의 시네마틱 채팅이 활성화되어 female_edition 무대를 런타임에서 껐습니다.",
     neutralize: {
       verifiedVersion: "1.0.0",
       markers: ["VNOverlay", "_getMood", "vino-overlay", "flags.vino"],
       dom: ["#vino-overlay"],
+      minimumHooks: 1,
     },
   },
   {
     id: "image-hover",
     feature: "토큰 이미지 호버",
     detail: "토큰 호버 HUD가 두 개 표시됩니다.",
+    own: { features: [FE_CONFLICT_FEATURE.IMAGE_HOVER], settings: ["ihEnabled"] },
+    externalSetting: "userEnableModule",
+    yieldWhenMaintained: true,
+    yieldDetail: "유지보수 중인 원본의 이미지 호버가 이 클라이언트에서 활성화되어 female_edition 이미지 호버를 런타임에서 껐습니다.",
     // fe-image-hover is a direct port and shares the `canvas.hud.imageHover`
     // slot + much vocabulary, so markers must be tokens UNIQUE to the original:
     // its keybind id "image-hover.userKeybindButton", the globals showSpecificArt
@@ -125,6 +151,7 @@ const FE_CG_CONFLICTS = [
         "cacheImageNames",
       ],
       dom: ["#image-hover-hud"],
+      minimumHooks: 1,
     },
   },
   {
@@ -138,12 +165,20 @@ const FE_CG_CONFLICTS = [
     id: "simple-message-window",
     feature: "무대(노벨게임풍 메시지 창)",
     mode: "warn",
+    own: {
+      features: [FE_CONFLICT_FEATURE.STAGE, FE_CONFLICT_FEATURE.NARRATOR],
+      settings: ["stageEnabled", "narratorEnabled"],
+      match: "any",
+    },
+    externalSetting: "smwEnable",
     detail: "채팅을 입그림+메시지 창으로 표시하는 기능이 female_edition 무대(fe-theatre)와 겹칩니다. 둘 다 켜면 무대 발화가 이중 표시되고, /narrate 내레이션도 두 곳에 표시됩니다. 한쪽만 사용하세요.",
   },
   {
     id: "chatlog-prune",
     feature: "채팅 자동 정리",
     mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.CHAT_PRUNE], settings: ["cePruneEnabled"] },
+    externalSetting: "enabled",
     detail: "female_edition 내장 채팅 정리 기능을 끄고 이 모듈에 양보했습니다.",
   },
   {
@@ -154,6 +189,8 @@ const FE_CG_CONFLICTS = [
     id: "CautiousGamemastersPack",
     feature: "타이핑 알림",
     mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.TYPING], settings: ["ceTypingEnabled"] },
+    externalSetting: "notifyTyping",
     detail: "female_edition이 타이핑 인디케이터를 끄고 이 모듈의 타이핑 알림에 양보했습니다.",
   },
   {
@@ -165,11 +202,133 @@ const FE_CG_CONFLICTS = [
     id: "combat-tracker-dock",
     feature: "컴뱃 트래커",
     mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.COMBAT_TRACKER], settings: ["ceCombatTrackerEnabled"] },
     detail: "female_edition이 내장 컴뱃 트래커를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
+  },
+  {
+    id: "chat-portrait",
+    feature: "채팅 포트레이트",
+    mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.CHAT_PORTRAIT], settings: ["chatPortraitEnabled"] },
+    detail: "female_edition이 내장 채팅 포트레이트를 런타임에서 끄고 원본 모듈에 양보했습니다.",
+  },
+  {
+    id: "chat-images",
+    feature: "채팅 이미지 업로드/임베드",
+    mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.CHAT_IMAGES], settings: ["chatImagesEnabled"] },
+    detail: "female_edition이 내장 채팅 이미지 기능을 런타임에서 끄고 원본 모듈에 양보했습니다.",
+  },
+  {
+    id: "emanim-music",
+    feature: "공용 음악 업로드/재생",
+    mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.MUSIC], settings: ["ceMusicEnabled"] },
+    detail: "female_edition이 내장 음악 기능을 런타임에서 끄고 원본 모듈에 양보했습니다.",
   },
 ];
 
+const FE_CG_RUNTIME_ACTIONS = new Map();
+const FE_CG_FCS_ID = "force-client-settings";
+const FE_CG_OWN_SETTING_PREFIX = "female_edition.";
+let FE_CG_FCS_RESULT = null;
+
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Force Client Settings is a classic script, so its top-level class is a
+ * global lexical binding rather than a globalThis property. ES modules can
+ * still resolve that binding through the global environment; retain the
+ * property fallback for forks which explicitly export it.
+ */
+function feCgGetForceClientSettingsRuntime() {
+  try {
+    if (typeof ForceClientSettings !== "undefined") return ForceClientSettings;
+  } catch { /* global lexical binding unavailable */ }
+  try { return globalThis.ForceClientSettings ?? null; }
+  catch { return null; }
+}
+
+function feCgIsOwnSettingKey(key) {
+  return String(key ?? "").startsWith(FE_CG_OWN_SETTING_PREFIX);
+}
+
+/**
+ * Neutralize the abandoned Force Client Settings module ONLY for this module.
+ *
+ * Its get/set/register wrappers all consult the mutable static `forced` Map at
+ * call time. Removing our namespace from that Map therefore makes the existing
+ * wrappers transparently pass female_edition reads/writes through while every
+ * other module remains governed by FCS. We also clear its per-client unlock and
+ * restriction maps for our keys, then guard the two mutators so the setting UI
+ * cannot re-apply an FE lock later in the same launch.
+ *
+ * This is runtime-only by design. We do not rewrite another module's persisted
+ * world settings; the same scoped neutralization is re-applied on every load.
+ */
+function feCgNeutralizeForceClientSettings(runtime = feCgGetForceClientSettingsRuntime()) {
+  const mod = game.modules?.get?.(FE_CG_FCS_ID);
+  if (!mod?.active) return { active: false, success: true, removed: [] };
+  if (!runtime || !(runtime.forced instanceof Map)) {
+    return {
+      active: true,
+      success: false,
+      removed: [],
+      reason: "ForceClientSettings 런타임 맵에 접근할 수 없음",
+    };
+  }
+
+  const removed = [];
+  for (const [name, map] of [
+    ["forced", runtime.forced],
+    ["unlocked", runtime.unlocked],
+    ["restricted", runtime.restricted],
+  ]) {
+    if (!(map instanceof Map)) continue;
+    for (const key of [...map.keys()]) {
+      if (!feCgIsOwnSettingKey(key)) continue;
+      map.delete(key);
+      removed.push({ map: name, key: String(key) });
+    }
+  }
+
+  let guarded = false;
+  try {
+    if (!runtime._feOwnNamespaceGuardInstalled) {
+      if (typeof runtime.forceSetting !== "function" || typeof runtime.restrictSetting !== "function") {
+        throw new Error("예상한 forceSetting/restrictSetting 메서드가 없음");
+      }
+      const wrapMutator = (methodName) => {
+        const original = runtime[methodName];
+        runtime[methodName] = function feCgFcsOwnNamespaceGuard(key, ...args) {
+          if (feCgIsOwnSettingKey(key)) {
+            console.warn(
+              `[female_edition] Force Client Settings의 ${key} ${methodName} 요청을 차단했습니다.`
+            );
+            return Promise.resolve(false);
+          }
+          return original.call(this, key, ...args);
+        };
+      };
+      wrapMutator("forceSetting");
+      wrapMutator("restrictSetting");
+      Object.defineProperty(runtime, "_feOwnNamespaceGuardInstalled", {
+        value: true,
+        configurable: true,
+      });
+    }
+    guarded = !!runtime._feOwnNamespaceGuardInstalled;
+  } catch (err) {
+    return {
+      active: true,
+      success: false,
+      removed,
+      reason: `재강제 차단 설치 실패: ${err?.message ?? err}`,
+    };
+  }
+
+  return { active: true, success: guarded, guarded, removed };
+}
 
 function feCgIsMldMidiTargetPositionError(app, err) {
   const mld = game.modules?.get?.("monks-little-details");
@@ -273,7 +432,7 @@ function feCgCoreGen() {
 
 // Safety gate: true when the module declares compatibility with a Foundry
 // generation NEWER than the running core — evidence it is actively maintained,
-// so an abandoned-target neutralize should be downgraded to a warning.
+// so a full-replacement target should yield our feature instead of being stripped.
 function feCgDeclaresForwardCompat(mod) {
   const max = mod?.compatibility?.maximum ?? mod?.compatibleCoreVersion;
   const maxGen = feCgGenOf(max);
@@ -283,12 +442,95 @@ function feCgDeclaresForwardCompat(mod) {
 // Safety gate: true when the installed module is NEWER than the version this
 // spec was written/verified against. The markers/DOM selectors are version-
 // specific, so a newer target may have changed internals → skip neutralize and
-// warn instead of risking a wrong/partial strip.
+// yield our corresponding feature instead of risking a wrong/partial strip.
 function feCgIsNewerThanVerified(mod, verifiedVersion) {
   if (!verifiedVersion) return false;
   const cur = String(mod?.version ?? "").replace(/^v/i, "");
   const ver = String(verifiedVersion).replace(/^v/i, "");
   try { return foundry.utils.isNewerVersion(cur, ver); } catch { return false; }
+}
+
+function feCgOwnFeatureState(hit) {
+  const own = hit?.own;
+  if (!own?.settings?.length) return { known: true, enabled: true };
+
+  const values = own.settings.map((key, index) => {
+    const setting = feReadRegisteredModuleSetting("female_edition", key);
+    if (!setting.known) return { known: false, enabled: false };
+    const feature = own.features?.[index];
+    const suppressed = feature ? feIsConflictFeatureSuppressed(feature) : false;
+    return { known: true, enabled: !!setting.value && !suppressed };
+  });
+  if (values.some((v) => !v.known)) return { known: false, enabled: false };
+  const enabled = own.match === "all"
+    ? values.every((v) => v.enabled)
+    : values.some((v) => v.enabled);
+  return { known: true, enabled };
+}
+
+function feCgExternalFeatureState(hit) {
+  if (!hit?.mod?.active) return { known: true, enabled: false };
+  if (hit.externalCheck === "vinoActors") {
+    try {
+      const actors = Array.from(game.actors?.contents ?? game.actors ?? []);
+      const enabled = actors.some((actor) => {
+        const flag = actor?.flags?.vino?.enabled ?? actor?.data?.flags?.vino?.enabled;
+        return flag !== false;
+      });
+      return { known: true, enabled };
+    } catch {
+      return { known: false, enabled: false };
+    }
+  }
+  if (!hit.externalSetting) return { known: true, enabled: true };
+  const setting = feReadRegisteredModuleSetting(hit.id, hit.externalSetting);
+  return setting.known
+    ? { known: true, enabled: !!setting.value }
+    : { known: false, enabled: false };
+}
+
+function feCgAssessConflict(hit) {
+  const own = feCgOwnFeatureState(hit);
+  const external = feCgExternalFeatureState(hit);
+  if (own.known && !own.enabled) return { action: "none", own, external };
+  if (external.known && !external.enabled) return { action: "none", own, external };
+  if (!own.known || !external.known) {
+    return { action: "unknown", own, external, reason: "기능 활성 설정을 확인할 수 없음" };
+  }
+  if (hit.mode === "yield") return { action: "yield", own, external };
+  if (!hit.neutralize) return { action: "warn", own, external };
+
+  const fwd = feCgDeclaresForwardCompat(hit.mod);
+  const newer = feCgIsNewerThanVerified(hit.mod, hit.neutralize.verifiedVersion);
+  if (!fwd && !newer) return { action: "neutralize", own, external };
+
+  const reason = fwd
+    ? "상위 코어 호환 선언 — 유지보수 중으로 판단"
+    : `검증 버전(${hit.neutralize.verifiedVersion})보다 높음(현재 ${hit.mod.version})`;
+  return {
+    action: hit.yieldWhenMaintained ? "yield" : "warn",
+    own,
+    external,
+    reason,
+    maintained: true,
+  };
+}
+
+function feCgPrepareRuntimePolicy() {
+  FE_CG_RUNTIME_ACTIONS.clear();
+  feClearConflictFeatureSuppressions();
+  for (const conflict of FE_CG_CONFLICTS) {
+    const mod = game.modules?.get?.(conflict.id);
+    if (!mod?.active) continue;
+    const hit = { ...conflict, mod, title: mod.title || conflict.id };
+    const assessment = feCgAssessConflict(hit);
+    FE_CG_RUNTIME_ACTIONS.set(hit.id, { hit, assessment });
+    if (assessment.action !== "yield") continue;
+    for (const feature of hit.own?.features ?? []) {
+      feSuppressConflictFeature(feature, `${hit.id}: ${assessment.reason ?? hit.detail ?? "yield"}`);
+    }
+  }
+  return FE_CG_RUNTIME_ACTIONS;
 }
 
 // Resolve the hook-registry object across Foundry versions. v11+ exposes it via
@@ -333,8 +575,18 @@ function feCgStripHooks(markers, selfGuard = FE_CG_SELF_GUARD) {
         // Prefer off-by-id; fall back to off-by-function for older builds.
         let ok = false;
         const id = entry?.id;
-        if (id != null) { try { Hooks.off(name, id); ok = true; } catch { /* try fn */ } }
-        if (!ok) { try { Hooks.off(name, fn); ok = true; } catch { /* no-op */ } }
+        if (id != null) {
+          try {
+            Hooks.off(name, id);
+            ok = !arr.includes(entry);
+          } catch { /* try fn */ }
+        }
+        if (!ok) {
+          try {
+            Hooks.off(name, fn);
+            ok = !arr.includes(entry);
+          } catch { /* no-op */ }
+        }
         if (ok) removed[name] = (removed[name] || 0) + 1;
       } catch { /* skip this entry, keep sweeping */ }
     }
@@ -358,11 +610,12 @@ function feCgNeutralize(hit) {
   const dom = feCgRemoveDom(spec.dom);
   const hookCount = Object.values(hooks).reduce((a, b) => a + b, 0);
 
-  // Second pass: a target that (re)registers hooks or builds its overlay DOM in
-  // its OWN ready/canvasReady — which may run AFTER our ready — would otherwise
-  // slip past the immediate strip. Re-run once after the dust settles; report
-  // only what the second pass actually caught (the synchronous console log below
-  // already covered the first pass).
+  return { hookCount, hooks, dom };
+}
+
+function feCgScheduleNeutralizeSecondPass(hit) {
+  const spec = hit.neutralize;
+  // A target may rebuild hooks/DOM in its own ready/canvasReady after our pass.
   setTimeout(() => {
     try {
       const moreHooks = feCgStripHooks(spec.markers);
@@ -376,49 +629,69 @@ function feCgNeutralize(hit) {
       }
     } catch { /* no-op */ }
   }, 1000);
-
-  return { hookCount, hooks, dom };
 }
 
 // ── main ──────────────────────────────────────────────────────────────────
 
+// All module settings have been registered by setup, while feature ready hooks
+// have not run yet. Establish runtime yields here so our own ready handlers see
+// the suppression before they inject UI or listeners.
+Hooks.once("setup", () => {
+  try {
+    FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
+    feCgPrepareRuntimePolicy();
+  }
+  catch (err) { console.error("[female_edition] conflict policy setup failed", err); }
+});
+
 Hooks.once("ready", () => {
   try {
     feCgInstallMldTargetConfirmationGuard();
+    if (!FE_CG_FCS_RESULT?.success) {
+      FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
+    }
 
-    const active = FE_CG_CONFLICTS
-      .map((c) => ({ ...c, mod: game.modules?.get?.(c.id) }))
-      .filter((c) => c.mod?.active)
-      .map((c) => ({ ...c, title: c.mod.title || c.id }));
-    if (!active.length) return;
+    if (!FE_CG_RUNTIME_ACTIONS.size) feCgPrepareRuntimePolicy();
+    const active = [...FE_CG_RUNTIME_ACTIONS.values()];
+    const fcsAffected = FE_CG_FCS_RESULT?.active
+      && (FE_CG_FCS_RESULT.removed?.length || !FE_CG_FCS_RESULT.success);
+    if (!active.length && !fcsAffected) return;
 
     const neutralized = []; // { hit, result }
     const warnConflicts = [];
     const yields = [];
 
-    for (const hit of active) {
-      if (hit.mode === "yield") { yields.push(hit); continue; }
-      if (hit.neutralize) {
-        // Abandoned target → neutralize, UNLESS a safety gate says it may be
-        // maintained / changed: forward core-compat, or installed newer than
-        // the version this spec was verified against. Then fall back to a warn.
-        const fwd = feCgDeclaresForwardCompat(hit.mod);
-        const newer = feCgIsNewerThanVerified(hit.mod, hit.neutralize.verifiedVersion);
-        if (!fwd && !newer) {
-          try {
-            neutralized.push({ hit, result: feCgNeutralize(hit) });
-          } catch (e) {
-            console.error(`[female_edition] neutralize failed for ${hit.id}`, e);
-            hit._skipReason = "무력화 실패(예외)";
-            warnConflicts.push(hit);
-          }
-        } else {
-          hit._skipReason = fwd
-            ? "상위 코어 호환 선언 — 유지보수 중으로 판단"
-            : `검증 버전(${hit.neutralize.verifiedVersion})보다 높음(현재 ${hit.mod.version}) — 마커 불일치 가능`;
+    for (const { hit, assessment } of active) {
+      if (assessment.action === "none") continue;
+      if (assessment.action === "yield") {
+        if (assessment.maintained && hit.yieldDetail) hit.detail = hit.yieldDetail;
+        yields.push(hit);
+        continue;
+      }
+      if (assessment.action === "unknown") {
+        hit._skipReason = assessment.reason;
+        warnConflicts.push(hit);
+        continue;
+      }
+      if (assessment.action === "warn") {
+        hit._skipReason = assessment.reason;
+        warnConflicts.push(hit);
+        continue;
+      }
+
+      try {
+        const result = feCgNeutralize(hit);
+        const minimumHooks = Math.max(1, Number(hit.neutralize?.minimumHooks) || 1);
+        if (result.hookCount < minimumHooks) {
+          hit._skipReason = `무력화 검증 실패(제거 훅 ${result.hookCount}/${minimumHooks})`;
           warnConflicts.push(hit);
+          continue;
         }
-      } else {
+        neutralized.push({ hit, result });
+        feCgScheduleNeutralizeSecondPass(hit);
+      } catch (e) {
+        console.error(`[female_edition] neutralize failed for ${hit.id}`, e);
+        hit._skipReason = "무력화 실패(예외)";
         warnConflicts.push(hit);
       }
     }
@@ -444,6 +717,21 @@ Hooks.once("ready", () => {
     for (const hit of yields) {
       console.warn(` ↪ 「${hit.title}」(${hit.id}) — ${hit.detail}`);
     }
+    if (FE_CG_FCS_RESULT?.active) {
+      if (FE_CG_FCS_RESULT.success) {
+        const keys = [...new Set(FE_CG_FCS_RESULT.removed.map((entry) => entry.key))];
+        if (keys.length) {
+          console.warn(
+            ` 🔧 「Force Client Settings」 — female_edition 범위만 런타임 무력화: ${keys.length}개 설정`,
+            keys
+          );
+        }
+      } else {
+        console.error(
+          ` ⚠ 「Force Client Settings」 — female_edition 범위 무력화 실패: ${FE_CG_FCS_RESULT.reason}`
+        );
+      }
+    }
 
     // ── notifications (GM only — module management is GM-only) ──
     if (!game.user?.isGM) return;
@@ -465,6 +753,19 @@ Hooks.once("ready", () => {
     for (const hit of yields) {
       ui.notifications?.warn(`female_edition: 「${hit.title}」 감지 — ${hit.detail}`);
     }
+    if (FE_CG_FCS_RESULT?.active && FE_CG_FCS_RESULT.removed?.length) {
+      const count = new Set(FE_CG_FCS_RESULT.removed.map((entry) => entry.key)).size;
+      ui.notifications?.warn(
+        `female_edition: 유지보수가 중단된 「Force Client Settings」의 ` +
+          `female_edition 설정 강제 ${count}개를 이 세션에서 무력화했습니다.`
+      );
+    } else if (FE_CG_FCS_RESULT?.active && !FE_CG_FCS_RESULT.success) {
+      ui.notifications?.error(
+        `female_edition: Force Client Settings의 자체 설정 강제를 무력화하지 못했습니다. ` +
+          `해당 모듈에서 female_edition 설정 잠금을 해제하세요. (콘솔 F12 확인)`,
+        { permanent: true }
+      );
+    }
   } catch (err) {
     console.error("[female_edition] conflict-guard failed", err);
   }
@@ -478,5 +779,11 @@ export {
   feCgGenOf,
   feCgDeclaresForwardCompat,
   feCgIsNewerThanVerified,
+  feCgOwnFeatureState,
+  feCgExternalFeatureState,
+  feCgAssessConflict,
+  feCgPrepareRuntimePolicy,
   feCgStripHooks,
+  feCgIsOwnSettingKey,
+  feCgNeutralizeForceClientSettings,
 };

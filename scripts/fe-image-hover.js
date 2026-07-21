@@ -5,6 +5,7 @@
  */
 
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
+import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 
 const _IH_MODULE = "female_edition";
 const _IH_DEFAULT_TOKEN = "icons/svg/mystery-man.svg";
@@ -51,7 +52,21 @@ let _ihMaxUpscale = _IH_MAX_UPSCALE; // resolution-based upscale cap factor; 0 =
 
 /** Effective enabled state for this client. */
 function _ihActive() {
-  return _ihEnabled;
+  return _ihEnabled && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.IMAGE_HOVER);
+}
+
+function _ihStandaloneActive() {
+  try { return !!game.modules?.get?.("image-hover")?.active; }
+  catch { return false; }
+}
+
+// The standalone module owns canvas.hud.imageHover whenever it is loaded—even
+// while its userEnableModule setting is false. Keep our HUD in a private slot in
+// that case so its still-registered hooks cannot call into our implementation.
+function _ihHud() {
+  return canvas?.hud?.feImageHover
+    ?? (_ihStandaloneActive() ? null : canvas?.hud?.imageHover)
+    ?? null;
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
@@ -93,7 +108,7 @@ function _ihRegisterSettings() {
     config: false,
     type: Boolean,
     default: true,
-    onChange: () => { _ihLoadSettings(); canvas.hud.imageHover?.close(); },
+    onChange: () => { _ihLoadSettings(); _ihHud()?.close(); },
   });
 
   game.keybindings.register(_IH_MODULE, "ihKeybind", {
@@ -101,15 +116,16 @@ function _ihRegisterSettings() {
     hint: "토큰 호버 중 이 키를 누르면 마우스가 토큰을 벗어날 때까지 아트가 표시됩니다. 다시 누르면 취소. 기본값: X",
     editable: [{ key: "KeyX" }],
     onDown: () => {
+      if (!_ihActive()) return false;
       const token = canvas.tokens?.hover;
       if (token) {
         if (_ihKeyToggled) {
           // 이미 표시 중 → 취소
           _ihKeyToggled = false;
-          canvas.hud.imageHover?.close();
+          _ihHud()?.close();
         } else {
           _ihKeyToggled = true;
-          canvas.hud.imageHover?.showArtworkRequirements(token, true, _ihDelay);
+          _ihHud()?.showArtworkRequirements(token, true, _ihDelay);
         }
         return;
       }
@@ -130,6 +146,7 @@ function _ihRegisterSettings() {
       }
     },
     onUp: () => {
+      if (!_ihActive()) return false;
       // 키를 떼도 이미지 유지 — 토큰 이탈 시 hoverToken hook이 해제
     },
   });
@@ -202,7 +219,8 @@ function _ihRegisterSettings() {
 
 function _ihLoadSettings() {
   _ihPermission     = game.settings.get(_IH_MODULE, "ihPermission");
-  _ihEnabled        = game.settings.get(_IH_MODULE, "ihEnabled");
+  _ihEnabled        = game.settings.get(_IH_MODULE, "ihEnabled")
+    && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.IMAGE_HOVER);
   _ihPosition       = game.settings.get(_IH_MODULE, "ihPosition");
   _ihSize           = game.settings.get(_IH_MODULE, "ihSize");
   _ihSizeWide       = game.settings.get(_IH_MODULE, "ihSizeWide");
@@ -241,7 +259,7 @@ function _ihLoadDimensions(url) {
 function _ihCacheToken(url, applyToScreen) {
   _ihLoadDimensions(url).then(({ width, height }) => {
     _ihCache[url] = { width, height };
-    if (applyToScreen) canvas.hud.imageHover?._applyToCanvas(url);
+    if (applyToScreen) _ihHud()?._applyToCanvas(url);
   }).catch(() => {});
 }
 
@@ -353,7 +371,7 @@ function _ihComputePosition(imageWidth, imageHeight) {
 
 function _ihClearArt() {
   _ihKeyToggled = false;
-  canvas.hud.imageHover?.close();
+  _ihHud()?.close();
   _ihHideDomArt();
 }
 
@@ -590,9 +608,9 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
           token === canvas.tokens.hover &&
           token.actor?.img === canvas.tokens.hover?.actor?.img
         ) {
-          canvas.hud.imageHover.bind(token);
+          _ihHud()?.bind(token);
         } else {
-          canvas.hud.imageHover.close();
+          _ihHud()?.close();
         }
       }, delay);
     } else {
@@ -609,30 +627,40 @@ class FeImageHoverHUD extends HandlebarsApplicationMixin(
  * The html argument is a raw HTMLElement (HeadsUpDisplayContainer is already AppV2).
  */
 Hooks.on("renderHeadsUpDisplayContainer", (_app, html) => {
-  html.style.zIndex = 70;
-  const anchor = document.createElement("template");
-  anchor.id = "fe-image-hover-hud";
-  html.appendChild(anchor);
-  canvas.hud.imageHover = new FeImageHoverHUD();
+  if (!_ihActive()) return;
+  // The standalone Image Hover constructs canvas.hud.imageHover even when its
+  // own userEnableModule toggle is false. Install after the complete hook pass so
+  // that inert instance cannot overwrite ours. When the original feature is on,
+  // conflict policy makes _ihActive() false and this callback never reaches here.
+  queueMicrotask(() => {
+    if (!_ihActive()) return;
+    html.style.zIndex = 70;
+    let anchor = html.querySelector?.("#fe-image-hover-hud");
+    if (!anchor) {
+      anchor = document.createElement("template");
+      anchor.id = "fe-image-hover-hud";
+      html.appendChild(anchor);
+    }
+    const hud = new FeImageHoverHUD();
+    canvas.hud.feImageHover = hud;
+    if (!_ihStandaloneActive()) canvas.hud.imageHover = hud;
 
-  // Cache only the tiny default-token SVG dimensions up front (it's the fallback).
-  // Per-token portrait dimensions are now cached LAZILY on first hover
-  // (showArtworkRequirements → bind → _updatePosition → _ihCacheToken(url, true)),
-  // instead of eagerly loading EVERY scene token's full-res actor portrait at each
-  // scene draw — which front-loaded dozens of image decodes for art that is often
-  // never hovered. First hover of a token incurs one small dimension-load, then caches.
-  _ihCacheToken(_IH_DEFAULT_TOKEN, false);
+    // Cache only the tiny default-token SVG dimensions up front (it's the fallback).
+    // Per-token portrait dimensions are cached lazily on first hover.
+    _ihCacheToken(_IH_DEFAULT_TOKEN, false);
+  });
 });
 
 /** (Token portrait dimensions are cached lazily on first hover — see above.) */
 
 /** Main hover entry point. */
 Hooks.on("hoverToken", (token, hovered) => {
-  if (!canvas.hud.imageHover) return;
+  const hud = _ihHud();
+  if (!hud) return;
   if (!hovered) {
     // 토큰에서 마우스가 떠남 → 래치 해제 + 이미지 닫기
     _ihKeyToggled = false;
-    canvas.hud.imageHover.close();
+    hud.close();
     return;
   }
   // 호버 진입: X 키를 누를 때까지 이미지 자동 표시 없음
@@ -709,7 +737,7 @@ Hooks.on("canvasReady", () => { _ihCache = {}; });
 window.addEventListener("blur", () => {
   if (_ihKeyToggled) {
     _ihKeyToggled = false;
-    canvas.hud?.imageHover?.close();
+    _ihHud()?.close();
   }
   _ihHideDomArt();
 });

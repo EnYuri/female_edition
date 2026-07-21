@@ -17,7 +17,7 @@
  *    이 파일을 system 보다 앞선 layouts(7) 레이어로 주입해야 !important 끼리의
  *    싸움에서 우리가 이긴다. 아래 명시도 트릭(:not(), (0,6,2) 등)은 같은 레이어
  *    내부의 형제 규칙 정렬용 보조 수단일 뿐, system 을 이기는 핵심은 레이어다.
- *    경쟁 규칙은 전부 !important — 비-!important 규칙은 .fedr-*/#fe-dx3rd-rui-* 등
+ *    경쟁 규칙은 전부 !important — 비-!important 규칙은 .fedr-* / #fe-dx3rd-rui-* 등
  *    모듈 자체 요소뿐이라 레이어 이동에 따른 회귀 없음.
  *
  * 원칙:
@@ -1447,12 +1447,6 @@ body.fe-retro-theme .ability-title-box {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme .fe-stage-emote-item:hover *,
-body.fe-retro-theme .fe-stage-emote-item.active * {
-  color: inherit !important;
-}
-
-
 /* ══════════════════════════════════════════════════════════════
  * § 20  FVTT + DX3rd 직접 색상 오버라이드 — 강조색(H·S) + 원본 명도(L)
  *
@@ -1578,87 +1572,6 @@ body.fe-retro-theme .application.sheet.dx3rd-emanim.actor.actor-sheet-v2:is(.min
    title bar. */
 body.fe-retro-theme.fe-retro-system-dx3rd .application.minimized .window-header .dx3rd-header-btn {
   display: none !important;
-}
-
-/* Plutonium/5etools AppV2 windows put their visible surface one level inside
-   .window-content.ve-app-window, so the generic window-content rule is not
-   enough. Keep the retro base black through that inner shell as well. */
-body.fe-retro-theme .application.ve-app,
-body.fe-retro-theme .application.ve-app > .window-content.ve-app-window,
-body.fe-retro-theme .application.ve-app > .window-content.ve-app-window > .ve-window,
-body.fe-retro-theme .application.ve-app
-  :is(
-    .veapp__bg-foundry,
-    .veapp-loading__wrp-outer,
-    .ve-ui-modal__inner,
-    .ve-ui-tab__wrp-tab-body--background,
-    .ve-ui-ctx__wrp,
-    .veapp-ctx-menu__wrp
-  ),
-body.fe-retro-theme .window-content.ve-app-window
-  :is(
-    .ve-window,
-    .veapp__bg-foundry,
-    .veapp-loading__wrp-outer,
-    .ve-ui-modal__inner,
-    .ve-ui-tab__wrp-tab-body--background,
-    .ve-ui-ctx__wrp,
-    .veapp-ctx-menu__wrp
-  ) {
-  background: #000000 !important;
-  background-color: #000000 !important;
-  background-image: none !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme .application.ve-app
-  :is(.veapp__list-row, .cfg__row, .permu__row-ent, .veapp__ele-hoverable):hover,
-body.fe-retro-theme .window-content.ve-app-window
-  :is(.veapp__list-row, .cfg__row, .permu__row-ent, .veapp__ele-hoverable):hover {
-  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
-  background-image: none !important;
-}
-
-body.fe-retro-theme .application.ve-app
-  :is(hr, .cfg__hr-tab-section, .permu__hr-head, .veapp__list-row, .permu__row-ent),
-body.fe-retro-theme .window-content.ve-app-window
-  :is(hr, .cfg__hr-tab-section, .permu__hr-head, .veapp__list-row, .permu__row-ent) {
-  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-}
-
-body.fe-retro-theme .application.ve-app
-  :is(.ve-fltr__mini-view, .ve-btn-group),
-body.fe-retro-theme .window-content.ve-app-window
-  :is(.ve-fltr__mini-view, .ve-btn-group) {
-  background:
-    linear-gradient(
-      to top,
-      var(--fe-ac-22, rgba(255, 255, 255, 0.22)),
-      var(--fe-ac-12, rgba(255, 255, 255, 0.12)) 1px
-    ) !important;
-  background-color: #000000 !important;
-  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-}
-
-body.fe-retro-theme .application.ve-app
-  :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default),
-body.fe-retro-theme .window-content.ve-app-window
-  :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default) {
-  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
-  background-image: none !important;
-  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-  box-shadow: none !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
-}
-
-body.fe-retro-theme .application.ve-app
-  :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default):is(:hover, :focus, .active, .ve-active),
-body.fe-retro-theme .window-content.ve-app-window
-  :is(.ve-fltr__mini-pill, .fltr__pill, .ve-btn, .ve-btn-default):is(:hover, :focus, .active, .ve-active) {
-  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
-  box-shadow: inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22) !important;
-  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
 }
 
 /* ── F. DX3rd 시트 배경 오버라이드 ─────────────────────────── */
@@ -2129,63 +2042,6 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
 }
 
 
-/* ══════════════════════════════════════════════════════════════
- * § 27  Theatre 채팅 네비 바 — 픽셀 테마 색조 통합
- *        (#fe-stage-nav, .fe-stage-select, .fe-stage-nav-emote,
- *         .fe-stage-nav-remove-cur)
- * ══════════════════════════════════════════════════════════════ */
-
-/* 네비 바 컨테이너 */
-body.fe-retro-theme #fe-stage-nav {
-  background:   #000 !important;
-  border-color: var(--fe-ac-22) !important;
-}
-
-/* speak-as 드롭다운 */
-body.fe-retro-theme .fe-stage-select {
-  background-color: #000 !important;
-  border-color:     var(--fe-ac-57) !important;
-  color:            var(--fe-ac-90) !important;
-  opacity:          1 !important;
-  text-shadow:      none !important;
-}
-
-body.fe-retro-theme .fe-stage-select:focus {
-  border-color: var(--fe-ac-90) !important;
-}
-
-body.fe-retro-theme .fe-stage-select option,
-body.fe-retro-theme .fe-stage-select optgroup {
-  background: #000 !important;
-  color: var(--fe-ac-90) !important;
-}
-
-/* 감정 선택 버튼 — 비활성 상태: L=70% 하한 + 채도 30% 축소로 dim 표현 */
-body.fe-retro-theme .fe-stage-nav-emote {
-  background:   transparent !important;
-  border-color: var(--fe-ac-12) !important;
-  color:        hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.30) 70%) !important;
-}
-
-body.fe-retro-theme .fe-stage-nav-emote:hover {
-  background: var(--fe-ac-06) !important;
-  color:      var(--fe-ac-57) !important;
-}
-
-/* 무대 제거 버튼 — 비활성 상태: L=70% 하한 + 채도 30% 축소로 dim 표현 */
-body.fe-retro-theme .fe-stage-nav-remove-cur {
-  background:   transparent !important;
-  border-color: var(--fe-ac-12) !important;
-  color:        hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.30) 70%) !important;
-}
-
-body.fe-retro-theme .fe-stage-nav-remove-cur:hover {
-  background:   var(--fe-ac-06) !important;
-  border-color: #f77 !important;
-  color:        #f77 !important;
-}
-
-
 /* 에디터 편집 연필(prose-mirror > button.icon.toggle) — 전역 button 규칙(§30)의
    1px 테두리가 Foundry 기본 좌우 패딩(0 8px)과 겹쳐 작은 연필 아이콘보다
    헐거운 사각 외곽선을 만든다. 패딩 제거 + 정사각으로 외곽선을 아이콘에 맞춘다. */
@@ -2437,25 +2293,6 @@ body.fe-retro-theme .applied-effect-table :is(th, td) {
 
 body.fe-retro-theme .applied-effect-table th {
   background: var(--fe-ac-06) !important;
-}
-
-
-/* ══════════════════════════════════════════════════════════════
- * § 39  타이핑 인디케이터(#fe-typing-notify) — 강조색 색조 적용
- *        기본 색(--color-text-dark-secondary #4b4a44)은 픽셀 테마의
- *        검정 입력 영역 위에서 거의 안 보임 → 액센트 색조로 교체.
- *        점 애니메이션은 background:currentColor 이므로 color 만 바꾸면
- *        텍스트·점이 함께 따라온다.
- *        layouts(7) 레이어 + !important — modules(9) 의 기본 규칙을 이김.
- * ══════════════════════════════════════════════════════════════ */
-
-body.fe-retro-theme #fe-typing-notify {
-  color: var(--fe-ac-80) !important;
-  /* 비레트로 기본 스타일이 가독성용으로 얹는 반투명 둥근 pill/그림자는
-   * 픽셀 미학과 어긋나므로 레트로에서는 flat 하게 되돌린다. */
-  background: transparent !important;
-  border-radius: 0 !important;
-  text-shadow: none !important;
 }
 
 

@@ -3,8 +3,8 @@
  * female_edition — 시스템과 무관하게 적용되는 레트로 표면 보정
  *
  * 이 파일은 fe-dx3rd-compat.css 뒤, fe-dnd5e-compat.css 앞에 layouts
- * 레이어로 로드된다. 기존의 실제 우선순위를 보존하면서, DX3rd 파일이
- * Theatre·툴팁·주사위 같은 공통 기능의 의존점이 되는 것을 막는다.
+ * 레이어로 로드된다. 기존의 실제 우선순위를 보존하면서, 시스템 파일이
+ * Theatre·타이핑 표시·툴팁·주사위 같은 공통 기능의 의존점이 되는 것을 막는다.
  *
  * 코어 폼 컨트롤의 표면(input·select·textarea, color-picker 등 입력 래퍼
  * 커스텀 엘리먼트, 체크박스, ::placeholder)은 이 파일이 아니라
@@ -264,6 +264,14 @@ body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
 body.fe-retro-theme .sidebar-tab :is(a, li, label) { color: var(--fe-ac-57) !important; }
 body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) { color: var(--fe-ac-80) !important; }
 
+/* 모듈 공통 타이핑 인디케이터. 점은 currentColor를 따라간다. */
+body.fe-retro-theme #fe-typing-notify {
+  color: var(--fe-ac-80) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  text-shadow: none !important;
+}
+
 /* ── 채팅 입력 및 시스템 중립 창 ───────────────────────────── */
 body.fe-retro-theme :is(#chat-form, :is(chat-sidebar, .chat-sidebar) footer, :is(chat-sidebar, .chat-sidebar) .chat-footer) {
   background: #000 !important;
@@ -481,6 +489,50 @@ body.fe-retro-theme .fe-stage-emote-item.active {
   color: #000000 !important;
   outline: 1px solid #ffffff !important;
   outline-offset: 0 !important;
+}
+
+body.fe-retro-theme .fe-stage-emote-item:hover *,
+body.fe-retro-theme .fe-stage-emote-item.active * {
+  color: inherit !important;
+}
+
+body.fe-retro-theme #fe-stage-nav {
+  background: #000000 !important;
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .fe-stage-select {
+  background-color: #000000 !important;
+  border-color: var(--fe-ac-57) !important;
+  color: var(--fe-ac-90) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme .fe-stage-select:focus {
+  border-color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .fe-stage-select :is(option, optgroup) {
+  background: #000000 !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme :is(.fe-stage-nav-emote, .fe-stage-nav-remove-cur) {
+  background: transparent !important;
+  border-color: var(--fe-ac-12) !important;
+  color: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.30) 70%) !important;
+}
+
+body.fe-retro-theme .fe-stage-nav-emote:hover {
+  background: var(--fe-ac-06) !important;
+  color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme .fe-stage-nav-remove-cur:hover {
+  background: var(--fe-ac-06) !important;
+  border-color: #f77 !important;
+  color: #f77 !important;
 }
 
 /* 9-슬라이스 테두리가 컨테이너에 잘리지 않도록 한다. */

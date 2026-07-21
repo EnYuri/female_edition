@@ -18,6 +18,11 @@
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 import {
+  FE_CONFLICT_FEATURE,
+  feIsConflictFeatureSuppressed,
+  feIsActiveModuleFeatureEnabled,
+} from "./fe-conflict-state.js";
+import {
   MUSIC_SOCKET, MUSIC_MSG, SHARED_FLAG,
   isAnyGMOnline, pickSharedPlaylist, sanitizeFileName, stripExt, normalizeDataDir, allowedAudio,
   resolveUploadTarget, ensureDirectory, ensureTrack, getFilePicker,
@@ -52,7 +57,9 @@ function musicSetting(key) {
   try { return game.settings.get(MODULE_ID, key); } catch { return FE_DEFAULTS[key]; }
 }
 function musicEnabled() {
-  return !!musicSetting(S.MUSIC_ENABLED);
+  return !!musicSetting(S.MUSIC_ENABLED)
+    && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.MUSIC)
+    && !feIsActiveModuleFeatureEnabled("emanim-music");
 }
 function musicUploadDir() {
   return normalizeDataDir(musicSetting(S.MUSIC_UPLOAD_ROOT)) || "assets/uploadedmusic";

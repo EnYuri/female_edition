@@ -13,6 +13,8 @@
  *  - Optional: hide theatre messages from chat log
  */
 
+import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
+
 const _FET_MODULE      = "female_edition";
 const _FET_ID_PREFIX   = "fes-";          // theatreId prefix: "fes-<actorId>"
 const _FET_FLAG_KEY    = "stage";         // actor flag namespace under female_edition
@@ -69,8 +71,8 @@ function _fetRegisterSettings() {
     type: Boolean,
     default: true,
     onChange: (v) => {
-      _fetEnabled = v;
-      if (!v) {
+      _fetEnabled = !!v && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
+      if (!_fetEnabled) {
         _fetClearAll(true);
         document.getElementById("fe-stage-nav")?.remove();
         _fetNavEl = null;
@@ -212,7 +214,8 @@ function _fetRegisterSettings() {
 }
 
 function _fetLoadSettings() {
-  _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled");
+  _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled")
+    && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
   _fetHideMessages   = game.settings.get(_FET_MODULE, "stageHideMessages");
   _fetExcludeSystemMessages = game.settings.get(_FET_MODULE, "stageExcludeSystemMessages");
   _fetRecallIncludeNonActor = game.settings.get(_FET_MODULE, "stageRecallIncludeNonActor");

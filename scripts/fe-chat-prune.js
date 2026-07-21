@@ -11,11 +11,12 @@
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feApplyChatMergeAroundElement } from "./fe-merge.js";
 import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
+import { feIsActiveModuleFeatureEnabled } from "./fe-conflict-state.js";
 
 export function feInstallChatLogPrune() {
   // chatlog-prune module handles this already — don't double-install
-  if (game.modules.get("chatlog-prune")?.active) {
-    console.log("female_edition | chatlog-prune active — skipping built-in DOM pruning");
+  if (feIsActiveModuleFeatureEnabled("chatlog-prune", "enabled", { unknown: true })) {
+    console.log("female_edition | chatlog-prune pruning enabled — skipping built-in DOM pruning");
     return;
   }
 

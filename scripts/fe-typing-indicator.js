@@ -5,8 +5,8 @@
 // (MIT, Alan Davies / Shoyu Vanilla), reimplemented to fit female_edition.
 //
 // Compatibility / conflict avoidance:
-//  - If CautiousGamemastersPack is active, this feature stays OFF and defers to
-//    CGMP entirely (no double indicator, no competing socket traffic).
+//  - If CGMP's own `notifyTyping` setting is enabled, this feature stays OFF and
+//    defers to CGMP entirely (no double indicator or competing socket traffic).
 //  - Shares the `module.female_edition` socket channel with fe-theatre.js, so all
 //    messages are namespaced by a `type` discriminator. Multiple socket.on()
 //    listeners coexist; each guards on its own type.
@@ -16,6 +16,7 @@
 //    override) when at-bottom, preserving auto-scroll.
 
 import { MODULE_ID, S } from "./fe-constants.js";
+import { feIsActiveModuleFeatureEnabled } from "./fe-conflict-state.js";
 
 const SOCKET_CHANNEL = "module.female_edition";
 const SOCKET_TYPE = "fe-typing-indicator";
@@ -45,8 +46,7 @@ let refreshTimer = null;
 // TYPING_SHOW_TO_PLAYERS is world-scoped and GM-only.
 
 function feCgmpActive() {
-  try { return !!game.modules.get("CautiousGamemastersPack")?.active; }
-  catch { return false; }
+  return feIsActiveModuleFeatureEnabled("CautiousGamemastersPack", "notifyTyping", { unknown: false });
 }
 
 function feTypingFeatureEnabled() {
@@ -270,7 +270,7 @@ function feClearAllTyping() {
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, S.TYPING_ENABLED, {
     name: "타이핑 인디케이터 표시('…님이 입력 중')",
-    hint: "다른 사용자가 채팅을 입력 중일 때 입력창 위에 표시합니다. CautiousGamemastersPack(CGMP)이 활성화되어 있으면 자동으로 비활성화되어 CGMP에 양보합니다.",
+    hint: "다른 사용자가 채팅을 입력 중일 때 입력창 위에 표시합니다. CautiousGamemastersPack(CGMP)의 타이핑 알림이 활성화되어 있으면 자동으로 비활성화되어 CGMP에 양보합니다.",
     scope: "client",
     config: false,
     type: Boolean,
@@ -295,7 +295,7 @@ Hooks.once("init", () => {
   try { game.socket.on(SOCKET_CHANNEL, feHandleSocket); } catch { /* no-op */ }
 
   if (feCgmpActive()) {
-    console.log(`${MODULE_ID} | CautiousGamemastersPack active — deferring typing indicator to CGMP`);
+    console.log(`${MODULE_ID} | CGMP typing notifier enabled — deferring typing indicator to CGMP`);
   }
 });
 

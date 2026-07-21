@@ -11,6 +11,7 @@ import {
   feGetMessageUserColor,
   feFireChatUiUpdated,
 } from "./fe-chat-enhance.js";
+import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 
 const CP = Object.freeze({
   ENABLED: "chatPortraitEnabled",
@@ -162,6 +163,14 @@ function cpSetRootVars(doc = document) {
 
 function cpIsChatPortraitModuleActive() {
   return !!game?.modules?.get?.("chat-portrait")?.active;
+}
+
+function cpConflictSuppressed() {
+  return feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.CHAT_PORTRAIT);
+}
+
+function cpEnabled() {
+  return !!cpGet(CP.ENABLED) && !cpConflictSuppressed();
 }
 
 function cpGetMessageKind(messageEl, message) {
@@ -1030,6 +1039,7 @@ function cpEnsureSenderText(message, messageEl, headerEl) {
 
 function cpUpsertPortrait(message, messageEl) {
   if (!messageEl) return;
+  if (cpConflictSuppressed()) return;
 
   // Restrict to the actual chat message element.
   if (!messageEl.matches?.("li.chat-message, #chat-notifications .message")) {
@@ -1056,7 +1066,7 @@ function cpUpsertPortrait(message, messageEl) {
   // Coexistence policy: allow duplicates, warn once (no hard-block).
   cpWarnIfChatPortraitModuleActive();
 
-  if (!cpGet(CP.ENABLED)) {
+  if (!cpEnabled()) {
     cpRemovePortrait(messageEl);
     return;
   }
@@ -1273,12 +1283,13 @@ export function feChatPortraitApplyVars(doc = document) {
 }
 
 function cpApplyCombatTrackerPortraits(html) {
+  if (cpConflictSuppressed()) return;
   cpWarnIfChatPortraitModuleActive();
   const root = html?.querySelector ? html : document;
   const combat = root.querySelector?.("#combat") ?? root.querySelector?.(".combat-tracker");
   if (!combat) return;
 
-  const enabled = !!cpGet(CP.ENABLED);
+  const enabled = cpEnabled();
   const applyCombat = enabled && !!cpGet(CP.APPLY_COMBAT);
 
   // If feature is off, clean up any previously injected portraits/styling.
@@ -1541,7 +1552,7 @@ Hooks.once("ready", () => {
 Hooks.on("preCreateChatMessage", (message, data) => {
   try {
     // Respect module enable, but it's harmless to store even if later hidden.
-    if (!cpGet(CP.ENABLED)) return;
+    if (!cpEnabled()) return;
 
     // Avoid overwriting an existing stored portrait.
     const existing = cpGetStoredPortraitSrc(message) || data?.flags?.[MODULE_ID]?.[FE_FLAG_PORTRAIT_SRC];

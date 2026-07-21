@@ -28,6 +28,7 @@
  */
 
 import { feMarkdownToHTML } from "./fe-markdown.js";
+import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 
 const _FN_MODULE   = "female_edition";
 const _FN_MD_ENABLED_KEY = "ceMarkdownEnabled";  // shared markdown toggle (fe-chat-enhance)
@@ -77,7 +78,10 @@ function _fnRegisterSettings() {
     name: "내레이터 기능 활성화",
     hint: "사이드바 채팅에서 /narrate, /describe, /note, /as 명령과 시네마틱 내레이션 오버레이를 사용합니다. (무대 채팅과 별개의 채널)",
     scope: "world", config: false, restricted: true, type: Boolean, default: true,
-    onChange: (v) => { _fnEnabled = v; if (!v) _fnForceClose(); },
+    onChange: (v) => {
+      _fnEnabled = !!v && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR);
+      if (!_fnEnabled) _fnForceClose();
+    },
   });
   game.settings.register(_FN_MODULE, "narratorDurationMult", {
     name: "내레이터: 표시 시간 배수",
@@ -133,7 +137,8 @@ function _fnRoleChoices() {
 }
 
 function _fnLoadSettings() {
-  _fnEnabled      = game.settings.get(_FN_MODULE, "narratorEnabled");
+  _fnEnabled      = game.settings.get(_FN_MODULE, "narratorEnabled")
+    && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR);
   _fnDurationMult = game.settings.get(_FN_MODULE, "narratorDurationMult");
   _fnAllowCopy    = game.settings.get(_FN_MODULE, "narratorAllowCopy");
   _fnPermNarrate  = Number(game.settings.get(_FN_MODULE, "narratorPermNarrate"));
@@ -388,6 +393,7 @@ function _fnRenderMarkdown(text) {
 
 // ── Chat message creation ────────────────────────────────────────────────────
 function _fnCreateMessage(type, message, options = {}) {
+  if (!_fnEnabled || feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR)) return;
   if (type === "narration" && game.user.role < _fnPermNarrate) return;
   if (type !== "narration" && game.user.role < _fnPermDescribe) return;
 
@@ -550,8 +556,10 @@ Hooks.on("init", () => {
 Hooks.on("ready", () => {
   _fnLoadSettings();
   _fn.isNarrator = !!(game.user.hasPermission?.("SETTINGS_MODIFY") && game.user.role >= _fnPermNarrate);
-  _fnBuildOverlay();
-  _fnController(_fnGetState());
+  if (_fnEnabled) {
+    _fnBuildOverlay();
+    _fnController(_fnGetState());
+  }
   // expose API
   const mod = game.modules.get(_FN_MODULE);
   if (mod) { mod.api ??= {}; mod.api.narrator = FENarrator; }
