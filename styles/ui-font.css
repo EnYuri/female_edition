@@ -316,11 +316,15 @@ body.fe-fonts-enabled.fe-chat-font-cookie-all {
   --fe-font-geurimilgi:  var(--fe-font-primary);
   --fe-font-secondary:   var(--fe-font-primary);
   --fe-chat-font-family: var(--fe-font-primary);
+  /* 단일 전체교체 — 카드 OFF용 안전폰트도 쿠키런을 따라간다(그렇지 않으면 카드만 Signika). */
+  --fe-chat-card-system-font-family: var(--fe-font-primary);
 }
 body.fe-fonts-enabled.fe-chat-font-geurimilgi {
   --fe-font-primary:     var(--fe-font-geurimilgi);
   --fe-font-secondary:   var(--fe-font-geurimilgi);
   --fe-chat-font-family: var(--fe-font-geurimilgi);
+  /* 단일 전체교체 — 카드 OFF용 안전폰트도 그림일기를 따라간다. */
+  --fe-chat-card-system-font-family: var(--fe-font-geurimilgi);
 }
 
 /* Mixed CookieRun + Geurimilgi preset: UI/sheet default font uses Geurimilgi. */
@@ -334,6 +338,9 @@ body.fe-fonts-enabled.fe-neodgm-mode {
   --fe-font-primary:    "NeoDunggeunmo Pro", monospace;
   --fe-font-geurimilgi: "NeoDunggeunmo Pro", monospace;
   --fe-font-secondary:  "NeoDunggeunmo Pro", monospace;
+  /* 전체 교체 모드 — 카드 OFF용 안전폰트도 픽셀폰트를 따라간다(그렇지 않으면
+     토글 OFF 시 카드만 Signika 로 남는다). */
+  --fe-chat-card-system-font-family: "NeoDunggeunmo Pro", monospace;
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
   font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
@@ -371,6 +378,7 @@ body.fe-fonts-enabled.fe-mona-mode {
   --fe-font-primary:    var(--fe-mona-stack);
   --fe-font-geurimilgi: var(--fe-mona-stack);
   --fe-font-secondary:  var(--fe-mona-stack);
+  --fe-chat-card-system-font-family: var(--fe-mona-stack); /* 전체 교체 — 카드 OFF도 픽셀 */
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
@@ -393,6 +401,7 @@ body.fe-fonts-enabled.fe-galmuri-mode {
   --fe-font-primary:    var(--fe-galmuri-stack);
   --fe-font-geurimilgi: var(--fe-galmuri-stack);
   --fe-font-secondary:  var(--fe-galmuri-stack);
+  --fe-chat-card-system-font-family: var(--fe-galmuri-stack); /* 전체 교체 — 카드 OFF도 픽셀 */
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
@@ -418,6 +427,7 @@ body.fe-fonts-enabled.fe-user-font-mode {
   --fe-chat-font-family: var(--fe-user-font-family);
   --fe-ui-font-family:   var(--fe-user-font-family);
   --fe-dnd5e-label-font-family: var(--fe-user-font-family);
+  --fe-chat-card-system-font-family: var(--fe-user-font-family); /* 전체 교체 — 카드 OFF도 유저폰트 */
 }
 
 /* dnd5e 스코프 재어설트 */
@@ -519,6 +529,19 @@ body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.cha
   --dnd5e-font-signika: var(--fe-chat-card-system-font-family) !important;
   --dnd5e-font-modesto: var(--fe-chat-card-system-font-family) !important;
   font-family: var(--fe-chat-card-system-font-family) !important;
+}
+
+/* dx3rd 카드의 폼 컨트롤(button/input/select/textarea)만 상속을 강제한다.
+   dx3rd 카드는 변수(--font-*)를 쓰지 않는 순수 HTML 이라 컨테이너(.dx3rd-item-chat)의
+   font-family 가 대부분 상속으로 내려가지만, 폼 컨트롤은 UA 기본 font-family 때문에
+   상속을 받지 않아 카드 폰트가 빠진다. inherit 로 컨테이너의 카드 폰트를 물려받게 한다.
+   (넓은 * 규칙은 FontAwesome 아이콘·다이스 폰트까지 덮어써 아이콘이 깨질 수 있어 쓰지 않는다.
+    inherit 는 OFF/ON 두 모드의 컨테이너 폰트를 그대로 따라가므로 규칙 하나로 충분하다.) */
+body.fe-fonts-enabled #sidebar #chat .dx3rd-item-chat :is(button, input, select, textarea),
+body.fe-fonts-enabled #chat-notifications .dx3rd-item-chat :is(button, input, select, textarea),
+body.fe-fonts-enabled .chat-popout #chat .dx3rd-item-chat :is(button, input, select, textarea),
+body.fe-fonts-enabled #fe-chat-export-log .dx3rd-item-chat :is(button, input, select, textarea) {
+  font-family: inherit !important;
 }
 
 body.fe-fonts-enabled.fe-chatcard-custom-font #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),

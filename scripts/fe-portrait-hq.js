@@ -234,9 +234,10 @@ export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   // DX3rdActorSheet: close→submit→_updateObject→actor.update({img})). A downscaled data: URL in
   // `src` would therefore be saved as actor.img and uploaded to worlds/<world>/assets/<type>/
   // img-*.webp, permanently replacing the real high-res file with a ~300px copy. So editable
-  // portraits get NO src swap — the original path is left untouched. Instead an HQ overlay div is
-  // layered on top (display-only, never a form field). The image-hover overlay and directory
-  // thumbnails are not form fields and keep the src-swap HQ below.
+  // portraits get NO src swap — the original path is left untouched in `src`. Instead the HQ
+  // bitmap is layered via `srcset` (see _applyEditableSrcsetHQ): the browser paints the srcset
+  // candidate while core serializes only getAttribute("src"). The image-hover overlay and
+  // directory thumbnails are not form fields and keep the src-swap HQ below.
   if (imgEl.hasAttribute?.("data-edit")) {
     if (url) imgEl.dataset.feHqSrc = url; // let image-hover resolve the real high-res original
     else imgEl.dataset.feHqSrc = "";

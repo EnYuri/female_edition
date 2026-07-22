@@ -691,19 +691,22 @@ function cpComputeDrawRect({
   return { dx, dy, dw, dh };
 }
 
-function cpComputeSourceCrop({ srcW, srcH, fit = "cover" }) {
+function cpComputeSourceCrop({ srcW, srcH, fit = "cover", anchorTop = false }) {
   // Compute a source rectangle (sx,sy,sw,sh) for drawing into a square destination.
-  // - cover: crop to a centered square
+  // - cover: crop to a square (horizontal centered). Vertically: top-anchored when
+  //   `anchorTop` (preserve head, crop the bottom — used for CHAT portraits so a tall
+  //   full-body image keeps the head), otherwise centered (combat tracker keeps its
+  //   original centered crop).
   // - contain: use full image
   const w = Math.max(1, Number(srcW) || 1);
   const h = Math.max(1, Number(srcH) || 1);
 
   if (fit === "contain") return { sx: 0, sy: 0, sw: w, sh: h };
 
-  // cover: crop to square by taking the min dimension
+  // cover: crop to square by taking the min dimension.
   const side = Math.min(w, h);
   const sx = (w - side) / 2;
-  const sy = (h - side) / 2;
+  const sy = anchorTop ? 0 : (h - side) / 2;
   return { sx, sy, sw: side, sh: side };
 }
 
@@ -723,7 +726,7 @@ function cpDownscaleCanvasStep(srcCanvas, dstW, dstH) {
   return next;
 }
 
-async function cpResampleToDataURL(img, size, fit) {
+async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
   const ok = await cpWaitForImage(img);
   if (!ok) return null;
 
@@ -743,7 +746,7 @@ async function cpResampleToDataURL(img, size, fit) {
   try {
     // Multi-step downscale for better quality (especially from very large portraits).
     // Step 1: crop (cover) or keep full (contain) into a working canvas.
-    const { sx, sy, sw, sh } = cpComputeSourceCrop({ srcW: nw, srcH: nh, fit });
+    const { sx, sy, sw, sh } = cpComputeSourceCrop({ srcW: nw, srcH: nh, fit, anchorTop });
 
     let work = document.createElement("canvas");
     work.width = Math.max(1, Math.floor(sw));
@@ -789,7 +792,7 @@ async function cpResampleToDataURL(img, size, fit) {
   }
 }
 
-function cpMaybeApplyHQResample(img, size, shape) {
+function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
   try {
     if (!cpIsImageElement(img)) return;
     if (!size || size <= 0) return;
@@ -812,7 +815,7 @@ function cpMaybeApplyHQResample(img, size, shape) {
     const fit = String(shape) === "none" ? "contain" : "cover";
 
     const p = (async () => {
-      const dataUrl = await cpResampleToDataURL(img, size, fit);
+      const dataUrl = await cpResampleToDataURL(img, size, fit, anchorTop);
       return dataUrl;
     })();
 
@@ -860,7 +863,7 @@ function cpShouldUseHQResample(img) {
  * @param {{ size, shape, borderMode, borderWidth, borderColor, color }} opts
  *   color — pre-resolved border color (user/actor color, or fallback)
  */
-function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color = null }) {
+function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color = null, anchorTop = false }) {
   try {
     img.width = size;
     img.height = size;
@@ -877,8 +880,11 @@ function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderCo
     img.style.setProperty("clip-path",       "none",         "important");
   } else {
     img.style.setProperty("border-radius",   shape === "square" ? "0" : "50%", "important");
-    img.style.setProperty("object-fit",      "cover",         "important");
-    img.style.setProperty("object-position", "center center", "important");
+    img.style.setProperty("object-fit", "cover", "important");
+    // anchorTop(채팅 포트레이트): 상단(얼굴/머리)을 보존하고 하단만 잘라낸다.
+    // 그 외(컴뱃 트래커 등): 기존대로 중앙 기준으로 자른다.
+    img.style.setProperty("object-position",
+      anchorTop ? "center top" : "center center", "important");
     img.style.setProperty("clip-path",
       shape === "circle" ? "circle(50% at 50% 50%)" : "none", "important");
   }
@@ -914,10 +920,11 @@ function cpApplyPortraitStyling(message, img, { size: sizeHint, shape: shapeHint
       color = msgColor || borderColor;
     }
 
-    cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color });
+    // Chat portraits crop top-anchored (preserve head on tall/full-body art).
+    cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color, anchorTop: true });
 
     // Attempt high-quality resample (safe no-op for cross-origin images).
-    cpMaybeApplyHQResample(img, size, shape);
+    cpMaybeApplyHQResample(img, size, shape, true);
   } catch {
     /* no-op */
   }
@@ -949,7 +956,8 @@ function cpApplyCombatPortraitStyling(combatant, img) {
       if (candidate && !isData) {
         if (!img.dataset.fePortraitOrigSrc) img.dataset.fePortraitOrigSrc = String(candidate);
         const fit = shape === "none" ? "contain" : "cover";
-        const key = `${img.dataset.fePortraitOrigSrc}@@${size}@@${fit}`;
+        // Combat tracker keeps the centered crop → distinct key from chat's "@@top".
+        const key = `${img.dataset.fePortraitOrigSrc}@@${size}@@${fit}@@center`;
         img.dataset.fePortraitResampleKey = key;
         const cached = cpResampleCacheGet(key);
         if (cached && img.src !== cached) img.src = cached;
@@ -1167,7 +1175,9 @@ function cpUpsertPortrait(message, messageEl) {
   const size = Math.max(16, Number(cpGet(CP.SIZE) ?? 64) || 64);
   const shape = String(cpGet(CP.SHAPE) ?? "circle");
   const fit = shape === "none" ? "contain" : "cover";
-  const key = `${src}@@${size}@@${fit}`;
+  // Chat portraits crop top-anchored; keep that distinct in the cache key from the
+  // combat tracker's centered crop of the same src/size/fit.
+  const key = `${src}@@${size}@@${fit}@@top`;
 
   const allowHQResample = cpShouldUseHQResample(img);
   const cached = allowHQResample ? cpResampleCacheGet(key) : null;
