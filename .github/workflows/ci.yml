@@ -30,7 +30,7 @@ jobs:
 
       # Node's built-in test runner — no dependency install needed.
       - name: Run unit tests
-        run: node --test test/*.test.mjs
+        run: node --test ci/*.test.mjs
 
   lint:
     runs-on: ubuntu-latest

@@ -771,7 +771,7 @@ Hooks.once("ready", () => {
   }
 });
 
-// Pure/testable helpers exported for the Node unit tests under `test/`. Foundry
+// Pure/testable helpers exported for the Node unit tests under `ci/`. Foundry
 // loads this file for its side effects only and ignores these named exports.
 export {
   FE_CG_CONFLICTS,

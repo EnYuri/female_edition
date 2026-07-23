@@ -13,7 +13,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ["scripts/**/*.js", "test/**/*.mjs"],
+    files: ["scripts/**/*.js", "ci/**/*.mjs"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

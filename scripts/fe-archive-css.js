@@ -3,7 +3,7 @@
 //
 // Sub-module of fe-chat-archive.js. No Foundry/DOM globals, no imports — every
 // export here is a pure string transform so it can be unit-tested with
-// `node --test` (see test/fe-archive-css.test.mjs).
+// `node --test` (see ci/fe-archive-css.test.mjs).
 //
 // WHY THIS EXISTS (the bug it fixes):
 // Foundry does NOT serve module/system stylesheets as <link> elements. Its game

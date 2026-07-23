@@ -2,7 +2,7 @@
  * Node unit tests for the PURE helpers of fe-conflict-guard.js.
  *
  * Run from the module root:
- *   node --test test/fe-conflict-guard.test.mjs
+ *   node --test ci/fe-conflict-guard.test.mjs
  *
  * fe-conflict-guard.js is a Foundry side-effect module (it registers a `ready`
  * hook at load), so we stub the few globals it touches at module-eval time

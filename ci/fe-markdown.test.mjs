@@ -2,7 +2,7 @@
  * Node unit tests for the PURE helpers of fe-markdown.js.
  *
  * Run from the module root:
- *   node --test test/fe-markdown.test.mjs
+ *   node --test ci/fe-markdown.test.mjs
  *
  * fe-markdown.js imports only fe-constants.js (no side effects) and
  * fe-gm-priority.js (feSetting is read lazily at call time, never at import),

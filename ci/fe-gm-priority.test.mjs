@@ -2,7 +2,7 @@
  * Node unit tests for the PURE read helpers of fe-gm-priority.js.
  *
  * Run from the module root:
- *   node --test test/fe-gm-priority.test.mjs
+ *   node --test ci/fe-gm-priority.test.mjs
  *
  * These helpers read `game.settings` lazily at call time (never at import), so
  * we drive them by swapping a minimal `globalThis.game` stub per test. Only the

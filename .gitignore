@@ -3,9 +3,9 @@
 .claude/
 docs/
 
-# NOTE: test/ is committed (CI runs it) but kept OUT of the distributed
-# module.zip via `test export-ignore` in .gitattributes — Foundry users never
-# receive it. Do not re-add test/ here.
+# NOTE: ci/ is committed (CI runs it) but kept OUT of the distributed
+# module.zip via `ci export-ignore` in .gitattributes — Foundry users never
+# receive it. Do not add ci/ here.
 
 # Node dev tooling — never shipped (also export-ignore'd) and never committed.
 node_modules/
