@@ -62,6 +62,11 @@ import {
   feNextTick,
   feWaitForImages,
 } from "./fe-archive-output.js";
+import {
+  feRewriteSnapshotCSSURLs,
+  feParseCssImports,
+  feAssembleInlinedStyleBlock,
+} from "./fe-archive-css.js";
 
 // ===========================================================================
 // Constants
@@ -2387,6 +2392,16 @@ async function feRenderChatArchiveWindow(win, {
     if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) failed or timed out`);
 
     if (metaEl) metaEl.textContent = "Loading fonts…";
+    // Inject the self-contained data: URL faces into the popup BEFORE waiting, so the
+    // print/PDF path never depends on the popup resolving Foundry's @import-based
+    // module stylesheets. The popup is an about:blank document whose <style>@import
+    // "modules/…/ui-font.css"> resolves through <base href> unreliably; when it loses
+    // the race, feWaitForFonts finds no registered @font-face and print captures with
+    // NO custom font ("PDF 폰트 미적용" bug). The embedded CSS carries the same faces as
+    // data: URLs (no network, no @import) and correctly routes BOTH the CookieRun and
+    // Geurimilgi vars, so the mixed preset renders in full. Done at render time (not at
+    // print) so fonts settle well before win.print() — avoids a mid-reflow capture.
+    await feEnsureArchiveEmbeddedFonts(win);
     await feWaitForFonts(win.document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
   }
 
@@ -2725,14 +2740,15 @@ async function feArchivePrint(win) {
 
   try {
     setMeta("Loading fonts…");
-    // feEnsureArchiveEmbeddedFonts is intentionally NOT called here.
-    // It is designed for offline HTML export (file:// CORS workaround) and
-    // injects !important font overrides + variable resets that break live fonts:
-    //   - resets --fe-font-geurimilgi to system fonts (breaks Geurimilgi chat font)
-    //   - overrides .chat-message * font-family, clobbering icon fonts (FA → □)
-    //   - triggers a full text re-layout just before win.print(), so Chromium
-    //     may capture the document mid-reflow (garbled text, broken rendering)
-    // The archive popup already has all fonts loaded via <link> stylesheets.
+    // The embedded data: URL faces are injected at RENDER time (feEnsureArchiveEmbeddedFonts,
+    // in feRenderChatArchiveWindow) — NOT here. Reasons they must not be injected at print
+    // time: the !important font overrides trigger a full text re-layout, so injecting right
+    // before win.print() risks Chromium capturing the document mid-reflow. The earlier
+    // objections that kept them out entirely are resolved: --fe-font-geurimilgi now routes to
+    // the embedded Geurimilgi face (mixed preset works), and Font Awesome is re-asserted in the
+    // embedded CSS so icons never fall back to □. So by the time we reach print, the popup
+    // already carries self-contained faces; we only wait for them to finish loading.
+    await feEnsureArchiveEmbeddedFonts(win);
     await feWaitForFonts(doc, FE_EXPORT_WAIT_FONTS_TIMEOUT);
   } catch {}
 
@@ -2776,39 +2792,123 @@ async function feArchivePrint(win) {
 // HTML Snapshot Export  (blob build, download, external browser)
 // ===========================================================================
 
-function feRewriteSnapshotCSSURLs(cssText, stylesheetURL) {
-  const resolve = (raw) => {
-    const value = String(raw ?? "").trim();
-    if (!value || value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("#")) return value;
-    try {
-      return new URL(value, stylesheetURL).href;
-    } catch {
-      return value;
-    }
-  };
-
-  let css = String(cssText ?? "");
-  css = css.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (_match, quote, raw) => {
-    const q = quote || '"';
-    return `url(${q}${resolve(raw)}${q})`;
-  });
-  css = css.replace(/(@import\s+)(["'])([^"']+)\2/gi, (_match, prefix, quote, raw) => {
-    return `${prefix}${quote}${resolve(raw)}${quote}`;
-  });
-  return css;
+// Fetch one same-origin stylesheet's text under the per-file size cap.
+// Returns { cssText, bytes } or null. Shared by both inlining phases below.
+async function feFetchSnapshotStylesheet(absolute) {
+  try {
+    const fetched = await feFetchWithTimeout(
+      absolute,
+      { credentials: "include" },
+      FE_EXPORT_STYLESHEET_FETCH_TIMEOUT,
+      async (response) => {
+        if (!response.ok) return null;
+        const declaredBytes = Number(response.headers.get("content-length") || 0);
+        if (Number.isFinite(declaredBytes) && declaredBytes > FE_EXPORT_STYLESHEET_MAX_BYTES) return null;
+        return { cssText: await response.text() };
+      }
+    );
+    if (!fetched) return null;
+    const bytes = new TextEncoder().encode(fetched.cssText).byteLength;
+    if (bytes > FE_EXPORT_STYLESHEET_MAX_BYTES) return null;
+    return { cssText: fetched.cssText, bytes };
+  } catch {
+    return null;
+  }
 }
 
 async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
+  const baseURL = doc?.baseURI || window.location.href;
+  // Shared byte budget across BOTH phases so a huge core <link> can't crowd out
+  // the module styles (Phase A runs first, so module CSS is admitted first).
+  const budget = { admitted: 0 };
+  const sameOrigin = (abs) => {
+    try { return new URL(abs).origin === window.location.origin; } catch { return false; }
+  };
+
+  setMeta("Embedding styles…");
+
+  // -----------------------------------------------------------------------
+  // Phase A: module/system stylesheets that Foundry injects as
+  // `@import "..." layer(...)` inside a <style> block (NOT as <link>s — see
+  // fe-archive-css.js). Without this, the saved standalone HTML keeps raw
+  // relative @imports that cannot resolve offline: every fe-* sheet (and the
+  // fonts they apply) vanishes, breaking the layout and the PDF font embed.
+  // -----------------------------------------------------------------------
+  let styleBlocks = [];
+  try {
+    styleBlocks = Array.from(headClone?.querySelectorAll?.("style") ?? [])
+      .filter((el) => /@import/i.test(el.textContent || ""));
+  } catch {
+    styleBlocks = [];
+  }
+
+  if (styleBlocks.length) {
+    const resolveAbs = (raw) => {
+      try { return new URL(raw, baseURL).href; } catch { return String(raw ?? ""); }
+    };
+
+    // Unique same-origin, non-media @import URLs across all blocks, first-seen order.
+    const importOrder = [];
+    const seen = new Set();
+    for (const el of styleBlocks) {
+      for (const imp of feParseCssImports(el.textContent || "")) {
+        if (imp.media) continue;
+        const abs = resolveAbs(imp.url);
+        if (seen.has(abs)) continue;
+        seen.add(abs);
+        if (!sameOrigin(abs)) continue;
+        importOrder.push(abs);
+      }
+    }
+
+    const fetchedByUrl = new Map();
+    let nextImport = 0;
+    const importWorker = async () => {
+      while (true) {
+        const i = nextImport++;
+        if (i >= importOrder.length) return;
+        const abs = importOrder[i];
+        const got = await feFetchSnapshotStylesheet(abs);
+        if (got) fetchedByUrl.set(abs, got);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, importOrder.length) }, () => importWorker()));
+
+    // Admit in first-seen order so the byte cap cannot race the cascade order.
+    const inlinedByUrl = new Map();
+    for (const abs of importOrder) {
+      const got = fetchedByUrl.get(abs);
+      if (!got || budget.admitted + got.bytes > FE_EXPORT_STYLESHEET_TOTAL_BYTES) continue;
+      inlinedByUrl.set(abs, feRewriteSnapshotCSSURLs(got.cssText, abs));
+      budget.admitted += got.bytes;
+    }
+
+    for (const el of styleBlocks) {
+      try {
+        const { text, rebuilt } = feAssembleInlinedStyleBlock(el.textContent || "", {
+          resolveAbs,
+          getInlinedCss: (abs) => (inlinedByUrl.has(abs) ? inlinedByUrl.get(abs) : null),
+        });
+        // A non-rebuilt block (one that also holds real rules) is left intact but
+        // still gets its relative @import/url() refs absolutized so it loads online.
+        el.textContent = rebuilt ? text : feRewriteSnapshotCSSURLs(el.textContent || "", baseURL);
+      } catch {
+        // Leave the block untouched if assembly throws.
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase B: real <link rel="stylesheet"> elements (mostly core CSS).
+  // -----------------------------------------------------------------------
   let links = [];
   try {
     links = Array.from(headClone?.querySelectorAll?.('link[rel="stylesheet"]') ?? []);
   } catch {
-    return;
+    links = [];
   }
   if (!links.length) return;
 
-  const baseURL = doc?.baseURI || window.location.href;
-  let admittedBytes = 0;
   let nextIndex = 0;
   const results = new Array(links.length).fill(null);
 
@@ -2822,38 +2922,22 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
         const href = link.getAttribute("href");
         if (!href) continue;
         const absolute = new URL(href, baseURL).href;
-        if (new URL(absolute).origin !== window.location.origin) continue;
-
-        const fetched = await feFetchWithTimeout(
-          absolute,
-          { credentials: "include" },
-          FE_EXPORT_STYLESHEET_FETCH_TIMEOUT,
-          async (response) => {
-            if (!response.ok) return null;
-            const declaredBytes = Number(response.headers.get("content-length") || 0);
-            if (Number.isFinite(declaredBytes) && declaredBytes > FE_EXPORT_STYLESHEET_MAX_BYTES) return null;
-            return { cssText: await response.text(), declaredBytes };
-          }
-        );
-        if (!fetched) continue;
-        const cssText = fetched.cssText;
-        const bytes = new TextEncoder().encode(cssText).byteLength;
-        if (bytes > FE_EXPORT_STYLESHEET_MAX_BYTES) continue;
-        results[index] = { absolute, cssText, bytes };
+        if (!sameOrigin(absolute)) continue;
+        const got = await feFetchSnapshotStylesheet(absolute);
+        if (got) results[index] = { absolute, cssText: got.cssText, bytes: got.bytes };
       } catch {
         // Keep the original <link> when a stylesheet cannot be captured.
       }
     }
   };
 
-  setMeta("Embedding styles…");
   await Promise.all(Array.from({ length: Math.min(4, links.length) }, () => worker()));
 
   // Admission and replacement stay in document order so the byte cap cannot
   // race and the original cascade order is preserved exactly.
   for (let index = 0; index < links.length; index += 1) {
     const result = results[index];
-    if (!result || admittedBytes + result.bytes > FE_EXPORT_STYLESHEET_TOTAL_BYTES) continue;
+    if (!result || budget.admitted + result.bytes > FE_EXPORT_STYLESHEET_TOTAL_BYTES) continue;
     try {
       const link = links[index];
       const style = doc.createElement("style");
@@ -2862,7 +2946,7 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
       if (media) style.setAttribute("media", media);
       style.textContent = feRewriteSnapshotCSSURLs(result.cssText, result.absolute);
       link.replaceWith(style);
-      admittedBytes += result.bytes;
+      budget.admitted += result.bytes;
     } catch {
       // A failed replacement leaves the original link intact.
     }
@@ -3254,6 +3338,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
   // Optional: embed Hakgyoansim Geurimilgi.
   // If present, we embed it so saved file:// HTML keeps the same look.
+  let geurimilgiEmbedded = false;
   try {
     const geurUrl = `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`;
     const geurimilgiData = await fetchFont(geurUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
@@ -3261,6 +3346,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
       faces.push(
         `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
       );
+      geurimilgiEmbedded = true;
     }
   } catch {}
 
@@ -3295,6 +3381,17 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
     return neodgmRule;
   }
 
+  // Geurimilgi routing for the mixed "쿠키런 + 그림일기" preset (small text / cards /
+  // tooltips = Geurimilgi). If the face was embedded, the export MUST route the
+  // geurimilgi var to it — otherwise that half of the mixed preset silently falls back
+  // to a system font and only CookieRun shows ("하나만 적용" bug). If it could NOT be
+  // embedded (over cap / fetch failed), keep the readable system stack.
+  const geurimilgiSystemStack =
+    `"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, -apple-system, sans-serif, var(--fe-symbol-fallback)`;
+  const geurimilgiStack = geurimilgiEmbedded
+    ? `"FE Geurimilgi Embedded", "FE Geurimilgi", ${geurimilgiSystemStack}`
+    : geurimilgiSystemStack;
+
   const css = `
 /* female_edition: embedded CookieRun fonts (offline HTML export) */
 ${neodgmRule}
@@ -3321,22 +3418,13 @@ ${faces.join("\n")}
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* Archive/export fallback for the large Geurimilgi face: use readable
-   * system UI fonts instead of forcing another decorative font in offline HTML.
-   */
-  --fe-font-geurimilgi:
-    "Noto Sans KR",
-    "Malgun Gothic",
-    "Apple SD Gothic Neo",
-    "Segoe UI",
-    system-ui,
-    -apple-system,
-    sans-serif,
-    var(--fe-symbol-fallback);
+  /* Geurimilgi: prefer the embedded face when it was embedded (the mixed
+   * CookieRun+Geurimilgi preset needs BOTH faces); else fall back to a readable
+   * system UI stack. Built in JS above as geurimilgiStack. */
+  --fe-font-geurimilgi: ${geurimilgiStack};
 
   /* Secondary stack (small text / chat-card descriptions). Mirrors ui-font.css's
-   * :root default — resolves to the readable system stack above, not a decorative
-   * face, since Geurimilgi intentionally isn't embedded for offline export. */
+   * :root default — follows the geurimilgi stack (embedded face when available). */
   --fe-font-secondary: var(--fe-font-geurimilgi);
 
   --fe-chat-card-system-font-family:

@@ -256,16 +256,11 @@ export function feNormalizeArchiveShellLayout(doc, { restore = false, root = nul
         el.style.setProperty("inline-size", "100%", "important");
         el.style.setProperty("min-width", "0", "important");
         el.style.setProperty("min-inline-size", "0", "important");
-        if (isMedia) {
-          // Preserve the sidebar's intrinsic media size, but never let a direct
-          // message child overflow the wider standalone archive viewport.
-          el.style.setProperty("max-width", "100%", "important");
-          el.style.setProperty("max-inline-size", "100%", "important");
-          el.style.setProperty("height", "auto", "important");
-        } else {
-          el.style.setProperty("max-width", "none", "important");
-          el.style.setProperty("max-inline-size", "none", "important");
-        }
+        // Every target here is a shell container (never a media element), so the
+        // container branch always applies: let it size to content and drop any
+        // inherited max-width so the standalone archive viewport is not clamped.
+        el.style.setProperty("max-width", "none", "important");
+        el.style.setProperty("max-inline-size", "none", "important");
         el.style.setProperty("flex", "none", "important");
         el.style.setProperty("flex-basis", "auto", "important");
         el.style.setProperty("overflow", "visible", "important");

@@ -1,0 +1,53 @@
+name: CI
+
+# Fast feedback on every push and pull request: run the unit tests (hard gate)
+# and the linter (advisory for now). The release workflow (release.yml) also runs
+# the tests as a gate, so a regression can never be published even if someone
+# pushes straight to main.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Node's built-in test runner — no dependency install needed.
+      - name: Run unit tests
+        run: node --test test/*.test.mjs
+
+  lint:
+    runs-on: ubuntu-latest
+    # Blocking: the config is tuned so only real problems are errors (warnings —
+    # unused vars/imports — do not fail the build). eslint exits non-zero only on
+    # an error, so this gate turns red only when a genuine mistake is introduced.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint

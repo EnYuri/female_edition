@@ -110,7 +110,19 @@ const FE_ARCHIVE_CONTAINER_STYLE_PROPS = [
 ];
 
 const FE_ARCHIVE_TEXT_STYLE_PROPS = [
-  "color", "font-family", "font-size", "font-style", "font-weight", "line-height",
+  // NOTE: `font-family` is deliberately NOT mirrored. The archive's font is owned
+  // entirely by the embedded-font <style> (feBuildEmbeddedCookieRunFontCSS): it
+  // routes text to the data-URL "FE … Embedded" faces via body classes + --fe-font-*
+  // vars. Mirroring copies the live sidebar's *computed* font-family — which names
+  // the LIVE faces ("FE CookieRun", not "…Embedded") — inline with !important, and
+  // that inline rule OVERRIDES the embedded routing. In a standalone HTML file the
+  // live faces load from Foundry-origin absolute url()s that 404 offline, so those
+  // elements fall back to the system default. Only the live-CLONED messages mirror
+  // (recent messages, clustered on the LAST pages), so the symptom was "마지막
+  // 페이지만 기본 폰트". Fresh-built messages never mirror and were always correct;
+  // dropping font-family here makes cloned messages match them. (font-size/weight/
+  // style/line-height stay — they vary per message and have no offline-face issue.)
+  "color", "font-size", "font-style", "font-weight", "line-height",
   "font-variant", "font-stretch", "letter-spacing", "word-spacing", "text-shadow",
   "text-transform", "text-align", "text-decoration", "text-decoration-color",
   "text-decoration-line", "text-decoration-style", "text-decoration-thickness",
@@ -153,6 +165,61 @@ const FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE = Array.from(new Set([...FE_ARCH
 const FE_ARCHIVE_CARD_TREE_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
 const FE_ARCHIVE_MIXED_STYLE_PROPS_NO_FIXED_SIZE = FE_ARCHIVE_TREE_STYLE_PROPS_NO_FIXED_SIZE;
 const FE_ARCHIVE_TREE_MAX_SIMPLE = 72;
+
+// The message HEADER layout (standard flexrow vs. the portrait GRID) is owned
+// entirely by the export stylesheet — NOT by whatever geometry the live sidebar
+// happened to compute at its narrow (~300px) width. Mirroring copies the live
+// computed flex/grid/justify/align/display onto the clone with `!important`,
+// which overrides the export's portrait grid and traps the timestamp inside a
+// sidebar-width slice (the "타임스탬프가 사이드바 폭에 갇힘" bug). After mirroring
+// we therefore STRIP these layout-geometry inline props from the header region so
+// the export CSS (and feNormalizeArchiveMessageLayout) governs the header layout.
+// Visual props (color, background, border, font, text, opacity, filter) are kept.
+const FE_ARCHIVE_HEADER_LAYOUT_RESET_PROPS = [
+  "flex", "flex-grow", "flex-shrink", "flex-basis", "flex-direction", "flex-wrap", "order",
+  "justify-content", "justify-items", "justify-self",
+  "align-items", "align-content", "align-self", "place-items", "place-content",
+  "grid-template-columns", "grid-template-rows", "grid-template-areas",
+  "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
+  "grid-area", "grid-column", "grid-column-start", "grid-column-end",
+  "grid-row", "grid-row-start", "grid-row-end",
+  "gap", "column-gap", "row-gap",
+  "display", "position", "top", "right", "bottom", "left", "float", "clear",
+  "margin", "padding",
+  "width", "inline-size", "min-width", "max-width", "height", "min-height", "max-height",
+];
+// Header text/meta boxes whose placement the export owns. The portrait <img> is
+// deliberately excluded — its size IS mirrored as a chat-format component, and
+// its grid-area matches the export grid.
+const FE_ARCHIVE_HEADER_LAYOUT_RESET_SELECTORS = [
+  ":scope > .message-header",
+  ":scope > .message-header .message-sender",
+  ":scope > .message-header .message-sender .name-stacked",
+  ":scope > .message-header .message-sender .title",
+  ":scope > .message-header .message-sender .subtitle",
+  ":scope > .message-header .message-metadata",
+  ":scope > .message-header .message-flavor",
+  ":scope > .message-header .flavor-text",
+  ":scope > .message-header .whisper-to",
+  ':scope > .message-header [class*="chat-portrait-whisper-to-"]',
+];
+
+function feStripHeaderLayoutInlineStyles(cloneEl) {
+  try {
+    if (!feIsElement(cloneEl)) return;
+    for (const selector of FE_ARCHIVE_HEADER_LAYOUT_RESET_SELECTORS) {
+      for (const el of feSelectScoped(cloneEl, selector)) {
+        const style = el?.style;
+        if (!style?.removeProperty) continue;
+        for (const prop of FE_ARCHIVE_HEADER_LAYOUT_RESET_PROPS) {
+          try { style.removeProperty(prop); } catch { /* no-op */ }
+        }
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
 const FE_ARCHIVE_TREE_MAX_PORTRAIT = 112;
 const FE_ARCHIVE_TREE_MAX_COMPLEX = 260;
 
@@ -350,6 +417,11 @@ export function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = nul
       sync(":scope, :scope > .message-header, :scope > .message-content", FE_ARCHIVE_CONTAINER_STYLE_PROPS);
       sync(":scope .message-content, :scope .round-marker", FE_ARCHIVE_TEXT_STYLE_PROPS);
     }
+
+    // MUST run last: undo the header-region layout geometry copied from the narrow
+    // live sidebar so the export stylesheet owns the header layout (fixes the
+    // last-page / live-cloned timestamp being trapped in a sidebar-width slice).
+    feStripHeaderLayoutInlineStyles(cloneEl);
   } catch {
     /* no-op */
   }

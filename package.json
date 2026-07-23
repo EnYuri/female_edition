@@ -1,0 +1,16 @@
+{
+  "name": "female_edition",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only tooling for the female_edition Foundry module. NOT shipped to users (export-ignore'd in .gitattributes). Foundry loads the ES modules under scripts/ directly with no build step.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "lint": "eslint scripts test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  }
+}

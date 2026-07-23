@@ -3,8 +3,12 @@
 .claude/
 docs/
 
-# Local-only tests
-test/
+# NOTE: test/ is committed (CI runs it) but kept OUT of the distributed
+# module.zip via `test export-ignore` in .gitattributes — Foundry users never
+# receive it. Do not re-add test/ here.
+
+# Node dev tooling — never shipped (also export-ignore'd) and never committed.
+node_modules/
 
 # Markdown docs are local-only — except the repo README
 *.md
