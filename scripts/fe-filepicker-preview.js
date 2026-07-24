@@ -161,13 +161,19 @@ function _revoke(aside) {
 }
 
 function _renderMedia(cat, url, name) {
+  // Attribute-escape BOTH the src URL and the alt name. A file whose name contains
+  // a double-quote (allowed on Linux/macOS hosts; a player-uploaded file is a
+  // cross-user vector once the GM previews it) would otherwise break out of the
+  // src="" attribute and inject an onerror handler. foundry.utils.escapeHTML is
+  // safe for quoted attributes (handles & < > " ').
+  const esc = (s) => globalThis.foundry?.utils?.escapeHTML?.(String(s ?? "")) ?? String(s ?? "");
   switch (cat) {
     case "image":
-      return `<img class="fe-fp-media" src="${url}" alt="${foundry.utils.escapeHTML?.(name) ?? name}" data-fe-media>`;
+      return `<img class="fe-fp-media" src="${esc(url)}" alt="${esc(name)}" data-fe-media>`;
     case "video":
-      return `<video class="fe-fp-media" src="${url}" controls preload="metadata" data-fe-media></video>`;
+      return `<video class="fe-fp-media" src="${esc(url)}" controls preload="metadata" data-fe-media></video>`;
     case "audio":
-      return `<div class="fe-fp-audio-wrap"><i class="fa-solid fa-music" inert></i><audio src="${url}" controls preload="metadata" data-fe-media></audio></div>`;
+      return `<div class="fe-fp-audio-wrap"><i class="fa-solid fa-music" inert></i><audio src="${esc(url)}" controls preload="metadata" data-fe-media></audio></div>`;
     case "font":
       return `<div class="fe-fp-font" data-fe-font>가나다라 AaBbCc 0123<br><span class="fe-fp-font-sm">다람쥐 헌 쳇바퀴 The quick brown fox</span></div>`;
     default:
@@ -195,7 +201,7 @@ function _writePreview(aside, { url, name, cat, sizeText = "", dateText = "", is
   aside.classList.remove("fe-fp-empty");
   aside.dataset.fePreviewKey = isLocal ? `local:${name}` : url;
 
-  const safeName = foundry.utils.escapeHTML?.(name) ?? name;
+  const safeName = globalThis.foundry?.utils?.escapeHTML?.(name) ?? name;
   body.innerHTML =
     `<div class="fe-fp-stage" data-fe-stage>${_renderMedia(cat, url, name)}</div>` +
     `<div class="fe-fp-meta">` +

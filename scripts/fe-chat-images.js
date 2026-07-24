@@ -64,13 +64,17 @@ function ciRandomId() {
   }
 }
 
+// Routes through core foundry.utils.escapeHTML (& < > " ') with a self-contained
+// fallback, matching the module-wide HTML-escape convention.
 function ciEscapeHtml(str) {
-  return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  const s = String(str ?? "");
+  return globalThis.foundry?.utils?.escapeHTML?.(s)
+    ?? s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 }
 
 function ciGetFilePickerClass() {

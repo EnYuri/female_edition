@@ -1,13 +1,18 @@
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
+// Delegates to core foundry.utils.escapeHTML (handles & < > " ', safe for both
+// inner-HTML and quoted attributes) with a self-contained fallback if the core
+// API is ever absent. All FE HTML-escape helpers route through the same core fn.
 function feEscapeHTML(str) {
-  return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  const s = String(str ?? "");
+  return globalThis.foundry?.utils?.escapeHTML?.(s)
+    ?? s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 }
 
 // Allow only safe link schemes for markdown `[label](url)` anchors. A bare

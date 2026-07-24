@@ -516,3 +516,59 @@ export function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } =
     return Promise.resolve(0);
   }
 }
+
+// ===========================================================================
+// Shared low-level archive utilities
+// Moved here (from fe-chat-archive.js) so BOTH the archive entry module and
+// fe-archive-snapshot.js can import them without a circular import.
+// ===========================================================================
+
+// Attribute-context escape. Routes through core foundry.utils.escapeHTML, which
+// ALSO escapes ' (the old local impl did not) — strictly safer for any quoting
+// style. Self-contained fallback if the core API is absent.
+export function feEscapeAttr(str) {
+  const s = String(str ?? "");
+  return globalThis.foundry?.utils?.escapeHTML?.(s)
+    ?? s
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll("'", "&#039;");
+}
+
+export function feGetFoundryBaseHref() {
+  try {
+    const route = (() => {
+      try {
+        const r = foundry?.utils?.getRoute?.("/");
+        if (typeof r === "string" && r.length) return r;
+      } catch {}
+      return "/";
+    })();
+
+    const path = route.endsWith("/") ? route : `${route}/`;
+    return new URL(path, window.location.origin).href;
+  } catch {
+    try {
+      return new URL("/", window.location.origin).href;
+    } catch {
+      return "/";
+    }
+  }
+}
+
+const feArchiveDocumentOperations = new WeakSet();
+export async function feRunArchiveDocumentOperation(doc, task) {
+  if (!doc || typeof task !== "function") return false;
+  if (feArchiveDocumentOperations.has(doc)) {
+    ui.notifications?.warn("female_edition | 이 아카이브에서 다른 인쇄/저장 작업이 진행 중입니다.", { console: false });
+    return false;
+  }
+  feArchiveDocumentOperations.add(doc);
+  try {
+    return await task();
+  } finally {
+    feArchiveDocumentOperations.delete(doc);
+  }
+}
