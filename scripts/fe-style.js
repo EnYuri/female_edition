@@ -262,7 +262,13 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
 
-    const accent = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff";
+    // 텍스트 색조 오버라이드가 꺼지면 강조색이 적용되는 모든 것(텍스트·테두리·체커보드
+    // 무늬)을 기본 백색(#ffffff, H=0·S=0%)으로 되돌려 "진짜 off" 상태로 만든다.
+    // 채팅 컨트롤의 강조색 스와치 버튼은 fe-chat-controls-menu.css 가 같은 조건으로 숨긴다.
+    const accentOverrideOn = !!feSetting(S.ACCENT_TEXT_OVERRIDE);
+    const accent = accentOverrideOn
+      ? (String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff")
+      : "#ffffff";
     root.style.setProperty("--fe-dx3rd-accent", accent);
 
     // H/S만 분해 — §20 CSS가 고정 명도와 조합해 사용 (명도 오염 방지)

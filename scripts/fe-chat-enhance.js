@@ -714,12 +714,17 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, S.ACCENT_TEXT_OVERRIDE, {
     name: "레트로: 텍스트 색조 오버라이드",
-    hint: "레트로 테마에서 dnd5e 시트·채팅의 텍스트를 강조색(픽셀 테마 강조색 스와치) 기반 톤으로 통일합니다. 끄면 기본 텍스트 색(흰/회색·유저 색상)을 사용합니다.",
+    hint: "레트로 테마의 강조색(텍스트·테두리·체커보드 무늬)을 픽셀 테마 강조색 스와치 기반 톤으로 통일합니다. 끄면 강조색 전체를 기본 백색(흰/회색)으로 되돌리고 채팅 컨트롤의 강조색 스와치 버튼도 숨깁니다.",
     scope: "client",
     config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.ACCENT_TEXT_OVERRIDE],
-    onChange: () => feSetAccentTextOverrideClass(document),
+    onChange: () => {
+      feSetAccentTextOverrideClass(document);
+      // 오버라이드 OFF → 강조색 전체(텍스트·테두리·무늬)를 기본 백색으로 되돌리고,
+      // ON → 저장된 강조색을 복원. feApplyStyleVarsFromSettings 가 두 경우를 모두 처리.
+      feApplyStyleVarsFromSettings(document);
+    },
   });
 
   game.settings.register(MODULE_ID, S.STYLE_PAPER_OVERLAY_ENABLED, {
