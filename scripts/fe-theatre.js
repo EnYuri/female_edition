@@ -1648,12 +1648,18 @@ function _fetRegisterContextOptions(_html, options) {
     return actor;
   };
 
+  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
+  // 최소 지원이 v13이라 양쪽 키를 모두 채운다(v13은 name/condition만 읽는다).
+  // 아래 "무대" 접두사 탐색(fe-dx3rd-resource-ui)도 name 을 보므로 name 은 유지.
+  const entry = ({ label, icon, visible, callback }) =>
+    ({ label, name: label, icon, visible, condition: visible, callback });
+
   // 무대 추가/제거 — "편집"(SIDEBAR.Edit) 항목 바로 아래에 끼워 넣는다.
   const stageItems = [
-    {
-      name: "무대에 추가",
+    entry({
+      label: "무대에 추가",
       icon: '<i class="fas fa-theater-masks"></i>',
-      condition: (li) => {
+      visible: (li) => {
         if (!_fetEnabled) return false;
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
         const actor = _fetActorForMenu(li);
@@ -1664,11 +1670,11 @@ function _fetRegisterContextOptions(_html, options) {
         const id = _fetGetActorIdFromLi(li);
         if (id) fetAddToStage(id);
       },
-    },
-    {
-      name: "무대에서 제거",
+    }),
+    entry({
+      label: "무대에서 제거",
       icon: '<i class="fas fa-door-open"></i>',
-      condition: (li) => {
+      visible: (li) => {
         if (!_fetEnabled) return false;
         // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
         const actor = _fetActorForMenu(li);
@@ -1679,17 +1685,17 @@ function _fetRegisterContextOptions(_html, options) {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetRemoveInsert(_FET_ID_PREFIX + id);
       },
-    },
+    }),
     // 무대 설정(GM 전용)도 무대 항목 그룹으로 묶어 "편집" 아래에 함께 배치.
-    {
-      name: "무대 설정",
+    entry({
+      label: "무대 설정",
       icon: '<i class="fas fa-cog"></i>',
-      condition: (li) => _fetEnabled && game.user.isGM && !!_fetActorForMenu(li),
+      visible: (li) => _fetEnabled && game.user.isGM && !!_fetActorForMenu(li),
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetOpenActorConfig(id);
       },
-    },
+    }),
   ];
 
   // 코어 "편집" 항목의 인덱스를 찾는다. v14 코어는 `label: "SIDEBAR.Edit"`(미지역화

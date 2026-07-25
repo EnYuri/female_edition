@@ -1572,25 +1572,30 @@ Hooks.on("getActorContextOptions", (directory, options) => {
   // sheet at all. Two mutually exclusive entries rather than one that changes label:
   // a ContextMenu entry's `name` is read once when the menu is built, so a single
   // stateful label would go stale. Each names the ACTION, not the current state.
+  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
+  // 최소 지원이 v13이므로 양쪽 키를 모두 채워 넣는다(v13은 name/condition만 읽는다).
+  const entry = ({ label, icon, visible, callback }) =>
+    ({ label, name: label, icon, visible, condition: visible, callback });
+
   const items = [
-    {
-      name: game.i18n.localize("FESP.Menu.TokenizeOn"),
+    entry({
+      label: game.i18n.localize("FESP.Menu.TokenizeOn"),
       icon: '<i class="fa-solid fa-chess-pawn"></i>',
-      condition: (li) => isOwnedPanel(li) && !actorOf(li).system.tokenize,
+      visible: (li) => isOwnedPanel(li) && !actorOf(li).system.tokenize,
       callback: (li) => actorOf(li)?.update({ "system.tokenize": true }),
-    },
-    {
-      name: game.i18n.localize("FESP.Menu.TokenizeOff"),
+    }),
+    entry({
+      label: game.i18n.localize("FESP.Menu.TokenizeOff"),
       icon: '<i class="fa-regular fa-square"></i>',
-      condition: (li) => isOwnedPanel(li) && !!actorOf(li).system.tokenize,
+      visible: (li) => isOwnedPanel(li) && !!actorOf(li).system.tokenize,
       callback: (li) => actorOf(li)?.update({ "system.tokenize": false }),
-    },
-    {
-      name: game.i18n.localize("FESP.Menu.PlaceOnScene"),
+    }),
+    entry({
+      label: game.i18n.localize("FESP.Menu.PlaceOnScene"),
       icon: '<i class="fa-solid fa-image"></i>',
-      condition: (li) => isOwnedPanel(li) && !!canvas?.scene,
+      visible: (li) => isOwnedPanel(li) && !!canvas?.scene,
       callback: (li) => { const a = actorOf(li); if (a) feScreenPanelPlaceOnScene(a); },
-    },
+    }),
   ];
 
   // Sit directly under core's "편집" (SIDEBAR.Edit) — the slot fe-theatre.js uses for its

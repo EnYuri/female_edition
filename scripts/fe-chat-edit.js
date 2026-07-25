@@ -535,14 +535,20 @@ function feInstallEditContextMenuEarly() {
       return;
     }
 
+    const visible = (target) => {
+      const msg = feMessageFromContextLI(target);
+      return feCanEditMessage(msg);
+    };
+
+    // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
+    // 최소 지원이 v13이므로 양쪽 키를 모두 넣어 v13 동작과 v14 무경고를 동시에 만족시킨다.
     options.unshift({
       feId: "fe-edit-message",
+      label: "메시지 수정",
       name: "메시지 수정",
       icon: '<i class="fa-solid fa-pen-to-square"></i>',
-      condition: (target) => {
-        const msg = feMessageFromContextLI(target);
-        return feCanEditMessage(msg);
-      },
+      visible,
+      condition: visible,
       callback: (target) => {
         const msg = feMessageFromContextLI(target);
         if (!msg) return;

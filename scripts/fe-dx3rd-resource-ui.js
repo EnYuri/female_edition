@@ -708,15 +708,20 @@ function _refreshVisibility() {
 function _ruiContextEntry(html, options) {
   if (!_isSupported() || !_ruiEnabled()) return;
   if (options.some(o => o.name === "스테이터스 토글")) return;
+  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
+  // 최소 지원이 v13이므로 양쪽 키를 모두 넣는다.
+  const visible = li => {
+    const el = li instanceof jQuery ? li[0] : li;
+    const id = el?.dataset?.documentId ?? el?.dataset?.entryId ?? el?.dataset?.actorId;
+    // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+    return !!game.actors.get(id)?.isOwner;
+  };
   const item = {
+    label: "스테이터스 토글",
     name: "스테이터스 토글",
     icon: '<i class="fas fa-eye"></i>',
-    condition: li => {
-      const el = li instanceof jQuery ? li[0] : li;
-      const id = el?.dataset?.documentId ?? el?.dataset?.entryId ?? el?.dataset?.actorId;
-      // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
-      return !!game.actors.get(id)?.isOwner;
-    },
+    visible,
+    condition: visible,
     callback: li => {
       const el = li instanceof jQuery ? li[0] : li;
       const id = el?.dataset?.documentId ?? el?.dataset?.entryId ?? el?.dataset?.actorId;
