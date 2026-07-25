@@ -227,6 +227,26 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   font-family: var(--fe-chat-font-family, var(--fe-font-primary), var(--font-primary), Signika, "Palatino Linotype", sans-serif) !important;
 }
 
+/* Card/box INTERNAL text = secondary (Geurimilgi) in the mixed "쿠키런 + 그림일기"
+   preset. The broad `.chat-message *` cookie rule above forces the chat font onto EVERY
+   message descendant — including chat-card / dx3rd-item-chat descriptions that must stay
+   secondary. In the LIVE sidebar those descendants simply INHERIT secondary from the card
+   container (no such `*` rule exists there); only the export re-breaks that inheritance.
+   The fix must live HERE (not in the embedded snapshot <style>): this file has no manifest
+   layer so it lands in `@layer modules`, and the cookie rule above is an `!important` rule
+   in that same layer. Per CSS cascade-layer !important REVERSAL, a `layer(modules)`
+   `!important` beats any UNLAYERED `!important` (the embedded snapshot card rule) regardless
+   of specificity — so the geurimilgi rule can only win by sitting in the SAME layer and
+   out-specifying it (this selector is (1,5,1) vs the cookie rule's (1,1,0)). ui-font.css's
+   card rule is in the earlier `layer(layouts)` and covers the card CONTAINER only, so it
+   already makes `.dx3rd-item-chat` itself geurimilgi but leaves the descendants to fall
+   through — this rule catches them. Names/titles live in `.message-header` (outside these
+   card selectors) so they keep the primary font. */
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
+  font-family: var(--fe-font-secondary) !important;
+}
+
 #fe-chat-export-container .chat-message,
 #fe-chat-export-container :is(#fe-chat-export-log, #chat-log) > .chat-message {
   display: block !important;

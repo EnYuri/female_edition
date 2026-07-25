@@ -248,6 +248,23 @@ function feCopyComputedCustomProperties(srcEl, dstEl) {
       const prop = String(cs.item?.(i) ?? cs[i] ?? "");
       if (!prop.startsWith("--")) continue;
       if (!FE_ARCHIVE_CUSTOM_PROPERTY_PREFIXES.some((prefix) => prop.startsWith(prefix))) continue;
+      // NEVER mirror a font-ROUTING custom property (any `--…font…` var:
+      // --fe-font-primary/secondary/geurimilgi, --fe-chat-font-family,
+      // --font-primary/sans/serif/h1…, --dnd5e-font-*, --fe-ui-font-family, …).
+      // The archive's font is owned entirely by the embedded-font <style>
+      // (feBuildEmbeddedCookieRunFontCSS), which routes these vars to the data-URL
+      // "FE … Embedded" faces at :root. The LIVE sidebar computes them to the
+      // NON-embedded faces ("FE Geurimilgi", "FE CookieRun" — no "…Embedded"),
+      // and copying that inline with !important shadows the embedded routing for
+      // the whole message subtree. In a standalone file:// HTML the live faces
+      // 404, so text falls to the next candidate — for --fe-font-secondary that
+      // is "FE CookieRun", so the mixed "쿠키런 + 그림일기" preset silently painted
+      // its Geurimilgi text (card descriptions / metadata) in CookieRun. All
+      // `font`-named vars are global routing/weight values (never per-message
+      // dynamic), so excluding them loses nothing. This is the same
+      // export-owns-the-font rule as the FE_ARCHIVE_TEXT_STYLE_PROPS `font-family`
+      // drop and feStripHeaderLayoutInlineStyles.
+      if (prop.includes("font")) continue;
       const value = cs.getPropertyValue(prop);
       if (!value) continue;
       dstEl.style.setProperty(prop, value.trim(), "important");
