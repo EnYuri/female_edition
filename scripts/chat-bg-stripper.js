@@ -22,7 +22,7 @@
 // The optional flat desaturation overlay is controlled independently by
 // cePaperOverlayEnabled; texture removal no longer inserts it implicitly.
 
-import { MODULE_ID, S, FE_DEFAULTS, feSetting } from "./fe-chat-enhance.js";
+import { MODULE_ID, S, FE_DEFAULTS, feSetting, feApplyCanvasTextFont } from "./fe-chat-enhance.js";
 
 const SETTINGS = {
   ENABLE_FONTS:    S.UI_ENABLE_FONTS,
@@ -46,6 +46,9 @@ function applyFontSetting(enabled) {
   try {
     document.body.classList.toggle("fe-fonts-enabled", !!enabled);
   } catch { /* no-op */ }
+  // Canvas text (token nameplates) is PIXI, not DOM — the body class does not
+  // reach it, so push/restore CONFIG.canvasTextStyle alongside the toggle.
+  try { feApplyCanvasTextFont(document); } catch { /* no-op */ }
 }
 
 function applyPortraitSetting(hide) {

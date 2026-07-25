@@ -238,6 +238,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.UI_USE_GEURIMILGI]:        feRead(S.UI_USE_GEURIMILGI),
       [S.UI_USE_USER_FONT]:         feRead(S.UI_USE_USER_FONT),
       [S.USER_FONT_FAMILY]:         feRead(S.USER_FONT_FAMILY),
+      [S.CANVAS_TEXT_FONT]:         feRead(S.CANVAS_TEXT_FONT),
 
       // Style vars
       [S.STYLE_CHAT_MESSAGE_SPACING]: feRead(S.STYLE_CHAT_MESSAGE_SPACING),
@@ -650,7 +651,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     const supplied = (key) => Object.prototype.hasOwnProperty.call(d, key);
     const fontsEnabled = !!d[S.UI_ENABLE_FONTS];
     const saveFontDependents = fontsEnabled || [
-      S.CHAT_FONT_CHOICE, S.UI_USE_USER_FONT, S.USER_FONT_FAMILY,
+      S.CHAT_FONT_CHOICE, S.UI_USE_USER_FONT, S.USER_FONT_FAMILY, S.CANVAS_TEXT_FONT,
     ].some(supplied);
     const saveAttrSource = !!d[S.ATTR_PATH_HELPER] || supplied(S.ATTR_PATH_HELPER_SOURCE);
     const saveDecayTime = !!d.stageAutoDecay || supplied("stageDecayTime");
@@ -702,6 +703,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           str(S.CHAT_FONT_CHOICE),
           setOne(S.UI_USE_GEURIMILGI, nextChatFontChoice === "cookie"),
           bool(S.UI_USE_USER_FONT), str(S.USER_FONT_FAMILY),
+          bool(S.CANVAS_TEXT_FONT),
         ] : []),
 
         // Style

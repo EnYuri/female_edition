@@ -25,6 +25,9 @@ const S = {
   // module's built-in CookieRun/Geurimilgi stack entirely (like NeoDGM mode).
   UI_USE_USER_FONT: "ceUiUseUserFont",
   USER_FONT_FAMILY: "ceUserFontFamily",
+  // Canvas (PIXI) text — token nameplates, cursors, measurement labels. These are
+  // WebGL text, not DOM, so CSS cannot reach them; see feApplyCanvasTextFont.
+  CANVAS_TEXT_FONT: "ceCanvasTextFont",
   // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
   // for backwards compatibility with already-saved user settings.
   UI_ENABLE_FONTS: "enableFonts",
@@ -133,6 +136,7 @@ const FE_DEFAULTS = {
   [S.UI_USE_GEURIMILGI]: true,
   [S.UI_USE_USER_FONT]: false,
   [S.USER_FONT_FAMILY]: "",
+  [S.CANVAS_TEXT_FONT]: true,
   [S.UI_ENABLE_FONTS]: true,
   [S.UI_RETRO_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,

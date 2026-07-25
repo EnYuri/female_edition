@@ -145,6 +145,13 @@
       <p class="notes">목록에서 고르거나 폰트 패밀리 이름을 직접 입력하세요(아래 입력칸 값이 실제 적용값). '시스템 폰트 불러오기'는 설치된 폰트 목록을 채워 줍니다 — 브라우저 권한 허용이 한 번 필요할 수 있습니다.{{#unless localFontsSupported}} 이 환경은 자동 목록을 지원하지 않아 직접 입력 또는 모듈 폴더 폰트만 사용할 수 있습니다.{{/unless}}</p>
     </div>
 
+    <div class="form-group">
+      <label>캔버스 텍스트에도 적용 (토큰 이름표)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceCanvasTextFont" data-dtype="Boolean" {{checked values.ceCanvasTextFont}} />
+      </div>
+      <p class="notes">씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다.</p>
+    </div>
 
   </section>
 

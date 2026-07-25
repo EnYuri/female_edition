@@ -281,6 +281,102 @@ function feApplyStyleVarsFromSettings(doc = document) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Canvas (PIXI) text font — token nameplates and friends
+// ---------------------------------------------------------------------------
+// Token nameplates are PreciseText drawn into the WebGL canvas, so no CSS rule
+// can ever reach them. The only lever is CONFIG.canvasTextStyle, which every
+// canvas label clones (Token#_getTextStyle at client/canvas/placeables/token.mjs,
+// plus cursors, templates, lights, sounds). Core's original family is captured
+// once so turning the option off restores exactly what core shipped.
+//
+// Two things this must do beyond assigning the family:
+//   1. Wait for the font to actually be in document.fonts. PIXI renders text
+//      through canvas 2D, which silently falls back to the next family when the
+//      face is not loaded yet — and never repaints when it finishes loading.
+//   2. Re-assign the style on already-drawn placeables. CONFIG.canvasTextStyle is
+//      *cloned* at draw time, so live nameplates keep their old family until they
+//      are redrawn.
+let _feCanvasFontOriginal = null;
+
+// Families the font-loading API cannot (and need not) load by name.
+const FE_CANVAS_GENERIC_FAMILIES = new Set([
+  "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui",
+  "ui-serif", "ui-sans-serif", "ui-monospace", "ui-rounded", "inherit", "initial",
+]);
+
+// Read the currently active font stack from the rendered CSS rather than
+// re-deriving it from the settings: the body mode classes (neodgm/mona/galmuri/
+// user-font/…) already resolve which stack wins, and getComputedStyle reports
+// the substituted result. Returns a PIXI-friendly array of family names.
+function feResolveCanvasFontFamilies(doc = document) {
+  try {
+    const body = doc?.body;
+    if (!body) return [];
+    const raw = String(getComputedStyle(body).getPropertyValue("--fe-font-primary") ?? "");
+    return raw
+      .split(",")
+      .map((part) => part.trim().replace(/\s+/g, " ").replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Nameplates/tooltips of already-drawn tokens hold a clone of the old style.
+// Re-running _getTextStyle() picks up the new CONFIG value without a full redraw.
+function feRefreshCanvasTextStyles() {
+  try {
+    const c = globalThis.canvas;
+    if (!c?.ready) return;
+    for (const token of c.tokens?.placeables ?? []) {
+      try {
+        const style = token?._getTextStyle?.();
+        if (!style) continue;
+        if (token.nameplate) token.nameplate.style = style;
+        if (token.tooltip) token.tooltip.style = style.clone?.() ?? style;
+      } catch { /* per-token, non-fatal */ }
+    }
+  } catch { /* no-op */ }
+}
+
+// Ask the browser to load the faces we are about to hand to PIXI, then refresh
+// once they are ready. Fire-and-forget — a failed/absent face just falls through
+// to the next family in the stack.
+function feEnsureCanvasFontsLoaded(families) {
+  try {
+    if (typeof document?.fonts?.load !== "function") return;
+    const size = Number(CONFIG?.canvasTextStyle?.fontSize) || 36;
+    const jobs = families
+      .filter((f) => !FE_CANVAS_GENERIC_FAMILIES.has(f.toLowerCase()))
+      .map((f) => document.fonts.load(`${size}px "${f.replace(/"/g, '\\"')}"`).catch(() => null));
+    if (!jobs.length) return;
+    Promise.all(jobs).then(() => feRefreshCanvasTextStyles()).catch(() => {});
+  } catch { /* no-op */ }
+}
+
+// UI_ENABLE_FONTS is GM-priority EXCLUDED, so read it directly (same reasoning as
+// feApplyStyleVarsFromSettings): going through feSetting would let a GM override
+// force fonts onto a client that opted out.
+function feApplyCanvasTextFont(doc = document) {
+  try {
+    const style = globalThis.CONFIG?.canvasTextStyle;
+    if (!style) return;
+    if (_feCanvasFontOriginal === null) _feCanvasFontOriginal = style.fontFamily;
+
+    let fontsOn = true;
+    try { fontsOn = !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS); } catch { /* pre-init */ }
+    const active = fontsOn && !!feSetting(S.CANVAS_TEXT_FONT);
+    const families = active ? feResolveCanvasFontFamilies(doc) : [];
+
+    style.fontFamily = families.length ? families : _feCanvasFontOriginal;
+    if (families.length) feEnsureCanvasFontsLoaded(families);
+    feRefreshCanvasTextStyles();
+  } catch (err) {
+    console.warn("female_edition | failed to apply canvas text font", err);
+  }
+}
+
 export {
   feSetBodyMergeClasses,
   feSetChatCardFontClass,
@@ -297,4 +393,5 @@ export {
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
   feApplyStyleVarsFromSettings,
+  feApplyCanvasTextFont,
 };

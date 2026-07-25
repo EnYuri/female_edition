@@ -46,6 +46,7 @@ import {
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
   feApplyStyleVarsFromSettings,
+  feApplyCanvasTextFont,
 } from "./fe-style.js";
 
 import {
@@ -135,6 +136,7 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetUiFontClass(doc); } catch { /* no-op */ }
   try { feSetNeodgmModeClass(doc); } catch { /* no-op */ }
   try { feSetUserFontMode(doc); } catch { /* no-op */ }
+  try { feApplyCanvasTextFont(doc); } catch { /* no-op */ }
   try { feSetRetroThemeClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
   try { feSetPaperOverlayClass(doc); } catch { /* no-op */ }
@@ -505,7 +507,18 @@ Hooks.once("init", () => {
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
+      feApplyCanvasTextFont(document);
     },
+  });
+
+  game.settings.register(MODULE_ID, S.CANVAS_TEXT_FONT, {
+    name: "캔버스 텍스트에도 적용 (토큰 이름표 등)",
+    hint: "씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다. '커스텀 폰트 적용'이 켜져 있어야 합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.CANVAS_TEXT_FONT],
+    onChange: () => feApplyCanvasTextFont(document),
   });
 
   game.settings.register(MODULE_ID, S.UI_USE_GEURIMILGI, {
@@ -527,6 +540,7 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.UI_USE_USER_FONT],
     onChange: () => {
       feSetUserFontMode(document);
+      feApplyCanvasTextFont(document);
       feSetChatCardFontClass(document);
       // Suppress/restore the module chat-font-choice classes (see feUserFontActive).
       feSetChatFontChoiceClass(document);
@@ -544,6 +558,7 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.USER_FONT_FAMILY],
     onChange: () => {
       feSetUserFontMode(document);
+      feApplyCanvasTextFont(document);
       feSetChatCardFontClass(document);
       // Family going empty/non-empty flips feUserFontActive → refresh module classes.
       feSetChatFontChoiceClass(document);
@@ -884,6 +899,10 @@ Hooks.once("ready", async () => {
   feSetUiFontClass(document);
   feSetNeodgmModeClass(document);
   feSetUserFontMode(document);
+  // Canvas text (token nameplates) — CSS cannot reach PIXI text, so the family is
+  // pushed into CONFIG.canvasTextStyle. Safe before the first canvas draw: later
+  // draws clone the updated CONFIG value.
+  feApplyCanvasTextFont(document);
   feSetRetroThemeClass(document);
   feSetUserColorBgClass(document);
   feSetPaperOverlayClass(document);
@@ -918,6 +937,14 @@ Hooks.once("ready", async () => {
     });
     window.addEventListener("focus", () => feRepinFollowingChatLogs());
   } catch { /* no-op */ }
+});
+
+// A scene draw that happens before the @font-face files finish loading paints the
+// nameplates with the fallback family and never repaints on its own (PIXI caches
+// the rendered text texture). Re-apply per scene: feApplyCanvasTextFont awaits
+// document.fonts and re-assigns the style, which marks every text dirty.
+Hooks.on("canvasReady", () => {
+  try { feApplyCanvasTextFont(document); } catch { /* no-op */ }
 });
 
 // -------------------------------------
@@ -1399,6 +1426,7 @@ export {
   feSetUiFontClass,
   feSetNeodgmModeClass,
   feSetUserFontMode,
+  feApplyCanvasTextFont,
   feSetRetroThemeClass,
   feSetUserColorBgBaseClass,
   feSetUserColorBgClass,
