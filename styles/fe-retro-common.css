@@ -98,6 +98,46 @@ body.fe-retro-theme .application :is(footer, nav.tabs) {
   background-image: none !important;
 }
 
+/* ── 씬 설정 탭 가시성 ─────────────────────────────────────────
+ * SceneConfig의 탭 nav는 `sheet-tabs tabs top-tabs`이고, 코어가
+ * `nav.tabs.sheet-tabs.top-tabs { border-top: none }`으로 상단 보더를 지워
+ * 하단 한 줄만 --color-tabs-border(다크 테마 = --color-dark-5)로 남긴다.
+ * 레트로는 nav를 #000으로 칠하지만 그 변수는 재정의하지 않으므로, 검정
+ * 표면 위의 거의 검정 선이 되어 nav 경계가 사라진다.
+ *
+ * 활성/비활성 구분도 코어에서는 color 하나뿐인데(secondary → emphatic),
+ * 레트로 매핑은 L70%/α0.82 → L90%/α0.82라 알파가 같다. 강조색 채도가 0인
+ * 흑백 구성에서는 회색 70% vs 90% 차이만 남아 사실상 읽히지 않는다.
+ *
+ * 그래서 (1) 경계선을 테두리 전용 토큰으로 끌어올리고, (2) 활성 표시를
+ * 색이 아닌 강조색 밑줄로 옮긴다. 비활성의 후퇴는 명도가 아니라 알파로
+ * 만든다 — 텍스트 명도 하한 70% 원칙(fe-dx3rd-compat.css § 색 토큰)을
+ * 지키면서 검정 배경에서의 실효 밝기만 낮추기 위함이다.
+ *
+ * nav 하단선은 코어가 이미 border-bottom을 갖고 있으므로 색만 바꾼다.
+ * 반면 활성 밑줄은 box-shadow inset으로 그린다 — <a>에는 보더가 없어
+ * border-bottom을 추가하면 높이가 2px 늘어 탭 행 전체가 흔들린다.
+ *
+ * 항목 사이 세로 구분선도 한때 넣었으나 뺐다. 하단선 + 세로선이 겹치면
+ * 탭 하나하나가 테두리 박스처럼 읽혀 과했다 — 밑줄 하나로 충분하다. */
+body.fe-retro-theme .application.scene-config nav.tabs {
+  border-bottom: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme .application.scene-config nav.tabs > [data-tab] {
+  color: hsl(var(--fe-dx3rd-accent-h, 0deg)
+             calc(var(--fe-dx3rd-accent-s, 0%) * 0.6) 70% / 0.55) !important;
+}
+
+body.fe-retro-theme .application.scene-config nav.tabs > [data-tab]:hover {
+  color: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme .application.scene-config nav.tabs > [data-tab].active {
+  color: var(--fe-ac-90) !important;
+  box-shadow: inset 0 -2px 0 var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
 body.fe-retro-theme :is(.window-app, .application)
   :is(.header-control, .close, .minimize, .header-button):not([disabled]) {
   color: var(--fe-ac-57) !important;

@@ -1,0 +1,36 @@
+/*
+ * fe-scene-config.css
+ * female_edition — 씬 설정 시트 보정 (테마 무관, unlayered)
+ *
+ * 짝 스크립트는 scripts/fe-scene-config.js — 창 기본 폭을 넓히는 쪽을 맡는다.
+ * 레트로 테마 전용 탭 배색/밑줄은 fe-retro-common.css § 씬 설정 탭 가시성이
+ * 따로 소유한다(그쪽은 layer(layouts)라 !important 우선순위가 다르다).
+ *
+ * 이 파일은 unlayered로 로드된다. 코어 규칙은 전부 @layer 안에 있으므로
+ * 일반 선언만으로 이긴다 — !important는 필요하지 않다.
+ *
+ * 모든 규칙은 body.fe-scene-config-tabs 뒤에 있다. 이 클래스는
+ * fe-scene-config.js가 CORE_UI_SCENE_CONFIG_TABS 설정에 따라 토글하며,
+ * 꺼지면 코어 기본 레이아웃이 그대로 남는다.
+ */
+
+/* ── 탭 라벨 줄바꿈 방지 ───────────────────────────────────────
+ * 코어 nav.tabs는 gap 16px · row nowrap · space-evenly이고, 각 <a>는 기본
+ * flex 항목이라 shrink 가능하다. 폭이 모자라면 min-content(= 가장 긴 단어)
+ * 까지 줄어들며 라벨이 공백에서 두 줄로 접힌다.
+ *
+ * nowrap으로 접힘을 막고, shrink 자체를 꺼서 압축된 박스 위로 글자가
+ * 삐져나오는 상태도 함께 없앤다. space-evenly의 여백 분배는 flex-grow가
+ * 아니라 justify-content가 하는 일이라 그대로 유지된다.
+ *
+ * gap은 16 → 12px로 조금만 줄인다. 스크립트가 창을 760px로 넓히므로 폭
+ * 자체는 이미 해결되지만, 커스텀 폰트가 기본 폰트보다 넓을 때를 위한
+ * 여유분이다. */
+body.fe-scene-config-tabs .application.scene-config nav.tabs {
+  gap: 12px;
+}
+
+body.fe-scene-config-tabs .application.scene-config nav.tabs > [data-tab] {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}

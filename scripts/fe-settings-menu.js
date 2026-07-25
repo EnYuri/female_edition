@@ -46,6 +46,13 @@ const CP_DEFAULTS = Object.freeze({
   [CP.SHOW_OTHER]:     true,
 });
 
+// Settings whose effect is decided once at load time and cannot be re-applied live.
+// Core's own `requiresReload: true` flag is useless to us — it is read only by
+// SettingsConfig's submit handler (client/applications/settings/config.mjs:257),
+// and our settings are `config: false` + saved through this custom menu, so core
+// never sees them. We prompt for the reload ourselves in #applyValues.
+const FE_RELOAD_REQUIRED_KEYS = Object.freeze([S.CORE_UI_SCENE_CONFIG_TABS]);
+
 // Combined fallback table: fe-chat-enhance defaults + portrait defaults + DND5e injection defaults.
 const ALL_DEFAULTS = Object.freeze({
   ...FE_DEFAULTS,
@@ -202,6 +209,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
       [S.CORE_UI_TOKEN_PREVIEW]: feRead(S.CORE_UI_TOKEN_PREVIEW),
       [S.CORE_UI_FILEPICKER_ENHANCEMENTS]: feRead(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
+      [S.CORE_UI_SCENE_CONFIG_TABS]: feRead(S.CORE_UI_SCENE_CONFIG_TABS),
       [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
       [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
       [S.TOKEN_SYNC_PLACED_NAME]: feRead(S.TOKEN_SYNC_PLACED_NAME),
@@ -630,6 +638,13 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       catch (err) { failed.push(key); console.warn(`[${MODULE_ID}] failed to save setting "${key}"`, err); }
     };
     const bool = (key) => setOne(key, !!d[key]);
+    // Snapshot before the batch so we can tell whether a reload-only key actually
+    // changed — prompting on every save would be noise.
+    const reloadKeyBefore = new Map();
+    for (const key of FE_RELOAD_REQUIRED_KEYS) {
+      if (!has(key)) continue;
+      try { reloadKeyBefore.set(key, game.settings.get(MODULE_ID, key)); } catch { /* no-op */ }
+    }
     const num  = (key) => { const n = Number(d[key]); return setOne(key, Number.isFinite(n) ? n : ALL_DEFAULTS[key]); };
     const str  = (key) => setOne(key, d[key] == null ? ALL_DEFAULTS[key] : String(d[key]));
     const supplied = (key) => Object.prototype.hasOwnProperty.call(d, key);
@@ -655,6 +670,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
         bool(S.SC_COLLAPSE_ENABLED),
         bool(S.CORE_UI_TOKEN_PREVIEW), bool(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
+        bool(S.CORE_UI_SCENE_CONFIG_TABS),
         bool(S.TOKEN_CONFIG_TWO_COLUMN),
         ...(game.user?.isGM ? [
           bool(S.TOKEN_SYNC_NAME),
@@ -811,6 +827,17 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     if (failed.length) {
       console.warn(`[${MODULE_ID}] ${failed.length} setting(s) failed to save:`, failed);
       ui.notifications?.warn(`일부 설정을 저장하지 못했습니다: ${failed.join(", ")}`);
+    }
+
+    // Not awaited: the caller closes this menu right after, and awaiting a modal
+    // here would hold the settings window open behind it. world:false — every
+    // reload-only key so far is client-scoped, so only this client needs it.
+    const reloadChanged = [...reloadKeyBefore].some(([key, prev]) => {
+      try { return game.settings.get(MODULE_ID, key) !== prev; } catch { return false; }
+    });
+    if (reloadChanged) {
+      foundry.applications.settings.SettingsConfig.reloadConfirm({ world: false })
+        .catch((err) => console.warn(`[${MODULE_ID}] reload prompt failed`, err));
     }
   }
 }
