@@ -323,8 +323,10 @@ function feResolveCanvasFontFamilies(doc = document) {
   }
 }
 
-// Nameplates/tooltips of already-drawn tokens hold a clone of the old style.
+// Nameplates/tooltips of already-drawn placeables hold a clone of the old style.
 // Re-running _getTextStyle() picks up the new CONFIG value without a full redraw.
+// Drawings and Notes are refreshed too: they read CONFIG.defaultFontFamily (not
+// canvasTextStyle) whenever their own fontFamily is blank.
 function feRefreshCanvasTextStyles() {
   try {
     const c = globalThis.canvas;
@@ -336,6 +338,16 @@ function feRefreshCanvasTextStyles() {
         if (token.nameplate) token.nameplate.style = style;
         if (token.tooltip) token.tooltip.style = style.clone?.() ?? style;
       } catch { /* per-token, non-fatal */ }
+    }
+    for (const drawing of c.drawings?.placeables ?? []) {
+      try {
+        if (drawing?.text) drawing.text.style = drawing._getTextStyle();
+      } catch { /* per-drawing, non-fatal */ }
+    }
+    for (const note of c.notes?.placeables ?? []) {
+      try {
+        if (note?.tooltip) note.tooltip.style = note._getTextStyle();
+      } catch { /* per-note, non-fatal */ }
     }
   } catch { /* no-op */ }
 }
@@ -355,22 +367,135 @@ function feEnsureCanvasFontsLoaded(families) {
   } catch { /* no-op */ }
 }
 
+// ---------------------------------------------------------------------------
+// Drawn text — Drawing / map Note placeables and the rich-text editor
+// ---------------------------------------------------------------------------
+// This is a DIFFERENT path from CONFIG.canvasTextStyle above. Drawing#_getTextStyle
+// (client/canvas/placeables/drawing.mjs) and Note#_getTextStyle read the document's
+// own `fontFamily` and only fall back to CONFIG.defaultFontFamily when it is blank
+// (the sheet's "기본값" blank option). The family dropdown itself comes from
+// FontConfig.getAvailableFontChoices(), which lists exactly the families that were
+// declared in CONFIG.fontDefinitions with `editor: true` AND then loaded through
+// FontConfig.loadFont — nothing else can appear there.
+//
+// So offering the module fonts for drawn text takes two independent steps:
+//   1. declare + load them, so every module font is selectable per drawing/note
+//      (and in the journal editor's font menu, which uses the same list),
+//   2. point CONFIG.defaultFontFamily at the active primary family, so a drawing
+//      left on "기본값" uses the module font without the user picking anything.
+//
+// The definitions deliberately use an empty `fonts: []`: ui-font.css already owns
+// every @font-face, so core only has to await document.fonts for that family
+// instead of building a second, duplicate FontFace for the same file. A family
+// that fails to load (CDN font while offline) is simply never added to the list.
+const FE_EDITOR_FONT_FAMILIES = [
+  "FE CookieRun",
+  "FE Geurimilgi",
+  "NeoDunggeunmo Pro",
+  "Galmuri11",
+  "Mona12",
+  "Mona12 Text KR",
+  "Mona10",
+];
+
+// font/-folder families discovered at runtime by fe-user-font.js.
+const _feExtraEditorFamilies = new Set();
+// Families already handed to FontConfig.loadFont — this applier re-runs on every
+// font setting change and on canvasReady, and loading is a one-time job.
+const _feEditorFontsLoaded = new Set();
+let _feDefaultFontFamilyOriginal = null;
+
+function feResolveFontConfig() {
+  return (
+    foundry?.applications?.settings?.menus?.FontConfig ||
+    globalThis.FontConfig ||
+    null
+  );
+}
+
+// The module's own families plus whatever the user brought in (font/ folder,
+// locally-installed pick).
+function feCollectEditorFontFamilies() {
+  const out = [...FE_EDITOR_FONT_FAMILIES, ..._feExtraEditorFamilies];
+  try {
+    const chosen = String(game.settings.get(MODULE_ID, S.USER_FONT_FAMILY) ?? "").trim();
+    if (chosen) out.push(chosen);
+  } catch { /* pre-init */ }
+  return out;
+}
+
+function feRegisterEditorFonts(active) {
+  try {
+    if (!active) return;
+    const FontConfig = feResolveFontConfig();
+    const definitions = globalThis.CONFIG?.fontDefinitions;
+    if (!FontConfig?.loadFont || !definitions) return;
+    for (const family of feCollectEditorFontFamilies()) {
+      if (!family || _feEditorFontsLoaded.has(family)) continue;
+      _feEditorFontsLoaded.add(family);
+      // Never clobber an existing definition — core ships some, and the world's
+      // own Font settings may define others under the same name.
+      definitions[family] ??= { editor: true, fonts: [] };
+      // loadFont resolves false (rather than throwing) when the face never
+      // arrives — e.g. a CDN pixel font while offline. Forget it either way so a
+      // later re-apply gets another chance.
+      Promise.resolve(FontConfig.loadFont(family, definitions[family]))
+        .then((ok) => { if (!ok) _feEditorFontsLoaded.delete(family); })
+        .catch(() => { _feEditorFontsLoaded.delete(family); });
+    }
+  } catch (err) {
+    console.warn("female_edition | failed to register editor fonts", err);
+  }
+}
+
+function feApplyDefaultFontFamily(doc, fontsOn) {
+  try {
+    const cfg = globalThis.CONFIG;
+    if (!cfg) return;
+    if (_feDefaultFontFamilyOriginal === null) _feDefaultFontFamilyOriginal = cfg.defaultFontFamily;
+
+    const active = fontsOn && !!feSetting(S.CANVAS_DRAWING_FONT);
+    // Only the FIRST family of the stack: CONFIG.defaultFontFamily is handed to
+    // PIXI as one family name, and PIXI quotes a plain string whole — a
+    // comma-separated stack would become a single, unmatchable family.
+    const primary = active ? feResolveCanvasFontFamilies(doc)[0] : null;
+    cfg.defaultFontFamily = primary || _feDefaultFontFamilyOriginal;
+    if (primary) feEnsureCanvasFontsLoaded([primary]);
+  } catch { /* no-op */ }
+}
+
+// Called by fe-user-font.js once the font/ folder scan resolves, so folder fonts
+// join the drawing/note dropdown alongside the built-ins.
+function feAddEditorFontFamilies(families = []) {
+  let added = false;
+  for (const entry of families) {
+    const family = String(entry ?? "").trim();
+    if (!family || _feExtraEditorFamilies.has(family)) continue;
+    _feExtraEditorFamilies.add(family);
+    added = true;
+  }
+  if (added) feApplyCanvasTextFont(document);
+}
+
 // UI_ENABLE_FONTS is GM-priority EXCLUDED, so read it directly (same reasoning as
 // feApplyStyleVarsFromSettings): going through feSetting would let a GM override
 // force fonts onto a client that opted out.
 function feApplyCanvasTextFont(doc = document) {
   try {
-    const style = globalThis.CONFIG?.canvasTextStyle;
-    if (!style) return;
-    if (_feCanvasFontOriginal === null) _feCanvasFontOriginal = style.fontFamily;
-
     let fontsOn = true;
     try { fontsOn = !!game.settings.get(MODULE_ID, S.UI_ENABLE_FONTS); } catch { /* pre-init */ }
-    const active = fontsOn && !!feSetting(S.CANVAS_TEXT_FONT);
-    const families = active ? feResolveCanvasFontFamilies(doc) : [];
 
-    style.fontFamily = families.length ? families : _feCanvasFontOriginal;
-    if (families.length) feEnsureCanvasFontsLoaded(families);
+    const style = globalThis.CONFIG?.canvasTextStyle;
+    if (style) {
+      if (_feCanvasFontOriginal === null) _feCanvasFontOriginal = style.fontFamily;
+      const active = fontsOn && !!feSetting(S.CANVAS_TEXT_FONT);
+      const families = active ? feResolveCanvasFontFamilies(doc) : [];
+      style.fontFamily = families.length ? families : _feCanvasFontOriginal;
+      if (families.length) feEnsureCanvasFontsLoaded(families);
+    }
+
+    feRegisterEditorFonts(fontsOn);
+    feApplyDefaultFontFamily(doc, fontsOn);
     feRefreshCanvasTextStyles();
   } catch (err) {
     console.warn("female_edition | failed to apply canvas text font", err);
@@ -392,6 +517,7 @@ export {
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
+  feAddEditorFontFamilies,
   feApplyStyleVarsFromSettings,
   feApplyCanvasTextFont,
 };

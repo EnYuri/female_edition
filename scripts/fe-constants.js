@@ -28,6 +28,10 @@ const S = {
   // Canvas (PIXI) text — token nameplates, cursors, measurement labels. These are
   // WebGL text, not DOM, so CSS cannot reach them; see feApplyCanvasTextFont.
   CANVAS_TEXT_FONT: "ceCanvasTextFont",
+  // Drawn text (Drawing / map Note placeables). A separate path from the one
+  // above: those documents carry their own `fontFamily` and only fall back to
+  // CONFIG.defaultFontFamily when it is blank.
+  CANVAS_DRAWING_FONT: "ceCanvasDrawingFont",
   // Master toggles registered by chat-bg-stripper.js. Keys are not "ce*"-prefixed
   // for backwards compatibility with already-saved user settings.
   UI_ENABLE_FONTS: "enableFonts",
@@ -137,6 +141,7 @@ const FE_DEFAULTS = {
   [S.UI_USE_USER_FONT]: false,
   [S.USER_FONT_FAMILY]: "",
   [S.CANVAS_TEXT_FONT]: true,
+  [S.CANVAS_DRAWING_FONT]: true,
   [S.UI_ENABLE_FONTS]: true,
   [S.UI_RETRO_THEME]: false,
   [S.UI_HIDE_PORTRAITS]: true,

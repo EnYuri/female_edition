@@ -512,12 +512,22 @@ Hooks.once("init", () => {
   });
 
   game.settings.register(MODULE_ID, S.CANVAS_TEXT_FONT, {
-    name: "캔버스 텍스트에도 적용 (토큰 이름표 등)",
+    name: "토큰 이름표·커서 글꼴",
     hint: "씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다. '커스텀 폰트 적용'이 켜져 있어야 합니다.",
     scope: "client",
     config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.CANVAS_TEXT_FONT],
+    onChange: () => feApplyCanvasTextFont(document),
+  });
+
+  game.settings.register(MODULE_ID, S.CANVAS_DRAWING_FONT, {
+    name: "캔버스 글꼴 (그리기·지도 노트)",
+    hint: "모듈 글꼴을 Foundry의 글꼴 목록에 등록해, 그리기(드로잉)·지도 노트·저널 편집기의 글꼴 선택 창에서 직접 고를 수 있게 합니다. 이 설정을 켜면 글꼴이 '기본값'인 그리기/노트는 위에서 고른 글꼴로 표시되고, 끄면 Foundry 기본 글꼴로 돌아갑니다(목록 등록은 유지). '커스텀 폰트 적용'이 켜져 있어야 합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.CANVAS_DRAWING_FONT],
     onChange: () => feApplyCanvasTextFont(document),
   });
 

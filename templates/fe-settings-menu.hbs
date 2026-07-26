@@ -146,11 +146,19 @@
     </div>
 
     <div class="form-group">
-      <label>캔버스 텍스트에도 적용 (토큰 이름표)</label>
+      <label>토큰 이름표·커서 글꼴</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCanvasTextFont" data-dtype="Boolean" {{checked values.ceCanvasTextFont}} />
       </div>
       <p class="notes">씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다.</p>
+    </div>
+
+    <div class="form-group">
+      <label>캔버스 글꼴 (그리기·지도 노트)</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceCanvasDrawingFont" data-dtype="Boolean" {{checked values.ceCanvasDrawingFont}} />
+      </div>
+      <p class="notes">모듈 글꼴을 Foundry의 글꼴 목록에 등록해, 그리기(드로잉)·지도 노트·저널 편집기의 글꼴 선택 창에서 직접 고를 수 있게 합니다. 이 설정을 켜면 글꼴이 '기본값'인 그리기/노트는 위에서 고른 글꼴로 표시되고, 끄면 Foundry 기본 글꼴로 돌아갑니다(목록 등록은 유지).</p>
     </div>
 
   </section>

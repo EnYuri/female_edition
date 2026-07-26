@@ -574,28 +574,64 @@ function feTgMeasureDistanceText(ox, oy, tx, ty) {
   return units ? `${val} ${units}` : String(val);
 }
 
-function feTgMakeDistanceLabel(ox, oy, token, gs) {
-  const tx = token.center.x, ty = token.center.y;
-  const text = feTgMeasureDistanceText(ox, oy, tx, ty);
+// One distance readout. `withDot` prepends a small filled circle in the owning user's
+// player color — shown only when several readouts share one target token, where the
+// stacked rows would otherwise be indistinguishable. Returns a node anchored at its
+// LEFT-MIDDLE (the caller positions it), or null when the scene has no grid distance.
+function feTgMakeDistanceLabel(row, token, fontSize, withDot) {
+  const text = feTgMeasureDistanceText(row.ox, row.oy, token.center.x, token.center.y);
   if (!text) return null;
   const PT = foundry.canvas?.containers?.PreciseText ?? globalThis.PreciseText ?? PIXI.Text;
   const style = new PIXI.TextStyle({
     fontFamily: feTgResolveFontFamily(),
-    fontSize: Math.round(Math.max(14, gs * 0.20)),
+    fontSize,
     fill: "#ffffff",
     stroke: "#000000",
     strokeThickness: 3,
     align: "left",
   });
   const lbl = new PT(text, style);
-  // Sit just beside the target token's top-right corner.
   lbl.anchor.set(0, 0.5);
+  lbl.eventMode = "none";
+  if (!withDot) return lbl;
+
+  const node = new PIXI.Container();
+  node.eventMode = "none";
+  const r = Math.max(3, fontSize * 0.26);
+  const dot = new PIXI.Graphics();
+  // Dark rim so a pale player color still reads against bright token art.
+  dot.lineStyle(Math.max(1, r * 0.4), 0x000000, 0.85)
+    .beginFill(feTgColorToInt(row.color), 1)
+    .drawCircle(0, 0, r)
+    .endFill();
+  dot.position.set(r, 0);
+  lbl.position.set(r * 2 + Math.max(3, fontSize * 0.22), 0);
+  node.addChild(dot, lbl);
+  return node;
+}
+
+// Lay out every readout aimed at ONE target token, stacked downward from the token's
+// top-right corner so multiple users' distances no longer overprint each other. Row
+// order is simply the order the beams were drawn in (FE_TG_REMOTE_SIGHTLINES is a Map,
+// so it follows the order each user's sightline first arrived) — no global ordering is
+// enforced, since the user-color dot is what distinguishes the rows.
+function feTgLayoutDistanceLabels(group, gs, labels) {
+  const { token, rows } = group;
+  const withDot = rows.length > 1;
+  const fontSize = Math.round(Math.max(14, gs * 0.20));
+  const lineHeight = Math.round(fontSize * 1.3);
   const tw = token.w || gs;
   const th = token.h || gs;
   const margin = Math.max(4, gs * 0.06);
-  lbl.position.set(tx + tw / 2 + margin, ty - th / 2);
-  lbl.eventMode = "none";
-  return lbl;
+  const x = token.center.x + tw / 2 + margin;
+  let y = token.center.y - th / 2;
+  for (const row of rows) {
+    const node = feTgMakeDistanceLabel(row, token, fontSize, withDot);
+    if (!node) continue;
+    node.position.set(x, y);
+    labels.addChild(node);
+    y += lineHeight;
+  }
 }
 
 function feTgClearLabels(container) {
@@ -728,6 +764,10 @@ function feTgRedrawSightlines() {
   const gs = canvas?.dimensions?.size ?? 100;
   const hit = new Set(); // tokens to occlude (drawn targets + participating origins)
   let drewAny = false;
+  // targetTokenId -> { token, rows }: the readouts aimed at that token, laid out
+  // together after the pass so several users targeting one token get stacked rows
+  // instead of overprinted text.
+  const labelGroups = new Map();
 
   // One pass per user (ours + every broadcast peer). The CORE stroke uses the owner's
   // player color (so you can tell whose line is whose); the soft GLOW keeps the
@@ -764,11 +804,14 @@ function feTgRedrawSightlines() {
       hit.add(o);
       drewAny = true;
       // Distance readout beside the target token's top-right corner (hidden when the
-      // scene declares no grid distance).
-      const lbl = feTgMakeDistanceLabel(ox, oy, t, gs);
-      if (lbl && labels) labels.addChild(lbl);
+      // scene declares no grid distance) — collected now, positioned per target below.
+      let group = labelGroups.get(pair.t);
+      if (!group) labelGroups.set(pair.t, group = { token: t, rows: [] });
+      group.rows.push({ ox, oy, color: entry.color });
     }
   }
+
+  if (labels) for (const [, group] of labelGroups) feTgLayoutDistanceLabels(group, gs, labels);
 
   layer.visible = drewAny;
   if (labels) labels.visible = drewAny;

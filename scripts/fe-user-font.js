@@ -19,7 +19,7 @@
 // registered in fe-chat-enhance.js alongside the other font settings.
 
 import { MODULE_ID } from "./fe-constants.js";
-import { feSetUserFontMode } from "./fe-style.js";
+import { feSetUserFontMode, feAddEditorFontFamilies } from "./fe-style.js";
 
 const FONT_DIR = `modules/${MODULE_ID}/font`;
 // font/ files that back the module's own @font-face declarations — they are
@@ -141,7 +141,10 @@ Hooks.once("ready", async () => {
   // Register font/-folder fonts so a saved user-font family that points at one of
   // them resolves, then (re)apply in case the user font is already selected.
   try {
-    await feRegisterModuleFolderFonts();
+    const folderFonts = await feRegisterModuleFolderFonts();
+    // Also publish them to Foundry's own font list (CONFIG.fontDefinitions), so a
+    // dropped-in font is selectable for drawings/map notes/journal text too.
+    feAddEditorFontFamilies((folderFonts ?? []).map((f) => f.family));
   } catch { /* no-op */ }
   try { feSetUserFontMode(document); } catch { /* no-op */ }
 });
