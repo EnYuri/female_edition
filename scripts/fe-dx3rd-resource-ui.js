@@ -749,9 +749,15 @@ function _ruiContextEntry(html, options) {
 Hooks.on("getActorContextOptions",     _ruiContextEntry);
 Hooks.on("getActorContextMenuOptions", _ruiContextEntry);
 
-Hooks.on("createActor", (actor) => {
+// 신규 액터는 마스킹 상태로 시작. createActor는 접속 중인 모든 클라이언트에서
+// 발화하므로 생성자 본인(=소유 권한 보유)만 기록한다. 게이트가 없으면 다른
+// 플레이어 클라이언트가 남의 액터에 update를 날려
+// "User X lacks permission to update Actor [...]" 가 반복 발생한다.
+Hooks.on("createActor", (actor, _options, userId) => {
   if (!_isDx3rd()) return;
-  actor.setFlag(MODULE_ID, MASK_FLAG, true);
+  if (game.user.id !== userId || !actor.isOwner) return;
+  actor.setFlag(MODULE_ID, MASK_FLAG, true)
+    .catch(err => console.warn(`[${MODULE_ID}] failed to set default mask flag`, err));
 });
 
 // 캔버스 토큰 우클릭 → Token HUD(아이콘 패널)에 버튼 주입.

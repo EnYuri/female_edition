@@ -42,7 +42,7 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
         ev.preventDefault();
         ev.stopPropagation();
         feUpdSetChatDisabled(true);
-        ui.notifications?.info("흐에... 이제 업데이트 채팅 알림은 안 보내는 거에요챱 (토스트 알림은 그대로에요)");
+        ui.notifications?.info("흐에... 이제 업데이트 채팅 알림은 안 보내는 거에요챱 (토스트 알림은 그대로인)");
         try { await message.delete(); } catch { /* no-op */ }
       });
     } catch (err) {
@@ -134,7 +134,7 @@ function feUpdNotify(latestVersion, localVersion) {
   FE_UPD_NOTIFIED_THIS_LOAD.add(loadKey);
 
   ui.notifications?.warn(
-    `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는거에요!!: 현재 ${local}이구, 최신은 ${latest}인 거에요... 글애서 FVTT 셋업- 부가 모듈 탭에서 업데이트를 확인하시는거에요챱`,
+    `흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는!!: 현재 ${local}이지만, 최신은 ${latest}인. 확인하시는거에요챱`,
     { permanent: true, console: false },
   );
 
@@ -151,7 +151,7 @@ function feUpdBuildNoticeContent(latest, local) {
   </div>
   <div style="line-height:1.5;">
     흐에흐에!!! <b>Female_edition</b> (aka. Female-cupwhi) 을 업데이트 할 수 있는거에요!!<br>
-    현재는 <b>${esc(local)}</b> 이구, 최신은 <b>${esc(latest)}</b> 인 거에요...<br>
+    그룬데 현재버전은 <b>${esc(local)}</b> 이구, 최신은 <b>${esc(latest)}</b> 인 거에요...<br>
     글애서 <b>FVTT 셋업 → 부가 모듈</b> 탭에서 업데이트를 확인하시는거에요챱
   </div>
   <div style="margin-top:10px;text-align:right;">
