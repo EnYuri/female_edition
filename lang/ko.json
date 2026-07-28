@@ -78,6 +78,11 @@
 	"FECT.Ctx.NotCurrentTurn": "현재 턴인 전투원만 턴을 종료할 수 있습니다.",
 	"FECT.Ctx.NoGM": "GM이 접속해 있지 않아 턴을 종료할 수 없습니다.",
 
+	"FETP.Viewport.Hint": "드래그: 이동 · 휠: 확대/축소",
+	"FETP.ResetView": "시점 초기화",
+	"FETP.Tint": "색조",
+	"FETP.Subject": "서브젝트",
+
 	"FESP.Settings.EnableName": "스크린 패널 기능 사용",
 	"FESP.Settings.EnableHint": "스크린 패널(액터 서브타입)을 씬 캔버스에 올리고 면 전환·표시/숨김·비활성화할 수 있게 합니다. 끄면 캔버스 상호작용이 비활성화됩니다(재시작 필요).",
 	"FESP.Settings.GridSnapName": "스크린 패널: 격자에 스냅",
@@ -142,6 +147,11 @@
 	"FESP.Sheet.MoveUp": "위로",
 	"FESP.Sheet.MoveDown": "아래로",
 	"FESP.Sheet.RemoveFace": "면 삭제",
+	"FESP.Sheet.DuplicateFace": "면 복제 (오버레이·어트리뷰트까지 통째로)",
+	"FESP.Sheet.DuplicateFaceName": "{name} 사본",
+	"FESP.Sheet.DefaultFaceMark": "기본 면",
+	"FESP.Sheet.NoFaces": "아직 면이 없습니다",
+	"FESP.Sheet.NoFacesHint": "면은 이 패널이 보여줄 이미지 한 장입니다. 면을 추가하고 이미지를 지정하면 씬에 올릴 수 있습니다.",
 	"FESP.Sheet.DefaultFace": "기본 면",
 	"FESP.Sheet.Width": "기본 너비(px)",
 	"FESP.Sheet.Height": "기본 높이(px)",
@@ -151,7 +161,11 @@
 
 	"FESP.Sheet.OverlayLinkHint": "액터를 여기로 드래그 앤 드롭하세요. 이 오버레이의 어트리뷰트 경로를 그 액터의 데이터에서 읽어옵니다.",
 	"FESP.Sheet.OverlayLinkClear": "클릭하여 연결 해제",
-	"FESP.Sheet.OverlayAttrPh": "어트리뷰트 경로 (예: system.attributes.hp.value)",
+	"FESP.Sheet.OverlayAttrPh": "어트리뷰트 경로 — ↓ 키로 목록 (예: system.attributes.hp.value)",
+	"FESP.Sheet.OverlayAttrWarnNoActor": "이 오버레이에 액터가 연결되어 있지 않아 경로를 읽을 수 없습니다. 왼쪽 칸에 액터를 드래그 앤 드롭하세요. (면의 연결 액터는 오버레이에 자동 적용되지 않습니다)",
+	"FESP.Sheet.OverlayAttrWarnPath": "연결된 액터에서 이 경로의 값을 찾지 못했습니다. 경로가 실제 값(예: …hp.value)까지 가리키는지 확인하세요. 지금은 고정 텍스트가 대신 표시됩니다.",
+	"FESP.Sheet.AttrSuggestValue": "(값)",
+	"FESP.Sheet.AttrSuggestMax": "(최대)",
 	"FESP.Sheet.OverlayTextPh": "고정 텍스트(경로가 비었거나 못 읽으면 표시)",
 	"FESP.Sheet.OverlayFontSize": "글자 크기(px)",
 	"FESP.Sheet.OverlayColor": "글자 색상",
@@ -195,5 +209,7 @@
 	"FESP.Grant.Apply": "적용",
 	"FESP.Grant.Done": "패널 조작권을 변경했습니다.",
 	"FESP.Grant.GMOnly": "GM만 조작권을 부여할 수 있습니다.",
-	"FESP.Grant.NoPlayers": "부여할 플레이어가 없습니다."
+	"FESP.Grant.NoPlayers": "부여할 플레이어가 없습니다.",
+	"FESP.Cleanup.ActorDeleted": "삭제된 패널 「{name}」의 배치 {count}개를 씬에서 함께 제거했습니다.",
+	"FESP.Cleanup.Orphans": "「{scene}」 씬에서 원본 패널이 없는 배치 {count}개를 제거했습니다."
 }

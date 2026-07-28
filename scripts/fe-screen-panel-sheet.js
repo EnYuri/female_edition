@@ -64,6 +64,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     actions: {
       feAddFace: ScreenPanelSheet.#onAddFace,
       feRemoveFace: ScreenPanelSheet.#onRemoveFace,
+      feDuplicateFace: ScreenPanelSheet.#onDuplicateFace,
       feMoveFaceUp: ScreenPanelSheet.#onMoveFaceUp,
       feMoveFaceDown: ScreenPanelSheet.#onMoveFaceDown,
       fePlaceOnScene: ScreenPanelSheet.#onPlaceOnScene,
@@ -184,11 +185,16 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
-   * @override — surface the prototype-token config as an ALWAYS-VISIBLE button
-   * directly in the window header (not inside the `⋮` controls dropdown, and
-   * regardless of the `tokenize` setting). The `configurePrototypeToken` action
-   * is inherited from ActorSheetV2's actions map, so the frame button's
-   * data-action dispatches to it automatically.
+   * @override — surface the prototype-token config as a button directly in the
+   * window header rather than buried inside the `⋮` controls dropdown. The
+   * `configurePrototypeToken` action is inherited from ActorSheetV2's actions
+   * map, so the frame button's data-action dispatches to it automatically.
+   *
+   * It is only meaningful for a TOKENIZED panel (a tile panel has no token at
+   * all), but frame buttons are built once with the window frame and are not
+   * rebuilt by later renders — so it is always created and its visibility is
+   * driven by the `fe-sp-tokenized` root class that `#syncTokenizeButton`
+   * maintains on every render (`styles/fe-screen-panel.css`).
    */
   _getFrameButtons(options) {
     const buttons = super._getFrameButtons?.(options) ?? [];
@@ -226,13 +232,59 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    * static fallback text, else "" when neither is set/resolves.
    */
   #previewFor(ov, linkedActor) {
-    if (ov.attr && linkedActor) {
-      try {
-        const v = foundry.utils.getProperty(linkedActor, ov.attr);
-        if (v !== undefined && v !== null && v !== "") return String(v);
-      } catch { /* fall through to static text */ }
-    }
+    const live = ScreenPanelSheet.#resolveAttrValue(linkedActor, ov.attr);
+    if (live !== null) return live;
     return ov.text || "";
+  }
+
+  /**
+   * One attribute dot-path resolved against an actor, or null when it does not
+   * yield a displayable scalar. Objects are rejected on purpose: a path that stops
+   * one segment short of its leaf (`system.customAttributes.0` instead of
+   * `…0.value`) would otherwise stringify to "[object Object]" and render that on
+   * the canvas. Mirrors feResolveOverlayText's guard in fe-screen-panel.js.
+   * @returns {string|null}
+   */
+  static #resolveAttrValue(actor, attr) {
+    if (!attr || !actor) return null;
+    let v;
+    try { v = foundry.utils.getProperty(actor, attr); } catch { return null; }
+    if (v === undefined || v === null || v === "") return null;
+    if (typeof v === "object") return null;
+    return String(v);
+  }
+
+  /**
+   * Candidate `attr` dot-paths for an overlay's attribute picker, resolved against
+   * the actor the overlay actually reads from at runtime (its OWN linkedActorUuid —
+   * the face's link is not a fallback, see feResolveOverlayText).
+   *
+   * The panel actor itself is a legitimate link target (that is how the panel's own
+   * `customAttributes` are surfaced on the canvas), but it carries no trackable
+   * system attributes, so it gets its own branch.
+   * @returns {Array<{path: string, label: string}>}
+   */
+  #attrSuggestions(actor) {
+    if (!actor) return [];
+    const out = [];
+    const push = (path, label) => { if (path) out.push({ path, label }); };
+    if (actor.id === this.document.id) {
+      const suffix = (k) => game.i18n.localize(`FESP.Sheet.AttrSuggest${k}`);
+      for (const [i, ca] of (actor.system?.customAttributes ?? []).entries()) {
+        const name = ca?.name || String(i);
+        push(`system.customAttributes.${i}.value`, `${name} ${suffix("Value")}`);
+        if (ca?.max) push(`system.customAttributes.${i}.max`, `${name} ${suffix("Max")}`);
+      }
+      return out;
+    }
+    for (const a of this.#extractCopiedAttributes(actor)) {
+      push(a.attr, a.max ? `${a.name} = ${a.value} / ${a.max}` : `${a.name} = ${a.value}`);
+      // A bar attribute's `.value` path always has a sibling `.max` worth offering.
+      if (a.max && a.attr.endsWith(".value")) {
+        push(`${a.attr.slice(0, -".value".length)}.max`, `${a.name} ${game.i18n.localize("FESP.Sheet.AttrSuggestMax")}`);
+      }
+    }
+    return out;
   }
 
   /**
@@ -329,10 +381,21 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       const faceActorUuid = face.linkedActorUuid ?? "";
       let faceActor = null;
       if (faceActorUuid) { try { faceActor = fromUuidSync(faceActorUuid); } catch { /* stale uuid */ } }
+      // Only the ACTIVE face is visible (the rest are display:none but still carry
+      // their hidden inputs), so the attribute pickers — the one genuinely bulky
+      // per-overlay payload — are built for it alone.
+      const active = index === this.#activeFaceIndex;
+      const suggestCache = new Map();
+      const suggestFor = (linkedActor) => {
+        if (!active || !linkedActor) return [];
+        if (!suggestCache.has(linkedActor.id)) suggestCache.set(linkedActor.id, this.#attrSuggestions(linkedActor));
+        return suggestCache.get(linkedActor.id);
+      };
       return {
         index,
         num: index + 1,
-        active: index === this.#activeFaceIndex,
+        active,
+        isDefault: index === (sys.defaultFace ?? 0),
         name: face.name ?? "",
         img: face.img ?? "",
         description: face.description ?? "",
@@ -379,6 +442,15 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
             barColor: ov.barColor ?? "#33cc33",
             preview: this.#previewFor(ov, linkedActor),
             picking: this.#picking?.faceIndex === index && this.#picking?.overlayIndex === oi,
+            attrOptions: suggestFor(linkedActor),
+            // A set `attr` that yields nothing is the panel's most common silent
+            // misconfiguration (no linked actor, a typo'd path, or a path stopping
+            // one segment short of its leaf). Say so in the row instead of leaving
+            // the user to wonder why the canvas shows the fallback text.
+            attrWarn: !!ov.attr && ScreenPanelSheet.#resolveAttrValue(linkedActor, ov.attr) === null,
+            attrWarnReason: game.i18n.localize(
+              linkedActorUuid ? "FESP.Sheet.OverlayAttrWarnPath" : "FESP.Sheet.OverlayAttrWarnNoActor"
+            ),
           };
         }),
       };
@@ -646,9 +718,20 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     }
   }
 
-  /** Rebuild + persist the faces array (preserves all current input edits via re-render). */
-  async #updateFaces(faces) {
-    return this.document.update({ "system.faces": faces });
+  /**
+   * Rebuild + persist the faces array (preserves all current input edits via re-render).
+   * `extra` carries sibling keys that must land in the SAME update — notably
+   * `system.defaultFace`, which is a positional index into this very array and would
+   * otherwise silently point at a different face after an insert/remove/reorder.
+   */
+  async #updateFaces(faces, extra = {}) {
+    return this.document.update({ "system.faces": faces, ...extra });
+  }
+
+  /** `{ "system.defaultFace": n }` when the pointer moved, else `{}` (no needless write). */
+  #defaultFacePatch(next) {
+    const current = this.document.system.defaultFace ?? 0;
+    return next === current ? {} : { "system.defaultFace": Math.max(0, next) };
   }
 
   async #updateCustomAttributes(items) {
@@ -758,11 +841,16 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    * Frame buttons are built once when the window frame is created and are NOT rebuilt by
    * subsequent renders, so the tokenize button would keep the icon and tooltip it was
    * born with even after the state flips. Re-sync it on every render instead.
+   *
+   * The same one-shot frame also carries the prototype-token button, which is
+   * token-only; the `fe-sp-tokenized` root class set here is what reveals it
+   * (CSS, so both directions of the flip are covered without DOM surgery).
    */
   #syncTokenizeButton() {
+    const on = !!this.document.system.tokenize;
+    this.element?.classList.toggle("fe-sp-tokenized", on);
     const btn = this.element?.querySelector('[data-action="feToggleTokenize"]');
     if (!btn) return;
-    const on = !!this.document.system.tokenize;
     btn.classList.toggle("fa-chess-pawn", on);
     btn.classList.toggle("fa-square", !on);
     btn.classList.toggle("fa-solid", on);
@@ -850,7 +938,29 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     faces.splice(i, 1);
     if (this.#activeFaceIndex >= faces.length) this.#activeFaceIndex = Math.max(0, faces.length - 1);
     else if (this.#activeFaceIndex > i) this.#activeFaceIndex--;
-    await this.#updateFaces(faces);
+    const df = this.document.system.defaultFace ?? 0;
+    await this.#updateFaces(faces, this.#defaultFacePatch(df > i ? df - 1 : Math.min(df, faces.length - 1)));
+  }
+
+  /**
+   * Clone a face — image, description, link, per-face token settings, copied
+   * attributes AND every overlay (position, styling, per-overlay actor link) — and
+   * insert it directly after the original. A second face usually differs from the
+   * first by one image or one overlay value, and rebuilding a dozen positioned
+   * overlays by hand was the sheet's most tedious workflow.
+   */
+  static async #onDuplicateFace(event, target) {
+    const i = Number(target.dataset.index);
+    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    if (!Number.isInteger(i) || i < 0 || i >= faces.length) return;
+    const copy = foundry.utils.deepClone(faces[i]);
+    copy.name = game.i18n.format("FESP.Sheet.DuplicateFaceName", {
+      name: faces[i].name || game.i18n.format("FESP.Sheet.FaceN", { n: i + 1 }),
+    });
+    faces.splice(i + 1, 0, copy);
+    this.#activeFaceIndex = i + 1;
+    const df = this.document.system.defaultFace ?? 0;
+    await this.#updateFaces(faces, this.#defaultFacePatch(df > i ? df + 1 : df));
   }
 
   static async #onMoveFaceUp(event, target) {
@@ -860,7 +970,14 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     [faces[i - 1], faces[i]] = [faces[i], faces[i - 1]];
     if (this.#activeFaceIndex === i) this.#activeFaceIndex = i - 1;
     else if (this.#activeFaceIndex === i - 1) this.#activeFaceIndex = i;
-    await this.#updateFaces(faces);
+    await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i - 1, i)));
+  }
+
+  /** Follow a two-element swap: an index sitting on either side moves with its face. */
+  static #swapIndex(index, a, b) {
+    if (index === a) return b;
+    if (index === b) return a;
+    return index;
   }
 
   static async #onMoveFaceDown(event, target) {
@@ -870,7 +987,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     [faces[i + 1], faces[i]] = [faces[i], faces[i + 1]];
     if (this.#activeFaceIndex === i) this.#activeFaceIndex = i + 1;
     else if (this.#activeFaceIndex === i + 1) this.#activeFaceIndex = i;
-    await this.#updateFaces(faces);
+    await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i, i + 1)));
   }
 
   static async #onPlaceOnScene() {
@@ -886,7 +1003,13 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (!Number.isInteger(fi) || fi < 0 || fi >= faces.length) return;
     faces[fi].overlays ??= [];
     faces[fi].overlays.push({
-      x: 0.5, y: 0.5, linkedActorUuid: "", attr: "", text: "", fontSize: 28, color: "#ffffff",
+      x: 0.5, y: 0.5,
+      // An overlay's `attr` resolves against its OWN linked actor and nothing else
+      // (feResolveOverlayText) — the face's link is not a fallback. Seeding it from
+      // the face is what the user almost always wants and removes the trap where a
+      // pasted path silently resolves to nothing; the link is still clearable.
+      linkedActorUuid: faces[fi].linkedActorUuid ?? "",
+      attr: "", text: "", fontSize: 28, color: "#ffffff",
       bar: false, barMin: 0, barMax: 100, barHeight: 6, barColor: "#33cc33",
     });
     this.#picking = { faceIndex: fi, overlayIndex: faces[fi].overlays.length - 1 };

@@ -283,6 +283,38 @@ const FE_PANEL_DRAG_THRESHOLD = 6; // px of pointer travel before a click become
 const FE_PANEL_DBLCLICK_MS = 300;
 let _lastPanelClick = null; // { tileId, t }
 
+/**
+ * Unwind any PIXI drag workflow core already started for this pointerdown.
+ *
+ * PIXI's EventSystem registered its own capture-phase listener on the same <canvas>
+ * BEFORE ours, so it dispatches the federated pointerdown (and core's
+ * MouseInteractionManager reacts) before our `stopImmediatePropagation` can land. By
+ * the time we decide to handle the press ourselves, the board MIM — and, when the
+ * press landed on a token, that token's MIM — has already reached CLICKED/GRABBED and
+ * armed its drag handlers. Left alone that produces a canvas marquee, or a token that
+ * drags along behind whatever UI we just opened.
+ *
+ * MUST be `cancel()`, NOT `reset({state: true})`. `reset` drops the state to NONE and
+ * stops there: `#handleLeftDown` requires `HOVER ≤ state ≤ DRAG`, so the manager would
+ * ignore EVERY later left click and drag, and the only route back to HOVER is
+ * `#handlePointerOver` — which never re-fires while the cursor stays over the canvas
+ * (PIXI keeps the target in its `overTargets`). The pointerup path cannot repair it
+ * either: `#handlePointerUp` → `cancel()` early-returns on `state ≤ HOVER`, so
+ * `canvas.currentMouseManager` stays pinned and the drag listeners stay live. Symptom:
+ * one click on a tile panel froze all canvas interaction until the pointer left the
+ * window and came back. `cancel()` runs core's full unwind (interactionData cleared,
+ * state → HOVER, `currentMouseManager` released, drag events deactivated); HOVER is
+ * below GRABBED so `#handlePointerMove` still bails and no marquee/drag starts. It is
+ * self-skipping (`state ≤ HOVER`) when our suppression won the race and the MIM never
+ * engaged, so calling it unconditionally is safe.
+ *
+ * @param {PlaceableObject} [placeable]  Also unwind this placeable's own manager.
+ */
+function feCancelCanvasDragWorkflows(placeable) {
+  try { canvas.mouseInteractionManager?.cancel?.(); } catch { /* no-op */ }
+  try { placeable?.mouseInteractionManager?.cancel?.(); } catch { /* no-op */ }
+}
+
 function onBoardPointerDown(event) {
   if (!isPanelFeatureEnabled() || event.button !== 0 || !canvas?.ready) return;
   const world = clientToWorld(event.clientX, event.clientY);
@@ -297,6 +329,11 @@ function onBoardPointerDown(event) {
     if (!bar) return; // core drags it
     event.preventDefault();
     event.stopImmediatePropagation();
+    // PIXI dispatched this pointerdown to the TOKEN before our DOM listener ran (same
+    // race as the marquee below), so core's own `#handleClickLeft` has already taken
+    // the token to GRABBED and armed its drag handlers. Without unwinding it the
+    // value-editor dialog opens AND the token drags along under the cursor.
+    feCancelCanvasDragWorkflows(tokenHit.tile);
     feHidePanelTooltip();
     feOpenBarValueEditor(bar.linkedActor, bar.attr, bar.value);
     return;
@@ -304,18 +341,22 @@ function onBoardPointerDown(event) {
 
   const hit = pickPanelTileAt(world);
   if (!hit || tokenOccludesAt(world, hit.doc)) return; // let core handle non-panel / token clicks
+  // Tiles layer active = the GM is deliberately in tile-editing mode, so core owns this
+  // tile exactly like it owns a tokenized panel on the Tokens layer. Intercepting here
+  // is not merely unhelpful, it CONFLICTS: `PlaceablesLayer#_deactivate` sets
+  // `objects.visible = false`, so a tile placeable is hit-tested by PIXI only while its
+  // layer is active — and when it is, core selects and drags it from the same
+  // pointerdown we are handling (PIXI won the race, see feCancelCanvasDragWorkflows).
+  // Both drags then move the mesh and both commit on release. Standing down is also what
+  // makes the panel menu's own premise true — that a tile panel is reachable through
+  // core's Tiles-layer tools (select, delete, send to back/front).
+  if (hit.tile.layer?.active) return;
   event.preventDefault();
   event.stopImmediatePropagation(); // suppress core canvas pan / selection
-  // The canvas marquee select is driven by the board's PIXI MouseInteractionManager
-  // off FEDERATED events. PIXI's EventSystem dispatches those synchronously from its
-  // own (earlier-registered, capture-phase) DOM listener on the same <canvas>, so our
-  // stopImmediatePropagation can land AFTER the board MIM has already advanced to
-  // GRABBED — leaving the select-rectangle to draw on the next pointermove. Reset the
-  // board MIM back to NONE so its drag-move handler bails (state must be ≥ GRABBED to
-  // start a marquee). Our own panel drag uses independent window listeners, so this
-  // only cancels the stray canvas selection, not the panel move. Idempotent no-op when
-  // our suppression won the race and the MIM never engaged.
-  try { canvas.mouseInteractionManager?.reset?.({ state: true }); } catch { /* no-op */ }
+  // Kill the canvas marquee core has already started (see the helper — the MUST-keep
+  // `cancel()` vs `reset()` detail lives there). Our own panel drag runs on independent
+  // window listeners, so this only cancels the stray canvas selection, not the move.
+  feCancelCanvasDragWorkflows();
   feHidePanelTooltip();
 
   // A click landing on a value bar (only "there" for users with OWNER on its
@@ -346,7 +387,13 @@ function onBoardContextMenu(event) {
   // A token sitting on top of a TILE panel means the user is aiming at that token, so
   // core should handle it. Never applies when the panel IS the token (it would find
   // itself and always bail).
-  if (!feIsPanelToken(hit.tile) && tokenOccludesAt(world, hit.doc)) return;
+  if (!feIsPanelToken(hit.tile)) {
+    if (tokenOccludesAt(world, hit.doc)) return;
+    // Tiles layer active → core owns this tile (see onBoardPointerDown). Its own Tile HUD
+    // opens from the same right-click and we do NOT veto `_canHUD` for tiles (only for
+    // panel tokens), so showing our menu on top would stack two menus on one click.
+    if (hit.tile.layer?.active) return;
+  }
   event.preventDefault();
   event.stopImmediatePropagation();
   feHidePanelTooltip();
@@ -481,7 +528,15 @@ function enforcePanelTileSize(tile) {
       // A face whose Token settings pin an explicit size owns it — the user set it through
       // core's TokenConfig, so the aspect auto-fit must not fight them every draw.
       if (feFaceTokenPinsSize(fePanelFace(actor, flag.currentFace ?? 0))) return;
-      const size = feCompanionTokenSize(doc.parent, w, h, isGridSnapEnabled());
+      // Do NOT read the local grid-snap preference here. Unlike a Tile (whose pixel box
+      // is the same number everywhere), a Token's width/height are grid units that this
+      // render gate rewrites locally — so consulting a CLIENT setting would draw the very
+      // same panel at whole-cell size for one player and pixel-exact size for another,
+      // throwing off the overlays and the hit test with it. The stored size is the shared
+      // truth (PLACE recorded the placing user's snap intent); infer the mode back out of
+      // it, so a face flip reshapes the token the same way on every client.
+      const storedSnapped = Number.isInteger(doc.width) && Number.isInteger(doc.height);
+      const size = feCompanionTokenSize(doc.parent, w, h, storedSnapped);
       // Tolerance in grid units: ±1px worth, so rounding cannot loop.
       const tol = 1 / (doc.parent?.grid?.size || canvas?.grid?.size || 100);
       if (Math.abs(doc.width - size.width) <= tol && Math.abs(doc.height - size.height) <= tol) return;
@@ -642,7 +697,11 @@ function feResolveOverlayText(item, linkedActor) {
   if (item?.attr && linkedActor) {
     try {
       const v = foundry.utils.getProperty(linkedActor, item.attr);
-      if (v !== undefined && v !== null && v !== "") return String(v);
+      // Objects are NOT a value: a path stopping one segment short of its leaf
+      // (`system.customAttributes.0` rather than `…0.value`) would otherwise paint
+      // the literal "[object Object]" onto the canvas instead of falling back to
+      // the static text. Mirrored by ScreenPanelSheet.#resolveAttrValue.
+      if (v !== undefined && v !== null && v !== "" && typeof v !== "object") return String(v);
     } catch { /* fall through to static text */ }
   }
   return item?.text ?? "";
@@ -1116,6 +1175,80 @@ function fePanelPlacementsIn(scene, actorId) {
   return out;
 }
 
+/**
+ * Panel placements in a scene whose panel Actor no longer exists — "ghost boards".
+ *
+ * The art keeps drawing (a Tile/Token is self-contained once its texture is set) but
+ * nothing resolves it any more: `pickPanelTileAt` skips it, so the right-click menu, the
+ * face cycle, the drag and the overlays are all dead, and a tokenized ghost additionally
+ * has core's Token HUD vetoed by `feInstallPanelHudVeto`. It is reachable ONLY through
+ * core's own layer tools — an un-obvious, un-deletable-looking leftover.
+ */
+function feOrphanPanelPlacementsIn(scene) {
+  const out = [];
+  const collect = (docs, isToken) => {
+    for (const doc of docs ?? []) {
+      const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+      if (!flag?.actorId) continue;
+      if (game.actors.get(flag.actorId)) continue; // still has its panel actor
+      out.push({ doc, flag, isToken });
+    }
+  };
+  collect(scene?.tiles, false);
+  collect(scene?.tokens, true);
+  return out;
+}
+
+/** Delete a list of {doc, isToken} placements from one scene, batched per collection. */
+async function feDeletePanelPlacements(scene, placements) {
+  const ids = (isToken) => placements.filter(p => p.isToken === isToken).map(p => p.doc.id);
+  const tileIds = ids(false);
+  const tokenIds = ids(true);
+  if (tileIds.length) await scene.deleteEmbeddedDocuments("Tile", tileIds);
+  if (tokenIds.length) await scene.deleteEmbeddedDocuments("Token", tokenIds);
+  return tileIds.length + tokenIds.length;
+}
+
+/**
+ * Remove every placement of one panel actor, across ALL scenes. GM-only (embedded writes).
+ * Runs from the `deleteActor` hook: a panel's boards are meaningless without the actor that
+ * defines their faces, so they go with it rather than becoming ghosts.
+ */
+async function feRemoveAllPanelPlacements(actorId) {
+  let removed = 0;
+  for (const scene of game.scenes ?? []) {
+    const placements = fePanelPlacementsIn(scene, actorId);
+    if (!placements.length) continue;
+    try { removed += await feDeletePanelPlacements(scene, placements); }
+    catch (err) { console.warn(`${MODULE_ID} | screen panel placement cleanup failed`, err); }
+  }
+  return removed;
+}
+
+/**
+ * Sweep ghosts out of ONE scene (the one being drawn). Deliberately not an all-scenes pass
+ * at `ready`: this is a destructive, automatic delete, so it stays bounded to the scene the
+ * GM is actually looking at and cleans up incrementally as scenes are visited. Gated on the
+ * feature setting too — with the panel feature off, nothing else in this module acts on
+ * these placeables and it must not be the one thing that silently deletes scene content.
+ */
+async function feSweepOrphanPanelPlacements(scene) {
+  if (!scene || !isPanelFeatureEnabled()) return;
+  // On world load `canvasReady` fires from Game#setupGame BEFORE game.ready, i.e. before
+  // the world is fully initialized — no destructive write belongs there. The `ready` hook
+  // runs the sweep for that first scene instead.
+  if (!game.ready) return;
+  if (game.user !== game.users.activeGM) return;
+  const orphans = feOrphanPanelPlacementsIn(scene);
+  if (!orphans.length) return;
+  try {
+    const count = await feDeletePanelPlacements(scene, orphans);
+    if (count) ui.notifications?.info(game.i18n.format("FESP.Cleanup.Orphans", { count, scene: scene.name }));
+  } catch (err) {
+    console.warn(`${MODULE_ID} | screen panel orphan sweep failed`, err);
+  }
+}
+
 /** Tile placement → Token placement (same spot, same flag). GM-only. */
 async function feConvertPanelTileToToken(scene, tileDoc, actor) {
   const flag = tileDoc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG) ?? {};
@@ -1193,6 +1326,12 @@ async function applyPanelOp(type, data, requester) {
     const face = fePanelFace(actor, data.faceIndex);
     await doc.update(fePanelFaceChanges(face, isToken));
   } else if (type === FE_PANEL_SOCKET.MOVE) {
+    // Never trust the requester's client-side lock check (`canDrag` in
+    // onBoardPointerDown): a stale menu or a hand-crafted socket payload would
+    // otherwise move a locked panel. Dropped silently — the preUpdate hooks own the
+    // user-facing warning, and it belongs on the screen of whoever actually dragged,
+    // not on the relaying GM's.
+    if (feIsPanelPlacementLocked(doc)) return;
     await doc.update({ x: Math.round(data.x), y: Math.round(data.y) });
   } else if (type === FE_PANEL_SOCKET.SHOW_HIDE) {
     await doc.update({ hidden: !doc.hidden });
@@ -1386,6 +1525,8 @@ Hooks.once("ready", () => {
   globalThis.feScreenPanelPlaceOnScene = feScreenPanelPlaceOnScene;
 
   if (canvas?.ready) attachBoardListeners();
+  // The initial scene's `canvasReady` fired before game.ready, so its sweep was skipped.
+  feSweepOrphanPanelPlacements(canvas?.scene);
 });
 
 Hooks.on("canvasTearDown", () => feResetPanelCanvasState());
@@ -1394,6 +1535,22 @@ Hooks.on("canvasReady", () => {
   fePanelTileIndexReady = false;
   attachBoardListeners();
   feBuildPanelTileIndex();
+  // Async and unawaited on purpose — the deletions fire their own delete hooks, which
+  // drop the removed placeables back out of the index we just built.
+  feSweepOrphanPanelPlacements(canvas?.scene);
+});
+
+// A panel actor's boards define nothing without it: every face image, overlay and menu
+// entry is resolved from the actor at draw/click time, so a surviving placement is a
+// ghost (see feOrphanPanelPlacementsIn). Take them with it, across every scene.
+// NOT gated on the feature setting — deleting the actor is an explicit act and its
+// boards belong to it either way; only the automatic ghost sweep is conservative.
+Hooks.on("deleteActor", (actor) => {
+  if (actor?.type !== FE_PANEL_TYPE) return;
+  if (game.user !== game.users.activeGM) return;
+  feRemoveAllPanelPlacements(actor.id).then((count) => {
+    if (count) ui.notifications?.info(game.i18n.format("FESP.Cleanup.ActorDeleted", { name: actor.name, count }));
+  }).catch(err => console.warn(`${MODULE_ID} | screen panel placement cleanup failed`, err));
 });
 // drawTile fires on initial draw, full redraw, AND face flips (texture.src sets
 // the redraw flag), each time with the new texture loaded — so it is the only
@@ -1431,10 +1588,43 @@ Hooks.on("deleteTile", (doc) => {
   feClearPanelOverlays(doc.object);
   feRemovePanelTileFromIndex(doc.object);
 });
-// Face flips and panel-flag changes are document updates. Reindex immediately
-// so a linked Actor update in the same render cycle still finds the right tile;
-// drawTile repeats this harmlessly once the new texture is ready.
-Hooks.on("updateTile", (doc) => { if (doc?.object) feIndexPanelTile(doc.object); });
+/**
+ * A placed panel's document was updated (Tile OR Token).
+ *
+ * 1. Reindex immediately so a linked Actor update in the same render cycle still finds
+ *    the right placeable; the draw hook repeats this harmlessly once the new texture
+ *    is ready.
+ * 2. **Force a state refresh when our own panel FLAG changed (MUST keep).** Core assigns
+ *    render flags strictly from the document's own fields — `tile.mjs` / `token.mjs`
+ *    `_onUpdate` list `hidden`/`sort`/`locked`/`x`/`y`/`texture`/… and nothing else — so
+ *    a **flags-only** update (표시 전환 `disabled`, 위치 고정 `locked`, or a face flip
+ *    between two faces that share an image) sets NO flags at all. `RenderFlags#set` then
+ *    adds the object to `pendingRenderFlags` with an empty set, and
+ *    `PlaceableObject#applyRenderFlags` early-returns on `!this.renderFlags.size` — so
+ *    neither `_refreshVisibility` nor our `refreshTile`/`refreshToken` handler ever runs
+ *    and the per-user disabled gate does not appear (or disappear) until the next full
+ *    redraw: a scene switch, a texture change, or F5. Asking for `refreshState` fixes
+ *    both directions at once: it propagates to `refreshVisibility`, so core recomputes
+ *    `visible` from its OWN rules first and `applyPanelTileVisibility` (which runs after,
+ *    from the refresh hook) only ever subtracts on top. That is why there is no "restore
+ *    visibility" branch in `applyPanelTileVisibility` — reconstructing core's visibility
+ *    ourselves would be wrong the moment core's rules change.
+ */
+function onPanelPlaceableUpdate(doc, changes) {
+  const obj = doc?.object;
+  if (!obj) return;
+  // A placeable that lost its panel flag must drop out of the reverse index, or a later
+  // linked-Actor update would still resolve to it.
+  if (!doc.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG)?.actorId) { feRemovePanelTileFromIndex(obj); return; }
+  feIndexPanelTile(obj);
+  // Hooks receive the EXPANDED diff, so a dot-path write lands here as a nested object.
+  const flagChange = foundry.utils.getProperty(changes ?? {}, `flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}`);
+  if (flagChange === undefined) return;
+  obj.renderFlags?.set?.({ refreshState: true });
+}
+
+Hooks.on("updateTile", onPanelPlaceableUpdate);
+Hooks.on("updateToken", onPanelPlaceableUpdate);
 
 // Force the screenPanel option to the BOTTOM of the Actor-create type dropdown.
 // Core sorts types alphabetically by label (ClientDocument.createDialog), which
@@ -1572,22 +1762,41 @@ function feInstallPanelHudVeto() {
   };
 }
 
-// Position lock for TOKENIZED panels. A Tile has a real `locked` field that core's own
-// tile tools honour, but a Token has none — and core owns a tokenized panel's dragging,
-// so the only place to enforce the panel's lock is the update itself. Cancelling the
-// pre-hook makes core snap the token back to where it was. Mirrors the tile lock:
-// per-placement (`flag.locked`, the right-click menu) OR per-panel
-// (`actor.system.locked`, the sheet's 위치 고정). GMs are not exempt — the lock is a
-// deliberate "don't nudge this board" guard; unlock it to move it.
-Hooks.on("preUpdateToken", (doc, changes) => {
+/**
+ * Is this placed panel position-locked? Per-placement (`flag.locked`, the right-click
+ * menu) OR per-panel (`actor.system.locked`, the sheet's 위치 고정). Returns false for
+ * anything that is not a panel placement.
+ */
+function feIsPanelPlacementLocked(doc) {
+  const flag = doc?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
+  if (!flag?.actorId) return false;
+  if (flag.locked) return true;
+  return !!game.actors.get(flag.actorId)?.system?.locked;
+}
+
+/**
+ * Position lock, enforced on the update itself for BOTH placeable kinds.
+ *
+ * A Token has no `locked` field of its own and core owns a tokenized panel's dragging,
+ * so the update is the only gate there. A Tile does have core's `locked` field, but we
+ * never set it (the panel lock is our flag), so a GM using the Tiles layer could drag a
+ * "locked" panel tile freely — and our own left-drag guard (`canDrag` in
+ * onBoardPointerDown) is client-side only, so it does not cover that path either.
+ * Cancelling the pre-hook makes core snap the placeable back to where it was.
+ *
+ * GMs are not exempt — the lock is a deliberate "don't nudge this board" guard; unlock
+ * it to move it. Relayed MOVE ops are filtered earlier (applyPanelOp) so this warning
+ * only ever fires for a direct drag by the user in front of the screen.
+ */
+function onPanelPlacementPreUpdate(doc, changes) {
   if ((changes.x === undefined) && (changes.y === undefined)) return;
-  const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-  if (!flag?.actorId) return;
-  const actor = game.actors.get(flag.actorId);
-  if (!flag.locked && !actor?.system?.locked) return;
+  if (!feIsPanelPlacementLocked(doc)) return;
   ui.notifications?.warn(game.i18n.localize("FESP.Menu.LockedWarn"));
   return false;
-});
+}
+
+Hooks.on("preUpdateToken", onPanelPlacementPreUpdate);
+Hooks.on("preUpdateTile", onPanelPlacementPreUpdate);
 
 // Dragging a panel actor onto the canvas must go through feScreenPanelPlaceOnScene.
 // Without this guard core's default Actor drop (board.mjs `#onDrop` → tokens._onDropActor)

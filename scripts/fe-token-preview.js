@@ -17,6 +17,39 @@ const _FE_TP_STORAGE_KEY = "fe-tp-preview-size";
 const _FE_TP_IMG_CACHE = new Map();
 const _FE_TP_IMG_CACHE_MAX = 512;
 
+// Core's texture fit modes (CONST.TEXTURE_DATA_FIT_MODES) mapped to `background-size`.
+// CSS `object-fit` was used before and silently broke on `width`/`height`: neither is a
+// valid object-fit keyword, so the whole declaration was dropped and the browser fell
+// back to `fill` — two of the five modes previewed as the wrong thing. `background-size`
+// expresses all five exactly, and the same value doubles as the tint layer's `mask-size`.
+const _FE_TP_FIT_TO_BACKGROUND_SIZE = Object.freeze({
+  fill: "100% 100%",
+  contain: "contain",
+  cover: "cover",
+  width: "100% auto",
+  height: "auto 100%",
+});
+
+// TokenRing.#defaultRingThickness + #defaultSubjectThickness (client/canvas/placeables/
+// tokens/ring.mjs) — the fallback when the ring spritesheet data is not loaded yet.
+const _FE_TP_DEFAULT_SUBJECT_SCALE_ADJUSTMENT = 1 / (0.1269848 + 0.6666666);
+// Ring band thickness in normalized ring-diameter units, drawn into a 100×100 viewBox.
+const _FE_TP_RING_THICKNESS = 0.1269848;
+
+// Range of the injected anchor sliders. `texture.anchorX/Y` is an unbounded NumberField in
+// core (`common/data/data.mjs`), so this is purely our own UI range — wide enough to park the
+// anchor outside the art, tight enough that the slider stays precise where it matters.
+const _FE_TP_ANCHOR_MIN = -0.5;
+const _FE_TP_ANCHOR_MAX = 1.5;
+
+// Appearance-tab fields whose change alters what the canvas paints.
+const _FE_TP_WATCHED_FIELDS = new Set([
+  "texture.src", "texture.anchorX", "texture.anchorY", "texture.fit", "texture.tint",
+  "scale", "width", "height", "mirrorX", "mirrorY", "alpha",
+  "ring.enabled", "ring.subject.texture", "ring.subject.scale",
+  "ring.colors.ring", "ring.colors.background",
+]);
+
 function feTpGetCachedImageSize(src) {
   if (!_FE_TP_IMG_CACHE.has(src)) return null;
   const value = _FE_TP_IMG_CACHE.get(src);
@@ -53,6 +86,28 @@ function _feTPParseOr(val, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Localize with an inline fallback, so a missing key never renders as the key itself. */
+function _feTPL(key, fallback) {
+  const s = game.i18n?.localize?.(key);
+  return s && s !== key ? s : fallback;
+}
+
+/**
+ * The live value of a form control, which for a `range-picker` is NOT its own `value`.
+ * `#onDragSlider` (client/applications/elements/range-picker.mjs) only mirrors the slider
+ * into the inner number input; `this.value` is assigned in `#onChangeInput`, i.e. on
+ * pointer release. Reading the element would therefore return the pre-drag value for the
+ * entire duration of a drag. The inner number input is the only live source.
+ */
+function _feTPLiveValue(el) {
+  if (!el) return undefined;
+  if (el.tagName === "RANGE-PICKER") {
+    const n = el.querySelector('input[type="number"]');
+    if (n && n.value !== "") return n.value;
+  }
+  return el.value;
+}
+
 function feLoadImage(src) {
   if (!src) return Promise.resolve(null);
   const cached = feTpGetCachedImageSize(src);
@@ -75,14 +130,96 @@ function feReadAppearanceValues(form) {
     src: form.elements["texture.src"]?.value ?? "",
     anchorX: _feTPParseOr(form.elements["texture.anchorX"]?.value, 0.5),
     anchorY: _feTPParseOr(form.elements["texture.anchorY"]?.value, 0.5),
-    scale: parseFloat(form.elements["scale"]?.value) || 1,
+    scale: parseFloat(_feTPLiveValue(form.elements["scale"])) || 1,
     mirrorX: !!form.elements["mirrorX"]?.checked,
     mirrorY: !!form.elements["mirrorY"]?.checked,
     tint: form.elements["texture.tint"]?.value || "",
     fit: form.elements["texture.fit"]?.value || "contain",
     width: parseFloat(form.elements["width"]?.value) || 1,
     height: parseFloat(form.elements["height"]?.value) || 1,
+    alpha: _feTPParseOr(form.elements["alpha"]?.value, 1),
+    // Dynamic token ring. `ring.colors.*` and `ring.subject.scale` are form-associated
+    // custom elements (color-picker / range-picker); `_applyInputAttributes` does NOT
+    // copy `name` onto their inner inputs, so `form.elements[name]` resolves to the
+    // custom element itself and `.value` is safe (no RadioNodeList).
+    ringEnabled: !!form.elements["ring.enabled"]?.checked,
+    ringSubjectSrc: form.elements["ring.subject.texture"]?.value ?? "",
+    ringSubjectScale: _feTPParseOr(_feTPLiveValue(form.elements["ring.subject.scale"]), 1),
+    ringColor: form.elements["ring.colors.ring"]?.value || "",
+    ringBgColor: form.elements["ring.colors.background"]?.value || "",
   };
+}
+
+/** A CSS `url()` token for an image path, safe to place inside an HTML attribute. */
+function _feTPCssUrl(src) {
+  if (!src) return "none";
+  // MUST resolve to an absolute URL. This `url()` is written into a custom property on an
+  // inline style, but it is *consumed* by `background-image`/`mask-image` in
+  // `styles/fe-token-preview.css` — and a relative url() in a custom property is resolved
+  // against the stylesheet that consumes the variable, not against the document. A Foundry
+  // data path such as `NPCimg/YC/hahami.png` therefore resolved to
+  // `modules/female_edition/styles/NPCimg/YC/hahami.png` and the preview painted nothing at
+  // all. Live-verified on v14.365. `document.baseURI` also keeps any route prefix intact.
+  let href = String(src);
+  try { href = new URL(href, document.baseURI).href; } catch { /* leave as-is */ }
+  // CSS-escape first, HTML-escape later at the attribute boundary: a `"` must reach the
+  // CSS parser as `\"`, and esc() would otherwise turn a bare quote into one that closes
+  // the url() string once the HTML parser decodes the entity.
+  return `url("${href.replace(/["\\]/g, "\\$&")}")`;
+}
+
+/** True when the world renders dynamic rings in grid-fit mode. */
+function _feTPIsGridFitMode() {
+  try { return game.settings.get("core", "dynamicTokenRingFitMode") === "grid"; }
+  catch { return false; }
+}
+
+/**
+ * The subject scale adjustment core multiplies into the mesh scale for ringed tokens in
+ * grid-fit mode (`Token#_refreshMeshSizeAndScale`). Read live from the ring spritesheet
+ * data when it is loaded — it varies per ring size bucket — else the default constant.
+ */
+function _feTPSubjectScaleAdjustment(size) {
+  try {
+    const v = CONFIG?.Token?.ring?.ringClass?.getRingDataBySize?.(size)?.subjectScaleAdjustment;
+    if (Number.isFinite(v) && v > 0) return v;
+  } catch { /* ring textures not initialized (no canvas yet) */ }
+  return _FE_TP_DEFAULT_SUBJECT_SCALE_ADJUSTMENT;
+}
+
+/**
+ * What the canvas actually paints for this token, which is not always `texture.src`:
+ * with a dynamic ring carrying an explicit subject texture the base image is overridden
+ * (core itself warns via `TOKEN.ImagePathOverridden`), and in grid-fit mode the mesh
+ * scale picks up an extra multiplier. Mirrors the sheet's own `usingSubject` test
+ * (`sheets/token/mixin.mjs:291`) — the *inferred* subject path in
+ * `TokenDocument#hasDistinctSubjectTexture` needs a file-existence check and is not
+ * something the form can answer, so it is deliberately out of scope here.
+ * @returns {{src: string, scale: number, usingSubject: boolean}}
+ */
+function _feTPResolveArt(vals) {
+  const usingSubject = !!(vals.ringEnabled && vals.ringSubjectSrc);
+  let scale = vals.scale;
+  if (vals.ringEnabled && _feTPIsGridFitMode()) {
+    scale *= _feTPSubjectScaleAdjustment(Math.min(vals.width, vals.height));
+  }
+  return { src: usingSubject ? vals.ringSubjectSrc : vals.src, scale, usingSubject };
+}
+
+/** True when pan or zoom has been moved off its default — i.e. a reset would do something. */
+function _feTPViewIsMoved(panel) {
+  const pan = panel._feTPPan ?? { x: 0, y: 0 };
+  const zoom = panel._feTPZoom ?? 1;
+  return Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5 || Math.abs(zoom - 1) > 0.001;
+}
+
+/**
+ * Show the reset control only while the view is actually off-default. It is the one moment
+ * it is useful, and it doubles as the indicator that what you are looking at is panned or
+ * zoomed — which the preview otherwise only hints at through the zoom percentage.
+ */
+function _feTPSyncViewResetButton(panel) {
+  panel.querySelector(".fe-tp-viewport")?.classList.toggle("fe-tp-view-moved", _feTPViewIsMoved(panel));
 }
 
 function feRenderGridPreview(container, vals, natSize) {
@@ -99,8 +236,11 @@ function feRenderGridPreview(container, vals, natSize) {
   const pw = cellSize * vals.width;
   const ph = cellSize * vals.height;
 
-  const scaleX = vals.scale * (vals.mirrorX ? -1 : 1);
-  const scaleY = vals.scale * (vals.mirrorY ? -1 : 1);
+  const art = _feTPResolveArt(vals);
+  const scaleX = art.scale * (vals.mirrorX ? -1 : 1);
+  const scaleY = art.scale * (vals.mirrorY ? -1 : 1);
+  const artUrl = _feTPCssUrl(art.src);
+  const bgSize = _FE_TP_FIT_TO_BACKGROUND_SIZE[vals.fit] ?? _FE_TP_FIT_TO_BACKGROUND_SIZE.contain;
 
   const anchorPxX = natSize ? Math.round(vals.anchorX * natSize.w) : "?";
   const anchorPxY = natSize ? Math.round(vals.anchorY * natSize.h) : "?";
@@ -117,16 +257,52 @@ function feRenderGridPreview(container, vals, natSize) {
 
   const esc = foundry.utils.escapeHTML ?? ((s) => s);
 
+  // Ring layers. The real ring is a spritesheet sampled in GLSL, so this is a schematic:
+  // it reproduces the two things the form actually controls — the colors and how much of
+  // the grid space the band eats — not the ring artwork. `ring.subject.scale` scales the
+  // ring's UVs outward (TokenRing#configureSize → getTextureUVs), i.e. a larger subject
+  // scale makes the *band* smaller around unchanged art, hence the inverse factor. A
+  // scale below 1 genuinely does push the band past the grid square on canvas too (core
+  // pads the mesh for exactly that case), so it is not clamped.
+  const ringSpan = Math.min(pw, ph);
+  const ringScale = 1 / Math.max(0.01, vals.ringSubjectScale || 1);
+  const ringBox = `left:50%;top:50%;width:${ringSpan}px;height:${ringSpan}px;transform:translate(-50%,-50%) scale(${ringScale});`;
+  const ringR = 50 - (_FE_TP_RING_THICKNESS * 100) / 2;
+  const ringLayers = vals.ringEnabled
+    ? {
+      under: `<svg class="fe-tp-ring fe-tp-ring-under" viewBox="0 0 100 100" style="${ringBox}"
+          xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="${ringR}"
+          fill="${esc(vals.ringBgColor || "#111111")}"/></svg>`,
+      over: `<svg class="fe-tp-ring fe-tp-ring-over" viewBox="0 0 100 100" style="${ringBox}"
+          xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="${ringR}" fill="none"
+          stroke="${esc(vals.ringColor || "#ffffff")}" stroke-width="${_FE_TP_RING_THICKNESS * 100}"/></svg>`,
+    }
+    : { under: "", over: "" };
+
+  // Only numeric declarations go into the markup. The image URL and the colors are
+  // handed to the CSSOM via setProperty() below instead of being interpolated into an
+  // HTML attribute: a data: URL inside `url("…")` inside a quoted attribute has to
+  // survive CSS escaping AND HTML escaping, and getting either layer wrong silently
+  // drops the whole style attribute (art gone, fit and opacity with it).
+  const artLayer = art.src
+    ? `<div class="fe-tp-art" style="transform:scale(${scaleX},${scaleY});opacity:${vals.alpha};">${
+      vals.tint ? `<div class="fe-tp-tint"></div>` : ""
+    }</div>`
+    : "";
+
   // Preserve resize handle if it already exists
   const existingHandle = container.querySelector(".fe-tp-resize-handle");
 
   container.innerHTML = `
     <div class="fe-tp-viewport" style="width:${vpW}px;height:${vpH}px;"
-      title="마우스 휠: 확대/축소 · 우클릭 드래그: 이동">
+      title="${esc(_feTPL("FETP.Viewport.Hint", "드래그: 이동 · 휠: 확대/축소"))}">
+      <button type="button" class="fe-tp-view-reset"
+        title="${esc(_feTPL("FETP.ResetView", "시점 초기화"))}"><i class="fa-solid fa-arrows-to-dot"></i></button>
       <div class="fe-tp-grid-field" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="background-size:${cellSize}px ${cellSize}px;background-position:${gridLeft}px ${gridTop}px;"></div>
       <div class="fe-tp-grid" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="width:${pw}px;height:${ph}px;left:${gridLeft}px;top:${gridTop}px;">
-        ${vals.src ? `<img class="fe-tp-img" src="${esc(vals.src)}" alt=""
-          style="object-fit:${vals.fit};transform:scale(${scaleX},${scaleY});">` : ""}
+        ${ringLayers.under}
+        ${artLayer}
+        ${ringLayers.over}
         <div class="fe-tp-grid-border"></div>
         <svg class="fe-tp-inscribed-circle" viewBox="0 0 ${pw} ${ph}" xmlns="http://www.w3.org/2000/svg">
           <ellipse cx="${pw / 2}" cy="${ph / 2}" rx="${pw / 2 - 1}" ry="${ph / 2 - 1}"/>
@@ -144,9 +320,30 @@ function feRenderGridPreview(container, vals, natSize) {
     <div class="fe-tp-info">
       <span class="fe-tp-info-label">Grid</span>
       <span class="fe-tp-info-value">${vals.width}×${vals.height}</span>
-      <span class="fe-tp-info-dim">scale ${vals.scale.toFixed(2)}</span>
+      <span class="fe-tp-info-dim">scale ${vals.scale.toFixed(2)}${
+        Math.abs(art.scale - vals.scale) > 0.001 ? ` → ${art.scale.toFixed(2)}` : ""
+      }</span>
+      ${vals.alpha < 1 ? `<span class="fe-tp-info-dim">alpha ${vals.alpha.toFixed(2)}</span>` : ""}
+      ${vals.tint ? `<span class="fe-tp-info-swatch" style="background:${esc(vals.tint)};"
+        title="${esc(_feTPL("FETP.Tint", "색조"))} ${esc(vals.tint)}"></span>` : ""}
       <span class="fe-tp-info-dim">zoom ${Math.round(zoom * 100)}%</span>
-    </div>`;
+    </div>
+    ${vals.ringEnabled ? `<div class="fe-tp-info">
+      <span class="fe-tp-info-label">Ring</span>
+      <span class="fe-tp-info-value">×${(vals.ringSubjectScale || 1).toFixed(2)}</span>
+      ${art.usingSubject
+        ? `<span class="fe-tp-info-dim" title="${esc(art.src)}">${
+          esc(_feTPL("FETP.Subject", "서브젝트"))}: ${esc(art.src.split("/").pop())}</span>`
+        : ""}
+    </div>` : ""}`;
+
+  const artEl = container.querySelector(".fe-tp-art");
+  if (artEl) {
+    artEl.style.setProperty("--fe-tp-art", artUrl);
+    artEl.style.setProperty("--fe-tp-fit", bgSize);
+    // Inherited by .fe-tp-tint, which reuses both as its mask-image / mask-size.
+    if (vals.tint) artEl.style.setProperty("--fe-tp-tint", vals.tint);
+  }
 
   if (!existingHandle) {
     const handle = document.createElement("div");
@@ -158,6 +355,22 @@ function feRenderGridPreview(container, vals, natSize) {
   }
   _feTPWirePan(container);
   _feTPWireZoom(container);
+  _feTPWireViewReset(container);
+  _feTPSyncViewResetButton(container);
+}
+
+function _feTPWireViewReset(panel) {
+  const btn = panel.querySelector(".fe-tp-view-reset");
+  if (!btn) return;
+  btn.addEventListener("click", (e) => {
+    // Pan/zoom are view state only — the anchor is document data and is deliberately left
+    // alone, so this can never undo an edit.
+    e.preventDefault();
+    e.stopPropagation();
+    panel._feTPPan = { x: 0, y: 0 };
+    panel._feTPZoom = 1;
+    feRenderGridPreview(panel, panel._feTPValues, panel._feTPNaturalSize);
+  });
 }
 
 function _feTPApplyPan(panel, pan) {
@@ -186,7 +399,12 @@ function _feTPWirePan(panel) {
   });
 
   viewport.addEventListener("pointerdown", (e) => {
-    if (e.button !== 2) return;
+    // Left drag pans — which is what `cursor: grab` had been promising all along while the
+    // handler ignored button 0 entirely. Right drag stays a pan so the gesture that already
+    // existed keeps working. The viewport is a viewer, not an editor: the anchor is set on
+    // the sliders, where the number is visible while it changes.
+    if (e.button !== 0 && e.button !== 2) return;
+    if (e.target.closest?.(".fe-tp-view-reset, .fe-tp-resize-handle")) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -198,10 +416,7 @@ function _feTPWirePan(panel) {
 
     const onMove = (ev) => {
       ev.preventDefault();
-      _feTPApplyPan(panel, {
-        x: startPan.x + ev.clientX - startX,
-        y: startPan.y + ev.clientY - startY,
-      });
+      _feTPApplyPan(panel, { x: startPan.x + (ev.clientX - startX), y: startPan.y + (ev.clientY - startY) });
     };
     const onUp = (ev) => {
       viewport.releasePointerCapture?.(ev.pointerId);
@@ -209,6 +424,9 @@ function _feTPWirePan(panel) {
       viewport.removeEventListener("pointermove", onMove);
       viewport.removeEventListener("pointerup", onUp);
       viewport.removeEventListener("pointercancel", onUp);
+      // `_feTPApplyPan` moves the DOM without re-rendering, so the reset control has to be
+      // re-evaluated here rather than riding along on a render.
+      _feTPSyncViewResetButton(panel);
     };
 
     viewport.addEventListener("pointermove", onMove);
@@ -368,7 +586,9 @@ function feInjectTokenPreview(app, html) {
   feApplyPreviewSheetSize(app, root);
 
   const panel = layout.querySelector(".fe-tp-panel");
-  feLoadImage(vals.src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
+  // The natural-size / anchor-pixel readout must describe the texture that is actually
+  // painted, which is the ring subject when one overrides the base image.
+  feLoadImage(_feTPResolveArt(vals).src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
 
   // Inject range sliders next to anchor X/Y number inputs
   feInjectAnchorSliders(tab, form);
@@ -397,8 +617,8 @@ function feInjectAnchorSliders(tab, form) {
     const range = document.createElement("input");
     range.type = "range";
     range.className = "fe-tp-anchor-range";
-    range.min = "-0.5";
-    range.max = "1.5";
+    range.min = String(_FE_TP_ANCHOR_MIN);
+    range.max = String(_FE_TP_ANCHOR_MAX);
     range.step = "0.01";
     range.value = numInput.value || "0.5";
 
@@ -423,7 +643,7 @@ function feWirePreviewUpdates(app, html) {
   if (root._feTPWired) return;
   root._feTPWired = true;
 
-  const updatePreview = () => {
+  const renderNow = () => {
     const tab = root.querySelector('.tab[data-tab="appearance"]');
     if (!tab) return;
     const panel = tab.querySelector(".fe-tp-panel");
@@ -431,7 +651,15 @@ function feWirePreviewUpdates(app, html) {
     const form = app.form ?? root.querySelector("form");
     const vals = feReadAppearanceValues(form);
     if (!vals) return;
-    feLoadImage(vals.src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
+    feLoadImage(_feTPResolveArt(vals).src).then((natSize) => feRenderGridPreview(panel, vals, natSize));
+  };
+
+  // Coalesce to one render per frame. Slider drags now stream input events (they used to be
+  // swallowed, see below), and each render is a full innerHTML rebuild of the panel.
+  let rafId = 0;
+  const updatePreview = () => {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => { rafId = 0; renderNow(); });
   };
 
   // Attach updatePreview to the panel so the resize handle can trigger it
@@ -440,21 +668,22 @@ function feWirePreviewUpdates(app, html) {
 
   const form = app.form ?? root.querySelector("form");
   if (form) {
-    form.addEventListener("input", (e) => {
-      const name = e.target.name ?? "";
-      if (["texture.anchorX", "texture.anchorY", "scale", "width", "height",
-           "texture.fit", "texture.tint", "texture.src"].includes(name)
-          || name === "mirrorX" || name === "mirrorY") {
-        updatePreview();
-      }
-    });
-    form.addEventListener("change", (e) => {
-      const name = e.target.name ?? "";
-      if (name === "mirrorX" || name === "mirrorY" || name === "texture.fit"
-          || name === "texture.src") {
-        updatePreview();
-      }
-    });
+    // One list for both events. The previous pair of divergent inline lists was already
+    // hard to keep in sync, and the ring fields fire on either depending on whether the
+    // control is a plain input, a color-picker or a range-picker.
+    const onFieldEvent = (e) => {
+      // The event target is not always the named control. Foundry's form-associated custom
+      // elements (range-picker, color-picker, file-picker) are light DOM and only the host
+      // carries `name` — `_applyInputAttributes` does not copy it onto the inner inputs —
+      // so a slider drag arrives with `target` = an anonymous `input[type=range]` and used
+      // to be dropped here. That, not the event plumbing, is why the scale slider looked
+      // dead until release. Walk up to the nearest named ancestor.
+      const t = e.target;
+      const name = t?.name || t?.closest?.("[name]")?.getAttribute("name") || "";
+      if (_FE_TP_WATCHED_FIELDS.has(name)) updatePreview();
+    };
+    form.addEventListener("input", onFieldEvent);
+    form.addEventListener("change", onFieldEvent);
 
     // Scroll-wheel adjustment on anchor X/Y inputs
     for (const name of ["texture.anchorX", "texture.anchorY"]) {

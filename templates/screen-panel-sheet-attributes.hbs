@@ -1,4 +1,21 @@
 <div class="tab fe-sp-attrs-tab{{#if tab.active}} active{{/if}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+  {{!-- Everything above the divider belongs to ONE face, so the same face switcher
+        as the 면 tab lives here too — otherwise editing face 3's attributes meant
+        bouncing to the other tab, switching, and coming back. `feSwitchFace`
+        re-renders and AppV2 keeps the active tab, so the user stays put. --}}
+  {{#if fe.faceCount}}
+    <nav class="fe-sp-face-tabs">
+      {{#each fe.faces as |face|}}
+        <button type="button" class="fe-sp-face-tab{{#if face.active}} active{{/if}}"
+                data-action="feSwitchFace" data-index="{{face.index}}"
+                title="{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}">
+          {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">{{/if}}
+          <span class="fe-sp-face-tab-label">{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}</span>
+        </button>
+      {{/each}}
+    </nav>
+  {{/if}}
+
   {{!-- Per-face attributes (copied from the active face's linked actor) --}}
   <header class="fe-sp-faces-header">
     <h3>{{localize "FESP.Sheet.FaceAttrs" n=fe.activeFace.num}}{{#if fe.activeFace.name}} — {{fe.activeFace.name}}{{/if}}</h3>
@@ -102,8 +119,11 @@
         <input type="text" class="fe-sp-attr-max" name="system.customAttributes.{{ca.index}}.max"
                value="{{ca.max}}" placeholder="{{localize "FESP.Sheet.CustomAttrMaxPh"}}"
                {{#unless ../fe.editable}}disabled{{/unless}}>
-        <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="system.customAttributes.{{ca.index}}"
-              title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">system.customAttributes.{{ca.index}}</code>
+        {{!-- MUST end in `.value` (or `.max`). An overlay resolves `attr` with a plain
+              getProperty, so `system.customAttributes.0` hands back the {name,value,max}
+              OBJECT and the canvas renders "[object Object]". --}}
+        <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="system.customAttributes.{{ca.index}}.value"
+              title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">system.customAttributes.{{ca.index}}.value</code>
         {{#if ../fe.editable}}
           <a data-action="feRemoveCustomAttr" data-index="{{ca.index}}" title="{{localize "FESP.Sheet.CustomAttrRemove"}}">
             <i class="fa-solid fa-trash"></i>

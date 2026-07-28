@@ -30,6 +30,14 @@
 .fe-tp-controls > .form-group > .form-fields {
   min-width: 0;
 }
+/* Wildcard-image row: core styles the label `flex: 1 1 0`, i.e. an equal share of the row with
+   a field that holds nothing but a checkbox — so the long Korean label wrapped onto a second
+   line while half the row sat empty. Size the label to its content and let the checkbox side
+   absorb the remainder. Scoped to `.token-image-group` so the ring fieldset keeps its own
+   uniform label column. */
+.fe-tp-controls .token-image-group > .form-group > :is(label, .label) {
+  flex: 0 1 auto;
+}
 
 .prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable.active:not([data-tab="appearance"]),
 .token-config.fe-tp-active.fe-tp-two-column .tab.scrollable.active:not([data-tab="appearance"]) {
@@ -97,6 +105,42 @@
   cursor: grabbing;
 }
 
+/* Reset pan/zoom. Only rendered visible while the view is actually off-default, which is
+   both the only moment it is useful and a standing indicator that the preview is panned or
+   zoomed. `type="button"` is load-bearing — this lives inside the sheet's <form>, where a
+   default-typed <button> would submit it. */
+.fe-tp-view-reset {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  /* Core's `button {min-height: var(--button-size)}` (foundry2.css) is 32px and `height` alone
+     cannot beat it — without this the icon renders in a 22x32 rectangle. */
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fe-tp-viewport.fe-tp-view-moved .fe-tp-view-reset {
+  display: flex;
+}
+.fe-tp-view-reset:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+}
+
 .fe-tp-grid-field {
   position: absolute;
   inset: 0;
@@ -111,12 +155,49 @@
   position: absolute;
 }
 
-.fe-tp-img {
-  display: block;
-  width: 100%;
-  height: 100%;
+/* Token art. A background-image (not an <img>) because `background-size` can express all
+   five of core's texture fit modes — `object-fit` has no `width`/`height` keyword — and
+   because the identical value drives the tint layer's mask-size. `isolation` confines the
+   tint's multiply blend to this art only, so it never darkens the ring beneath. */
+.fe-tp-art {
+  position: absolute;
+  inset: 0;
+  background-image: var(--fe-tp-art);
+  background-size: var(--fe-tp-fit);
+  background-position: center;
+  background-repeat: no-repeat;
+  isolation: isolate;
   pointer-events: none;
 }
+
+/* texture.tint — PIXI tints by multiplication, so multiply is the faithful blend. The
+   mask clips it to the art's own alpha (same url + size + position as the background),
+   otherwise the tint would flood the transparent margin of the token rect. */
+.fe-tp-tint {
+  position: absolute;
+  inset: 0;
+  background-color: var(--fe-tp-tint);
+  mix-blend-mode: multiply;
+  -webkit-mask-image: var(--fe-tp-art);
+  mask-image: var(--fe-tp-art);
+  -webkit-mask-size: var(--fe-tp-fit);
+  mask-size: var(--fe-tp-fit);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* Dynamic token ring — schematic (colors + how much grid space the band eats), not a
+   reproduction of the ring spritesheet. Background disc under the art, band over it. */
+.fe-tp-ring {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.fe-tp-ring-under { opacity: 0.85; }
+.fe-tp-ring-over { opacity: 0.9; }
 
 /* Grid space border — complete rectangle around the token area */
 .fe-tp-grid-border {
@@ -205,6 +286,13 @@
 .fe-tp-info-dim {
   opacity: 0.5;
   font-size: 10px;
+}
+.fe-tp-info-swatch {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 /* Anchor row: [X] [-----slider-----] [0.5] on a single line */

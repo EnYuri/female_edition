@@ -38,12 +38,17 @@
     </div>
   </section>
 
+  {{!-- Face switcher. The thumbnail is the point: faces are images, and "2면"/"3면"
+        alone made you click through them to find the one you meant. The star marks
+        the panel's default face so it is identifiable without opening the select. --}}
   <nav class="fe-sp-face-tabs">
     {{#each fe.faces as |face|}}
       <button type="button" class="fe-sp-face-tab{{#if face.active}} active{{/if}}"
               data-action="feSwitchFace" data-index="{{face.index}}"
-              title="{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}">
-        {{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}
+              title="{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}{{#if face.isDefault}} · {{localize "FESP.Sheet.DefaultFaceMark"}}{{/if}}">
+        {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">{{/if}}
+        <span class="fe-sp-face-tab-label">{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}</span>
+        {{#if face.isDefault}}<i class="fa-solid fa-star fe-sp-face-tab-default"></i>{{/if}}
       </button>
     {{/each}}
     {{#if fe.editable}}
@@ -53,6 +58,19 @@
       </button>
     {{/if}}
   </nav>
+
+  {{#unless fe.faceCount}}
+    <div class="fe-sp-empty">
+      <i class="fa-regular fa-images"></i>
+      <p class="fe-sp-empty-title">{{localize "FESP.Sheet.NoFaces"}}</p>
+      <p class="notes">{{localize "FESP.Sheet.NoFacesHint"}}</p>
+      {{#if fe.editable}}
+        <button type="button" class="fe-sp-btn" data-action="feAddFace">
+          <i class="fa-solid fa-plus"></i> {{localize "FESP.Sheet.AddFace"}}
+        </button>
+      {{/if}}
+    </div>
+  {{/unless}}
 
   <ol class="fe-sp-faces">
     {{#each fe.faces as |face|}}
@@ -68,6 +86,7 @@
                    {{#unless ../fe.editable}}disabled{{/unless}}>
             {{#if ../fe.editable}}
               <span class="fe-sp-face-actions">
+                <a data-action="feDuplicateFace" data-index="{{face.index}}" title="{{localize "FESP.Sheet.DuplicateFace"}}"><i class="fa-solid fa-clone"></i></a>
                 <a data-action="feMoveFaceUp" data-index="{{face.index}}" title="{{localize "FESP.Sheet.MoveUp"}}"><i class="fa-solid fa-arrow-up"></i></a>
                 <a data-action="feMoveFaceDown" data-index="{{face.index}}" title="{{localize "FESP.Sheet.MoveDown"}}"><i class="fa-solid fa-arrow-down"></i></a>
                 <a data-action="feRemoveFace" data-index="{{face.index}}" title="{{localize "FESP.Sheet.RemoveFace"}}"><i class="fa-solid fa-trash"></i></a>
@@ -160,7 +179,7 @@
             </div>
             <ol class="fe-sp-overlay-rows">
               {{#each face.overlays as |ov|}}
-                <li class="fe-sp-overlay-row">
+                <li class="fe-sp-overlay-row{{#if ov.attrWarn}} fe-sp-overlay-warn{{/if}}">
                   <span class="fe-sp-overlay-num">{{ov.num}}</span>
                   <span class="fe-sp-overlay-link{{#if ov.linkedActorName}} linked{{/if}}"
                         {{#if ../../fe.editable}}data-action="{{#if ov.linkedActorName}}feClearOverlayLinkedActor{{/if}}"{{/if}}
@@ -168,9 +187,26 @@
                         title="{{#if ov.linkedActorName}}{{ov.linkedActorName}} ({{localize "FESP.Sheet.OverlayLinkClear"}}){{else}}{{localize "FESP.Sheet.OverlayLinkHint"}}{{/if}}">
                     {{#if ov.linkedActorName}}<img src="{{ov.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-link-slash"></i>{{/if}}
                   </span>
+                  {{!-- The attribute path used to be typed by hand or copied out of the
+                        어트리뷰트 tab. The datalist offers this overlay's OWN linked actor's
+                        real paths (with their current values) — pressing ↓ or typing filters
+                        it — while staying a plain text input, so the faces-array auto-submit
+                        is untouched. Built for the active face only (see _prepareContext). --}}
                   <input type="text" name="system.faces.{{face.index}}.overlays.{{ov.index}}.attr"
+                         {{#if ov.attrOptions.length}}list="fe-sp-attrlist-{{face.index}}-{{ov.index}}"{{/if}}
                          value="{{ov.attr}}" placeholder="{{localize "FESP.Sheet.OverlayAttrPh"}}"
                          {{#unless ../../fe.editable}}disabled{{/unless}}>
+                  {{#if ov.attrOptions.length}}
+                    <datalist id="fe-sp-attrlist-{{face.index}}-{{ov.index}}">
+                      {{#each ov.attrOptions as |opt|}}
+                        <option value="{{opt.path}}">{{opt.label}}</option>
+                      {{/each}}
+                    </datalist>
+                  {{/if}}
+                  {{#if ov.attrWarn}}
+                    <i class="fa-solid fa-triangle-exclamation fe-sp-overlay-warn-icon"
+                       title="{{ov.attrWarnReason}}"></i>
+                  {{/if}}
                   <input type="text" name="system.faces.{{face.index}}.overlays.{{ov.index}}.text"
                          value="{{ov.text}}" placeholder="{{localize "FESP.Sheet.OverlayTextPh"}}"
                          {{#unless ../../fe.editable}}disabled{{/unless}}>

@@ -119,6 +119,15 @@
 .fe-screen-panel-sheet .window-content {
   overflow-y: auto;
 }
+
+/* 프로토타입 토큰 설정은 토큰화된 패널에서만 의미가 있다(타일 패널에는 토큰이 없다).
+   AppV2 프레임 버튼은 창 프레임 생성 시 한 번만 만들어지고 이후 렌더에서 다시
+   만들어지지 않으므로, 버튼 자체는 항상 만들고 표시 여부만 매 렌더마다
+   #syncTokenizeButton이 루트에 다는 .fe-sp-tokenized 로 뒤집는다. */
+.fe-screen-panel-sheet:not(.fe-sp-tokenized)
+  .window-header button[data-action="configurePrototypeToken"] {
+  display: none;
+}
 .fe-screen-panel-sheet .fe-sp-sheet {
   padding: 6px 8px;
 }
@@ -167,7 +176,10 @@
 }
 .fe-screen-panel-sheet .fe-sp-face-tab {
   flex: 0 0 auto;
-  padding: 5px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
@@ -177,13 +189,31 @@
   cursor: pointer;
   color: inherit;
   opacity: 0.6;
-  max-width: 120px;
+  max-width: 150px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   transition:
     opacity 0.15s,
     background 0.15s;
+}
+/* Faces are images — the thumbnail is what actually identifies a tab. */
+.fe-screen-panel-sheet .fe-sp-face-tab-thumb {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.fe-screen-panel-sheet .fe-sp-face-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fe-screen-panel-sheet .fe-sp-face-tab-default {
+  flex: 0 0 auto;
+  font-size: 9px;
+  opacity: 0.75;
 }
 .fe-screen-panel-sheet .fe-sp-face-tab:hover {
   opacity: 0.85;
@@ -210,6 +240,37 @@
 }
 .fe-screen-panel-sheet .fe-sp-face-tab-add:hover {
   opacity: 0.9;
+}
+/* In the 면 tab the active tab visually merges into the face box directly below
+   it; the 어트리뷰트 tab has no such box, so close the row off with its own rule. */
+.fe-screen-panel-sheet .fe-sp-attrs-tab .fe-sp-face-tabs {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  margin-bottom: 8px;
+}
+
+/* ----- Empty state (no faces yet) ----- */
+.fe-screen-panel-sheet .fe-sp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 1px dashed rgba(0, 0, 0, 0.25);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  text-align: center;
+}
+.fe-screen-panel-sheet .fe-sp-empty > i {
+  font-size: 30px;
+  opacity: 0.35;
+}
+.fe-screen-panel-sheet .fe-sp-empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+.fe-screen-panel-sheet .fe-sp-empty .notes {
+  margin: 0;
+  max-width: 40ch;
 }
 
 .fe-screen-panel-sheet .fe-sp-faces {
@@ -458,7 +519,9 @@
 .fe-screen-panel-sheet .fe-sp-overlay-preview {
   position: relative;
   width: 100%;
-  max-width: 260px;
+  /* Placement is done by clicking/dragging inside this box, so its size IS the
+     precision of the result. 260px left most of the 600px sheet unused. */
+  max-width: 360px;
   margin-bottom: 6px;
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 4px;
@@ -564,6 +627,19 @@
   opacity: 1;
   color: #c85a5a;
 }
+/* An `attr` that resolves to nothing renders the static text (or nothing at all)
+   on the canvas with no other symptom — flag the row rather than let the user
+   hunt for it. */
+.fe-screen-panel-sheet .fe-sp-overlay-warn-icon {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #d08a20;
+  cursor: help;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-warn input[name$=".attr"] {
+  border-color: rgba(208, 138, 32, 0.7);
+}
+
 .fe-screen-panel-sheet .fe-sp-overlay-add {
   margin-top: 6px;
 }
@@ -731,7 +807,14 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   .fe-screen-panel-sheet
-  :is(.fe-sp-face-actor-section, .fe-sp-overlay-section, .fe-sp-attr-divider) {
+  :is(
+    .fe-sp-face-actor-section,
+    .fe-sp-overlay-section,
+    .fe-sp-attr-divider,
+    .fe-sp-empty,
+    .fe-sp-face-tab-thumb,
+    .fe-sp-attrs-tab .fe-sp-face-tabs
+  ) {
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
 }
 
