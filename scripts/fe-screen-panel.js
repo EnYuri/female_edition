@@ -24,6 +24,7 @@ import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 import {
   FE_PANEL_TYPE,
+  FE_PANEL_SUBTYPE,
   FE_PANEL_TILE_FLAG,
   FE_PANEL_SOCKET,
   FE_PANEL_DEFAULT_SIZE,
@@ -1222,44 +1223,87 @@ function onPanelSocket(data, senderId) {
 }
 
 /**
- * Item Piles 3.2.x builds libWrapper targets by treating every Actor type as a
- * dot-separated object path. Module document types are intentionally namespaced
- * strings ("female_edition.screenPanel"), so its generated target becomes
- * `sheetClasses.female_edition.screenPanel` instead of the real, literal-keyed
- * `sheetClasses["female_edition.screenPanel"]`. The failed wrapper is noisy on
- * every client startup.
+ * Third-party hardening: dot-path resolution of our DOTTED sub-type id.
  *
- * Provide only that resolution path as a non-enumerable alias. It is not a
- * second sheet registration and thus does not affect Foundry's sheet picker;
- * non-enumerability also prevents Item Piles from scanning the alias as another
- * actor type. This can be removed once Item Piles handles dotted type IDs.
+ * A module sub-type id is namespaced ("female_edition.screenPanel"), and a lot of
+ * third-party code treats a type id as an object PATH rather than a literal key —
+ * either directly (`foundry.utils.getProperty(registry, actor.type)`, which splits
+ * on ".") or by string-building a target out of it. Every such consumer resolves
+ * `CONFIG.Actor.<registry>.female_edition.screenPanel` instead of the real
+ * `CONFIG.Actor.<registry>["female_edition.screenPanel"]` and fails on OUR type
+ * only, so the breakage looks like a female_edition bug.
+ *
+ * Observed instance (Item Piles 3.2.x): it builds one libWrapper target per
+ * registered actor sheet as `CONFIG.Actor.sheetClasses.${type}.["${sheetId}"]…`,
+ * so ours becomes unresolvable and every client start logs a red
+ * LibWrapperPackageError blaming Item Piles.
+ *
+ * Fix: expose the dot-path as a NON-ENUMERABLE alias on each type-keyed
+ * CONFIG.Actor registry. This is not a second type or sheet registration —
+ * Foundry only ever reads these registries by literal key.
+ *
+ * Non-enumerability is load-bearing twice over:
+ *   - core (`WorldCollection.registeredSheets`, `DocumentSheetConfig`) and any
+ *     module walking `Object.values(registry)` must not see a phantom actor type;
+ *   - the very enumeration that produced the broken target above would otherwise
+ *     walk into the alias and build a SECOND broken target
+ *     (`sheetClasses.female_edition.["screenPanel"].cls`).
+ *
+ * The alias is a live GETTER rather than a copied reference, so it keeps resolving
+ * after a registry entry is replaced (another module registering a sheet for our
+ * type, a system swapping data models).
+ *
+ * TIMING — this is what made the first attempt dead code: `registerSheet()` before
+ * `game.ready` only queues into DocumentSheetConfig's private #pending list, and
+ * core REBUILDS `CONFIG.Actor.sheetClasses` from scratch in
+ * `DocumentSheetConfig.initializeSheets()`, which runs AFTER the `setup` hook
+ * (`client/game.mjs`: init → setup → initializeSheets → ready). So at `init` our
+ * type key does not exist yet and anything installed there is thrown away with the
+ * old object. Hence the `ready` call — still comfortably before the earliest point
+ * a module can wrap a sheet class (Item Piles does it at `ready` + 100 ms). The
+ * `init` call is kept because dataModels/typeLabels ARE ours from init onward.
  */
-function feInstallItemPilesScreenPanelSheetAlias() {
-  if (!game.modules.get("item-piles")?.active) return;
+const FE_TYPE_KEYED_ACTOR_REGISTRIES = [
+  "sheetClasses",
+  "dataModels",
+  "typeLabels",
+  "typeIcons",
+  "trackableAttributes",
+];
 
-  const sheetClasses = CONFIG.Actor.sheetClasses;
-  const panelSheets = sheetClasses?.[FE_PANEL_TYPE];
-  if (!panelSheets) return;
+function feInstallDottedTypeAliases() {
+  const cfg = CONFIG.Actor;
+  if (!cfg) return;
 
-  try {
-    let moduleNamespace = sheetClasses[MODULE_ID];
-    if (!moduleNamespace) {
-      moduleNamespace = Object.create(null);
-      Object.defineProperty(sheetClasses, MODULE_ID, {
-        value: moduleNamespace,
+  for (const name of FE_TYPE_KEYED_ACTOR_REGISTRIES) {
+    const registry = cfg[name];
+    if (!registry || typeof registry !== "object") continue;
+    if (!(FE_PANEL_TYPE in registry)) continue; // nothing registered for our type here
+    try {
+      let ns = registry[MODULE_ID];
+      if (ns === undefined) {
+        ns = Object.create(null);
+        Object.defineProperty(registry, MODULE_ID, {
+          value: ns,
+          enumerable: false,
+          configurable: true,
+          writable: true,
+        });
+      }
+      // A real entry literally keyed "female_edition" would be someone else's
+      // data — never shadow it.
+      if (!ns || typeof ns !== "object") continue;
+      const existing = Object.getOwnPropertyDescriptor(ns, FE_PANEL_SUBTYPE);
+      if (existing && !existing.configurable) continue;
+      Object.defineProperty(ns, FE_PANEL_SUBTYPE, {
+        get: () => registry[FE_PANEL_TYPE],
         enumerable: false,
         configurable: true,
       });
+    } catch (err) {
+      // A nonstandard system-owned CONFIG shape must never block panel setup.
+      console.warn(`${MODULE_ID} | could not install the dotted-type alias for CONFIG.Actor.${name}`, err);
     }
-
-    Object.defineProperty(moduleNamespace, "screenPanel", {
-      value: panelSheets,
-      enumerable: false,
-      configurable: true,
-    });
-  } catch (err) {
-    // A nonstandard system-owned CONFIG shape should never block panel setup.
-    console.warn(`${MODULE_ID} | could not install Item Piles screen-panel compatibility alias`, err);
   }
 }
 
@@ -1283,7 +1327,9 @@ Hooks.once("init", () => {
     makeDefault: true,
     label: "FESP.SheetLabel",
   });
-  feInstallItemPilesScreenPanelSheetAlias();
+  // Covers dataModels/typeLabels immediately; sheetClasses is re-installed at
+  // `ready` because core rebuilds that object after `setup` — see the function.
+  feInstallDottedTypeAliases();
 
   game.settings.register(MODULE_ID, S.SCREEN_PANEL_ENABLED, {
     // Pass localization KEYS — at the `init` hook i18n is not yet loaded; the
@@ -1315,6 +1361,9 @@ Hooks.once("setup", () => {
 });
 
 Hooks.once("ready", () => {
+  // MUST run here (not at init): core replaces CONFIG.Actor.sheetClasses wholesale
+  // in DocumentSheetConfig.initializeSheets(), which runs after `setup`.
+  feInstallDottedTypeAliases();
   feInitPanelMenuDismissers();
   feSetPanelMenuActions({
     flip: feActionFlip,

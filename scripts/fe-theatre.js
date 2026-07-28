@@ -1686,11 +1686,12 @@ function _fetRegisterContextOptions(_html, options) {
         if (id) _fetRemoveInsert(_FET_ID_PREFIX + id);
       },
     }),
-    // 무대 설정(GM 전용)도 무대 항목 그룹으로 묶어 "편집" 아래에 함께 배치.
+    // 무대 설정도 무대 항목 그룹으로 묶어 "편집" 아래에 함께 배치. 소유자 기준
+    // (GM 은 모든 액터의 소유자) — 위 추가/제거 항목과 동일한 게이트.
     entry({
       label: "무대 설정",
       icon: '<i class="fas fa-cog"></i>',
-      visible: (li) => _fetEnabled && game.user.isGM && !!_fetActorForMenu(li),
+      visible: (li) => _fetEnabled && !!_fetActorForMenu(li)?.isOwner,
       callback: (li) => {
         const id = _fetGetActorIdFromLi(li);
         if (id) _fetOpenActorConfig(id);
@@ -1770,9 +1771,11 @@ function _fetGetActorSheetActor(app) {
 // DX3rd) have no such menu at all — those keep 무대 설정 as a plain header
 // button (see the windowHeader fallback branch in _fetInjectSheetButtons).
 function _fetOnGetHeaderControls(app, controls) {
-  if (!_fetEnabled || !game.user?.isGM) return;
+  if (!_fetEnabled) return;
   const actor = _fetGetActorSheetActor(app);
-  if (!actor) return;
+  // 소유자면 자기 액터의 무대 설정(표시 이름/포트레이트/감정 표정)을 직접 편집할 수
+  // 있다. 저장 경로는 actor.setFlag 뿐이라 코어 OWNER 권한으로 이미 충분하다.
+  if (!actor?.isOwner) return;
   if (actor.type === "female_edition.screenPanel") return;
   controls.push({
     action: "fetStageConfig",
@@ -1828,7 +1831,7 @@ function _fetInjectSheetButtons(app, el) {
     // buttons are already in the container — our injected controls sort last
     // (lower priority than the existing header menu), not first.
     // Final order (left → right): [Foundry 기본 버튼들] [추가/전환] [제거]
-    // 무대 설정(GM) lives in the sheet's own native "⋯" controls dropdown
+    // 무대 설정(소유자) lives in the sheet's own native "⋯" controls dropdown
     // instead — see _fetOnGetHeaderControls above.
     if (onStage) {
       headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
@@ -1864,7 +1867,7 @@ function _fetInjectSheetButtons(app, el) {
       ins(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
         () => fetAddToStage(actor)));
     }
-    if (game.user?.isGM && !hasNativeControls) {
+    if (actor.isOwner && !hasNativeControls) {
       ins(mkBtn("fet-stage-config", "fa-cog", "무대 설정",
         () => _fetOpenActorConfig(actor.id)));
     }

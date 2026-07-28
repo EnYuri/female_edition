@@ -204,6 +204,65 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 
 
 /* ----------------------------------------------------------------
+ * body.theme-light 아래 dnd5e 앱 전체의 텍스트 토큰 (MUST keep)
+ *
+ * dnd5e 는 라이트 팔레트를 `body.theme-light .dnd5e2 { … }` 로 걸면서
+ * 코어 텍스트 토큰(--color-text-primary 등)을 ".dnd5e2 자기 자신에" 선언한다
+ * (dnd5e.css:413-418, 5.3.3 기준). 우리 레트로 리맵은 같은 토큰을
+ * fe-dx3rd-compat.css 의 `body.fe-retro-theme { … !important }` 에 선언한다.
+ *
+ * ⚠️ 커스텀 프로퍼티는 "가장 가까운 선언 요소"가 이긴다 — 서로 다른 요소라
+ *    !important 도 특이도도 개입하지 못한다. 즉 <body> 에 건 리맵은 .dnd5e2
+ *    안쪽으로 절대 도달하지 못하고, dnd5e.css 에서 `color: var(--color-text-primary)`
+ *    로 칠하는 46개 규칙이 전부 어두운 잉크로 남는다. 레트로는 표면을 검정으로
+ *    강제하므로 결과는 "검정 위 검정".
+ *
+ * 조건: Foundry UI 테마가 light 로 해석될 때만 발생한다(core.uiConfig
+ * colorScheme = light, 또는 기본값 "" + OS 라이트 모드 → game.mjs:1850-1855).
+ * theme-dark 에서는 dnd5e 가 --dnd5e-color-blue-white(밝은색)를 넣어 무해하다.
+ *
+ * 기존 커버리지는 .dnd5e2.application.sheet.actor.standard-form 하나뿐이라
+ * 아이템/액티비티/어드밴스먼트 시트·컴펜디움 브라우저·dialog-lg·휴식/굴림설정/
+ * 특성선택/화폐관리 다이얼로그·롤테이블 시트가 전부 빠져 있었다.
+ *   → 토큰을 ".dnd5e2 자신"에 다시 선언해 dnd5e 의 선언 지점과 같은 높이로 맞춘다.
+ *      액터 시트 블록(아래 §Quadrone/standard-form)은 특이도가 더 높아 그대로 이긴다.
+ *
+ * theme-dark 를 굳이 배제하지 않는 이유: 이 값들은 레트로 검정 표면 기준으로
+ * 고른 톤이라 다크 테마에서도 동일하게 맞는다. 테마 클래스에 의존하지 않는 편이
+ * 코어 colorScheme 이 바뀌어도 깨지지 않는다.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
+  --color-text-emphatic: var(--fe-ac-90) !important;
+  --color-text-primary: var(--fe-ac-90) !important;
+  --color-text-secondary: var(--fe-ac-57) !important;
+  --color-text-inactive: var(--fe-ac-t22) !important;
+  --color-text-title: var(--fe-ac-90) !important;
+  --dnd5e-heading-3-color: var(--fe-ac-70) !important;
+  --dnd5e-ability-color: var(--fe-ac-57) !important;
+  --dnd5e-ability-mod-color: var(--fe-ac-90) !important;
+  --activity-icon-color: var(--fe-ac-90) !important;
+  --advancement-summary-link-color: var(--fe-ac-70) !important;
+  --filter-control-active-color: var(--fe-ac-90) !important;
+  --fieldset-legend-color: var(--fe-ac-57) !important;
+  --control-button-text-color: var(--fe-ac-57) !important;
+  --hint-icon-color: var(--fe-ac-57) !important;
+  --item-control-active-color: var(--fe-ac-90) !important;
+  --item-state-toggle-active: var(--fe-ac-90) !important;
+  --pill-empty-text-color: var(--fe-ac-57) !important;
+}
+
+/* dnd5e 가 --icon-fill 을 .dnd5e2 가 아니라 "자손"에 다시 선언하는 세 지점
+   (dnd5e.css:517/520/538). 위 루트 블록은 더 가까운 이 선언들을 이길 수 없으므로
+   같은 요소를 직접 잡아야 한다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  .dnd5e2 :is(.items-section .item-name, .items-section .item .tags),
+body.fe-retro-theme.fe-retro-system-dnd5e
+  .dnd5e2.roll-table-sheet table {
+  --icon-fill: var(--fe-ac-90) !important;
+}
+
+
+/* ----------------------------------------------------------------
  * 캐릭터 시트 HP/리소스 미터 위에 겹쳐진 입력칸
  *
  * dnd5e/Tidy5e 시트는 HP·리소스 값 입력칸(input.resource-value 등)을
@@ -2030,11 +2089,12 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standa
   color: var(--fe-dnd5e-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
 }
 
+/* --dnd5e-color-parchment 만 남긴다 (dnd5e 5.3.3 에서 30회 참조).
+   --dnd5e-color-parchment-light / --dnd5e-color-ink 은 시스템 CSS 에 참조가
+   0건이라 제거했다 — 되살리기 전에 dnd5e.css 에서 실제 사용을 먼저 확인할 것. */
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(.dnd5e2.application.sheet.actor.standard-form, .dnd5e2.dnd5e-tooltip.theme-light) {
   --dnd5e-color-parchment: #000000 !important;
-  --dnd5e-color-parchment-light: #0d0d0d !important;
-  --dnd5e-color-ink: var(--fe-dnd5e-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.dnd5e-tooltip.theme-light {

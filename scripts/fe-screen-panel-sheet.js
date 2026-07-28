@@ -115,6 +115,75 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
+   * Core actor-sheet header actions that are meaningful on a DISPLAY BOARD.
+   * Anything else that reaches this sheet's `⋮` menu arrived through a
+   * third-party `getHeaderControls*` hook (core fires it AFTER
+   * `_getHeaderControls`, so the filter above cannot see it) and was written for
+   * a character-ish actor.
+   *
+   * Live example: Item Piles adds "Configure Item Pile" to EVERY actor sheet
+   * unconditionally (`insertActorHeaderButtons`, no type check). Using it on a
+   * panel makes `isValidItemPile(actor)` true — and Item Piles' own
+   * PRE_RENDER_SHEET handler then CANCELS this sheet's render and shows its pile
+   * interface instead, i.e. the panel sheet becomes unopenable. Dropping the
+   * button is the cheap way to keep a display board a display board.
+   */
+  static FE_ALLOWED_HEADER_ACTIONS = Object.freeze([
+    "configureSheet",
+    "configureOwnership",
+    "configurePrototypeToken",
+    "copyUuid",
+    "importDocument",
+  ]);
+
+  static #headerControlAllowed(control) {
+    const action = control?.action;
+    // Hook-injected entries commonly carry only `onClick`/`class` and no action.
+    if (typeof action !== "string" || !action) return false;
+    if (action.startsWith("fe")) return true; // our own actions
+    return ScreenPanelSheet.FE_ALLOWED_HEADER_ACTIONS.includes(action);
+  }
+
+  /**
+   * @override — the ONE funnel that sees header controls AFTER the
+   * `getHeaderControls…` hook has run, on both the v14 lazy ContextMenu path
+   * (`_headerControlContextEntries` → here, rebuilt on every open) and the v13
+   * frame-time dropdown. Foreign entries are dropped here rather than by racing
+   * other modules' hook registration order, which is not guaranteed.
+   */
+  _headerControlButtons() {
+    const source = super._headerControlButtons?.();
+    if (!source) return source;
+    const keep = (control) => {
+      if (ScreenPanelSheet.#headerControlAllowed(control)) return true;
+      ScreenPanelSheet.#logDroppedHeaderControl(control);
+      return false;
+    };
+    // Shape-preserving on purpose: v14 core consumes this as an iterator
+    // (`Array.from(this._headerControlContextEntries())` on every menu open), but
+    // returning a generator where a core build handed back an array would break
+    // any `.length`/`.map` in the caller. Mirror whatever super returned.
+    if (Array.isArray(source)) return source.filter(keep);
+    return (function* filterHeaderControls() {
+      for (const control of source) if (keep(control)) yield control;
+    })();
+  }
+
+  // Dropped labels are logged once each per session — a silently vanishing
+  // third-party button would otherwise be undebuggable.
+  static #droppedHeaderControls = new Set();
+
+  static #logDroppedHeaderControl(control) {
+    const label = String(control?.label ?? control?.action ?? control?.class ?? "(unnamed)");
+    if (ScreenPanelSheet.#droppedHeaderControls.has(label)) return;
+    ScreenPanelSheet.#droppedHeaderControls.add(label);
+    console.debug(
+      `${MODULE_ID} | screen panel sheet: dropped a foreign header control 「${label}」 ` +
+      `(a panel is a display board, not a character)`
+    );
+  }
+
+  /**
    * @override — surface the prototype-token config as an ALWAYS-VISIBLE button
    * directly in the window header (not inside the `⋮` controls dropdown, and
    * regardless of the `tokenize` setting). The `configurePrototypeToken` action
@@ -438,6 +507,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   _onRender(context, options) {
     super._onRender?.(context, options);
     this.#syncTokenizeButton();
+    this.#pruneForeignHeaderControlDom();
     if (!this.isEditable) return;
     const root = this.element;
 
@@ -700,6 +770,28 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const label = game.i18n.localize(on ? "FESP.Sheet.TokenizeOn" : "FESP.Sheet.TokenizeOff");
     btn.setAttribute("aria-label", label);
     btn.dataset.tooltip = label;
+  }
+
+  /**
+   * Belt-and-braces for the `_headerControlButtons` filter: v14 builds the `⋮`
+   * menu lazily through that generator (so the filter is authoritative there),
+   * but a build that instead renders the controls into a static frame-time
+   * `<ul class="controls-dropdown">` would bypass it. Sweep the rendered DOM with
+   * the same allowlist; a no-op wherever that element does not exist.
+   */
+  #pruneForeignHeaderControlDom() {
+    const menu = this.element?.querySelector(".controls-dropdown");
+    if (!menu) return;
+    for (const li of menu.querySelectorAll("li.header-control")) {
+      // `_renderHeaderControl` stringifies a missing action to "undefined".
+      const action = li.dataset.action === "undefined" ? "" : (li.dataset.action ?? "");
+      if (ScreenPanelSheet.#headerControlAllowed({ action })) continue;
+      ScreenPanelSheet.#logDroppedHeaderControl({
+        action,
+        label: li.querySelector(".control-label")?.textContent?.trim(),
+      });
+      li.remove();
+    }
   }
 
   /** Open core's TokenConfig for ONE face's token settings. */
