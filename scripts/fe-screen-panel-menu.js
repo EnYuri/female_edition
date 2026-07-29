@@ -187,10 +187,26 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
         disabled ? "FESP.Menu.Enable" : "FESP.Menu.Disable",
         () => _actions.toggleDisable?.(tile));
 
-    const locked = !!flag.locked;
-    add(locked ? "fa-lock-open" : "fa-lock",
-        locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
-        () => _actions.toggleLock?.(tile));
+    // Position lock. The ENFORCED lock (feIsPanelPlacementLocked / fePanelLockSource in
+    // the entry module) is `flag.locked` OR `actor.system.locked`, but this row can only
+    // ever write the flag. While the panel-level lock is on, offering the flag toggle was
+    // a row that lied twice over: it read "위치 고정" on a panel that was already locked,
+    // and pressing it changed nothing anyone could see. Name the real source instead —
+    // the owner releases it from the sheet's 위치 고정 checkbox.
+    const panelLocked = !!actor.system?.locked;
+    if (panelLocked) {
+      const note = document.createElement("button");
+      note.type = "button";
+      note.className = "fe-sp-menu-item";
+      note.disabled = true;
+      note.innerHTML = `<i class="fa-solid fa-lock"></i><span>${game.i18n.localize("FESP.Menu.LockedByPanel")}</span>`;
+      ownerSection.appendChild(note);
+    } else {
+      const locked = !!flag.locked;
+      add(locked ? "fa-lock-open" : "fa-lock",
+          locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
+          () => _actions.toggleLock?.(tile));
+    }
 
     // Layer ordering — TOKENIZED panels only. A tile panel is reachable through core's own
     // Tiles-layer tools (which have send-to-back/front); a token has no such UI, and core's

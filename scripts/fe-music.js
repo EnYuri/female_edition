@@ -410,7 +410,14 @@ function registerDeleteGuards() {
  */
 function registerPlaylistSeekControls() {
   const SEEK_SELECTOR = ".fe-music-seek";
+  // uuid → generation of the newest local seek-sync run for that sound. Entries are
+  // dropped once their run settles (see the `finally` in the updatePlaylistSound
+  // hook), so the map only ever holds in-flight seeks. `seekSeq` is monotonic and
+  // never reused, which is what makes that deletion safe: were the generation
+  // re-derived from the map it could restart at 1 and a slow superseded run could
+  // mistake itself for the current one.
   const seekGenerations = new Map();
+  let seekSeq = 0;
 
   const extractElement = (html) => {
     const el = html?.nodeType ? html : html?.[0];
@@ -441,14 +448,16 @@ function registerPlaylistSeekControls() {
     }
   };
 
-  const updateSeekSlider = (slider) => {
+  // `knownSound` skips the row→playlist→sound lookup for callers that already hold
+  // the document (the per-second tick walks sounds, not sliders).
+  const updateSeekSlider = (slider, knownSound = null) => {
     if (!slider || slider.dataset.seeking === "true") return;
     if (slider.dataset.dragging === "true") {
       const current = slider.closest(".sound")?.querySelector(".sound-timer .current");
       if (current) current.textContent = formatTimestamp(Number(slider.value));
       return;
     }
-    const { sound } = soundForElement(slider);
+    const sound = knownSound ?? soundForElement(slider).sound;
     if (!sound) return;
 
     const duration = Number(sound.sound?.duration);
@@ -466,6 +475,90 @@ function registerPlaylistSeekControls() {
     slider.value = String(Math.clamp(current, 0, duration));
     slider.setAttribute("aria-valuetext", `${formatTimestamp(current)} / ${formatTimestamp(duration)}`);
   };
+
+  // --- Seek-slider refresh (MUST keep: no timer of our own) ---------------------
+  //
+  // The playhead only advances while a sound is actually playing, and there is
+  // already a timer on the page running exactly that cadence: core's
+  // PlaylistDirectory arms `setInterval(this.updateTimestamps.bind(this), 1000)` in
+  // `_onFirstRender` (playlist-directory.mjs:315) and never clears it, to keep the
+  // `.current`/`.duration` text sitting right next to our slider live. So we ride
+  // core's tick and own no timer at all.
+  //
+  // What this replaced: a bare `setInterval(…, 500)` armed at `ready` with no
+  // `clearInterval` — a `querySelectorAll` plus a per-slider `game.playlists.get`/
+  // `sounds.get`, twice a second, for the whole session, in every client, whether
+  // or not the Playlists tab was ever opened and whether or not anything was
+  // playing. Per-tick work is now proportional to the sounds that are actually
+  // playing (usually one), and 1s lands the slider on the same frame as the
+  // timestamp beside it instead of drifting against it at 500ms.
+  //
+  // Dropping to core's cadence loses nothing, because everything a NON-playing
+  // slider needs is event-driven: a play/pause/stop/seek writes `playing` or
+  // `pausedTime` → `updatePlaylistSound`; a row rebuild → `renderPlaylistDirectory`.
+  // A paused playhead does not move on its own.
+
+  // A playing sound is rendered TWICE — once in the directory tree, once in the
+  // "currently playing" panel — from the same `sound-partial.hbs`, so this is
+  // querySelectorAll, not querySelector. Matched on playlist-id + sound-id rather
+  // than the row's `data-sound-uuid`: those are the two attributes `soundForElement`
+  // has always relied on, i.e. the pair proven present on every supported core
+  // version, and the ids are plain alphanumeric so they need no selector escaping.
+  const seekSlidersForSound = (sound) => document.querySelectorAll(
+    `.playlists-sidebar .sound[data-playlist-id="${sound.parent?.id}"][data-sound-id="${sound.id}"] ${SEEK_SELECTOR}`
+  );
+
+  /**
+   * Per-tick path: walk the playing sounds, not the sliders.
+   * `Playlist#playing` is derived in `prepareDerivedData` (client/documents/playlist.mjs:82 —
+   * `this.sounds.some(s => s.playing)`), so `game.playlists.playing` cannot go stale.
+   */
+  const refreshPlayingSeekSliders = () => {
+    for (const playlist of game.playlists?.playing ?? []) {
+      for (const sound of playlist.sounds) {
+        if (!sound.playing) continue;
+        for (const slider of seekSlidersForSound(sound)) updateSeekSlider(slider, sound);
+      }
+    }
+  };
+
+  /** Event path: rare enough that sweeping every slider is the simpler correct thing. */
+  const refreshAllSeekSliders = () => {
+    for (const slider of document.querySelectorAll(`.playlists-sidebar ${SEEK_SELECTOR}`)) {
+      updateSeekSlider(slider);
+    }
+  };
+
+  // Must be `setup`, NOT `ready`: core binds the interval callback as
+  // `this.updateTimestamps.bind(this)`, and `.bind` resolves the method off the
+  // prototype AT BIND TIME. The sidebar first renders inside `initializeUI`, and
+  // game.mjs runs setup (:740) → initializeUI (:764) → ready (:779) — so a patch
+  // installed at `ready` would be captured by nobody and silently never run.
+  Hooks.once("setup", () => {
+    const PD = CONFIG?.ui?.playlists;
+    const original = PD?.prototype?.updateTimestamps;
+    if (typeof original !== "function") {
+      // Degrade, don't break: sliders still seek and still refresh on every hook
+      // below — they just stop advancing on their own.
+      console.warn("female_edition | PlaylistDirectory#updateTimestamps is missing — playlist seek sliders will not auto-advance");
+      return;
+    }
+    if (original.feSeekPatched) return;
+    const patched = function (...args) {
+      const result = original.apply(this, args);
+      // Core scopes its own work to the `.currently-playing` panel; ours is
+      // document-wide, so the docked instance's tick also covers the directory-tree
+      // copy of the same row. Popout coverage is whatever `.playlists-sidebar`
+      // resolves to — unchanged from the interval this replaced, which used the
+      // same prefix; core arms no timer on a popout (`!this.isPopout`), so a popout
+      // has never had a tick of its own.
+      try { refreshPlayingSeekSliders(); }
+      catch (error) { console.error("female_edition | playlist seek slider refresh failed", error); }
+      return result;
+    };
+    patched.feSeekPatched = true;
+    PD.prototype.updateTimestamps = patched;
+  });
 
   const enhancePlayback = (playback) => {
     if (playback.querySelector(SEEK_SELECTOR)) return;
@@ -522,10 +615,17 @@ function registerPlaylistSeekControls() {
     for (const playback of root.querySelectorAll(".playlists-sidebar .sound-playback, .sound-playback")) {
       enhancePlayback(playback);
     }
+    // A re-render replaces the sliders with fresh (0-valued) ones, so they need a
+    // pass even when enhancePlayback short-circuited on an already-enhanced row.
+    refreshAllSeekSliders();
   };
 
   Hooks.on("renderPlaylistDirectory", (_app, html) => enhanceDirectory(html));
+  // Core writes `playing`/`pausedTime` on the sound and `playing` on the playlist;
+  // either is a moment a slider's value changes without the playhead advancing.
+  Hooks.on("updatePlaylist", () => refreshAllSeekSliders());
   Hooks.on("updatePlaylistSound", async (sound, changed) => {
+    refreshAllSeekSliders();
     if (!("pausedTime" in changed) || !sound.playing || !sound.sound?.playing) return;
     const target = Number(changed.pausedTime);
     const duration = Number(sound.sound.duration);
@@ -534,7 +634,7 @@ function registerPlaylistSeekControls() {
     // Core only reads PlaylistSound.pausedTime when starting a stopped Sound.
     // Restart the already-playing local Sound on every client that receives the
     // document update, keeping the seek synchronized without two server trips.
-    const generation = (seekGenerations.get(sound.uuid) ?? 0) + 1;
+    const generation = ++seekSeq;
     seekGenerations.set(sound.uuid, generation);
     const audio = sound.sound;
     try {
@@ -549,6 +649,12 @@ function registerPlaylistSeekControls() {
     } catch (error) {
       console.error("female_edition | local playlist seek sync failed", error);
       sound.sync?.();
+    } finally {
+      // Keep the map to in-flight seeks only; without this it kept one entry per
+      // seeked sound for the rest of the session. Only the run that still owns the
+      // slot clears it — a superseded run must leave its successor's generation
+      // alone.
+      if (seekGenerations.get(sound.uuid) === generation) seekGenerations.delete(sound.uuid);
     }
   });
 
@@ -627,12 +733,9 @@ function registerPlaylistSeekControls() {
   }, true);
 
   Hooks.once("ready", () => {
+    // Catch-up pass for a world that loaded with the sidebar already rendered;
+    // from here on the sliders live off core's tick plus the hooks above.
     enhanceDirectory(ui?.playlists?.element ?? document);
-    setInterval(() => {
-      for (const slider of document.querySelectorAll(`.playlists-sidebar ${SEEK_SELECTOR}`)) {
-        updateSeekSlider(slider);
-      }
-    }, 500);
   });
 }
 

@@ -46,12 +46,54 @@ const CP_DEFAULTS = Object.freeze({
   [CP.SHOW_OTHER]:     true,
 });
 
-// Settings whose effect is decided once at load time and cannot be re-applied live.
-// Core's own `requiresReload: true` flag is useless to us — it is read only by
-// SettingsConfig's submit handler (client/applications/settings/config.mjs:257),
-// and our settings are `config: false` + saved through this custom menu, so core
-// never sees them. We prompt for the reload ourselves in #applyValues.
-const FE_RELOAD_REQUIRED_KEYS = Object.freeze([S.CORE_UI_SCENE_CONFIG_TABS]);
+// Keys whose effect only lands after a page reload. Core's own `requiresReload: true` is
+// INERT for this module — SettingsConfig reads it only in its own submit handler
+// (client/applications/settings/config.mjs:257) and every one of our settings is
+// `config: false`, saved through this custom menu, so core never sees them. THIS LIST is
+// what actually produces the prompt (#applyValues). A key carrying `requiresReload` but
+// missing from here gets no prompt at all — which is exactly how the combat tracker and
+// the music feature ended up silently doing nothing until the user happened to reload.
+//
+// Membership means: the feature's install work happens once, at `init`/`ready`, behind a
+// gate that already returned. Per key:
+//   - CORE_UI_SCENE_CONFIG_TABS — SceneConfig.DEFAULT_OPTIONS.position.width is raised at
+//     `init`, and a Document caches its sheet instance while AppV2 freezes options at
+//     construction, so an already-opened scene keeps the old width forever.
+//   - SCREEN_PANEL_ENABLED — the panel feature draws PIXI overlays into canvas.primary,
+//     rewrites placeable sizes through updateSource, and subtracts from core's computed
+//     visibility with no restore branch (deliberate — see docs/screen-panel.md); unwinding
+//     that live would mean a canvas.draw() on every connected client, i.e. the same
+//     disruption as a reload with less predictability.
+//   - COMBAT_TRACKER_ENABLED — the `ready` block that builds the root, binds the socket and
+//     registers ~10 combat hooks bails early when off, so ON needs a reload. (OFF alone does
+//     not: feCtTeardown clears the DOM live, and every hook funnels back through feCtRender's
+//     own gate. Prompting both ways is the honest simplification — declining leaves a clean
+//     screen either way.)
+//   - MUSIC_ENABLED — same shape: `init` skips registerSidebarButton/registerPlaylistSeekControls
+//     and `ready` skips registerSocket/registerDeleteGuards/registerLiveRefresh, so turning it
+//     on without a reload leaves the feature entirely absent.
+//   - PRUNE_ENABLED — feInstallChatLogPrune (called from fe-chat-enhance's `init`) reads the key
+//     exactly ONCE, at fe-chat-prune.js:24, and returns before subclassing CONFIG.ui.chat. So ON
+//     never installs the subclass and OFF leaves the installed one pruning forever — BOTH
+//     directions are reload-only. (Its sibling PRUNE_MAX_MESSAGES is read per-call and IS live;
+//     the asymmetry is why this one was easy to miss.) Client-scope → world:false → the prompt
+//     reloads only the person who changed it, which is right for a local preference.
+//   - injectCustomConditions / injectCustomDamageTypes — both write straight into CONFIG.DND5E
+//     during `init` behind a gate that already returned (inject-conditions.js:87,
+//     inject-damage-type.js:65), and neither has a removal branch, so OFF also only lands on
+//     reload. World-scope → world:true → the reload broadcasts, which is correct for a CONFIG
+//     change everyone shares. Registered even on non-dnd5e worlds (inject-conditions registers
+//     before its CONFIG.DND5E check), but #applyValues only saves them under
+//     `feIsDnd5eSystem() && isGM`, so elsewhere the value cannot move and no prompt fires.
+const FE_RELOAD_REQUIRED_KEYS = Object.freeze([
+  S.CORE_UI_SCENE_CONFIG_TABS,
+  S.SCREEN_PANEL_ENABLED,
+  S.COMBAT_TRACKER_ENABLED,
+  S.MUSIC_ENABLED,
+  S.PRUNE_ENABLED,
+  "injectCustomConditions",
+  "injectCustomDamageTypes",
+]);
 
 // Combined fallback table: fe-chat-enhance defaults + portrait defaults + DND5e injection defaults.
 const ALL_DEFAULTS = Object.freeze({
@@ -774,14 +816,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
         num("stageBoxBottom"), num("stageBoxLeft"), num("stageTextSize"),
 
-        // Screen Panel — world/GM (requiresReload triggers the reload prompt on change)
+        // Screen Panel — world/GM (in FE_RELOAD_REQUIRED_KEYS → reload prompt on change)
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),
         // Screen Panel grid-snap — client-scoped (always saved for every user)
         bool(S.SCREEN_PANEL_GRID_SNAP),
         // Attribute name helper — client-scoped (always saved for every user)
         bool(S.ATTR_PATH_HELPER), ...(saveAttrSource ? [bool(S.ATTR_PATH_HELPER_SOURCE)] : []),
 
-        // Combat Tracker — world/GM (enabled[requiresReload] + hide-defeated) gated;
+        // Combat Tracker — world/GM (enabled[FE_RELOAD_REQUIRED_KEYS] + hide-defeated) gated;
         // client display prefs always saved (GM-priority forces them automatically).
         ...(game.user?.isGM ? [
           bool(S.COMBAT_TRACKER_ENABLED), bool(S.COMBAT_TRACKER_HIDE_DEFEATED),
@@ -792,7 +834,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.COMBAT_TRACKER_SHOW_INITIATIVE), bool(S.COMBAT_TRACKER_SHOW_DISPOSITION),
         bool(S.COMBAT_TRACKER_SHOW_HP),
 
-        // Music — world/GM (enabled[requiresReload] + name/root/size); non-GMs lack write permission
+        // Music — world/GM (enabled[FE_RELOAD_REQUIRED_KEYS] + name/root/size); non-GMs lack write permission
         ...(game.user?.isGM ? [
           bool(S.MUSIC_ENABLED), str(S.MUSIC_PLAYLIST_NAME),
           str(S.MUSIC_UPLOAD_ROOT), num(S.MUSIC_MAX_MB),
@@ -833,14 +875,25 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       ui.notifications?.warn(`일부 설정을 저장하지 못했습니다: ${failed.join(", ")}`);
     }
 
-    // Not awaited: the caller closes this menu right after, and awaiting a modal
-    // here would hold the settings window open behind it. world:false — every
-    // reload-only key so far is client-scoped, so only this client needs it.
-    const reloadChanged = [...reloadKeyBefore].some(([key, prev]) => {
-      try { return game.settings.get(MODULE_ID, key) !== prev; } catch { return false; }
-    });
-    if (reloadChanged) {
-      foundry.applications.settings.SettingsConfig.reloadConfirm({ world: false })
+    // Not awaited: the caller closes this menu right after, and awaiting a modal here
+    // would hold the settings window open behind it.
+    //
+    // `world` is derived from the SCOPE of whichever reload-only key actually moved, not
+    // hardcoded: `reloadConfirm({world: true})` emits a "reload" socket to every connected
+    // client (config.mjs:195). That is required for a world-scope key like the screen-panel
+    // toggle — the setting changed for everyone, so everyone's page is now stale — and
+    // wrong for a client-scope one like the scene-config tabs, which would reload the whole
+    // table for one person's local preference. Core derives the same flag the same way in
+    // its own SettingsConfig submit.
+    const changedReloadKeys = [...reloadKeyBefore]
+      .filter(([key, prev]) => { try { return game.settings.get(MODULE_ID, key) !== prev; } catch { return false; } })
+      .map(([key]) => key);
+    if (changedReloadKeys.length) {
+      const world = changedReloadKeys.some((key) => {
+        try { return game.settings.settings.get(`${MODULE_ID}.${key}`)?.scope === "world"; }
+        catch { return false; }
+      });
+      foundry.applications.settings.SettingsConfig.reloadConfirm({ world })
         .catch((err) => console.warn(`[${MODULE_ID}] reload prompt failed`, err));
     }
   }

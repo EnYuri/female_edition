@@ -316,7 +316,14 @@ async function feUpdCheckForUpdate() {
     const latestVersion = String(checked?.latestVersion || "").trim();
     if (!latestVersion) throw new Error("No latest module version returned by any update source");
 
+    // Spread the existing cache — this write owns only the check-result fields, and a
+    // bare object literal here silently dropped `chatNotifiedFor` (written at :183)
+    // every time the 27h TTL expired. That is the PRIMARY chat-card dedupe; losing it
+    // left the whole thing resting on feUpdHasPostedChatNotice's game.messages scan,
+    // which only holds while the card is still in the log. Flush the chat and the
+    // notice reappears once per TTL. The other two write sites both spread already.
     feUpdWriteCache({
+      ...feUpdReadCache(),
       checkedAt: now,
       latestVersion,
       manifest: feUpdManifestUrl(),

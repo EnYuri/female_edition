@@ -7,9 +7,12 @@
 // Compatibility / conflict avoidance:
 //  - If CGMP's own `notifyTyping` setting is enabled, this feature stays OFF and
 //    defers to CGMP entirely (no double indicator or competing socket traffic).
-//  - Shares the `module.female_edition` socket channel with fe-theatre.js, so all
-//    messages are namespaced by a `type` discriminator. Multiple socket.on()
-//    listeners coexist; each guards on its own type.
+//  - Shares the `module.female_edition` socket channel with fe-screen-panel.js,
+//    fe-combat-tracker.js, fe-music.js and fe-dx3rd-resource-ui.js, so all messages are
+//    namespaced by a `type` discriminator. Multiple socket.on() listeners coexist; each
+//    guards on its own type. (fe-theatre.js, named here previously, has no socket code
+//    at all any more.) Sender identity comes from the server-supplied `senderId`, never
+//    from the packet — see feHandleSocket.
 //  - The indicator element lives in the chat input area (next to #chat-message),
 //    NEVER inside .chat-log, so it does not interfere with fe-chat-prune.js DOM
 //    pruning. Visibility changes reassert scrollBottom() (the prune subclass's
@@ -17,6 +20,7 @@
 
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feIsActiveModuleFeatureEnabled } from "./fe-conflict-state.js";
+import { feResolveSocketSender } from "./fe-socket-auth.js";
 
 const SOCKET_CHANNEL = "module.female_edition";
 const SOCKET_TYPE = "fe-typing-indicator";
@@ -103,14 +107,21 @@ function feInputIsEmpty(input) {
 
 // ── Receive (remote typing packets) ──────────────────────────────────────────
 
-function feHandleSocket(payload) {
-  // Coexist with other female_edition socket users (fe-theatre): ignore foreign types.
+function feHandleSocket(payload, senderId) {
+  // Coexist with the other four female_edition socket listeners: ignore foreign types.
   if (payload?.type !== SOCKET_TYPE) return;
   if (!feTypingFeatureEnabled()) return;
   // GM-gated visibility: when disabled, only GMs see who is typing.
   if (!feShowToPlayers() && !game.user.isGM) return;
 
-  const id = payload.user;
+  // Identify the typist from the SERVER-authenticated sender, not from `payload.user`.
+  // The packet-owned id was trusted verbatim, so any client could emit
+  // `{type, event:"typing", user:"<someone else's id>"}` and put a "…님이 입력 중"
+  // caption under another player's name. The other four listeners on this shared
+  // channel (screen-panel, combat-tracker, music, resource-ui) all already resolve the
+  // sender this way; this one was the outlier. `payload.user` stays as the v13
+  // claimed-id fallback that feResolveSocketSender handles.
+  const id = feResolveSocketSender(senderId, payload.user, "typing-indicator")?.id;
   if (!id || id === game.user.id) return;
 
   if (payload.event === "typing") {

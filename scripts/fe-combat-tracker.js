@@ -296,6 +296,29 @@ function feCtScheduleRender() {
   });
 }
 
+/**
+ * Remove every trace of the tracker from the screen.
+ *
+ * `feCtRender` bails on `!feCtEnabled()` BEFORE it touches the DOM, so turning the
+ * feature off only stops repainting — whatever was last drawn stays on screen forever.
+ * The root is appended to `document.body` (feCtEnsureRoot), i.e. it survives scene
+ * changes and sidebar re-renders on its own; nothing else would ever collect it.
+ *
+ * Teardown is enough to make "off" complete WITHOUT a reload: the hooks registered at
+ * `ready` all funnel into `feCtRender`, which stands down on its own gate, and
+ * `feCtOnSocket` is likewise inert while disabled. Turning it back ON is the direction
+ * that genuinely needs a reload (the `ready` block never ran), which is why
+ * S.COMBAT_TRACKER_ENABLED is in the settings menu's FE_RELOAD_REQUIRED_KEYS.
+ *
+ * `feCtCloseContextMenu` is what drops the menu's document/window listeners, so it must
+ * run here and not just `.remove()` the node.
+ */
+function feCtTeardown() {
+  if (_ctRaf) { cancelAnimationFrame(_ctRaf); _ctRaf = 0; }
+  feCtCloseContextMenu();
+  document.getElementById(TRACKER_DOM_ID)?.remove();
+}
+
 function feCtRender() {
   if (!feCtEnabled() || feCtOriginalActive()) return;
   const root = document.getElementById(TRACKER_DOM_ID);
@@ -645,6 +668,10 @@ async function feCtApplyEndTurn(data, requester) {
 
 function feCtOnSocket(data, senderId) {
   if (data?.type !== CT_SOCKET_END_TURN) return;
+  // The setting is world-scope, so a request arriving while it is off means a client
+  // that has not reloaded yet. The GM is the one who advances the turn, so this is
+  // where it has to stop (same shape as onPanelSocket in fe-screen-panel.js).
+  if (!feCtEnabled()) return;
   if (!feCtIsPrimaryGm()) return;
   const requester = feResolveSocketSender(senderId, data.requesterId, "combat-tracker");
   if (!requester) return;
@@ -778,7 +805,14 @@ Hooks.once("init", () => {
     config: false,
     type: Boolean,
     default: FE_DEFAULTS[S.COMBAT_TRACKER_ENABLED],
+    // Inert here — core reads requiresReload only in SettingsConfig's own submit and
+    // this setting is config:false. Kept as documentation of intent; the ACTUAL reload
+    // prompt comes from FE_RELOAD_REQUIRED_KEYS in fe-settings-menu.js.
     requiresReload: true,
+    // World-scope, so this fires on every connected client — each one clears its own
+    // tracker. Only the OFF direction is handled: turning it back on needs the `ready`
+    // block that never ran, which is what the reload prompt is for.
+    onChange: (v) => { if (!v) feCtTeardown(); },
   });
   game.settings.register(MODULE_ID, S.COMBAT_TRACKER_PORTRAIT_SIZE, {
     name: "FECT.Settings.SizeName",
