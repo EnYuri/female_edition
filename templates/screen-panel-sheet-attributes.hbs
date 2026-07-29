@@ -9,7 +9,9 @@
         <button type="button" class="fe-sp-face-tab{{#if face.active}} active{{/if}}"
                 data-action="feSwitchFace" data-index="{{face.index}}"
                 title="{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}">
-          {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">{{/if}}
+          {{! 이미지가 없는 면도 같은 썸네일 칸을 갖는다 — screen-panel-sheet.hbs 와 동일. }}
+          {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">
+          {{else}}<span class="fe-sp-face-tab-thumb fe-sp-face-tab-thumb-empty"><i class="fa-regular fa-image"></i></span>{{/if}}
           <span class="fe-sp-face-tab-label">{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}</span>
         </button>
       {{/each}}

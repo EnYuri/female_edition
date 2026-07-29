@@ -718,12 +718,60 @@ function feResolveOverlayNumericValue(item, linkedActor) {
   return null;
 }
 
-/** (Re)draw a bar's track + fill rects in its own local space (0,0 origin). */
-function feDrawBarGraphics(bar, w, h, pct, color) {
+/**
+ * (Re)draw a bar's track + fill rects in its own local space (0,0 origin), then its
+ * outline. The outline is drawn LAST so neither the track nor the fill paints over
+ * it, and with `alignment: 0` (inside the path) so it never grows the bar past the
+ * length the user set — `pickPanelBarAt` hit-tests exactly `w`×`h`.
+ */
+function feDrawBarGraphics(bar, w, h, pct, color, borderWidth, borderColor) {
   bar.clear();
   bar.beginFill(0x000000, 0.5).drawRect(0, 0, w, h).endFill();
   const fillW = Math.max(0, Math.min(w, w * pct));
   if (fillW > 0) bar.beginFill(color || "#33cc33").drawRect(0, 0, fillW, h).endFill();
+  if (borderWidth > 0) {
+    bar.lineStyle({ width: borderWidth, color: borderColor || "#000000", alignment: 0 });
+    bar.drawRect(0, 0, w, h);
+    bar.lineStyle(0);
+  }
+}
+
+/**
+ * The bar's box in RENDERED pixels for one text+bar pair — the single source of
+ * that geometry, shared by the full rebuild and the cheap reposition path so the
+ * two can never drift apart.
+ *
+ * `scale` is the panel's natural-pixel → screen ratio, the same factor `fontSize`
+ * goes through, so every authored dimension is multiplied by it exactly once.
+ * The bar's own settings are read off the Graphics (`_feBar*`), which is all the
+ * reposition path has; the font size comes from the paired text (`_feFontSize`).
+ *
+ * - `_feBarWidth > 0` is an explicit length; 0 means auto = the text's own
+ *   rendered width (plus side padding in "inside" mode, where the text is *in*
+ *   the bar and a tight fit would read as a bug).
+ * - "inside" is the boss-HP layout: bar centered ON the text instead of below it,
+ *   with a thickness floor of the text's rendered height + padding — that floor
+ *   is what makes the FONT SIZE the bar's default thickness.
+ */
+function feBarBox(text, bar, scale) {
+  const inside = bar._feBarMode === "inside";
+  const fontPx = Math.max(1, (text._feFontSize || 28) * scale);
+  const padX = inside ? Math.round(fontPx * 0.4) : 0;
+  const padY = inside ? Math.round(fontPx * 0.22) : 0;
+  const w = bar._feBarWidth > 0
+    ? Math.max(1, Math.round(bar._feBarWidth * scale))
+    : Math.max(1, Math.round(text.width) + padX * 2);
+  const floorH = inside ? Math.round(text.height) + padY * 2 : 1;
+  const h = Math.max(1, floorH, Math.round((bar._feBarHeight || 6) * scale));
+  const gap = Math.max(1, Math.round(2 * scale));
+  // A 1px outline authored in image pixels would round to 0 on a scaled-down panel and
+  // silently disappear, so keep a 1px floor once the user has asked for one at all.
+  const bw = bar._feBarBorderWidth > 0 ? Math.max(1, Math.round(bar._feBarBorderWidth * scale)) : 0;
+  return {
+    w, h, bw,
+    x: text.position.x - w / 2,
+    y: inside ? text.position.y - h / 2 : text.position.y + text.height / 2 + gap,
+  };
 }
 
 /**
@@ -804,12 +852,15 @@ function feRebuildPanelOverlays(tile) {
         const span = (item.barMax ?? 100) - (item.barMin ?? 0);
         if (numeric !== null && span !== 0) {
           const pct = Math.max(0, Math.min(1, (numeric - (item.barMin ?? 0)) / span));
-          const barW = Math.max(1, text.width);
-          const barH = Math.max(1, Math.round((item.barHeight || 6) * scale));
-          const gap = Math.max(1, Math.round(2 * scale));
           const bar = new PIXI.Graphics();
-          feDrawBarGraphics(bar, barW, barH, pct, item.barColor);
-          bar.position.set(text.position.x - barW / 2, text.position.y + text.height / 2 + gap);
+          bar._feBarMode = item.barMode === "inside" ? "inside" : "under";
+          bar._feBarWidth = Math.max(0, item.barWidth ?? 0);
+          bar._feBarHeight = item.barHeight || 6;
+          bar._feBarBorderWidth = Math.max(0, item.barBorderWidth ?? 0);
+          bar._feBarBorderColor = item.barBorderColor || "#000000";
+          const box = feBarBox(text, bar, scale);
+          feDrawBarGraphics(bar, box.w, box.h, pct, item.barColor, box.bw, bar._feBarBorderColor);
+          bar.position.set(box.x, box.y);
           // Click-to-edit (see pickPanelBarAt / onBoardPointerDown): handled via
           // this module's own DOM-level board hit-testing, NOT PIXI's federated
           // events — onBoardPointerDown's capture-phase listener already swallows
@@ -821,13 +872,17 @@ function feRebuildPanelOverlays(tile) {
           bar.elevation = text.elevation;
           bar.sortLayer = text.sortLayer;
           bar.sort = text.sort;
-          bar.zIndex = text.zIndex;
+          // One BELOW its text (which sits at mesh.zIndex + 1) — in "inside" mode the
+          // bar covers the text's box, and PrimaryCanvasGroup._compareObjects would
+          // otherwise fall through to _lastSortedIndex and paint the fill over the
+          // number. `sort` still beats the panel's own mesh, so the bar stays above
+          // the artwork either way.
+          bar.zIndex = text.zIndex - 1;
           bar._feIsBar = true;
-          bar._feBarHeight = item.barHeight || 6;
           bar._feBarColor = item.barColor;
           bar._feBarPct = pct;
-          bar._feBarW = barW;
-          bar._feBarH = barH;
+          bar._feBarW = box.w;
+          bar._feBarH = box.h;
           bar._feLinkedActor = linkedActor;
           bar._feAttr = item.attr;
           bar._feValue = numeric;
@@ -862,14 +917,65 @@ function feRepositionPanelOverlays(tile) {
       const bar = obj._feBar;
       if (bar) {
         obj.updateText?.(true); // force sync re-measure so .width reflects the new fontSize
-        const barW = Math.max(1, obj.width);
-        const barH = Math.max(1, Math.round(bar._feBarHeight * scale));
-        const gap = Math.max(1, Math.round(2 * scale));
-        bar.position.set(obj.position.x - barW / 2, obj.position.y + obj.height / 2 + gap);
-        bar._feBarW = barW; // kept fresh for pickPanelBarAt's hit test
-        bar._feBarH = barH;
-        feDrawBarGraphics(bar, barW, barH, bar._feBarPct, bar._feBarColor);
+        const box = feBarBox(obj, bar, scale);
+        bar.position.set(box.x, box.y);
+        bar._feBarW = box.w; // kept fresh for pickPanelBarAt's hit test
+        bar._feBarH = box.h;
+        feDrawBarGraphics(bar, box.w, box.h, bar._feBarPct, bar._feBarColor, box.bw, bar._feBarBorderColor);
       }
+    }
+  } catch { /* no-op */ }
+}
+
+/** Compare a PIXI fontFamily (string OR array stack) by value, not by reference. */
+function feSameFontFamily(a, b) {
+  const norm = (v) => (Array.isArray(v) ? v.join(",") : String(v ?? ""));
+  return norm(a) === norm(b);
+}
+
+/**
+ * Re-assign the current canvas font family onto ALREADY-BUILT overlay labels.
+ *
+ * Overlay text clones CONFIG.canvasTextStyle at build time, so the clone keeps
+ * whatever family the CONFIG held right then — the same staleness core's own
+ * nameplates have (see feRefreshCanvasTextStyles in fe-style.js). Two orderings
+ * make it bite here:
+ *   - the FIRST scene is fully drawn before the module font is ever pushed into
+ *     CONFIG. Core's Game#setupGame does `await this.canvas.initializing` and only
+ *     THEN `Hooks.callAll("ready")`, and feApplyCanvasTextFont runs off ready /
+ *     canvasReady — so drawTile/drawToken has already cloned core's Signika. The
+ *     scene a client logs into would keep it forever (later scene switches look
+ *     fine, which is what made this read as "sometimes it works").
+ *   - a face drawn before the @font-face files land paints with the fallback and
+ *     PIXI never repaints on its own; fe-style.js's document.fonts.load() → refresh
+ *     is the only thing that fixes it.
+ * Only fontFamily is copied — fontSize/fill are per-overlay.
+ */
+function feRefreshPanelOverlayFonts() {
+  try {
+    const family = globalThis.CONFIG?.canvasTextStyle?.fontFamily;
+    for (const placeable of fePanelPlaceables()) {
+      const list = placeable?._fePanelOverlays;
+      if (!list?.length) continue;
+      for (const obj of list) {
+        if (obj._feIsBar || !obj.style) continue;
+        // PIXI's fontFamily setter compares by reference, so re-assigning an equal
+        // array would bump styleID pointlessly. Compare the resolved stack instead.
+        if (family !== undefined && !feSameFontFamily(obj.style.fontFamily, family)) {
+          obj.style.fontFamily = Array.isArray(family) ? [...family] : family;
+        }
+        // Re-measure UNCONDITIONALLY, even when the family did not move: it can be
+        // right and still render wrong. PIXI caches ascent/descent per font string
+        // and never invalidates it, so a label first measured while the @font-face
+        // was still loading keeps the fallback's vertical metrics and gets clipped.
+        // fe-style.js drops that cache immediately before firing this hook — this
+        // redraw is what actually picks the corrected metrics up.
+        obj.dirty = true;
+        obj.updateText?.(false);
+      }
+      // A value bar's width IS its paired text's rendered width, which the re-measure
+      // above may have changed.
+      feRepositionPanelOverlays(placeable);
     }
   } catch { /* no-op */ }
 }
@@ -1530,6 +1636,11 @@ Hooks.once("ready", () => {
 });
 
 Hooks.on("canvasTearDown", () => feResetPanelCanvasState());
+
+// fe-style.js fires this from feRefreshCanvasTextStyles, i.e. every time it
+// re-styles core's own canvas text: the font settings changed, or the @font-face
+// files finished loading after a scene had already been drawn.
+Hooks.on(`${MODULE_ID}.canvasTextStyleRefreshed`, feRefreshPanelOverlayFonts);
 
 Hooks.on("canvasReady", () => {
   fePanelTileIndexReady = false;

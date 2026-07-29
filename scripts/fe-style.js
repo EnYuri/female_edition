@@ -323,6 +323,22 @@ function feResolveCanvasFontFamilies(doc = document) {
   }
 }
 
+// PIXI caches a font's ascent/descent/fontSize under its FONT STRING — see
+// TextMetrics.measureFont in pixi.js 7.4.3 (`if (_TextMetrics._fonts[font]) return …`,
+// never invalidated). The font string is `style.toFontString()`, which does NOT change
+// when the @font-face finally arrives, so text first measured while the face was still
+// missing keeps the FALLBACK's vertical metrics for the rest of the session — and the
+// texture built from them clips the real glyphs top and bottom. That is the "token
+// nameplate is cut off right after a world load" symptom; re-picking a font only
+// appeared to fix it because a different family is a different cache key.
+//
+// Drop the whole cache before re-styling anything. It is keyed per font string and
+// each entry costs two canvas measureText calls to rebuild, so a full clear is cheap
+// and avoids having to guess which strings (family × every size in use) went stale.
+function feClearPixiFontMetricsCache() {
+  try { globalThis.PIXI?.TextMetrics?.clearMetrics?.(); } catch { /* no-op */ }
+}
+
 // Nameplates/tooltips of already-drawn placeables hold a clone of the old style.
 // Re-running _getTextStyle() picks up the new CONFIG value without a full redraw.
 // Drawings and Notes are refreshed too: they read CONFIG.defaultFontFamily (not
@@ -331,6 +347,10 @@ function feRefreshCanvasTextStyles() {
   try {
     const c = globalThis.canvas;
     if (!c?.ready) return;
+    // MUST run before the re-styling below: assigning a style only marks the text
+    // dirty, and a redraw that re-reads a poisoned metrics cache measures exactly the
+    // same wrong ascent/descent again.
+    feClearPixiFontMetricsCache();
     for (const token of c.tokens?.placeables ?? []) {
       try {
         const style = token?._getTextStyle?.();
@@ -349,6 +369,12 @@ function feRefreshCanvasTextStyles() {
         if (note?.tooltip) note.tooltip.style = note._getTextStyle();
       } catch { /* per-note, non-fatal */ }
     }
+    // This module draws canvas text of its own (screen panel overlay labels), which
+    // clones CONFIG.canvasTextStyle at build time exactly like core's nameplates and
+    // goes stale for exactly the same reasons. Announce the refresh instead of
+    // importing the feature module: fe-style.js sits low in the chat-enhance
+    // dependency order and must not reach up into an entry module.
+    Hooks.callAll(`${MODULE_ID}.canvasTextStyleRefreshed`);
   } catch { /* no-op */ }
 }
 

@@ -22,19 +22,25 @@
       <label>{{localize "FESP.Sheet.Height"}}</label>
       <input type="number" name="system.height" value="{{fe.height}}" min="1" step="1" {{#unless fe.editable}}disabled{{/unless}}>
     </div>
+    {{!-- 설명문은 인라인 <p class="notes"> 가 아니라 호버 툴팁이다. 두 힌트의 길이가
+          크게 달라(위치 고정 쪽이 거의 두 배) 그리드 두 칸의 높이를 벌려 놓았고,
+          켜고 끄기만 하면 되는 토글 옆에 세 줄짜리 문단은 과했다.
+          코어 TooltipManager 는 포인터가 '들어간 바로 그 엘리먼트'의 dataset 만
+          읽으므로(tooltip-manager.mjs #onActivate, capture 단계 pointerenter),
+          label 과 checkbox 양쪽에 모두 달아야 한다 — label 에만 달면 정작 체크박스
+          위에서는 뜨지 않는다. data-tooltip-text 는 평문 그대로 쓰이고 로컬라이즈되지
+          않으므로(같은 파일 :258) 여기서 localize 한다. --}}
     <div class="fe-sp-field fe-sp-field-checkbox">
-      <label>
-        <input type="checkbox" name="system.locked" {{checked fe.locked}} {{#unless fe.editable}}disabled{{/unless}}>
+      <label data-tooltip-text="{{localize "FESP.Sheet.LockedHint"}}">
+        <input type="checkbox" name="system.locked" data-tooltip-text="{{localize "FESP.Sheet.LockedHint"}}" {{checked fe.locked}} {{#unless fe.editable}}disabled{{/unless}}>
         {{localize "FESP.Sheet.Locked"}}
       </label>
-      <p class="notes">{{localize "FESP.Sheet.LockedHint"}}</p>
     </div>
     <div class="fe-sp-field fe-sp-field-checkbox">
-      <label>
-        <input type="checkbox" name="system.dblclickCycle" {{checked fe.dblclickCycle}} {{#unless fe.editable}}disabled{{/unless}}>
+      <label data-tooltip-text="{{localize "FESP.Sheet.DblclickCycleHint"}}">
+        <input type="checkbox" name="system.dblclickCycle" data-tooltip-text="{{localize "FESP.Sheet.DblclickCycleHint"}}" {{checked fe.dblclickCycle}} {{#unless fe.editable}}disabled{{/unless}}>
         {{localize "FESP.Sheet.DblclickCycle"}}
       </label>
-      <p class="notes">{{localize "FESP.Sheet.DblclickCycleHint"}}</p>
     </div>
   </section>
 
@@ -46,7 +52,11 @@
       <button type="button" class="fe-sp-face-tab{{#if face.active}} active{{/if}}"
               data-action="feSwitchFace" data-index="{{face.index}}"
               title="{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}{{#if face.isDefault}} · {{localize "FESP.Sheet.DefaultFaceMark"}}{{/if}}">
-        {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">{{/if}}
+        {{!-- 이미지가 없는 면도 같은 크기의 썸네일 칸을 갖는다. 예전에는 이미지가 있는
+              면에만 칸이 생겨서, 어두운 아트를 쓴 면 하나만 레이블 왼쪽에 정체불명의
+              여백이 있는 것처럼 보였다(실측: 1면 82px / 2면 41px). --}}
+        {{#if face.img}}<img class="fe-sp-face-tab-thumb" src="{{face.img}}" alt="">
+        {{else}}<span class="fe-sp-face-tab-thumb fe-sp-face-tab-thumb-empty"><i class="fa-regular fa-image"></i></span>{{/if}}
         <span class="fe-sp-face-tab-label">{{#if face.name}}{{face.name}}{{else}}{{localize "FESP.Sheet.FaceN" n=face.num}}{{/if}}</span>
         {{#if face.isDefault}}<i class="fa-solid fa-star fe-sp-face-tab-default"></i>{{/if}}
       </button>
@@ -168,14 +178,40 @@
 
           {{#if face.img}}
           <div class="fe-sp-overlay-section">
+            {{! No tooltip on the viewport itself. Core's TooltipManager reads the dataset of
+                the element the pointer entered (tooltip-manager.mjs #onActivate) — the stage
+                and image cover this box, so it would fire only over the letterboxing, and a
+                tooltip over a full-width drag surface is in the way besides. The hint is a
+                visible caption under the box instead, which is also where it gets found. }}
             <div class="fe-sp-overlay-preview" data-face-index="{{face.index}}">
-              <img src="{{face.img}}" alt="">
-              {{#each face.overlays as |ov|}}
-                <div class="fe-sp-overlay-marker{{#if ov.preview}} has-preview{{/if}}{{#if ov.picking}} picking{{/if}}"
-                     data-overlay-index="{{ov.index}}"
-                     style="left:{{ov.xPct}}%; top:{{ov.yPct}}%;{{#if ov.preview}} color:{{ov.color}};{{/if}}"
-                     title="{{ov.num}}">{{#if ov.preview}}{{ov.preview}}{{else}}{{ov.num}}{{/if}}</div>
-              {{/each}}
+              {{! `data-tooltip` takes the raw key: core localizes it when game.i18n.has()
+                  matches, and aria-label carries the name for an icon-only button. }}
+              <button type="button" class="fe-sp-overlay-view-reset"
+                      data-tooltip="FESP.Sheet.PreviewResetView"
+                      aria-label="{{localize 'FESP.Sheet.PreviewResetView'}}"><i class="fa-solid fa-arrows-to-dot"></i></button>
+              <span class="fe-sp-overlay-zoom"></span>
+              {{! The stage is the image, and it is what the markers position against — keep
+                  them INSIDE it. Their left/top percentages resolve against the padding box
+                  of their containing block, so parenting them to the viewport instead would
+                  peg them to the fixed window box rather than to the artwork, and they
+                  would neither pan nor zoom with it. }}
+              <div class="fe-sp-overlay-stage">
+                <img src="{{face.img}}" alt="">
+                {{#each face.overlays as |ov|}}
+                  {{! WYSIWYG, not a chip: a `.has-preview` marker renders the overlay the way
+                      the CANVAS will — canvas typeface/outline, the authored font size scaled
+                      by rendered/natural width, and the value bar at its real length, thickness,
+                      gap and outline. Every --fe-sp-ov-* number below is in the face image's OWN
+                      pixels and is converted by the one cqw formula in the stylesheet, so the
+                      preview and `feBarBox` cannot disagree. The chip chrome only comes back on
+                      hover, as a drag affordance. `showBar` is the "would the canvas actually
+                      paint one" test, so the marker never shows a bar the canvas would skip. }}
+                  <div class="fe-sp-overlay-marker{{#if ov.preview}} has-preview{{/if}}{{#if ov.showBar}} has-bar bar-{{ov.barMode}}{{#if ov.barFixed}} bar-fixed{{/if}}{{#if ov.barBordered}} bar-bordered{{/if}}{{/if}}"
+                       data-overlay-index="{{ov.index}}"
+                       style="left:{{ov.xPct}}%; top:{{ov.yPct}}%;{{#if ov.preview}} color:{{ov.color}}; --fe-sp-ov-font:{{ov.fontSize}};{{/if}}{{#if ov.showBar}} --fe-sp-ov-bar-pct:{{ov.barPct}}%; --fe-sp-ov-bar-color:{{ov.barColor}}; --fe-sp-ov-bar-w:{{ov.barWidth}}; --fe-sp-ov-bar-h:{{ov.barHeight}}; --fe-sp-ov-bar-bw:{{ov.barBorderWidth}}; --fe-sp-ov-bar-bc:{{ov.barBorderColor}};{{/if}}"
+                       data-tooltip-text="{{ov.num}}">{{#if ov.showBar}}<span class="fe-sp-overlay-marker-bar"></span>{{/if}}<span class="fe-sp-overlay-marker-text">{{#if ov.preview}}{{ov.preview}}{{else}}{{ov.num}}{{/if}}</span></div>
+                {{/each}}
+              </div>
             </div>
             <ol class="fe-sp-overlay-rows">
               {{#each face.overlays as |ov|}}
@@ -187,22 +223,11 @@
                         title="{{#if ov.linkedActorName}}{{ov.linkedActorName}} ({{localize "FESP.Sheet.OverlayLinkClear"}}){{else}}{{localize "FESP.Sheet.OverlayLinkHint"}}{{/if}}">
                     {{#if ov.linkedActorName}}<img src="{{ov.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-link-slash"></i>{{/if}}
                   </span>
-                  {{!-- The attribute path used to be typed by hand or copied out of the
-                        어트리뷰트 tab. The datalist offers this overlay's OWN linked actor's
-                        real paths (with their current values) — pressing ↓ or typing filters
-                        it — while staying a plain text input, so the faces-array auto-submit
-                        is untouched. Built for the active face only (see _prepareContext). --}}
-                  <input type="text" name="system.faces.{{face.index}}.overlays.{{ov.index}}.attr"
-                         {{#if ov.attrOptions.length}}list="fe-sp-attrlist-{{face.index}}-{{ov.index}}"{{/if}}
-                         value="{{ov.attr}}" placeholder="{{localize "FESP.Sheet.OverlayAttrPh"}}"
-                         {{#unless ../../fe.editable}}disabled{{/unless}}>
-                  {{#if ov.attrOptions.length}}
-                    <datalist id="fe-sp-attrlist-{{face.index}}-{{ov.index}}">
-                      {{#each ov.attrOptions as |opt|}}
-                        <option value="{{opt.path}}">{{opt.label}}</option>
-                      {{/each}}
-                    </datalist>
-                  {{/if}}
+                  {{!-- The attribute path lives in the 설정 dialog (feEditOverlay) next to the
+                        other styling fields, with the datalist picker built there. It stays a
+                        hidden input HERE because the faces-array auto-submit resets any field
+                        with no input in the form — see the ArrayField rule in CLAUDE.md. --}}
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.attr" value="{{ov.attr}}">
                   {{#if ov.attrWarn}}
                     <i class="fa-solid fa-triangle-exclamation fe-sp-overlay-warn-icon"
                        title="{{ov.attrWarnReason}}"></i>
@@ -218,13 +243,15 @@
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.bar" value="{{ov.bar}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barMin" value="{{ov.barMin}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barMax" value="{{ov.barMax}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barMode" value="{{ov.barMode}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barWidth" value="{{ov.barWidth}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barHeight" value="{{ov.barHeight}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barColor" value="{{ov.barColor}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barBorderWidth" value="{{ov.barBorderWidth}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barBorderColor" value="{{ov.barBorderColor}}">
                   {{#if ../../fe.editable}}
                     <a data-action="feEditOverlay" data-face-index="{{face.index}}" data-overlay-index="{{ov.index}}"
                        title="{{localize "FESP.Sheet.OverlayEdit"}}"><i class="fa-solid fa-sliders"></i></a>
-                    <a data-action="fePickOverlayPos" data-face-index="{{face.index}}" data-overlay-index="{{ov.index}}"
-                       class="{{#if ov.picking}}active{{/if}}" title="{{localize "FESP.Sheet.OverlayPick"}}"><i class="fa-solid fa-crosshairs"></i></a>
                     <a data-action="feRemoveOverlay" data-face-index="{{face.index}}" data-overlay-index="{{ov.index}}"
                        title="{{localize "FESP.Sheet.OverlayRemove"}}"><i class="fa-solid fa-trash"></i></a>
                   {{/if}}
@@ -235,9 +262,6 @@
               <button type="button" class="fe-sp-btn fe-sp-overlay-add" data-action="feAddOverlay" data-face-index="{{face.index}}">
                 <i class="fa-solid fa-plus"></i> {{localize "FESP.Sheet.OverlayAdd"}}
               </button>
-            {{/if}}
-            {{#if face.overlays.length}}
-              <p class="notes fe-sp-overlay-hint">{{localize "FESP.Sheet.OverlayPickHint"}}</p>
             {{/if}}
           </div>
           {{/if}}

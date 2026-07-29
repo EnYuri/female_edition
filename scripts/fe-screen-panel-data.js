@@ -48,6 +48,24 @@ const FE_PANEL_COMMON_ATTR_NAMES = [
   "encroachment", "body", "sense", "mind", "social",
 ];
 
+// A panel's own customAttributes are free-form slots, NOT system values, so their
+// DEFAULT labels are deliberately meaningless: an "hp"/"ac"/"mp"/"lv" default (what
+// this used to ship) collides with real system attribute names — it sorts to the
+// front via FE_PANEL_COMMON_ATTR_NAMES, reads as if the panel tracked that stat, and
+// invites a macro/module/user to address it by name when the only address that ever
+// resolves is the positional path `system.customAttributes.<index>.value`.
+// `jk<n>` collides with nothing and is obviously a placeholder to rename.
+const FE_PANEL_ATTR_NAME_PREFIX = "jk";
+const FE_PANEL_DEFAULT_ATTR_COUNT = 4;
+
+/** Lowest-numbered `jk<n>` not already used by `items` — keeps added rows unique. */
+function feNextCustomAttrName(items) {
+  const used = new Set((items ?? []).map(a => String(a?.name ?? "")));
+  let n = 1;
+  while (used.has(`${FE_PANEL_ATTR_NAME_PREFIX}${n}`)) n++;
+  return `${FE_PANEL_ATTR_NAME_PREFIX}${n}`;
+}
+
 class ScreenPanelSourcedItemsMap extends Map {
   get(key) {
     if (!key) return undefined;
@@ -155,15 +173,36 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
               text: new f.StringField({ required: false, blank: true, initial: "" }),
               fontSize: new f.NumberField({ required: true, integer: true, min: 4, initial: 28, nullable: false }),
               color: new f.StringField({ required: true, blank: false, initial: "#ffffff" }),
-              // Optional value bar (HP-bar style) rendered just below the text.
-              // Only meaningful when `attr` resolves to a number against the
-              // linked actor. Width always matches the rendered text's width
-              // (no separate field) — height is the only bar dimension exposed.
+              // Optional value bar (HP-bar style). Only meaningful when `attr`
+              // resolves to a number against the linked actor.
               bar: new f.BooleanField({ initial: false }),
               barMin: new f.NumberField({ required: true, initial: 0, nullable: false }),
               barMax: new f.NumberField({ required: true, initial: 100, nullable: false }),
+              // Where the bar sits relative to the text:
+              //   "under"  — text on top, thin bar drawn just below it (the original look)
+              //   "inside" — bar-first "boss HP" layout: the bar IS the element and the
+              //              text is drawn centered inside it. The thickness then has a
+              //              floor of the text's own rendered height, i.e. the FONT SIZE
+              //              is what sets the bar's default thickness and `barHeight` can
+              //              only push it thicker.
+              barMode: new f.StringField({ required: true, blank: false, initial: "under", choices: ["under", "inside"] }),
+              // Bar LENGTH in the face image's own pixels (scaled with the panel exactly
+              // like `fontSize`). 0 = auto — the rendered text's own width, which is what
+              // the original bar always did; back then padding the text with spaces was
+              // the only way to widen it.
+              barWidth: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
+              // Bar THICKNESS, same units. In "inside" mode it is a floor, not the value.
               barHeight: new f.NumberField({ required: true, integer: true, min: 1, initial: 6, nullable: false }),
               barColor: new f.StringField({ required: true, blank: false, initial: "#33cc33" }),
+              // Outline drawn on the bar's own box. The track is black at 50% alpha, which
+              // is INVISIBLE on dark face art (live-verified) — in "inside" mode that made
+              // the bar read as a floating block of fill with the number beside it rather
+              // than as a bar. A width rather than "just a colour" because `<input
+              // type="color">` cannot express "off" and because a 1px outline authored in
+              // image pixels vanishes once the panel is scaled down. 0 = no outline, which
+              // is what every pre-existing overlay keeps.
+              barBorderWidth: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
+              barBorderColor: new f.StringField({ required: true, blank: false, initial: "#000000" }),
             }),
             { required: true, initial: [] }
           ),
@@ -181,16 +220,16 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
       dblclickCycle: new f.BooleanField({ initial: true }),
       customAttributes: new f.ArrayField(
         new f.SchemaField({
-          name: new f.StringField({ required: true, blank: false, initial: "attr" }),
+          name: new f.StringField({ required: true, blank: false, initial: FE_PANEL_ATTR_NAME_PREFIX }),
           value: new f.StringField({ required: false, blank: true, initial: "" }),
           max: new f.StringField({ required: false, blank: true, initial: "" }),
         }),
         {
           required: true,
-          initial: [
-            { name: "hp", value: "" }, { name: "mp", value: "" },
-            { name: "ac", value: "" }, { name: "lv", value: "" },
-          ],
+          initial: () => Array.from(
+            { length: FE_PANEL_DEFAULT_ATTR_COUNT },
+            (_, i) => ({ name: `${FE_PANEL_ATTR_NAME_PREFIX}${i + 1}`, value: "" })
+          ),
         }
       ),
       // How this panel is placed on a scene: as a TOKEN when true, as a TILE when
@@ -267,6 +306,8 @@ export {
   FE_PANEL_SOCKET,
   FE_PANEL_DEFAULT_SIZE,
   FE_PANEL_COMMON_ATTR_NAMES,
+  FE_PANEL_ATTR_NAME_PREFIX,
+  feNextCustomAttrName,
   feSortAttrItems,
   feEnsureScreenPanelDnd5eActorCompat,
   feCleanFaceTokenData,

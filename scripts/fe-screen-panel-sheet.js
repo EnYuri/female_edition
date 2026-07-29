@@ -8,7 +8,13 @@
 // AppV2 so it is forward-clean for v14; it also runs on v13.
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feSortAttrItems } from "./fe-screen-panel-data.js";
+import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
+
+// Overlay-preview zoom limits, relative to the contain-fit that zoom 1 means. The ceiling
+// is well above fe-token-preview's 4x because the fit itself can be tiny here — a 200x3000
+// face opens at roughly 0.11, so 4x would still be a 21px-wide sliver to place markers on.
+const FE_PREVIEW_ZOOM_MIN = 0.5;
+const FE_PREVIEW_ZOOM_MAX = 20;
 
 /**
  * Core's own PrototypeTokenConfig, retargeted at ONE FACE's token settings instead of the
@@ -70,7 +76,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       fePlaceOnScene: ScreenPanelSheet.#onPlaceOnScene,
       feAddOverlay: ScreenPanelSheet.#onAddOverlay,
       feRemoveOverlay: ScreenPanelSheet.#onRemoveOverlay,
-      fePickOverlayPos: ScreenPanelSheet.#onPickOverlayPos,
       feClearOverlayLinkedActor: ScreenPanelSheet.#onClearOverlayLinkedActor,
       feEditOverlay: ScreenPanelSheet.#onEditOverlay,
       feAddCustomAttr: ScreenPanelSheet.#onAddCustomAttr,
@@ -217,10 +222,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return buttons;
   }
 
-  // { faceIndex, overlayIndex } of the overlay awaiting a click-to-place on its
-  // face's preview image, or null. Pure UI state — never persisted.
-  #picking = null;
-
   // Which face tab is currently shown. Pure UI state — never persisted.
   #activeFaceIndex = 0;
 
@@ -252,6 +253,23 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (v === undefined || v === null || v === "") return null;
     if (typeof v === "object") return null;
     return String(v);
+  }
+
+  /**
+   * Fill fraction (0-1) the canvas would paint for this overlay's value bar, or
+   * null when it would paint nothing. Mirrors feResolveOverlayNumericValue + the
+   * pct clamp in fe-screen-panel.js (duplicated for the same no-circular-import
+   * reason as #previewFor) so the preview marker cannot disagree with the canvas.
+   */
+  static #barPctFor(ov, linkedActor) {
+    if (!ov?.bar) return null;
+    if (!ov.attr || !linkedActor) return null;
+    let n;
+    try { n = Number(foundry.utils.getProperty(linkedActor, ov.attr)); } catch { return null; }
+    if (!Number.isFinite(n)) return null;
+    const span = (ov.barMax ?? 100) - (ov.barMin ?? 0);
+    if (span === 0) return null;
+    return Math.max(0, Math.min(1, (n - (ov.barMin ?? 0)) / span));
   }
 
   /**
@@ -381,16 +399,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       const faceActorUuid = face.linkedActorUuid ?? "";
       let faceActor = null;
       if (faceActorUuid) { try { faceActor = fromUuidSync(faceActorUuid); } catch { /* stale uuid */ } }
-      // Only the ACTIVE face is visible (the rest are display:none but still carry
-      // their hidden inputs), so the attribute pickers — the one genuinely bulky
-      // per-overlay payload — are built for it alone.
+      // Only the ACTIVE face is visible; the rest are display:none but still carry
+      // their hidden inputs (the faces-array auto-submit needs every field present).
       const active = index === this.#activeFaceIndex;
-      const suggestCache = new Map();
-      const suggestFor = (linkedActor) => {
-        if (!active || !linkedActor) return [];
-        if (!suggestCache.has(linkedActor.id)) suggestCache.set(linkedActor.id, this.#attrSuggestions(linkedActor));
-        return suggestCache.get(linkedActor.id);
-      };
       return {
         index,
         num: index + 1,
@@ -420,6 +431,10 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           const linkedActorUuid = ov.linkedActorUuid ?? "";
           let linkedActor = null;
           if (linkedActorUuid) { try { linkedActor = fromUuidSync(linkedActorUuid); } catch { /* stale uuid */ } }
+          const barPct = ScreenPanelSheet.#barPctFor(ov, linkedActor);
+          const barMode = ov.barMode === "inside" ? "inside" : "under";
+          const barWidth = Math.max(0, ov.barWidth ?? 0);
+          const barBorderWidth = Math.max(0, ov.barBorderWidth ?? 0);
           return {
             index: oi,
             num: oi + 1,
@@ -438,11 +453,20 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
             bar: ov.bar ?? false,
             barMin: ov.barMin ?? 0,
             barMax: ov.barMax ?? 100,
+            barMode,
+            barWidth,
             barHeight: ov.barHeight ?? 6,
             barColor: ov.barColor ?? "#33cc33",
+            barBorderWidth,
+            barBorderColor: ov.barBorderColor ?? "#000000",
+            // Marker-level mirror of the canvas bar. `showBar` is deliberately the
+            // "would the canvas actually paint one" test, not just `ov.bar`, so the
+            // preview never promises a bar a non-numeric attr can't produce.
+            showBar: barPct !== null,
+            barPct: barPct === null ? 0 : Math.round(barPct * 1000) / 10,
+            barFixed: barPct !== null && barWidth > 0,
+            barBordered: barPct !== null && barBorderWidth > 0,
             preview: this.#previewFor(ov, linkedActor),
-            picking: this.#picking?.faceIndex === index && this.#picking?.overlayIndex === oi,
-            attrOptions: suggestFor(linkedActor),
             // A set `attr` that yields nothing is the panel's most common silent
             // misconfiguration (no linked actor, a typo'd path, or a path stopping
             // one segment short of its leaf). Say so in the row instead of leaving
@@ -575,11 +599,212 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     };
   }
 
+  /**
+   * Per-face pan/zoom of the overlay preview. Kept on the sheet **instance**, not on the
+   * DOM: `submitOnChange` re-renders the whole part on every edit, so view state parked
+   * on an element would be thrown away the moment the user typed in an overlay field —
+   * zoom in, nudge a marker, and you would be back at 100% for the next one.
+   * Deliberately not persisted past the sheet's lifetime; it is a camera, not a setting.
+   * @type {Map<number, {pan: {x: number, y: number}, zoom: number}>}
+   */
+  #previewView = new Map();
+
+  #previewViewFor(faceIndex) {
+    let v = this.#previewView.get(faceIndex);
+    if (!v) this.#previewView.set(faceIndex, (v = { pan: { x: 0, y: 0 }, zoom: 1 }));
+    return v;
+  }
+
+  /**
+   * Rebuild the camera map through an old-index → new-index mapping (`null` = that face is
+   * gone). A face's identity IS its array index — the schema has no per-face id — so every
+   * structural face operation has to carry the cameras along with it, exactly as it already
+   * carries `#activeFaceIndex` and `defaultFace`. Four operations shift indices: remove,
+   * duplicate (inserts at i+1), move up and move down. Without this, deleting face 2 hands
+   * its camera to whichever face slides into slot 2, and you find yourself looking at an
+   * unrelated image through someone else's zoom.
+   *
+   * Rebuilds into a new Map rather than mutating in place: a shift touches overlapping keys
+   * (2→1 while 3→2), so an in-place pass would overwrite entries it had not read yet.
+   */
+  #remapPreviewView(mapIndex) {
+    const next = new Map();
+    for (const [index, view] of this.#previewView) {
+      const to = mapIndex(index);
+      if (to !== null) next.set(to, view);
+    }
+    this.#previewView = next;
+  }
+
+  /**
+   * Set up each face's overlay preview viewport. Runs BEFORE `_onRender`'s `isEditable`
+   * guard — an observer's preview should be as truthful and as navigable as an owner's,
+   * it just cannot be dragged or placed.
+   *
+   * Publishing the image's natural size is the one thing CSS cannot do for itself, and
+   * two separate things are derived from it:
+   * - **font**: an overlay's `fontSize` is authored in the face image's own pixels, so
+   *   the canvas paints it at `fontSize * renderedWidth / naturalWidth`
+   *   (`feRebuildPanelOverlays`). Without this the marker was pinned at a hardcoded
+   *   11px and changing the font size visibly did nothing.
+   * - **shape**: the aspect ratio is what contain-fits the stage into the fixed viewport
+   *   at zoom 1, so any panel proportion opens fully visible.
+   *
+   * The stylesheet carries stand-in values for both, so a slow or broken image never
+   * leaves the marker without a size.
+   */
+  #setupOverlayPreviews() {
+    this.#publishCanvasTextStyle();
+    for (const preview of this.element?.querySelectorAll(".fe-sp-overlay-preview") ?? []) {
+      const img = preview.querySelector("img");
+      if (!img) continue;
+      const faceIndex = Number(preview.dataset.faceIndex);
+      const apply = () => {
+        if (!(img.naturalWidth > 0) || !(img.naturalHeight > 0)) return;
+        preview.style.setProperty("--fe-sp-ov-natw", String(img.naturalWidth));
+        preview.style.setProperty("--fe-sp-ov-nath", String(img.naturalHeight));
+      };
+      // Decoded already (the usual case — the same face image is in cache across
+      // re-renders), else wait. No `error` handler: a broken image simply keeps the
+      // stylesheet's stand-in size.
+      if (img.complete) apply();
+      else img.addEventListener("load", apply, { once: true });
+
+      this.#applyPreviewView(preview, faceIndex);
+      this.#wirePreviewViewport(preview, faceIndex);
+    }
+  }
+
+  /**
+   * Mirror `CONFIG.canvasTextStyle` — the style overlay labels are actually painted
+   * with (`feRebuildPanelOverlays` clones it and overrides only fontSize/fill) — onto
+   * the sheet root as CSS variables, so the preview marker renders in the SAME
+   * typeface with the SAME outline instead of the sheet's UI font.
+   *
+   * It has to come from JS: the family is a runtime stack (`fe-style.js` pushes the
+   * module font into CONFIG at ready/canvasReady, so it is not knowable at author
+   * time), and `strokeThickness` is **not** scaled by the overlay's font size on the
+   * canvas — it is a constant in the panel image's own pixels, which is why it is
+   * published raw and converted with the same cqw formula as everything else.
+   */
+  #publishCanvasTextStyle() {
+    const root = this.element;
+    if (!root) return;
+    const s = globalThis.CONFIG?.canvasTextStyle;
+    if (!s) return;
+    const family = Array.isArray(s.fontFamily)
+      ? s.fontFamily.map(f => (/[^\w-]/.test(f) ? `"${f}"` : f)).join(", ")
+      : String(s.fontFamily ?? "");
+    if (family) root.style.setProperty("--fe-sp-ov-family", family);
+    root.style.setProperty("--fe-sp-ov-weight", String(s.fontWeight ?? "normal"));
+    root.style.setProperty("--fe-sp-ov-stroke", String(s.stroke ?? "#111111"));
+    root.style.setProperty("--fe-sp-ov-stroke-w", String(Number(s.strokeThickness) || 0));
+    root.style.setProperty("--fe-sp-ov-shadow", String(s.dropShadow ? (Number(s.dropShadowBlur) || 0) : 0));
+    root.style.setProperty("--fe-sp-ov-shadow-color", String(s.dropShadowColor ?? "#000000"));
+  }
+
+  /** Push the stored camera onto the CSS custom properties the stage transform reads. */
+  #applyPreviewView(preview, faceIndex) {
+    const { pan, zoom } = this.#previewViewFor(faceIndex);
+    preview.style.setProperty("--fe-sp-ov-panx", `${Math.round(pan.x)}px`);
+    preview.style.setProperty("--fe-sp-ov-pany", `${Math.round(pan.y)}px`);
+    preview.style.setProperty("--fe-sp-ov-zoom", String(zoom));
+    const moved = Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5 || Math.abs(zoom - 1) > 0.001;
+    preview.classList.toggle("fe-sp-view-moved", moved);
+    const readout = preview.querySelector(".fe-sp-overlay-zoom");
+    if (readout) readout.textContent = `${Math.round(zoom * 100)}%`;
+  }
+
+  /**
+   * Drag-to-pan, wheel-to-zoom and the reset control on one preview viewport.
+   *
+   * Re-binds on every render, with no "already wired" flag, because core hands us a fresh
+   * element each time: `HandlebarsApplicationMixin#_replaceHTML` either `replaceWith`s the
+   * part or `replaceChildren`s it (`handlebars-application.mjs:213-214`), so the previous
+   * preview — and every listener on it — is detached and collected. That is also why the
+   * click-to-place and marker-drag loops in `_onRender` need no guard. An earlier flag here
+   * looked like it prevented listener duplication; it never fired once.
+   */
+  #wirePreviewViewport(preview, faceIndex) {
+    preview.querySelector(".fe-sp-overlay-view-reset")?.addEventListener("click", (event) => {
+      // View state only — marker positions are document data and are deliberately left
+      // alone, so this can never undo an edit.
+      event.preventDefault();
+      event.stopPropagation();
+      this.#previewView.set(faceIndex, { pan: { x: 0, y: 0 }, zoom: 1 });
+      this.#applyPreviewView(preview, faceIndex);
+    });
+
+    preview.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 && event.button !== 2) return;
+      // A marker is its own drag handle and stops propagation, so anything that reaches
+      // here is empty space. The one exception is the reset button.
+      if (event.target.closest?.(".fe-sp-overlay-view-reset")) return;
+      event.preventDefault();
+
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const start = { ...this.#previewViewFor(faceIndex).pan };
+      preview.classList.add("fe-sp-preview-panning");
+      preview.setPointerCapture?.(event.pointerId);
+
+      const onMove = (e) => {
+        e.preventDefault();
+        const view = this.#previewViewFor(faceIndex);
+        view.pan = { x: start.x + (e.clientX - startX), y: start.y + (e.clientY - startY) };
+        this.#applyPreviewView(preview, faceIndex);
+      };
+      const done = (e) => {
+        preview.releasePointerCapture?.(e.pointerId);
+        preview.classList.remove("fe-sp-preview-panning");
+        preview.removeEventListener("pointermove", onMove);
+        preview.removeEventListener("pointerup", done);
+        preview.removeEventListener("pointercancel", done);
+      };
+      preview.addEventListener("pointermove", onMove);
+      preview.addEventListener("pointerup", done);
+      preview.addEventListener("pointercancel", done);
+    });
+
+    // Right-drag pans too, so suppress the menu that would otherwise land on release.
+    preview.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    preview.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const view = this.#previewViewFor(faceIndex);
+      const perLine = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? preview.clientHeight : 1;
+      const delta = Math.min(100, Math.max(-100, event.deltaY * perLine));
+      const zoom = Math.min(
+        FE_PREVIEW_ZOOM_MAX,
+        Math.max(FE_PREVIEW_ZOOM_MIN, view.zoom * Math.exp(-delta * 0.0015))
+      );
+      if (Math.abs(zoom - view.zoom) < 0.0001) return;
+
+      // Keep the image point under the cursor stationary. The stage's anchor is the
+      // viewport centre plus the current pan, and pan is applied before `scale()` in the
+      // transform, so it lives in unscaled viewport pixels — the same convention (and
+      // the same correction) as `_feTPWireZoom` in fe-token-preview.js.
+      const rect = preview.getBoundingClientRect();
+      const fromAnchorX = event.clientX - rect.left - rect.width / 2 - view.pan.x;
+      const fromAnchorY = event.clientY - rect.top - rect.height / 2 - view.pan.y;
+      const ratio = zoom / view.zoom;
+      view.pan = {
+        x: view.pan.x + fromAnchorX * (1 - ratio),
+        y: view.pan.y + fromAnchorY * (1 - ratio),
+      };
+      view.zoom = zoom;
+      this.#applyPreviewView(preview, faceIndex);
+    }, { passive: false });
+  }
+
   /** @override */
   _onRender(context, options) {
     super._onRender?.(context, options);
     this.#syncTokenizeButton();
     this.#pruneForeignHeaderControlDom();
+    this.#setupOverlayPreviews();
     if (!this.isEditable) return;
     const root = this.element;
 
@@ -595,20 +820,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         const value = nameInput.value.trim();
         if (value && value !== this.document.name) this.document.update({ name: value });
       }, { capture: true });
-    }
-
-    // Click-to-place: while an overlay is "armed" (picking), clicking its own
-    // face's preview image commits the click position as that overlay's x/y.
-    for (const preview of root.querySelectorAll(".fe-sp-overlay-preview")) {
-      preview.addEventListener("click", (event) => {
-        const faceIndex = Number(preview.dataset.faceIndex);
-        if (!this.#picking || this.#picking.faceIndex !== faceIndex) return;
-        const pos = this.#relativePos(preview, event.clientX, event.clientY);
-        if (!pos) return;
-        const { overlayIndex } = this.#picking;
-        this.#picking = null;
-        this.#updateOverlayPos(faceIndex, overlayIndex, pos.x, pos.y);
-      });
     }
 
     // Drag-to-reposition: pressing a marker and dragging moves it live (visual
@@ -936,6 +1147,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
     if (!Number.isInteger(i) || i < 0 || i >= faces.length) return;
     faces.splice(i, 1);
+    this.#remapPreviewView((idx) => (idx === i ? null : idx > i ? idx - 1 : idx));
     if (this.#activeFaceIndex >= faces.length) this.#activeFaceIndex = Math.max(0, faces.length - 1);
     else if (this.#activeFaceIndex > i) this.#activeFaceIndex--;
     const df = this.document.system.defaultFace ?? 0;
@@ -958,6 +1170,12 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       name: faces[i].name || game.i18n.format("FESP.Sheet.FaceN", { n: i + 1 }),
     });
     faces.splice(i + 1, 0, copy);
+    const camera = this.#previewView.get(i);
+    this.#remapPreviewView((idx) => (idx > i ? idx + 1 : idx));
+    // The copy opens on the same view as its original: you duplicate a face to tweak one
+    // overlay, and re-finding the spot you were zoomed into is the tedious part. Cloned,
+    // never shared — a shared object would make panning the copy drag the original too.
+    if (camera) this.#previewView.set(i + 1, { pan: { ...camera.pan }, zoom: camera.zoom });
     this.#activeFaceIndex = i + 1;
     const df = this.document.system.defaultFace ?? 0;
     await this.#updateFaces(faces, this.#defaultFacePatch(df > i ? df + 1 : df));
@@ -968,6 +1186,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
     if (i <= 0 || i >= faces.length) return;
     [faces[i - 1], faces[i]] = [faces[i], faces[i - 1]];
+    this.#remapPreviewView((idx) => ScreenPanelSheet.#swapIndex(idx, i - 1, i));
     if (this.#activeFaceIndex === i) this.#activeFaceIndex = i - 1;
     else if (this.#activeFaceIndex === i - 1) this.#activeFaceIndex = i;
     await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i - 1, i)));
@@ -985,6 +1204,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
     if (i < 0 || i >= faces.length - 1) return;
     [faces[i + 1], faces[i]] = [faces[i], faces[i + 1]];
+    this.#remapPreviewView((idx) => ScreenPanelSheet.#swapIndex(idx, i, i + 1));
     if (this.#activeFaceIndex === i) this.#activeFaceIndex = i + 1;
     else if (this.#activeFaceIndex === i + 1) this.#activeFaceIndex = i;
     await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i, i + 1)));
@@ -1010,9 +1230,10 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       // pasted path silently resolves to nothing; the link is still clearable.
       linkedActorUuid: faces[fi].linkedActorUuid ?? "",
       attr: "", text: "", fontSize: 28, color: "#ffffff",
-      bar: false, barMin: 0, barMax: 100, barHeight: 6, barColor: "#33cc33",
+      bar: false, barMin: 0, barMax: 100,
+      barMode: "under", barWidth: 0, barHeight: 6, barColor: "#33cc33",
+      barBorderWidth: 0, barBorderColor: "#000000",
     });
-    this.#picking = { faceIndex: fi, overlayIndex: faces[fi].overlays.length - 1 };
     await this.#updateFaces(faces);
   }
 
@@ -1023,17 +1244,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const overlays = faces[fi]?.overlays;
     if (!overlays || oi < 0 || oi >= overlays.length) return;
     overlays.splice(oi, 1);
-    if (this.#picking?.faceIndex === fi && this.#picking?.overlayIndex === oi) this.#picking = null;
     await this.#updateFaces(faces);
-  }
-
-  /** Arm/disarm click-to-place for one overlay (see _onRender's preview click listener). */
-  static async #onPickOverlayPos(event, target) {
-    const fi = Number(target.dataset.faceIndex);
-    const oi = Number(target.dataset.overlayIndex);
-    const already = this.#picking?.faceIndex === fi && this.#picking?.overlayIndex === oi;
-    this.#picking = already ? null : { faceIndex: fi, overlayIndex: oi };
-    this.render();
   }
 
   static async #onClearOverlayLinkedActor(event, target) {
@@ -1043,10 +1254,14 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
-   * Secondary fields (font size, color, value bar) live in a dialog rather than
-   * the overlay row — attr/text are the two fields actually tweaked often, and
-   * the row was already getting cramped before the bar fields (min/max/height/
-   * color) would have pushed it past usable.
+   * Everything except the static text lives in this dialog: the attribute path plus
+   * the styling fields (font size, color, value bar). The row keeps only what is read
+   * at a glance — number, actor link, fallback text — because the bar's six fields
+   * (min/max/mode/length/thickness/color) would have pushed it past usable.
+   *
+   * The attr picker is a `<datalist>` built HERE, per overlay, from that overlay's OWN
+   * linked actor. It used to be one datalist per row on every render of the active face;
+   * on demand for exactly one overlay is both cheaper and where the path is now edited.
    */
   static async #onEditOverlay(event, target) {
     const fi = Number(target.dataset.faceIndex);
@@ -1055,8 +1270,22 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (!ov) return;
     const esc = foundry.utils.escapeHTML ?? ((s) => s);
     const L = (k) => game.i18n.localize(k);
+    let linkedActor = null;
+    if (ov.linkedActorUuid) { try { linkedActor = fromUuidSync(ov.linkedActorUuid); } catch { /* stale uuid */ } }
+    const options = this.#attrSuggestions(linkedActor);
+    const listId = `fe-sp-attrlist-${fi}-${oi}`;
     const content = `
       <div class="fe-sp-overlay-edit-form">
+        <div class="fe-sp-field fe-sp-field-wide">
+          <label>${L("FESP.Sheet.OverlayAttr")}</label>
+          <input type="text" name="attr" value="${esc(ov.attr ?? "")}"
+                 placeholder="${esc(L("FESP.Sheet.OverlayAttrPh"))}"
+                 ${options.length ? `list="${listId}"` : ""}>
+          ${options.length ? `<datalist id="${listId}">${
+            options.map(o => `<option value="${esc(o.path)}">${esc(o.label)}</option>`).join("")
+          }</datalist>` : ""}
+        </div>
+        <hr>
         <div class="fe-sp-field">
           <label>${L("FESP.Sheet.OverlayFontSize")}</label>
           <input type="number" name="fontSize" value="${ov.fontSize ?? 28}" min="4" step="1">
@@ -1079,6 +1308,18 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           <input type="number" name="barMax" value="${ov.barMax ?? 100}" step="any">
         </div>
         <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBarMode")}</label>
+          <select name="barMode">
+            <option value="under" ${ov.barMode === "inside" ? "" : "selected"}>${L("FESP.Sheet.OverlayBarModeUnder")}</option>
+            <option value="inside" ${ov.barMode === "inside" ? "selected" : ""}>${L("FESP.Sheet.OverlayBarModeInside")}</option>
+          </select>
+        </div>
+        <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBarWidth")}</label>
+          <input type="number" name="barWidth" value="${ov.barWidth ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBarWidthPh"))}">
+        </div>
+        <div class="fe-sp-field">
           <label>${L("FESP.Sheet.OverlayBarHeight")}</label>
           <input type="number" name="barHeight" value="${ov.barHeight ?? 6}" min="1" step="1">
         </div>
@@ -1086,6 +1327,16 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           <label>${L("FESP.Sheet.OverlayBarColor")}</label>
           <input type="color" name="barColor" value="${esc(ov.barColor ?? "#33cc33")}">
         </div>
+        <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBarBorderWidth")}</label>
+          <input type="number" name="barBorderWidth" value="${ov.barBorderWidth ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBarBorderWidthPh"))}">
+        </div>
+        <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBarBorderColor")}</label>
+          <input type="color" name="barBorderColor" value="${esc(ov.barBorderColor ?? "#000000")}">
+        </div>
+        <p class="notes fe-sp-overlay-bar-note">${L("FESP.Sheet.OverlayBarNote")}</p>
       </div>`;
     await foundry.applications.api.DialogV2.prompt({
       window: { title: game.i18n.format("FESP.Sheet.OverlayEditTitle", { n: oi + 1 }) },
@@ -1097,12 +1348,20 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           const form = button.form ?? button.closest?.("form");
           if (!form) return;
           const patch = {
+            attr: (form.elements.attr?.value ?? "").trim(),
             fontSize: Number(form.elements.fontSize?.value) || 28,
             color: form.elements.color?.value || "#ffffff",
             bar: !!form.elements.bar?.checked,
             barMin: Number(form.elements.barMin?.value) || 0,
             barMax: Number(form.elements.barMax?.value) || 100,
+            barMode: form.elements.barMode?.value === "inside" ? "inside" : "under",
+            // 0 is a MEANINGFUL value here (auto-width), so `|| 0` is the fallback
+            // rather than a bug — an empty/NaN field means "auto", same as typing 0.
+            barWidth: Math.max(0, Math.round(Number(form.elements.barWidth?.value) || 0)),
             barHeight: Math.max(1, Number(form.elements.barHeight?.value) || 6),
+            // Like barWidth, 0 is meaningful (no outline) rather than missing.
+            barBorderWidth: Math.max(0, Math.round(Number(form.elements.barBorderWidth?.value) || 0)),
+            barBorderColor: form.elements.barBorderColor?.value || "#000000",
             barColor: form.elements.barColor?.value || "#33cc33",
           };
           await this.#updateOverlayFields(fi, oi, patch);
@@ -1113,7 +1372,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onAddCustomAttr() {
     const items = foundry.utils.deepClone(this.document.system.customAttributes ?? []);
-    items.push({ name: "", value: "" });
+    // A blank name would be cleaned back to the field's bare initial ("jk"), so every
+    // added row would share one label. Number it against the rows already present.
+    items.push({ name: feNextCustomAttrName(items), value: "" });
     await this.#updateCustomAttributes(items);
   }
 

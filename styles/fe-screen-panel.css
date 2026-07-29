@@ -115,6 +115,17 @@
    and let the content area scroll internally. */
 .fe-screen-panel-sheet {
   max-height: 80vh;
+  /* 테두리·면 색을 currentColor 에서 뽑는다 (MUST keep). 이 시트의 색들은 원래
+     rgba(0, 0, 0, …) 였는데 그건 '밝은 시트'를 전제한 값이고, 코어 기본 테마가
+     theme-dark 인 월드에서는 통째로 보이지 않았다 — 실측: 활성 탭 테두리
+     rgba(0,0,0,0.15) 가 검은 시트 위에서 사라져, 화면에 보이던 주황 외곽선은
+     우리 스타일이 아니라 코어의 포커스 링이었다. currentColor 는 테마를 따라
+     뒤집히므로 밝은 테마/어두운 테마 양쪽에서 같은 대비를 낸다. 레트로 테마는
+     아래 별도 블록이 명시적으로 덮으므로 영향이 없다. */
+  --fe-sp-line: color-mix(in srgb, currentColor 20%, transparent);
+  --fe-sp-line-strong: color-mix(in srgb, currentColor 40%, transparent);
+  --fe-sp-fill: color-mix(in srgb, currentColor 7%, transparent);
+  --fe-sp-fill-strong: color-mix(in srgb, currentColor 12%, transparent);
 }
 .fe-screen-panel-sheet .window-content {
   overflow-y: auto;
@@ -146,13 +157,20 @@
   font-size: 12px;
   font-weight: 600;
 }
+/* 위치 고정 / 더블클릭으로 면 전환은 같은 그리드 행에 나란히 놓인다. 예전에는 각
+   칸에 인라인 설명문(.notes)이 붙어 있었고 두 힌트의 길이가 크게 달라서(LockedHint
+   가 거의 두 배) `justify-content: end` 바닥 정렬과 맞물려 정작 눈이 가는 체크박스
+   줄이 서로 다른 높이에 앉았다. 설명문을 툴팁으로 옮기면서 두 칸 모두 한 줄이 되었으므로
+   가운데 정렬로 위쪽 입력 칸들과 나란히 앉힌다. 설명문을 다시 인라인으로 되돌린다면
+   이 정렬부터 손봐야 한다. */
 .fe-screen-panel-sheet .fe-sp-field-checkbox {
-  justify-content: end;
+  justify-content: center;
 }
 .fe-screen-panel-sheet .fe-sp-field-checkbox label {
   flex-direction: row;
   align-items: center;
   gap: 6px;
+  margin: 0;
 }
 
 .fe-screen-panel-sheet .fe-sp-faces-header {
@@ -165,25 +183,48 @@
   margin: 0;
 }
 
-/* ----- Face tab navigation ----- */
+/* ----- Face tab navigation -----
+   줄바꿈(wrap)이지 가로 스크롤이 아니다 (MUST keep). `overflow-x: auto` 는 이 nav 를
+   스크롤 컨테이너로 만들고, 스크롤 컨테이너는 가로만이 아니라 블록 축도 함께 잘라낸다.
+   면 탭은 <button class="… active"> 라서 코어 foundry2.css 의
+   `a.button.active, button.active { outline: 1px solid …; box-shadow: 0 0 4px …; }`
+   (layer(elements.forms)) 를 그대로 받는데, outline 과 box-shadow 는 테두리 상자
+   '바깥'에 그려진다 — 스크롤 컨테이너가 그걸 잘라냈다. 이것이 실제로 보고된
+   "활성화 시 외곽선 클리핑" 의 정체다. 이 코어 글로우는 살려 둔다: 테마를 따라가고
+   활성 탭을 어느 테마에서든 분명히 표시해 준다. 다만 그러려면 이 nav 가 절대
+   클리핑하면 안 된다. 면이 많으면 스크롤 대신 다음 줄로 넘어간다.
+
+   경계선은 탭이 아니라 이 nav 가 갖는다. 아래 `.fe-sp-face` / `.fe-sp-empty` 는
+   `border-top: none` 이라 상자의 윗변을 누군가는 그려 줘야 하는데, 예전처럼 탭마다
+   테두리를 두르면 그 윗변이 탭 폭만큼만 이어지다 끊긴다. nav 가 한 줄로 그으면
+   상자 너비 전체를 덮고, 활성 탭은 그 선 위에 앉는다. */
 .fe-screen-panel-sheet .fe-sp-face-tabs {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 2px;
   margin: 6px 0 0;
   padding: 0 2px;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  border-bottom: 1px solid var(--fe-sp-line);
 }
+/* 비활성 탭은 테두리·배경 없이 물러나 있고, 활성 탭만 아래 `.fe-sp-face` 상자와
+   똑같은 배경·테두리색을 입어 하나의 도형으로 이어진다(면 상자는 `border-top: none`).
+   테두리 두께가 상태와 무관하게 같아야 줄이 흔들리지 않으므로, 네 변 모두 항상
+   1px 로 두고 색만 바꾼다 — 예전의 `border-bottom: none` ↔ `1px solid transparent`
+   전환은 활성 탭만 1px 높이게 만들었다. */
 .fe-screen-panel-sheet .fe-sp-face-tab {
   flex: 0 0 auto;
   display: flex;
+  /* 코어의 `button { justify-content: center }` 를 명시적으로 덮는다 — 탭 내용은
+     항상 왼쪽에서 시작해야 하고, max-width 에 걸린 탭이 가운데 정렬로 양쪽이
+     동시에 잘려 나가는 것도 막는다. */
+  justify-content: flex-start;
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-bottom: none;
+  border: 1px solid transparent;
   border-radius: 6px 6px 0 0;
-  background: rgba(0, 0, 0, 0.03);
+  background: transparent;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -196,14 +237,24 @@
     opacity 0.15s,
     background 0.15s;
 }
-/* Faces are images — the thumbnail is what actually identifies a tab. */
+/* Faces are images — the thumbnail is what actually identifies a tab. 테두리를 또렷하게
+   두는 것이 핵심이다: 어두운 아트를 쓴 면은 20px 썸네일이 그냥 검은 사각형이라,
+   액자가 보이지 않으면 레이블 왼쪽의 영문 모를 여백으로 읽힌다. 이미지가 없는 면도
+   같은 칸(.fe-sp-face-tab-thumb-empty)을 받아 탭들의 왼쪽 구조가 항상 같다. */
 .fe-screen-panel-sheet .fe-sp-face-tab-thumb {
   flex: 0 0 auto;
   width: 20px;
   height: 20px;
   object-fit: cover;
   border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--fe-sp-line-strong);
+  background: var(--fe-sp-fill-strong);
+}
+.fe-screen-panel-sheet .fe-sp-face-tab-thumb-empty {
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  opacity: 0.45;
 }
 .fe-screen-panel-sheet .fe-sp-face-tab-label {
   min-width: 0;
@@ -217,22 +268,13 @@
 }
 .fe-screen-panel-sheet .fe-sp-face-tab:hover {
   opacity: 0.85;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--fe-sp-fill-strong);
 }
 .fe-screen-panel-sheet .fe-sp-face-tab.active {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.06);
-  border-bottom: 1px solid transparent;
-  position: relative;
-}
-.fe-screen-panel-sheet .fe-sp-face-tab.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  background: var(--color-warm-1, rgba(0, 0, 0, 0.06));
+  background: var(--fe-sp-fill);
+  border-color: var(--fe-sp-line);
+  border-bottom-color: transparent;
 }
 .fe-screen-panel-sheet .fe-sp-face-tab-add {
   padding: 5px 10px;
@@ -241,10 +283,9 @@
 .fe-screen-panel-sheet .fe-sp-face-tab-add:hover {
   opacity: 0.9;
 }
-/* In the 면 tab the active tab visually merges into the face box directly below
-   it; the 어트리뷰트 tab has no such box, so close the row off with its own rule. */
+/* 어트리뷰트 탭에는 탭 줄 바로 아래에 붙는 상자가 없으므로 간격만 더 준다.
+   경계선 자체는 이제 두 탭 모두 위의 공통 규칙이 갖는다. */
 .fe-screen-panel-sheet .fe-sp-attrs-tab .fe-sp-face-tabs {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
   margin-bottom: 8px;
 }
 
@@ -255,7 +296,7 @@
   align-items: center;
   gap: 6px;
   padding: 22px 16px;
-  border: 1px dashed rgba(0, 0, 0, 0.25);
+  border: 1px dashed var(--fe-sp-line-strong);
   border-top: none;
   border-radius: 0 0 6px 6px;
   text-align: center;
@@ -281,14 +322,16 @@
   flex-direction: column;
   gap: 6px;
 }
+/* 활성 탭이 이 상자와 하나로 이어져 보여야 하므로 배경·테두리를 같은 변수에서
+   뽑는다 — 한쪽만 바꾸면 탭이 상자에서 떨어져 나온다. */
 .fe-screen-panel-sheet .fe-sp-face {
   display: none;
   gap: 8px;
   padding: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--fe-sp-line);
   border-top: none;
   border-radius: 0 0 6px 6px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--fe-sp-fill);
 }
 .fe-screen-panel-sheet .fe-sp-face.active {
   display: flex;
@@ -516,26 +559,167 @@
   padding-top: 6px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
+/* A FIXED viewport onto the face image, pannable and zoomable like the token preview —
+   `.fe-sp-overlay-stage` inside it is the image, aspect-fitted at zoom 1. Splitting the
+   two is what makes extreme panel shapes usable at all. Before, the box was the image:
+   a 200x3000 face made it 5372px tall and shoved the overlay row list ~5000px down the
+   sheet (measured: .window-content scrollHeight 6164 against a 691px viewport), while a
+   3000x200 face collapsed to a 24px strip with no room to place anything vertically.
+   Now the sheet's height is constant whatever the panel's shape, and the way you reach
+   detail is to zoom in. */
 .fe-screen-panel-sheet .fe-sp-overlay-preview {
   position: relative;
+  /* Full form column, NO max-width. Placement is done by clicking/dragging inside this
+     box, so its size IS the precision of the result — capped at 360px it rendered a wide
+     face at a fraction of its possible size while ~200px of the 600px sheet sat empty to
+     its right. The height had to move with it (320 → 400) because contain-fit is bound by
+     the SHORTER budget: for a square or portrait face, widening alone would only have
+     added letterboxing. */
   width: 100%;
-  /* Placement is done by clicking/dragging inside this box, so its size IS the
-     precision of the result. 260px left most of the 600px sheet unused. */
-  max-width: 360px;
-  margin-bottom: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  /* Stand-ins until _onRender reads the image's real natural size. Deliberately NOT
+     `var()` fallbacks at the use sites: a var() that resolves to nothing makes the whole
+     declaration invalid at computed-value time, and `font-size` is inherited, so the
+     marker would silently jump to the sheet's font size instead of falling back. A
+     square default is neutral, and 900 keeps the default 28px overlay proportionate
+     (~11px per 360px of rendered stage width) for the one frame before _onRender
+     publishes the image's real natural size. */
+  --fe-sp-ov-natw: 900;
+  --fe-sp-ov-nath: 900;
+  /* The viewport height, as a variable because the stage's contain-fit has to divide
+     by the very same number — keep them from drifting apart. Inherited by the stage.
+     `min()` so a short screen does not get a box taller than the window can show: the
+     sheet is `height: auto` capped at 80vh, and the preview must not eat all of it. */
+  --fe-sp-ov-vh: min(400px, 40vh);
+  /* FIXED, not max-height: the stage is absolutely positioned and contributes no
+     layout, so this alone is the section's height for every panel shape. */
+  height: var(--fe-sp-ov-vh);
   overflow: hidden;
-  cursor: default;
+  margin-bottom: 8px;
+  /* 어디까지가 미리보기인지 한눈에 들어와야 한다: 레터박스(이 상자의 배경)와 시트
+     배경이 비슷해서 경계가 녹아 보였다. 굵기를 2px 로 올리지는 않는다 — box-sizing 이
+     border-box 라 콘텐츠 높이가 4px 더 줄어드는데 stage 의 contain-fit 은 여전히
+     --fe-sp-ov-vh 전체로 나누므로 둘이 어긋난다. 대신 진한 1px 테두리 + 바깥쪽
+     1px 링(box-shadow, 레이아웃 비용 0)으로 이중 경계를 만들고, 안쪽 링은 아래
+     ::before 가 콘텐츠 '위에' 그린다. inset box-shadow 는 배경 직후에 칠해지므로
+     뷰포트를 꽉 채운 면 이미지에 그대로 덮여 사라진다 — 실제로 그렇게 삼켜졌다. */
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+  cursor: grab;
+  user-select: none;
+  /* Required for touch panning: canceling `pointerdown` does NOT suppress scrolling —
+     `touch-action` is the only thing that does, so without this a touch drag scrolls
+     the sheet and pans at the same time. Same reason the markers carry it. */
+  touch-action: none;
   background: rgba(0, 0, 0, 0.06);
 }
-.fe-screen-panel-sheet .fe-sp-overlay-preview img {
+/* 안쪽 링. 콘텐츠 '위에' 올라타야 하므로 pseudo-element 다 — 면 이미지는 뷰포트를
+   꽉 채우고 stage 는 이 상자의 자식이라, 배경 레이어에 그려지는 inset box-shadow 로는
+   이미지에 덮여 사라진다. z-index 5 는 리셋 버튼/줌 표시(둘 다 4)보다 위지만 둘 다
+   4px 안쪽에 있어 겹치지 않고, pointer-events: none 이라 팬/줌/마커 드래그를 가리지
+   않는다. inset 0 에 대응하는 반지름은 바깥 4px 에서 테두리 1px 을 뺀 3px. */
+.fe-screen-panel-sheet .fe-sp-overlay-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-preview.fe-sp-preview-panning {
+  cursor: grabbing;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* An inline-size container so the marker font can be expressed in `cqw`, i.e. as a
+     fraction of the rendered image width — which is exactly how the canvas sizes it
+     (`fe-screen-panel.js`: fontSize * renderedWidth / naturalWidth). That keeps the
+     scaling correct with no ResizeObserver and no JS on the zoom path; JS only publishes
+     the image's natural size once per render. It must sit on the STAGE, not the
+     viewport — for a wide face the two are different widths. */
+  container-type: inline-size;
+  /* Contain-fit at zoom 1: cap the width by the height budget when the image is taller
+     than the viewport, else fill it. The img below is `width:100%; height:auto`, so its
+     height follows and can never exceed the viewport. */
+  width: min(100%, calc(var(--fe-sp-ov-vh) * var(--fe-sp-ov-natw) / var(--fe-sp-ov-nath)));
+  /* Pan is applied BEFORE scale, so it stays in viewport pixels regardless of zoom —
+     the same convention as `_feTPApplyPan` in fe-token-preview.js. */
+  transform:
+    translate(-50%, -50%)
+    translate(var(--fe-sp-ov-panx, 0px), var(--fe-sp-ov-pany, 0px))
+    scale(var(--fe-sp-ov-zoom, 1));
+  transform-origin: center center;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-stage img {
   display: block;
   width: 100%;
   height: auto;
 }
+/* Reset pan/zoom. Shown only while the view is off-default, which is both the only
+   moment it does anything and a standing indicator that you are looking at a moved
+   view. `type="button"` is load-bearing — this lives inside the sheet's <form>. */
+.fe-screen-panel-sheet .fe-sp-overlay-view-reset {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  /* Core's `button {min-height: var(--button-size)}` is 32px and `height` alone cannot
+     beat it — without this the icon renders in a 22x32 rectangle. */
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-preview.fe-sp-view-moved .fe-sp-overlay-view-reset {
+  display: flex;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-view-reset:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+}
+/* Zoom readout, bottom-left. Only rendered while zoom is off 100%. */
+.fe-screen-panel-sheet .fe-sp-overlay-zoom {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 4;
+  display: none;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-preview.fe-sp-view-moved .fe-sp-overlay-zoom {
+  display: block;
+}
 .fe-screen-panel-sheet .fe-sp-overlay-marker {
   position: absolute;
+  /* THE conversion, used by every dimension below: an overlay's sizes are authored in
+     the face image's OWN pixels, and the canvas paints them at
+     `value * renderedWidth / naturalWidth` (feRebuildPanelOverlays / feBarBox). `100cqw`
+     IS the rendered width and --fe-sp-ov-natw is published by #setupOverlayPreviews, so
+     `--fe-sp-ov-px * <value>` is exactly what the canvas will use. Keep every preview
+     dimension going through it — that is what makes this preview WYSIWYG rather than a
+     decorative marker. */
+  --fe-sp-ov-px: calc(100cqw / var(--fe-sp-ov-natw, 900));
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -563,32 +747,127 @@
 .fe-screen-panel-sheet .fe-sp-overlay-marker:hover {
   background: rgba(160, 140, 235, 0.95);
 }
-/* Once a value/text resolves, show it directly (color = the overlay's own
-   configured color, set inline) instead of the generic index number — a live
-   preview of what will actually render on the canvas. */
+/* Once a value/text resolves, the marker STOPS being a chip and becomes a rendering of
+   what the canvas will paint: no plate, no padding, no border, no rounding, no
+   truncation — just the text, in the canvas typeface, at the canvas size, with the
+   canvas outline and glow (--fe-sp-ov-family/-weight/-stroke/-shadow are published from
+   CONFIG.canvasTextStyle by #publishCanvasTextStyle, which is the style the overlay is
+   literally drawn with). Judging "how big will this actually be" is the whole job of
+   this preview; a decorated chip made every overlay look like the same size.
+
+   `strokeThickness` is NOT scaled by font size on the canvas — feRebuildPanelOverlays
+   only overrides fontSize/fill on the cloned style — so it converts from image pixels
+   like the bar does, not from `em`. */
 .fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview {
   height: auto;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.78);
-  border-color: currentColor;
-  font-size: 11px;
-  line-height: 1.3;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+  font-family: var(--fe-sp-ov-family, inherit);
+  font-weight: var(--fe-sp-ov-weight, normal);
+  /* No clamp: a floor or ceiling here is a lie about the size being configured. The
+     0.5px floor only avoids a degenerate zero-size box. */
+  font-size: max(0.5px, calc(var(--fe-sp-ov-font, 28) * var(--fe-sp-ov-px)));
+  /* PIXI's text box is the font's own ascent+descent — live-measured at ~1.04x the font
+     size for the canvas stack, which is what the bar's "inside" thickness floor and the
+     "under" gap are both measured against. */
+  line-height: 1.04;
+  -webkit-text-stroke: calc(var(--fe-sp-ov-stroke-w, 1) * var(--fe-sp-ov-px))
+    var(--fe-sp-ov-stroke, #111111);
+  paint-order: stroke fill; /* PIXI strokes behind the fill; the default would eat thin glyphs */
+  text-shadow: 0 0 calc(var(--fe-sp-ov-shadow, 2) * var(--fe-sp-ov-px))
+    var(--fe-sp-ov-shadow-color, #000000);
 }
-.fe-screen-panel-sheet .fe-sp-overlay-marker.picking {
-  background: rgba(230, 90, 90, 0.92);
-  box-shadow: 0 0 0 3px rgba(230, 90, 90, 0.35);
+/* The drag affordance moved to hover: the marker IS its own drag handle, but a permanent
+   plate is exactly what stops the preview being truthful. `outline` (not border/padding)
+   because it must not occupy layout — the box under it is the measurement. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview:hover {
+  background: none;
+  outline: 1px dashed rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
+}
+/* The label is its own element so the bar can be a positioned sibling without the two
+   fighting over the marker's box. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker-text {
+  position: relative; /* above the bar, which is the sibling below it in the stack */
+  white-space: nowrap;
 }
 .fe-screen-panel-sheet .fe-sp-overlay-marker.dragging {
   cursor: grabbing;
   z-index: 1;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
 }
-/* When an overlay is armed, the preview itself signals "click to place". */
-.fe-screen-panel-sheet
-  .fe-sp-overlay-preview:has(.fe-sp-overlay-marker.picking) {
-  cursor: crosshair;
-  outline: 2px solid rgba(230, 90, 90, 0.7);
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview.dragging {
+  box-shadow: none;
+  outline: 1px dashed rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+}
+
+/* --- Value bar: a rendering of feBarBox, not an indicator ---------------------
+   Every rule here is the CSS transcription of one line of `feBarBox`/`feDrawBarGraphics`
+   in fe-screen-panel.js. If you change the geometry there, change it here — the two are
+   deliberately mirror images so the sheet can answer "what will this look like on the
+   canvas" without the user putting a panel on a scene to find out.
+
+   The bar is OUT OF FLOW in both modes. Live-measured on v14.365: as a flex row it made
+   the marker's box `text + bar` tall, and the marker is centred on the overlay's anchor
+   via translate(-50%,-50%) — so the TEXT drifted up by half the bar's height, while on
+   the canvas the anchor is the text's own centre. Out of flow, the marker's box is the
+   text alone and the anchor means the same thing in both places.
+
+   --fe-sp-ov-bar-w is 0 when the length is auto; the .bar-fixed / .bar-bordered CLASSES
+   (not the values) select the explicit rules, since `width: calc(0 …)` cannot express
+   "shrink to the text" and `outline: 0` cannot express the 1px floor. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker-bar {
+  position: absolute;
+  left: 50%;
+  /* feBarBox: auto width = the text's own rendered width. The marker has no padding once
+     .has-preview strips the chip, so 100% of the containing block IS the text box. */
+  width: 100%;
+  height: max(0.5px, calc(var(--fe-sp-ov-bar-h, 6) * var(--fe-sp-ov-px)));
+  background-color: rgba(0, 0, 0, 0.5); /* feDrawBarGraphics' track: black at 50% */
+  background-image: linear-gradient(
+    to right,
+    var(--fe-sp-ov-bar-color, #33cc33) 0 var(--fe-sp-ov-bar-pct, 0%),
+    transparent var(--fe-sp-ov-bar-pct, 0%)
+  );
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker.bar-fixed .fe-sp-overlay-marker-bar {
+  width: calc(var(--fe-sp-ov-bar-w, 0) * var(--fe-sp-ov-px));
+}
+/* feDrawBarGraphics strokes the outline INSIDE the box (alignment 0) so it never grows
+   the bar — an INSET box-shadow is the same thing and takes no layout space. Not
+   `outline`: Chrome floors outline-width to whole pixels (live-measured — a 4-image-px
+   border at scale 0.459 should be 1.84px and rendered as 1px), while box-shadow keeps
+   the fraction. Not `border` either: that would shrink the content box. The 1px floor
+   mirrors feBarBox's own floor for a scaled-down panel. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.bar-bordered .fe-sp-overlay-marker-bar {
+  box-shadow: inset 0 0 0 max(1px, calc(var(--fe-sp-ov-bar-bw, 0) * var(--fe-sp-ov-px)))
+    var(--fe-sp-ov-bar-bc, #000000);
+}
+/* "under": `y = text bottom + gap`, gap = 2 image px (feBarBox). */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.bar-under .fe-sp-overlay-marker-bar {
+  top: calc(100% + max(1px, calc(2 * var(--fe-sp-ov-px))));
+  transform: translateX(-50%);
+}
+/* "inside": the bar is CENTRED on the text, its box is the text box grown by
+   padX = 0.4em and padY = 0.22em (feBarBox derives both from the font size, so `em` is
+   the exact equivalent here), and its thickness floor is that grown height. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.bar-inside .fe-sp-overlay-marker-bar {
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% + 0.8em);
+  height: max(
+    calc(100% + 0.44em),
+    calc(var(--fe-sp-ov-bar-h, 6) * var(--fe-sp-ov-px))
+  );
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker.bar-inside.bar-fixed .fe-sp-overlay-marker-bar {
+  width: calc(var(--fe-sp-ov-bar-w, 0) * var(--fe-sp-ov-px));
 }
 
 .fe-screen-panel-sheet .fe-sp-overlay-rows {
@@ -623,10 +902,6 @@
 .fe-screen-panel-sheet .fe-sp-overlay-row a:hover {
   opacity: 1;
 }
-.fe-screen-panel-sheet .fe-sp-overlay-row a.active {
-  opacity: 1;
-  color: #c85a5a;
-}
 /* An `attr` that resolves to nothing renders the static text (or nothing at all)
    on the canvas with no other symptom — flag the row rather than let the user
    hunt for it. */
@@ -636,15 +911,15 @@
   color: #d08a20;
   cursor: help;
 }
-.fe-screen-panel-sheet .fe-sp-overlay-warn input[name$=".attr"] {
-  border-color: rgba(208, 138, 32, 0.7);
+/* The path itself is no longer in the row (it moved into the 설정 dialog), so the
+   warning colors the button that opens the place where it is fixed. */
+.fe-screen-panel-sheet .fe-sp-overlay-warn a[data-action="feEditOverlay"] {
+  color: #d08a20;
+  opacity: 1;
 }
 
 .fe-screen-panel-sheet .fe-sp-overlay-add {
   margin-top: 6px;
-}
-.fe-screen-panel-sheet .fe-sp-overlay-hint {
-  margin: 4px 0 0;
 }
 
 /* ----- Tab navigation + Attributes tab ----- */
@@ -723,7 +998,7 @@
   font-weight: 600;
 }
 
-/* ----- Per-overlay edit dialog (font size / color / value bar) ----- */
+/* ----- Per-overlay edit dialog (attribute path / font size / color / value bar) ----- */
 .fe-sp-overlay-edit-form {
   display: flex;
   flex-direction: column;
@@ -735,6 +1010,11 @@
   flex-direction: column;
   gap: 3px;
 }
+/* An attribute dot-path runs well past 40 characters — widen the dialog through this
+   one field instead of making the user scroll a 260px input to read what they typed. */
+.fe-sp-overlay-edit-form .fe-sp-field-wide {
+  min-width: 380px;
+}
 .fe-sp-overlay-edit-form .fe-sp-field label {
   font-weight: 600;
   font-size: 12px;
@@ -743,6 +1023,15 @@
   border: none;
   border-top: 1px solid rgba(0, 0, 0, 0.15);
   margin: 2px 0;
+}
+/* The bar's units (face-image pixels, not screen pixels) and the two "auto" rules
+   — length 0 and the inside-mode thickness floor — are not inferable from the
+   field labels, and getting them wrong just looks like the bar ignoring the input. */
+.fe-sp-overlay-edit-form .fe-sp-overlay-bar-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.8;
 }
 .fe-sp-overlay-bar-toggle {
   display: flex;
@@ -793,7 +1082,6 @@ body.fe-retro-theme .fe-sp-menu-note {
 body.fe-retro-theme
   .fe-screen-panel-sheet
   :is(
-    .fe-sp-face-tab,
     .fe-sp-face,
     .fe-sp-face-thumb,
     .fe-sp-face-actor-drop,
@@ -805,6 +1093,17 @@ body.fe-retro-theme
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
 }
 
+/* 미리보기 뷰포트만은 그룹 규칙의 옅은 테두리로는 경계가 읽히지 않는다 — 밝은
+   테두리 + 어두운 바깥/안쪽 링으로 이중 경계를 만든다. 그룹 규칙과 명시도가 같으므로
+   반드시 뒤에 온다. */
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-preview {
+  border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-preview::before {
+  border-color: rgba(0, 0, 0, 0.7);
+}
+
 body.fe-retro-theme
   .fe-screen-panel-sheet
   :is(
@@ -812,13 +1111,24 @@ body.fe-retro-theme
     .fe-sp-overlay-section,
     .fe-sp-attr-divider,
     .fe-sp-empty,
-    .fe-sp-face-tab-thumb,
-    .fe-sp-attrs-tab .fe-sp-face-tabs
+    .fe-sp-face-tabs
   ) {
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
 }
 
+/* 썸네일만은 그룹의 --fe-ac-22 보다 진해야 한다 — 어두운 면 아트는 검은 시트 위에서
+   액자선이 없으면 썸네일이 아니라 빈 여백으로 읽힌다. */
+body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab-thumb {
+  border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45));
+}
+
+/* 면 탭: 비활성은 물러나고 활성만 아래 면 상자와 같은 배경으로 이어진다. 이 파일의
+   기본 규칙과 같은 구조를 유지해야 하므로 배경/테두리를 여기서 직접 잡는다 —
+   위의 :is() 그룹에 .fe-sp-face-tab 을 다시 넣지 말 것. 넣으면 비활성 탭까지
+   칠해져 활성/비활성 구분이 뒤집힌다. */
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab {
+  background: transparent;
+  border-color: transparent;
   color: var(--fe-ac-57, #aaa);
   opacity: 1;
 }
@@ -830,20 +1140,16 @@ body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab:hover {
 }
 
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab.active {
-  background: transparent;
+  background: var(--fe-ac-06, rgba(255, 255, 255, 0.06));
   border-color: var(--fe-dx3rd-accent, #fff);
+  border-bottom-color: transparent;
   color: var(--fe-dx3rd-accent, #fff);
-}
-
-body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab.active::after {
-  content: none;
 }
 
 body.fe-retro-theme
   .fe-screen-panel-sheet
   :is(
     .fe-sp-face-actor-drophint,
-    .fe-sp-overlay-hint,
     .fe-sp-attr-path,
     .fe-sp-reference-attr-name
   ) {
@@ -863,16 +1169,16 @@ body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-attr-path:hover {
 
 body.fe-retro-theme
   .fe-screen-panel-sheet
-  .fe-sp-overlay-marker:not(.has-preview):not(.picking) {
+  .fe-sp-overlay-marker:not(.has-preview) {
   background: var(--fe-dx3rd-accent, #fff);
   border-color: var(--fe-dx3rd-accent, #fff);
   color: #000;
 }
 
-body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview {
-  background: #000;
-  border-color: currentColor;
-}
+/* No retro restyling for .has-preview markers ON PURPOSE. They are a rendering of what
+   the canvas will paint, and the canvas has no theme — a retro plate behind them made
+   the preview answer a different question than the one being asked. Only the index-chip
+   fallback above (which is pure UI) follows the theme. */
 
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-marker.dragging {
   outline: 2px solid var(--fe-dx3rd-accent, #fff);
