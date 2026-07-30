@@ -206,6 +206,53 @@ function _feTPResolveArt(vals) {
   return { src: usingSubject ? vals.ringSubjectSrc : vals.src, scale, usingSubject };
 }
 
+/**
+ * The size the art is actually painted at, in viewport pixels — core's
+ * `PrimarySpriteMesh#resize` (`fit` → scale factor, then `× scale`) expressed against the
+ * grid rect, which is exactly what `background-size` + the CSS `transform: scale()` produce.
+ * Falls back to the grid rect while the natural size is still unknown (the image load
+ * re-renders the preview, so the approximation is momentary).
+ */
+function _feTPPaintedArtSize(vals, art, natSize, pw, ph) {
+  const nw = natSize?.w;
+  const nh = natSize?.h;
+  let fw = pw;
+  let fh = ph;
+  if (nw > 0 && nh > 0) {
+    let s = null;
+    switch (vals.fit) {
+      case "fill": break;
+      case "cover": s = Math.max(pw / nw, ph / nh); break;
+      case "width": s = pw / nw; break;
+      case "height": s = ph / nh; break;
+      default: s = Math.min(pw / nw, ph / nh); break; // contain
+    }
+    if (s !== null) {
+      fw = nw * s;
+      fh = nh * s;
+    }
+  }
+  const k = Math.abs(art.scale);
+  return { w: fw * k, h: fh * k };
+}
+
+/**
+ * How far the art is displaced from the grid square's center by the texture anchor.
+ *
+ * On canvas the mesh's *anchor point* is pinned to the token's center
+ * (`Token#_refreshPosition`: `mesh.position = this.center`; `Token#_refreshMesh`:
+ * `mesh.anchor.set(anchorX, anchorY)`), so the anchor moves the ART, never the square.
+ * `anchor 0.5/0.5` centers it; `anchor 0` puts the art's left/top edge on the center.
+ * A mirrored axis has a negative mesh scale, which flips the art around that same pinned
+ * point — hence the sign flip.
+ */
+function _feTPAnchorOffset(vals, artSize) {
+  return {
+    x: (0.5 - vals.anchorX) * artSize.w * (vals.mirrorX ? -1 : 1),
+    y: (0.5 - vals.anchorY) * artSize.h * (vals.mirrorY ? -1 : 1),
+  };
+}
+
 /** True when pan or zoom has been moved off its default — i.e. a reset would do something. */
 function _feTPViewIsMoved(panel) {
   const pan = panel._feTPPan ?? { x: 0, y: 0 };
@@ -246,11 +293,15 @@ function feRenderGridPreview(container, vals, natSize) {
   const anchorPxY = natSize ? Math.round(vals.anchorY * natSize.h) : "?";
   const sizeLabel = natSize ? `${natSize.w}×${natSize.h}` : "";
 
-  // Offset the grid so the anchor point sits at the viewport center.
+  // The grid square is what stays put — it is the token's footprint, and the canvas pins the
+  // texture's anchor point to its center. The anchor therefore moves the ART inside the
+  // square (see `_feTPAnchorOffset`), not the square itself.
+  const artSize = _feTPPaintedArtSize(vals, art, natSize, pw, ph);
+  const anchorOffset = _feTPAnchorOffset(vals, artSize);
   const vpW = vpSize;
   const vpH = vpSize;
-  const baseGridLeft = Math.round(vpW / 2 - vals.anchorX * pw);
-  const baseGridTop = Math.round(vpH / 2 - vals.anchorY * ph);
+  const baseGridLeft = Math.round(vpW / 2 - pw / 2);
+  const baseGridTop = Math.round(vpH / 2 - ph / 2);
   const pan = container._feTPPan ?? { x: 0, y: 0 };
   const gridLeft = baseGridLeft + pan.x;
   const gridTop = baseGridTop + pan.y;
@@ -266,7 +317,10 @@ function feRenderGridPreview(container, vals, natSize) {
   // pads the mesh for exactly that case), so it is not clamped.
   const ringSpan = Math.min(pw, ph);
   const ringScale = 1 / Math.max(0.01, vals.ringSubjectScale || 1);
-  const ringBox = `left:50%;top:50%;width:${ringSpan}px;height:${ringSpan}px;transform:translate(-50%,-50%) scale(${ringScale});`;
+  // The ring is sampled over the mesh's own quad (`TokenRing#configureSize` → `getTextureUVs`),
+  // so it rides along with the anchor displacement exactly like the art does.
+  const ringBox = `left:50%;top:50%;width:${ringSpan}px;height:${ringSpan}px;transform:translate(-50%,-50%) `
+    + `translate(${anchorOffset.x}px,${anchorOffset.y}px) scale(${ringScale});`;
   const ringR = 50 - (_FE_TP_RING_THICKNESS * 100) / 2;
   const ringLayers = vals.ringEnabled
     ? {
@@ -285,7 +339,7 @@ function feRenderGridPreview(container, vals, natSize) {
   // survive CSS escaping AND HTML escaping, and getting either layer wrong silently
   // drops the whole style attribute (art gone, fit and opacity with it).
   const artLayer = art.src
-    ? `<div class="fe-tp-art" style="transform:scale(${scaleX},${scaleY});opacity:${vals.alpha};">${
+    ? `<div class="fe-tp-art" style="transform:translate(${anchorOffset.x}px,${anchorOffset.y}px) scale(${scaleX},${scaleY});opacity:${vals.alpha};">${
       vals.tint ? `<div class="fe-tp-tint"></div>` : ""
     }</div>`
     : "";
@@ -307,9 +361,11 @@ function feRenderGridPreview(container, vals, natSize) {
         <svg class="fe-tp-inscribed-circle" viewBox="0 0 ${pw} ${ph}" xmlns="http://www.w3.org/2000/svg">
           <ellipse cx="${pw / 2}" cy="${ph / 2}" rx="${pw / 2 - 1}" ry="${ph / 2 - 1}"/>
         </svg>
-        <div class="fe-tp-crosshair-h" style="top:${vals.anchorY * 100}%;"></div>
-        <div class="fe-tp-crosshair-v" style="left:${vals.anchorX * 100}%;"></div>
-        <div class="fe-tp-crosshair-dot" style="left:${vals.anchorX * 100}%;top:${vals.anchorY * 100}%;"></div>
+        <!-- The crosshair marks the square's center, i.e. the fixed point the texture anchor is
+             pinned to. It does not move: the art moves under it. -->
+        <div class="fe-tp-crosshair-h" style="top:50%;"></div>
+        <div class="fe-tp-crosshair-v" style="left:50%;"></div>
+        <div class="fe-tp-crosshair-dot" style="left:50%;top:50%;"></div>
       </div>
     </div>
     <div class="fe-tp-info">
@@ -453,8 +509,8 @@ function _feTPWireZoom(panel) {
     const newZoom = Math.min(_FE_TP_ZOOM_MAX, Math.max(_FE_TP_ZOOM_MIN, requestedZoom));
     if (Math.abs(newZoom - oldZoom) < 0.0001) return;
 
-    // Keep the grid point beneath the cursor stationary while zooming. The
-    // grid anchor normally sits at viewport center plus the current pan.
+    // Keep the grid point beneath the cursor stationary while zooming. The grid scales about
+    // its own center, which sits at the viewport center plus the current pan.
     const rect = viewport.getBoundingClientRect();
     const pan = panel._feTPPan ?? { x: 0, y: 0 };
     const cursorFromAnchorX = e.clientX - rect.left - rect.width / 2 - pan.x;

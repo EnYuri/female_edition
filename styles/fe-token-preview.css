@@ -91,7 +91,7 @@
   padding: 4px;
 }
 
-/* Viewport — the fixed-size window that clips the grid; anchor is always at its center */
+/* Viewport — the fixed-size window that clips the grid; the grid square sits at its center */
 .fe-tp-viewport {
   position: relative;
   overflow: hidden;
@@ -150,7 +150,9 @@
   pointer-events: none;
 }
 
-/* Grid container — positioned absolutely inside the viewport, offset so anchor lands at center */
+/* Grid container — positioned absolutely inside the viewport, centered (plus the pan offset).
+   The token square is the fixed frame: the texture anchor displaces the ART inside it, so
+   `.fe-tp-art` may legitimately overhang and must NOT be clipped here. */
 .fe-tp-grid {
   position: absolute;
 }
