@@ -15,11 +15,10 @@ function feEscapeHTML(str) {
       .replaceAll("'", "&#039;");
 }
 
-// Allow only safe link schemes for markdown `[label](url)` anchors. A bare
-// `javascript:`/`data:`/`vbscript:` href turns a chat link into a script-execution
-// vector the moment another user clicks it. Relative/anchor/protocol-relative URLs
-// (no scheme) and http(s)/mailto are allowed; anything else returns null → rendered
-// as plain text instead of an anchor.
+// Allow only safe link/image schemes for markdown destinations. A bare
+// `javascript:`/`data:`/`vbscript:` URL can turn generated markup into an unsafe
+// navigation or resource. Relative/anchor/protocol-relative URLs (no scheme) and
+// http(s)/mailto are allowed; anything else returns null → rendered as plain text.
 function feSafeMarkdownUrl(url) {
   const u = String(url ?? "").trim();
   if (!u) return null;
@@ -28,26 +27,36 @@ function feSafeMarkdownUrl(url) {
   return u;
 }
 
-function feInlineFormat(text) {
-  const codeSpans = [];
-  text = text.replace(/`([^`]+)`/g, (_m, code) => {
-    const idx = codeSpans.push(code) - 1;
-    return `FECODE${idx}`;
-  });
+function _feInlineFormatEscaped(escapedText) {
+  let text = String(escapedText ?? "");
+  const protectedHTML = [];
+  let tokenPrefix = "FEMDTOKEN";
+  while (text.includes(tokenPrefix)) tokenPrefix += "X";
 
-  // NOTE: `text` is already HTML-escaped by every feInlineFormat caller, so the
-  // captured alt/label/url are safe for HTML/attribute context as-is. Re-escaping
-  // here would double-encode `&` (e.g. query-string URLs `?a=1&b=2` → `&amp;amp;`)
-  // and corrupt links — so we intentionally do NOT escape again.
+  const protect = (html) => {
+    const idx = protectedHTML.push(html) - 1;
+    return `${tokenPrefix}${idx}Z`;
+  };
+
+  // Protect generated markup before applying emphasis. Otherwise underscores or
+  // asterisks in href/src attributes are mistaken for markdown and corrupt them.
   text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt, url) => {
-    return `<img src="${url}" alt="${alt}">`;
+    const safeUrl = feSafeMarkdownUrl(url);
+    if (!safeUrl) return alt;
+    return protect(`<img src="${safeUrl}" alt="${alt}">`);
   });
 
   text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => {
+    const formattedLabel = _feInlineFormatEscaped(label);
     const safeUrl = feSafeMarkdownUrl(url);
-    // Unsafe scheme (javascript:/data:/…) → drop the anchor, render label as text.
-    if (!safeUrl) return label;
-    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    if (!safeUrl) return protect(formattedLabel);
+    return protect(`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${formattedLabel}</a>`);
+  });
+
+  text = text.replace(/`([^`]+)`/g, (_m, code) => {
+    // `text` was escaped before parsing, so escaping again here would make
+    // `<b>` display as the literal entity text `&lt;b&gt;`.
+    return protect(`<code>${code}</code>`);
   });
 
   text = text.replace(/~~(.+?)~~/gs, "<s>$1</s>");
@@ -56,14 +65,21 @@ function feInlineFormat(text) {
   text = text.replace(/\*\*(.+?)\*\*/gs, "<strong>$1</strong>");
   text = text.replace(/__(.+?)__/gs, "<strong>$1</strong>");
   text = text.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/gm, "$1<em>$2</em>");
-  text = text.replace(/(^|[^_])_([^_\n]+?)_(?!_)/gm, "$1<em>$2</em>");
+  // Markdown underscores do not create emphasis in the middle of a word.
+  text = text.replace(
+    /(^|[^\p{L}\p{N}_])_([^_\n]+?)_(?![\p{L}\p{N}_])/gmu,
+    "$1<em>$2</em>",
+  );
 
-  for (let i = 0; i < codeSpans.length; i++) {
-    const safe = feEscapeHTML(codeSpans[i]);
-    text = text.replaceAll(`FECODE${i}`, `<code>${safe}</code>`);
+  for (let i = 0; i < protectedHTML.length; i++) {
+    text = text.replaceAll(`${tokenPrefix}${i}Z`, protectedHTML[i]);
   }
 
   return text;
+}
+
+function feInlineFormat(text) {
+  return _feInlineFormatEscaped(feEscapeHTML(text));
 }
 
 function feMarkdownToHTML(md) {
@@ -75,8 +91,7 @@ function feMarkdownToHTML(md) {
   const pushParagraph = (paragraphLines) => {
     if (!paragraphLines.length) return;
     const raw = paragraphLines.join("\n");
-    const escaped = feEscapeHTML(raw);
-    const formatted = feInlineFormat(escaped).replaceAll("\n", "<br>");
+    const formatted = feInlineFormat(raw).replaceAll("\n", "<br>");
     blocks.push(`<p>${formatted}</p>`);
   };
 
@@ -104,7 +119,7 @@ function feMarkdownToHTML(md) {
     const mHeading = line.match(/^(#{1,6})\s+(.*)$/);
     if (mHeading) {
       const level = Math.min(6, mHeading[1].length);
-      const text = feInlineFormat(feEscapeHTML(mHeading[2] ?? ""));
+      const text = feInlineFormat(mHeading[2] ?? "");
       blocks.push(`<h${level}>${text}</h${level}>`);
       i++; continue;
     }
@@ -120,8 +135,7 @@ function feMarkdownToHTML(md) {
         i++;
       }
       const raw = quoteLines.join("\n");
-      const escaped = feEscapeHTML(raw);
-      const formatted = feInlineFormat(escaped).replaceAll("\n", "<br>");
+      const formatted = feInlineFormat(raw).replaceAll("\n", "<br>");
       blocks.push(`<blockquote><p>${formatted}</p></blockquote>`);
       continue;
     }
@@ -134,7 +148,7 @@ function feMarkdownToHTML(md) {
         if (!m) break;
         items.push(m[2]); i++;
       }
-      const lis = items.map((it) => `<li>${feInlineFormat(feEscapeHTML(it ?? ""))}</li>`).join("");
+      const lis = items.map((it) => `<li>${feInlineFormat(it ?? "")}</li>`).join("");
       blocks.push(`<ul>${lis}</ul>`);
       continue;
     }

@@ -229,12 +229,10 @@
   --fe-inline-leading:          2px;
   --fe-inline-pad-y:            1px;
 
-  /* Weight / synthesis */
+  /* Font weights */
   --fe-font-weight-title: 700;
   --fe-font-weight-body:  400;
   --fe-font-weight-small: 400;
-
-  font-synthesis: weight;
 }
 
 /* ===================================================
@@ -291,8 +289,8 @@ body.fe-fonts-enabled {
    0,2,3)가 헤딩을 Signika 로 되돌려, DX3rd 시트의 h4 등이 커스텀 폰트 대신
    Signika 로 표시됐다(--font-h4 는 코어가 .app 에서 재선언 안 해 NeoDGM 유지되지만,
    헤딩 규칙이 --font-h4 가 아니라 --font-primary 를 쓰는 게 함정).
-   → .app/.application 스코프에도 재선언해 관통시킨다(특정도 0,3,0 > 코어 0,2,0,
-     ui-font.css 는 비-레이어라 일반 선언이 코어 레이어보다 우선). */
+   → .app/.application 자신에도 important 로 재선언해 관통시킨다. ui-font.css 는
+     layer(layouts)이고 코어의 해당 변수 선언은 normal 이므로 이 선언이 이긴다. */
 body.fe-fonts-enabled :is(.app, .application) {
   --font-primary: var(--fe-font-primary) !important;
 }
@@ -455,7 +453,6 @@ body.fe-fonts-enabled .dnd5e2.sheet,
 body.fe-fonts-enabled .dnd5e2.application,
 body.fe-fonts-enabled .dnd5e2.app {
   font-family: var(--fe-ui-font-family) !important;
-  font-synthesis: weight;
   text-rendering: auto;
   -webkit-font-smoothing: auto;
   -moz-osx-font-smoothing: auto;

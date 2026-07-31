@@ -44,9 +44,24 @@ test("feInlineFormat renders bold, italic, strikethrough and code", () => {
 });
 
 test("feInlineFormat escapes HTML inside a code span", () => {
-  // The code span content is re-escaped after formatting so markup inside
-  // backticks never becomes live HTML.
   assert.equal(feInlineFormat("`<b>`"), "<code>&lt;b&gt;</code>");
+});
+
+test("feMarkdownToHTML does not double-escape code span content", () => {
+  assert.equal(feMarkdownToHTML("`<b>`"), "<p><code>&lt;b&gt;</code></p>");
+});
+
+test("feInlineFormat does not treat intraword underscores as emphasis", () => {
+  assert.equal(feInlineFormat("foo_bar_baz"), "foo_bar_baz");
+  assert.equal(feInlineFormat("앞_중간_뒤"), "앞_중간_뒤");
+  assert.equal(feInlineFormat("a _italic_ word"), "a <em>italic</em> word");
+});
+
+test("feInlineFormat protects literal text from placeholder collisions", () => {
+  assert.equal(
+    feInlineFormat("FECODE0 and `x`"),
+    "FECODE0 and <code>x</code>",
+  );
 });
 
 // ── feInlineFormat: link safety (security-critical) ───────────────────────────
@@ -57,7 +72,7 @@ test("feInlineFormat keeps http(s) links as anchors", () => {
 });
 
 test("feInlineFormat drops a javascript: link, leaving only the label text", () => {
-  const out = feInlineFormat(feEscapeHTML("[click](javascript:alert(1))"));
+  const out = feInlineFormat("[click](javascript:alert(1))");
   assert.doesNotMatch(out, /<a\b/);
   assert.doesNotMatch(out, /javascript:/i);
   assert.match(out, /click/);
@@ -70,12 +85,34 @@ test("feInlineFormat drops a data: link", () => {
 });
 
 test("feInlineFormat does not double-encode ampersands in a query string", () => {
-  // text is already HTML-escaped by callers, so `&` arrives as `&amp;`; the URL
-  // must survive verbatim (no `&amp;amp;`).
-  const escaped = feEscapeHTML("[q](https://e.com/?a=1&b=2)");
-  const out = feInlineFormat(escaped);
+  const out = feInlineFormat("[q](https://e.com/?a=1&b=2)");
   assert.match(out, /href="https:\/\/e\.com\/\?a=1&amp;b=2"/);
   assert.doesNotMatch(out, /&amp;amp;/);
+});
+
+test("feInlineFormat does not parse underscores inside link or image attributes", () => {
+  assert.equal(
+    feInlineFormat("[label](https://example.com/a_b_c)"),
+    '<a href="https://example.com/a_b_c" target="_blank" rel="noopener noreferrer">label</a>',
+  );
+  assert.equal(
+    feInlineFormat("![alt](images/a_b_c.webp)"),
+    '<img src="images/a_b_c.webp" alt="alt">',
+  );
+});
+
+test("feInlineFormat formats link labels while keeping generated markup protected", () => {
+  assert.equal(
+    feInlineFormat("[**bold** and `code`](https://example.com)"),
+    '<a href="https://example.com" target="_blank" rel="noopener noreferrer"><strong>bold</strong> and <code>code</code></a>',
+  );
+});
+
+test("feInlineFormat drops unsafe image schemes", () => {
+  const out = feInlineFormat("![alt](data:image/svg+xml,bad)");
+  assert.doesNotMatch(out, /<img\b/);
+  assert.doesNotMatch(out, /data:/i);
+  assert.equal(out, "alt");
 });
 
 // ── feMarkdownToHTML: block structure ─────────────────────────────────────────
