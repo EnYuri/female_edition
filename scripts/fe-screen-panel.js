@@ -847,9 +847,14 @@ function feBarBox(text, bar, scale) {
 
 /**
  * Full (re)build of a panel tile's overlay labels for its CURRENT face. Called
- * whenever content can change: initial draw, face flips (drawTile fires for
- * both — texture.src changes set the redraw flag), and whenever the panel
+ * whenever content can change: initial draw, face flips, and whenever the panel
  * actor's faces/overlays or the linked actor's data is edited.
+ *
+ * A flip reaches this through TWO different paths and both are needed: when the
+ * new face has a different image, `texture.src` sets core's redraw flag and
+ * drawTile/drawToken fires; when the faces share an image (or are both imageless)
+ * nothing redraws, and onPanelPlaceableUpdate calls this directly off the
+ * currentFace flag change. See the note there.
  */
 /** Is this panel placeable a Token (tokenized panel) rather than a Tile? */
 function feIsPanelToken(placeable) {
@@ -1852,6 +1857,22 @@ function onPanelPlaceableUpdate(doc, changes) {
   const flagChange = foundry.utils.getProperty(changes ?? {}, `flags.${MODULE_ID}.${FE_PANEL_TILE_FLAG}`);
   if (flagChange === undefined) return;
   obj.renderFlags?.set?.({ refreshState: true });
+
+  // 3. **Rebuild the overlays on a face flip that changes no texture (MUST keep).**
+  //    feRebuildPanelOverlays runs from drawTile/drawToken, and a flip only reaches
+  //    those because a `texture.src` change sets core's redraw flag. When the two
+  //    faces SHARE one image — or are both imageless — the update carries no texture
+  //    key at all, so nothing redraws and the PREVIOUS face's labels stay on screen:
+  //    for a panel whose faces differ only in their overlay text, the flip looks like
+  //    it did absolutely nothing. `refreshState` above is not enough — the refresh
+  //    hook only runs feRepositionPanelOverlays, which moves the existing labels and
+  //    never re-reads the face.
+  //    Skip when the texture IS changing: the redraw rebuilds it anyway, and doing it
+  //    here would measure the OLD texture (`tile.texture` still holds the previous
+  //    bitmap at update time), scaling every label to the wrong size.
+  if (flagChange.currentFace === undefined) return;
+  if (foundry.utils.getProperty(changes ?? {}, "texture.src") !== undefined) return;
+  feRebuildPanelOverlays(obj);
 }
 
 Hooks.on("updateTile", fePanelGated(onPanelPlaceableUpdate));
