@@ -173,6 +173,22 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
               text: new f.StringField({ required: false, blank: true, initial: "" }),
               fontSize: new f.NumberField({ required: true, integer: true, min: 4, initial: 28, nullable: false }),
               color: new f.StringField({ required: true, blank: false, initial: "#ffffff" }),
+              // Text-box WIDTH in the face image's own pixels (same units and the same
+              // one-time `* scale` as `fontSize`/`barWidth`). 0 = auto: one unwrapped
+              // line, which is what every pre-existing overlay keeps. Above 0 the canvas
+              // turns on PIXI word wrap at exactly this width, so long text reflows
+              // inside the box instead of running off the panel. Draggable straight off
+              // the sheet preview's right edge — see ScreenPanelSheet's box handle.
+              boxWidth: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
+              // Text-box HEIGHT, same units. 0 = auto = the text's own rendered height.
+              // The canvas never reads it: the text is anchored at the box's CENTRE
+              // (x, y), so centring it in an explicit height paints exactly where
+              // centring it on the anchor does. What the height buys is the resize
+              // geometry — dragging the bottom edge pins the top and moves the centre,
+              // which is how the text visibly shifts, exactly like resizing a frame
+              // around centred content. Kept in the document (not derived) because the
+              // frame has to survive a re-render to be draggable again.
+              boxHeight: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
               // Optional value bar (HP-bar style). Only meaningful when `attr`
               // resolves to a number against the linked actor.
               bar: new f.BooleanField({ initial: false }),

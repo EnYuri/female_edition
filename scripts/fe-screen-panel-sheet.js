@@ -16,6 +16,12 @@ import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feNextCustomAttrName,
 const FE_PREVIEW_ZOOM_MIN = 0.5;
 const FE_PREVIEW_ZOOM_MAX = 20;
 
+// Floor for a dragged text box, in face-image pixels. Small enough not to get in the
+// way, large enough that a box can always be grabbed again — a zero-size frame has no
+// grips left to pull. "No box at all" (0 = auto / no wrap) is a separate state and is
+// reached by typing 0 in the 설정 dialog, not by collapsing the frame.
+const FE_OVERLAY_BOX_MIN_PX = 16;
+
 /**
  * Core's own PrototypeTokenConfig, retargeted at ONE FACE's token settings instead of the
  * actor's prototype token.
@@ -450,6 +456,13 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
             text: ov.text ?? "",
             fontSize: ov.fontSize ?? 28,
             color: ov.color ?? "#ffffff",
+            // 0 = auto (one unwrapped line). `hasBox` drives the marker class that
+            // switches the preview from nowrap to a fixed-width wrapping box, mirroring
+            // feApplyOverlayWordWrap on the canvas.
+            boxWidth: Math.max(0, ov.boxWidth ?? 0),
+            boxHeight: Math.max(0, ov.boxHeight ?? 0),
+            hasBoxW: (ov.boxWidth ?? 0) > 0,
+            hasBoxH: (ov.boxHeight ?? 0) > 0,
             bar: ov.bar ?? false,
             barMin: ov.barMin ?? 0,
             barMax: ov.barMax ?? 100,
@@ -588,15 +601,43 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     await this.#updateFaces(faces);
   }
 
-  /** Relative (0-1, clamped) position of a client point within a preview's rendered image box. */
-  #relativePos(preview, clientX, clientY) {
+  /**
+   * Relative position of a client point within a preview's rendered image box, NOT
+   * clamped. The clamp belongs at the end of the drag math, not at each measurement:
+   * a marker drag subtracts the grab offset from the pointer, and clamping the two
+   * operands separately silently collapses that offset the moment either one leaves
+   * the image (which is exactly when a wide text box's edge does).
+   */
+  #relativePosRaw(preview, clientX, clientY) {
     const img = preview.querySelector("img");
     const box = (img ?? preview).getBoundingClientRect();
     if (!box.width || !box.height) return null;
+    return { x: (clientX - box.left) / box.width, y: (clientY - box.top) / box.height };
+  }
+
+  /** Relative (0-1, clamped) position of a client point within a preview's rendered image box. */
+  #relativePos(preview, clientX, clientY) {
+    const pos = this.#relativePosRaw(preview, clientX, clientY);
+    if (!pos) return null;
     return {
-      x: Math.min(1, Math.max(0, (clientX - box.left) / box.width)),
-      y: Math.min(1, Math.max(0, (clientY - box.top) / box.height)),
+      x: Math.min(1, Math.max(0, pos.x)),
+      y: Math.min(1, Math.max(0, pos.y)),
     };
+  }
+
+  /**
+   * Rendered image pixels → the face image's OWN pixels, the unit every authored
+   * overlay dimension (fontSize, barWidth, boxWidth) is stored in. The inverse of the
+   * `* scale` the canvas applies in feRebuildPanelOverlays, and of the `--fe-sp-ov-px`
+   * cqw formula the preview stylesheet applies. Returns null when the image has not
+   * published its natural size yet (#setupOverlayPreviews sets it on load).
+   */
+  #clientToImagePx(preview, clientPx) {
+    const img = preview.querySelector("img");
+    const width = img?.getBoundingClientRect().width;
+    const natural = img?.naturalWidth;
+    if (!(width > 0) || !(natural > 0)) return null;
+    return clientPx * (natural / width);
   }
 
   /**
@@ -799,6 +840,92 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     }, { passive: false });
   }
 
+  /**
+   * The eight grips of one marker's text-box frame: a normal resize widget, i.e. the
+   * edge you grab is the ONLY edge that moves and the opposite edge stays where it is.
+   *
+   * That is why a resize also writes `x`/`y`. The overlay's stored position is the box's
+   * CENTRE (the canvas anchors the text at 0.5, 0.5 on it), so pinning the left edge
+   * while the right one moves necessarily slides the centre by half the change. An
+   * earlier pass resized symmetrically about the centre precisely to avoid touching the
+   * position — which is exactly the behaviour that made one grip pull both sides at once.
+   *
+   * Geometry is done in CLIENT pixels off the frame's own rect, then converted once at
+   * the end (#clientToImagePx for the sizes, the image rect for the centre). Every move
+   * recomputes from the rect captured at pointerdown rather than from the previous frame,
+   * so the box cannot drift by accumulated rounding over a long drag.
+   *
+   * `boxHeight` never reaches the canvas — centred text in an explicit height paints
+   * where centred text on the anchor paints. What a vertical drag actually does is move
+   * the centre, which is what makes the text visibly shift. See the schema comment.
+   *
+   * Live preview writes the CSS vars + classes directly and commits once on release, the
+   * same shape as the marker move above: every intermediate write would be a document
+   * update and a full re-render.
+   */
+  #wireOverlayBoxResize(preview, faceIndex, marker) {
+    const overlayIndex = Number(marker.dataset.overlayIndex);
+    for (const handle of marker.querySelectorAll(".fe-sp-overlay-box-handle")) {
+      const side = handle.dataset.side ?? "";
+      handle.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const frame = handle.closest(".fe-sp-overlay-box-frame");
+        const img = preview.querySelector("img");
+        const start = frame?.getBoundingClientRect();
+        const imgBox = img?.getBoundingClientRect();
+        if (!start?.width || !imgBox?.width) return;
+        // The minimum in client pixels, so the clamp happens in the same space as the
+        // rest of the math — converting a clamped image-pixel value back would round twice.
+        const min = FE_OVERLAY_BOX_MIN_PX * (imgBox.width / (img.naturalWidth || imgBox.width));
+
+        let box = null;
+        let moved = false;
+        marker.classList.add("dragging", "resizing");
+        const onMove = (e) => {
+          let { left, top, right, bottom } = start;
+          if (side.includes("e")) right = Math.max(left + min, e.clientX);
+          if (side.includes("w")) left = Math.min(right - min, e.clientX);
+          if (side.includes("s")) bottom = Math.max(top + min, e.clientY);
+          if (side.includes("n")) top = Math.min(bottom - min, e.clientY);
+          const w = this.#clientToImagePx(preview, right - left);
+          const h = this.#clientToImagePx(preview, bottom - top);
+          if (w === null || h === null) return;
+          moved = true;
+          box = {
+            boxWidth: Math.round(w),
+            boxHeight: Math.round(h),
+            x: Math.min(1, Math.max(0, ((left + right) / 2 - imgBox.left) / imgBox.width)),
+            y: Math.min(1, Math.max(0, ((top + bottom) / 2 - imgBox.top) / imgBox.height)),
+          };
+          marker.style.left = `${box.x * 100}%`;
+          marker.style.top = `${box.y * 100}%`;
+          marker.style.setProperty("--fe-sp-ov-box-w", String(box.boxWidth));
+          marker.style.setProperty("--fe-sp-ov-box-h", String(box.boxHeight));
+          // Both axes become explicit on any resize: the frame the user just dragged IS
+          // the box now, and leaving one axis on "auto" would snap it back to the text's
+          // own size the moment the sheet re-rendered.
+          marker.classList.add("has-box-w", "has-box-h");
+        };
+        const cleanup = () => {
+          window.removeEventListener("pointermove", onMove, true);
+          window.removeEventListener("pointerup", onUp, true);
+          window.removeEventListener("pointercancel", onCancel, true);
+          marker.classList.remove("dragging", "resizing");
+        };
+        const onUp = () => {
+          cleanup();
+          if (moved && box) this.#updateOverlayFields(faceIndex, overlayIndex, box);
+        };
+        const onCancel = () => cleanup(); // re-render restores the persisted box
+        window.addEventListener("pointermove", onMove, true);
+        window.addEventListener("pointerup", onUp, true);
+        window.addEventListener("pointercancel", onCancel, true);
+      });
+    }
+  }
+
   /** @override */
   _onRender(context, options) {
     super._onRender?.(context, options);
@@ -831,13 +958,36 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       for (const marker of preview.querySelectorAll(".fe-sp-overlay-marker")) {
         marker.addEventListener("pointerdown", (event) => {
           if (event.button !== 0) return;
+          // The box grips are their own gesture (resize, not move) and are wired below.
+          if (event.target.closest?.(".fe-sp-overlay-box-handle")) return;
           event.preventDefault();
           event.stopPropagation(); // don't let this bubble into the click-to-place listener above
           const overlayIndex = Number(marker.dataset.overlayIndex);
+          // GRAB OFFSET, not "snap the anchor to the cursor". The marker is centred on
+          // its anchor via translate(-50%, -50%), so writing the raw pointer position
+          // into left/top teleports whatever part of the text you grabbed to the middle
+          // of the box — the wider the box, the bigger the jump. Hold the distance
+          // between the pointer and the anchor constant instead, the way every other
+          // drag in this module (and on the canvas) behaves.
+          const grab = this.#relativePosRaw(preview, event.clientX, event.clientY);
+          const origin = {
+            x: (parseFloat(marker.style.left) || 0) / 100,
+            y: (parseFloat(marker.style.top) || 0) / 100,
+          };
+          const offset = grab ? { x: origin.x - grab.x, y: origin.y - grab.y } : { x: 0, y: 0 };
+          const at = (e) => {
+            const pos = this.#relativePosRaw(preview, e.clientX, e.clientY);
+            if (!pos) return null;
+            // One clamp, applied to the RESULT — see #relativePosRaw.
+            return {
+              x: Math.min(1, Math.max(0, pos.x + offset.x)),
+              y: Math.min(1, Math.max(0, pos.y + offset.y)),
+            };
+          };
           let moved = false;
           marker.classList.add("dragging");
           const onMove = (e) => {
-            const pos = this.#relativePos(preview, e.clientX, e.clientY);
+            const pos = at(e);
             if (!pos) return;
             moved = true;
             marker.style.left = `${pos.x * 100}%`;
@@ -852,7 +1002,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           const onUp = (e) => {
             cleanup();
             if (!moved) return;
-            const pos = this.#relativePos(preview, e.clientX, e.clientY);
+            const pos = at(e);
             if (!pos) return;
             this.#updateOverlayPos(faceIndex, overlayIndex, pos.x, pos.y);
           };
@@ -861,6 +1011,8 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           window.addEventListener("pointerup", onUp, true);
           window.addEventListener("pointercancel", onCancel, true);
         });
+
+        this.#wireOverlayBoxResize(preview, faceIndex, marker);
       }
     }
 
@@ -1232,7 +1384,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       attr: "", text: "", fontSize: 28, color: "#ffffff",
       bar: false, barMin: 0, barMax: 100,
       barMode: "under", barWidth: 0, barHeight: 6, barColor: "#33cc33",
-      barBorderWidth: 0, barBorderColor: "#000000",
+      barBorderWidth: 0, barBorderColor: "#000000", boxWidth: 0, boxHeight: 0,
     });
     await this.#updateFaces(faces);
   }
@@ -1294,53 +1446,94 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           <label>${L("FESP.Sheet.OverlayColor")}</label>
           <input type="color" name="color" value="${esc(ov.color ?? "#ffffff")}">
         </div>
+        <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBoxWidth")}</label>
+          <input type="number" name="boxWidth" value="${ov.boxWidth ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">
+        </div>
+        <div class="fe-sp-field">
+          <label>${L("FESP.Sheet.OverlayBoxHeight")}</label>
+          <input type="number" name="boxHeight" value="${ov.boxHeight ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">
+        </div>
+        <p class="notes">${L("FESP.Sheet.OverlayBoxWidthNote")}</p>
         <hr>
+        ${/* The checkbox sits ABOVE the fields it controls, not below them. Below, every
+              toggle moved it by the full height of the block that had just appeared above
+              it — you clicked it and it slid out from under the cursor. Above, expanding
+              only ever grows the form downwards and the control the user is operating
+              never moves. (It stays at the BOTTOM of the dialog for as long as the bar is
+              off, which is the layout the previous pass was after.) */""}
         <label class="fe-sp-overlay-bar-toggle">
           <input type="checkbox" name="bar" ${ov.bar ? "checked" : ""}>
           ${L("FESP.Sheet.OverlayBarEnable")}
         </label>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarMin")}</label>
-          <input type="number" name="barMin" value="${ov.barMin ?? 0}" step="any">
+        <div class="fe-sp-overlay-bar-fields" ${ov.bar ? "" : "hidden"}>
+          <hr>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarMin")}</label>
+            <input type="number" name="barMin" value="${ov.barMin ?? 0}" step="any">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarMax")}</label>
+            <input type="number" name="barMax" value="${ov.barMax ?? 100}" step="any">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarMode")}</label>
+            <select name="barMode">
+              <option value="under" ${ov.barMode === "inside" ? "" : "selected"}>${L("FESP.Sheet.OverlayBarModeUnder")}</option>
+              <option value="inside" ${ov.barMode === "inside" ? "selected" : ""}>${L("FESP.Sheet.OverlayBarModeInside")}</option>
+            </select>
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarWidth")}</label>
+            <input type="number" name="barWidth" value="${ov.barWidth ?? 0}" min="0" step="1"
+                   placeholder="${esc(L("FESP.Sheet.OverlayBarWidthPh"))}">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarHeight")}</label>
+            <input type="number" name="barHeight" value="${ov.barHeight ?? 6}" min="1" step="1">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarColor")}</label>
+            <input type="color" name="barColor" value="${esc(ov.barColor ?? "#33cc33")}">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarBorderWidth")}</label>
+            <input type="number" name="barBorderWidth" value="${ov.barBorderWidth ?? 0}" min="0" step="1"
+                   placeholder="${esc(L("FESP.Sheet.OverlayBarBorderWidthPh"))}">
+          </div>
+          <div class="fe-sp-field">
+            <label>${L("FESP.Sheet.OverlayBarBorderColor")}</label>
+            <input type="color" name="barBorderColor" value="${esc(ov.barBorderColor ?? "#000000")}">
+          </div>
+          <p class="notes">${L("FESP.Sheet.OverlayBarNote")}</p>
         </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarMax")}</label>
-          <input type="number" name="barMax" value="${ov.barMax ?? 100}" step="any">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarMode")}</label>
-          <select name="barMode">
-            <option value="under" ${ov.barMode === "inside" ? "" : "selected"}>${L("FESP.Sheet.OverlayBarModeUnder")}</option>
-            <option value="inside" ${ov.barMode === "inside" ? "selected" : ""}>${L("FESP.Sheet.OverlayBarModeInside")}</option>
-          </select>
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarWidth")}</label>
-          <input type="number" name="barWidth" value="${ov.barWidth ?? 0}" min="0" step="1"
-                 placeholder="${esc(L("FESP.Sheet.OverlayBarWidthPh"))}">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarHeight")}</label>
-          <input type="number" name="barHeight" value="${ov.barHeight ?? 6}" min="1" step="1">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarColor")}</label>
-          <input type="color" name="barColor" value="${esc(ov.barColor ?? "#33cc33")}">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarBorderWidth")}</label>
-          <input type="number" name="barBorderWidth" value="${ov.barBorderWidth ?? 0}" min="0" step="1"
-                 placeholder="${esc(L("FESP.Sheet.OverlayBarBorderWidthPh"))}">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBarBorderColor")}</label>
-          <input type="color" name="barBorderColor" value="${esc(ov.barBorderColor ?? "#000000")}">
-        </div>
-        <p class="notes fe-sp-overlay-bar-note">${L("FESP.Sheet.OverlayBarNote")}</p>
       </div>`;
     await foundry.applications.api.DialogV2.prompt({
       window: { title: game.i18n.format("FESP.Sheet.OverlayEditTitle", { n: oi + 1 }) },
+      // Scoping class for the height cap in fe-screen-panel.css — see the CSS comment:
+      // without it the fully-expanded bar block pushes the [적용] footer past the window
+      // bottom and .window-content's `overflow: hidden` clips it away entirely.
+      classes: ["fe-sp-overlay-edit-dialog"],
       content,
+      // The bar's eight fields are dead weight while 값 바 표시 is off — and they were the
+      // bulk of the height that made the footer unreachable. They stay IN the form (hidden,
+      // not removed) so the ok callback's `form.elements.bar*` reads keep working unchanged.
+      render: (_event, dialog) => {
+        const root = dialog.element;
+        const toggle = root?.querySelector('input[name="bar"]');
+        if (!toggle) return;
+        const fields = root.querySelector(".fe-sp-overlay-bar-fields");
+        const sync = () => {
+          if (fields) fields.hidden = !toggle.checked;
+          // The window was sized for the previous content height; re-measure or it keeps
+          // the taller box (and, collapsing, a large empty area under the footer).
+          dialog.setPosition({ height: "auto" });
+        };
+        toggle.addEventListener("change", sync);
+        sync();
+      },
       ok: {
         icon: "fa-solid fa-check",
         label: L("FESP.Sheet.OverlayEditApply"),
@@ -1351,6 +1544,9 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
             attr: (form.elements.attr?.value ?? "").trim(),
             fontSize: Number(form.elements.fontSize?.value) || 28,
             color: form.elements.color?.value || "#ffffff",
+            // Like barWidth, 0 is meaningful (auto / no wrap) rather than missing.
+            boxWidth: Math.max(0, Math.round(Number(form.elements.boxWidth?.value) || 0)),
+            boxHeight: Math.max(0, Math.round(Number(form.elements.boxHeight?.value) || 0)),
             bar: !!form.elements.bar?.checked,
             barMin: Number(form.elements.barMin?.value) || 0,
             barMax: Number(form.elements.barMax?.value) || 100,

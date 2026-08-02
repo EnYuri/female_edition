@@ -790,11 +790,106 @@
   outline: 1px dashed rgba(255, 255, 255, 0.75);
   outline-offset: 2px;
 }
+/* An editable marker has a resize frame, and the frame draws its own dashed rectangle —
+   with no box set the two coincide and read as a doubled outline. The frame wins: it is
+   the one that tells you what the grips will move. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-preview:hover:has(.fe-sp-overlay-box-frame) {
+  outline: none;
+}
 /* The label is its own element so the bar can be a positioned sibling without the two
    fighting over the marker's box. */
 .fe-screen-panel-sheet .fe-sp-overlay-marker-text {
   position: relative; /* above the bar, which is the sibling below it in the stack */
   white-space: nowrap;
+}
+/* --- Text box (boxWidth > 0): the CSS transcription of feApplyOverlayWordWrap -------
+   The canvas turns on PIXI word wrap at `boxWidth * scale` and centres the wrapped
+   lines (the anchor is the box's centre in both places). --fe-sp-ov-box-w is in the
+   face image's own pixels, so it goes through the same --fe-sp-ov-px conversion as
+   every other dimension here. `overflow-wrap: anywhere` is the browser's equivalent of
+   PIXI's `breakWords`: a Korean sentence written without spaces is a single unbreakable
+   token everywhere else, and it must reflow rather than run off the box.
+
+   One knowing divergence: with a box set AND the bar on AUTO length, the canvas sizes
+   the bar to `text.width` = the longest WRAPPED line, while the bar below hugs the box.
+   CSS cannot express "the longest resulting line" (`fit-content` under a `max-width`
+   clamps to the max-width, not to where the text actually broke), and the gap is at
+   most one line fragment. Set an explicit bar length if it matters. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-box-w {
+  width: max(1px, calc(var(--fe-sp-ov-box-w, 0) * var(--fe-sp-ov-px)));
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-box-w .fe-sp-overlay-marker-text {
+  width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/* --- Resize frame -------------------------------------------------------------------
+   A separate element from the marker, and deliberately OUT OF FLOW: the marker's own box
+   must stay the TEXT box, because the value bar is positioned against it and feBarBox
+   measures the text on the canvas too. Sizing the marker to the frame would drop an
+   "under" bar to the bottom of the frame while the canvas keeps it under the text.
+
+   Centred on the marker (= the overlay's anchor = the box centre in the document), so
+   the frame the user drags is the same rectangle the resize math writes back.
+
+   `pointer-events: none` on the frame, `auto` on the grips: the frame overlays the text,
+   and a frame that swallowed clicks would kill the move-drag on anything inside it. */
+.fe-screen-panel-sheet .fe-sp-overlay-box-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;   /* auto = the text's own box, until a boxWidth/boxHeight is set */
+  height: 100%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 80ms linear;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-box-w .fe-sp-overlay-box-frame {
+  width: max(1px, calc(var(--fe-sp-ov-box-w, 0) * var(--fe-sp-ov-px)));
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker.has-box-h .fe-sp-overlay-box-frame {
+  height: max(1px, calc(var(--fe-sp-ov-box-h, 0) * var(--fe-sp-ov-px)));
+}
+.fe-screen-panel-sheet .fe-sp-overlay-marker:hover .fe-sp-overlay-box-frame,
+.fe-screen-panel-sheet .fe-sp-overlay-marker.resizing .fe-sp-overlay-box-frame {
+  opacity: 1;
+  outline: 1px dashed rgba(255, 255, 255, 0.85);
+}
+/* The eight grips. Each is centred ON its edge/corner rather than pushed outside it, so
+   a frame that has been dragged down to the minimum still has eight distinct targets
+   instead of a ring of overlapping ones. 11px because a 2px hairline is not a pointer
+   target; the visible dot is drawn by ::before at half that. */
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px; /* centre on the left/top the rules below place it at */
+  pointer-events: auto;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+}
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-nw { left: 0;    top: 0;    cursor: nwse-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-n  { left: 50%;  top: 0;    cursor: ns-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-ne { left: 100%; top: 0;    cursor: nesw-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-w  { left: 0;    top: 50%;  cursor: ew-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-e  { left: 100%; top: 50%;  cursor: ew-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-sw { left: 0;    top: 100%; cursor: nesw-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-s  { left: 50%;  top: 100%; cursor: ns-resize; }
+.fe-screen-panel-sheet .fe-sp-overlay-box-handle.h-se { left: 100%; top: 100%; cursor: nwse-resize; }
+/* While resizing, the frame's dashed rectangle is the feedback that matters — it is the
+   box being sized. The move gesture's white halo would read as "this is moving". */
+.fe-screen-panel-sheet .fe-sp-overlay-marker.resizing {
+  box-shadow: none;
+  outline: none;
 }
 .fe-screen-panel-sheet .fe-sp-overlay-marker.dragging {
   cursor: grabbing;
@@ -1024,10 +1119,11 @@
   border-top: 1px solid rgba(0, 0, 0, 0.15);
   margin: 2px 0;
 }
-/* The bar's units (face-image pixels, not screen pixels) and the two "auto" rules
-   — length 0 and the inside-mode thickness floor — are not inferable from the
-   field labels, and getting them wrong just looks like the bar ignoring the input. */
-.fe-sp-overlay-edit-form .fe-sp-overlay-bar-note {
+/* Every unit in this dialog is in FACE-IMAGE pixels, not screen pixels, and each block
+   has an "auto" rule that is not inferable from its field label (bar length 0, the
+   inside-mode thickness floor, box width 0). Getting one wrong just looks like the
+   setting being ignored, so each block carries its note. */
+.fe-sp-overlay-edit-form .notes {
   margin: 0;
   font-size: 11px;
   line-height: 1.45;
@@ -1038,6 +1134,33 @@
   align-items: center;
   gap: 6px;
   font-weight: 600;
+}
+/* 값 바 표시가 꺼져 있으면 통째로 접힌다. 폼에서 제거하지 않고 감추기만 하는 이유는
+   [적용] 콜백이 form.elements.bar* 를 그대로 읽기 때문. 이 규칙이 display 를 지정하므로
+   UA 의 [hidden]{display:none} 을 이기고, 따라서 [hidden] 분기를 따로 둬야 한다. */
+.fe-sp-overlay-edit-form .fe-sp-overlay-bar-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fe-sp-overlay-edit-form .fe-sp-overlay-bar-fields[hidden] {
+  display: none;
+}
+
+/* 오버레이 설정 다이얼로그의 높이 상한 (MUST keep).
+   바 설정 8칸을 모두 펼치면 내용이 화면보다 길어지는데, 코어의
+   `.application .window-content { overflow: hidden }` 이 넘치는 부분을 잘라내므로
+   폼 맨 아래 <footer> 의 [적용] 버튼이 통째로 사라져 클릭 자체가 불가능했다.
+   (v14.365 실측: 다이얼로그 높이 777px, 버튼 top 840px — 창 밖.) 증상이 "설정이 저장되지
+   않는다"로 보였던 원인이 이것이다. Enter 로는 저장됐다.
+   ApplicationV2#_updatePosition 의 height:"auto" 분기는 max-height 로 클램프하지 않지만
+   getBoundingClientRect() 로 "브라우저가 실제로 그린" 박스를 재므로 CSS max-height 는
+   존중된다 — CLAUDE.md 의 "AppV2 Auto-Height Sheets Need Explicit Scroll" 규칙 그대로. */
+.application.dialog.fe-sp-overlay-edit-dialog {
+  max-height: 85vh;
+}
+.application.dialog.fe-sp-overlay-edit-dialog .window-content {
+  overflow-y: auto;
 }
 
 /* ----- Retro theme -----

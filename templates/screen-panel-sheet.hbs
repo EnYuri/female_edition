@@ -206,10 +206,16 @@
                       preview and `feBarBox` cannot disagree. The chip chrome only comes back on
                       hover, as a drag affordance. `showBar` is the "would the canvas actually
                       paint one" test, so the marker never shows a bar the canvas would skip. }}
-                  <div class="fe-sp-overlay-marker{{#if ov.preview}} has-preview{{/if}}{{#if ov.showBar}} has-bar bar-{{ov.barMode}}{{#if ov.barFixed}} bar-fixed{{/if}}{{#if ov.barBordered}} bar-bordered{{/if}}{{/if}}"
+                  <div class="fe-sp-overlay-marker{{#if ov.preview}} has-preview{{/if}}{{#if ov.hasBoxW}} has-box-w{{/if}}{{#if ov.hasBoxH}} has-box-h{{/if}}{{#if ov.showBar}} has-bar bar-{{ov.barMode}}{{#if ov.barFixed}} bar-fixed{{/if}}{{#if ov.barBordered}} bar-bordered{{/if}}{{/if}}"
                        data-overlay-index="{{ov.index}}"
-                       style="left:{{ov.xPct}}%; top:{{ov.yPct}}%;{{#if ov.preview}} color:{{ov.color}}; --fe-sp-ov-font:{{ov.fontSize}};{{/if}}{{#if ov.showBar}} --fe-sp-ov-bar-pct:{{ov.barPct}}%; --fe-sp-ov-bar-color:{{ov.barColor}}; --fe-sp-ov-bar-w:{{ov.barWidth}}; --fe-sp-ov-bar-h:{{ov.barHeight}}; --fe-sp-ov-bar-bw:{{ov.barBorderWidth}}; --fe-sp-ov-bar-bc:{{ov.barBorderColor}};{{/if}}"
-                       data-tooltip-text="{{ov.num}}">{{#if ov.showBar}}<span class="fe-sp-overlay-marker-bar"></span>{{/if}}<span class="fe-sp-overlay-marker-text">{{#if ov.preview}}{{ov.preview}}{{else}}{{ov.num}}{{/if}}</span></div>
+                       style="left:{{ov.xPct}}%; top:{{ov.yPct}}%; --fe-sp-ov-box-w:{{ov.boxWidth}}; --fe-sp-ov-box-h:{{ov.boxHeight}};{{#if ov.preview}} color:{{ov.color}}; --fe-sp-ov-font:{{ov.fontSize}};{{/if}}{{#if ov.showBar}} --fe-sp-ov-bar-pct:{{ov.barPct}}%; --fe-sp-ov-bar-color:{{ov.barColor}}; --fe-sp-ov-bar-w:{{ov.barWidth}}; --fe-sp-ov-bar-h:{{ov.barHeight}}; --fe-sp-ov-bar-bw:{{ov.barBorderWidth}}; --fe-sp-ov-bar-bc:{{ov.barBorderColor}};{{/if}}"
+                       data-tooltip-text="{{ov.num}}">{{#if ov.showBar}}<span class="fe-sp-overlay-marker-bar"></span>{{/if}}<span class="fe-sp-overlay-marker-text">{{#if ov.preview}}{{ov.preview}}{{else}}{{ov.num}}{{/if}}</span>{{#if ../../fe.editable}}{{! The text-box resize frame: a hover-only rectangle with the usual eight
+                        grips. It is a SEPARATE element from the marker on purpose — the
+                        marker's own box has to stay the TEXT box, because that is what the
+                        value bar is positioned against (feBarBox measures the text, not the
+                        frame). Sizing the marker itself would drop an "under" bar to the
+                        bottom of the frame while the canvas keeps it under the text. }}<span class="fe-sp-overlay-box-frame"
+                        title="{{localize 'FESP.Sheet.OverlayBoxHandleHint'}}"><span class="fe-sp-overlay-box-handle h-nw" data-side="nw"></span><span class="fe-sp-overlay-box-handle h-n" data-side="n"></span><span class="fe-sp-overlay-box-handle h-ne" data-side="ne"></span><span class="fe-sp-overlay-box-handle h-w" data-side="w"></span><span class="fe-sp-overlay-box-handle h-e" data-side="e"></span><span class="fe-sp-overlay-box-handle h-sw" data-side="sw"></span><span class="fe-sp-overlay-box-handle h-s" data-side="s"></span><span class="fe-sp-overlay-box-handle h-se" data-side="se"></span></span>{{/if}}</div>
                 {{/each}}
               </div>
             </div>
@@ -240,6 +246,8 @@
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.linkedActorUuid" value="{{ov.linkedActorUuid}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.fontSize" value="{{ov.fontSize}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.color" value="{{ov.color}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.boxWidth" value="{{ov.boxWidth}}">
+                  <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.boxHeight" value="{{ov.boxHeight}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.bar" value="{{ov.bar}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barMin" value="{{ov.barMin}}">
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.barMax" value="{{ov.barMax}}">

@@ -776,6 +776,38 @@ function feDrawBarGraphics(bar, w, h, pct, color, borderWidth, borderColor) {
 }
 
 /**
+ * Turn PIXI word wrap on/off for one overlay's text style — the single place the
+ * text-box width is translated, shared by the full rebuild and the cheap reposition
+ * path so the two can never drift.
+ *
+ * `boxWidth` is authored in the face image's own pixels, so it goes through `scale`
+ * exactly once, like `fontSize` and `barWidth`. 0 = auto = the original single
+ * unwrapped line.
+ *
+ * `breakWords: true` is load-bearing for Korean. PIXI's `TextMetrics.wordWrap`
+ * tokenizes on whitespace, so a Korean sentence written without spaces is ONE token
+ * and would overflow the box no matter how narrow it is. The character-breaking
+ * branch is only entered for a token that is itself wider than the box, so English
+ * still breaks between words — turning this on does not make Latin text break
+ * mid-word unless a single word genuinely cannot fit.
+ *
+ * `align: "center"` because the text is anchored at (0.5, 0.5): with the default
+ * left alignment a wrapped second line would sit flush-left inside a box whose
+ * CENTRE is the overlay's placement point, i.e. visibly off-anchor.
+ */
+function feApplyOverlayWordWrap(style, boxWidth, scale) {
+  const w = Math.max(0, boxWidth ?? 0);
+  if (w > 0) {
+    style.wordWrap = true;
+    style.wordWrapWidth = Math.max(1, Math.round(w * scale));
+    style.breakWords = true;
+    style.align = "center";
+  } else {
+    style.wordWrap = false;
+  }
+}
+
+/**
  * The bar's box in RENDERED pixels for one text+bar pair — the single source of
  * that geometry, shared by the full rebuild and the cheap reposition path so the
  * two can never drift apart.
@@ -856,6 +888,7 @@ function feRebuildPanelOverlays(tile) {
       const style = CONFIG.canvasTextStyle.clone();
       style.fontSize = Math.max(1, Math.round((item.fontSize || 28) * scale));
       style.fill = item.color || "#ffffff";
+      feApplyOverlayWordWrap(style, item.boxWidth, scale);
       const text = new FE_OVERLAY_TEXT_CLASS(str, style);
       text.eventMode = "none";
       text.anchor.set(0.5, 0.5);
@@ -880,6 +913,7 @@ function feRebuildPanelOverlays(tile) {
       text._feX = item.x;
       text._feY = item.y;
       text._feFontSize = item.fontSize || 28;
+      text._feBoxWidth = Math.max(0, item.boxWidth ?? 0);
       canvas.primary.addChild(text);
       tile._fePanelOverlays.push(text);
 
@@ -953,6 +987,12 @@ function feRepositionPanelOverlays(tile) {
       obj.position.set(rect.left + obj._feX * mw, rect.top + obj._feY * mh);
       const size = Math.max(1, Math.round(obj._feFontSize * scale));
       if (obj.style.fontSize !== size) obj.style.fontSize = size;
+      // The wrap width is in image pixels too, so a resize/zoom has to re-derive it or
+      // the text keeps wrapping at the width the panel had when it was built.
+      if (obj._feBoxWidth > 0) {
+        const wrap = Math.max(1, Math.round(obj._feBoxWidth * scale));
+        if (obj.style.wordWrapWidth !== wrap) feApplyOverlayWordWrap(obj.style, obj._feBoxWidth, scale);
+      }
       const bar = obj._feBar;
       if (bar) {
         obj.updateText?.(true); // force sync re-measure so .width reflects the new fontSize
