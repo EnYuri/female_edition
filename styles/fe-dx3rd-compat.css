@@ -1480,6 +1480,7 @@ body.fe-retro-theme {
   /* 강조색 H·S + 원본 명도(L) — 텍스트 색상 변수에 알파 0.82 적용 (가시성 완화) */
   --fe-ac-90: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.82);
   /* --fe-ac-90 alpha 변형 — 구 rgb(from accent / X) 패턴 대체용. 명도 90% 고정으로 채도 오염 방지 */
+  --fe-ac-90-60: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.60);
   --fe-ac-90-50: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.50);
   --fe-ac-90-40: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.40);
   --fe-ac-90-35: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.35);
