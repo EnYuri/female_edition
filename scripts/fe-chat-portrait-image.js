@@ -11,7 +11,7 @@
  *
  * Public surface (imported by fe-chat-portrait.js):
  *   - cpMaybeApplyHQResample(img, size, shape, anchorTop) — fire-and-forget swap
- *   - cpShouldUseHQResample(img)                          — per-document policy
+ *   - cpShouldUseHQResample(img, shape)                   — per-document/shape policy
  *   - cpResampleCacheGet(key)                             — synchronous cache peek
  */
 
@@ -74,37 +74,59 @@ function cpIsSafeCanvasSource(src) {
   }
 }
 
+// Hard ceiling on the load/decode wait. MUST stay: a `loading="lazy"` <img> that
+// Chromium has DEFERRED reports `complete === false` with a valid `naturalWidth`
+// (the dimensions come from the partial fetch), never fires `load`, and makes
+// `decode()` hang FOREVER — measured live on v14.365, every off-viewport chat
+// portrait. Without a timeout the resample promise never settles, so its key stays
+// in `_cpResampleInflight` and every later call for that portrait early-returns —
+// a permanent per-key deadlock that silently disabled HQ resampling in live chat.
+const CP_IMAGE_WAIT_TIMEOUT_MS = 10000;
+
 async function cpWaitForImage(img) {
   try {
     if (!img) return false;
     if (img.complete && img.naturalWidth > 0) return true;
 
-    if (typeof img.decode === "function") {
-      try {
-        await img.decode();
-        if (img.complete && img.naturalWidth > 0) return true;
-      } catch {
-        // fall back to onload
-      }
-    }
-
-    await new Promise((resolve, reject) => {
-      const onLoad = () => {
-        cleanup();
-        resolve(true);
-      };
-      const onErr = () => {
-        cleanup();
-        reject(new Error("image load failed"));
-      };
-      const cleanup = () => {
-        img.removeEventListener?.("load", onLoad);
-        img.removeEventListener?.("error", onErr);
-      };
-      img.addEventListener?.("load", onLoad, { once: true });
-      img.addEventListener?.("error", onErr, { once: true });
+    let timer = null;
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(false), CP_IMAGE_WAIT_TIMEOUT_MS);
     });
-    return img.complete && img.naturalWidth > 0;
+
+    const wait = (async () => {
+      if (typeof img.decode === "function") {
+        try {
+          await img.decode();
+          if (img.complete && img.naturalWidth > 0) return true;
+        } catch {
+          // fall back to onload
+        }
+      }
+
+      await new Promise((resolve, reject) => {
+        const onLoad = () => {
+          cleanup();
+          resolve(true);
+        };
+        const onErr = () => {
+          cleanup();
+          reject(new Error("image load failed"));
+        };
+        const cleanup = () => {
+          img.removeEventListener?.("load", onLoad);
+          img.removeEventListener?.("error", onErr);
+        };
+        img.addEventListener?.("load", onLoad, { once: true });
+        img.addEventListener?.("error", onErr, { once: true });
+      });
+      return img.complete && img.naturalWidth > 0;
+    })().catch(() => false);
+
+    try {
+      return await Promise.race([wait, timeout]);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
   } catch {
     return false;
   }
@@ -236,7 +258,7 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
     if (!cpIsImageElement(img)) return;
     if (!size || size <= 0) return;
     if (size > 256) return; // sanity cap
-    if (!cpShouldUseHQResample(img)) return;
+    if (!cpShouldUseHQResample(img, shape)) return;
 
     const origSrc = img.dataset?.fePortraitOrigSrc;
     const key = img.dataset?.fePortraitResampleKey;
@@ -250,6 +272,32 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
     }
 
     if (_cpResampleInflight.has(key)) return;
+
+    // The portrait <img> carries `loading="lazy"`, so an off-viewport one is DEFERRED by
+    // Chromium: `complete` stays false, no `load` fires and `decode()` never settles.
+    // Starting the resample here would occupy the in-flight slot with a promise that only
+    // the timeout can end, and — worse — the image is not decodable yet, so the attempt is
+    // wasted. Instead, defer: re-enter once the browser actually loads it (i.e. when the
+    // user scrolls it into view). Do NOT "fix" this by forcing `loading="eager"` — that
+    // would eagerly fetch every full-resolution source in the whole chat history.
+    if (!img.complete || !(img.naturalWidth > 0)) {
+      if (!img.dataset.feHqWaiting) {
+        img.dataset.feHqWaiting = "1";
+        const done = () => {
+          delete img.dataset.feHqWaiting;
+        };
+        img.addEventListener?.(
+          "load",
+          () => {
+            done();
+            cpMaybeApplyHQResample(img, size, shape, anchorTop);
+          },
+          { once: true }
+        );
+        img.addEventListener?.("error", done, { once: true });
+      }
+      return;
+    }
 
     const fit = String(shape) === "none" ? "contain" : "cover";
 
@@ -276,22 +324,36 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
   }
 }
 
-function cpShouldUseHQResample(img) {
+function cpShouldUseHQResample(img, shape) {
   try {
     const body = img?.ownerDocument?.body;
 
-    // Keep print/PDF documents on the original sources to avoid a large number of
-    // extra data: URLs during final export. (Checked first: takes precedence even
-    // if an archive doc is being printed.)
+    // Archive/export window: portraits are enlarged there, so a one-time high-quality
+    // downscale (shared via cache) helps regardless of shape.
+    //
+    // MUST be checked BEFORE `fe-print-chatlog`: the archive window's body class is built
+    // as `… fe-print-chatlog fe-chat-archive fe-chat-archive-window …`
+    // (`fe-chat-archive.js`, feBuildArchiveDocument), so it carries BOTH. Testing print
+    // first made this branch unreachable and silently disabled HQ resampling in every
+    // archive window — the reported "아카이브에서 포트레이트 안티에일리어싱이 안 된다".
+    if (body?.classList?.contains("fe-chat-archive")) return true;
+
+    // Genuine print/PDF path only — `feExportChatLogToPDFInline` adds `fe-print-chatlog`
+    // to the MAIN document (no `fe-chat-archive`). Keep those on the original sources to
+    // avoid a large number of extra data: URLs during the final export.
     if (body?.classList?.contains("fe-print-chatlog")) return false;
 
-    // HQ resample is only worthwhile in the archive/export window, where low-resolution
-    // PC portraits are enlarged and a one-time high-quality downscale (shared via cache)
-    // visibly helps. The live sidebar and combat tracker display at ~64px where the
-    // browser's native downscale is already crisp — resampling there spends async work +
-    // cache for no visible gain, so it is intentionally skipped (verified live: dpr=1,
-    // 64px sidebar portraits are indistinguishable with/without the swap).
-    return !!body?.classList?.contains("fe-chat-archive");
+    // Live sidebar / combat tracker: needed ONLY for the cropping shapes.
+    //
+    // Chromium's native <img> downscale is properly box-filtered as long as the drawn
+    // bitmap FITS the element box — `object-fit: contain`, and `cover` on a square
+    // source, both look correct at 64px. But `cover` on a non-square source draws the
+    // bitmap LARGER than the box and clips it, and on that path Chromium drops to a
+    // low-quality filter: a large portrait (~1000px) shrunk into a 64px crop comes out
+    // visibly aliased/moiré. Measured, not assumed — see CLAUDE.md.
+    //
+    // `shape` is undefined for callers that have no crop context; treat that as "no".
+    return shape != null && String(shape) !== "none";
   } catch {
     return false;
   }

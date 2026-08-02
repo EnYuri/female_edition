@@ -122,14 +122,16 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background: #000000 !important;
   background-image: none !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  /* 유저 색상 없는(= 마스터 내레이션/NPC) 메시지도 플레이어와 같은 명도·알파를
+     쓴다 — 경위는 fe-dx3rd-compat.css §14 헤더 주석 참조. */
+  border-color: var(--fe-ac-90) !important;
   color: var(--fe-ac-90, #e6e6e6) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
-  border-color: rgb(var(--fe-user-color-rgb) / 0.5) !important;
+  border-color: rgb(var(--fe-user-color-rgb, 230 230 230) / 0.82) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e

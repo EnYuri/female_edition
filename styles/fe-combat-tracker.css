@@ -487,3 +487,14 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 .fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item:hover {
   background: var(--fe-ac-12, rgba(255, 255, 255, 0.18));
 }
+
+/* destructive entry (전투원 제거) — declared after the retro block so it wins the
+   equal-specificity tie against the retro item color rule */
+.fe-ct-context-menu .fe-ct-ctx-item.is-danger,
+.fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item.is-danger {
+  color: #ff8a80;
+}
+.fe-ct-context-menu .fe-ct-ctx-item.is-danger:hover,
+.fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item.is-danger:hover {
+  background: rgba(255, 80, 80, 0.18);
+}

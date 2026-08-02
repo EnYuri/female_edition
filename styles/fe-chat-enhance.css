@@ -272,15 +272,14 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
  * 색상: 유저 색상(.fe-has-user-color) 우선, 없으면 액센트.
  *   폴백은 예전에 리터럴 rgba(255,255,255,0.45) 였다. 마스터/시스템 메시지는
  *   .fe-has-user-color 가 붙지 않으므로(fe-render-state.js: GM 내레이션·NPC 는 틴트 억제)
- *   항상 이 폴백을 쓰는데, 순백 + 알파 0.45 라서 액센트 색조가 전혀 반영되지 않고
- *   플레이어 쪽 알파(0.6)보다 옅었다 → 마스터 카드만 색조·농도가 튀는 문제.
- *   폴백을 액센트 파생(--fe-ac-90-60, L=90%/α=0.60)로 바꿔 색조를, 알파를 0.6 으로
- *   맞춰 농도를 플레이어와 통일한다. 레트로가 아닐 때는 --fe-ac-90-60 이 없으므로
- *   같은 알파의 흰색으로 폴백한다(기존 테마의 미묘한 농도 차이도 함께 해소).
+ *   항상 이 폴백을 쓰는데, 순백 고정이라 액센트 색조가 전혀 반영되지 않고 플레이어
+ *   쪽 알파(0.6)보다 옅었다 → 마스터만 색조·농도가 튀었다. 액센트 원색 + 알파 0.6
+ *   으로 맞춘다. 명도를 깎는 --fe-ac-90-* 계열은 쓰지 말 것(fe-dx3rd-compat.css §14
+ *   헤더 주석: 마스터 테두리만 어두워진다).
  * transition:none — 레트로의 `* { transition: all 1ms }` 가 테두리 변경을 시작값에
  *   고착시키는 문제(채팅 색조 틴트와 동일 원인)를 회피. */
 body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message {
-  --fe-group-outline-color: var(--fe-ac-90-60, rgba(255, 255, 255, 0.6));
+  --fe-group-outline-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6);
   border: 3px solid var(--fe-group-outline-color) !important;
   transition: none !important;
 }

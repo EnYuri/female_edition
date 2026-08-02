@@ -66,6 +66,8 @@
 	"FECT.Ctx.AdjustHP": "HP 조절",
 	"FECT.Ctx.MoveUp": "순서 위로",
 	"FECT.Ctx.MoveDown": "순서 아래로",
+	"FECT.Ctx.Remove": "전투원 제거",
+	"FECT.Ctx.RemoveConfirm": "이 전투원을 전투에서 제거합니다.",
 	"FECT.Ctx.NoActor": "연결된 액터가 없어 HP를 조절할 수 없습니다.",
 	"FECT.Ctx.NoHP": "이 액터에서 HP 경로를 찾을 수 없습니다.",
 	"FECT.Ctx.NeedInit": "이니셔티브가 없는 전투원은 순서를 바꿀 수 없습니다.",

@@ -35,6 +35,7 @@ import {
   feChatPortraitUpsert,
   feChatPortraitApplyVars,
 } from "./fe-chat-portrait.js";
+import { cpMaybeApplyHQResample } from "./fe-chat-portrait-image.js";
 
 // Image processing: canvas downscale, background freeze.
 import {
@@ -1048,6 +1049,30 @@ function feNormalizeArchivePortraitImages(rootEl, renderProfile = null) {
       }
       img.setAttribute("loading", renderProfile?.normalizeImageLoading || "eager");
       img.setAttribute("decoding", renderProfile?.normalizeImageDecoding || "sync");
+
+      // Re-apply the HQ downscale AFTER the src normalization above.
+      //
+      // MUST stay: `feRestoreOriginalPortraitSources` deliberately puts the original file
+      // path back into `src` (the saved-HTML path needs real files to embed), and it runs
+      // per node during render — i.e. AFTER `feChatPortraitUpsert` already resolved the
+      // HQ data URL. Nothing else re-invokes the resample once the render pass is over, so
+      // without this call the archive window keeps painting full-resolution bitmaps
+      // (e.g. 832x1216) inside a 64px `object-fit: cover` box — exactly the Chromium
+      // low-quality clipped-downscale path the HQ pipeline exists to avoid.
+      //
+      // Cheap by design: `cpMaybeApplyHQResample` is a cache hit for any portrait already
+      // processed by the live sidebar, and a no-op when the <img> is still lazy-deferred
+      // (it re-enters on that image's own `load`). The snapshot builder calls
+      // `feRestoreOriginalPortraitSources` again with its own undo, so the saved HTML is
+      // unaffected by the data URLs we put back here.
+      try {
+        cpMaybeApplyHQResample(
+          img,
+          Math.max(16, Number(feSetting("chatPortraitSize") ?? 64) || 64),
+          String(feSetting("chatPortraitShape") ?? "circle"),
+          true
+        );
+      } catch {}
       if (!explicitlyHidden) {
         // Inline !important is intentional: v13 systems/themes can carry their
         // own broad @media print image rules, which otherwise beat module CSS.

@@ -692,10 +692,45 @@ body.fe-retro-theme
     1px 2px 0 var(--fe-dice-outline), 2px 2px 0 var(--fe-dice-outline) !important;
 }
 
+/* 주사위 눈 글자색.
+ * core 는 `.dice-tooltip .dice-rolls .roll { color: #000 }` 을 하드코드한다
+ * (foundry2.css:5630). 위 .dice-tooltip 규칙이 패널을 #000 으로 칠하므로,
+ * 그대로 두면 눈금이 배경과 똑같은 검정이 되어 사라진다 — 바로 위 윤곽선
+ * text-shadow 의 흰 ±2px 후광만 남아 오히려 더 읽기 어려워진다.
+ * .exploded/.fumble 만 자기 color 를 갖고 있어서 "일부 주사위만 숫자가
+ * 보인다"로 나타난다. 상태 클래스가 없는 눈을 밝은 액센트로 되돌린다.
+ * (.discarded/.rerolled 는 core 가 color:inherit + opacity 필터로 흐리게
+ *  처리하므로 여기서 상속받아 의도대로 어두워진다.) */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
-  :is(li.dice.exploded, li.dice.exploded > span) {
+  :is(li:not(.clear), li:not(.clear) > span) {
+  color: var(--fe-ac-90, #e6e6e6) !important;
+}
+
+/* core 의 성공/실패 색(#18520b / #aa0200)도 검정 패널 위에서는 판독 불가 —
+ * 의미는 유지한 채 밝은 톤으로 올리고, 색을 뒤트는 sepia/hue-rotate 필터는
+ * 끈다(그 필터는 우리 윤곽선 text-shadow 까지 함께 물들인다). */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
+  :is(li.success, li.max, li.success > span, li.max > span) {
+  color: #4ade80 !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
+  :is(li.failure, li.min, li.failure > span, li.min > span) {
+  color: #ff6b6b !important;
+  filter: none !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
+  :is(li.exploded, li.exploded > span) {
   color: #00aa22 !important;
   text-shadow: 0 0 6px #99ffbb, 0 0 3px #99ffbb, 1px 0 0 #99ffbb,
     -1px 0 0 #99ffbb, 0 1px 0 #99ffbb, 0 -1px 0 #99ffbb,
@@ -706,7 +741,7 @@ body.fe-retro-theme
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
-  :is(li.dice.fumble, li.dice.fumble > span) {
+  :is(li.fumble, li.fumble > span) {
   color: #cc2020 !important;
   text-shadow: 0 0 6px #ff9999, 0 0 3px #ff9999, 1px 0 0 #ff9999,
     -1px 0 0 #ff9999, 0 1px 0 #ff9999, 0 -1px 0 #ff9999,

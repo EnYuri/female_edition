@@ -547,6 +547,12 @@ function feCtOpenContextMenu(id, x, y) {
     { action: "set-initiative", icon: "fa-dice-d20", label: feCtL("FECT.Ctx.SetInit", "이니셔티브 수정") },
     { action: "move-up", icon: "fa-arrow-up", label: feCtL("FECT.Ctx.MoveUp", "순서 위로") },
     { action: "move-down", icon: "fa-arrow-down", label: feCtL("FECT.Ctx.MoveDown", "순서 아래로") },
+    {
+      action: "remove-combatant",
+      icon: "fa-trash",
+      label: feCtL("FECT.Ctx.Remove", "전투원 제거"),
+      danger: true,
+    },
   );
 
   const menu = document.createElement("div");
@@ -556,7 +562,8 @@ function feCtOpenContextMenu(id, x, y) {
   menu.innerHTML = items
     .map(
       (it) =>
-        `<button type="button" class="fe-ct-ctx-item${it.disabled ? " is-disabled" : ""}" ` +
+        `<button type="button" class="fe-ct-ctx-item${it.disabled ? " is-disabled" : ""}` +
+        `${it.danger ? " is-danger" : ""}" ` +
         `data-ct-ctx="${it.action}" ${it.disabled ? "disabled" : ""}>` +
         `<i class="fas ${it.icon}"></i><span>${feCtEsc(it.label)}</span></button>`
     )
@@ -616,6 +623,7 @@ async function feCtHandleContextAction(action, id) {
       case "set-initiative":  await feCtOpenInitiativeDialog(combat, c); break;
       case "move-up":         await feCtMoveCombatant(combat, c, -1); break;
       case "move-down":       await feCtMoveCombatant(combat, c, +1); break;
+      case "remove-combatant": await feCtRemoveCombatant(c); break;
     }
   } catch (e) {
     console.error("[female_edition] combat-tracker context action failed", e);
@@ -793,6 +801,29 @@ async function feCtMoveCombatant(combat, c, dir) {
     newInit = dir < 0 ? nInit + 1 : nInit - 1;
   }
   await c.update({ initiative: newInit });
+}
+
+// Remove a combatant from the encounter (native tracker's "전투원 제거"). Deleting the
+// Combatant is all that is needed — core's Combat#_onDeleteDescendantDocuments re-runs
+// setupTurns() and fixes up `turn` when the removed one was the current/earlier turn.
+// Confirmed first because it is destructive and the tracker has no undo.
+async function feCtRemoveCombatant(c) {
+  const DialogV2 = foundry.applications.api.DialogV2;
+  let ok = false;
+  try {
+    ok = await DialogV2.confirm({
+      window: { title: feCtL("FECT.Ctx.Remove", "전투원 제거") },
+      content: `<p>${feCtEsc(
+        feCtL("FECT.Ctx.RemoveConfirm", "이 전투원을 전투에서 제거합니다.")
+      )}</p><p><strong>${feCtEsc(c.name ?? "")}</strong></p>`,
+      rejectClose: false,
+      modal: true,
+    });
+  } catch {
+    return; // dialog cancelled
+  }
+  if (!ok) return;
+  await c.delete();
 }
 
 // ── lifecycle ───────────────────────────────────────────────────────────────

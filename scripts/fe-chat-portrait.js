@@ -322,6 +322,26 @@ function cpGetRoundMarkerFlagValue(source) {
   return null;
 }
 
+// dx3rd(DX3 System) 전투 진행 알림 — 라운드 N / 셋업·이니셔티브·메인·클린업 프로세스.
+// The system emits every one of them as `<h3 class="dx3rd-combat-msg">…</h3>` with a GM
+// (or, for 메인 프로세스, the acting actor's) speaker. Duplicated from fe-util.js's
+// feIsSystemCombatNoticeContent — this script is deliberately import-free.
+const CP_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
+
+function cpIsSystemCombatNoticeMessage(message, messageEl) {
+  try {
+    if (messageEl?.querySelector?.(`.${CP_SYSTEM_COMBAT_NOTICE_CLASS}`)) return true;
+  } catch {
+    /* no-op */
+  }
+  try {
+    if (/<[^>]*\bdx3rd-combat-msg\b/i.test(String(message?.content ?? ""))) return true;
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
 function cpIsRoundMarkerMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
@@ -347,6 +367,7 @@ function cpIsRoundMarkerMessage(message, messageEl) {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
     if (cpLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
+    if (/<[^>]*\bdx3rd-combat-msg\b/i.test(content)) return true;
   } catch {
     /* ignore */
   }
@@ -795,13 +816,18 @@ function cpUpsertPortrait(message, messageEl) {
   // Narrator/round-marker style system messages must have NO portrait modifications.
   // Narrator messages hide the base header entirely; round-marker messages keep their original
   // header because, for several modules, the header *is* the marker UI.
+  // The dx3rd combat notices are round markers too, but their header is NOT marker UI —
+  // it is just the GM's (or the acting actor's) name on a "라운드 3" / "메인 프로세스" line.
+  // dnd5e's own combat notices have no header; match that and hide it like a narrator line.
   const isNarratorSpecial = cpIsNarratorToolsMessage(message, messageEl);
   const isRoundMarkerSpecial = cpIsRoundMarkerMessage(message, messageEl);
-  if (isNarratorSpecial || isRoundMarkerSpecial) {
+  const isCombatNoticeSpecial = cpIsSystemCombatNoticeMessage(message, messageEl);
+  if (isNarratorSpecial || isRoundMarkerSpecial || isCombatNoticeSpecial) {
     cpRemovePortrait(messageEl);
     messageEl.classList.toggle("fe-narrator-chat", isNarratorSpecial);
-    messageEl.classList.toggle("fe-round-marker-chat", isRoundMarkerSpecial);
-    if (isNarratorSpecial) cpHideHeaderForSpecial(messageEl);
+    messageEl.classList.toggle("fe-round-marker-chat", isRoundMarkerSpecial || isCombatNoticeSpecial);
+    messageEl.classList.toggle("fe-system-combat-notice", isCombatNoticeSpecial);
+    if (isNarratorSpecial || isCombatNoticeSpecial) cpHideHeaderForSpecial(messageEl);
     else cpRestoreHeaderForSpecial(messageEl);
     return;
   }
@@ -916,7 +942,7 @@ function cpUpsertPortrait(message, messageEl) {
   // combat tracker's centered crop of the same src/size/fit.
   const key = `${src}@@${size}@@${fit}@@top`;
 
-  const allowHQResample = cpShouldUseHQResample(img);
+  const allowHQResample = cpShouldUseHQResample(img, shape);
   const cached = allowHQResample ? cpResampleCacheGet(key) : null;
   const prevKey = img.dataset?.fePortraitResampleKey;
   const prevOrig = img.dataset?.fePortraitOrigSrc;

@@ -6,6 +6,7 @@ import {
   feIsElementNode, feExtractHTMLElement, feBindMessageToElement, feNormalizeChatMessageId,
   feGetMessageIdFromElement, feGetChatLogs, feGetChatMessageElementOrder,
   feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
+  feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_CLASS,
 } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
 
@@ -237,7 +238,8 @@ function feComputeMessageRenderState(message, data = {}, userId = null) {
       flags?.[MODULE_ID]?.isRoundMarker ||
       roundFlag === true ||
       String(roundFlag) === "true" ||
-      /\bround-marker\b/i.test(content)
+      /\bround-marker\b/i.test(content) ||
+      feIsSystemCombatNoticeContent(content)
     );
 
     const speaker = data?.speaker ?? message?.speaker ?? {};
@@ -370,7 +372,7 @@ function feIsNarratorToolsMessage(message, messageEl) {
 function feIsRoundMarkerMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
-    if (messageEl?.querySelector?.(".round-marker")) return true;
+    if (messageEl?.querySelector?.(`.round-marker, .${FE_SYSTEM_COMBAT_NOTICE_CLASS}`)) return true;
   } catch {}
 
   try {
@@ -386,6 +388,7 @@ function feIsRoundMarkerMessage(message, messageEl) {
   try {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
+    if (feIsSystemCombatNoticeContent(content)) return true;
     if (feLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
   } catch {}
 
