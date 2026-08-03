@@ -720,6 +720,20 @@
      dimension going through it — that is what makes this preview WYSIWYG rather than a
      decorative marker. */
   --fe-sp-ov-px: calc(100cqw / var(--fe-sp-ov-natw, 900));
+  /* NEVER animate a marker. MUST keep — this is not a taste call, it is what makes the
+     resize grips behave. Live-measured on v14.365: every element on the page computes
+     `transition: all 0.001s` from a universal rule that is in NO stylesheet reachable
+     from the CSSOM (an extension/UA-level sheet — a fresh <div> appended anywhere,
+     document.body included, inherits it). A transition's FIRST painted frame is the
+     `from` value, so with it on, each pointermove painted the marker's OLD left/top
+     while the frame's width — which carries its own `transition: opacity`, so the
+     global rule loses to it — updated instantly. The frame is centred on the marker
+     (left:50% + translate(-50%)), so a lagging centre plus an instant width paints the
+     box growing from BOTH edges by half the drag each, and it only snapped to the real
+     edge-pinned geometry on release. Measured with one 50px east drag: with the
+     transition -25.2 / +25.3, with `transition: none` -0.3 / +50.2. The JS was correct
+     the whole time; this was purely what got painted. */
+  transition: none;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -743,6 +757,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
+}
+/* Same reason, for everything drawn inside the marker: the text and the value bar are
+   sized in % of the marker (or off --fe-sp-ov-px), so a resize moves them too and a
+   lagging paint would smear the same illusion one level down. The box frame declares
+   its own `transition: opacity` further below and, being later at equal specificity,
+   keeps its fade. */
+.fe-screen-panel-sheet .fe-sp-overlay-marker * {
+  transition: none;
 }
 .fe-screen-panel-sheet .fe-sp-overlay-marker:hover {
   background: rgba(160, 140, 235, 0.95);
