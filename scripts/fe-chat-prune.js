@@ -9,7 +9,8 @@
 //   - Skips installation when the chatlog-prune companion module is already active
 
 import { MODULE_ID, S } from "./fe-constants.js";
-import { feApplyChatMergeAroundElement } from "./fe-merge.js";
+import { feApplyChatMerge, feApplyChatMergeAroundElement } from "./fe-merge.js";
+import { feSetting } from "./fe-gm-priority.js";
 import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { feIsActiveModuleFeatureEnabled } from "./fe-conflict-state.js";
 
@@ -100,14 +101,14 @@ export function feInstallChatLogPrune() {
     async renderBatch(count) {
       if (this.#busyBack) return;
       this.#busyBack = true;
-      await this.#sem.add(() => this.#doRenderBatch(count ?? bs()));
+      await this.#sem.add(() => this.#doRenderBatch(this.#clampBatch(count)));
     }
 
     // Load newer messages after back-pruning
     async renderBatchForward(count) {
       if (this.#busyFwd) return;
       this.#busyFwd = true;
-      await this.#sem.add(() => this.#doRenderBatchFwd(count ?? bs()));
+      await this.#sem.add(() => this.#doRenderBatchFwd(this.#clampBatch(count)));
     }
 
     // Guard against updates for messages that are currently pruned from DOM.
@@ -300,7 +301,18 @@ export function feInstallChatLogPrune() {
           }
         }
       } finally {
-        restoreStickyScroll();
+        // Re-pin ONLY when nothing was pruned. The loop above stops as soon as the
+        // tail element is within the viewport + one screen of buffer, so a tail
+        // prune is only ever possible while the reader is scrolled UP — the two
+        // states are mutually exclusive. Pinning after a real prune therefore always
+        // yanks the reader off the history they just loaded, and it escalates: by
+        // then #fwdPruned is set, so the pin's `app.scrollBottom()` takes the
+        // `#fwdPruned && !#domTailIsNewest()` branch into #goLive(), which CLEARS the
+        // whole window and repopulates from the newest end. Captured live 2026-08-04:
+        //   app.scrollBottom ← _feStickyPin ← feRestoreStickyScroll ← #pruneNewest
+        //   → #goLive → 125 messages removed, 25 re-added, reader back at live.
+        // The no-prune case keeps its restore so an at-bottom reader is unaffected.
+        if (pruned === 0) restoreStickyScroll();
       }
       this.#schedOverflow();
     }
@@ -358,6 +370,7 @@ export function feInstallChatLogPrune() {
         if (fragments.length) {
           log.prepend(...fragments);
           this.#firstId = all[start]?.id ?? this.#firstId;
+          this.#settleMergeClasses(log);
         }
 
         // We just loaded older messages — prune the newest tail to stay bounded
@@ -421,6 +434,46 @@ export function feInstallChatLogPrune() {
     }
 
     // ── Private: utilities ───────────────────────────────────────────────────
+
+    // Run the merge classification SYNCHRONOUSLY, in the same task as the prepend.
+    //
+    // fe-chat-enhance schedules its rendered-state pass on rAF (feQueueMergeForRAF /
+    // feScheduleRenderedLogRefresh), so freshly prepended messages are laid out once
+    // with their render-time merge hint and then RE-laid out one to three frames later
+    // with the real classes. Those classes are height-bearing: measured live
+    // 2026-08-04 on one 25-message batch, individual messages moved 116 -> 30 px
+    // (fe-merge-follow -> fe-merge-mid) and 34 -> 116 px (hint removed), a net -188 px
+    // for the batch. All of it lands ABOVE the viewport, so the reader's content
+    // shifts under them after the scroll position was already settled — a residual
+    // 68-226 px jump per load that survived both the batch-size and the anchor fix.
+    //
+    // Doing it here costs nothing extra (the deferred pass would run anyway and now
+    // finds nothing to change) and it happens before any paint, so scroll anchoring
+    // and core's own post-batch scroll fix-up both see final heights.
+    #settleMergeClasses(log) {
+      try {
+        if (!feSetting(S.MERGE_ENABLED)) return;
+        feApplyChatMerge(log);
+      } catch { /* no-op */ }
+    }
+
+    // Clamp a caller-supplied batch size to our own bs().
+    //
+    // Core's #onScrollLog calls `renderBatch(CONFIG.ChatMessage.batchSize)` — 100 by
+    // default. That is 4x our batch AND 2x cePruneMaxMessages, so every single
+    // scroll-to-top prepended 100 messages just for #pruneNewest to throw most of
+    // them straight back out. Measured live 2026-08-04 (2936 messages, max 50):
+    // one renderBatch took 437-486 ms of uninterrupted main-thread work and grew
+    // the DOM 25 -> 125 (scrollHeight 2803 -> 12741 px). During that block the log
+    // does not grow, so the reader sits pinned at the top unable to scroll — the
+    // reported scroll-up jerkiness. `count ?? bs()` never helped: the argument is
+    // always supplied, so bs() was dead on this path.
+    #clampBatch(count) {
+      const limit = bs();
+      const n = Number(count);
+      return Number.isFinite(n) && n > 0 ? Math.min(n, limit) : limit;
+    }
+
 
     // True when the DOM's last chat message is the newest visible message overall
     // — i.e. there is NO forward gap, so a normal tail-append is safe. Used to

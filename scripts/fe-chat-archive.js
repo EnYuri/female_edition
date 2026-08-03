@@ -93,6 +93,17 @@ const FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT = 4500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_LARGE = 2500;
 const FE_ARCHIVE_HARVEST_TIMEOUT_HUGE = 1200;
 let feArchiveLaunchInProgress = false;
+// Bumped per launch so an ABANDONED run's `finally` cannot clear a lock that a later
+// run now owns. Without it, a stale-lock takeover would be undone the moment the old
+// run finally unwound, letting a third click start a concurrent render.
+let feArchiveLaunchToken = 0;
+let feArchiveLaunchStartedAt = 0;
+// The popup the current launch is rendering into, so the busy-guard can tell an
+// abandoned run (its window is gone) from a genuinely slow one.
+let feArchiveLaunchWindow = null;
+// Last-resort valve for a hang we have not foreseen. Generous on purpose: a huge log
+// legitimately takes minutes, and releasing early would start a second concurrent render.
+const FE_ARCHIVE_LAUNCH_STALE_MS = 10 * 60 * 1000;
 
 
 
@@ -482,19 +493,53 @@ function feEnsurePrintCSSOverrides() {
  *     window.print() uses the slow/unreliable OS printer route.
  */
 async function feExportChatLogToPDF() {
-  if (feArchiveLaunchInProgress) {
+  if (feArchiveLaunchInProgress && !feArchiveLaunchIsAbandoned()) {
     ui.notifications?.warn("female_edition | 채팅 아카이브를 이미 만들고 있습니다.", { console: false });
     return;
   }
+
+  const token = ++feArchiveLaunchToken;
   feArchiveLaunchInProgress = true;
+  feArchiveLaunchStartedAt = Date.now();
+  feArchiveLaunchWindow = null;
   const buttons = Array.from(document.querySelectorAll(".fe-export-pdf"));
   for (const button of buttons) button.setAttribute?.("aria-disabled", "true");
   try {
     return await feExportChatLogToPDFUnlocked();
   } finally {
-    feArchiveLaunchInProgress = false;
-    for (const button of buttons) button.removeAttribute?.("aria-disabled");
+    // Only the CURRENT owner may release. An abandoned run reaching here later must
+    // not unlock a launch that superseded it.
+    if (feArchiveLaunchToken === token) {
+      feArchiveLaunchInProgress = false;
+      feArchiveLaunchWindow = null;
+      for (const button of buttons) button.removeAttribute?.("aria-disabled");
+    }
   }
+}
+
+/**
+ * Whether the in-progress launch should be considered dead so a new one may take over.
+ *
+ * Primary signal is precise, not a guess: the popup it was rendering into is gone. The
+ * render aborts at its next batch boundary in that case, so the old run is finishing
+ * anyway. The elapsed-time valve is a backstop for a hang we have not foreseen — the
+ * failure it guards against is a lock stuck for the WHOLE SESSION, which is what
+ * closing the window mid-render used to cause.
+ */
+function feArchiveLaunchIsAbandoned() {
+  try {
+    if (feArchiveLaunchWindow && feArchiveWindowClosed(feArchiveLaunchWindow)) {
+      console.warn("female_edition | archive launch lock released: its window was closed");
+      return true;
+    }
+    if (feArchiveLaunchStartedAt && Date.now() - feArchiveLaunchStartedAt > FE_ARCHIVE_LAUNCH_STALE_MS) {
+      console.warn("female_edition | archive launch lock released: stale");
+      return true;
+    }
+  } catch {
+    /* no-op */
+  }
+  return false;
 }
 
 async function feExportChatLogToPDFUnlocked() {
@@ -534,6 +579,8 @@ async function feExportChatLogToPDFUnlocked() {
 
   // Step 3: Now open the archive popup window.
   const win = feOpenChatArchiveWindow();
+  // Recorded so the busy-guard can detect an abandoned launch (see feArchiveLaunchIsAbandoned).
+  feArchiveLaunchWindow = win || null;
   if (win) {
     try {
       const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
@@ -1566,6 +1613,12 @@ async function feRenderMessagesIntoLog({
   };
 
   for (let start = 0; start < messages.length; start += concurrency) {
+    // The user can close the archive popup mid-render. Without this the loop keeps
+    // building thousands of nodes into a dead document — and every downstream asset
+    // wait (feWaitForImages/feWaitForFonts) then burns its full 10–12 s timeout on
+    // images that can never load. Stop at the batch boundary instead.
+    if (feArchiveWindowClosed(yieldWindow)) break;
+
     const slice = messages.slice(start, start + concurrency);
     const nodes = await Promise.all(slice.map((msg) => renderOne(msg)));
 
@@ -2301,6 +2354,15 @@ async function feRenderChatArchiveWindow(win, {
     renderProfile,
   });
 
+  // Everything below writes into win.document and waits on its assets. If the user
+  // closed the popup during the render there is nothing left to produce, and pressing
+  // on would only stall on asset timeouts before failing anyway. Return normally (not
+  // by throwing) so the caller's `finally` clears feArchiveLaunchInProgress and the
+  // next archive request is accepted immediately.
+  if (feArchiveWindowClosed(win)) {
+    console.debug("female_edition | archive window closed during render; aborting");
+    return;
+  }
 
   // If texture stripping / export optimization is enabled, apply the same
   // sanitization logic used in the live chat log (chat-bg-stripper.js).
@@ -2740,7 +2802,34 @@ async function feArchivePrint(win) {
 }
 
 
+/**
+ * True when `win` is a popup we opened that the user has since closed.
+ *
+ * Returns false for the main window (the in-document fallback path passes it as the
+ * render target, and `window.closed` is false there anyway) and false when the check
+ * itself is not possible — "unknown" must never read as "gone".
+ */
+function feArchiveWindowClosed(win) {
+  try {
+    if (!win || win === window) return false;
+    return win.closed === true;
+  } catch {
+    return false;
+  }
+}
+
+// How long to wait for a yield scheduled on the target window before giving up on it
+// and continuing on our own timer. Only ever paid when that window died mid-yield.
+const FE_YIELD_FALLBACK_MS = 250;
+
 async function feMaybeYieldForUI(targetWindow = window) {
+  // A CLOSED window's timers NEVER FIRE. This used to `await` one unconditionally, so
+  // closing the archive popup mid-render hung feRenderMessagesIntoLog forever — the
+  // export promise never settled, feExportChatLogToPDF's `finally` never ran, and
+  // `feArchiveLaunchInProgress` stayed true for the rest of the session. That is the
+  // reported "아직 렌더 중" that no longer clears. Bail out before scheduling anything.
+  if (feArchiveWindowClosed(targetWindow)) return;
+
   // Background tabs/windows clamp timers; yielding there can look like the export "stopped".
   // Only yield when the *target* document is visible.
   try {
@@ -2750,12 +2839,26 @@ async function feMaybeYieldForUI(targetWindow = window) {
     // If we can't read visibility state, fall back to yielding.
   }
 
-  try {
-    const t = targetWindow?.setTimeout ?? setTimeout;
-    await new Promise((resolve) => t(resolve, 0));
-  } catch {
-    await feNextTick();
-  }
+  // Race the target window's timer against our own. The `closed` check above cannot
+  // cover a window that dies between it and the callback, and this yield sits in the
+  // hot render loop — it must be structurally incapable of wedging.
+  await new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    try {
+      // `.call` matters: a cross-window setTimeout invoked unbound throws
+      // "Illegal invocation" in Chromium.
+      const host = targetWindow ?? window;
+      (host.setTimeout ?? setTimeout).call(host, done, 0);
+    } catch {
+      /* fall through to the local timer below */
+    }
+    setTimeout(done, FE_YIELD_FALLBACK_MS);
+  });
 }
 
 // ===========================================================================

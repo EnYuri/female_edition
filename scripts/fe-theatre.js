@@ -1721,8 +1721,20 @@ Hooks.on("init", () => {
   _fetRegisterSettings();
 });
 
+// Settings must be loaded BEFORE the sidebar renders. `_fetEnabled` starts false and
+// is only ever assigned here, while `_fetInjectUI` bails on `!_fetEnabled` — so if the
+// first load happens at `ready`, the renderChatLog hook below has already run and
+// injected nothing. Core's order is setup(game.mjs:740) → initializeUI(:764) →
+// await canvas.initializing(:776) → ready(:779), so loading at `setup` puts the values
+// in place before the chat log renders AND survives a canvas that never finishes
+// (measured: a .webm tile in a non-visible tab hangs canvas.draw() forever, so `ready`
+// never fires — see feApplyVisualSettingsToDocument in fe-chat-enhance.js).
+Hooks.once("setup", () => {
+  try { _fetLoadSettings(); } catch { /* no-op */ }
+});
+
 Hooks.on("ready", () => {
-  _fetLoadSettings();   // world-scoped settings are only reliable here
+  _fetLoadSettings();   // re-read: `setup` ran before GM priority was synced
   _fetInjectUI();
   void _fetRestoreUserState();
 });

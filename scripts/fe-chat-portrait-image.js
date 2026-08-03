@@ -171,20 +171,144 @@ function cpComputeSourceCrop({ srcW, srcH, fit = "cover", anchorTop = false }) {
   return { sx, sy, sw: side, sh: side };
 }
 
-function cpDownscaleCanvasStep(srcCanvas, dstW, dstH) {
-  const next = document.createElement("canvas");
-  next.width = dstW;
-  next.height = dstH;
-  const ctx = next.getContext("2d");
-  if (!ctx) return next;
-  ctx.imageSmoothingEnabled = true;
+// Drop a canvas' backing store immediately instead of waiting for GC. A single
+// full-resolution portrait step can hold tens of MB; without this the whole
+// halving chain stays resident until the next collection, which is what makes a
+// burst of resamples feel like a stall rather than a blip.
+function cpReleaseCanvas(canvas) {
   try {
-    ctx.imageSmoothingQuality = "high";
+    if (!canvas) return;
+    canvas.width = 0;
+    canvas.height = 0;
   } catch {
     /* ignore */
   }
-  ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, dstW, dstH);
-  return next;
+}
+
+// Resample jobs are synchronous main-thread work, so a burst — a chat-log render,
+// or a scroll revealing a batch of lazy-deferred portraits — used to run as one
+// uninterrupted block with no frame in between.
+//
+// MEASURED (Chrome 150, dpr 1, 64px target, 832x1216 sources, synthetic rig):
+//   halving ladder      ~0.4 ms   <- negligible
+//   toDataURL("png")    ~3.8 ms   <- DOMINATES; ~3.8/4.2 of the per-portrait cost
+//   burst of 12         ~73 ms in one block (~250 ms for 20 cold-decoded sources)
+//
+// So the fix is NOT to make each job cheaper (there is little left to win: toBlob +
+// webp measured 2.4 ms, and buying ~1.4 ms is not worth blob-URL lifetime/eviction
+// and cross-window risk against the archive). The fix is to stop the burst from
+// landing in one block.
+//
+// Time-SLICED, not one-yield-per-job: at ~4 ms each, yielding before every job would
+// add an idle round-trip per portrait for no benefit. Jobs run back-to-back until the
+// slice budget is spent (about half a 60 Hz frame — one in-flight job can overrun it
+// by its own duration, which still lands under 16.7 ms), then the queue yields.
+// `requestIdleCallback`'s timeout bounds the wait so the queue cannot starve.
+const CP_QUEUE_SLICE_MS = 8;
+const CP_QUEUE_YIELD_TIMEOUT_MS = 100;
+
+const _cpQueue = [];
+let _cpQueueDraining = false;
+
+function cpYieldToBrowser() {
+  return new Promise((resolve) => {
+    try {
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(() => resolve(), { timeout: CP_QUEUE_YIELD_TIMEOUT_MS });
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    setTimeout(resolve, 0);
+  });
+}
+
+function cpNow() {
+  try {
+    return performance.now();
+  } catch {
+    return Date.now();
+  }
+}
+
+async function cpDrainResampleQueue() {
+  try {
+    while (_cpQueue.length) {
+      const sliceStart = cpNow();
+      while (_cpQueue.length && cpNow() - sliceStart < CP_QUEUE_SLICE_MS) {
+        const entry = _cpQueue.shift();
+        try {
+          entry.resolve(await entry.job());
+        } catch (err) {
+          entry.reject(err);
+        }
+      }
+      if (_cpQueue.length) await cpYieldToBrowser();
+    }
+  } finally {
+    _cpQueueDraining = false;
+  }
+}
+
+function cpEnqueueResample(job) {
+  return new Promise((resolve, reject) => {
+    _cpQueue.push({ job, resolve, reject });
+    if (_cpQueueDraining) return;
+    _cpQueueDraining = true;
+    // Start on a microtask so a synchronous caller finishes claiming its in-flight
+    // slot before the first job can run.
+    Promise.resolve()
+      .then(cpDrainResampleQueue)
+      .catch(() => {
+        _cpQueueDraining = false;
+      });
+  });
+}
+
+// Resample to DEVICE pixels, not CSS px. The <img> displays at `size` CSS px, so a
+// bitmap at size×dpr maps 1:1 to device pixels → crisp on HiDPI (dpr>1) instead of
+// being upscaled (soft). At dpr=1 this is identical to `size`.
+function cpTargetPixels(size) {
+  const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  return Math.max(1, Math.round(Number(size) * dpr));
+}
+
+/**
+ * True when running the pipeline could not possibly improve on what the browser
+ * already paints, so the whole job (canvas ladder + ~3.8 ms toDataURL) is waste.
+ *
+ * The pipeline exists for exactly ONE reason: Chromium drops to a low-quality filter
+ * when `object-fit: cover` draws the bitmap LARGER than the element box and clips it
+ * (see the HQ-resample policy in CLAUDE.md). Two cases provably never reach that path:
+ *
+ *  - Nothing to downscale (source already at/below the device-pixel target).
+ *  - `cover` with a SQUARE source. Our box is square (cpApplyImgStyling sets width ===
+ *    height), so cover's scale is `max(s/w, s/h)` with `w === h` → the drawn bitmap is
+ *    an EXACT fit, nothing overflows, and Chromium keeps the properly box-filtered
+ *    path. This is the `sq cover` ✅ / `sq cover+clip` ✅ row of the recorded probe
+ *    matrix, and it matters in practice because Foundry token art is typically square.
+ *
+ * Deliberately NOT applied in the archive window: its branch in cpShouldUseHQResample
+ * is unconditional for a separate reason, and that path was only just repaired — it is
+ * not being re-tuned in the same breath on reasoning alone.
+ */
+function cpResampleIsPointless(img, size, fit) {
+  try {
+    const body = img?.ownerDocument?.body;
+    if (body?.classList?.contains("fe-chat-archive")) return false;
+
+    const nw = Number(img.naturalWidth || 0);
+    const nh = Number(img.naturalHeight || 0);
+    if (!nw || !nh) return false;
+
+    const target = cpTargetPixels(size);
+    if (nw <= target && nh <= target) return true;
+    if (String(fit) === "cover" && nw === nh) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
@@ -195,42 +319,63 @@ async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
   const nh = Number(img.naturalHeight || 0);
   if (!nw || !nh) return null;
 
-  // Resample to DEVICE pixels, not CSS px. The <img> displays at `size` CSS px,
-  // so a bitmap at size×dpr maps 1:1 to device pixels → crisp on HiDPI (dpr>1)
-  // instead of being upscaled (soft). At dpr=1 this is identical to `size`.
-  const dpr = Math.min(2.5, window.devicePixelRatio || 1);
-  const target = Math.max(1, Math.round(size * dpr));
+  const target = cpTargetPixels(size);
 
   // Only resample when we are actually downscaling.
   if (nw <= target && nh <= target) return null;
 
+  let work = null;
+  let out = null;
   try {
-    // Multi-step downscale for better quality (especially from very large portraits).
-    // Step 1: crop (cover) or keep full (contain) into a working canvas.
     const { sx, sy, sw, sh } = cpComputeSourceCrop({ srcW: nw, srcH: nh, fit, anchorTop });
 
-    let work = document.createElement("canvas");
-    work.width = Math.max(1, Math.floor(sw));
-    work.height = Math.max(1, Math.floor(sh));
-    let wctx = work.getContext("2d");
-    if (!wctx) return null;
-    wctx.imageSmoothingEnabled = true;
-    try {
-      wctx.imageSmoothingQuality = "high";
-    } catch {
-      /* ignore */
+    // Plan the halving chain BEFORE allocating anything.
+    //
+    // The quality requirement is only that no single reduction exceeds 2:1 (a larger
+    // ratio is where Chromium's filter degrades — see CLAUDE.md). The old code met it
+    // by copying the source rect 1:1 into a work canvas and halving from there, but
+    // that first copy is pure waste: for a 3328px portrait it allocates 3328x3328 px
+    // (~44 MB) and does a full-resolution draw, per portrait, on the main thread.
+    // Starting the chain at HALF the source is the same <=2:1 first reduction — the
+    // browser just performs it straight out of the decoded <img> — while cutting the
+    // peak allocation 4x and removing one full-size draw entirely.
+    // Bound the ladder on the LARGER dimension, and never clamp the smaller one to
+    // `target`. The old loop tested `work.width` alone and clamped both next dims with
+    // `Math.max(target, …)`, which for "자르기 없음" (contain, non-square source) was
+    // wrong in both directions: a TALL portrait stopped a step early (final canvas→canvas
+    // draw up to ~2.4:1 instead of ≤2:1), and a WIDE one had its height floored at
+    // `target` mid-ladder — e.g. 4000×1000 became a 250×128 work canvas holding a
+    // vertically stretched image, so the final compose came out at the wrong aspect
+    // ratio. For "cover" the crop is square (sw === sh), so this is a no-op there.
+    const dims = [];
+    let w = Math.max(1, Math.floor(sw));
+    let h = Math.max(1, Math.floor(sh));
+    while (Math.floor(Math.max(w, h) / 2) >= target) {
+      w = Math.max(1, Math.floor(w / 2));
+      h = Math.max(1, Math.floor(h / 2));
+      dims.push([w, h]);
     }
-    wctx.drawImage(img, sx, sy, sw, sh, 0, 0, work.width, work.height);
 
-    // Step 2: repeatedly half until close to target.
-    while (work.width / 2 > target) {
-      const nextW = Math.max(target, Math.floor(work.width / 2));
-      const nextH = Math.max(target, Math.floor(work.height / 2));
-      work = cpDownscaleCanvasStep(work, nextW, nextH);
+    for (const [stepW, stepH] of dims) {
+      const next = document.createElement("canvas");
+      next.width = stepW;
+      next.height = stepH;
+      const ctx = next.getContext("2d");
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = true;
+      try {
+        ctx.imageSmoothingQuality = "high";
+      } catch {
+        /* ignore */
+      }
+      if (work) ctx.drawImage(work, 0, 0, work.width, work.height, 0, 0, stepW, stepH);
+      else ctx.drawImage(img, sx, sy, sw, sh, 0, 0, stepW, stepH);
+      cpReleaseCanvas(work);
+      work = next;
     }
 
-    // Step 3: final draw into a square destination canvas (device-pixel sized).
-    const out = document.createElement("canvas");
+    // Final draw into a square destination canvas (device-pixel sized).
+    out = document.createElement("canvas");
     out.width = target;
     out.height = target;
     const octx = out.getContext("2d");
@@ -244,12 +389,18 @@ async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
 
     const { dx, dy, dw, dh } = cpComputeDrawRect({ srcW: sw, srcH: sh, dstSize: target, fit });
     octx.clearRect(0, 0, target, target);
-    octx.drawImage(work, 0, 0, work.width, work.height, dx, dy, dw, dh);
+    // `dims` is empty when the source is already within 2x of the target — then the
+    // single draw straight from the <img> is both the reduction and the final compose.
+    if (work) octx.drawImage(work, 0, 0, work.width, work.height, dx, dy, dw, dh);
+    else octx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 
     return out.toDataURL("image/png");
   } catch {
     // Tainted canvas or unsupported draw.
     return null;
+  } finally {
+    cpReleaseCanvas(work);
+    cpReleaseCanvas(out);
   }
 }
 
@@ -272,6 +423,31 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
     }
 
     if (_cpResampleInflight.has(key)) return;
+
+    const fit = String(shape) === "none" ? "contain" : "cover";
+
+    // Decided BEFORE the deferral guard below, on purpose.
+    //
+    // It needs only `naturalWidth`/`naturalHeight`, and those are already valid while
+    // Chromium has a lazy image DEFERRED — the dimensions come from the partial fetch
+    // (that is the same quirk the deferral guard exists for). When they really are 0 it
+    // returns false and falls through to the guard, so nothing is decided on bad data.
+    //
+    // Measured live 2026-08-04: every portrait still sitting in the deferred state was a
+    // 760x760 SQUARE source — i.e. one this function skips anyway. Running the guard
+    // first made each of them register a one-shot `load` listener and carry a
+    // `feHqWaiting` marker forever, for a resample that was never going to happen.
+    //
+    // Cheap arithmetic, and it also ends a repeat cost: the equivalent "nothing to
+    // downscale" test inside cpResampleToDataURL returns null, which is never cached, so
+    // EVERY later upsert of such a portrait used to re-enqueue a job.
+    //
+    // No src fix-up on this path: cpUpsertPortrait already put `cached || src` on the
+    // element, and we only get here when the cache missed — so `src` is the original
+    // path already. (Assigning `img.src = origSrc` would in fact be a real mutation
+    // every time, since the property reflects an ABSOLUTE URL while origSrc is the
+    // relative one, and the two never compare equal.)
+    if (cpResampleIsPointless(img, size, fit)) return;
 
     // The portrait <img> carries `loading="lazy"`, so an off-viewport one is DEFERRED by
     // Chromium: `complete` stays false, no `load` fires and `decode()` never settles.
@@ -299,12 +475,12 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
       return;
     }
 
-    const fit = String(shape) === "none" ? "contain" : "cover";
-
-    const p = (async () => {
-      const dataUrl = await cpResampleToDataURL(img, size, fit, anchorTop);
-      return dataUrl;
-    })();
+    // Queued, not fired immediately: see cpEnqueueResample. The in-flight slot is
+    // still claimed synchronously below, so a queued job is deduped exactly like an
+    // already-running one. The `!img.complete` guard above means the job's own
+    // cpWaitForImage resolves instantly, so a job can never sit on the queue head
+    // waiting for a network fetch.
+    const p = cpEnqueueResample(() => cpResampleToDataURL(img, size, fit, anchorTop));
 
     _cpResampleInflight.set(key, p);
 

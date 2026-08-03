@@ -226,15 +226,25 @@ Hooks.once("init", () => {
   } catch { /* no-op */ }
 });
 
-Hooks.once("ready", () => {
-  const fontsEnabled   = safeGetSetting(SETTINGS.ENABLE_FONTS,   FE_DEFAULTS[S.UI_ENABLE_FONTS]);
-  const hidePortraits  = safeGetSetting(SETTINGS.HIDE_PORTRAITS, FE_DEFAULTS[S.UI_HIDE_PORTRAITS]);
-  const stripTextures  = safeGetSetting(SETTINGS.STRIP_TEXTURES, FE_DEFAULTS[S.UI_STRIP_TEXTURES]);
-
-  applyFontSetting(fontsEnabled);
-  applyPortraitSetting(hidePortraits);
+// The three body classes this script owns. Settings-only + classList-only, so it
+// runs at `setup` as well — a canvas that never finishes loading must not cost us
+// the chat appearance. See feApplyVisualSettingsToDocument in fe-chat-enhance.js
+// for the measured failure mode (webm tile + non-visible tab → `ready` never fires).
+function applyBodyClassSettings() {
+  applyFontSetting(safeGetSetting(SETTINGS.ENABLE_FONTS, FE_DEFAULTS[S.UI_ENABLE_FONTS]));
+  applyPortraitSetting(safeGetSetting(SETTINGS.HIDE_PORTRAITS, FE_DEFAULTS[S.UI_HIDE_PORTRAITS]));
   // Apply the body class that drives CSS-first texture stripping.
+  const stripTextures = safeGetSetting(SETTINGS.STRIP_TEXTURES, FE_DEFAULTS[S.UI_STRIP_TEXTURES]);
   try { document.body?.classList?.toggle("fe-strip-chat-textures", !!stripTextures); } catch {}
+}
+
+Hooks.once("setup", () => {
+  try { applyBodyClassSettings(); } catch { /* no-op */ }
+});
+
+Hooks.once("ready", () => {
+  // Re-apply: `setup` ran before GM priority was synced.
+  applyBodyClassSettings();
   // Remove any inline overrides left by pre-v0.3.91 builds.
   restoreAllExisting();
   feInstallChatContextMenuSurfaceSync();

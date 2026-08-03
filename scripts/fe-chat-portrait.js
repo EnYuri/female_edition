@@ -469,6 +469,20 @@ function cpApplyChatCardIconSizing(messageEl) {
     const size = Math.max(0, Number(cpGet(CP.CARD_ICON_SIZE) ?? 36) || 0);
     if (!size) return;
 
+    // This pass runs several querySelector/querySelectorAll sweeps over the message
+    // content plus a few `closest()` walks per contained <img>, and cpUpsertPortrait
+    // calls it unconditionally — so a whole-log refresh pays it N times over even
+    // though the only input is the icon size. Skip when this element was already
+    // sized for the current value. A re-rendered message is a fresh node without the
+    // marker, and a changed setting produces a different one, so both still run.
+    // The image count is part of the marker so a card that grows images AFTER the
+    // first pass (a collapsible expanding, an async enricher, an automation module
+    // injecting a target row) is still picked up by the next upsert. One unqualified
+    // `img` query is far cheaper than the sweeps it guards.
+    const iconStamp = `${size}:${messageEl.querySelectorAll("img").length}`;
+    if (messageEl.dataset?.feCardIconStamp === iconStamp) return;
+    try { messageEl.dataset.feCardIconStamp = iconStamp; } catch {}
+
     // If this is an explicit image-post style message, don't touch its images.
     if (messageEl.querySelector?.(".message-content .chat-images-container img, .message-content .ci-message-image img")) return;
 
@@ -622,6 +636,20 @@ function cpPickActorOwnerColor(actor) {
  *   color — pre-resolved border color (user/actor color, or fallback)
  */
 function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color = null, anchorTop = false }) {
+  // Every branch below writes `!important` inline properties, ~15 of them. That is a
+  // style-engine invalidation per property, and this runs for EVERY portrait on every
+  // whole-log refresh (a settings change, a chatUiUpdated broadcast) even when not one
+  // of the inputs moved. Skip the writes when the resolved appearance is unchanged.
+  // The signature lives on the element, so a re-rendered or cloned message (which
+  // carries the inline styles along with the dataset) stays consistent.
+  const styleSig = `${size}|${shape}|${borderMode}|${borderWidth}|${borderColor}|${color ?? ""}|${anchorTop ? 1 : 0}`;
+  try {
+    if (img.dataset?.feCpStyleSig === styleSig) return;
+    // Stamped up front, not per exit branch — the function has three early returns
+    // and is fully deterministic in its inputs.
+    img.dataset.feCpStyleSig = styleSig;
+  } catch {}
+
   try {
     img.width = size;
     img.height = size;

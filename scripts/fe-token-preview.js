@@ -39,8 +39,20 @@ const _FE_TP_RING_THICKNESS = 0.1269848;
 // Range of the injected anchor sliders. `texture.anchorX/Y` is an unbounded NumberField in
 // core (`common/data/data.mjs`), so this is purely our own UI range — wide enough to park the
 // anchor outside the art, tight enough that the slider stays precise where it matters.
-const _FE_TP_ANCHOR_MIN = -0.5;
-const _FE_TP_ANCHOR_MAX = 1.5;
+const _FE_TP_ANCHOR_MIN = -1.5;
+const _FE_TP_ANCHOR_MAX = 2.5;
+
+// Widened replacements for core's appearance-tab range pickers. Core hard-codes
+// `scale` as min 0.2 / max 3 (templates/scene/token/appearance.hbs) and passes
+// `max=3` for `ring.subject.scale`; both underlying document fields are looser than
+// the UI — `texture.scaleX/Y` is an unbounded NumberField (common/data/data.mjs) and
+// `ring.subject.scale` only carries a schema `min: 0.5` (common/documents/token.mjs).
+// That schema minimum is a real validation floor, so the ring subject scale widens at
+// the top end only; going below 0.5 there would throw on submit.
+const _FE_TP_RANGE_OVERRIDES = [
+  { name: "scale", min: 0.1, max: 6, step: 0.05 },
+  { name: "ring.subject.scale", min: 0.5, max: 6, step: 0.02 },
+];
 
 // Appearance-tab fields whose change alters what the canvas paints.
 const _FE_TP_WATCHED_FIELDS = new Set([
@@ -648,6 +660,36 @@ function feInjectTokenPreview(app, html) {
 
   // Inject range sliders next to anchor X/Y number inputs
   feInjectAnchorSliders(tab, form);
+  feWidenAppearanceRanges(tab);
+}
+
+/**
+ * Widen the appearance tab's scale sliders past core's hard-coded bounds.
+ *
+ * `HTMLRangePickerElement` reads min/max/step into PRIVATE fields in its constructor
+ * (client/applications/elements/range-picker.mjs) and `_setValue` clamps against those
+ * captured numbers — so rewriting the attributes (or the inner inputs') on a live element
+ * does nothing. The element has to be rebuilt through `create()`, which is why this
+ * replaces the node instead of patching it.
+ */
+function feWidenAppearanceRanges(tab) {
+  for (const { name, min, max, step } of _FE_TP_RANGE_OVERRIDES) {
+    const old = tab.querySelector(`range-picker[name="${name}"]`);
+    if (!old || old.dataset.feTpWidened === "1") continue;
+    const cls = typeof old.constructor?.create === "function"
+      ? old.constructor
+      : foundry.applications.elements?.HTMLRangePickerElement;
+    if (typeof cls?.create !== "function") continue;
+
+    const current = Number(old.value ?? old.getAttribute("value"));
+    const picker = cls.create({
+      name, value: Number.isFinite(current) ? current : 1, min, max, step,
+    });
+    picker.dataset.feTpWidened = "1";
+    if (old.id) picker.id = old.id;
+    if (old.disabled) picker.disabled = true;
+    old.replaceWith(picker);
+  }
 }
 
 function feInjectAnchorSliders(tab, form) {

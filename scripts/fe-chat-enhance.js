@@ -128,7 +128,20 @@ async function feMigrateLegacySettings() {
 // GM priority UI refresh (needs style + fire — lives here to avoid circular)
 // -------------------------------------
 
-function feApplyGmPriorityUiRefresh(doc = document) {
+// Every purely visual apply — CSS variables and body classes. Touches only the
+// document and the settings store, never the canvas or the chat log, so it is
+// safe to run as early as `setup`.
+//
+// MUST stay callable before `ready` (measured 2026-08-04, live v14.365): a scene
+// whose tile is a .webm hangs Foundry's video-texture load forever when the tab
+// is not visible — `<video>` never leaves readyState 0 (reproduced with a blob
+// URL too, so it is Chrome's media pipeline, not the network: the same file
+// `fetch`es in 5ms). Foundry has no timeout there, so `canvas.draw()` never
+// resolves and `canvas.ready` → `game.ready` → the `ready` hook never fire. When
+// that happened, everything below was skipped and the module rendered half-
+// applied — no retro theme, no accent variables, no merge classes. Calling this
+// from `setup` decouples the look of the UI from whether the canvas ever loads.
+function feApplyVisualSettingsToDocument(doc = document) {
   try { feApplyStyleVarsFromSettings(doc); } catch { /* no-op */ }
   try { feSetBodyMergeClasses(); } catch { /* no-op */ }
   try { feSetChatCardFontClass(doc); } catch { /* no-op */ }
@@ -145,6 +158,10 @@ function feApplyGmPriorityUiRefresh(doc = document) {
   try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
   try { feSetSystemMsgColorClass(doc); } catch { /* no-op */ }
   try { feSetForceNormalMsgColorClass(doc); } catch { /* no-op */ }
+}
+
+function feApplyGmPriorityUiRefresh(doc = document) {
+  feApplyVisualSettingsToDocument(doc);
   try {
     feFireChatUiUpdated({ reason: "gm-priority-overrides", root: doc, log: null, document: doc });
   } catch {
@@ -889,6 +906,18 @@ Hooks.on("clientSettingChanged", (fullKey, value) => {
   }
 });
 
+// Paint the UI from settings as soon as the settings store is populated, without
+// waiting for the canvas. `setup` fires after world documents are prepared and
+// BEFORE the canvas is drawn, so this survives a canvas that never finishes
+// loading (see feApplyVisualSettingsToDocument). GM priority overrides are not
+// synced yet at this point, so a player may briefly paint their own pre-force
+// values; the identical call in `ready` below runs after the sync and corrects
+// them. Every apply is an idempotent classList/style write, so running twice is
+// free.
+Hooks.once("setup", () => {
+  try { feApplyVisualSettingsToDocument(document); } catch { /* no-op */ }
+});
+
 Hooks.once("ready", async () => {
   await feMigrateLegacySettings();
   // Apply this world's saved settings (or seed on first visit) BEFORE GM
@@ -902,25 +931,12 @@ Hooks.once("ready", async () => {
     // session (e.g. the GM disabled it while this client was offline).
     await feRestoreLocalGmPrioritySettings();
   }
-  feApplyStyleVarsFromSettings(document);
-  feSetBodyMergeClasses();
-  feSetChatCardFontClass(document);
-  feSetChatFontChoiceClass(document);
-  feSetUiFontClass(document);
-  feSetNeodgmModeClass(document);
-  feSetUserFontMode(document);
-  // Canvas text (token nameplates) — CSS cannot reach PIXI text, so the family is
-  // pushed into CONFIG.canvasTextStyle. Safe before the first canvas draw: later
-  // draws clone the updated CONFIG value.
-  feApplyCanvasTextFont(document);
-  feSetRetroThemeClass(document);
-  feSetUserColorBgClass(document);
-  feSetPaperOverlayClass(document);
-  feSetUserColorBgBaseClass(document);
-  feSetChatGroupOutlineClass(document);
-  feSetAccentTextOverrideClass(document);
-  feSetSystemMsgColorClass(document);
-  feSetForceNormalMsgColorClass(document);
+  // Re-apply now that world settings are hydrated and GM priority is synced —
+  // the `setup` pass above painted from un-synced values. Same idempotent call.
+  // (Includes feApplyCanvasTextFont: CSS cannot reach PIXI text, so the family
+  // goes into CONFIG.canvasTextStyle. Safe before the first canvas draw — later
+  // draws clone the updated CONFIG value.)
+  feApplyVisualSettingsToDocument(document);
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   // Guarantee a correct full merge once the log is populated (the incremental
   // path misses groups when messages arrive in a single batch / via chat-prune).
