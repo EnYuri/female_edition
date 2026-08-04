@@ -478,6 +478,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
           try { downscaleRestore?.(); } catch {}
           try { prepRestore?.(); } catch {}
           try { portraitRestore?.(); } catch {}
+          // Consumed. A throw from serializeSnapshotRoot() runs this finally AND
+          // then the fallback branch below, which owns the same closure — without
+          // this the undo ran twice. It is idempotent today (the second pass
+          // re-writes already-restored srcs over an emptied blob-URL set), so this
+          // is not a live bug; it is removing the reliance on that.
+          portraitRestore = () => {};
         }
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed images", err);

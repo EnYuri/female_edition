@@ -314,12 +314,22 @@ export function feNormalizeArchiveShellLayout(doc, { restore = false, root = nul
   };
 }
 
+// Returns an undo for the portrait-source restoration it performs.
+//
+// Only that part is reversible on purpose. The loading/decoding sweep below is
+// deliberately NOT recorded: tempDisableImages and the straggler pass already
+// record and restore `loading` for every image they touch, and a second undo for
+// the same attribute would race theirs (each one replays a value snapshotted at a
+// different point in the pass). An archive window left with eager/sync images
+// after printing costs nothing; a portrait left on its full-resolution original
+// src does — which is what this undo exists for.
 export function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = true, decoding = "sync" } = {}) {
+  let restorePortraitSources = () => {};
   try {
-    if (!rootEl?.querySelectorAll) return;
+    if (!rootEl?.querySelectorAll) return () => {};
     if (restorePortraits) {
       try {
-        feRestoreOriginalPortraitSources(rootEl);
+        restorePortraitSources = feRestoreOriginalPortraitSources(rootEl) || (() => {});
       } catch {}
     }
     // decoding:
@@ -345,6 +355,9 @@ export function fePrepareArchiveImagesForOutput(rootEl, { restorePortraits = tru
   } catch {
     /* no-op */
   }
+  return () => {
+    try { restorePortraitSources(); } catch {}
+  };
 }
 
 export function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) {

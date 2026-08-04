@@ -123,17 +123,26 @@ async function feAtDecodeAnimation(src) {
   try {
     if (!(await globalThis.ImageDecoder.isTypeSupported(type))) return null;
 
-    const response = await fetch(src);
+    // Resolve exactly the way the loader/<img> would. A bare relative fetch resolves against the
+    // current URL, which is /game (or /join) — NOT the app root — so "worlds/x/a.gif" would 404.
+    const url = new URL(src, document.baseURI).href;
+    const response = await fetch(url);
     if (!response.ok) return null;
     const data = await response.arrayBuffer();
 
     decoder = new globalThis.ImageDecoder({ data, type });
-    // `completed` guarantees `frameCount` is final rather than a streaming estimate.
+    // BOTH awaits are required and they are not interchangeable: `completed` says the encoded
+    // bytes are buffered (so frameCount is final, not a streaming estimate), `tracks.ready` says
+    // the track list is populated. Without the latter `selectedTrack` can still be undefined and
+    // every animation silently decodes to null.
     await decoder.completed;
+    await decoder.tracks.ready;
 
     const track = decoder.tracks?.selectedTrack;
+    // Gate on frameCount, not `track.animated` — some encoders leave `animated` false on a file
+    // that genuinely carries multiple frames, and frameCount is the thing we actually need.
     const frameCount = track?.frameCount ?? 0;
-    if (!track?.animated || frameCount < 2) return null;
+    if (frameCount < 2) return null;
 
     const delays = [];
     for (let i = 0; i < frameCount; i++) {
@@ -203,7 +212,11 @@ function feAtAttach(tile, src, anim) {
   });
   const texture = new PIXI.Texture(baseTexture);
 
-  const entry = { tile, src, anim, ctx, surface, texture, baseTexture, original, index: -1, elapsed: 0 };
+  const entry = {
+    tile, src, anim, ctx, surface, texture, baseTexture, original,
+    index: -1, elapsed: 0,
+    ...feAtPlaybackOf(tile.document),
+  };
   _feAtActive.set(tile, entry);
 
   feAtPaintFrame(entry, 0);
@@ -232,6 +245,21 @@ function feAtDetach(tile) {
   // Ours to free — core only destroys a tile base texture for unlinked video (tile.mjs:243).
   try { entry.texture.destroy(true); } catch (_) {}
   entry.surface.width = entry.surface.height = 0;
+}
+
+/**
+ * Playback flags for a tile.
+ *
+ * These reuse core's OWN `video.loop` / `video.autoplay` fields rather than module flags. They are
+ * on the schema of every TileDocument (common/documents/tile.mjs, both default `true`) and their
+ * form inputs already exist in templates/scene/tile/appearance.hbs — core only hides that fieldset
+ * behind `hasVideo`. So an animated gif reuses the exact control a webm gets, and a tile authored
+ * before this module existed already carries sane values. `volume` is meaningless here (no audio
+ * track) and is left alone.
+ */
+function feAtPlaybackOf(doc) {
+  const video = doc?.video ?? {};
+  return { loop: video.loop !== false, playing: video.autoplay !== false };
 }
 
 function feAtPaintFrame(entry, index) {
@@ -281,12 +309,21 @@ function feAtTick() {
     // copies of the same art) but skips the GPU upload until it is drawn again.
     const visible = tile.visible && tile.renderable && (tile.mesh?.visible !== false);
 
+    if (!entry.playing) continue;
+
     entry.elapsed += dt;
     const { delays } = entry.anim;
+    const last = delays.length - 1;
     let index = entry.index < 0 ? 0 : entry.index;
     let guard = delays.length + 1;
     while (entry.elapsed >= delays[index] && guard-- > 0) {
       entry.elapsed -= delays[index];
+      if (index === last && !entry.loop) {
+        // 반복 없음: hold the final frame instead of wrapping, and stop consuming ticks.
+        entry.elapsed = 0;
+        entry.playing = false;
+        break;
+      }
       index = (index + 1) % delays.length;
     }
     if (guard <= 0) entry.elapsed = 0;  // pathologically long frame: resync instead of spinning
@@ -379,3 +416,116 @@ Hooks.on("canvasTearDown", () => {
 });
 
 Hooks.on("canvasReady", () => { feAtRefreshAll(); });
+
+// Loop/autoplay are live-editable: apply them without forcing a redraw (a redraw would drop and
+// re-attach the texture, restarting the animation for a change that should not restart it).
+Hooks.on("updateTile", (doc, changed) => {
+  if (!changed?.video) return;
+  const entry = _feAtActive.get(doc.object);
+  if (!entry) return;
+  const next = feAtPlaybackOf(doc);
+  entry.loop = next.loop;
+  // Only autoplay's own transitions move the play state — do not resume a clip the user paused
+  // by clearing 반복 on a finished non-looping animation.
+  if ("autoplay" in changed.video) {
+    entry.playing = next.playing;
+    if (entry.playing) entry.elapsed = 0;
+  }
+  if (entry.playing) feAtEnsureTicker();
+});
+
+/* -------------------------------------------- */
+/*  Tile Config: reveal the playback controls   */
+/* -------------------------------------------- */
+
+// Core hides `fieldset[data-video-options]` unless `VideoHelper.hasVideoExtension(src)` and marks
+// every input inside it `disabled` (templates/scene/tile/appearance.hbs:24-28) — and a disabled
+// input is NOT submitted, so un-hiding alone would silently save nothing. `TileConfig#_onChangeForm`
+// re-hides it on every form change, hence the deferred re-apply below.
+function feAtSyncTileConfig(app, root) {
+  const form = root?.querySelector?.("form") ?? (root?.tagName === "FORM" ? root : null);
+  const fieldset = root?.querySelector?.("fieldset[data-video-options]");
+  if (!fieldset) return;
+
+  const srcInput = root.querySelector('[name="texture.src"]');
+  const src = srcInput?.value ?? app?.document?._source?.texture?.src ?? "";
+  const animated = !!feAtMimeOf(src);
+
+  const legend = fieldset.querySelector("legend");
+  if (legend && !("feAtLegend" in legend.dataset)) legend.dataset.feAtLegend = legend.textContent;
+
+  // Volume has no meaning without an audio track; hide only the group, never disable the input,
+  // so the existing value still round-trips through the form.
+  const volume = fieldset.querySelector('[name="video.volume"]');
+  const volumeGroup = volume?.closest(".form-group");
+
+  if (animated) {
+    fieldset.hidden = false;
+    for (const name of ["video.loop", "video.autoplay"]) {
+      const input = fieldset.querySelector(`[name="${name}"]`);
+      if (input) input.disabled = false;
+    }
+    if (legend) legend.textContent = "애니메이션 재생";
+    if (volumeGroup) volumeGroup.hidden = true;
+    fieldset.dataset.feAnimatedTile = "1";
+  } else if (fieldset.dataset.feAnimatedTile) {
+    // Reverted to a still image (or to a real video): hand the fieldset back to core untouched.
+    delete fieldset.dataset.feAnimatedTile;
+    if (legend && legend.dataset.feAtLegend) legend.textContent = legend.dataset.feAtLegend;
+    if (volumeGroup) volumeGroup.hidden = false;
+  }
+  return form;
+}
+
+Hooks.on("renderTileConfig", (app, element) => {
+  const root = element instanceof HTMLElement ? element : app?.element;
+  if (!root) return;
+  feAtSyncTileConfig(app, root);
+  if (root.dataset.feAnimatedTileBound) return;
+  root.dataset.feAnimatedTileBound = "1";
+  // Deferred: core's own _onChangeForm also toggles this fieldset, and we must land after it
+  // regardless of which element each listener is bound to.
+  root.addEventListener("change", () => {
+    requestAnimationFrame(() => { try { feAtSyncTileConfig(app, root); } catch (_) {} });
+  });
+});
+
+/* -------------------------------------------- */
+/*  Diagnostics                                 */
+/* -------------------------------------------- */
+
+// One-line live check: feAnimatedTileDebug() in the console.
+globalThis.feAnimatedTileDebug = function feAnimatedTileDebug() {
+  const tiles = (canvas?.tiles?.placeables ?? []).map(t => {
+    const e = _feAtActive.get(t);
+    const row = {
+      id: t.id,
+      src: t.document?.texture?.src,
+      candidate: !!feAtMimeOf(t.document?.texture?.src),
+      animating: !!e,
+    };
+    if (!e) return row;
+    return Object.assign(row, {
+      // Call this twice a second apart: `index` MUST differ. If it does not, playback is stalled;
+      // if it does but the canvas looks frozen, the texture upload is the problem, not the clock.
+      index: e.index,
+      frames: e.anim.frames.length,
+      totalMs: e.anim.totalMs,
+      playing: e.playing,
+      loop: e.loop,
+      // Painting is skipped while the tile is not drawn — a false here explains a frozen tile.
+      visible: t.visible && t.renderable && (t.mesh?.visible !== false),
+      textureSwapped: t.mesh?.texture === e.texture,
+      dirtyId: e.baseTexture.dirtyId,
+    });
+  });
+  return {
+    enabled: feAtEnabled(),
+    hasImageDecoder: typeof globalThis.ImageDecoder === "function",
+    tickerBound: _feAtTickerBound,
+    tickerStarted: !!canvas?.app?.ticker?.started,
+    active: _feAtActive.size,
+    cached: [..._feAtCache.keys()],
+    tiles,
+  };
+};

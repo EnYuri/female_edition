@@ -2654,6 +2654,19 @@ async function feArchivePrint(win) {
   let restoreStragglers = () => {};
   let restorePageBreaks = () => {};
   let restorePortraitUpgrade = () => {};
+  let restorePrepImages = () => {};
+
+  // Both hide modes are implemented ENTIRELY by blanking `src` (tempDisableImages
+  // above) — there is no `display:none` anywhere in styles/ for them, only a
+  // `:not(.fe-print-hide-*)` exclusion. So fePrepareArchiveImagesForOutput must not
+  // run its portrait-source restoration here: it writes the ORIGINAL FILE PATH back
+  // over the placeholder (and sets loading="eager"), which un-hides the very images
+  // the mode exists to suppress. In hideAvatars the straggler pass happens to
+  // re-blank them (a freshly-assigned src is never `complete`); hideAll skips that
+  // pass entirely, so there it printed full-resolution portraits — the exact
+  // eager-full-res state feRestoreOriginalPortraitSources' own comment documents as
+  // a print-preview killer.
+  const portraitsAreBlanked = mode === "hideAll" || mode === "hideAvatars";
 
   const restoreOnce = () => {
     try {
@@ -2670,6 +2683,15 @@ async function feArchivePrint(win) {
     } catch {}
     try {
       restoreImages();
+    } catch {}
+    // LAST of the src-restoring undos, and that position is load-bearing. This one
+    // rewrites the portrait `src` it replaced; every undo above replays a value it
+    // snapshotted LATER in the pass (the downscaler's `prev` for a portrait is the
+    // original path this pass just installed, the straggler/blank undos likewise),
+    // so running it any earlier would let one of them overwrite the restored value
+    // with a stale one.
+    try {
+      restorePrepImages();
     } catch {}
     try {
       restoreBg();
@@ -2713,7 +2735,10 @@ async function feArchivePrint(win) {
       setMeta(mildDownscale ? "Loading images… (품질 우선)" : "Loading images…");
       // Originals are about to be replaced by downscaled blobs — skip the
       // sync-decode storm (async lets Chromium decode off-thread).
-      fePrepareArchiveImagesForOutput(logEl, { decoding: "async" });
+      restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
+        decoding: "async",
+        restorePortraits: !portraitsAreBlanked,
+      }) || (() => {});
       // Wait for ALL images to finish loading (bytes) — not a small initial
       // slice. The downscaler skips images that aren't `complete`, so anything
       // unloaded by now would slip through to print at full resolution. The
@@ -2764,7 +2789,9 @@ async function feArchivePrint(win) {
 
   if (!shouldDownscale && logEl) {
     try {
-      fePrepareArchiveImagesForOutput(logEl);
+      restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
+        restorePortraits: !portraitsAreBlanked,
+      }) || (() => {});
     } catch {}
   }
 
