@@ -204,6 +204,64 @@ const FE_ARCHIVE_HEADER_LAYOUT_RESET_SELECTORS = [
   ':scope > .message-header [class*="chat-portrait-whisper-to-"]',
 ];
 
+// The message ROOT's OUTER spacing is owned by the export — never mirrored.
+//
+// `fe-chat-archive.css` (~1042) and `feNormalizeArchiveMessageLayout`
+// (fe-archive-output.js) both lock every archive message to
+// `width: 100% !important`. On a width-locked box a mirrored horizontal margin
+// cannot shrink anything — it can only push the box past the container's right
+// edge. In print that lands outside the `@page` area, so the right border is
+// clipped off the sheet entirely.
+//
+// The live value is core's `.chat-message { margin: var(--chat-message-spacing) }`
+// (foundry2.css:9943) = 4px on all four sides. That variable is defined ONLY on
+// `.chat-sidebar` (foundry2.css:9797), so in the archive document it is
+// undefined → the declaration is invalid at computed-value time → margin 0.
+// Fresh-built messages are therefore correct by construction; only the
+// live-CLONED tail carried the sidebar's 4px inline with `!important`.
+//
+// Measured on a real 654-page export (A4, `@page { margin: 10mm }` → printable
+// x ∈ [28.50, 567.00]pt): fresh-built boxes sat at exactly [28.50, 567.00]pt,
+// live-cloned boxes at [31.49, 569.98]pt — identical 538.5pt width, shifted
+// +2.99pt = +4 CSS px, with the right 4px (the border) off the page. The
+// transition landed mid-page 649, exactly where the sidebar's live DOM window
+// (prune) begins. Vertical margins happen to match because the merge spacing
+// rules (fe-chat-enhance.css:199/261) include `#fe-chat-export-log` in their
+// selectors and so apply natively in the archive too — which is also why
+// stripping the vertical inline values here changes nothing visually.
+//
+// Do NOT "fix" this by adding `margin: 0 !important` to the archive stylesheet:
+// an inline `!important` outranks every stylesheet rule regardless of layer.
+const FE_ARCHIVE_ROOT_SPACING_RESET_PROPS = [
+  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+  "margin-block", "margin-block-start", "margin-block-end",
+  "margin-inline", "margin-inline-start", "margin-inline-end",
+];
+
+// The root itself plus the two width-locked shells below it. The header region
+// is already covered by feStripHeaderLayoutInlineStyles.
+const FE_ARCHIVE_ROOT_SPACING_RESET_SELECTORS = [
+  ":scope",
+  ":scope > .message-content",
+];
+
+function feStripOwnedSpacingInlineStyles(cloneEl) {
+  try {
+    if (!feIsElement(cloneEl)) return;
+    for (const selector of FE_ARCHIVE_ROOT_SPACING_RESET_SELECTORS) {
+      for (const el of feSelectScoped(cloneEl, selector)) {
+        const style = el?.style;
+        if (!style?.removeProperty) continue;
+        for (const prop of FE_ARCHIVE_ROOT_SPACING_RESET_PROPS) {
+          try { style.removeProperty(prop); } catch { /* no-op */ }
+        }
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 function feStripHeaderLayoutInlineStyles(cloneEl) {
   try {
     if (!feIsElement(cloneEl)) return;
@@ -439,6 +497,10 @@ export function feMirrorLiveMessageStyles(liveEl, cloneEl, { renderProfile = nul
     // live sidebar so the export stylesheet owns the header layout (fixes the
     // last-page / live-cloned timestamp being trapped in a sidebar-width slice).
     feStripHeaderLayoutInlineStyles(cloneEl);
+    // Same rule for the message ROOT's outer spacing: the sidebar's 4px margin on
+    // a width:100%-locked archive box overflows right and the PDF clips the right
+    // border. See FE_ARCHIVE_ROOT_SPACING_RESET_PROPS.
+    feStripOwnedSpacingInlineStyles(cloneEl);
   } catch {
     /* no-op */
   }

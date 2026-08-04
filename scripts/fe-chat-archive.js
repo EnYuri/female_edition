@@ -3157,6 +3157,31 @@ function feFallbackRenderChatMessage(doc, msg) {
     if (Array.isArray(msg?.whisper) && msg.whisper.length) li.classList.add("whisper");
   } catch {}
 
+  // Core parity — the message border color.
+  //
+  // `ChatMessage#renderHTML` (client/documents/chat-message.mjs:428) does exactly
+  // one thing with it: `if (style === CHAT_MESSAGE_STYLES.OOC) borderColor =
+  // author.color.css`. So ONLY OOC messages get the author's color; IC / emote /
+  // roll keep the theme's `--chat-message-border-color` (#6f6c66). It reaches the
+  // DOM as an inline `style="border-color:…"`, which means the live-clone and
+  // core-render paths inherit it for free — and this fresh-build path was the only
+  // one that dropped it, so OOC messages older than the sidebar's live DOM window
+  // rendered gray in the archive while the recent ones were colored
+  // ("이전 페이지들만 유저색 테두리가 없음"). Verified live: messages carrying the
+  // `ic` class had no inline border-color, non-IC ones did.
+  //
+  // Do NOT widen this to every message — coloring IC borders too would make the
+  // archive stop matching the live chat, which is the opposite of the point.
+  try {
+    const styles = CONST?.CHAT_MESSAGE_STYLES || CONST?.CHAT_MESSAGE_TYPES || {};
+    if (Number(msg?.style ?? msg?.type ?? -1) === styles.OOC) {
+      const author = msg?.author ?? msg?.user;
+      const color = author?.color;
+      const css = typeof color === "string" ? color : color?.css;
+      if (css) li.style.borderColor = String(css);
+    }
+  } catch {}
+
   const actorName = (() => {
     try { if (msg?.speaker?.alias) return String(msg.speaker.alias); } catch {}
     try {

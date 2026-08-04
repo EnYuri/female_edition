@@ -101,6 +101,9 @@ const S = {
   TOKEN_CONFIG_TWO_COLUMN: "ceTokenConfigTwoColumn",
   TOKEN_SYNC_NAME: "ceTokenSyncName",
   TOKEN_SYNC_PLACED_NAME: "ceTokenSyncPlacedName",
+  // Animated tile textures: core treats gif/webp/apng as still images (only <video>
+  // sources animate), so we decode their frames and drive the tile texture ourselves.
+  ANIMATED_TILE_ENABLED: "ceAnimatedTileEnabled",
   // Music: players upload audio (GM-proxied) into their own personal playlist.
   MUSIC_ENABLED: "ceMusicEnabled",
   MUSIC_PLAYLIST_NAME: "ceMusicPlaylistName",
@@ -206,6 +209,7 @@ const FE_DEFAULTS = {
   [S.CORE_UI_SCENE_CONFIG_TABS]: true,
   [S.TOKEN_SYNC_NAME]: true,
   [S.TOKEN_SYNC_PLACED_NAME]: false,
+  [S.ANIMATED_TILE_ENABLED]: true,
   [S.MUSIC_ENABLED]: true,
   [S.MUSIC_PLAYLIST_NAME]: "player-uploads",
   [S.MUSIC_UPLOAD_ROOT]: "assets/uploadedmusic",

@@ -391,6 +391,9 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.TOKEN_GLOW_TARGET]:    feRead(S.TOKEN_GLOW_TARGET),
       [S.TOKEN_GLOW_SIGHTLINE]: feRead(S.TOKEN_GLOW_SIGHTLINE),
 
+      // Animated tile textures (gif/webp/apng)
+      [S.ANIMATED_TILE_ENABLED]: feRead(S.ANIMATED_TILE_ENABLED),
+
       // Retro theme (general — all systems)
       [S.UI_RETRO_THEME]:           feRead(S.UI_RETRO_THEME),
 
@@ -843,6 +846,11 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         // Token selection glow — client-scoped (GM-priority forces them automatically)
         bool(S.TOKEN_GLOW_ENABLED), bool(S.TOKEN_GLOW_HOVER), num(S.TOKEN_GLOW_STRENGTH),
         bool(S.TOKEN_GLOW_TARGET), bool(S.TOKEN_GLOW_SIGHTLINE),
+
+        // Animated tile textures — client-scoped (GM-priority forces it automatically).
+        // No reload key: fe-animated-tile.js always installs its hooks and its onChange
+        // attaches/detaches in place, per the CLAUDE.md teardown corollary.
+        bool(S.ANIMATED_TILE_ENABLED),
 
         // Chat portrait
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),
