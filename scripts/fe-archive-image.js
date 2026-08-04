@@ -453,6 +453,17 @@ export async function feDownscaleImagesForPrint(
   let imgs = Array.from(rootEl.querySelectorAll("img"));
   if (!imgs.length) return () => {};
 
+  // MUST stay. `feUpgradePortraitsForExport` has already replaced these with a
+  // pre-cropped, self-contained bitmap sized for PRINT/zoom rather than for this
+  // screen, and it marked them. This pass sizes every avatar at `cssBox × avatarDpr`
+  // — 64 × 1.5 = 96px for a default portrait — so without the skip it would resample
+  // that work straight back down and reinstate the exact low-resolution ceiling the
+  // upgrade exists to lift.
+  imgs = imgs.filter((img) => {
+    try { return !img.dataset?.feExportPortrait; } catch { return true; }
+  });
+  if (!imgs.length) return () => {};
+
   if (waitForPendingMs > 0) {
     // Only images that can actually finish on their own: a `loading="lazy"`
     // element that is off-screen (the archive log is mostly off-screen) would

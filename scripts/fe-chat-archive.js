@@ -67,6 +67,7 @@ import {
   feDownloadArchiveHTML,
   feBuildEmbeddedCookieRunFontCSS,
   feDownloadExportHTMLFromCurrentDocument,
+  feUpgradePortraitsForExport,
 } from "./fe-archive-snapshot.js";
 
 // ===========================================================================
@@ -80,6 +81,11 @@ const FE_EXPORT_WAIT_IMAGES_MAX = 800;
 const FE_EXPORT_WAIT_IMAGES_TIMEOUT = 20000;
 const FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT = 15000;
 const FE_EXPORT_WAIT_FONTS_TIMEOUT = 12000;
+// Ceiling on the two-paint-frame settle before win.print(). Generous next to the
+// ~33 ms two frames actually take when the popup is in front, and the only thing
+// standing between the user and a minute-plus hang when it is not — a hidden window
+// gets no rAF at all. See the comment at the await for the measurement.
+const FE_EXPORT_PAINT_FRAME_TIMEOUT = 400;
 const FE_EXPORT_PORTRAIT_MARKER_SELECTOR = 'img[class*="chat-portrait-message-portrait"], img.chat-portrait-message-portrait, .chat-portrait-container';
 const FE_ARCHIVE_LARGE_LOG_THRESHOLD = 1200;
 const FE_ARCHIVE_HUGE_LOG_THRESHOLD = 2600;
@@ -2647,8 +2653,12 @@ async function feArchivePrint(win) {
   // right before print (restored on afterprint). Set after downscale.
   let restoreStragglers = () => {};
   let restorePageBreaks = () => {};
+  let restorePortraitUpgrade = () => {};
 
   const restoreOnce = () => {
+    try {
+      restorePortraitUpgrade();
+    } catch {}
     try {
       restorePageBreaks();
     } catch {}
@@ -2669,6 +2679,28 @@ async function feArchivePrint(win) {
   try {
     win.addEventListener("afterprint", restoreOnce, { once: true });
   } catch {}
+
+  // Portraits get an EXPORT-resolution bitmap before anything else touches them.
+  //
+  // What is on the element right now is the live HQ resample — `portraitSize × dpr`,
+  // i.e. a 64x64 PNG on a dpr-1 machine. That is correct on screen and far too small on
+  // paper: `win.print()` rasterizes well above CSS pixels, so the portrait is the one
+  // element in the whole page that gets visibly enlarged. The downscale pass below would
+  // not have fixed it either — it caps avatars at `cssBox × avatarDpr` (~96px) — which is
+  // why it now skips anything this marks. Portraits it cannot upgrade keep their current
+  // src and fall through to the normal path.
+  if (logEl && mode !== "hideAll" && mode !== "hideAvatars") {
+    try {
+      restorePortraitUpgrade = await feUpgradePortraitsForExport(logEl, {
+        meta: setMeta,
+        // blob: URLs, not data:. Revoked by restoreOnce on afterprint.
+        useBlobURL: true,
+        win,
+      });
+    } catch (err) {
+      console.warn("female_edition | print portrait upgrade failed", err);
+    }
+  }
 
   // Downscale images for stability:
   // - always when mode === "downscale"
@@ -2776,12 +2808,34 @@ async function feArchivePrint(win) {
   // freeze, image src swaps) are fully composited before the print engine
   // captures the document. A single offsetHeight reflow is not enough when
   // style mutations queue micro-task paint work.
+  //
+  // THE TIMEOUT IS NOT OPTIONAL. MEASURED 2026-08-05, live, 2936-message log: this
+  // await was the single largest cost of the whole print path — 3.1 s to reach it,
+  // then 73 s sitting here. The archive popup opens BEHIND the Foundry window, so
+  // its `document.visibilityState` is "hidden" (verified) and Chromium does not run
+  // rAF for a hidden window at all. `win.focus()` two lines up does not help: focus
+  // stealing is blocked. The old `catch` never fired either — a rAF that is simply
+  // never serviced does not throw. So the user pressed 인쇄 and waited a minute-plus
+  // for a frame that only arrived when the compositor happened to wake the window,
+  // which is why the delay looked random.
+  //
+  // Racing it is safe: `void doc.body.offsetHeight` above already forced a
+  // synchronous layout, and a hidden window has no composited frame to wait for in
+  // the first place. When the popup IS in front, two frames land in ~33 ms and the
+  // timeout is never reached — behaviour there is unchanged.
   try {
     await new Promise((resolve) => {
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      const timer = setTimeout(done, FE_EXPORT_PAINT_FRAME_TIMEOUT);
       try {
-        win.requestAnimationFrame(() => win.requestAnimationFrame(resolve));
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+          clearTimeout(timer);
+          done();
+        }));
       } catch {
-        setTimeout(resolve, 50);
+        clearTimeout(timer);
+        setTimeout(done, 50);
       }
     });
   } catch {}

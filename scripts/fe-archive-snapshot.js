@@ -30,6 +30,10 @@ import {
   feRunArchiveDocumentOperation,
 } from "./fe-archive-output.js";
 import {
+  cpBuildExportPortraitDataURL,
+  cpClearExportPortraitCache,
+} from "./fe-chat-portrait-image.js";
+import {
   feRewriteSnapshotCSSURLs,
   feParseCssImports,
   feAssembleInlinedStyleBlock,
@@ -391,9 +395,22 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       // afterwards instead of cloning the entire body (cloning a large log doubles
       // the DOM tree in V8 heap right when we're about to allocate a giant outerHTML
       // string and a Blob).
+      //
+      // Declared OUT here, not inside the try: the fallback below runs on the LIVE
+      // archive document, so an exception thrown anywhere between the upgrade and the
+      // inner finally would otherwise leave every portrait permanently swapped to its
+      // export bitmap (and marked data-fe-export-portrait) in the window the user is
+      // still looking at, with no reference left to undo it.
+      let portraitRestore = () => {};
       try {
+        // Portraits first: re-resample each one from its ORIGINAL file at export
+        // resolution. The data: URL currently on the element is sized for THIS screen
+        // (size × dpr — 64px on a dpr-1 machine) and turns blocky the moment the saved
+        // file is printed or zoomed. See feUpgradePortraitsForExport.
+        portraitRestore = await feUpgradePortraitsForExport(snapshotRoot, { meta: setMeta }) || (() => {});
         setMeta("Embedding images…");
-        // keepSelfContainedSrc: a portrait already showing its HQ data: URL stays
+        // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade
+        // above, or the live HQ result when the upgrade could not improve on it) stays
         // as-is. Restoring the original file path would push a full-resolution
         // image into the embed budget (and past its per-image cap), which is how
         // portraits ended up as absolute Foundry URLs — broken for every reader
@@ -446,12 +463,21 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
           meta: setMeta,
           maxTotalBytes: Math.max(0, HTML_EMBED_TOTAL_BYTES - (dsStats.bytesUsed || 0)),
         });
+        // Duplicated portrait bitmaps are NOT a problem left to solve here: the embed
+        // pass ends in feDeduplicateInlineDataUrlsInNode, which keeps one copy of each
+        // distinct data: URL and strips `src` from the rest, restoring them on open via
+        // a tiny data-fe-img-ref bootstrap. VERIFIED 2026-08-05 on a 137-message export:
+        // 134 portraits, 7 distinct bitmaps, "Deduplicated 127 inline image(s) (~3.0MB
+        // saved)", and the saved file renders 134/134. A second sharing mechanism was
+        // written here (one CSS background rule per bitmap) and removed — running after
+        // the dedup pass it saw seven groups of one and never emitted a single rule.
         try {
           bodyParts = serializeSnapshotRoot();
         } finally {
           try { embedRestore?.(); } catch {}
           try { downscaleRestore?.(); } catch {}
           try { prepRestore?.(); } catch {}
+          try { portraitRestore?.(); } catch {}
         }
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed images", err);
@@ -462,6 +488,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
           bodyParts = serializeSnapshotRoot();
         } finally {
           try { restore(); } catch {}
+          try { portraitRestore?.(); } catch {}
         }
       }
     } else {
@@ -1283,6 +1310,189 @@ function feSerializeBodyToParts(body) {
   } catch {
     try { return [body?.outerHTML || ""]; } catch { return [""]; }
   }
+}
+
+// Multiplier over the CSS portrait box, and the absolute pixel ceiling, for the
+// export-resolution portrait bitmaps. 4x of the default 64px box = 256px.
+//
+// The number is a print-DPI budget, not a taste setting: Chrome rasterizes
+// `window.print()` well above CSS pixels, and a reader may zoom or open the file on a
+// HiDPI screen. Anything at 1x (which is what the live `src` data URL is on a dpr-1
+// machine) is visibly blocky in all three cases — that is exactly the "터무니없이 낮은
+// 해상도" report. A 256px pre-cropped PNG costs ~60-100 KB and dedups across every
+// message from the same actor, so the whole log usually adds well under 1 MB.
+// The 4x multiplier IS the print budget: 300 DPI over CSS's 96 DPI reference is
+// 3.125 device px per CSS px, so 4x covers 300 DPI with headroom at every portrait
+// size. The ceiling only exists to bound the file, and MUST NOT be set below what the
+// multiplier needs at the largest usable portrait size — at 512 it silently clipped
+// every box above 128px (a 160px portrait needs ~500px at 300 DPI and got 512, a 200px
+// one needs ~625 and still got 512), i.e. the exact ceiling this whole pass removes,
+// reappearing for anyone who enlarged their portraits. 768 covers up to a 192px box.
+const FE_EXPORT_PORTRAIT_SCALE = 4;
+const FE_EXPORT_PORTRAIT_MAX_PX = 768;
+// Total wall-clock the portrait pass may spend on NEW work. Sized against the 5 s
+// per-source probe ceiling at concurrency 4: a batch of dead paths costs one round of
+// timeouts, not one per source. Keep it well under the point where a user assumes the
+// export has hung — everything past it degrades to "keep the original src", not to a
+// failure.
+const FE_EXPORT_PORTRAIT_BUDGET_MS = 10000;
+
+/**
+ * Re-resample every portrait from its ORIGINAL file at export resolution and swap the
+ * result in, returning an undo.
+ *
+ * Runs BEFORE fePrepareBodyForHTMLSnapshot so its `keepSelfContainedSrc` branch sees
+ * an already-self-contained data: URL and leaves it alone; anything this could not
+ * upgrade still falls through to the normal restore + embed path.
+ */
+export async function feUpgradePortraitsForExport(
+  root,
+  { meta = () => {}, useBlobURL = false, win = null } = {}
+) {
+  const changed = [];
+  const winURL = (win && win.URL) || URL;
+  const createdBlobURLs = new Set();
+  // dataUrl -> Promise<blobUrl>. Every message from the same speaker must end up
+  // sharing ONE blob: URL, which is the entire point of this on the print path.
+  const blobURLByData = new Map();
+  const toBlobURL = (dataUrl) => {
+    let p = blobURLByData.get(dataUrl);
+    if (p) return p;
+    p = (async () => {
+      const blob = await (await fetch(dataUrl)).blob();
+      const url = winURL.createObjectURL(blob);
+      createdBlobURLs.add(url);
+      return url;
+    })().catch(() => null);
+    blobURLByData.set(dataUrl, p);
+    return p;
+  };
+  try {
+    if (!root?.querySelectorAll) return () => {};
+    const imgs = Array.from(root.querySelectorAll("img[data-fe-portrait-orig-src]"));
+    if (!imgs.length) return () => {};
+
+    const size = Math.max(16, Number(feSetting("chatPortraitSize") ?? 64) || 64);
+    const shape = String(feSetting("chatPortraitShape") ?? "circle");
+    const fit = shape === "none" ? "contain" : "cover";
+    const targetPx = Math.min(FE_EXPORT_PORTRAIT_MAX_PX, Math.round(size * FE_EXPORT_PORTRAIT_SCALE));
+
+    // Wall-clock budget for NEW work. MUST stay: cpWaitForImage puts a ceiling on each
+    // source, and a source that 404s or hangs burns all of it. Past the deadline the
+    // pass keeps running but only serves sources already resolved in the memo (free),
+    // so repeated speakers still upgrade; everything else keeps its original src and
+    // falls through to the normal embed path.
+    const deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
+
+    // CONCURRENT, bounded. This loop used to be serial, with a comment claiming
+    // parallelism could not help because the work is main-thread canvas work. That
+    // reasoning was WRONG and it made printing take far too long: per the measurements
+    // in CLAUDE.md the ladder is ~0.4 ms and the encode ~2.4 ms, but this pass first has
+    // to FETCH AND FULLY DECODE the original file — several MB and 10+ megapixels for a
+    // typical portrait — and that part is off-main-thread and overlaps almost perfectly.
+    // Serially it is the entire cost of the pass, multiplied by the number of distinct
+    // speakers, and on a remote Foundry host it is network latency multiplied by the
+    // same. The cap keeps peak memory to a few decoded sources at once.
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    let done = 0;
+    const runOne = async (img) => {
+      const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.("data-fe-portrait-orig-src") || "";
+      if (!orig) return;
+      let dataUrl = null;
+      try {
+        dataUrl = await cpBuildExportPortraitDataURL(orig, {
+          targetPx,
+          fit,
+          anchorTop: true,
+          cachedOnly: performance.now() > deadline,
+        });
+      } catch {}
+      if (!dataUrl) return;
+
+      // PRINT uses blob: URLs, the saved-HTML path uses the data: URL directly.
+      //
+      // The bitmap is identical either way — what differs is what sits in the DOM. A
+      // base64 data: URL is ~20 KB of attribute text, and a busy log repeats the same
+      // speaker across hundreds of messages, so the print document ends up carrying
+      // megabytes of duplicated string that Chromium has to copy when it builds the
+      // preview. One blob: URL per distinct speaker is a short, shared handle instead.
+      // `feDownscaleImagesForPrint` already made exactly this choice for the same
+      // reason ("~33% memory plus V8 string overhead"); portraits skip that pass now,
+      // so they have to make it themselves. The saved HTML cannot use blob: at all —
+      // the handle dies with the session — hence the flag rather than a blanket switch.
+      let finalUrl = dataUrl;
+      if (useBlobURL) {
+        const blobUrl = await toBlobURL(dataUrl);
+        if (blobUrl) finalUrl = blobUrl;
+      }
+
+      const prevSrc = img.getAttribute("src");
+      const prevSrcset = img.getAttribute("srcset");
+      if (prevSrc === finalUrl && !prevSrcset) return;
+      changed.push({ img, prevSrc, prevSrcset });
+      // Same contract as the downscale pass: an HTML snapshot taken while these blob:
+      // URLs are live reverts through data-fe-print-orig-src, since a blob: handle in
+      // saved HTML would be dead on arrival.
+      //
+      // Stash the ORIGINAL FILE PATH, never `prevSrc`. MEASURED 2026-08-05: prevSrc
+      // here is the live HQ resample, i.e. a ~10.8 KB base64 data: URL, and copying it
+      // per element put 29.34 MB of dead string into the print document — the single
+      // largest attribute in it, ahead of style (6.51 MB) and src (0.37 MB). Nothing
+      // ever paints it. The path is what a snapshot actually wants (it is the same
+      // value feRestoreOriginalPortraitSources would write) and costs ~20 bytes.
+      if (useBlobURL && orig) {
+        try { img.dataset.fePrintOrigSrc = orig; } catch {}
+      }
+      img.setAttribute("src", finalUrl);
+      img.removeAttribute("srcset");
+      // Tells feDownscaleImagesForPrint to leave this one alone. Without it the
+      // downscale pass re-targets every avatar at `cssBox × avatarDpr` (64 × 1.5 =
+      // 96px) and throws the extra resolution straight back away — which is the
+      // ceiling that made both the PDF and the saved HTML look low-resolution.
+      img.dataset.feExportPortrait = "1";
+    };
+
+    // Progress has to be reported from inside the pass: the memoized sources return
+    // instantly and the cold ones do not, so a single message posted up front sits
+    // there looking hung for exactly as long as the work actually takes.
+    const workers = Array.from({ length: Math.min(CONCURRENCY, imgs.length) }, async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= imgs.length) return;
+        try {
+          await runOne(imgs[i]);
+        } catch {}
+        done += 1;
+        if (done === imgs.length || done % CONCURRENCY === 0) {
+          meta(`Preparing portraits… ${done}/${imgs.length}`);
+        }
+      }
+    });
+    await Promise.all(workers);
+  } catch (err) {
+    console.warn("female_edition | HTML export: portrait upgrade failed", err);
+  }
+  return () => {
+    for (const it of changed) {
+      try {
+        if (it.prevSrc == null) it.img.removeAttribute("src");
+        else it.img.setAttribute("src", it.prevSrc);
+        if (it.prevSrcset == null) it.img.removeAttribute("srcset");
+        else it.img.setAttribute("srcset", it.prevSrcset);
+        delete it.img.dataset.feExportPortrait;
+        delete it.img.dataset.fePrintOrigSrc;
+      } catch {}
+    }
+    // Blob handles outlive the elements that referenced them until revoked — the
+    // bitmaps would stay pinned in memory for the rest of the session otherwise.
+    for (const url of createdBlobURLs) {
+      try { winURL.revokeObjectURL(url); } catch {}
+    }
+    createdBlobURLs.clear();
+    blobURLByData.clear();
+    try { cpClearExportPortraitCache(); } catch {}
+  };
 }
 
 function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false, keepSelfContainedSrc = false } = {}) {

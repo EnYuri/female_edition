@@ -83,14 +83,20 @@ function cpIsSafeCanvasSource(src) {
 // a permanent per-key deadlock that silently disabled HQ resampling in live chat.
 const CP_IMAGE_WAIT_TIMEOUT_MS = 10000;
 
-async function cpWaitForImage(img) {
+// Shorter ceiling for the EXPORT probe. The 10 s above is sized for the lazy-deferral
+// quirk on in-document portraits; an export probe is a detached, eager <img> that has
+// none of it, so the only thing a long wait buys there is a dead path stalling an
+// export the user is sitting in front of.
+const CP_EXPORT_IMAGE_WAIT_TIMEOUT_MS = 5000;
+
+async function cpWaitForImage(img, timeoutMs = CP_IMAGE_WAIT_TIMEOUT_MS) {
   try {
     if (!img) return false;
     if (img.complete && img.naturalWidth > 0) return true;
 
     let timer = null;
     const timeout = new Promise((resolve) => {
-      timer = setTimeout(() => resolve(false), CP_IMAGE_WAIT_TIMEOUT_MS);
+      timer = setTimeout(() => resolve(false), Math.max(1, Number(timeoutMs) || CP_IMAGE_WAIT_TIMEOUT_MS));
     });
 
     const wait = (async () => {
@@ -311,7 +317,18 @@ function cpResampleIsPointless(img, size, fit) {
   }
 }
 
-async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
+// `targetPx` (0 = off) bypasses the CSS-size × dpr calculation entirely, and
+// `mimeType`/`quality` override the encoder. Both exist for the export path, which
+// needs a bitmap sized for PRINT/zoom rather than for this machine's screen, and which
+// pays for that size in file bytes — see cpBuildExportPortraitDataURL. The live path
+// passes neither and is unchanged: screen-sized, lossless PNG.
+async function cpResampleToDataURL(
+  img,
+  size,
+  fit,
+  anchorTop = false,
+  { targetPx: targetOverride = 0, mimeType = "image/png", quality } = {}
+) {
   const ok = await cpWaitForImage(img);
   if (!ok) return null;
 
@@ -319,7 +336,7 @@ async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
   const nh = Number(img.naturalHeight || 0);
   if (!nw || !nh) return null;
 
-  const target = cpTargetPixels(size);
+  const target = targetOverride > 0 ? Math.max(1, Math.round(targetOverride)) : cpTargetPixels(size);
 
   // Only resample when we are actually downscaling.
   if (nw <= target && nh <= target) return null;
@@ -394,7 +411,7 @@ async function cpResampleToDataURL(img, size, fit, anchorTop = false) {
     if (work) octx.drawImage(work, 0, 0, work.width, work.height, dx, dy, dw, dh);
     else octx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 
-    return out.toDataURL("image/png");
+    return out.toDataURL(mimeType, quality);
   } catch {
     // Tainted canvas or unsupported draw.
     return null;
@@ -535,4 +552,126 @@ function cpShouldUseHQResample(img, shape) {
   }
 }
 
-export { cpMaybeApplyHQResample, cpShouldUseHQResample, cpResampleCacheGet };
+// ---------------------------------------------------------------------------
+// Export-resolution portraits
+// ---------------------------------------------------------------------------
+
+// Keyed by `${origUrl}|${targetPx}|${fit}|${anchorTop}`. Deliberately SEPARATE from
+// the LRU above: these bitmaps are several times larger, they are only useful for the
+// duration of one export, and mixing them in would evict the live sidebar's cache.
+// The export path calls cpClearExportPortraitCache() when it is done.
+const _cpExportPortraitCache = new Map();
+
+function cpClearExportPortraitCache() {
+  _cpExportPortraitCache.clear();
+}
+
+/**
+ * How many pixels an export resample may actually ask for, given the source.
+ *
+ * MUST stay. The "nothing to do" guard inside `cpResampleToDataURL` is
+ * `max(nw, nh) <= target`, which is the correct test for **contain** (the whole image
+ * is drawn, so the long side is what has to reach the target) but WRONG for **cover**:
+ * cover crops to a square on the SHORT side first, so only the short side has to
+ * supply the target. A 200x600 source asked for 256 passes that guard — 600 > 256 —
+ * and then has its 200px square blown up 1.28x, producing a blurrier AND larger file
+ * than the untouched original. Clamping to what the source can actually supply makes
+ * the pass a pure downscale in both fits.
+ *
+ * Returns 0 when the source dimensions are unusable — the caller must bail then, not
+ * substitute a default. When the clamp lands on the source's own size,
+ * `cpResampleToDataURL` returns null and the caller falls back to embedding the
+ * original file, which for a source that small is the cheaper answer anyway.
+ */
+function cpEffectiveExportTarget(srcW, srcH, fit, targetPx) {
+  const nw = Math.floor(Number(srcW) || 0);
+  const nh = Math.floor(Number(srcH) || 0);
+  if (!(nw > 0) || !(nh > 0)) return 0;
+  const target = Math.round(Number(targetPx) || 0);
+  if (!(target > 0)) return 0;
+  const supplied = fit === "contain" ? Math.max(nw, nh) : Math.min(nw, nh);
+  return Math.max(1, Math.min(target, supplied));
+}
+
+/**
+ * Build a portrait bitmap sized for EXPORT rather than for this screen.
+ *
+ * MUST NOT be replaced by reusing the live `src` data URL. That one is `size × dpr`
+ * device pixels — a 64x64 PNG on a dpr-1 machine — which is exactly right in the
+ * sidebar and visibly blocky the moment it is enlarged: browser zoom, a HiDPI reader,
+ * and above all `window.print()`, which rasterizes at print DPI. The saved HTML has to
+ * survive all three on machines we know nothing about, so it gets its own, larger
+ * resample straight from the ORIGINAL file.
+ *
+ * Also MUST NOT be replaced by simply embedding the original file and letting CSS
+ * scale it: the portrait box is square and applies `object-fit: cover`, so a non-square
+ * source is drawn larger than the box and clipped — the Chromium low-quality-filter
+ * path this whole module exists to avoid (see CLAUDE.md). Pre-cropping to a square
+ * here keeps the good filter AND is far smaller than the untouched source.
+ *
+ * Returns null when nothing can be gained (unsafe/tainted source, load failure, or a
+ * source already at/below the target — `cpResampleToDataURL` never upscales). The
+ * caller must then leave the original src alone and let the normal embed path have it.
+ */
+async function cpBuildExportPortraitDataURL(
+  origUrl,
+  {
+    targetPx = 256,
+    fit = "cover",
+    anchorTop = false,
+    mimeType = "image/webp",
+    quality = 0.92,
+    cachedOnly = false,
+  } = {}
+) {
+  try {
+    if (!origUrl || !cpIsSafeCanvasSource(origUrl)) return null;
+    const target = Math.max(1, Math.round(targetPx));
+    const key = `${origUrl}|${target}|${fit}|${anchorTop ? 1 : 0}|${mimeType}|${quality}`;
+    if (_cpExportPortraitCache.has(key)) return _cpExportPortraitCache.get(key);
+    // The caller has spent its time budget and will not start new work — but a source
+    // it already paid for is free, so it keeps asking with this flag set.
+    if (cachedOnly) return null;
+
+    const promise = (async () => {
+      // A detached <img> — never `loading="lazy"`, so none of the deferral quirks that
+      // plague the in-document portraits apply and cpWaitForImage settles normally.
+      const probe = new Image();
+      // "async", NOT "sync". These probes are fetched several at a time and each one is
+      // a full-resolution source (10+ megapixels is normal for portrait art); a sync
+      // hint pulls that decode onto the main thread, which is the one place it must not
+      // be during an export the user is watching.
+      try { probe.decoding = "async"; } catch { /* ignore */ }
+      probe.src = new URL(origUrl, window.location.href).href;
+      const ok = await cpWaitForImage(probe, CP_EXPORT_IMAGE_WAIT_TIMEOUT_MS);
+      if (!ok) return null;
+
+      const effective = cpEffectiveExportTarget(probe.naturalWidth, probe.naturalHeight, fit, target);
+      if (!effective) return null;
+
+      // WebP q0.92 rather than the live path's lossless PNG: a 256px photographic
+      // portrait is ~120 KB as PNG and ~15 KB here, and the saved HTML carries one per
+      // distinct speaker. The difference is not visible at portrait scale.
+      return await cpResampleToDataURL(probe, 0, fit, anchorTop, { targetPx: effective, mimeType, quality });
+    })().catch(() => null);
+
+    _cpExportPortraitCache.set(key, promise);
+    return await promise;
+  } catch {
+    return null;
+  }
+}
+
+export {
+  cpMaybeApplyHQResample,
+  cpShouldUseHQResample,
+  cpResampleCacheGet,
+  cpBuildExportPortraitDataURL,
+  cpClearExportPortraitCache,
+  // Pure geometry — exported for ci/fe-chat-portrait-image.test.mjs. They have no
+  // production caller outside this file; the crop/target math is where every
+  // resolution and aspect-ratio regression this module has had actually lived.
+  cpEffectiveExportTarget,
+  cpComputeSourceCrop,
+  cpComputeDrawRect,
+};

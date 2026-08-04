@@ -19,6 +19,19 @@ export function feRestoreOriginalPortraitSources(root, { keepSelfContainedSrc = 
     for (const img of imgs) {
       const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.('data-fe-portrait-orig-src') || '';
       if (!orig) continue;
+      // NEVER touch a portrait that feUpgradePortraitsForExport already replaced.
+      // MEASURED 2026-08-05, live, 2936-message log — this guard's absence was a
+      // print-preview killer. The print path runs the upgrade (fe-chat-archive.js
+      // ~2689) and then fePrepareArchiveImagesForOutput (~2711), which calls this
+      // function; without the guard it put the ORIGINAL FILE PATH back into src and
+      // set loading="eager". Meanwhile feDownscaleImagesForPrint skips anything
+      // carrying data-fe-export-portrait — so the upgrade's marker switched OFF the
+      // only pass that was shrinking portraits, and this line threw away the
+      // replacement that was supposed to make that safe. Net state at win.print():
+      // 2774 <img> pointing at full-resolution originals (akari.png 3328x3677 in a
+      // 64px box, x481; largest 3745x5539), 33 distinct sources totalling 69.7
+      // MEGAPIXELS, all eager. Chromium's preview never became ready.
+      if (img.dataset?.feExportPortrait) continue;
       const prevSrc = img.getAttribute('src');
       const prevSrcset = img.getAttribute('srcset');
       const prevLoading = img.getAttribute('loading');
