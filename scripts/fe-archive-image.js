@@ -361,6 +361,41 @@ async function feResampleViaImageBitmap(win, img, spec, outW, outH) {
 // Image downscale  (main export — called by feArchivePrint)
 // ===========================================================================
 
+// Bounded wait until every given <img> settles (load or error). Local to this
+// module by design — fe-archive-image.js imports nothing.
+function feAwaitImageElements(imgs, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    let remaining = 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(finish, Math.max(0, Number(timeoutMs) || 0));
+
+    for (const img of imgs) {
+      try {
+        if (img.complete && img.naturalWidth > 0) continue;
+        remaining += 1;
+        const onSettled = () => {
+          try {
+            img.removeEventListener("load", onSettled);
+            img.removeEventListener("error", onSettled);
+          } catch {}
+          remaining -= 1;
+          if (remaining <= 0) finish();
+        };
+        img.addEventListener("load", onSettled);
+        img.addEventListener("error", onSettled);
+      } catch {}
+    }
+
+    if (remaining <= 0) finish();
+  });
+}
+
 export async function feDownscaleImagesForPrint(
   win,
   rootEl,
@@ -400,11 +435,42 @@ export async function feDownscaleImagesForPrint(
     // total encoded output bytes produced. Lets the HTML-embed caller charge the
     // remaining embed budget against what downscaling already spent (shared cap).
     stats = null,
+    // Bounded wait for images that are still loading when this runs. 0 = don't
+    // wait (print path: everything was already awaited before the print call).
+    //
+    // MUST stay non-zero on the HTML-embed path: `feRestoreOriginalPortraitSources`
+    // rewrites a portrait's `src` from its HQ data: URL back to the original file
+    // path immediately before this runs, which puts the <img> back into loading
+    // state. The grouping loop below skips any `!img.complete` element, so without
+    // this wait every restored portrait silently escapes downscaling and reaches
+    // `feEmbedImagesInNode` at FULL resolution — where anything over MAX_PER_IMAGE
+    // (0.8MB) is dropped and left pointing at an absolute Foundry-origin URL, i.e.
+    // a broken image for anyone but the exporting user.
+    waitForPendingMs = 0,
   } = {}
 ) {
   const setMeta = typeof meta === "function" ? meta : () => {};
   let imgs = Array.from(rootEl.querySelectorAll("img"));
   if (!imgs.length) return () => {};
+
+  if (waitForPendingMs > 0) {
+    // Only images that can actually finish on their own: a `loading="lazy"`
+    // element that is off-screen (the archive log is mostly off-screen) would
+    // never fire and would burn the whole timeout for nothing.
+    const pending = imgs.filter((img) => {
+      try {
+        if (!img.getAttribute("src")) return false;
+        if (img.complete && img.naturalWidth > 0) return false;
+        return String(img.getAttribute("loading") || "").toLowerCase() !== "lazy";
+      } catch {
+        return false;
+      }
+    });
+    if (pending.length) {
+      setMeta(`Waiting for ${pending.length} image(s) to load…`);
+      await feAwaitImageElements(pending, waitForPendingMs);
+    }
+  }
 
   const changed = [];
 
@@ -774,6 +840,98 @@ async function feEncodeCanvasToBlob(canvas, { webpQuality = 0.82, jpegQuality = 
     if (blob) return blob;
   }
   return null;
+}
+
+// ===========================================================================
+// Oversize-blob compression  (embed fallback — called by feEmbedImagesInNode)
+// ===========================================================================
+
+// Last-chance compressor for an image the embed pass fetched but found too large
+// (or too large for the remaining budget). Decodes the blob off-DOM, resizes it
+// with the same off-thread `createImageBitmap` path the downscaler prefers, and
+// re-encodes until it fits `targetBytes`.
+//
+// This exists so the per-image cap stops being a silent DROP: a dropped image keeps
+// an absolute Foundry-origin `src` in the saved HTML, which loads only on the
+// exporting user's machine. Compressing is always better than that — a smaller
+// picture beats a broken one. The caller therefore does NOT re-apply its caps to
+// what comes back from here.
+//
+// Works on the BLOB, not on a live <img>: the source may be a lazy/off-screen
+// element whose decode never completes, and the bytes are already in hand.
+export async function feCompressImageBlobForEmbed(
+  win,
+  blob,
+  { targetBytes = 900_000, maxSide = 1400, webpQuality = 0.82, jpegQuality = 0.85 } = {}
+) {
+  const doc = win?.document;
+  if (!doc || !blob || typeof win.createImageBitmap !== "function") return null;
+
+  // Progressively harder attempts. Each is one decode + one encode; three passes
+  // cover everything from "slightly over" to "8000px scan of a battle map".
+  const attempts = [
+    { side: maxSide, webp: webpQuality, jpeg: jpegQuality },
+    { side: Math.round(maxSide * 0.7), webp: Math.max(0.6, webpQuality - 0.12), jpeg: Math.max(0.65, jpegQuality - 0.12) },
+    { side: Math.round(maxSide * 0.5), webp: 0.6, jpeg: 0.65 },
+  ];
+
+  let best = null;
+  for (const attempt of attempts) {
+    let bitmap = null;
+    let canvas = null;
+    try {
+      const probe = await win.createImageBitmap(blob);
+      const natW = Math.max(1, probe.width || 1);
+      const natH = Math.max(1, probe.height || 1);
+      const scale = Math.min(1, attempt.side / Math.max(natW, natH));
+      const outW = Math.max(1, Math.round(natW * scale));
+      const outH = Math.max(1, Math.round(natH * scale));
+
+      if (scale < 1) {
+        try {
+          bitmap = await win.createImageBitmap(probe, {
+            resizeWidth: outW,
+            resizeHeight: outH,
+            resizeQuality: "high",
+          });
+        } catch {
+          bitmap = null;
+        }
+      }
+      if (!bitmap) bitmap = probe;
+      else { try { probe.close?.(); } catch {} }
+
+      canvas = doc.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return best;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap, 0, 0, outW, outH);
+
+      const out = await feEncodeCanvasToBlob(canvas, {
+        webpQuality: attempt.webp,
+        jpegQuality: attempt.jpeg,
+      });
+      if (out && (!best || out.size < best.size)) best = out;
+      if (out && out.size <= targetBytes) break;
+    } catch {
+      // Tainted canvas / decode failure / OOM → keep whatever earlier pass produced.
+      break;
+    } finally {
+      try { bitmap?.close?.(); } catch {}
+      // Release the backing store immediately instead of waiting for GC.
+      try { if (canvas) { canvas.width = 0; canvas.height = 0; } } catch {}
+    }
+  }
+
+  if (!best) return null;
+  try {
+    return { dataUrl: await feBlobToDataURL(best), size: best.size };
+  } catch {
+    return null;
+  }
 }
 
 async function feCanvasToDataURL(canvas, options) {

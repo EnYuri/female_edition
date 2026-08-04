@@ -14,6 +14,7 @@ import {
   feBlobToDataURL,
   feFreezeMessageBackgroundsForPrint,
   feDownscaleImagesForPrint,
+  feCompressImageBlobForEmbed,
 } from "./fe-archive-image.js";
 import {
   feRestoreOriginalPortraitSources,
@@ -392,7 +393,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       // string and a Blob).
       try {
         setMeta("Embedding images…");
-        const prepRestore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts });
+        // keepSelfContainedSrc: a portrait already showing its HQ data: URL stays
+        // as-is. Restoring the original file path would push a full-resolution
+        // image into the embed budget (and past its per-image cap), which is how
+        // portraits ended up as absolute Foundry URLs — broken for every reader
+        // but the exporter.
+        const prepRestore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts, keepSelfContainedSrc: true });
         // P4: downscale images to small data: URLs BEFORE embedding. feEmbedImagesInNode
         // skips anything already `data:`, so this both shrinks the embedded payload
         // (far more images fit under the byte budget → better offline fidelity) and
@@ -402,7 +408,10 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         // Shared image-byte budget for the saved HTML. Pre-embed downscaling
         // spends part of it (dsStats.bytesUsed); feEmbedImagesInNode gets only
         // what's left so downscaled + leftover-embedded images never exceed it.
-        const HTML_EMBED_TOTAL_BYTES = 12_000_000;
+        // Shared ceiling for downscaled + embedded bytes. Raised 12MB → 24MB with the
+        // per-image cap: overflowing it is not "a smaller file", it is images that only
+        // load on this machine.
+        const HTML_EMBED_TOTAL_BYTES = 24_000_000;
         const dsStats = {};
         let downscaleRestore = () => {};
         try {
@@ -424,6 +433,10 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
               avatarJpegQuality: 0.84,
               maxSide: 1600,
               concurrency: 4,
+              // Portraits restored to their original file path are mid-load here;
+              // the grouping loop skips `!complete` images, so they would escape
+              // downscaling entirely and reach the embed pass at full resolution.
+              waitForPendingMs: 8000,
             });
           }
         } catch (e) {
@@ -442,8 +455,9 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         }
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed images", err);
-        // Fallback: still produce a valid snapshot.
-        const restore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts });
+        // Fallback: still produce a valid snapshot. Self-contained portrait srcs
+        // are kept for the same reason as the main path above.
+        const restore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts, keepSelfContainedSrc: true });
         try {
           bodyParts = serializeSnapshotRoot();
         } finally {
@@ -924,11 +938,22 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
   // Hard safety limits:
   // Single-file HTML + embedded images can easily crash Chromium/Electron (STATUS_BREAKPOINT / OOM)
   // due to base64 expansion + JS string memory overhead.
-  const MAX_IMAGES = 160;
-  // ~12MB (binary) before base64/string expansion. Caller may pass a smaller cap
+  //
+  // These are LAST-RESORT ceilings, not a tuning knob for file size — the pre-embed
+  // downscale pass is what actually keeps the payload small. Hitting one of them is a
+  // silent failure that leaves an absolute Foundry-origin src in the saved HTML, i.e.
+  // an image only the exporting user can load. So they are set well above what a
+  // downscaled log needs; the console warning at the end of the pass reports any image
+  // that still fell through.
+  const MAX_IMAGES = 600;
+  // ~24MB (binary) before base64/string expansion. Caller may pass a smaller cap
   // (shared budget) — e.g. after pre-embed downscaling already spent part of it.
-  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 12_000_000;
-  const MAX_PER_IMAGE = 800_000;      // ~0.8MB per image
+  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 24_000_000;
+  // ~4MB per image. The old 0.8MB dropped full-size NPC portrait art outright
+  // whenever it escaped downscaling. Over this, the image is compressed (never dropped).
+  const MAX_PER_IMAGE = 4_000_000;
+  // Absolute stop for the compress-past-the-budget path below.
+  const HARD_TOTAL_CEILING = Math.round(MAX_TOTAL_BYTES * 1.5);
 
   const cache = new Map();
 
@@ -990,8 +1015,25 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
         const blob = fetched;
         if (!blob) return null;
         // Per-image limit. Order-independent, so it belongs here rather than at commit.
-        if (blob.size > MAX_PER_IMAGE) return null;
-        return { dataUrl: await feBlobToDataURL(blob), size: blob.size };
+        // Over the cap is NOT a drop: dropping leaves an absolute Foundry-origin src that
+        // only this machine can load. Compress it down instead and embed the result
+        // unconditionally — `compressed: true` tells the commit loop not to re-apply any
+        // cap to what came back.
+        if (blob.size > MAX_PER_IMAGE) {
+          const shrunk = await feCompressImageBlobForEmbed(window, blob, {
+            targetBytes: MAX_PER_IMAGE,
+            maxSide: 1400,
+          });
+          if (!shrunk) {
+            console.warn("female_edition | HTML export: image over per-image cap and not compressible", abs, blob.size);
+            return null;
+          }
+          return { dataUrl: shrunk.dataUrl, size: shrunk.size, compressed: true };
+        }
+        // `blob` is kept so the commit loop can compress this image if it no longer
+        // fits the remaining total budget. Cleared right after that decision so the
+        // memoized entry doesn't pin bytes for the rest of the run.
+        return { dataUrl: await feBlobToDataURL(blob), size: blob.size, blob };
       } catch (err) {
         console.warn("female_edition | HTML export: failed to embed image", abs, err);
         return null;
@@ -1023,8 +1065,13 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
       const entry = entryAt(i);
       if (!entry) continue;
 
-      // Stop when reaching limits
-      if (embeddedCount >= MAX_IMAGES || embeddedBytes >= MAX_TOTAL_BYTES) {
+      // Stop when reaching limits.
+      //
+      // NOT at MAX_TOTAL_BYTES: past the budget, images go through the compressor
+      // below instead of being abandoned on a server-only URL. HARD_TOTAL_CEILING is
+      // where that stops too — otherwise 600 compressed images could still add up
+      // far past any sane file size.
+      if (embeddedCount >= MAX_IMAGES || embeddedBytes >= HARD_TOTAL_CEILING) {
         setMeta(
           `Embedding images… stopped (limit reached: ${embeddedCount} images, ${(
             embeddedBytes /
@@ -1038,37 +1085,53 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
       const { img, abs } = entry;
 
       if (cache.has(abs)) {
-        // For duplicate archive images, keep the original absolute src instead of repeating
-        // the same large data: URL over and over in saved HTML.
+        // Every duplicate — including one collapsed by feOptimizeArchiveNodeImages
+        // (`data-fe-archive-shared-image`) — gets the cached data: URL. Leaving a
+        // shared duplicate on its absolute Foundry-origin src used to be the
+        // size optimization, but it makes that image load ONLY for a viewer who can
+        // reach this server. `feDeduplicateInlineDataUrlsInNode` below already
+        // removes the repeat cost: identical data: srcs collapse to one copy plus a
+        // marker attribute, restored at view time by the bootstrap script.
         try {
           recordBeforeMutate(img);
-          if (img.dataset?.feArchiveSharedImage === "1") {
-            img.setAttribute("src", abs);
-            img.removeAttribute("srcset");
-            if (!img.getAttribute("loading")) img.setAttribute("loading", "lazy");
-          } else {
-            img.setAttribute("src", cache.get(abs));
-            img.removeAttribute("srcset");
-            img.removeAttribute("loading");
-          }
+          img.setAttribute("src", cache.get(abs));
+          img.removeAttribute("srcset");
+          img.removeAttribute("loading");
         } catch {}
         continue;
       }
 
       setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i + 1}/${imgs.length})`);
 
-      const result = await startFetch(abs);
+      let result = await startFetch(abs);
       if (!result) continue;
 
-      // Total limit. A too-large image is skipped while smaller ones after it still fit,
-      // so this cannot short-circuit the loop.
-      if (embeddedBytes + result.size > MAX_TOTAL_BYTES) {
-        // Release the decoded data URL: the budget only ever grows, so a later duplicate of
-        // this URL would be skipped here too. Holding it would pin megabytes precisely when
-        // we are already at the cap.
-        fetches.set(abs, Promise.resolve(null));
-        continue;
+      // Total limit. A too-large image is compressed into what's left rather than skipped —
+      // same reasoning as the per-image cap: a skipped image keeps a server-only URL. Once
+      // it has been through the compressor it is embedded regardless of the remaining
+      // budget (bounded overshoot: a compressed image is ≲1MB).
+      if (!result.compressed && embeddedBytes + result.size > MAX_TOTAL_BYTES) {
+        const remaining = Math.max(0, MAX_TOTAL_BYTES - embeddedBytes);
+        const shrunk = result.blob
+          ? await feCompressImageBlobForEmbed(window, result.blob, {
+              targetBytes: Math.max(150_000, remaining),
+              maxSide: 1200,
+            })
+          : null;
+        if (shrunk && shrunk.size < result.size) {
+          result = { dataUrl: shrunk.dataUrl, size: shrunk.size, compressed: true };
+        } else {
+          // Compression failed, or re-encoding an already-optimized file made it bigger.
+          // Embed the original rather than abandon it: it is under MAX_PER_IMAGE, and the
+          // run still stops at HARD_TOTAL_CEILING.
+          result = { dataUrl: result.dataUrl, size: result.size, compressed: true };
+        }
+        // Re-memoize so later duplicates reuse this decision (and drop the blob).
+        fetches.set(abs, Promise.resolve(result));
       }
+
+      // Budget decision is made — drop the retained blob so it can be collected.
+      try { if (result.blob) result.blob = null; } catch {}
 
       cache.set(abs, result.dataUrl);
 
@@ -1085,6 +1148,26 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
       // Yield periodically so Chromium doesn't freeze.
       if (i % 10 === 0) await feNextTick();
     }
+
+    // Diagnostic: anything still pointing at a network URL will render only for a
+    // reader whose browser can reach this Foundry server — i.e. a broken image for
+    // everyone the file is shared with. Report it instead of failing silently.
+    try {
+      const leftovers = [];
+      for (const img of root.querySelectorAll?.("img[src]") ?? []) {
+        const s = img.getAttribute("src") || "";
+        if (!s || s.startsWith("data:")) continue;
+        leftovers.push(s);
+      }
+      if (leftovers.length) {
+        console.warn(
+          `female_edition | HTML export: ${leftovers.length} image(s) could NOT be embedded and still ` +
+          `reference this server — they will appear broken for other viewers.`,
+          leftovers.slice(0, 10)
+        );
+        setMeta(`Warning: ${leftovers.length} image(s) left un-embedded`);
+      }
+    } catch {}
 
     // Final pass: deduplicate identical inline data: URLs across the serialized HTML.
     // Each repeated <img src="data:..."> is reduced to a marker; a small bootstrap
@@ -1202,10 +1285,10 @@ function feSerializeBodyToParts(body) {
   }
 }
 
-function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false } = {}) {
+function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false, keepSelfContainedSrc = false } = {}) {
   const restores = [];
   try {
-    restores.push(feRestoreOriginalPortraitSources(root));
+    restores.push(feRestoreOriginalPortraitSources(root, { keepSelfContainedSrc }));
   } catch {}
   try {
     // Revert any blob: URLs left over from in-flight print downscale so they

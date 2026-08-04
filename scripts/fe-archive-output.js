@@ -2,7 +2,16 @@
 // source restoration, font preparation, and image/font readiness waits.
 // Self-contained; no Foundry module imports.
 
-export function feRestoreOriginalPortraitSources(root) {
+// `keepSelfContainedSrc`: the HTML-snapshot path passes true. A portrait whose
+// src is ALREADY a data: URL (the HQ resample result — see fe-chat-portrait-image.js)
+// needs no file to embed from: it is self-contained, and it is exactly the size the
+// portrait box renders at. Restoring the original path there is actively harmful —
+// it puts the <img> back into loading state (so feDownscaleImagesForPrint skips it),
+// then hands feEmbedImagesInNode a full-resolution file that is dropped whenever it
+// exceeds MAX_PER_IMAGE, leaving an absolute Foundry-origin URL in the saved HTML —
+// which only the exporting user's browser can resolve. Any srcset is still stripped
+// so nothing paints from a non-embedded candidate.
+export function feRestoreOriginalPortraitSources(root, { keepSelfContainedSrc = false } = {}) {
   const changed = [];
   try {
     if (!root?.querySelectorAll) return () => {};
@@ -13,6 +22,12 @@ export function feRestoreOriginalPortraitSources(root) {
       const prevSrc = img.getAttribute('src');
       const prevSrcset = img.getAttribute('srcset');
       const prevLoading = img.getAttribute('loading');
+      if (keepSelfContainedSrc && prevSrc && /^data:/i.test(prevSrc)) {
+        if (!prevSrcset) continue;
+        changed.push({ img, prevSrc, prevSrcset, prevLoading });
+        img.removeAttribute('srcset');
+        continue;
+      }
       if (prevSrc === orig && !prevSrcset) continue;
       changed.push({ img, prevSrc, prevSrcset, prevLoading });
       img.setAttribute('src', orig);
