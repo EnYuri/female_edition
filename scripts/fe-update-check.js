@@ -9,7 +9,10 @@ const FE_UPD_FALLBACK_MANIFEST = "https://github.com/EnYuri/female_edition/relea
 // unlike release-asset redirect URLs; it is usable from an active game world.
 const FE_UPD_GITHUB_LATEST_RELEASE = "https://api.github.com/repos/EnYuri/female_edition/releases/latest";
 const FE_UPD_CACHE_KEY = "female_edition.updateCheck.v1";
-const FE_UPD_CHAT_DISABLED_KEY = "female_edition.updateCheck.chatDisabled";
+// Legacy key name — it now gates BOTH the toast and the chat card, and its VALUE is
+// the dismissed version (a bare "1" in the legacy format). The string is kept as-is
+// so an already-dismissed GM stays dismissed across the format change.
+const FE_UPD_DISMISSED_KEY = "female_edition.updateCheck.chatDisabled";
 const FE_UPD_CACHE_TTL_MS = 27 * 60 * 60 * 1000;
 const FE_UPD_FAILURE_TTL_MS = 60 * 60 * 1000;
 const FE_UPD_NOTIFIED_THIS_LOAD = new Set();
@@ -33,16 +36,23 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
       el?.classList?.add?.("fe-update-notice-card");
       const btn = el?.querySelector?.("[data-fe-upd-dismiss]");
       if (!btn) return;
-      // The dismiss control is GM-only (it turns off the notice + deletes the card,
+      // The dismiss control is GM-only (it silences the notice + deletes the card,
       // which non-GMs can't do). Players still see the informational card.
+      // Only the primary active GM ever reaches feUpdNotify, but ANY GM may click
+      // this — the flag is per-client localStorage, so it silences that GM only.
       if (!game?.user?.isGM) { btn.remove(); return; }
       if (btn.dataset.feUpdBound === "1") return;
       btn.dataset.feUpdBound = "1";
       btn.addEventListener("click", async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        feUpdSetChatDisabled(true);
-        ui.notifications?.info("흐에... 이제 업데이트 채팅 알림은 안 보내는 거에요챱 (토스트 알림은 그대로인)");
+        // Snooze up to THIS version — read from the card's own flag, so the record
+        // is the version the GM actually saw, not whatever the cache holds now.
+        // (Falls back to the cache so an empty flag can't clear the snooze entirely.)
+        const seen = String(message.flags.female_edition.updateNotice?.latest || "").trim()
+          || String(feUpdReadCache().latestVersion || "").trim();
+        feUpdSetDismissedVersion(seen);
+        ui.notifications?.info("흐에... 그룬 업데이트 알림은 나중에 보내는챱");
         try { await message.delete(); } catch { /* no-op */ }
       });
     } catch (err) {
@@ -51,15 +61,38 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
   });
 }
 
-function feUpdChatDisabled() {
-  try { return localStorage.getItem(FE_UPD_CHAT_DISABLED_KEY) === "1"; }
-  catch { return false; }
+// The version the GM dismissed the notice at ("" when never dismissed).
+function feUpdDismissedVersion() {
+  try {
+    const raw = String(localStorage.getItem(FE_UPD_DISMISSED_KEY) || "").trim();
+    if (!raw) return "";
+    // Legacy value: a bare "1" meant "never notify again". Migrate it to the newest
+    // version known at read time, so a genuinely NEWER release still gets through.
+    // With no cached latest to migrate to, drop the flag — one more notice is the
+    // safe failure direction, and it re-arms with a real version on the next dismiss.
+    if (raw === "1") {
+      const known = String(feUpdReadCache().latestVersion || "").trim();
+      feUpdSetDismissedVersion(known);
+      return known;
+    }
+    return raw;
+  } catch {
+    return "";
+  }
 }
 
-function feUpdSetChatDisabled(disabled) {
+// Suppressed unless the remote has moved past the version that was dismissed.
+function feUpdNoticeDismissedFor(latestVersion) {
+  const dismissed = feUpdDismissedVersion();
+  if (!dismissed) return false;
+  return !feUpdIsNewer(latestVersion, dismissed);
+}
+
+function feUpdSetDismissedVersion(version) {
+  const value = String(version || "").trim();
   try {
-    if (disabled) localStorage.setItem(FE_UPD_CHAT_DISABLED_KEY, "1");
-    else localStorage.removeItem(FE_UPD_CHAT_DISABLED_KEY);
+    if (value) localStorage.setItem(FE_UPD_DISMISSED_KEY, value);
+    else localStorage.removeItem(FE_UPD_DISMISSED_KEY);
   } catch { /* no-op */ }
 }
 
@@ -124,21 +157,30 @@ function feUpdIsNewer(remoteVersion, localVersion) {
   return false;
 }
 
-function feUpdNotify(latestVersion, localVersion) {
+// All four gates that used to guard ONLY the chat card now guard the toast as well —
+// dismissal, primary-GM, the persisted per-version-transition record, and the
+// already-in-log scan. Keep them here rather than duplicated per channel: the toast
+// and the card are one notice, so a condition that suppresses one must suppress both.
+async function feUpdNotify(latestVersion, localVersion) {
   const latest = String(latestVersion || "").trim();
   const local = String(localVersion || "").trim();
   if (!latest || !local) return;
 
   const loadKey = `${local}->${latest}`;
   if (FE_UPD_NOTIFIED_THIS_LOAD.has(loadKey)) return;
+  if (feUpdNoticeDismissedFor(latest)) return;
+  if (!feUpdIsPrimaryActiveGM()) return;
+  // Dedupe across reloads: notify once per version transition.
+  if (String(feUpdReadCache().chatNotifiedFor || "") === loadKey) return;
+  if (feUpdHasPostedChatNotice(latest, local)) return;
   FE_UPD_NOTIFIED_THIS_LOAD.add(loadKey);
 
   ui.notifications?.warn(
-    `흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는!!: 현재 ${local}이지만, 최신은 ${latest}인. 확인하시는거에요챱`,
+    `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는!!: 지금은 ${local}이지만 최신은 ${latest}인. 확인하시는챱`,
     { permanent: true, console: false },
   );
 
-  void feUpdPostChatNotice(latest, local, loadKey);
+  await feUpdPostChatNotice(latest, local, loadKey);
 }
 
 function feUpdBuildNoticeContent(latest, local) {
@@ -147,11 +189,11 @@ function feUpdBuildNoticeContent(latest, local) {
 <div class="fe-update-notice" style="border:2px solid var(--color-warm-2,#c9a13b);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.28);">
   <div style="display:flex;align-items:center;gap:8px;font-weight:bold;font-size:1.05em;margin-bottom:6px;">
     <i class="fas fa-arrow-up-right-dots"></i>
-    <span>암컷모듈 업데이트가 있는 거에요!</span>
+    <span>흐물! 암컷모듈 업데이트가 있는 거에요!</span>
   </div>
   <div style="line-height:1.5;">
     흐에흐에!!! <b>Female_edition</b> (aka. Female-cupwhi) 을 업데이트 할 수 있는거에요!!<br>
-    그룬데 현재버전은 <b>${esc(local)}</b> 이구, 최신은 <b>${esc(latest)}</b> 인 거에요...<br>
+    그룬데 현재버전은 <b>${esc(local)}</b> 이구 채신은 <b>${esc(latest)}</b> 인 거에요...<br>
     글애서 <b>FVTT 셋업 → 부가 모듈</b> 탭에서 업데이트를 확인하시는거에요챱
   </div>
   <div style="margin-top:10px;text-align:right;">
@@ -162,16 +204,10 @@ function feUpdBuildNoticeContent(latest, local) {
 </div>`.trim();
 }
 
+// Gates live in feUpdNotify (single source for both channels) — this only posts.
 async function feUpdPostChatNotice(latest, local, loadKey) {
   try {
-    if (feUpdChatDisabled()) return;
-    if (!feUpdIsPrimaryActiveGM()) return;
     if (typeof ChatMessage?.create !== "function") return;
-
-    // Dedupe across reloads: post the chat card once per version transition.
-    const cached = feUpdReadCache();
-    if (String(cached.chatNotifiedFor || "") === loadKey) return;
-    if (feUpdHasPostedChatNotice(latest, local)) return;
 
     await ChatMessage.create({
       content: feUpdBuildNoticeContent(latest, local),
@@ -306,7 +342,7 @@ async function feUpdCheckForUpdate() {
   const cachedAt = Number(cached.checkedAt) || 0;
 
   if (cachedLatest && (now - cachedAt) < FE_UPD_CACHE_TTL_MS) {
-    if (feUpdIsNewer(cachedLatest, localVersion)) feUpdNotify(cachedLatest, localVersion);
+    if (feUpdIsNewer(cachedLatest, localVersion)) await feUpdNotify(cachedLatest, localVersion);
     return;
   }
   if ((now - (Number(cached.failedAt) || 0)) < FE_UPD_FAILURE_TTL_MS) return;
@@ -331,7 +367,7 @@ async function feUpdCheckForUpdate() {
       failedAt: 0,
     });
 
-    if (checked?.isUpgrade || feUpdIsNewer(latestVersion, localVersion)) feUpdNotify(latestVersion, localVersion);
+    if (checked?.isUpgrade || feUpdIsNewer(latestVersion, localVersion)) await feUpdNotify(latestVersion, localVersion);
   } catch (err) {
     feUpdWriteCache({ ...feUpdReadCache(), failedAt: now });
     console.warn("female_edition | update check failed", err);
