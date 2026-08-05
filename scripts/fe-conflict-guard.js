@@ -244,7 +244,10 @@ let FE_CG_FCS_RESULT = null;
 function feCgGetForceClientSettingsRuntime() {
   try {
     if (typeof ForceClientSettings !== "undefined") return ForceClientSettings;
-  } catch { /* global lexical binding unavailable */ }
+  // NOTE: this comment must not begin with the word "global" — ESLint reads such a
+  // block comment as a global-declaration directive and then reports each following
+  // word as an unused variable.
+  } catch { /* ForceClientSettings lexical binding unavailable */ }
   try { return globalThis.ForceClientSettings ?? null; }
   catch { return null; }
 }

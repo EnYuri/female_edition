@@ -8,7 +8,7 @@ import {
 import { feSetting } from "./fe-gm-priority.js";
 import {
   feMessageMergeInfo, feMergeKey, feCanMergePair,
-  feStampRenderedStateAttributes, feApplyUserColorBgToLog,
+  feApplyUserColorBgToLog,
   feUserColorBgFeatureActive,
 } from "./fe-render-state.js";
 

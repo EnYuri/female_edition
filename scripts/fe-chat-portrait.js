@@ -4,7 +4,6 @@
 
 import {
   MODULE_ID,
-  S,
   feSetting,
   feGetChatLogs,
   feGetSpeakerActorFromMessage,

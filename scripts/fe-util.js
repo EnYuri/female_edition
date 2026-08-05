@@ -1,4 +1,4 @@
-import { MODULE_ID, FE_MERGE_CLASS_LIST } from "./fe-constants.js";
+import { MODULE_ID } from "./fe-constants.js";
 
 function feIsElementNode(node) {
   return !!node && node.nodeType === 1;

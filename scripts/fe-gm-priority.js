@@ -165,7 +165,7 @@ async function feSeedGmPriorityOverridesFromLocal({ force = false } = {}) {
     if (!feIsGmPriorityEnabled()) return false;
     const existing = feGetGmPriorityOverrides();
     const partial = {};
-    for (const [fullKey, cfg] of game.settings.settings ?? []) {
+    for (const [fullKey] of game.settings.settings ?? []) {
       if (!String(fullKey).startsWith(`${MODULE_ID}.`)) continue;
       const key = String(fullKey).slice(MODULE_ID.length + 1);
       if (!feIsGmPrioritySettingKey(key)) continue;

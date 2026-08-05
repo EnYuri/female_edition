@@ -8,7 +8,6 @@ import {
   feMarkdownToHTML,
   feUnwrapProseMirrorHTML,
   feCaptureMessageRenderFlagsOnPreUpdate,
-  feGetChatLogs,
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
 } from "./fe-chat-enhance.js";

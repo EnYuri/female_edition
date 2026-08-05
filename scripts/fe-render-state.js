@@ -3,8 +3,8 @@ import {
   FE_RENDER_STATE_FLAG, FE_RENDER_SPECIAL_KIND_FLAG, FE_RENDER_MERGE_HINT_FLAG, FE_RENDER_STATE_VERSION,
 } from "./fe-constants.js";
 import {
-  feIsElementNode, feExtractHTMLElement, feBindMessageToElement, feNormalizeChatMessageId,
-  feGetMessageIdFromElement, feGetChatLogs, feGetChatMessageElementOrder,
+  feExtractHTMLElement, feNormalizeChatMessageId,
+  feGetMessageIdFromElement,
   feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
   feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_CLASS,
 } from "./fe-util.js";
@@ -327,15 +327,6 @@ function feChangeTouchesRenderState(change) {
     if (!change || typeof change !== "object") return false;
     return ["content", "rolls", "speaker", "whisper", "blind", "rollMode", "style", "type", "user", "flavor", "flags"]
       .some((k) => Object.prototype.hasOwnProperty.call(change, k));
-  } catch {
-    return false;
-  }
-}
-
-function feChangeTouchesInlineRollSnapshot(change) {
-  try {
-    if (!change || typeof change !== "object") return false;
-    return ["content", "rolls", "flavor"].some((k) => Object.prototype.hasOwnProperty.call(change, k));
   } catch {
     return false;
   }

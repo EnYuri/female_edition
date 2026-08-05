@@ -56,8 +56,8 @@ import {
   fePrepareArchiveImagesForOutput,
   feNormalizeArchiveMessageLayout,
   feIsElement,
-  feNextTick,
   feWaitForImages,
+  feBuildArchiveTitleText,
   feEscapeAttr,
   feGetFoundryBaseHref,
   feRunArchiveDocumentOperation,
@@ -591,9 +591,8 @@ async function feExportChatLogToPDFUnlocked() {
     try {
       const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
 
-      const worldName = game.world?.title || game.world?.name || "";
-      const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
-
+      // The window title is NOT set here — feRenderChatArchiveWindow calls
+      // feBuildArchiveTitleText() itself and writes it to #fe-chat-export-title.
       await feRenderChatArchiveWindow(win, {
         autoPrint: !!feSetting(S.EXPORT_AUTO_PRINT),
         optimize,
@@ -720,9 +719,8 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     const renderProfile = feGetArchiveRenderProfile(messages.length);
 
     // Header/meta
-    const worldName = game.world?.title ?? game.world?.name ?? "";
     const sceneName = canvas?.scene?.name ?? "";
-    titleEl.textContent = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+    titleEl.textContent = feBuildArchiveTitleText();
     metaEl.textContent = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
 
     // Prefer cloning from the already-rendered live chat log DOM when possible.
@@ -862,8 +860,9 @@ function feCreateHiddenArchiveFrame() {
 
 async function feExportChatLogToDesktopHTML({ preCollectedMessages = null, preRangeSpec = null } = {}) {
   const optimize = !!feSetting(S.EXPORT_OPTIMIZE);
-  const worldName = game.world?.title || game.world?.name || "";
-  const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+  // Same helper feRenderChatArchiveWindow uses below, so the saved file's header
+  // and its filename can never disagree.
+  const titleText = feBuildArchiveTitleText();
 
   const iframe = feCreateHiddenArchiveFrame();
   const win = iframe.contentWindow;
@@ -1806,9 +1805,8 @@ async function feRenderChatArchiveWindow(win, {
   })();
   const effectiveOptimize = !!optimize || stripTexturesSetting;
 
-  const worldName = game.world?.title ?? game.world?.name ?? "";
   const sceneName = canvas?.scene?.name ?? "";
-  const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+  const titleText = feBuildArchiveTitleText();
 
   // Build the archive document immediately so the popup is never left as a blank about:blank
   // while we collect older message history.

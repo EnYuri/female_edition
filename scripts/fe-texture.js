@@ -1,4 +1,4 @@
-import { MODULE_ID, FE_TEX_RE } from "./fe-constants.js";
+import { FE_TEX_RE } from "./fe-constants.js";
 import {
   feGetMessageFromElementOrCollection, feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
   feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_CLASS,

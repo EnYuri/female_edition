@@ -50,15 +50,15 @@ import {
 } from "./fe-style.js";
 
 import {
-  feGetStoredRenderState, feStoreRenderStateOverride, feHydrateRenderStateOverride,
+  feStoreRenderStateOverride, feHydrateRenderStateOverride,
   feChangeTouchesRenderState,
   feCaptureMessageRenderFlagsOnPreCreate, feCaptureMessageRenderFlagsOnPreUpdate,
   feGetPendingMessageSource,
   feIsNarratorToolsMessage, feIsRoundMarkerMessage, feIsUntouchedSpecialMessage,
-  feApplyUserColorBgToMessageElement, feApplyUserColorBgToAllLogs, feApplyUserColorBgToLog,
+  feApplyUserColorBgToMessageElement, feApplyUserColorBgToAllLogs,
   feUserColorBgFeatureActive,
   feStampRenderedStateAttributes,
-  feMessageMergeInfo, feMergeKey, feCanMergePair,
+  feMessageMergeInfo, feMergeKey,
   feGetMessageUserColor, feGetSpeakerActorFromMessage,
 } from "./fe-render-state.js";
 

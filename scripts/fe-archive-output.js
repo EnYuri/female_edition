@@ -564,6 +564,22 @@ export function feWaitForImages(rootEl, timeoutMs = 10000, { maxImages = 800 } =
 // fe-archive-snapshot.js can import them without a circular import.
 // ===========================================================================
 
+// The one archive title string, used for the on-page header, the saved file's
+// <title>, AND the download filename. It MUST be a single source: the desktop
+// path used to derive its own copy for the filename while letting
+// feRenderChatArchiveWindow title the document, so the two could disagree.
+//
+// The `?? game.world?.name` fallback below is retained only as v9-era defensive
+// residue — it cannot fire on v13/v14. Package schema declares `id`, not `name`
+// (common/packages/base-package.mjs:322), and there is no `name` getter, so
+// game.world.name is undefined; `title` is {required: true, blank: false}, so it
+// is never blank either. That is also why the old ||-vs-?? split between call
+// sites was unobservable and safe to collapse.
+export function feBuildArchiveTitleText() {
+  const worldName = game.world?.title ?? game.world?.name ?? "";
+  return worldName ? `Chat Log – ${worldName}` : "Chat Log";
+}
+
 // Attribute-context escape. Routes through core foundry.utils.escapeHTML, which
 // ALSO escapes ' (the old local impl did not) — strictly safer for any quoting
 // style. Self-contained fallback if the core API is absent.

@@ -28,6 +28,7 @@ import {
   feEscapeAttr,
   feGetFoundryBaseHref,
   feRunArchiveDocumentOperation,
+  feBuildArchiveTitleText,
 } from "./fe-archive-output.js";
 import {
   cpBuildExportPortraitDataURL,
@@ -1536,8 +1537,7 @@ async function feDownloadExportHTMLFromCurrentDocument() {
     const container = document.getElementById("fe-chat-export-container");
     if (!container) return false;
 
-    const worldName = game.world?.title ?? game.world?.name ?? "";
-    const titleText = worldName ? `Chat Log – ${worldName}` : "Chat Log";
+    const titleText = feBuildArchiveTitleText();
     // Reuse the popup/desktop snapshot pipeline, but serialize only the export
     // subtree. Head styles and body theme classes are retained; unrelated live
     // Foundry UI and out-of-range chat DOM never enter the saved file.

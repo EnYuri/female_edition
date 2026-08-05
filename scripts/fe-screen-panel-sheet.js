@@ -615,16 +615,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return { x: (clientX - box.left) / box.width, y: (clientY - box.top) / box.height };
   }
 
-  /** Relative (0-1, clamped) position of a client point within a preview's rendered image box. */
-  #relativePos(preview, clientX, clientY) {
-    const pos = this.#relativePosRaw(preview, clientX, clientY);
-    if (!pos) return null;
-    return {
-      x: Math.min(1, Math.max(0, pos.x)),
-      y: Math.min(1, Math.max(0, pos.y)),
-    };
-  }
-
   /**
    * Rendered image pixels → the face image's OWN pixels, the unit every authored
    * overlay dimension (fontSize, barWidth, boxWidth) is stored in. The inverse of the
