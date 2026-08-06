@@ -2707,8 +2707,10 @@ async function feArchivePrint(win) {
   // paper: `win.print()` rasterizes well above CSS pixels, so the portrait is the one
   // element in the whole page that gets visibly enlarged. The downscale pass below would
   // not have fixed it either — it caps avatars at `cssBox × avatarDpr` (~96px) — which is
-  // why it now skips anything this marks. Portraits it cannot upgrade keep their current
-  // src and fall through to the normal path.
+  // why it now skips anything this marks. A portrait it cannot upgrade because the source
+  // is ALREADY at/below the export target (small token art, a vector) is marked too, with
+  // its original file pinned: that source is the best answer available, and the ~96px cap
+  // would otherwise throw away resolution we already had.
   if (logEl && mode !== "hideAll" && mode !== "hideAvatars") {
     try {
       restorePortraitUpgrade = await feUpgradePortraitsForExport(logEl, {

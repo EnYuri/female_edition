@@ -57,14 +57,28 @@ function cpResampleCacheGet(key) {
 // Track in-flight resample promises to avoid duplicating work
 const _cpResampleInflight = new Map();
 
+// Vector sources. They are excluded from every canvas pass (rasterization quality
+// differs and can be inconsistent), but the EXPORT path has to tell them apart from a
+// genuinely unusable source: a vector file is the one thing that survives print DPI
+// untouched, so it must be pinned to its original rather than handed to the avatar
+// downscaler — which would rasterize it at ~96px. Foundry's default speaker art
+// (`icons/svg/mystery-man.svg`) lands here, i.e. exactly the actors with no portrait
+// of their own.
+function cpIsVectorSource(src) {
+  try {
+    return /\.svgz?(\?.*)?$/i.test(String(src ?? ""));
+  } catch {
+    return false;
+  }
+}
+
 function cpIsSafeCanvasSource(src) {
   try {
     if (!src) return false;
     const s = String(src);
     // Already processed or ephemeral.
     if (s.startsWith("data:") || s.startsWith("blob:")) return false;
-    // SVG portraits are better left untouched (rasterization quality differs and can be inconsistent).
-    if (/\.svg(\?.*)?$/i.test(s)) return false;
+    if (cpIsVectorSource(s)) return false;
 
     const url = new URL(s, window.location.href);
     return url.origin === window.location.origin;
@@ -320,7 +334,7 @@ function cpResampleIsPointless(img, size, fit) {
 // `targetPx` (0 = off) bypasses the CSS-size × dpr calculation entirely, and
 // `mimeType`/`quality` override the encoder. Both exist for the export path, which
 // needs a bitmap sized for PRINT/zoom rather than for this machine's screen, and which
-// pays for that size in file bytes — see cpBuildExportPortraitDataURL. The live path
+// pays for that size in file bytes — see cpBuildExportPortrait. The live path
 // passes neither and is unchanged: screen-sized, lossless PNG.
 async function cpResampleToDataURL(
   img,
@@ -424,6 +438,19 @@ async function cpResampleToDataURL(
 function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
   try {
     if (!cpIsImageElement(img)) return;
+    // An element the EXPORT pass already resolved is OFF-LIMITS. `feUpgradePortraitsForExport`
+    // puts a targetPx (256) bitmap — or the pinned original file — into `src` and marks it,
+    // while this function's answer is the 64px SCREEN bitmap. Re-applying that here is a pure
+    // 4x downgrade of a portrait that is about to be printed.
+    //
+    // Measured live 2026-08-07 on v14: after the export pass, calling this on the archive log
+    // took 48/48 portraits from 256x256 back to 64x64. That is the whole of the reported
+    // "아카이브 PDF에서 일부 포트레이트만 저해상도" — and it presents as "일부" only because
+    // the two passes RACE: `feNormalizeArchivePortraitImages` enqueues the HQ jobs during
+    // render and `feUpgradePortraitsForExport` awaits network fetches, so which one lands
+    // last varies per source (a big source decodes slower and lands after ⇒ that speaker is
+    // the one that comes out blurry). It correlates with an actor's art, never with ownership.
+    if (img.dataset?.feExportPortrait === "1") return;
     if (!size || size <= 0) return;
     if (size > 256) return; // sanity cap
     if (!cpShouldUseHQResample(img, shape)) return;
@@ -479,14 +506,23 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
         const done = () => {
           delete img.dataset.feHqWaiting;
         };
-        img.addEventListener?.(
-          "load",
-          () => {
-            done();
-            cpMaybeApplyHQResample(img, size, shape, anchorTop);
-          },
-          { once: true }
-        );
+        const onLoad = () => {
+          // Release the flag FIRST, unconditionally. It is the only thing gating a fresh
+          // registration, so holding it across a branch that does not resample would wedge
+          // this element out of HQ for the rest of the session.
+          done();
+          // The export pass owns this element right now — the `load` that just fired is
+          // almost certainly its own src write. Resampling here would undo the upgrade, but
+          // simply consuming the one-shot listener would leave a portrait that never got its
+          // screen bitmap parked on the browser-downscaled original after the export undo.
+          // Re-arm: the undo restores the previous src, which fires `load` again.
+          if (img.dataset?.feExportPortrait === "1") {
+            img.addEventListener?.("load", onLoad, { once: true });
+            return;
+          }
+          cpMaybeApplyHQResample(img, size, shape, anchorTop);
+        };
+        img.addEventListener?.("load", onLoad, { once: true });
         img.addEventListener?.("error", done, { once: true });
       }
       return;
@@ -505,6 +541,11 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
       _cpResampleInflight.delete(key);
       if (!dataUrl) return;
       cpResampleCacheSet(key, dataUrl);
+      // Repeated, not redundant: this job may have been enqueued BEFORE the export pass
+      // marked the element, so the guard at the top of the function saw nothing. Caching
+      // the result above is still correct — it is a valid SCREEN bitmap — but applying it
+      // to an element the export pass owns would undo the upgrade.
+      if (img.dataset?.feExportPortrait === "1") return;
       // Only apply if this image still refers to the same request.
       if (img.dataset?.fePortraitResampleKey === key) {
         img.src = dataUrl;
@@ -594,7 +635,35 @@ function cpEffectiveExportTarget(srcW, srcH, fit, targetPx) {
 }
 
 /**
- * Build a portrait bitmap sized for EXPORT rather than for this screen.
+ * Build a portrait bitmap sized for EXPORT rather than for this screen, and — just as
+ * importantly — report WHY when it cannot.
+ *
+ * Returns:
+ *   null                                    — nothing usable (already self-contained,
+ *                                             cross-origin, load failure, or the
+ *                                             caller's budget is spent).
+ *   { dataUrl, srcW, srcH }                 — the upgraded bitmap.
+ *   { dataUrl: null, keepOriginal: true }   — the ORIGINAL file is already the best
+ *                                             answer; the caller must pin it and keep
+ *                                             it out of the avatar downscaler.
+ *
+ * That third case is not a detail — it is where the "NPC 포트레이트만 저해상도" report
+ * came from. Two sources land in it and BOTH used to fall through to a low-resolution
+ * ceiling that the large-art portraits never hit:
+ *
+ *  - A source already at/below the export target (a 256px token art with a 256px
+ *    target). `cpResampleToDataURL` correctly refuses to upscale and returns null, so
+ *    the portrait stayed unmarked: on the print path `feDownscaleImagesForPrint` then
+ *    re-sized it at `cssBox × avatarDpr` (~96px), and on the saved-HTML path
+ *    `keepSelfContainedSrc` left the LIVE screen bitmap (64px) in place. Both are
+ *    below the source's own resolution, i.e. we threw away pixels we already had.
+ *  - A vector source (`icons/svg/mystery-man.svg` and friends). Perfect at any DPI
+ *    until something rasterizes it at 96px.
+ *
+ * Note this can only ever be reached with `max(srcW, srcH) <= targetPx`, so pinning the
+ * original is also cheap for the embed budget: for `cover` the bail needs a square
+ * source (the crop takes the short side), for `contain` it needs the long side under
+ * the target. A tall 200x3000 source still resamples normally.
  *
  * MUST NOT be replaced by reusing the live `src` data URL. That one is `size × dpr`
  * device pixels — a 64x64 PNG on a dpr-1 machine — which is exactly right in the
@@ -609,11 +678,12 @@ function cpEffectiveExportTarget(srcW, srcH, fit, targetPx) {
  * path this whole module exists to avoid (see CLAUDE.md). Pre-cropping to a square
  * here keeps the good filter AND is far smaller than the untouched source.
  *
- * Returns null when nothing can be gained (unsafe/tainted source, load failure, or a
- * source already at/below the target — `cpResampleToDataURL` never upscales). The
- * caller must then leave the original src alone and let the normal embed path have it.
+ * The `cover` note above is also why "just embed the original" is not the answer for the
+ * general case, only for the small-source case: a NON-square original left to CSS is the
+ * clipped-downscale path. The pin is safe exactly because a size bail implies a source
+ * the crop would not have shrunk anyway.
  */
-async function cpBuildExportPortraitDataURL(
+async function cpBuildExportPortrait(
   origUrl,
   {
     targetPx = 256,
@@ -625,7 +695,11 @@ async function cpBuildExportPortraitDataURL(
   } = {}
 ) {
   try {
-    if (!origUrl || !cpIsSafeCanvasSource(origUrl)) return null;
+    if (!origUrl) return null;
+    // Before the safe-source test, which lumps vectors in with data:/blob:/cross-origin.
+    // Not cached: it is a regex, and it never starts any work.
+    if (cpIsVectorSource(origUrl)) return { dataUrl: null, srcW: 0, srcH: 0, keepOriginal: true };
+    if (!cpIsSafeCanvasSource(origUrl)) return null;
     const target = Math.max(1, Math.round(targetPx));
     const key = `${origUrl}|${target}|${fit}|${anchorTop ? 1 : 0}|${mimeType}|${quality}`;
     if (_cpExportPortraitCache.has(key)) return _cpExportPortraitCache.get(key);
@@ -646,13 +720,21 @@ async function cpBuildExportPortraitDataURL(
       const ok = await cpWaitForImage(probe, CP_EXPORT_IMAGE_WAIT_TIMEOUT_MS);
       if (!ok) return null;
 
-      const effective = cpEffectiveExportTarget(probe.naturalWidth, probe.naturalHeight, fit, target);
+      const srcW = Math.floor(Number(probe.naturalWidth) || 0);
+      const srcH = Math.floor(Number(probe.naturalHeight) || 0);
+      const effective = cpEffectiveExportTarget(srcW, srcH, fit, target);
       if (!effective) return null;
 
       // WebP q0.92 rather than the live path's lossless PNG: a 256px photographic
       // portrait is ~120 KB as PNG and ~15 KB here, and the saved HTML carries one per
       // distinct speaker. The difference is not visible at portrait scale.
-      return await cpResampleToDataURL(probe, 0, fit, anchorTop, { targetPx: effective, mimeType, quality });
+      const dataUrl = await cpResampleToDataURL(probe, 0, fit, anchorTop, { targetPx: effective, mimeType, quality });
+      if (dataUrl) return { dataUrl, srcW, srcH, keepOriginal: false };
+
+      // No bitmap — either the source is already at/below the target (never upscale) or
+      // the draw failed. Only the former is a "keep the original" verdict, and it is
+      // identified by the size test rather than assumed.
+      return { dataUrl: null, srcW, srcH, keepOriginal: Math.max(srcW, srcH) <= target };
     })().catch(() => null);
 
     _cpExportPortraitCache.set(key, promise);
@@ -666,7 +748,7 @@ export {
   cpMaybeApplyHQResample,
   cpShouldUseHQResample,
   cpResampleCacheGet,
-  cpBuildExportPortraitDataURL,
+  cpBuildExportPortrait,
   cpClearExportPortraitCache,
   // Pure geometry — exported for ci/fe-chat-portrait-image.test.mjs. They have no
   // production caller outside this file; the crop/target math is where every

@@ -31,7 +31,7 @@ import {
   feBuildArchiveTitleText,
 } from "./fe-archive-output.js";
 import {
-  cpBuildExportPortraitDataURL,
+  cpBuildExportPortrait,
   cpClearExportPortraitCache,
 } from "./fe-chat-portrait-image.js";
 import {
@@ -410,9 +410,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         // file is printed or zoomed. See feUpgradePortraitsForExport.
         portraitRestore = await feUpgradePortraitsForExport(snapshotRoot, { meta: setMeta }) || (() => {});
         setMeta("Embedding images…");
-        // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade
-        // above, or the live HQ result when the upgrade could not improve on it) stays
-        // as-is. Restoring the original file path would push a full-resolution
+        // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade above,
+        // or — only when the upgrade could not run at all, e.g. a dead source or a spent
+        // budget — the live HQ result) stays as-is. A source the upgrade merely could not
+        // IMPROVE on no longer lands here: it is pinned to its original file and marked, so
+        // this keeps its hands off it entirely.
+        // Restoring the original file path would push a full-resolution
         // image into the embed budget (and past its per-image cap), which is how
         // portraits ended up as absolute Foundry URLs — broken for every reader
         // but the exporter.
@@ -1343,6 +1346,11 @@ const FE_EXPORT_PORTRAIT_MAX_PX = 768;
 // export has hung — everything past it degrades to "keep the original src", not to a
 // failure.
 const FE_EXPORT_PORTRAIT_BUDGET_MS = 10000;
+// Absolute ceiling for the same pass, so "extend on progress" can never turn into an
+// unbounded wait when slow-but-alive and dead sources interleave. Generous on purpose:
+// everything past it degrades to a lower-resolution portrait, which is exactly the
+// defect this pass exists to fix — it is a hang guard, not a speed target.
+const FE_EXPORT_PORTRAIT_HARD_BUDGET_MS = 90000;
 
 /**
  * Re-resample every portrait from its ORIGINAL file at export resolution and swap the
@@ -1384,12 +1392,21 @@ export async function feUpgradePortraitsForExport(
     const fit = shape === "none" ? "contain" : "cover";
     const targetPx = Math.min(FE_EXPORT_PORTRAIT_MAX_PX, Math.round(size * FE_EXPORT_PORTRAIT_SCALE));
 
-    // Wall-clock budget for NEW work. MUST stay: cpWaitForImage puts a ceiling on each
-    // source, and a source that 404s or hangs burns all of it. Past the deadline the
-    // pass keeps running but only serves sources already resolved in the memo (free),
-    // so repeated speakers still upgrade; everything else keeps its original src and
-    // falls through to the normal embed path.
-    const deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
+    // Budget for NEW work, measured as time WITHOUT PROGRESS rather than total elapsed.
+    // MUST stay: cpWaitForImage puts a ceiling on each source, and a source that 404s or
+    // hangs burns all of it. Past the deadline the pass keeps running but only serves
+    // sources already resolved in the memo (free), so repeated speakers still upgrade;
+    // everything else keeps its original src and falls through to the normal embed path.
+    //
+    // The deadline is pushed forward on every source that answers (`runOne`), because a
+    // FIXED total is the wrong shape here: a log with many distinct speakers on a remote
+    // Foundry host spends its whole budget on healthy-but-slow fetches and then silently
+    // degrades the entire tail — and the tail is where the one-off NPCs live, which is
+    // the second half of the "NPC만 저해상도" report. What the budget must actually bound
+    // is a batch of DEAD paths, and those make no progress by definition. The hard
+    // ceiling below still bounds the pathological case where the two interleave.
+    let deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
+    const hardDeadline = performance.now() + FE_EXPORT_PORTRAIT_HARD_BUDGET_MS;
 
     // CONCURRENT, bounded. This loop used to be serial, with a comment claiming
     // parallelism could not help because the work is main-thread canvas work. That
@@ -1406,16 +1423,48 @@ export async function feUpgradePortraitsForExport(
     const runOne = async (img) => {
       const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.("data-fe-portrait-orig-src") || "";
       if (!orig) return;
-      let dataUrl = null;
+      let info = null;
       try {
-        dataUrl = await cpBuildExportPortraitDataURL(orig, {
+        info = await cpBuildExportPortrait(orig, {
           targetPx,
           fit,
           anchorTop: true,
-          cachedOnly: performance.now() > deadline,
+          cachedOnly: performance.now() > Math.min(deadline, hardDeadline),
         });
       } catch {}
-      if (!dataUrl) return;
+      if (!info) return;
+      // Any answer at all means this source is alive — see the deadline comment.
+      deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
+
+      const dataUrl = info.dataUrl;
+      if (!dataUrl) {
+        // The ORIGINAL file is already the best available answer (a source at/below the
+        // export target, or a vector). Pin it and mark it: doing nothing here is not
+        // neutral — it hands the portrait to the two passes that each impose their own
+        // ceiling BELOW the source's own resolution (the avatar downscaler's
+        // `cssBox × avatarDpr` ≈ 96px on the print path, and `keepSelfContainedSrc`
+        // keeping the 64px live screen bitmap on the saved-HTML path). That asymmetry —
+        // large portrait art upgraded to 256px, small/default art capped at 64-96px —
+        // is the reported "PC는 선명한데 NPC 포트레이트만 저해상도".
+        if (!info.keepOriginal) return;
+        const prevSrc = img.getAttribute("src");
+        const prevSrcset = img.getAttribute("srcset");
+        const prevLoading = img.getAttribute("loading");
+        changed.push({ img, prevSrc, prevSrcset, prevLoading });
+        img.setAttribute("src", orig);
+        img.removeAttribute("srcset");
+        // The print path waits on image LOAD before rasterizing; a portrait we just
+        // pointed at a file must be able to finish on its own (feDownscaleImagesForPrint
+        // and feWaitForImages both skip `loading="lazy"` elements).
+        img.setAttribute("loading", "eager");
+        img.dataset.feExportPortrait = "1";
+        // Same value the snapshot revert would write anyway — set so the print path's
+        // blob revert treats this element like every other upgraded portrait.
+        if (useBlobURL) {
+          try { img.dataset.fePrintOrigSrc = orig; } catch {}
+        }
+        return;
+      }
 
       // PRINT uses blob: URLs, the saved-HTML path uses the data: URL directly.
       //
@@ -1436,7 +1485,17 @@ export async function feUpgradePortraitsForExport(
 
       const prevSrc = img.getAttribute("src");
       const prevSrcset = img.getAttribute("srcset");
-      if (prevSrc === finalUrl && !prevSrcset) return;
+      if (prevSrc === finalUrl && !prevSrcset) {
+        // Already carrying exactly this bitmap — but it still has to be MARKED, or the
+        // downscale pass re-targets it at `cssBox × avatarDpr` and the HQ resampler is
+        // free to put the 64px screen bitmap back. Recorded in `changed` so undo clears
+        // the marker; rewriting the identical src on undo is a no-op.
+        if (img.dataset.feExportPortrait !== "1") {
+          changed.push({ img, prevSrc, prevSrcset });
+          img.dataset.feExportPortrait = "1";
+        }
+        return;
+      }
       changed.push({ img, prevSrc, prevSrcset });
       // Same contract as the downscale pass: an HTML snapshot taken while these blob:
       // URLs are live reverts through data-fe-print-orig-src, since a blob: handle in
@@ -1487,6 +1546,12 @@ export async function feUpgradePortraitsForExport(
         else it.img.setAttribute("src", it.prevSrc);
         if (it.prevSrcset == null) it.img.removeAttribute("srcset");
         else it.img.setAttribute("srcset", it.prevSrcset);
+        // Only the keep-the-original branch records `loading`; the upgrade branch leaves
+        // it untouched, so `undefined` here means "was never changed".
+        if (it.prevLoading !== undefined) {
+          if (it.prevLoading == null) it.img.removeAttribute("loading");
+          else it.img.setAttribute("loading", it.prevLoading);
+        }
         delete it.img.dataset.feExportPortrait;
         delete it.img.dataset.fePrintOrigSrc;
       } catch {}

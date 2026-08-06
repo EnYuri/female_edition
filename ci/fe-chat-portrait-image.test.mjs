@@ -47,9 +47,35 @@ test("cpEffectiveExportTarget: never upscales — result <= what the fit can sup
 });
 
 test("cpEffectiveExportTarget: a square source at the target resolves to the target", () => {
-  // Equal, not greater — cpResampleToDataURL then returns null and the caller
-  // falls back to embedding the original, which is correct for this case.
+  // Equal, not greater — cpResampleToDataURL then returns null and cpBuildExportPortrait
+  // reports `keepOriginal`, so the caller PINS the original file. Leaving it unpinned is
+  // what capped these portraits at 64-96px while large art was upgraded to 256px.
   assert.equal(cpEffectiveExportTarget(256, 256, "cover", 256), 256);
+});
+
+// The `keepOriginal` branch is only safe because a size bail implies a SMALL source:
+// it is what lets the caller pin the original file (and skip the avatar downscaler)
+// without pushing a full-resolution image into the print doc or the embed budget.
+// `cpResampleToDataURL` bails when `max(nw, nh) <= effective`, so assert that this can
+// only happen for sources whose long side is already within the requested target.
+test("a size bail implies max(srcW, srcH) <= targetPx — the pin-the-original guarantee", () => {
+  const TARGET = 256;
+  const cases = [
+    [64, 64], [256, 256], [200, 220], [257, 257], [200, 600], [600, 200],
+    [255, 4000], [832, 1216], [3328, 3677], [768, 768],
+  ];
+  for (const [w, h] of cases) {
+    for (const fit of ["cover", "contain"]) {
+      const eff = cpEffectiveExportTarget(w, h, fit, TARGET);
+      const bails = Math.max(w, h) <= eff; // cpResampleToDataURL's "nothing to do" test
+      if (bails) {
+        assert.ok(
+          Math.max(w, h) <= TARGET,
+          `${fit} ${w}x${h}: bailed with a source larger than the target`
+        );
+      }
+    }
+  }
 });
 
 test("cpEffectiveExportTarget: unusable input returns 0, never a default", () => {
