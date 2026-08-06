@@ -534,6 +534,11 @@ function feCtOpenContextMenu(id, x, y) {
 
   if (isGM) items.push(
     {
+      action: "open-sheet",
+      icon: "fa-edit",
+      label: feCtL("FECT.Ctx.OpenSheet", "전투원 설정"),
+    },
+    {
       action: "toggle-hidden",
       icon: c.hidden ? "fa-eye" : "fa-eye-slash",
       label: c.hidden ? feCtL("FECT.Ctx.Unhide", "숨김 해제") : feCtL("FECT.Ctx.Hide", "숨기기"),
@@ -545,15 +550,35 @@ function feCtOpenContextMenu(id, x, y) {
     },
     { action: "adjust-hp", icon: "fa-heart", label: feCtL("FECT.Ctx.AdjustHP", "HP 조절") },
     { action: "set-initiative", icon: "fa-dice-d20", label: feCtL("FECT.Ctx.SetInit", "이니셔티브 수정") },
+    { action: "reroll-initiative", icon: "fa-dice", label: feCtL("FECT.Ctx.Reroll", "이니셔티브 재굴림") },
     { action: "move-up", icon: "fa-arrow-up", label: feCtL("FECT.Ctx.MoveUp", "순서 위로") },
     { action: "move-down", icon: "fa-arrow-down", label: feCtL("FECT.Ctx.MoveDown", "순서 아래로") },
-    {
-      action: "remove-combatant",
-      icon: "fa-trash",
-      label: feCtL("FECT.Ctx.Remove", "전투원 제거"),
-      danger: true,
-    },
   );
+
+  // Mirrors core's `visible` conditions (combat-tracker.mjs#_getEntryContextOptions):
+  // 초기화 only when an initiative is actually set, 이동 기록 only when there is history.
+  // `clearMovementHistory` is v14-only — v13 combatants have no movement history at all.
+  if (isGM && Number.isFinite(c.initiative)) {
+    items.push({
+      action: "clear-initiative",
+      icon: "fa-arrow-rotate-left",
+      label: feCtL("FECT.Ctx.ClearInit", "이니셔티브 초기화"),
+    });
+  }
+  if (isGM && typeof c.clearMovementHistory === "function" && (c.token?.movementHistory?.length > 0)) {
+    items.push({
+      action: "clear-movement",
+      icon: "fa-shoe-prints",
+      label: feCtL("FECT.Ctx.ClearMovement", "이동 기록 초기화"),
+    });
+  }
+
+  if (isGM) items.push({
+    action: "remove-combatant",
+    icon: "fa-trash",
+    label: feCtL("FECT.Ctx.Remove", "전투원 제거"),
+    danger: true,
+  });
 
   const menu = document.createElement("div");
   menu.id = CTX_MENU_ID;
@@ -619,8 +644,17 @@ async function feCtHandleContextAction(action, id) {
         }
         break;
       }
+      case "open-sheet":      c.sheet?.render({ force: true }); break;
       case "adjust-hp":       await feCtOpenHpDialog(c); break;
       case "set-initiative":  await feCtOpenInitiativeDialog(combat, c); break;
+      case "reroll-initiative": await combat.rollInitiative([c.id]); break;
+      case "clear-initiative":  await c.update({ initiative: null }); break;
+      case "clear-movement": {
+        if (typeof c.clearMovementHistory !== "function") break;
+        await c.clearMovementHistory();
+        ui.notifications?.info(`${c.name}의 이동 기록을 초기화했습니다.`);
+        break;
+      }
       case "move-up":         await feCtMoveCombatant(combat, c, -1); break;
       case "move-down":       await feCtMoveCombatant(combat, c, +1); break;
       case "remove-combatant": await feCtRemoveCombatant(c); break;

@@ -411,6 +411,13 @@ Hooks.once("init", () => {
     default: "downscaleLite",
   });
 
+  // DEPRECATED but INTENTIONALLY still registered — do not delete.
+  // Nothing reads this key any more: the Electron export path was rewritten to
+  // "save HTML only" and all four readers were removed from fe-chat-archive.js
+  // (the external-browser hand-off, the archive window's auto mode, the "브라우저"
+  // button, and feOpenArchiveInExternalBrowser's mode gate). The registration is
+  // kept so worlds that still have a stored value do not end up holding an
+  // unregistered setting, and the name/hint carry the deprecation notice.
   game.settings.register(MODULE_ID, S.EXPORT_DESKTOP_EXTERNAL_MODE, {
     name: "[이전 버전 호환] FVTT 데스크톱 외부 브라우저 열기",
     hint: "더 이상 사용되지 않습니다. FVTT 데스크톱 앱에서는 HTML 아카이브만 저장하며, 저장한 파일을 브라우저에서 열어 PDF로 저장하세요.",
@@ -977,6 +984,15 @@ Hooks.on("canvasReady", () => {
 // Rendered state application
 // -------------------------------------
 
+// `allowNarratorMerge` is INTENTIONALLY unused here — do not delete the parameter.
+// It was live until the merge call was lifted out of this function into the batch
+// level (feApplyRenderedStateToLog / feFlushQueuedRenderedMessageRefreshes); the
+// signature was kept deliberately (the removal commit left an explicit
+// `void allowNarratorMerge;` marker, later dropped). Two reasons it must stay:
+// this is an exported function that fe-chat-archive.js calls, and
+// feApplyRenderedStateToLog forwards feArchiveMergeOptions() straight through, so
+// both must accept the same options shape. Narrator/round-marker classification
+// itself is recomputed inside feStampRenderedStateAttributes and does not need it.
 function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarratorMerge = false } = {}) {
   try {
     const el = feExtractHTMLElement(messageEl);
@@ -1007,14 +1023,6 @@ function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
   }
 }
 
-function feApplyRenderedStateToAllLogs() {
-  try {
-    for (const log of feGetChatLogs()) feApplyRenderedStateToLog(log);
-  } catch {
-    /* no-op */
-  }
-}
-
 // -------------------------------------
 // Scheduling / queue system
 // -------------------------------------
@@ -1023,6 +1031,21 @@ const fePendingRenderedLogs = new Set();
 const fePendingRenderedLogOptions = new WeakMap();
 const fePendingRenderedLogFrames = new Map();
 
+// TWO handles, two ROLES — not a redundant pair. Do not collapse them.
+//   RAF   → renderChatMessageHTML. Runs BEFORE the browser paints the new element,
+//           so the merge classes (header visibility / height) are final at first
+//           paint. Dropping this brings back the merge-class flicker it was added for.
+//   Timer → updateChatMessage and the retry backoff below. Post-paint refresh.
+//
+// Known asymmetry, left ALONE on purpose: feScheduleRenderedMessageRefresh guards on
+// the timer only (not the RAF), and this flush clears the timer handle even when it
+// was entered from the RAF — both are pre-RAF code the RAF commit did not revisit.
+// The effect is bounded and self-healing: the flush is idempotent and returns
+// immediately on an empty queue, so a duplicate pass is a no-op. The only real loss
+// is that a ghost timer can pre-empt the retry backoff (feQueuedRenderedMessagePass),
+// which the authoritative feScheduleFullMergePass covers anyway. "Fixing" the
+// symmetry means re-tuning the paint-relative timing that was already tuned once —
+// not worth the flicker regression risk. Measure before touching.
 const feQueuedRenderedMessageIds = new Set();
 let feQueuedRenderedMessageTimer = null;
 let feQueuedRenderedMessageRAF = null;
@@ -1170,13 +1193,18 @@ function feFlushQueuedRenderedMessageRefreshes() {
 
     const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
     const logs = feGetChatLogs();
+    // Escape once, not per (log × id). An unescaped id that is not a valid CSS
+    // identifier makes querySelector THROW, and the outer catch would silently drop
+    // the whole queued batch — feScheduleRenderedStateRefreshForMessageId already
+    // escapes for exactly this reason.
+    const escapedIds = ids.map((id) => feCssEscape(id));
     let missing = false;
     try {
       for (const log of logs) {
         if (!feIsElementNode(log)) continue;
         try { feDedupeChatMessagesInLog(log); } catch {}
         const anchors = new Set();
-        for (const id of ids) {
+        for (const id of escapedIds) {
           const el = log.querySelector?.(`li.chat-message[data-message-id="${id}"], li.chat-message[data-document-id="${id}"]`);
           if (!el) { missing = true; continue; }
           anchors.add(el);
@@ -1273,6 +1301,12 @@ Hooks.on("createChatMessage", (message, _options, userId) => {
   }
   try {
     feHydrateRenderStateOverride(message, null, userId);
+    // Safety refresh for the create→update race: when feQueueMergeForRAF fired from
+    // renderChatMessageHTML the element may not have been in the DOM yet. This is NOT
+    // redundant with the 120ms full pass — it also (re)stamps and re-applies the user
+    // colour background, which the merge-only pass does not do.
+    // The 42ms delay is TUNED, not arbitrary: an earlier build scheduled a second
+    // 18ms merge here and it produced a visible double-flash of merge classes.
     feDeferTask(() => feScheduleRenderedStateRefreshForMessageId(message?.id ?? message?._id, { delay: 42 }));
     // (Full merge pass is scheduled from the renderChatMessageHTML hook, which fires
     // for every rendered message — including these newly created ones.)
@@ -1444,7 +1478,6 @@ export {
   feApplyUserColorBgToMessageElement,
   feApplyRenderedStateToMessageElement,
   feApplyRenderedStateToLog,
-  feApplyRenderedStateToAllLogs,
   feScheduleRenderedStateRefreshForAllLogs,
   feScheduleRenderedStateRefreshForMessageId,
   feSetChatFontChoiceClass,

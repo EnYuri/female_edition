@@ -198,8 +198,19 @@ function registerSocket() {
     // typing-indicator): only handle the `music:`-namespaced types, bail on the rest.
     if (!msg?.type || !String(msg.type).startsWith("music:")) return;
 
-    /** ===== 플레이어 수신 ===== */
-    if (!game.user.isGM) {
+    /** ===== 요청자 수신(업로드 응답) ===== */
+    // Gated on "is NOT the authority", not on "is not a GM". `User#isGM` is
+    // ASSISTANT-or-higher (common/documents/user.mjs:124), while FILES_UPLOAD is
+    // revocable from ASSISTANT — its `requiredRoles` is [GAMEMASTER] alone
+    // (common/constants.mjs:1312), unlike FILES_BROWSE which ASSISTANT can never
+    // lose. So a world whose GM revokes assistant upload rights puts that assistant
+    // on the PROXY path, and an `isGM` gate here made them emit UP_INIT and then
+    // ignore their own UP_INIT_ACK — every upload died at INIT_ACK_TIMEOUT while
+    // isPrimaryActiveGm() (highest role wins, via getDesignatedUser) also kept them
+    // out of the handler below. Letting non-authority GMs run this branch is safe:
+    // every handler in it already requires `msg.toUserId === game.user.id`, and the
+    // authority never proxy-uploads to itself.
+    if (!isPrimaryActiveGm()) {
       const authority = feResolveSocketSender(senderId, msg.authorityId, "music-response");
       if (!authority?.isGM) return;
       if (msg.type === MUSIC_MSG.ENSURE_DIR_ACK && msg.toUserId === game.user.id) {
@@ -234,12 +245,10 @@ function registerSocket() {
       return;
     }
 
-    // Every GM receives the module socket broadcast. Only the current active GM
-    // may create folders, allocate upload sessions, or write the finished file.
-    // This guard is dynamic, so authority transfers without re-registering the
-    // listener when the active GM changes.
-    if (!isPrimaryActiveGm()) return;
-
+    // Past this point the client IS the current active GM — the only one that may
+    // create folders, allocate upload sessions, or write the finished file. The
+    // branch above is the dynamic guard, so authority transfers without
+    // re-registering the listener when the active GM changes.
     const sender = feResolveSocketSender(senderId, msg.fromUserId, "music-request");
     if (!sender) return;
 
@@ -279,8 +288,18 @@ function registerSocket() {
       const maxMB = musicSetting(S.MUSIC_MAX_MB);
       if (size > maxMB * 1024 * 1024) return void err(`파일이 너무 큼 (최대 ${maxMB}MB)`);
 
+      // A client has no way to cancel a GM-side session: closing the window or
+      // reloading mid-transfer just abandons it, and it then survives for the full
+      // UPLOAD_TTL_MS. Rejecting the retry left that user locked out for up to ten
+      // minutes ("이미 업로드가 진행 중입니다") with nothing they could do about it,
+      // and the dead session still counted against MAX_CONCURRENT_UPLOADS for
+      // everyone else. Supersede instead of reject — the one-session-per-user cap is
+      // unchanged (the old record is dropped before the new one is created), it is
+      // just no longer the *first* session that wins.
+      const prevUploadId = uploadsByUser.get(fromUserId);
+      if (prevUploadId && prevUploadId !== uploadId) cleanupUpload(prevUploadId);
+
       if (uploads.size >= MAX_CONCURRENT_UPLOADS) return void err("서버가 바쁨(동시 업로드 제한). 잠시 후 다시 시도");
-      if (uploadsByUser.has(fromUserId)) return void err("이미 업로드가 진행 중입니다. 이전 업로드 완료 후 다시 시도");
 
       const pl = pickSharedPlaylist();
       if (!pl) return void err("공용 플레이리스트 없음(GM 자동 초기화 실패)");
@@ -339,6 +358,16 @@ function registerSocket() {
 
       rec.chunks[idx] = u8;
       rec.received++;
+
+      // TTL is an ABANDONMENT timeout, not a transfer deadline. It was armed once
+      // at UP_INIT, so a large file on a slow link could have its session collected
+      // out from under it mid-transfer and fail at UP_FINISH with "업로드 세션 없음".
+      // Re-arm on progress: an actually-abandoned session still expires
+      // UPLOAD_TTL_MS after its LAST chunk, and the client's own
+      // FINISH_ACK_TIMEOUT_MS is only awaited after the final chunk is sent, so it
+      // still outlives the GM record it is waiting on.
+      try { clearTimeout(rec.timer); } catch (_) {}
+      rec.timer = setTimeout(() => cleanupUpload(uploadId), UPLOAD_TTL_MS);
       return;
     }
 

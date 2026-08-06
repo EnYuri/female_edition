@@ -120,6 +120,26 @@ export function normalizeDataDir(p) {
   return parts.join("/");
 }
 
+/**
+ * Normalize a stored file path into ONE comparable form.
+ *
+ * The same file reaches us described two different ways: `FilePicker.browse`
+ * returns percent-encoded paths (core decodes them purely for display —
+ * `applications/apps/file-picker.mjs:721,743`), while `FilePicker.upload`
+ * returns the raw server path. So a Korean-named track uploaded once and then
+ * re-uploaded yields `…/노래.mp3` and `…/%EB%85%B8%EB%9E%98.mp3` for the SAME
+ * file — a plain string compare misses and `ensureTrack` creates a duplicate
+ * PlaylistSound. Compare through this instead of the raw string.
+ *
+ * Deliberately not used to REWRITE the stored path: both forms are valid URLs
+ * (core itself stores the browse-encoded form for picked files), so the first
+ * writer's form is kept and only the comparison is normalized.
+ */
+export function normalizeComparePath(p) {
+  const raw = String(p ?? "");
+  try { return decodeURIComponent(raw); } catch { return raw; }
+}
+
 /** The basename (last path segment), URL-decoded. */
 export function baseNameOf(p) {
   const raw = String(p ?? "");
@@ -226,10 +246,15 @@ export async function ensureDirectory(source, dir) {
 /**
  * Ensure a PlaylistSound pointing at `path` exists in `pl` (dedup by path).
  * Returns the existing or newly-created sound. Requires OWNER on `pl`.
+ *
+ * Dedup runs through `normalizeComparePath`, NOT a raw string compare — see the
+ * note there: browse-derived and upload-derived paths for the same file differ
+ * by percent-encoding whenever the filename is non-ASCII.
  */
 export async function ensureTrack(pl, path, name) {
   if (!pl) return null;
-  const existing = pl.sounds.find(s => s.path === path);
+  const wanted = normalizeComparePath(path);
+  const existing = pl.sounds.find(s => normalizeComparePath(s.path) === wanted);
   if (existing) return existing;
   const created = await pl.createEmbeddedDocuments("PlaylistSound", [{
     name: name || stripExt(baseNameOf(path)),
