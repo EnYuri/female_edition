@@ -8,7 +8,7 @@
 // AppV2 so it is forward-clean for v14; it also runs on v13.
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
+import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feEscapeHtml, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
 
 // Overlay-preview zoom limits, relative to the contain-fit that zoom 1 means. The ceiling
 // is well above fe-token-preview's 4x because the fit itself can be tiny here — a 200x3000
@@ -566,39 +566,35 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    */
 
   /**
-   * Persist one overlay's x/y. MUST go through a full faces-array clone+submit
-   * (like #updateFaces) rather than a narrow dot-path update such as
-   * `{"system.faces.0.overlays.0.x": ...}` — empirically, Foundry does NOT merge
-   * that into the existing ArrayField element; it resets every sibling field on
-   * that face (img, name, description) and every other field on that overlay
-   * (attr, text, fontSize, color, and even the untouched y) to schema defaults.
-   * Confirmed live: a single such dot-path update wiped a face's image.
+   * A private deep clone of the whole faces array — the starting point of EVERY write
+   * into it. Never narrow a write down to a dot-path such as
+   * `{"system.faces.0.overlays.0.x": ...}`: empirically, Foundry does NOT merge that
+   * into the existing ArrayField element; it resets every sibling field on that face
+   * (img, name, description) and every other field on that overlay (attr, text,
+   * fontSize, color, and even the untouched y) to schema defaults. Confirmed live — a
+   * single such dot-path update wiped a face's image.
    */
-  async #updateOverlayPos(faceIndex, overlayIndex, x, y) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
-    const ov = faces[faceIndex]?.overlays?.[overlayIndex];
-    if (!ov) return;
-    ov.x = x;
-    ov.y = y;
-    await this.#updateFaces(faces);
+  #cloneFaces() {
+    return foundry.utils.deepClone(this.document.system.faces ?? []);
   }
 
-  /** Persist one overlay's linkedActorUuid — same full-array-clone safety as #updateOverlayPos. */
-  async #updateOverlayLinkedActor(faceIndex, overlayIndex, uuid) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
-    const ov = faces[faceIndex]?.overlays?.[overlayIndex];
-    if (!ov) return;
-    ov.linkedActorUuid = uuid;
-    await this.#updateFaces(faces);
-  }
-
-  /** Persist an arbitrary set of overlay fields (the edit dialog) — same full-array-clone safety. */
+  /** Persist an arbitrary set of overlay fields — the one write path for overlay data. */
   async #updateOverlayFields(faceIndex, overlayIndex, patch) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const ov = faces[faceIndex]?.overlays?.[overlayIndex];
     if (!ov) return;
     Object.assign(ov, patch);
     await this.#updateFaces(faces);
+  }
+
+  /** Persist one overlay's x/y (marker drag). */
+  async #updateOverlayPos(faceIndex, overlayIndex, x, y) {
+    await this.#updateOverlayFields(faceIndex, overlayIndex, { x, y });
+  }
+
+  /** Persist one overlay's linkedActorUuid (actor chip drop / clear). */
+  async #updateOverlayLinkedActor(faceIndex, overlayIndex, uuid) {
+    await this.#updateOverlayFields(faceIndex, overlayIndex, { linkedActorUuid: uuid });
   }
 
   /**
@@ -1007,51 +1003,27 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     }
 
     // Per-overlay linked-actor drop zone: accepts a dragged Actor document.
-    for (const dropZone of root.querySelectorAll(".fe-sp-overlay-link")) {
-      const faceIndex = Number(dropZone.dataset.faceIndex);
-      const overlayIndex = Number(dropZone.dataset.overlayIndex);
-      dropZone.addEventListener("dragover", (event) => event.preventDefault());
-      dropZone.addEventListener("drop", async (event) => {
-        event.preventDefault();
-        let data;
-        try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
-        if (data?.type !== "Actor" || !data.uuid) return;
-        await this.#updateOverlayLinkedActor(faceIndex, overlayIndex, data.uuid);
-      });
-    }
+    this.#wireActorDropZones(root, ".fe-sp-overlay-link", (zone, uuid) =>
+      this.#updateOverlayLinkedActor(Number(zone.dataset.faceIndex), Number(zone.dataset.overlayIndex), uuid));
 
     // Per-face linked-actor drop zone: drag an Actor onto the face's actor
     // area to set that face's linkedActorUuid.
-    for (const dropZone of root.querySelectorAll(".fe-sp-face-actor-drop")) {
-      const faceIndex = Number(dropZone.dataset.faceIndex);
-      dropZone.addEventListener("dragover", (event) => event.preventDefault());
-      dropZone.addEventListener("drop", async (event) => {
-        event.preventDefault();
-        let data;
-        try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
-        if (data?.type !== "Actor" || !data.uuid) return;
-        this.#activeFaceIndex = faceIndex; // so the Attributes tab reflects the just-linked face
-        await this.#updateFaceLinkedActor(faceIndex, data.uuid);
-      });
-    }
+    this.#wireActorDropZones(root, ".fe-sp-face-actor-drop", (zone, uuid) => {
+      const faceIndex = Number(zone.dataset.faceIndex);
+      this.#activeFaceIndex = faceIndex; // so the Attributes tab reflects the just-linked face
+      return this.#updateFaceLinkedActor(faceIndex, uuid);
+    });
 
     // Per-face image drop zone: drag an Actor onto the face thumb to pick
     // portrait or token image via a quick dialog.
-    for (const dropZone of root.querySelectorAll(".fe-sp-face-thumb")) {
-      const faceIndex = Number(dropZone.dataset.faceIndex);
-      if (!Number.isInteger(faceIndex)) continue;
-      dropZone.addEventListener("dragover", (event) => event.preventDefault());
-      dropZone.addEventListener("drop", async (event) => {
-        event.preventDefault();
-        let data;
-        try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
-        if (data?.type !== "Actor" || !data.uuid) return;
-        let actor = null;
-        try { actor = await fromUuid(data.uuid); } catch { return; }
-        if (!actor) return;
-        await this.#pickActorImageForFace(faceIndex, actor);
-      });
-    }
+    this.#wireActorDropZones(root, ".fe-sp-face-thumb", async (zone, uuid) => {
+      const faceIndex = Number(zone.dataset.faceIndex);
+      if (!Number.isInteger(faceIndex)) return;
+      let actor = null;
+      try { actor = await fromUuid(uuid); } catch { return; }
+      if (!actor) return;
+      await this.#pickActorImageForFace(faceIndex, actor);
+    });
 
     // Per-face attribute inline edits. These inputs carry NO `name` (so they
     // are invisible to the auto-submit FormDataExtended pass) — each commits via
@@ -1068,6 +1040,32 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         if (!Number.isInteger(fi) || !Number.isInteger(ai) || !field) return;
         this.#updateFaceAttr(fi, ai, { [field]: input.value });
       }, { capture: true });
+    }
+  }
+
+  /**
+   * Wire every `selector` element under `root` as an Actor drop target.
+   *
+   * All three drop zones on this sheet accept exactly one thing — a dragged Actor
+   * document — and differ only in what they do with its uuid, so the boilerplate
+   * (preventDefault on dragover, the guarded JSON parse, the Actor/uuid check) lives
+   * here. Re-binds on every render with no "already wired" flag for the same reason
+   * #wirePreviewViewport does: core replaces the part's DOM, taking its listeners.
+   *
+   * @param {HTMLElement} root
+   * @param {string} selector
+   * @param {(zone: HTMLElement, uuid: string) => any} onActor
+   */
+  #wireActorDropZones(root, selector, onActor) {
+    for (const zone of root.querySelectorAll(selector)) {
+      zone.addEventListener("dragover", (event) => event.preventDefault());
+      zone.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        let data;
+        try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
+        if (data?.type !== "Actor" || !data.uuid) return;
+        await onActor(zone, data.uuid);
+      });
     }
   }
 
@@ -1092,7 +1090,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   async #updateFaceLinkedActor(faceIndex, uuid) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const face = faces[faceIndex];
     if (!face) return;
     face.linkedActorUuid = uuid;
@@ -1116,7 +1114,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   /** Re-snapshot the active face's copied attributes from its current linked actor. */
   async #recopyFaceAttrs(faceIndex) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const face = faces[faceIndex];
     if (!face?.linkedActorUuid) return;
     let linked = null;
@@ -1128,7 +1126,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   /** Persist one face-attribute field edit (full-array-clone — never a narrow dot-path). */
   async #updateFaceAttr(faceIndex, attrIndex, patch) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const attr = faces[faceIndex]?.attributes?.[attrIndex];
     if (!attr) return;
     Object.assign(attr, patch);
@@ -1142,7 +1140,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (portrait && !token) return this.#setFaceImage(faceIndex, portrait);
     if (!portrait && token) return this.#setFaceImage(faceIndex, token);
     const L = (k) => game.i18n.localize(k);
-    const esc = foundry.utils.escapeHTML ?? ((s) => s);
+    const esc = feEscapeHtml;
     await foundry.applications.api.DialogV2.wait({
       window: { title: L("FESP.Sheet.ActorImagePickTitle") },
       content: `<div style="display:flex;gap:16px;justify-content:center;padding:12px;">
@@ -1165,7 +1163,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   async #setFaceImage(faceIndex, src) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const face = faces[faceIndex];
     if (!face) return;
     face.img = src;
@@ -1270,7 +1268,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   /** Full-array-clone write, per the AppV2 Auto-Submit vs ArrayField rule. */
   async #updateFaceToken(index, submitData) {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     if (!faces[index]) return;
     faces[index].token = feCleanFaceTokenData(submitData);
     await this.document.update({ "system.faces": faces });
@@ -1278,7 +1276,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   static async #onAddFace() {
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     faces.push({ name: "", img: "", description: "" });
     this.#activeFaceIndex = faces.length - 1;
     await this.#updateFaces(faces);
@@ -1286,7 +1284,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onRemoveFace(event, target) {
     const i = Number(target.dataset.index);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     if (!Number.isInteger(i) || i < 0 || i >= faces.length) return;
     faces.splice(i, 1);
     this.#remapPreviewView((idx) => (idx === i ? null : idx > i ? idx - 1 : idx));
@@ -1305,7 +1303,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    */
   static async #onDuplicateFace(event, target) {
     const i = Number(target.dataset.index);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     if (!Number.isInteger(i) || i < 0 || i >= faces.length) return;
     const copy = foundry.utils.deepClone(faces[i]);
     copy.name = game.i18n.format("FESP.Sheet.DuplicateFaceName", {
@@ -1323,17 +1321,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     await this.#updateFaces(faces, this.#defaultFacePatch(df > i ? df + 1 : df));
   }
 
-  static async #onMoveFaceUp(event, target) {
-    const i = Number(target.dataset.index);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
-    if (i <= 0 || i >= faces.length) return;
-    [faces[i - 1], faces[i]] = [faces[i], faces[i - 1]];
-    this.#remapPreviewView((idx) => ScreenPanelSheet.#swapIndex(idx, i - 1, i));
-    if (this.#activeFaceIndex === i) this.#activeFaceIndex = i - 1;
-    else if (this.#activeFaceIndex === i - 1) this.#activeFaceIndex = i;
-    await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i - 1, i)));
-  }
-
   /** Follow a two-element swap: an index sitting on either side moves with its face. */
   static #swapIndex(index, a, b) {
     if (index === a) return b;
@@ -1341,15 +1328,32 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return index;
   }
 
+  /**
+   * Swap face `a` with face `b`. Three index-keyed things ride along with the swap and
+   * all three MUST be carried: the preview cameras (#previewView — a face's identity is
+   * its array position, the schema has no per-face id), the active tab, and
+   * `system.defaultFace`, which is a positional index and would otherwise silently point
+   * at a different face.
+   */
+  async #swapFaces(a, b) {
+    if (!Number.isInteger(a) || !Number.isInteger(b)) return;
+    const faces = this.#cloneFaces();
+    if (a < 0 || b < 0 || a >= faces.length || b >= faces.length) return;
+    [faces[a], faces[b]] = [faces[b], faces[a]];
+    this.#remapPreviewView((idx) => ScreenPanelSheet.#swapIndex(idx, a, b));
+    this.#activeFaceIndex = ScreenPanelSheet.#swapIndex(this.#activeFaceIndex, a, b);
+    const defaultFace = ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, a, b);
+    await this.#updateFaces(faces, this.#defaultFacePatch(defaultFace));
+  }
+
+  static async #onMoveFaceUp(event, target) {
+    const i = Number(target.dataset.index);
+    await this.#swapFaces(i - 1, i);
+  }
+
   static async #onMoveFaceDown(event, target) {
     const i = Number(target.dataset.index);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
-    if (i < 0 || i >= faces.length - 1) return;
-    [faces[i + 1], faces[i]] = [faces[i], faces[i + 1]];
-    this.#remapPreviewView((idx) => ScreenPanelSheet.#swapIndex(idx, i, i + 1));
-    if (this.#activeFaceIndex === i) this.#activeFaceIndex = i + 1;
-    else if (this.#activeFaceIndex === i + 1) this.#activeFaceIndex = i;
-    await this.#updateFaces(faces, this.#defaultFacePatch(ScreenPanelSheet.#swapIndex(this.document.system.defaultFace ?? 0, i, i + 1)));
+    await this.#swapFaces(i, i + 1);
   }
 
   static async #onPlaceOnScene() {
@@ -1361,7 +1365,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onAddOverlay(event, target) {
     const fi = Number(target.dataset.faceIndex);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     if (!Number.isInteger(fi) || fi < 0 || fi >= faces.length) return;
     faces[fi].overlays ??= [];
     faces[fi].overlays.push({
@@ -1382,7 +1386,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onRemoveOverlay(event, target) {
     const fi = Number(target.dataset.faceIndex);
     const oi = Number(target.dataset.overlayIndex);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const overlays = faces[fi]?.overlays;
     if (!overlays || oi < 0 || oi >= overlays.length) return;
     overlays.splice(oi, 1);
@@ -1410,42 +1414,54 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const oi = Number(target.dataset.overlayIndex);
     const ov = this.document.system.faces?.[fi]?.overlays?.[oi];
     if (!ov) return;
-    const esc = foundry.utils.escapeHTML ?? ((s) => s);
+    const esc = feEscapeHtml;
     const L = (k) => game.i18n.localize(k);
     let linkedActor = null;
     if (ov.linkedActorUuid) { try { linkedActor = fromUuidSync(ov.linkedActorUuid); } catch { /* stale uuid */ } }
     const options = this.#attrSuggestions(linkedActor);
     const listId = `fe-sp-attrlist-${fi}-${oi}`;
+
+    /**
+     * The `.fe-sp-field` label wrapper — and ONLY the wrapper. Each control's markup
+     * stays written out verbatim at its call site, deliberately:
+     *
+     * every field here carries a different attribute set, and the differences are
+     * load-bearing. `barMin`/`barMax` accept negatives so they must have NO `min`;
+     * `fontSize` floors at 4, `barHeight` at 1, the rest at 0; four fields carry a
+     * "0 = 자동" placeholder that is the only place that rule is stated in the UI. A
+     * builder that generated the `<input>` too would have to pick defaults for those,
+     * and a default `min="0"` alone would silently stop the browser from accepting a
+     * negative `barMin`. Worse, this markup is bound to the ok callback purely by the
+     * `name` string (`form.elements.<name>`), so a name a builder got wrong would not
+     * throw — it would read `undefined`, fall through `Number(...) || 0`, and quietly
+     * save a schema default over the user's value.
+     */
+    const field = (labelKey, control, { wide = false } = {}) => `
+        <div class="fe-sp-field${wide ? " fe-sp-field-wide" : ""}">
+          <label>${L(labelKey)}</label>
+          ${control}
+        </div>`;
+
     const content = `
       <div class="fe-sp-overlay-edit-form">
-        <div class="fe-sp-field fe-sp-field-wide">
-          <label>${L("FESP.Sheet.OverlayAttr")}</label>
+        ${field("FESP.Sheet.OverlayAttr", `
           <input type="text" name="attr" value="${esc(ov.attr ?? "")}"
                  placeholder="${esc(L("FESP.Sheet.OverlayAttrPh"))}"
                  ${options.length ? `list="${listId}"` : ""}>
           ${options.length ? `<datalist id="${listId}">${
             options.map(o => `<option value="${esc(o.path)}">${esc(o.label)}</option>`).join("")
-          }</datalist>` : ""}
-        </div>
+          }</datalist>` : ""}`, { wide: true })}
         <hr>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayFontSize")}</label>
-          <input type="number" name="fontSize" value="${ov.fontSize ?? 28}" min="4" step="1">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayColor")}</label>
-          <input type="color" name="color" value="${esc(ov.color ?? "#ffffff")}">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBoxWidth")}</label>
-          <input type="number" name="boxWidth" value="${ov.boxWidth ?? 0}" min="0" step="1"
-                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">
-        </div>
-        <div class="fe-sp-field">
-          <label>${L("FESP.Sheet.OverlayBoxHeight")}</label>
-          <input type="number" name="boxHeight" value="${ov.boxHeight ?? 0}" min="0" step="1"
-                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">
-        </div>
+        ${field("FESP.Sheet.OverlayFontSize",
+          `<input type="number" name="fontSize" value="${ov.fontSize ?? 28}" min="4" step="1">`)}
+        ${field("FESP.Sheet.OverlayColor",
+          `<input type="color" name="color" value="${esc(ov.color ?? "#ffffff")}">`)}
+        ${field("FESP.Sheet.OverlayBoxWidth",
+          `<input type="number" name="boxWidth" value="${ov.boxWidth ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">`)}
+        ${field("FESP.Sheet.OverlayBoxHeight",
+          `<input type="number" name="boxHeight" value="${ov.boxHeight ?? 0}" min="0" step="1"
+                 placeholder="${esc(L("FESP.Sheet.OverlayBoxWidthPh"))}">`)}
         <p class="notes">${L("FESP.Sheet.OverlayBoxWidthNote")}</p>
         <hr>
         ${/* The checkbox sits ABOVE the fields it controls, not below them. Below, every
@@ -1453,50 +1469,38 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
               it — you clicked it and it slid out from under the cursor. Above, expanding
               only ever grows the form downwards and the control the user is operating
               never moves. (It stays at the BOTTOM of the dialog for as long as the bar is
-              off, which is the layout the previous pass was after.) */""}
+              off, which is the layout the previous pass was after.) This ORDER is the
+              fix, so it must stay written out here — do not move these rows into a
+              data-driven list where the arrangement becomes an implicit convention. */""}
         <label class="fe-sp-overlay-bar-toggle">
           <input type="checkbox" name="bar" ${ov.bar ? "checked" : ""}>
           ${L("FESP.Sheet.OverlayBarEnable")}
         </label>
         <div class="fe-sp-overlay-bar-fields" ${ov.bar ? "" : "hidden"}>
           <hr>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarMin")}</label>
-            <input type="number" name="barMin" value="${ov.barMin ?? 0}" step="any">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarMax")}</label>
-            <input type="number" name="barMax" value="${ov.barMax ?? 100}" step="any">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarMode")}</label>
+          ${/* No `min` on barMin/barMax on purpose — a bar may legitimately span a
+                negative range, and a `min="0"` would have the browser refuse it. */""}
+          ${field("FESP.Sheet.OverlayBarMin",
+            `<input type="number" name="barMin" value="${ov.barMin ?? 0}" step="any">`)}
+          ${field("FESP.Sheet.OverlayBarMax",
+            `<input type="number" name="barMax" value="${ov.barMax ?? 100}" step="any">`)}
+          ${field("FESP.Sheet.OverlayBarMode", `
             <select name="barMode">
               <option value="under" ${ov.barMode === "inside" ? "" : "selected"}>${L("FESP.Sheet.OverlayBarModeUnder")}</option>
               <option value="inside" ${ov.barMode === "inside" ? "selected" : ""}>${L("FESP.Sheet.OverlayBarModeInside")}</option>
-            </select>
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarWidth")}</label>
-            <input type="number" name="barWidth" value="${ov.barWidth ?? 0}" min="0" step="1"
-                   placeholder="${esc(L("FESP.Sheet.OverlayBarWidthPh"))}">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarHeight")}</label>
-            <input type="number" name="barHeight" value="${ov.barHeight ?? 6}" min="1" step="1">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarColor")}</label>
-            <input type="color" name="barColor" value="${esc(ov.barColor ?? "#33cc33")}">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarBorderWidth")}</label>
-            <input type="number" name="barBorderWidth" value="${ov.barBorderWidth ?? 0}" min="0" step="1"
-                   placeholder="${esc(L("FESP.Sheet.OverlayBarBorderWidthPh"))}">
-          </div>
-          <div class="fe-sp-field">
-            <label>${L("FESP.Sheet.OverlayBarBorderColor")}</label>
-            <input type="color" name="barBorderColor" value="${esc(ov.barBorderColor ?? "#000000")}">
-          </div>
+            </select>`)}
+          ${field("FESP.Sheet.OverlayBarWidth",
+            `<input type="number" name="barWidth" value="${ov.barWidth ?? 0}" min="0" step="1"
+                   placeholder="${esc(L("FESP.Sheet.OverlayBarWidthPh"))}">`)}
+          ${field("FESP.Sheet.OverlayBarHeight",
+            `<input type="number" name="barHeight" value="${ov.barHeight ?? 6}" min="1" step="1">`)}
+          ${field("FESP.Sheet.OverlayBarColor",
+            `<input type="color" name="barColor" value="${esc(ov.barColor ?? "#33cc33")}">`)}
+          ${field("FESP.Sheet.OverlayBarBorderWidth",
+            `<input type="number" name="barBorderWidth" value="${ov.barBorderWidth ?? 0}" min="0" step="1"
+                   placeholder="${esc(L("FESP.Sheet.OverlayBarBorderWidthPh"))}">`)}
+          ${field("FESP.Sheet.OverlayBarBorderColor",
+            `<input type="color" name="barBorderColor" value="${esc(ov.barBorderColor ?? "#000000")}">`)}
           <p class="notes">${L("FESP.Sheet.OverlayBarNote")}</p>
         </div>
       </div>`;
@@ -1574,7 +1578,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onAddFaceAttr() {
     const fi = this.#activeFaceIndex;
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     if (!faces[fi]) return;
     faces[fi].attributes ??= [];
     faces[fi].attributes.push({ name: "", value: "", max: "", attr: "" });
@@ -1584,7 +1588,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onRemoveFaceAttr(event, target) {
     const fi = Number(target.dataset.faceIndex);
     const i = Number(target.dataset.index);
-    const faces = foundry.utils.deepClone(this.document.system.faces ?? []);
+    const faces = this.#cloneFaces();
     const attrs = faces[fi]?.attributes;
     if (!attrs || i < 0 || i >= attrs.length) return;
     attrs.splice(i, 1);

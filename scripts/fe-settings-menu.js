@@ -17,7 +17,6 @@ const CP = Object.freeze({
   BORDER_WIDTH:   "chatPortraitBorderWidth",
   BORDER_COLOR:   "chatPortraitBorderColor",
   NAME_ALIGN:     "chatPortraitNameAlign",
-  APPLY_COMBAT:   "chatPortraitApplyCombatTracker",
   SHOW_IC:        "chatPortraitShowIC",
   SHOW_OOC:       "chatPortraitShowOOC",
   SHOW_EMOTE:     "chatPortraitShowEmote",
@@ -37,7 +36,6 @@ const CP_DEFAULTS = Object.freeze({
   [CP.BORDER_WIDTH]:   0,
   [CP.BORDER_COLOR]:   "#000000",
   [CP.NAME_ALIGN]:     "left",
-  [CP.APPLY_COMBAT]:   false,
   [CP.SHOW_IC]:        true,
   [CP.SHOW_OOC]:       true,
   [CP.SHOW_EMOTE]:     true,
@@ -114,8 +112,8 @@ const ALL_DEFAULTS = Object.freeze({
   // narrator (all world/GM)
   narratorEnabled: true, narratorDurationMult: 1,
   narratorAllowCopy: true, narratorPermNarrate: 4, narratorPermDescribe: 4, narratorPermAs: 4,
-  // theatre (6 world/GM + 6 client)
-  stageEnabled: true, stageHideMessages: false, stageExcludeSystemMessages: true,
+  // theatre (5 world/GM + 6 client)
+  stageEnabled: true, stageExcludeSystemMessages: true,
   stageRecallIncludeNonActor: false,
   stageAutoDecay: false, stageDecayTime: 30000,
   stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
@@ -417,7 +415,6 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [CP.BORDER_WIDTH]:   feRead(CP.BORDER_WIDTH),
       [CP.BORDER_COLOR]:   feRead(CP.BORDER_COLOR),
       [CP.NAME_ALIGN]:     feRead(CP.NAME_ALIGN),
-      [CP.APPLY_COMBAT]:   feRead(CP.APPLY_COMBAT),
       [CP.SHOW_IC]:        feRead(CP.SHOW_IC),
       [CP.SHOW_OOC]:       feRead(CP.SHOW_OOC),
       [CP.SHOW_EMOTE]:     feRead(CP.SHOW_EMOTE),
@@ -808,10 +805,8 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         ] : []),
 
         // Theatre — world/GM (enable/history/decay) gated; client box dims always saved.
-        // stageHideMessages remains hidden during ordinary saves, but must reset.
         ...(game.user?.isGM ? [
           bool("stageEnabled"),
-          ...(resetDefaults ? [bool("stageHideMessages")] : []),
           bool("stageExcludeSystemMessages"),
           bool("stageRecallIncludeNonActor"),
           bool("stageAutoDecay"), ...(saveDecayTime ? [num("stageDecayTime")] : []),
@@ -856,7 +851,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(CP.ENABLED), bool(CP.HIDE_WRAP), bool(CP.USE_TOKEN),
         num(CP.SIZE), num(CP.CARD_ICON_SIZE),
         str(CP.SHAPE), str(CP.BORDER_MODE), num(CP.BORDER_WIDTH),
-        str(CP.BORDER_COLOR), str(CP.NAME_ALIGN), bool(CP.APPLY_COMBAT),
+        str(CP.BORDER_COLOR), str(CP.NAME_ALIGN),
         bool(CP.SHOW_IC), bool(CP.SHOW_OOC), bool(CP.SHOW_EMOTE),
         bool(CP.SHOW_WHISPER), bool(CP.SHOW_ROLL), bool(CP.SHOW_OTHER),
       ]);

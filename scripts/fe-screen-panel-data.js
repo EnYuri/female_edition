@@ -58,6 +58,18 @@ const FE_PANEL_COMMON_ATTR_NAMES = [
 const FE_PANEL_ATTR_NAME_PREFIX = "jk";
 const FE_PANEL_DEFAULT_ATTR_COUNT = 4;
 
+/**
+ * HTML-escape a string for interpolation into a dialog template.
+ *
+ * `foundry.utils.escapeHTML` is the real implementation; the arrow is the fallback for
+ * a build that does not expose it. Lives here (the dependency root) because the entry
+ * module and the sheet both need it and neither may import the other.
+ */
+function feEscapeHtml(value) {
+  const esc = foundry.utils.escapeHTML;
+  return typeof esc === "function" ? esc(value) : String(value ?? "");
+}
+
 /** Lowest-numbered `jk<n>` not already used by `items` — keeps added rows unique. */
 function feNextCustomAttrName(items) {
   const used = new Set((items ?? []).map(a => String(a?.name ?? "")));
@@ -322,7 +334,7 @@ export {
   FE_PANEL_SOCKET,
   FE_PANEL_DEFAULT_SIZE,
   FE_PANEL_COMMON_ATTR_NAMES,
-  FE_PANEL_ATTR_NAME_PREFIX,
+  feEscapeHtml,
   feNextCustomAttrName,
   feSortAttrItems,
   feEnsureScreenPanelDnd5eActorCompat,

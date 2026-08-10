@@ -405,6 +405,20 @@ function _ihResolveHoverArt(target) {
     if (src && !src.startsWith("data:")) return src;
   }
 
+  // 채팅 포트레이트(.message-header 안) — 아래의 .message-content 분기가 잡지 못한다.
+  // src 에는 HQ 리샘플 결과인 표시 크기(≈64px) data: URL 이 들어 있을 수 있으므로,
+  // cpUpsertPortrait 가 보존해 둔 원본 경로(fePortraitOrigSrc)를 최우선으로 쓴다.
+  // 원본 경로를 모르는 채로 data: 를 돌려주면 64px 비트맵을 확대해 보여주게 되므로,
+  // 그 경우엔 아무것도 표시하지 않는다.
+  const portrait = target.closest("img.fe-chat-portrait");
+  if (portrait) {
+    const orig = portrait.dataset?.fePortraitOrigSrc || portrait.dataset?.feHqSrc;
+    if (orig) return orig;
+    const src = portrait.getAttribute("src");
+    if (src && !src.startsWith("data:")) return src;
+    return null;
+  }
+
   // 채팅 메시지 본문 이미지(업로드/임베드/마크다운/카드 아트) — 호버+X 로 표시.
   // 임베드 base64(data:) 도 실제 이미지 소스이므로 허용한다.
   const chatImg = target.closest("img");
@@ -725,10 +739,20 @@ Hooks.on("preUpdateToken", _ihClearArt);
 Hooks.on("deleteToken",    _ihClearArt);
 
 // Clear art when various application windows close (avoids stale HUD state).
-// closeApplication fires for all AppV2 instances (v14+); the V1 variants cover v13.
-Hooks.on("closeActorSheet",    _ihClearArt);
+//
+// The close hook name is built from the CLASS NAME of every entry in the app's
+// inheritance chain, and the two frameworks have different base classes:
+//   · AppV2 — `ApplicationV2#_doEvent` → `#callHooks` (applications/api/application.mjs)
+//     bottoms out at `ApplicationV2` / `ActorSheetV2` → closeApplicationV2, closeActorSheetV2
+//   · AppV1 — `Application#_callHooks` (appv1/api/application-v1.mjs:53, class name is a
+//     bare `Application`) → closeApplication, closeActorSheet
+// So the V1 names alone MISS every AppV2 sheet (dnd5e v4+ and core's own). Both sets
+// are needed; `closeSettingsConfig` is spelled the same in either framework.
+Hooks.on("closeActorSheet",     _ihClearArt);
+Hooks.on("closeActorSheetV2",   _ihClearArt);
 Hooks.on("closeSettingsConfig", _ihClearArt);
-Hooks.on("closeApplication",   _ihClearArt);
+Hooks.on("closeApplication",    _ihClearArt);
+Hooks.on("closeApplicationV2",  _ihClearArt);
 
 /** Discard dimension cache on scene change — prevents unbounded memory growth. */
 Hooks.on("canvasReady", () => { _ihCache = {}; });

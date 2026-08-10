@@ -37,7 +37,6 @@ const _fet = {
 
 // Settings cache — updated on init and on settings close
 let _fetEnabled       = false;
-let _fetHideMessages  = false;
 let _fetExcludeSystemMessages = true;
 let _fetRecallIncludeNonActor = false;
 let _fetAutoDecay     = true;
@@ -86,17 +85,6 @@ function _fetRegisterSettings() {
         _fetRefreshSheetHeaders();
       }
     },
-  });
-
-  game.settings.register(_FET_MODULE, "stageHideMessages", {
-    name: "무대 채팅: 채팅 로그에서 숨기기",
-    hint: "무대(Stage)에서 발신된 메시지를 채팅 로그에 표시하지 않습니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: false,
-    onChange: (v) => { _fetHideMessages = v; },
   });
 
   game.settings.register(_FET_MODULE, "stageExcludeSystemMessages", {
@@ -216,7 +204,6 @@ function _fetRegisterSettings() {
 function _fetLoadSettings() {
   _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled")
     && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
-  _fetHideMessages   = game.settings.get(_FET_MODULE, "stageHideMessages");
   _fetExcludeSystemMessages = game.settings.get(_FET_MODULE, "stageExcludeSystemMessages");
   _fetRecallIncludeNonActor = game.settings.get(_FET_MODULE, "stageRecallIncludeNonActor");
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
@@ -806,7 +793,7 @@ function _fetRemoveInsert(theatreId, remote = false) {
   if (insert.currentMessageId && insert.currentMessageId === _fet.recallMessageId) {
     _fet.recallMessageId = null;
   }
-  insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+  insert.el.classList.remove("fe-stage-insert--visible");
   setTimeout(() => insert.el.remove(), 400);
   insert.opt?.remove();
   _fet.inserts.delete(theatreId);
@@ -826,7 +813,7 @@ function _fetRemoveDisplayInsert(theatreId) {
   if (insert.currentMessageId && insert.currentMessageId === _fet.recallMessageId) {
     _fet.recallMessageId = null;
   }
-  insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+  insert.el.classList.remove("fe-stage-insert--visible");
   setTimeout(() => insert.el.remove(), 400);
   _fet.displayInserts.delete(theatreId);
 }
@@ -1022,7 +1009,7 @@ function _fetDismissInsert(insert) {
     _fet.recallMessageId = null;
   }
   insert.textboxEl.classList.remove("fe-stage-textbox--visible");
-  insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+  insert.el.classList.remove("fe-stage-insert--visible");
   insert.hideTimeout = setTimeout(() => { insert.el.hidden = true; }, 400);
 }
 
@@ -1178,7 +1165,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   for (const [tid, other] of _fetDisplayInsertEntries()) {
     if (tid === theatreId) continue;
     clearTimeout(other.hideTimeout);
-    other.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+    other.el.classList.remove("fe-stage-insert--visible");
     other.hideTimeout = setTimeout(() => { other.el.hidden = true; }, 400);
   }
 
@@ -1187,7 +1174,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
     insert.el.hidden = false;
     insert.el.offsetWidth; // force reflow so transition fires from the initial state
   }
-  insert.el.classList.add("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+  insert.el.classList.add("fe-stage-insert--visible");
 
   // "Pop" pulse animation on the portrait (회상 탐색 시엔 생략 — 과한 흔들림 방지)
   if (!recall) {
@@ -1236,7 +1223,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
     const readTime = _fetDecayTime + text.length * 38;
     insert.decayTimeout = setTimeout(() => {
       insert.textboxEl.classList.remove("fe-stage-textbox--visible");
-      insert.el.classList.remove("fe-stage-insert--visible", "fe-stage-insert--last-speaking");
+      insert.el.classList.remove("fe-stage-insert--visible");
       insert.hideTimeout = setTimeout(() => { insert.el.hidden = true; }, 400);
     }, readTime);
   }
@@ -1452,12 +1439,6 @@ Hooks.on("createChatMessage", (chatMessage) => {
     displayName: chatMessage.speaker?.alias,
     portraitSrc: chatMessage.flags?.[_FET_MODULE]?.portraitSrc,
   });
-});
-
-Hooks.on("renderChatMessageHTML", (chatMessage, html) => {
-  if (!_fetEnabled || !_fetHideMessages || !chatMessage.flags?.[_FET_MODULE]?.stageId) return;
-  const el = html instanceof jQuery ? html[0] : html;
-  el.style.display = "none";
 });
 
 Hooks.on("updateActor", (actor, change) => {

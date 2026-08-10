@@ -9,7 +9,7 @@
 // arbitrary screen coordinates (the canvas tile has no DOM element of its own).
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_TILE_FLAG } from "./fe-screen-panel-data.js";
+import { FE_PANEL_TILE_FLAG, feEscapeHtml } from "./fe-screen-panel-data.js";
 
 const MENU_ID = "fe-sp-menu";
 const TOOLTIP_ID = "fe-sp-tooltip";
@@ -60,6 +60,27 @@ function isMenuOpen() {
 // --------------------------------
 // Tooltip
 // --------------------------------
+
+/**
+ * One dropdown row. Every entry in this menu is the same button — icon, label, a click
+ * that closes the menu and then runs the action — so they are all built here rather than
+ * hand-assembled per row.
+ *
+ * `disabled` is opt-in per row and NOT derived from "is a GM online": relayed ops need
+ * one, but the local-only rows (grid snap, open sheet) work regardless and must stay
+ * clickable. `onClick` is omitted for a pure informational row (the panel-level lock
+ * note), which is then always disabled.
+ */
+function menuItem({ icon, label, danger = false, disabled = false, active = false, extraClass = "", onClick }) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = ["fe-sp-menu-item", extraClass, danger ? "danger" : "", active ? "active" : ""]
+    .filter(Boolean).join(" ");
+  item.innerHTML = `<i class="${icon}"></i><span>${feEscapeHtml(label)}</span>`;
+  item.disabled = disabled || !onClick;
+  if (onClick) item.addEventListener("click", async () => { closePanelMenu(); await onClick(); });
+  return item;
+}
 
 function ensureTooltipEl() {
   let el = document.getElementById(TOOLTIP_ID);
@@ -137,134 +158,125 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
   const el = ensureMenuEl();
   el.innerHTML = "";
 
+  // Every mutating row goes through the GM relay, so it is dead while no GM is online.
+  const relayDown = !gmOnline && !game.user.isGM;
+  const L = (key) => game.i18n.localize(key);
+  const section = () => {
+    const node = document.createElement("div");
+    node.className = "fe-sp-menu-section";
+    el.appendChild(node);
+    return node;
+  };
+
   // --- Face switcher (OBSERVER+) ---
   if (faces.length > 1) {
-    const section = document.createElement("div");
-    section.className = "fe-sp-menu-section";
+    const facesSection = section();
     const label = document.createElement("div");
     label.className = "fe-sp-menu-label";
-    label.textContent = game.i18n.localize("FESP.Menu.Faces");
-    section.appendChild(label);
+    label.textContent = L("FESP.Menu.Faces");
+    facesSection.appendChild(label);
     faces.forEach((face, i) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "fe-sp-menu-item fe-sp-face-item";
-      if (i === (flag.currentFace ?? 0)) item.classList.add("active");
-      const name = face.name?.trim() || game.i18n.format("FESP.Sheet.FaceN", { n: i + 1 });
-      item.innerHTML = `<i class="fa-solid fa-clone"></i><span>${foundry.utils.escapeHTML?.(name) ?? name}</span>`;
-      item.disabled = !gmOnline && !game.user.isGM;
-      item.addEventListener("click", async () => {
-        closePanelMenu();
-        await _actions.flip?.(tile, i);
-      });
-      section.appendChild(item);
+      facesSection.appendChild(menuItem({
+        icon: "fa-solid fa-clone",
+        label: face.name?.trim() || game.i18n.format("FESP.Sheet.FaceN", { n: i + 1 }),
+        extraClass: "fe-sp-face-item",
+        active: i === (flag.currentFace ?? 0),
+        disabled: relayDown,
+        onClick: () => _actions.flip?.(tile, i),
+      }));
     });
-    el.appendChild(section);
   }
 
   // --- Owner controls ---
   if (isOwner) {
-    const ownerSection = document.createElement("div");
-    ownerSection.className = "fe-sp-menu-section";
-
-    const add = (icon, key, handler, { danger = false } = {}) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "fe-sp-menu-item" + (danger ? " danger" : "");
-      item.innerHTML = `<i class="fa-solid ${icon}"></i><span>${game.i18n.localize(key)}</span>`;
-      item.disabled = !gmOnline && !game.user.isGM;
-      item.addEventListener("click", async () => { closePanelMenu(); await handler(); });
-      ownerSection.appendChild(item);
-    };
+    const ownerSection = section();
+    // `relay: true` = the op is applied by the GM, so the row follows relayDown.
+    const add = (opts) => ownerSection.appendChild(menuItem({
+      ...opts,
+      disabled: opts.relay ? relayDown : false,
+    }));
 
     const hidden = !!tile.document.hidden;
-    add(hidden ? "fa-eye" : "fa-eye-slash",
-        hidden ? "FESP.Menu.Show" : "FESP.Menu.Hide",
-        () => _actions.toggleShowHide?.(tile));
+    add({
+      relay: true,
+      icon: hidden ? "fa-solid fa-eye" : "fa-solid fa-eye-slash",
+      label: L(hidden ? "FESP.Menu.Show" : "FESP.Menu.Hide"),
+      onClick: () => _actions.toggleShowHide?.(tile),
+    });
 
     const disabled = !!flag.disabled;
-    add(disabled ? "fa-user-check" : "fa-user-slash",
-        disabled ? "FESP.Menu.Enable" : "FESP.Menu.Disable",
-        () => _actions.toggleDisable?.(tile));
+    add({
+      relay: true,
+      icon: disabled ? "fa-solid fa-user-check" : "fa-solid fa-user-slash",
+      label: L(disabled ? "FESP.Menu.Enable" : "FESP.Menu.Disable"),
+      onClick: () => _actions.toggleDisable?.(tile),
+    });
 
     // Position lock. The ENFORCED lock (feIsPanelPlacementLocked / fePanelLockSource in
     // the entry module) is `flag.locked` OR `actor.system.locked`, but this row can only
     // ever write the flag. While the panel-level lock is on, offering the flag toggle was
     // a row that lied twice over: it read "위치 고정" on a panel that was already locked,
     // and pressing it changed nothing anyone could see. Name the real source instead —
-    // the owner releases it from the sheet's 위치 고정 checkbox.
-    const panelLocked = !!actor.system?.locked;
-    if (panelLocked) {
-      const note = document.createElement("button");
-      note.type = "button";
-      note.className = "fe-sp-menu-item";
-      note.disabled = true;
-      note.innerHTML = `<i class="fa-solid fa-lock"></i><span>${game.i18n.localize("FESP.Menu.LockedByPanel")}</span>`;
-      ownerSection.appendChild(note);
+    // the owner releases it from the sheet's 위치 고정 checkbox. No `onClick`, so the row
+    // renders permanently disabled.
+    if (actor.system?.locked) {
+      add({ icon: "fa-solid fa-lock", label: L("FESP.Menu.LockedByPanel") });
     } else {
       const locked = !!flag.locked;
-      add(locked ? "fa-lock-open" : "fa-lock",
-          locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock",
-          () => _actions.toggleLock?.(tile));
+      add({
+        relay: true,
+        icon: locked ? "fa-solid fa-lock-open" : "fa-solid fa-lock",
+        label: L(locked ? "FESP.Menu.Unlock" : "FESP.Menu.Lock"),
+        onClick: () => _actions.toggleLock?.(tile),
+      });
     }
 
     // Layer ordering — TOKENIZED panels only. A tile panel is reachable through core's own
     // Tiles-layer tools (which have send-to-back/front); a token has no such UI, and core's
     // Token HUD is vetoed for panels, so this menu is the only place to reorder one.
     if (tile.document?.documentName === "Token") {
-      add("fa-arrow-up", "FESP.Menu.SortForward", () => _actions.sort?.(tile, 1));
-      add("fa-arrow-down", "FESP.Menu.SortBackward", () => _actions.sort?.(tile, -1));
+      add({ relay: true, icon: "fa-solid fa-arrow-up", label: L("FESP.Menu.SortForward"), onClick: () => _actions.sort?.(tile, 1) });
+      add({ relay: true, icon: "fa-solid fa-arrow-down", label: L("FESP.Menu.SortBackward"), onClick: () => _actions.sort?.(tile, -1) });
     }
 
     // Grid-snap is a LOCAL drag preference (client setting, no GM relay), so this
     // item stays enabled even when no GM is online. It toggles snapping for THIS
     // user's panel drags globally.
     const snapOn = !!_actions.gridSnapState?.();
-    const snapItem = document.createElement("button");
-    snapItem.type = "button";
-    snapItem.className = "fe-sp-menu-item";
-    snapItem.innerHTML = `<i class="fa-solid ${snapOn ? "fa-table-cells" : "fa-table-cells-large"}"></i>`
-      + `<span>${game.i18n.localize(snapOn ? "FESP.Menu.SnapOff" : "FESP.Menu.SnapOn")}</span>`;
-    snapItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleGridSnap?.(); });
-    ownerSection.appendChild(snapItem);
+    add({
+      icon: snapOn ? "fa-solid fa-table-cells" : "fa-solid fa-table-cells-large",
+      label: L(snapOn ? "FESP.Menu.SnapOff" : "FESP.Menu.SnapOn"),
+      onClick: () => _actions.toggleGridSnap?.(),
+    });
 
     // Per-panel (actor.system.dblclickCycle) → world data, so it applies to every
     // user, not just this client. Writing it needs OWNER on the actor, which this
     // whole section is already gated on.
     const dblOn = !!_actions.dblclickCycleState?.(actor);
-    const dblItem = document.createElement("button");
-    dblItem.type = "button";
-    dblItem.className = "fe-sp-menu-item";
-    dblItem.innerHTML = `<i class="fa-solid ${dblOn ? "fa-toggle-on" : "fa-toggle-off"}"></i>`
-      + `<span>${game.i18n.localize(dblOn ? "FESP.Menu.DblclickOff" : "FESP.Menu.DblclickOn")}</span>`;
-    dblItem.addEventListener("click", async () => { closePanelMenu(); await _actions.toggleDblclickCycle?.(actor); });
-    ownerSection.appendChild(dblItem);
+    add({
+      icon: dblOn ? "fa-solid fa-toggle-on" : "fa-solid fa-toggle-off",
+      label: L(dblOn ? "FESP.Menu.DblclickOff" : "FESP.Menu.DblclickOn"),
+      onClick: () => _actions.toggleDblclickCycle?.(actor),
+    });
 
-    add("fa-trash", "FESP.Menu.Remove", () => _actions.remove?.(tile), { danger: true });
+    add({ relay: true, danger: true, icon: "fa-solid fa-trash", label: L("FESP.Menu.Remove"), onClick: () => _actions.remove?.(tile) });
     ownerSection.appendChild(document.createElement("hr"));
 
     // Sheet edit is a local action (no socket) — always enabled for owners.
-    const sheetItem = document.createElement("button");
-    sheetItem.type = "button";
-    sheetItem.className = "fe-sp-menu-item";
-    sheetItem.innerHTML = `<i class="fa-solid fa-pen-to-square"></i><span>${game.i18n.localize("FESP.Menu.Edit")}</span>`;
-    sheetItem.addEventListener("click", () => { closePanelMenu(); _actions.openSheet?.(actor); });
-    ownerSection.appendChild(sheetItem);
-
-    el.appendChild(ownerSection);
+    add({
+      icon: "fa-solid fa-pen-to-square",
+      label: L("FESP.Menu.Edit"),
+      onClick: () => _actions.openSheet?.(actor),
+    });
   }
 
   // --- GM controls: delegate operate rights to specific players ---
   if (game.user.isGM) {
-    const gmSection = document.createElement("div");
-    gmSection.className = "fe-sp-menu-section";
-    const grant = document.createElement("button");
-    grant.type = "button";
-    grant.className = "fe-sp-menu-item";
-    grant.innerHTML = `<i class="fa-solid fa-user-shield"></i><span>${game.i18n.localize("FESP.Menu.GrantRights")}</span>`;
-    grant.addEventListener("click", () => { closePanelMenu(); _actions.grantRights?.(actor); });
-    gmSection.appendChild(grant);
-    el.appendChild(gmSection);
+    section().appendChild(menuItem({
+      icon: "fa-solid fa-user-shield",
+      label: L("FESP.Menu.GrantRights"),
+      onClick: () => _actions.grantRights?.(actor),
+    }));
   }
 
   if (!gmOnline && !game.user.isGM && isOwner) {

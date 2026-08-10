@@ -602,13 +602,6 @@
     </div>
 
     <div class="form-group">
-      <label>컴뱃 트래커에 포트레이트 적용</label>
-      <div class="form-fields">
-        <input type="checkbox" name="chatPortraitApplyCombatTracker" data-dtype="Boolean" {{checked values.chatPortraitApplyCombatTracker}} />
-      </div>
-    </div>
-
-    <div class="form-group">
       <label>표시할 메시지 타입</label>
       <div class="form-fields fe-inline-grid">
         <label class="checkbox"><input type="checkbox" name="chatPortraitShowIC" data-dtype="Boolean" {{checked values.chatPortraitShowIC}} /> IC</label>
@@ -1168,7 +1161,7 @@
     <div class="form-group">
       <label>글로우 세기</label>
       <div class="form-fields">
-        <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="1" max="8" step="1" />
+        <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="1" max="10" step="1" />
         <span class="fe-range-value" data-for="ceTokenGlowStrength">{{values.ceTokenGlowStrength}}</span>
       </div>
     </div>

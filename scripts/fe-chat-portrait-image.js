@@ -176,8 +176,7 @@ function cpComputeSourceCrop({ srcW, srcH, fit = "cover", anchorTop = false }) {
   // Compute a source rectangle (sx,sy,sw,sh) for drawing into a square destination.
   // - cover: crop to a square (horizontal centered). Vertically: top-anchored when
   //   `anchorTop` (preserve head, crop the bottom — used for CHAT portraits so a tall
-  //   full-body image keeps the head), otherwise centered (combat tracker keeps its
-  //   original centered crop).
+  //   full-body image keeps the head), otherwise centered (the export path's default).
   // - contain: use full image
   const w = Math.max(1, Number(srcW) || 1);
   const h = Math.max(1, Number(srcH) || 1);
@@ -577,7 +576,8 @@ function cpShouldUseHQResample(img, shape) {
     // avoid a large number of extra data: URLs during the final export.
     if (body?.classList?.contains("fe-print-chatlog")) return false;
 
-    // Live sidebar / combat tracker: needed ONLY for the cropping shapes.
+    // Live sidebar: needed ONLY for the cropping shapes. (The battle tracker is NOT a
+    // caller — fe-combat-tracker.js has its own downscaler, feApplyHQPortrait.)
     //
     // Chromium's native <img> downscale is properly box-filtered as long as the drawn
     // bitmap FITS the element box — `object-fit: contain`, and `cover` on a square

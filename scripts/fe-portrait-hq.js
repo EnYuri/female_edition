@@ -133,6 +133,17 @@ async function _produce(url, tw, th) {
   return _viaImg(url, tw, th);
 }
 
+// _hqCache 를 LRU 상한 안으로 되돌린다. 축출은 반드시 _hqCache 를 기준으로 두 맵을 함께
+// 지운다 — 어느 한쪽에만 들어가는 키가 있으면 그쪽이 영원히 안 지워지기 때문이다.
+// (실제로 다운스케일 불가 URL 이 _hqValue 에만 들어가 무한히 쌓이던 경로가 있었다.)
+function _hqEvict() {
+  while (_hqCache.size > _HQ_CACHE_MAX) {
+    const oldest = _hqCache.keys().next().value;
+    _hqCache.delete(oldest);
+    _hqValue.delete(oldest);
+  }
+}
+
 // url 을 (tw×th 커버) 고품질 비트맵 데이터 URL 로 변환. 실패 시 null. 동시성·캐시 적용.
 export function feHQImageDownscale(url, tw, th) {
   if (!url || typeof url !== "string") return Promise.resolve(null);
@@ -140,18 +151,20 @@ export function feHQImageDownscale(url, tw, th) {
   const key = `${url}|${tw}x${th}`;
   const cached = _hqCache.get(key);
   if (cached) { _hqCache.delete(key); _hqCache.set(key, cached); return cached; } // LRU bump
+
+  // 교차 출처 등 다운스케일 불가 → "불가" 판정도 캐시한다. 단 _hqValue 에만 넣으면
+  // 축출 대상이 되지 못하므로(축출은 _hqCache 기준) _hqCache 에도 함께 등록한다.
   if (!_canDownscaleUrl(url)) {
+    const job = Promise.resolve(null);
     _hqValue.set(key, null);
-    return Promise.resolve(null);
+    _hqCache.set(key, job);
+    _hqEvict();
+    return job;
   }
 
   const job = _enqueue(() => _produce(url, tw, th)).then(v => { _hqValue.set(key, v); return v; });
   _hqCache.set(key, job);
-  if (_hqCache.size > _HQ_CACHE_MAX) {
-    const oldest = _hqCache.keys().next().value;
-    _hqCache.delete(oldest);
-    _hqValue.delete(oldest);
-  }
+  _hqEvict();
   return job;
 }
 

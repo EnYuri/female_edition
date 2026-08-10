@@ -27,7 +27,6 @@ const CP = Object.freeze({
   BORDER_MODE: "chatPortraitBorderMode",
   BORDER_WIDTH: "chatPortraitBorderWidth",
   BORDER_COLOR: "chatPortraitBorderColor",
-  APPLY_COMBAT: "chatPortraitApplyCombatTracker",
   NAME_ALIGN: "chatPortraitNameAlign",
 
   SHOW_IC: "chatPortraitShowIC",
@@ -595,41 +594,8 @@ function cpClampLargeInlinePortraits(messageEl, size) {
 }
 
 
-function cpPickActorOwnerColor(actor) {
-  try {
-    if (!actor || !game?.users) return null;
-    const users = Array.isArray(game.users) ? game.users : game.users.contents ?? [];
-
-    const canOwn = (u) => {
-      try {
-        if (typeof actor.testUserPermission === "function") return actor.testUserPermission(u, "OWNER");
-        const lvl = actor.ownership?.[u.id] ?? 0;
-        const ownerLvl = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
-        return lvl >= ownerLvl;
-      } catch {
-        return false;
-      }
-    };
-
-    const owners = users.filter((u) => canOwn(u));
-    if (!owners.length) return null;
-
-    const pick =
-      owners.find((u) => !u.isGM && u.active) ||
-      owners.find((u) => !u.isGM) ||
-      owners.find((u) => u.active) ||
-      owners[0] ||
-      null;
-
-    return pick?.color ? String(pick.color) : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Apply size/shape/border/quality styles to a portrait <img>.
- * Shared by chat-message portraits and combat-tracker portraits.
  * @param {HTMLImageElement} img
  * @param {{ size, shape, borderMode, borderWidth, borderColor, color }} opts
  *   color — pre-resolved border color (user/actor color, or fallback)
@@ -710,46 +676,6 @@ function cpApplyPortraitStyling(message, img, { size: sizeHint, shape: shapeHint
 
     // Attempt high-quality resample (safe no-op for cross-origin images).
     cpMaybeApplyHQResample(img, size, shape, true);
-  } catch {
-    /* no-op */
-  }
-}
-
-
-function cpApplyCombatPortraitStyling(combatant, img) {
-  try {
-    if (!cpIsImageElement(img)) return;
-
-    const size       = Math.max(16, Number(cpGet(CP.SIZE)) || 64);
-    const shape      = String(cpGet(CP.SHAPE) ?? "circle");
-    const borderMode = String(cpGet(CP.BORDER_MODE) ?? "theme");
-    const borderWidth = Math.max(0, Number(cpGet(CP.BORDER_WIDTH) ?? 2) || 0);
-    const borderColor = String(cpGet(CP.BORDER_COLOR) ?? "#000000");
-
-    let color = borderColor;
-    if (borderMode === "user") {
-      const actorColor = cpPickActorOwnerColor(combatant?.actor);
-      color = actorColor || borderColor;
-    }
-
-    cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderColor, color });
-
-    // Seed HQ-resample cache key (combat tracker images don't go through cpUpsertPortrait).
-    try {
-      const candidate = img.dataset?.fePortraitOrigSrc || img.currentSrc || img.getAttribute?.("src") || img.src || "";
-      const isData = String(candidate).startsWith("data:") || String(candidate).startsWith("blob:");
-      if (candidate && !isData) {
-        if (!img.dataset.fePortraitOrigSrc) img.dataset.fePortraitOrigSrc = String(candidate);
-        const fit = shape === "none" ? "contain" : "cover";
-        // Combat tracker keeps the centered crop → distinct key from chat's "@@top".
-        const key = `${img.dataset.fePortraitOrigSrc}@@${size}@@${fit}@@center`;
-        img.dataset.fePortraitResampleKey = key;
-        const cached = cpResampleCacheGet(key);
-        if (cached && img.src !== cached) img.src = cached;
-      }
-    } catch {}
-
-    cpMaybeApplyHQResample(img, size, shape);
   } catch {
     /* no-op */
   }
@@ -1082,76 +1008,6 @@ export function feChatPortraitApplyVars(doc = document) {
   cpApplyVarsToDocument(doc);
 }
 
-function cpApplyCombatTrackerPortraits(html) {
-  if (cpConflictSuppressed()) return;
-  cpWarnIfChatPortraitModuleActive();
-  const root = html?.querySelector ? html : document;
-  const combat = root.querySelector?.("#combat") ?? root.querySelector?.(".combat-tracker");
-  if (!combat) return;
-
-  const enabled = cpEnabled();
-  const applyCombat = enabled && !!cpGet(CP.APPLY_COMBAT);
-
-  // If feature is off, clean up any previously injected portraits/styling.
-  if (!applyCombat) {
-    try {
-      const imgs = Array.from(combat.querySelectorAll?.("img.token-image.fe-combat-portrait") ?? []);
-      for (const img of imgs) {
-        try {
-          img.classList.remove("fe-combat-portrait");
-        } catch {}
-
-        // Attempt to restore the default token image.
-        try {
-          const li = img.closest?.("li.combatant") ?? img.closest?.("li");
-          const cid = li?.dataset?.combatantId;
-          const combatant = cid ? game.combat?.combatants?.get(cid) : null;
-          const tokenDoc = combatant?.token;
-          const restore = tokenDoc?.texture?.src || tokenDoc?.img || combatant?.actor?.img;
-          if (restore) img.src = restore;
-        } catch {}
-
-        try {
-          img.style.removeProperty("width");
-          img.style.removeProperty("height");
-          img.style.removeProperty("flex");
-          img.style.removeProperty("border-radius");
-          img.style.removeProperty("object-fit");
-          img.style.removeProperty("clip-path");
-          img.style.removeProperty("display");
-          img.style.removeProperty("image-rendering");
-          img.style.removeProperty("border");
-        } catch {}
-      }
-    } catch {}
-    return;
-  }
-
-  const useToken = !!cpGet(CP.USE_TOKEN);
-
-  for (const li of combat.querySelectorAll?.("li.combatant") ?? []) {
-    const id = li?.dataset?.combatantId;
-    const combatant = id ? game.combat?.combatants?.get(id) : null;
-    if (!combatant) continue;
-
-    const img = li.querySelector?.("img.token-image");
-    if (!img) continue;
-
-    let src = null;
-    if (useToken) {
-      // Token image: keep current, but prefer document texture if available.
-      const tokenDoc = combatant.token;
-      src = tokenDoc?.texture?.src || tokenDoc?.img || img.src;
-    } else {
-      src = combatant.actor?.img || img.src;
-    }
-
-    if (src) img.src = src;
-    img.classList.add("fe-combat-portrait");
-    cpApplyCombatPortraitStyling(combatant, img);
-  }
-}
-
 function cpRegisterSettings() {
   game.settings.register(MODULE_ID, CP.ENABLED, {
     name: "채팅 포트레이트 사용",
@@ -1306,16 +1162,6 @@ function cpRegisterSettings() {
     },
   });
 
-  game.settings.register(MODULE_ID, CP.APPLY_COMBAT, {
-    name: "컴뱃 트래커에 포트레이트 적용",
-    hint: "컴뱃 트래커의 토큰 이미지에 동일한 규칙(토큰/포트레이트)을 적용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-    onChange: () => feFireChatUiUpdated({ reason: "portrait-settings", document }),
-  });
-
   // Message type filters
   const typeSetting = (key, name, def = true) =>
     game.settings.register(MODULE_ID, key, {
@@ -1374,10 +1220,6 @@ Hooks.on("renderChatLog", () => {
   // Portrait insertion is performed per-message via renderChatMessageHTML.
   // Keep this hook lightweight to avoid whole-log post-processing passes.
   cpSetRootVars();
-});
-
-Hooks.on("renderCombatTracker", (app, html) => {
-  cpApplyCombatTrackerPortraits(html);
 });
 
 Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {

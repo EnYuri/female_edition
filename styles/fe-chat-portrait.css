@@ -195,16 +195,8 @@ li.chat-message .fe-chat-portrait {
   display: block;
 }
 
-/* Combat tracker */
-.combat-tracker img.token-image.fe-combat-portrait {
-  width: var(--fe-chat-portrait-size);
-  height: var(--fe-chat-portrait-size);
-  flex: 0 0 var(--fe-chat-portrait-size);
-}
-
 /* Quality: prefer smooth downscaling */
 li.chat-message .fe-chat-portrait,
-.combat-tracker img.token-image.fe-combat-portrait,
 li.chat-message .fe-chat-card-icon,
 #chat-notifications .message .fe-chat-portrait,
 #chat-notifications .message .fe-chat-card-icon {
@@ -217,8 +209,7 @@ li.chat-message .fe-chat-card-icon,
  * - fe-hide-portraits: hides INTERNAL/system portraits
  * - fe-hide-chat-portrait-wrap: hides THIS module's inserted portraits
  */
-body.fe-hide-chat-portrait-wrap :is(li.chat-message, #chat-notifications .message) :is(.fe-chat-portrait-wrap, img.fe-chat-portrait),
-body.fe-hide-chat-portrait-wrap .combat-tracker img.token-image.fe-combat-portrait {
+body.fe-hide-chat-portrait-wrap :is(li.chat-message, #chat-notifications .message) :is(.fe-chat-portrait-wrap, img.fe-chat-portrait) {
   display: none !important;
 }
 

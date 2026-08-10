@@ -31,6 +31,7 @@ import {
   ScreenPanelData,
   feEnsureScreenPanelDnd5eActorCompat,
   feCleanFaceTokenData,
+  feEscapeHtml,
   feFaceTokenPinsSize,
   fePanelFace,
 } from "./fe-screen-panel-data.js";
@@ -48,9 +49,14 @@ import {
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 const PANEL_SOCKET_TYPES = new Set(Object.values(FE_PANEL_SOCKET));
 
+/** A module boolean setting, falling back to its declared default before registration. */
+function fePanelBoolSetting(key) {
+  try { return !!game.settings.get(MODULE_ID, key); }
+  catch { return !!FE_DEFAULTS[key]; }
+}
+
 function isPanelFeatureEnabled() {
-  try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_ENABLED); }
-  catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_ENABLED]; }
+  return fePanelBoolSetting(S.SCREEN_PANEL_ENABLED);
 }
 
 /**
@@ -79,8 +85,7 @@ const fePanelGated = (fn) => (...args) => (isPanelFeatureEnabled() ? fn(...args)
 // Per-client storage for "snap to grid while dragging". It is not in
 // FE_GM_PRIORITY_EXCLUDED_KEYS, so GM priority may force the local value.
 function isGridSnapEnabled() {
-  try { return !!game.settings.get(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP); }
-  catch { return !!FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP]; }
+  return fePanelBoolSetting(S.SCREEN_PANEL_GRID_SNAP);
 }
 
 // Double-click face cycling is a PER-PANEL setting on the actor (system.dblclickCycle),
@@ -845,17 +850,6 @@ function feBarBox(text, bar, scale) {
   };
 }
 
-/**
- * Full (re)build of a panel tile's overlay labels for its CURRENT face. Called
- * whenever content can change: initial draw, face flips, and whenever the panel
- * actor's faces/overlays or the linked actor's data is edited.
- *
- * A flip reaches this through TWO different paths and both are needed: when the
- * new face has a different image, `texture.src` sets core's redraw flag and
- * drawTile/drawToken fires; when the faces share an image (or are both imageless)
- * nothing redraws, and onPanelPlaceableUpdate calls this directly off the
- * currentFace flag change. See the note there.
- */
 /** Is this panel placeable a Token (tokenized panel) rather than a Tile? */
 function feIsPanelToken(placeable) {
   return placeable?.document?.documentName === "Token";
@@ -868,6 +862,17 @@ function fePanelSortLayer(doc) {
   return doc?.documentName === "Token" ? (L.TOKENS ?? 0) : (L.TILES ?? 0);
 }
 
+/**
+ * Full (re)build of a panel tile's overlay labels for its CURRENT face. Called
+ * whenever content can change: initial draw, face flips, and whenever the panel
+ * actor's faces/overlays or the linked actor's data is edited.
+ *
+ * A flip reaches this through TWO different paths and both are needed: when the
+ * new face has a different image, `texture.src` sets core's redraw flag and
+ * drawTile/drawToken fires; when the faces share an image (or are both imageless)
+ * nothing redraws, and onPanelPlaceableUpdate calls this directly off the
+ * currentFace flag change. See the note there.
+ */
 function feRebuildPanelOverlays(tile) {
   feClearPanelOverlays(tile);
   try {
@@ -1118,13 +1123,12 @@ async function feScreenPanelGrantRights(actor) {
   const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
   const players = game.users.filter((u) => !u.isGM);
   if (!players.length) { ui.notifications?.info(game.i18n.localize("FESP.Grant.NoPlayers")); return; }
-  const esc = foundry.utils.escapeHTML ?? ((s) => s);
   const rows = players.map((u) => {
     const checked = (actor.ownership?.[u.id] ?? 0) >= OWNER ? "checked" : "";
     return `<label class="fe-sp-grant-row" style="display:flex;align-items:center;gap:.5em;padding:.25em 0;">
       <input type="checkbox" name="${u.id}" ${checked}/>
       <span style="display:inline-block;width:.8em;height:.8em;border-radius:50%;background:${u.color ?? "#888"};"></span>
-      <span>${esc(u.name)}</span>
+      <span>${feEscapeHtml(u.name)}</span>
     </label>`;
   }).join("");
   await foundry.applications.api.DialogV2.prompt({
@@ -1157,10 +1161,9 @@ async function feScreenPanelGrantRights(actor) {
  * an arbitrarily-linked other actor like our per-overlay model needs.
  */
 async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
-  const esc = foundry.utils.escapeHTML ?? ((s) => s);
   const content = `
     <div class="form-group">
-      <label>${esc(linkedActor.name)} — ${esc(attr)}</label>
+      <label>${feEscapeHtml(linkedActor.name)} — ${feEscapeHtml(attr)}</label>
       <input type="number" name="value" value="${currentValue ?? 0}" step="any" autofocus>
     </div>`;
   await foundry.applications.api.DialogV2.prompt({
@@ -1356,18 +1359,29 @@ async function feSyncPanelTokenization(panelActor) {
   }
 }
 
+/**
+ * Every flagged panel placement in a scene — Tiles first, then Tokens — narrowed by
+ * `keep(flag)`. Both callers below want the same `{doc, flag, isToken}` shape over the
+ * same two collections and differ only in that predicate.
+ */
+function feFilterPanelPlacementsIn(scene, keep) {
+  const out = [];
+  const collect = (docs, isToken) => {
+    for (const doc of docs ?? []) {
+      const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
+      if (!flag?.actorId) continue;
+      if (!keep(flag)) continue;
+      out.push({ doc, flag, isToken });
+    }
+  };
+  collect(scene?.tiles, false);
+  collect(scene?.tokens, true);
+  return out;
+}
+
 /** Every placement of a panel actor in a scene, as Tiles AND Tokens. */
 function fePanelPlacementsIn(scene, actorId) {
-  const out = [];
-  for (const doc of scene?.tiles ?? []) {
-    const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-    if (flag?.actorId === actorId) out.push({ doc, flag, isToken: false });
-  }
-  for (const doc of scene?.tokens ?? []) {
-    const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-    if (flag?.actorId === actorId) out.push({ doc, flag, isToken: true });
-  }
-  return out;
+  return feFilterPanelPlacementsIn(scene, (flag) => flag.actorId === actorId);
 }
 
 /**
@@ -1390,18 +1404,7 @@ function fePanelPlacementsIn(scene, actorId) {
  * the user — but not after we have deleted the boards.
  */
 function feOrphanPanelPlacementsIn(scene) {
-  const out = [];
-  const collect = (docs, isToken) => {
-    for (const doc of docs ?? []) {
-      const flag = doc.getFlag(MODULE_ID, FE_PANEL_TILE_FLAG);
-      if (!flag?.actorId) continue;
-      if (game.actors.get(flag.actorId)) continue; // still has its panel actor
-      out.push({ doc, flag, isToken });
-    }
-  };
-  collect(scene?.tiles, false);
-  collect(scene?.tokens, true);
-  return out;
+  return feFilterPanelPlacementsIn(scene, (flag) => !game.actors.get(flag.actorId));
 }
 
 /** Delete a list of {doc, isToken} placements from one scene, batched per collection. */
@@ -1454,7 +1457,7 @@ async function feCleanupOrphanPanelPlacementsIn(scene) {
   }
   const ok = await foundry.applications.api.DialogV2.confirm({
     window: { title: game.i18n.localize("FESP.Cleanup.ConfirmTitle") },
-    content: `<p>${game.i18n.format("FESP.Cleanup.ConfirmBody", { count: orphans.length, scene: foundry.utils.escapeHTML(scene.name) })}</p>`,
+    content: `<p>${game.i18n.format("FESP.Cleanup.ConfirmBody", { count: orphans.length, scene: feEscapeHtml(scene.name) })}</p>`,
   }).catch(() => false);
   if (!ok) return 0;
   try {
@@ -1786,30 +1789,26 @@ Hooks.on("deleteActor", (actor) => {
     if (count) ui.notifications?.info(game.i18n.format("FESP.Cleanup.ActorDeleted", { name: actor.name, count }));
   }).catch(err => console.warn(`${MODULE_ID} | screen panel placement cleanup failed`, err));
 });
-// drawTile fires on initial draw, full redraw, AND face flips (texture.src sets
-// the redraw flag), each time with the new texture loaded — so it is the only
-// hook the aspect resize needs.
-Hooks.on("drawTile", fePanelGated(enforcePanelTileSize));
-// Must run AFTER enforcePanelTileSize — it reads the tile's just-resized mesh
-// (via panelTileRect) to position labels against the actually-drawn art.
-Hooks.on("drawTile", fePanelGated(feRebuildPanelOverlays));
-Hooks.on("drawTile", fePanelGated(feIndexPanelTile));
-Hooks.on("drawTile", fePanelGated(applyPanelTileVisibility));
-Hooks.on("refreshTile", fePanelGated(feRepositionPanelOverlays));
-Hooks.on("refreshTile", fePanelGated(applyPanelTileVisibility));
-
-// A tokenized panel is a Token, so the same overlay/index/visibility work must run off
-// the Token draw cycle too — otherwise a tokenized panel shows no overlay labels and is
+// A panel is drawn as a Tile OR a Token, so the same overlay/index/visibility work runs
+// off BOTH draw cycles — otherwise a tokenized panel shows no overlay labels and is
 // missing from the linked-actor index. The handlers are placeable-shape-agnostic
 // (panelTileRect reads the mesh; the panel flag lives on either document), and they
 // no-op immediately on any placeable without a panel flag — i.e. on every ordinary
 // token in the scene.
-Hooks.on("drawToken", fePanelGated(enforcePanelTileSize));
-Hooks.on("drawToken", fePanelGated(feRebuildPanelOverlays));
-Hooks.on("drawToken", fePanelGated(feIndexPanelTile));
-Hooks.on("drawToken", fePanelGated(applyPanelTileVisibility));
-Hooks.on("refreshToken", fePanelGated(feRepositionPanelOverlays));
-Hooks.on("refreshToken", fePanelGated(applyPanelTileVisibility));
+//
+// `draw*` fires on initial draw, full redraw, AND face flips (texture.src sets the
+// redraw flag), each time with the new texture already loaded — so it is the only hook
+// the aspect resize needs. The ORDER within it is load-bearing: feRebuildPanelOverlays
+// reads the just-resized mesh (via panelTileRect) to position labels against the
+// actually-drawn art, so enforcePanelTileSize must have run first.
+for (const kind of ["Tile", "Token"]) {
+  for (const handler of [enforcePanelTileSize, feRebuildPanelOverlays, feIndexPanelTile, applyPanelTileVisibility]) {
+    Hooks.on(`draw${kind}`, fePanelGated(handler));
+  }
+  for (const handler of [feRepositionPanelOverlays, applyPanelTileVisibility]) {
+    Hooks.on(`refresh${kind}`, fePanelGated(handler));
+  }
+}
 // Teardown is NOT gated (see fePanelGated): a client that declined the reload prompt still
 // has live overlay PIXI objects, and they must be destroyed with their placeable either way.
 Hooks.on("destroyToken", (token) => {

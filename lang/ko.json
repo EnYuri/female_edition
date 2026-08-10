@@ -1,7 +1,6 @@
 {
 	"MYCOND.CondFemaleMating": "교미 중",
 	"MYCOND.Mark": "표식",
-	"MYCOND.CondFemaleMatingHintHtml": "<p><strong>Ability Checks and Attacks Affected.</strong> You have Disadvantage on attack rolls.</p><p><strong>Saves Affected.</strong> Disadvantage on Intelligence, Wisdom, and Charisma saving throws.</p><p><strong>Movement.</strong> Your speed is 0.</p>",
 
 	"FEAPH.Settings.EnableName": "어트리뷰트 이름 도우미",
 	"FEAPH.Settings.EnableHint": "시트나 채팅에 표시된 값 위에 마우스를 올리면, 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd 모두 지원하는 점검 도구입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
@@ -59,6 +58,7 @@
 	"FECT.Collapse": "컴뱃 트래커 최소화",
 	"FECT.Expand": "컴뱃 트래커 펼치기",
 	"FECT.Apply": "적용",
+	"FECT.Ctx.OpenSheet": "전투원 설정",
 	"FECT.Ctx.Hide": "숨기기",
 	"FECT.Ctx.Unhide": "숨김 해제",
 	"FECT.Ctx.Defeat": "사망 표시",
@@ -72,6 +72,9 @@
 	"FECT.Ctx.NoHP": "이 액터에서 HP 경로를 찾을 수 없습니다.",
 	"FECT.Ctx.NeedInit": "이니셔티브가 없는 전투원은 순서를 바꿀 수 없습니다.",
 	"FECT.Ctx.SetInit": "이니셔티브 수정",
+	"FECT.Ctx.Reroll": "이니셔티브 재굴림",
+	"FECT.Ctx.ClearInit": "이니셔티브 초기화",
+	"FECT.Ctx.ClearMovement": "이동 기록 초기화",
 	"FECT.Ctx.Initiative": "이니셔티브",
 	"FECT.Ctx.InitEmpty": "비움 = 미설정",
 	"FECT.Ctx.InitInvalid": "유효한 이니셔티브 값이 아닙니다.",
@@ -93,8 +96,6 @@
 	"FESP.Tabs.faces": "면",
 	"FESP.Tabs.attributes": "패널 어트리뷰트",
 
-	"FESP.Sheet.Tokenize": "토큰화",
-	"FESP.Sheet.TokenizeHint": "켜면 이 패널을 타일이 아니라 토큰으로 배치합니다. 전투 추적기 등록·선택 같은 코어 토큰 기능을 쓸 수 있고, 이동·선택·격자 스냅은 코어가 맡습니다. 면 전환과 위치 고정, 패널 설정은 우클릭 메뉴에 있습니다. 패널은 토큰이나 타일 둘 중 하나로만 존재합니다.",
 	"FESP.Sheet.FaceTokenTitle": "면 토큰 설정",
 	"FESP.Sheet.FaceTokenEdit": "이 면의 토큰 설정",
 	"FESP.Sheet.FaceTokenClear": "이 면의 토큰 설정 초기화",
@@ -133,7 +134,6 @@
 	"FESP.Sheet.ActorImagePickTitle": "이미지 선택",
 	"FESP.Sheet.ActorImagePortrait": "포트레이트",
 	"FESP.Sheet.ActorImageToken": "토큰",
-	"FESP.Sheet.ActorImageApply": "적용",
 
 	"FESP.Sheet.DblclickCycle": "더블클릭으로 면 전환",
 	"FESP.Sheet.DblclickCycleHint": "이 패널을 캔버스에서 더블클릭하면 다음 면으로 넘어갑니다. 끄면 우클릭 메뉴로만 면을 바꿀 수 있습니다. 패널마다 개별 설정이며, 모든 유저에게 적용됩니다.",
@@ -141,7 +141,6 @@
 	"FESP.Bar.EditTitle": "값 수정",
 	"FESP.Bar.EditApply": "적용",
 
-	"FESP.Sheet.Faces": "면(Face) 목록",
 	"FESP.Sheet.AddFace": "면 추가",
 	"FESP.Sheet.FaceN": "{n}면",
 	"FESP.Sheet.FaceNamePh": "면 이름(선택)",
@@ -167,7 +166,6 @@
 	"FESP.Sheet.OverlayAttrPh": "↓ 키로 목록 (예: system.attributes.hp.value)",
 	"FESP.Sheet.OverlayAttrWarnNoActor": "이 오버레이에 액터가 연결되어 있지 않아 경로를 읽을 수 없습니다. 왼쪽 칸에 액터를 드래그 앤 드롭하세요. (면의 연결 액터는 오버레이에 자동 적용되지 않습니다)",
 	"FESP.Sheet.OverlayAttrWarnPath": "연결된 액터에서 이 경로의 값을 찾지 못했습니다. 경로가 실제 값(예: …hp.value)까지 가리키는지 확인하세요. 지금은 고정 텍스트가 대신 표시됩니다.",
-	"FESP.Sheet.AttrSuggestValue": "(값)",
 	"FESP.Sheet.AttrSuggestMax": "(최대)",
 	"FESP.Sheet.OverlayTextPh": "고정 텍스트(경로가 비었거나 못 읽으면 표시)",
 	"FESP.Sheet.OverlayFontSize": "글자 크기(px)",

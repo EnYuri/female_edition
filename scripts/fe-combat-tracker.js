@@ -174,8 +174,11 @@ function feCtEnsureRoot() {
   let root = document.getElementById(TRACKER_DOM_ID);
   if (!root) {
     root = document.createElement("div");
+    // No base class: every rule in fe-combat-tracker.css is anchored on the id
+    // (`#fe-combat-tracker…`). The state classes added later (fe-ct-active,
+    // fe-ct-align-*, fe-ct-collapsed, fe-ct-paused) are set with classList, and
+    // this assignment runs only on first creation, so it never clobbers them.
     root.id = TRACKER_DOM_ID;
-    root.className = "fe-ct";
     document.body.appendChild(root);
     feCtBindRootEvents(root);
   }
