@@ -215,9 +215,22 @@
   --fe-chat-font-family:        inherit;
   --fe-dnd5e-label-font-family: inherit;
 
-  /* Font Awesome 변수 */
-  --fe-fa-classic: var(--fa-style-family-classic, "Font Awesome 6 Pro");
-  --fe-fa-brands:  var(--fa-style-family-brands,  "Font Awesome 6 Brands");
+  /* Font Awesome 변수.
+   * FA는 메이저 버전마다 패밀리 이름과 변수 이름이 모두 바뀐다. v13=FA6, v14=FA7.
+   * v14의 all.min.css는 --fa-style-family-classic은 그대로 두었지만
+   * --fa-style-family-brands는 --fa-family-brands로 **이름을 바꿨다**. 그래서
+   * 예전의 단일 var() 참조는 v14에서 폴백인 "Font Awesome 6 Brands"로 떨어졌고,
+   * 그 패밀리는 v14에 존재하지 않아 브랜드 아이콘이 두부(□)로 깨졌다.
+   * 새 이름 → 옛 이름 → 리터럴 스택 순으로 훑는다. 리터럴 폴백은 버전 무관 스택으로
+   * 두어야 하며, 글리프 단위 폴백이므로 한 스택이 Pro/Free/Brands를 모두 커버한다. */
+  --fe-fa-classic:
+    var(--fa-family-classic,
+      var(--fa-style-family-classic,
+        "Font Awesome 7 Pro", "Font Awesome 6 Pro", "Font Awesome 6 Free", "Font Awesome 5 Pro"));
+  --fe-fa-brands:
+    var(--fa-family-brands,
+      var(--fa-style-family-brands,
+        "Font Awesome 7 Brands", "Font Awesome 6 Brands", "Font Awesome 5 Brands"));
 
   /* UI 크기 / 레이아웃 (JS feApplyStyleVarsFromSettings로 덮어씌워짐) */
   --fe-chat-title-size:         22px;

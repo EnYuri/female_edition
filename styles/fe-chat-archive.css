@@ -703,8 +703,22 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   border-color: rgba(255, 255, 255, 0.22) !important;
 }
 
+/* Re-assert Font Awesome over this file's own `.chat-message *` chat-font rule.
+ *
+ * MUST stay a VERSION-AGNOSTIC STACK — v13 shipped FA6, v14 ships FA7, and the
+ * family names carry the major version. The old list named only FA6 Free/Pro and
+ * FA5 Free, none of which exist on v14, so this rule replaced FA's correct family
+ * with three nonexistent ones and every icon rendered as tofu (□ / ✗).
+ * Font fallback is per-GLYPH, so one stack covers solid/regular/brands/duotone.
+ * Mirror of the same stack in fe-archive-snapshot.js (feBuildEmbeddedCookieRunFontCSS) —
+ * keep the two in sync; that one also ships inside saved HTML.
+ */
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
-  font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
+  font-family:
+    "Font Awesome 7 Pro", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 7 Duotone",
+    "Font Awesome 6 Pro", "Font Awesome 6 Free", "Font Awesome 6 Brands", "Font Awesome 6 Duotone",
+    "Font Awesome 5 Pro", "Font Awesome 5 Free", "Font Awesome 5 Brands", "Font Awesome 5 Duotone",
+    "FontAwesome" !important;
 }
 
 

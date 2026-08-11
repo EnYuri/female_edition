@@ -52,6 +52,23 @@ const FE_EXPORT_STYLESHEET_FETCH_TIMEOUT = 8000;
 const FE_EXPORT_STYLESHEET_MAX_BYTES = 2_000_000;
 const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
 
+// CSS `url()` asset embedding (see feEmbedSnapshotCssAssets).
+// Fonts get the generous cap because they are correctness-critical (a missing
+// face is an unreadable tofu box, not a missing decoration) and because the
+// largest face Foundry ships is fa-thin-100.woff2 at ~574KB. Images get a tight
+// cap on purpose: the small ones that matter in a chat log (d20-black.svg,
+// lozenge.svg, the notable-corner SVGs, texture-gray1.webp, dnd5e's badge webps)
+// are all well under it, while dnd5e's decorative sheet banners — hundreds of KB
+// each and never visible in a chat message — fall out for free.
+const FE_EXPORT_ASSET_FONT_MAX_BYTES = 700_000;
+const FE_EXPORT_ASSET_IMAGE_MAX_BYTES = 160_000;
+const FE_EXPORT_ASSET_TOTAL_BYTES = 8_000_000;
+const FE_EXPORT_ASSET_FONT_EXT_RE = /\.(?:woff2?|ttf|otf|eot)(?:[?#]|$)/i;
+const FE_EXPORT_ASSET_IMAGE_EXT_RE = /\.(?:svg|png|webp|jpe?g|gif|avif)(?:[?#]|$)/i;
+// Same shape as feRewriteSnapshotCSSURLs' matcher — kept local so the two stay
+// independently readable; this one only READS urls, it never rewrites in place.
+const FE_EXPORT_CSS_URL_RE = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
+
 // Memoized embedded-font CSS (built once per session).
 let feEmbeddedFontCssPromise = null;
 let feEmbeddedFontCssValue = null;
@@ -251,6 +268,126 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
   }
 }
 
+/**
+ * Replace same-origin `url()` references inside the already-inlined <style> blocks
+ * with data: URLs, so the saved standalone HTML renders offline.
+ *
+ * WHY (the bug it fixes):
+ * feInlineSnapshotStylesheets brings the CSS *text* into the file, but
+ * feRewriteSnapshotCSSURLs only ABSOLUTIZES the `url()`s inside it — it never
+ * embeds them. Opened as file://, every one of those absolute Foundry-origin URLs
+ * 404s (and even with Foundry running, a file:// document's origin is "null", so
+ * @font-face fetches are blocked by CORS). Measured consequences on a real export:
+ *   - core fontawesome/webfonts/*.woff2  → every icon renders as tofu (□ / ✗)
+ *   - core Signika, dnd5e modesto-condensed → text silently falls to a system face
+ *   - dnd5e's 97 url() assets (icons/svg/d20-black.svg, ui/lozenge.svg,
+ *     ui/notable-*-corner.svg, ui/texture-gray1.webp, the badge webps) → dice icons
+ *     vanish and the decorated boxes around them lose their art
+ * This pass closes that gap. Anything it cannot embed (cross-origin, over cap,
+ * fetch failed, 404 — Foundry v14 references a fa-v4compatibility.woff2 that is
+ * not shipped) is LEFT AS THE ABSOLUTE URL, i.e. exactly today's behaviour, so a
+ * failure here can only ever be a no-op.
+ *
+ * Runs only for the HTML snapshot. The print/PDF popup is a live document with
+ * network access and needs none of this.
+ */
+async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}) {
+  let styleEls = [];
+  try {
+    styleEls = Array.from(headClone?.querySelectorAll?.("style") ?? []);
+  } catch {
+    return;
+  }
+  if (!styleEls.length) return;
+
+  const sameOrigin = (abs) => {
+    try {
+      const u = new URL(abs);
+      return u.origin === window.location.origin && (u.protocol === "http:" || u.protocol === "https:");
+    } catch {
+      return false;
+    }
+  };
+
+  // ---- Collect: unique candidate URLs, in first-seen order, classified. ----
+  const fonts = [];
+  const images = [];
+  const seen = new Set();
+  for (const el of styleEls) {
+    const text = el.textContent || "";
+    if (!text.includes("url(")) continue;
+    FE_EXPORT_CSS_URL_RE.lastIndex = 0;
+    for (let m = FE_EXPORT_CSS_URL_RE.exec(text); m !== null; m = FE_EXPORT_CSS_URL_RE.exec(text)) {
+      const raw = String(m[2] ?? "").trim();
+      if (!raw || raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("#")) continue;
+      if (seen.has(raw)) continue;
+      seen.add(raw);
+      if (!sameOrigin(raw)) continue;
+      if (FE_EXPORT_ASSET_FONT_EXT_RE.test(raw)) fonts.push(raw);
+      else if (FE_EXPORT_ASSET_IMAGE_EXT_RE.test(raw)) images.push(raw);
+    }
+  }
+  if (!fonts.length && !images.length) return;
+
+  setMeta("Embedding CSS assets…");
+
+  // ---- Fetch: fonts FIRST so a large decorative image can never crowd out a
+  // face whose absence would leave unreadable tofu. Within each group the shared
+  // budget is spent in first-seen order, so admission is deterministic. ----
+  const embedded = new Map(); // original url string -> data URL
+  const budget = { admitted: 0 };
+
+  const runGroup = async (urls, perFileCap) => {
+    if (!urls.length) return;
+    let next = 0;
+    const results = new Array(urls.length).fill(null);
+    const worker = async () => {
+      while (true) {
+        const i = next++;
+        if (i >= urls.length) return;
+        // Cannot pre-check the shared budget here (workers race); admission below
+        // is what enforces it, and a fetch we then decline costs only bandwidth.
+        try {
+          results[i] = await feFetchAsDataURLCapped(urls[i], perFileCap);
+        } catch {
+          results[i] = null;
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(FE_EXPORT_EMBED_CONCURRENCY, urls.length) }, () => worker())
+    );
+    for (let i = 0; i < urls.length; i += 1) {
+      const got = results[i];
+      if (!got?.dataUrl) continue;
+      if (budget.admitted + got.bytes > FE_EXPORT_ASSET_TOTAL_BYTES) continue;
+      embedded.set(urls[i], got.dataUrl);
+      budget.admitted += got.bytes;
+    }
+  };
+
+  await runGroup(fonts, FE_EXPORT_ASSET_FONT_MAX_BYTES);
+  await runGroup(images, FE_EXPORT_ASSET_IMAGE_MAX_BYTES);
+
+  if (!embedded.size) return;
+
+  // ---- Substitute. A data URL contains no unescaped `)`, so re-emitting it in
+  // quotes keeps the declaration parseable. ----
+  for (const el of styleEls) {
+    const text = el.textContent || "";
+    if (!text.includes("url(")) continue;
+    try {
+      el.textContent = text.replace(FE_EXPORT_CSS_URL_RE, (match, quote, raw) => {
+        const dataUrl = embedded.get(String(raw ?? "").trim());
+        return dataUrl ? `url("${dataUrl}")` : match;
+      });
+    } catch {
+      // Leave the block untouched — the absolute URLs it still holds are the
+      // pre-existing behaviour, not a regression.
+    }
+  }
+}
+
 async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta, bodyRoot = null } = {}) {
   if (!win || win.closed) throw new Error("Archive window is closed");
   const setMeta = typeof meta === "function" ? meta : () => {};
@@ -361,6 +498,11 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   } catch {}
 
   await feInlineSnapshotStylesheets(headClone, doc, setMeta);
+
+  // Must run AFTER inlining (it operates on the inlined CSS text) and BEFORE the
+  // embedded-font <style> is appended below — that block is already data: URLs and
+  // its cross-origin NeoDGM @import is not ours to touch.
+  await feEmbedSnapshotCssAssets(headClone, doc, setMeta);
 
   // Embed custom fonts (optional).
   if (feSetting(S.EXPORT_EMBED_FONTS)) {
@@ -843,8 +985,28 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
   font-family: var(--fe-font-secondary) !important;
 }
 
+/* Re-assert Font Awesome over the `.chat-message *` chat-font rule above.
+ *
+ * MUST stay a VERSION-AGNOSTIC STACK. Foundry v13 shipped FA6, v14 ships FA7, and
+ * the families are named per major version — v14's fontawesome/css/all.min.css
+ * declares ONLY "Font Awesome 7 Pro" / "7 Brands" / "7 Duotone" (plus the FA5
+ * aliases and bare "FontAwesome"). The old three-family list here named
+ * "Font Awesome 6 Free" / "6 Pro" / "5 Free" — none of which exist on v14 — and
+ * because this <style> is UNLAYERED its !important outranks every layer, so it
+ * beat FA's own "font-family: var(--_fa-family)" and every icon fell through to
+ * the text font and rendered as tofu (□ / ✗). That hit BOTH the saved HTML and
+ * the print popup (feEnsureArchiveEmbeddedFonts injects this same CSS there).
+ *
+ * Font fallback is per-GLYPH, so one stack covers solid/regular/brands/duotone:
+ * a brand glyph is absent from "… Pro" and falls through to "… Brands". Do NOT
+ * narrow this back to the families of whichever Foundry version is current.
+ */
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
-  font-family: "Font Awesome 6 Free", "Font Awesome 6 Pro", "Font Awesome 5 Free" !important;
+  font-family:
+    "Font Awesome 7 Pro", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 7 Duotone",
+    "Font Awesome 6 Pro", "Font Awesome 6 Free", "Font Awesome 6 Brands", "Font Awesome 6 Duotone",
+    "Font Awesome 5 Pro", "Font Awesome 5 Free", "Font Awesome 5 Brands", "Font Awesome 5 Duotone",
+    "FontAwesome" !important;
 }
 `;
 
@@ -875,6 +1037,20 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
   try {
     const res = await fetch(url, { credentials: "include", signal: controller.signal });
     if (!res.ok) return null;
+
+    // Carry the response's own MIME into the Blob we assemble from the stream.
+    // `new Blob(chunks)` with no type yields `data:application/octet-stream`, which a
+    // font `src` survives (the `format()` hint drives the decode) but an IMAGE does
+    // NOT — `background-image: url(data:application/octet-stream;…)` renders nothing.
+    // The blob() fallback below already carries the type; this makes the streamed
+    // path match it.
+    const contentType = (() => {
+      try {
+        return String(res.headers.get("content-type") || "").split(";")[0].trim();
+      } catch {
+        return "";
+      }
+    })();
 
     // Respect content-length if present.
     try {
@@ -912,7 +1088,7 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
       chunks.push(value);
     }
 
-    const blob = new Blob(chunks);
+    const blob = contentType ? new Blob(chunks, { type: contentType }) : new Blob(chunks);
     if (blob.size > cap) return null;
     return { dataUrl: await feBlobToDataURL(blob), bytes: blob.size };
   } catch {
