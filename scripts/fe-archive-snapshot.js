@@ -301,7 +301,7 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
 
     for (const el of styleBlocks) {
       try {
-        const { text, rebuilt } = feAssembleInlinedStyleBlock(el.textContent || "", {
+        const { text, rebuilt, mixed } = feAssembleInlinedStyleBlock(el.textContent || "", {
           resolveAbs,
           getInlinedCss: (abs) => (inlinedByUrl.has(abs) ? inlinedByUrl.get(abs) : null),
           // Nested imports may resolve ONLY to the allowlisted webfont sheets. Handing
@@ -310,9 +310,16 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
           getNestedInlinedCss: (abs) =>
             nestedSet.has(abs) && inlinedByUrl.has(abs) ? inlinedByUrl.get(abs) : null,
         });
-        // A non-rebuilt block (one that also holds real rules) is left intact but
-        // still gets its relative @import/url() refs absolutized so it loads online.
-        el.textContent = rebuilt ? text : feRewriteSnapshotCSSURLs(el.textContent || "", baseURL);
+        // A non-rebuilt block is left intact but still gets its relative
+        // @import/url() refs absolutized so it loads online.
+        //
+        // A MIXED block (imports inlined in place, real rules left where they were)
+        // needs that same pass: only the inlined bodies were url-rewritten, against
+        // their own sheet URL — the residual rules Foundry wrote inline never were.
+        // Re-running it over the whole block is safe because absolutizing an
+        // already-absolute url() is a no-op.
+        if (rebuilt) el.textContent = mixed ? feRewriteSnapshotCSSURLs(text, baseURL) : text;
+        else el.textContent = feRewriteSnapshotCSSURLs(el.textContent || "", baseURL);
       } catch {
         // Leave the block untouched if assembly throws.
       }

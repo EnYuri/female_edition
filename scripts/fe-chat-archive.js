@@ -275,7 +275,6 @@ function feGetArchiveRenderProfile(messageCount = 0) {
     collapseDuplicateImages: true,
     collapseDuplicateImagesAggressive: large,
     bodyClass: huge ? " fe-archive-huge fe-archive-lean" : large ? " fe-archive-lean" : "",
-    statusLabel: large ? "메모리 절약 모드" : "",
   };
 }
 
@@ -1174,6 +1173,61 @@ function feSyncArchiveMergeBodyClasses(doc) {
   }
 }
 
+// The ONE place an exported timestamp string is produced. Both the from-scratch
+// header builder and the live-clone normalizer below go through it.
+function feFormatArchiveTimestamp(msg) {
+  try {
+    const ts = Number(msg?.timestamp);
+    if (!Number.isFinite(ts) || ts <= 0) return "";
+    return new Date(ts).toLocaleString();
+  } catch {
+    return "";
+  }
+}
+
+// An archive read a year later must say WHEN, so every timestamp is the absolute
+// locale string — never core's relative one.
+//
+// Core rewrites `<time.message-timestamp>` in the live log to a relative string
+// ("9일 19시간 전") from `ChatLog#updateTimestamps`, on a timer. Messages the
+// exporter CLONES from the live DOM therefore carry that text, while messages it
+// rebuilds from the database get the absolute date — and which path a message
+// takes depends only on whether it is still in the (pruned) live log. Measured on
+// a 2938-message export: 2664 absolute + 274 relative, the 274 being the newest
+// tail. Two formats in one document, changing mid-scroll.
+//
+// Relative text is also just wrong once saved: "9일 전" is anchored to the export
+// moment and silently rots as the file ages.
+function feNormalizeArchiveTimestamps(node, msg) {
+  try {
+    if (!feIsElement(node)) return;
+    const text = feFormatArchiveTimestamp(msg);
+    if (!text) return;
+    for (const el of node.querySelectorAll?.("time.message-timestamp") ?? []) {
+      el.textContent = text;
+    }
+  } catch {}
+}
+
+// Live-cloned messages drag their header CONTROLS along — this module's own edit
+// pencil (`a.message-edit.fe-message-edit`, fe-chat-edit.js) and core's delete "X".
+// They are dead buttons in an export, and because they sit inside
+// `.message-metadata` right before the timestamp they also shove the date sideways,
+// so the affected messages look misaligned next to rebuilt ones. Same 274 messages
+// as the relative-timestamp problem above (perfect 1:1 on the measured export) —
+// both are symptoms of "came from the live DOM".
+//
+// Scoped to `.message-metadata` on purpose: message CONTENT anchors (content links,
+// inline rolls, dx3rd item buttons) must survive untouched.
+function feStripArchiveMessageControls(node) {
+  try {
+    if (!feIsElement(node)) return;
+    for (const el of node.querySelectorAll?.(".message-metadata a, a.message-edit") ?? []) {
+      el.remove();
+    }
+  } catch {}
+}
+
 function feNormalizeArchivePortraitImages(rootEl, renderProfile = null) {
   try {
     if (!rootEl?.querySelectorAll) return;
@@ -1550,9 +1604,31 @@ function feArchiveMessageContentLooksEmpty(node) {
 //                            tooltip (`.dice-tooltip`) and dnd5e's
 //                            `.dice-tooltip-collapser` both sit at
 //                            `grid-template-rows: 0fr` until then.
+//   dx3rd `.collapsible-content` → a THIRD mechanism, see below.
 // Measured on the 2026-08-12 export: `collapsible collapsed` occurred 0 times
 // (already handled) while `dice-roll expanded` also occurred 0 times across all
 // 252 dice rolls — i.e. every single roll breakdown was collapsed.
+//
+// dx3rd-emanim puts `collapsed` on the CONTENT element itself and never emits a
+// `.collapsible` wrapper anywhere (`class="[^"]*\bcollapsible\b[^-]` matches 0
+// times in the whole system). So `.collapsible.collapsed` — and every
+// `.collapsible .collapsible-content` rule in styles/fe-chat-archive.css —
+// misses it completely, and an exported dx3rd item card loses its 설명 /
+// 이펙트 / 무기 / 술식 sections outright.
+//
+// Two independent things hide them, so BOTH must be undone here:
+//   1. `.dx3rd-item-chat .collapsible-content.collapsed{display:none!important}`
+//      (dx3rd styles.css:2347). dx3rd's sheets are in `layer(system)`, which for
+//      `!important` OUTRANKS our `layer(modules)` archive sheet — a CSS override
+//      there could never win. Dropping the class is the layer-proof fix.
+//   2. an inline `style="display:none"`, from two places: `renderChatMessageHTML`
+//      (chat-ui.js:195) when the world's `expandChatItemCards` is off, and the
+//      card builder itself, which bakes it into the stored message content
+//      (actor-chat.js:684, :692). Inline styles beat any layered rule that is not
+//      `!important`, and they are part of the message HTML — so clear the
+//      property rather than trying to out-specify it.
+// Only `display` is cleared, never the whole style attribute: dx3rdSlideToggle
+// also parks `height`/`overflow`/`transition` there mid-animation.
 function feExpandCollapsedArchiveSections(node) {
   try {
     if (!feIsElement(node)) return;
@@ -1561,6 +1637,15 @@ function feExpandCollapsedArchiveSections(node) {
     }
     for (const el of node.querySelectorAll?.(".dice-roll") ?? []) {
       try { el.classList.add("expanded"); } catch {}
+    }
+    for (const el of node.querySelectorAll?.(".collapsible-content") ?? []) {
+      try {
+        el.classList.remove("collapsed");
+        if (el.style?.display === "none") el.style.removeProperty("display");
+        el.style?.removeProperty?.("height");
+        el.style?.removeProperty?.("overflow");
+        el.style?.removeProperty?.("transition");
+      } catch {}
     }
   } catch {}
 }
@@ -1848,6 +1933,8 @@ async function feRenderMessagesIntoLog({
       decoding: renderProfile?.normalizeImageDecoding,
     });
     if (msg) feApplyRenderedStateToMessageElement(msg, node);
+    if (msg) feNormalizeArchiveTimestamps(node, msg);
+    feStripArchiveMessageControls(node);
 
     if (!deferPortraits) {
       try {
@@ -2280,6 +2367,21 @@ async function feRenderChatArchiveWindow(win, {
         overflow: visible !important;
       }
 
+      /* dx3rd item cards: a THIRD collapse mechanism (collapsed sits on the
+       * content element, with no .collapsible wrapper anywhere in the system).
+       * feExpandCollapsedArchiveSections drops the class and the inline
+       * display:none; this is the backstop for nodes that never went through it.
+       * It has to live in THIS inline sheet, not styles/fe-chat-archive.css:
+       * dx3rd hides them with display:none !important from layer(system), which
+       * for !important outranks our layer(modules) sheet. This tag is unlayered,
+       * so it outranks every layer. */
+      #fe-chat-export-log .dx3rd-item-chat .collapsible-content,
+      #fe-chat-export-log .dx3rd-item-chat .collapsible-content.collapsed {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
       /* dnd5e SVG icons grafted in by feInlineDnd5eIcons. Reproduces
        * IconElement.CSS from dnd5e.mjs, whose :host / svg rules live in a closed
        * shadow root that does not survive an export. The host keeps
@@ -2627,9 +2729,12 @@ async function feRenderChatArchiveWindow(win, {
     /* no-op */
   }
 
+  // Deliberately NOT including the render profile's lean/huge label. That meta line
+  // is the archive's own header and is serialized into the saved file, where an
+  // internal performance mode is noise — the reader wants what this log IS, not how
+  // it was produced.
   const metaParts = [`${messages.length} messages`];
   if (sceneName) metaParts.push(sceneName);
-  if (renderProfile.statusLabel) metaParts.push(renderProfile.statusLabel);
   const metaText = metaParts.join(" • ");
   setStatus(metaText);
 
@@ -3201,6 +3306,10 @@ function feArchiveWindowClosed(win) {
 // How long to wait for a yield scheduled on the target window before giving up on it
 // and continuing on our own timer. Only ever paid when that window died mid-yield.
 const FE_YIELD_FALLBACK_MS = 250;
+// Backstop only, for a hidden window whose MessageChannel yield somehow never lands.
+// Chromium clamps a hidden window's timers to >=1000 ms, so anything below that is
+// indistinguishable from 1000 — do not "tighten" it, it would just spin.
+const FE_YIELD_HIDDEN_FALLBACK_MS = 1000;
 
 async function feMaybeYieldForUI(targetWindow = window) {
   // A CLOSED window's timers NEVER FIRE. This used to `await` one unconditionally, so
@@ -3210,34 +3319,64 @@ async function feMaybeYieldForUI(targetWindow = window) {
   // reported "아직 렌더 중" that no longer clears. Bail out before scheduling anything.
   if (feArchiveWindowClosed(targetWindow)) return;
 
-  // Background tabs/windows clamp timers; yielding there can look like the export "stopped".
-  // Only yield when the *target* document is visible.
-  try {
-    const doc = targetWindow?.document ?? document;
-    if (doc.visibilityState !== "visible") return;
-  } catch {
-    // If we can't read visibility state, fall back to yielding.
-  }
+  // MUST keep yielding even when the target document is HIDDEN.
+  //
+  // This used to `return` early on `visibilityState !== "visible"`, to stop a
+  // background window's clamped timers from making the export look stopped. The
+  // cure was worse: with no yield at all, the whole remaining render runs in ONE
+  // uninterrupted synchronous burst. The popup shares its event loop with the
+  // Foundry window that is driving the render, so alt-tabbing away from a 3000
+  // message archive freezes BOTH windows solid until it finishes — the reported
+  // "알탭 하면 아예 뻗는다". Under ~1200 messages it was short enough to pass for
+  // normal slowness, which is why it surfaced only on a very large log.
+  //
+  // MessageChannel is the fix for the original problem too: a port message is an
+  // ordinary task, NOT a timer, so Chromium's background clamp (>=1000 ms for
+  // setTimeout in a hidden tab) does not apply to it. A hidden window therefore
+  // keeps draining at full speed AND stays interruptible.
+  const hidden = (() => {
+    try {
+      return (targetWindow?.document ?? document).visibilityState !== "visible";
+    } catch {
+      return false;
+    }
+  })();
 
-  // Race the target window's timer against our own. The `closed` check above cannot
-  // cover a window that dies between it and the callback, and this yield sits in the
-  // hot render loop — it must be structurally incapable of wedging.
+  // Race every available scheduler. The `closed` check above cannot cover a window
+  // that dies between it and the callback, and this yield sits in the hot render
+  // loop — it must be structurally incapable of wedging.
   await new Promise((resolve) => {
     let settled = false;
+    let port = null;
     const done = () => {
       if (settled) return;
       settled = true;
+      try { port?.close?.(); } catch {}
       resolve();
     };
+
+    const host = targetWindow ?? window;
+    try {
+      const Channel = host.MessageChannel ?? MessageChannel;
+      const ch = new Channel();
+      port = ch.port1;
+      ch.port1.onmessage = done;
+      ch.port1.start?.();
+      ch.port2.postMessage(0);
+    } catch {
+      /* fall through to the timers below */
+    }
+
     try {
       // `.call` matters: a cross-window setTimeout invoked unbound throws
       // "Illegal invocation" in Chromium.
-      const host = targetWindow ?? window;
       (host.setTimeout ?? setTimeout).call(host, done, 0);
     } catch {
       /* fall through to the local timer below */
     }
-    setTimeout(done, FE_YIELD_FALLBACK_MS);
+    // While hidden, the local timer is clamped too — it is only a backstop here,
+    // and the MessageChannel task above is what actually settles this promise.
+    setTimeout(done, hidden ? FE_YIELD_HIDDEN_FALLBACK_MS : FE_YIELD_FALLBACK_MS);
   });
 }
 
@@ -3575,15 +3714,7 @@ function feFallbackRenderChatMessage(doc, msg) {
     try { const a = msg?.author ?? msg?.user; return String(a?.name || "").trim(); } catch { return ""; }
   })();
 
-  const timestampText = (() => {
-    try {
-      const ts = Number(msg?.timestamp);
-      if (!Number.isFinite(ts) || ts <= 0) return "";
-      return new Date(ts).toLocaleString();
-    } catch {
-      return "";
-    }
-  })();
+  const timestampText = feFormatArchiveTimestamp(msg);
 
   const header = doc.createElement("header");
   header.className = "message-header flexrow";

@@ -96,6 +96,76 @@ function feFormatImportStatement(url, layer, media) {
   return `@import "${url}"${layerPart}${mediaPart};`;
 }
 
+// `String#replace` with a STRING pattern treats `$&`, `$1`, `` $` `` etc. in the
+// REPLACEMENT specially. A stylesheet body is arbitrary text and does contain `$`
+// (e.g. `content: "$"`), so every substitution here goes through a function
+// replacer, which is exempt from that expansion.
+function feReplaceOnce(haystack, needle, replacement) {
+  return haystack.replace(needle, () => replacement);
+}
+
+/**
+ * Resolve one already-inlined stylesheet body, folding in whatever nested
+ * `@import`s it can and collecting the rest for the caller to hoist.
+ * Shared by the pure-import rebuild and the in-place mixed-block path.
+ */
+function feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports }) {
+  let body = String(inlined ?? "");
+  for (const n of feParseCssImports(body)) {
+    const nestedAbs = resolve(n.url);
+    const nestedCss = n.media || n.layer ? null : inlineNested(nestedAbs);
+    if (nestedCss != null) {
+      body = feReplaceOnce(body, n.raw, nestedCss);
+      continue;
+    }
+    body = feReplaceOnce(body, n.raw, "");
+    hoistImports.push(feFormatImportStatement(nestedAbs, n.layer, n.media));
+  }
+  return body.trim();
+}
+
+/**
+ * In-place variant for a block that mixes `@import`s with real rules. Each
+ * inlinable import is swapped for its body (wrapped in the layer it declared);
+ * everything else in the block is left byte-identical.
+ *
+ * The one ordering hazard, and why imports are hoisted rather than left alone:
+ * `@import` is only honoured before any style rule. Replacing an EARLIER import
+ * with its `@layer {}` body would therefore silently kill a LATER import that had
+ * to stay a network reference. So every non-inlined import is moved to the very
+ * top of the block (valid — only `@charset` and `@layer` statements may precede an
+ * import, and both are already fine there). Their relative cascade position is
+ * unaffected because Foundry qualifies each with `layer(...)`, and the block's
+ * own `@layer a, b, c;` statement fixes that order independently of source order.
+ *
+ * Returns `mixed: true` so the caller still absolutizes the residual rules' urls.
+ */
+function feAssembleMixedStyleBlock(src, parsed, { resolve, inline, inlineNested }) {
+  const hoistImports = [];
+  let out = src;
+  let inlinedAny = false;
+
+  for (const imp of parsed) {
+    const abs = resolve(imp.url);
+    const inlined = imp.media ? null : inline(abs);
+    if (inlined == null) {
+      out = feReplaceOnce(out, imp.raw, "");
+      hoistImports.push(feFormatImportStatement(abs, imp.layer, imp.media));
+      continue;
+    }
+    const body = feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports });
+    out = feReplaceOnce(out, imp.raw, imp.layer ? `@layer ${imp.layer} {\n${body}\n}` : body);
+    inlinedAny = true;
+  }
+
+  // Nothing could be inlined — hand the block back untouched rather than rewriting
+  // it for no gain. The caller's absolutize-only path is exactly the old behaviour.
+  if (!inlinedAny) return { text: src, rebuilt: false };
+
+  const text = hoistImports.length ? `${hoistImports.join("\n")}\n${out}` : out;
+  return { text, rebuilt: true, mixed: true };
+}
+
 /**
  * Rebuild a `<style>` block that consists solely of `@import` rules (Foundry's
  * module/system style block) into a self-contained, layer-order-preserving block.
@@ -121,17 +191,32 @@ export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlin
   const parsed = feParseCssImports(src);
   if (!parsed.length) return { text: src, rebuilt: false };
 
-  // A "pure import block" is one whose only content is @import statements (plus
-  // whitespace/comments). Anything else means real rules live here too — do not
-  // touch it, or we could reorder/lose them.
-  let residual = src;
-  for (const imp of parsed) residual = residual.replace(imp.raw, "");
-  residual = residual.replace(/\/\*[\s\S]*?\*\//g, "").trim();
-  if (residual) return { text: src, rebuilt: false };
-
   const resolve = typeof resolveAbs === "function" ? resolveAbs : (u) => u;
   const inline = typeof getInlinedCss === "function" ? getInlinedCss : () => null;
   const inlineNested = typeof getNestedInlinedCss === "function" ? getNestedInlinedCss : () => null;
+
+  // A "pure import block" is one whose only content is @import statements (plus
+  // whitespace/comments). The full rebuild below reorders freely, so it is only
+  // valid for those.
+  let residual = src;
+  for (const imp of parsed) residual = residual.replace(imp.raw, "");
+  residual = residual.replace(/\/\*[\s\S]*?\*\//g, "").trim();
+  // MIXED block — real rules live here too, so a rebuild could reorder or lose
+  // them. This used to bail out entirely, which meant the block's @imports stayed
+  // raw `http://<foundry-host>/…` URLs and their CSS never entered the saved file.
+  //
+  // That is not a rare shape: Foundry v14 emits SYSTEM styles as one <style> that
+  // holds `@layer system, layouts, modules;` + the system's @imports + an inline
+  // `@layer system { … }` block. Measured on a dx3rd-emanim export (2026-08-12):
+  // the saved HTML contained ZERO of dx3rd's own rules — `.two-columns`,
+  // `.item-name-toggle`, `.dx3rd-item-chat .item-header` all 0 occurrences — so
+  // every item chat card lost its layout and rendered as bare stacked divs. It
+  // only looked fine in the PDF because that renders while Foundry is running and
+  // the localhost @import still resolves.
+  //
+  // Substitute IN PLACE instead: nothing moves, so residual rules keep their exact
+  // position and cascade order.
+  if (residual) return feAssembleMixedStyleBlock(src, parsed, { resolve, inline, inlineNested });
 
   // Layer order is fixed by first appearance — emit it up front so the cascade
   // order is identical no matter which imports end up inlined vs. kept as links.
@@ -159,19 +244,7 @@ export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlin
       //
       // Hoisting stays the fallback for everything else, because `@import` is invalid
       // inside `@layer {}` and must precede all rules.
-      const nested = feParseCssImports(inlined);
-      let body = inlined;
-      for (const n of nested) {
-        const nestedAbs = resolve(n.url);
-        const nestedCss = n.media || n.layer ? null : inlineNested(nestedAbs);
-        if (nestedCss != null) {
-          body = body.replace(n.raw, nestedCss);
-          continue;
-        }
-        body = body.replace(n.raw, "");
-        hoistImports.push(feFormatImportStatement(nestedAbs, n.layer, n.media));
-      }
-      body = body.trim();
+      const body = feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports });
       layerBlocks.push(imp.layer ? `@layer ${imp.layer} {\n${body}\n}` : body);
     } else {
       // Keep as a network import so the saved HTML still styles correctly online.

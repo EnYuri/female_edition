@@ -190,14 +190,53 @@ test("assemble: media-qualified import stays a network import (never inlined)", 
   assert.ok(!text.includes("should-not-be-used"));
 });
 
-test("assemble: a block with real rules (not pure imports) is left untouched", () => {
+// Foundry v14 emits SYSTEM css as one <style> holding the layer statement, the
+// system's @imports AND an inline `@layer system {}` block. Bailing out on that
+// shape left dx3rd-emanim's stylesheets as network-only @imports, so saved HTML
+// had none of its item-card layout rules.
+test("assemble: a mixed block inlines its imports IN PLACE, residual rules untouched", () => {
   const block = '@import "a.css" layer(modules);\n.real{color:blue}';
-  const { text, rebuilt } = feAssembleInlinedStyleBlock(block, {
+  const { text, rebuilt, mixed } = feAssembleInlinedStyleBlock(block, {
     resolveAbs,
     getInlinedCss: () => "x{}",
   });
+  assert.equal(rebuilt, true);
+  assert.equal(mixed, true);
+  assert.equal(text, "@layer modules {\nx{}\n}\n.real{color:blue}");
+});
+
+test("assemble: mixed block with nothing inlinable is left untouched", () => {
+  const block = '@import "a.css" layer(modules);\n.real{color:blue}';
+  const { text, rebuilt } = feAssembleInlinedStyleBlock(block, {
+    resolveAbs,
+    getInlinedCss: () => null,
+  });
   assert.equal(rebuilt, false);
   assert.equal(text, block);
+});
+
+// @import is only honoured before any style rule, so an import that must stay a
+// network reference has to be hoisted above the body we just inlined in its place.
+test("assemble: mixed block hoists non-inlinable imports above the inlined ones", () => {
+  const block = '@import "a.css" layer(modules);\n@import "b.css" layer(modules);\n.real{color:blue}';
+  const { text, rebuilt } = feAssembleInlinedStyleBlock(block, {
+    resolveAbs,
+    getInlinedCss: (abs) => (abs.endsWith("a.css") ? "x{}" : null),
+  });
+  assert.equal(rebuilt, true);
+  assert.ok(text.startsWith('@import "http://localhost:30000/b.css" layer(modules);'));
+  assert.ok(text.indexOf("@layer modules {") > text.indexOf("b.css"));
+  assert.ok(text.endsWith(".real{color:blue}"));
+});
+
+// A `$` in the inlined body must survive: String#replace expands $&/$1 in a string
+// replacement, so every substitution goes through a function replacer.
+test("assemble: a '$' in an inlined body is not mangled", () => {
+  const { text } = feAssembleInlinedStyleBlock('@import "a.css" layer(modules);\n.real{}', {
+    resolveAbs,
+    getInlinedCss: () => '.a::after{content:"$& $1"}',
+  });
+  assert.ok(text.includes('content:"$& $1"'));
 });
 
 test("assemble: comments between imports still count as a pure import block", () => {
