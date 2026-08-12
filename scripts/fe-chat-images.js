@@ -311,7 +311,26 @@ function ciDataUrlToBlobUrl(dataUrl) {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 }
 
-// 실제 브라우저 새 창/탭으로 이미지를 연다(ImagePopout 헤더의 "새 창으로 보기" 버튼).
+// 화면 중앙에 놓인 팝업 창 features 문자열. window.open 의 3번째 인자가 **비어 있으면**
+// 브라우저는 target=_blank 를 새 탭으로 처리한다(HTML 표준: "window features" 가 없으면
+// 탭 여부는 UA 재량이고, Chromium 은 항상 탭). 별도 OS 창을 원하면 features 를 반드시
+// 넘겨야 하며, 그중에서도 popup=yes + width/height 조합이 있어야 탭이 아닌 창이 된다.
+// (fe-chat-archive.js 의 feOpenChatArchiveWindow 도 같은 이유로 features 를 넘긴다.)
+function ciBuildPopupFeatures() {
+  try {
+    const availW = Math.max(320, Number(window.screen?.availWidth) || 1280);
+    const availH = Math.max(320, Number(window.screen?.availHeight) || 800);
+    const width = Math.round(Math.min(1280, availW - 80));
+    const height = Math.round(Math.min(900, availH - 80));
+    const left = Math.max(0, Math.round((availW - width) / 2));
+    const top = Math.max(0, Math.round((availH - height) / 2));
+    return `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+  } catch {
+    return "popup=yes,width=1100,height=800";
+  }
+}
+
+// 실제 브라우저 새 창으로 이미지를 연다(ImagePopout 헤더의 "새 창으로 보기" 버튼).
 // 상대경로는 절대화, data: 는 blob: 으로 변환(top-level 탐색 차단 회피).
 function ciOpenImageInBrowser(src) {
   if (!src) return;
@@ -328,7 +347,7 @@ function ciOpenImageInBrowser(src) {
   try {
     // Open a same-origin blank page first so popup blocking remains detectable,
     // sever its access to the Foundry window, then navigate to the image URL.
-    browserWin = window.open("about:blank", "_blank");
+    browserWin = window.open("about:blank", "_blank", ciBuildPopupFeatures());
     if (!browserWin) {
       if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
       ui?.notifications?.warn?.("팝업이 차단되어 새 창을 열 수 없습니다.");

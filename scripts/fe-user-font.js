@@ -29,8 +29,7 @@ const FE_BUILTIN_FONT_FILES = new Set([
   "cookierun regular.otf", "cookierun regular.ttf",
   "cookierun bold.otf", "cookierun bold.ttf",
   "cookierun black.otf", "cookierun black.ttf",
-  "hakgyoansimgeurimilgi-r.ttf",
-  "neodunggeunmopro-regular.ttf", "neodgm.ttf",
+  "hakgyoansimgeurimilgi-r.otf", "hakgyoansimgeurimilgi-r.ttf",
 ]);
 const FONT_EXT_RE = /\.(ttf|otf|woff2?|otc|ttc)$/i;
 

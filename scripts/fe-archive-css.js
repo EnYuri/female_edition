@@ -106,11 +106,17 @@ function feFormatImportStatement(url, layer, media) {
  * @param {(absUrl: string) => (string|null)} opts.getInlinedCss  Return the already-
  *        fetched-and-url-rewritten CSS for an absolute URL, or null if it must stay a
  *        network import (cross-origin, over budget, media-qualified, or fetch failed).
+ * @param {(absUrl: string) => (string|null)} [opts.getNestedInlinedCss]  Same, but consulted
+ *        ONLY for imports found INSIDE an inlined body. Separate from getInlinedCss on
+ *        purpose: the caller's top-level map also holds every same-origin sheet, so
+ *        reusing it here would inline a sheet's body a SECOND time whenever one
+ *        stylesheet @imports another that is itself top-level. Omit it and nested
+ *        imports all hoist, which is the historical behaviour.
  * @returns {{ text: string, rebuilt: boolean }}  `rebuilt` is false when the block is
  *        NOT a pure import list (it then must be left as-is / only URL-absolutized by
  *        the caller — we never risk mangling a block that also holds real rules).
  */
-export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlinedCss } = {}) {
+export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlinedCss, getNestedInlinedCss } = {}) {
   const src = String(originalText ?? "");
   const parsed = feParseCssImports(src);
   if (!parsed.length) return { text: src, rebuilt: false };
@@ -125,6 +131,7 @@ export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlin
 
   const resolve = typeof resolveAbs === "function" ? resolveAbs : (u) => u;
   const inline = typeof getInlinedCss === "function" ? getInlinedCss : () => null;
+  const inlineNested = typeof getNestedInlinedCss === "function" ? getNestedInlinedCss : () => null;
 
   // Layer order is fixed by first appearance — emit it up front so the cascade
   // order is identical no matter which imports end up inlined vs. kept as links.
@@ -140,13 +147,29 @@ export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlin
     const abs = resolve(imp.url);
     const inlined = imp.media ? null : inline(abs);
     if (inlined != null) {
-      // Nested @import (e.g. a webfont CDN inside ui-font.css) is invalid inside an
-      // @layer {} block and must precede all rules — hoist it out to the top.
+      // Nested @import — e.g. ui-font.css imports the NeoDGM Pro webfont CSS from a
+      // CDN. Try to inline it IN PLACE first: that CSS is nothing but @font-face
+      // rules, and inlining them is the only way the saved file renders that face
+      // offline (a hoisted @import needs the network). @font-face is layer-agnostic,
+      // so living inside the surrounding @layer block changes nothing.
+      //
+      // A nested import that carries its OWN layer() is never inlined — honouring it
+      // would need a nested @layer block whose order relative to the parent's is not
+      // something this function can establish. It hoists, like before.
+      //
+      // Hoisting stays the fallback for everything else, because `@import` is invalid
+      // inside `@layer {}` and must precede all rules.
       const nested = feParseCssImports(inlined);
       let body = inlined;
       for (const n of nested) {
+        const nestedAbs = resolve(n.url);
+        const nestedCss = n.media || n.layer ? null : inlineNested(nestedAbs);
+        if (nestedCss != null) {
+          body = body.replace(n.raw, nestedCss);
+          continue;
+        }
         body = body.replace(n.raw, "");
-        hoistImports.push(feFormatImportStatement(n.url, n.layer, n.media));
+        hoistImports.push(feFormatImportStatement(nestedAbs, n.layer, n.media));
       }
       body = body.trim();
       layerBlocks.push(imp.layer ? `@layer ${imp.layer} {\n${body}\n}` : body);

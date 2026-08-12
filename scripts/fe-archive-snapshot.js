@@ -53,21 +53,90 @@ const FE_EXPORT_STYLESHEET_MAX_BYTES = 2_000_000;
 const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
 
 // CSS `url()` asset embedding (see feEmbedSnapshotCssAssets).
-// Fonts get the generous cap because they are correctness-critical (a missing
-// face is an unreadable tofu box, not a missing decoration) and because the
-// largest face Foundry ships is fa-thin-100.woff2 at ~574KB. Images get a tight
-// cap on purpose: the small ones that matter in a chat log (d20-black.svg,
-// lozenge.svg, the notable-corner SVGs, texture-gray1.webp, dnd5e's badge webps)
-// are all well under it, while dnd5e's decorative sheet banners — hundreds of KB
-// each and never visible in a chat message — fall out for free.
-const FE_EXPORT_ASSET_FONT_MAX_BYTES = 700_000;
+//
+// FONT PER-FILE CAP — 700_000 WAS TOO SMALL AND SILENTLY DROPPED OUR OWN FONTS.
+// The first version of this sized the cap off "the largest face Foundry ships"
+// (fa-thin-100.woff2, ~574KB) and forgot the module's own `font/` directory, which
+// is the entire point of the feature. Measured on a real export
+// ("Chat Log – Death Wish Blues", 2026-08-12): CookieRun Regular/Bold/Black .otf are
+// 948/978/929KB — every one over the cap — so all three were skipped and the saved
+// file's `document.fonts` reported `FE CookieRun: error`, i.e. the chat rendered in a
+// fallback face. Keep this at parity with `MAX_PER_FILE_BYTES_COOKIE` inside
+// feBuildEmbeddedCookieRunFontCSS; the two caps describe the same files.
+//
+// Hakgyoansim Geurimilgi (6.3MB TTF) is DELIBERATELY still over the cap. It is the
+// one face big enough to make base64 expansion an OOM risk in Chromium/Electron, and
+// there is already a user-facing opt-in for exactly it — the "커스텀 폰트 임베드"
+// setting routes it through feBuildEmbeddedCookieRunFontCSS's own 7MB allowance. Do
+// not raise this cap past ~1.2MB to catch it; turn that setting on instead.
+//
+// Images keep a tight cap on purpose: the small ones that matter in a chat log
+// (d20-black.svg, lozenge.svg, the notable-corner SVGs, texture-gray1.webp, dnd5e's
+// badge webps) are all well under it, while dnd5e's decorative sheet banners —
+// hundreds of KB each and never visible in a chat message — fall out for free.
+// 1_400_000 rather than 1_200_000 so the largest ONLINE face the module can select
+// fits: measured 2026-08-12 over the CDN, Mona12-Bold.woff2 is 1_304_316 bytes and
+// Mona12.woff2 is 1_247_648. Everything the paragraph above rules out is still ruled
+// out — CookieRun's TTFs are 2.1–2.3MB and Geurimilgi's is 6.3MB.
+const FE_EXPORT_ASSET_FONT_MAX_BYTES = 1_400_000;
 const FE_EXPORT_ASSET_IMAGE_MAX_BYTES = 160_000;
-const FE_EXPORT_ASSET_TOTAL_BYTES = 8_000_000;
+// SEPARATE totals, not one shared pool. They used to share 8MB, which meant raising
+// the font cap above would have let the fonts (measured: ~4.1MB of faces even before
+// CookieRun) crowd out the images — trading one reported bug for another. Fonts are
+// correctness-critical (a missing face is unreadable text); images are decoration.
+// Raised 8MB → 12MB when cross-origin webfonts became embeddable (below). The
+// online faces are large: measured over the CDN, the Mona family alone is ~4.3MB
+// across 7 files. Only the faces the document ACTUALLY USES are fetched, so a
+// typical export spends far less than this; the headroom exists so that a font
+// admitted late in first-seen order cannot be dropped by a budget the same-origin
+// faces have already half-spent.
+const FE_EXPORT_ASSET_FONT_TOTAL_BYTES = 12_000_000;
+const FE_EXPORT_ASSET_IMAGE_TOTAL_BYTES = 8_000_000;
 const FE_EXPORT_ASSET_FONT_EXT_RE = /\.(?:woff2?|ttf|otf|eot)(?:[?#]|$)/i;
 const FE_EXPORT_ASSET_IMAGE_EXT_RE = /\.(?:svg|png|webp|jpe?g|gif|avif)(?:[?#]|$)/i;
+
+// ---------------------------------------------------------------------------
+// Cross-origin webfont embedding.
+//
+// ui-font.css serves three of its six font modes from a CDN rather than from the
+// module's own `font/` directory — NeoDGM Pro (an @import of the project's own
+// style.css), the Mona family, and Galmuri. Everything else in the snapshot is
+// gated on same-origin, so those three modes produced a saved HTML file whose text
+// fell back to a system face the moment it was opened offline, while CookieRun and
+// Geurimilgi (local files) embedded fine. That asymmetry was the bug.
+//
+// The gate is an explicit HOST ALLOWLIST, not "any cross-origin URL". A snapshot
+// must never turn into a crawler for whatever third-party host a stylesheet happens
+// to name. jsdelivr is here because ui-font.css itself chose it, and because it
+// answers with `Access-Control-Allow-Origin: *` (verified 2026-08-12) — without CORS
+// the fetch could not produce bytes at all.
+//
+// Three deliberate narrowings:
+//   1. FONTS ONLY. Cross-origin images stay excluded; a missing decorative image is
+//      cosmetic, a missing face is unreadable text.
+//   2. woff2 ONLY. Webfont CSS commonly lists woff2/woff/ttf in one `src` as a
+//      compatibility ladder (NeoDGM Pro lists all three). Embedding every entry
+//      would triple the cost to embed two faces no browser that can open the file
+//      will ever choose.
+//   3. ONLY FACES THE DOCUMENT ACTUALLY LOADED. See feCollectLoadedFontFamilies —
+//      the archive window has already rendered the chat, so `document.fonts` knows
+//      exactly which families resolved. The font modes are mutually exclusive, so
+//      without this a CookieRun export would still carry ~4.3MB of unused Mona.
+// ---------------------------------------------------------------------------
+const FE_EXPORT_FONT_CDN_HOSTS = new Set(["cdn.jsdelivr.net"]);
+const FE_EXPORT_ASSET_WOFF2_RE = /\.woff2(?:[?#]|$)/i;
+const FE_EXPORT_FONT_FACE_RE = /@font-face\s*\{([^}]*)\}/gi;
+const FE_EXPORT_FONT_FAMILY_DECL_RE = /(?:^|[;{])\s*font-family\s*:\s*([^;}]+)/i;
 // Same shape as feRewriteSnapshotCSSURLs' matcher — kept local so the two stay
 // independently readable; this one only READS urls, it never rewrites in place.
 const FE_EXPORT_CSS_URL_RE = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
+// The same thing as it appears in SERIALIZED HTML, where a style attribute's inner
+// quotes are entity-escaped: `style="background: url(&quot;http://…&quot;)"`. Group 1
+// is the whole quote token so the replacement can put back what it found.
+const FE_EXPORT_HTML_STYLE_URL_RE = /url\(\s*(&quot;|&#0?39;|["'])?([^"')]+?)\1?\s*\)/gi;
+// A serialized `style="…"` attribute. outerHTML always emits double quotes and
+// entity-escapes any inner `"`, so `[^"]*` cannot run past the attribute's end.
+const FE_EXPORT_HTML_STYLE_ATTR_RE = /style="([^"]*)"/gi;
 
 // Memoized embedded-font CSS (built once per session).
 let feEmbeddedFontCssPromise = null;
@@ -113,7 +182,7 @@ async function feFetchSnapshotStylesheet(absolute) {
   try {
     const fetched = await feFetchWithTimeout(
       absolute,
-      { credentials: "include" },
+      { credentials: feSnapshotFetchCredentials(absolute) },
       FE_EXPORT_STYLESHEET_FETCH_TIMEOUT,
       async (response) => {
         if (!response.ok) return null;
@@ -177,21 +246,53 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
     }
 
     const fetchedByUrl = new Map();
-    let nextImport = 0;
-    const importWorker = async () => {
-      while (true) {
-        const i = nextImport++;
-        if (i >= importOrder.length) return;
-        const abs = importOrder[i];
-        const got = await feFetchSnapshotStylesheet(abs);
-        if (got) fetchedByUrl.set(abs, got);
-      }
+    const fetchInto = async (urls) => {
+      let next = 0;
+      const worker = async () => {
+        while (true) {
+          const i = next++;
+          if (i >= urls.length) return;
+          const abs = urls[i];
+          const got = await feFetchSnapshotStylesheet(abs);
+          if (got) fetchedByUrl.set(abs, got);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, urls.length) }, () => worker()));
     };
-    await Promise.all(Array.from({ length: Math.min(4, importOrder.length) }, () => importWorker()));
+    await fetchInto(importOrder);
+
+    // SECOND ROUND — nested imports. ui-font.css reaches the NeoDGM Pro webfont
+    // through `@import url("https://cdn.jsdelivr.net/…/style.css")`, a URL that
+    // cannot be known until ui-font.css itself has been fetched, which is why this
+    // cannot fold into the pass above. Without it feAssembleInlinedStyleBlock has
+    // nothing to inline for that import and hoists it as a network @import, leaving
+    // the saved file dependent on the CDN for that font mode.
+    //
+    // Only allowlisted webfont hosts are followed, and only one level deep: a
+    // stylesheet reached this way is third-party, and chasing its imports
+    // recursively would be an unbounded walk of someone else's CSS graph.
+    const nestedOrder = [];
+    for (const abs of importOrder) {
+      const got = fetchedByUrl.get(abs);
+      if (!got) continue;
+      for (const imp of feParseCssImports(got.cssText)) {
+        if (imp.media || imp.layer) continue;
+        let nestedAbs = "";
+        try { nestedAbs = new URL(imp.url, abs).href; } catch { continue; }
+        if (seen.has(nestedAbs)) continue;
+        seen.add(nestedAbs);
+        if (!feSnapshotIsAllowedFontCdn(nestedAbs)) continue;
+        nestedOrder.push(nestedAbs);
+      }
+    }
+    if (nestedOrder.length) await fetchInto(nestedOrder);
+    const nestedSet = new Set(nestedOrder);
 
     // Admit in first-seen order so the byte cap cannot race the cascade order.
+    // Nested imports come last: they are leaves, and a byte budget spent on one
+    // must never cost a top-level sheet that other rules depend on.
     const inlinedByUrl = new Map();
-    for (const abs of importOrder) {
+    for (const abs of [...importOrder, ...nestedOrder]) {
       const got = fetchedByUrl.get(abs);
       if (!got || budget.admitted + got.bytes > FE_EXPORT_STYLESHEET_TOTAL_BYTES) continue;
       inlinedByUrl.set(abs, feRewriteSnapshotCSSURLs(got.cssText, abs));
@@ -203,6 +304,11 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
         const { text, rebuilt } = feAssembleInlinedStyleBlock(el.textContent || "", {
           resolveAbs,
           getInlinedCss: (abs) => (inlinedByUrl.has(abs) ? inlinedByUrl.get(abs) : null),
+          // Nested imports may resolve ONLY to the allowlisted webfont sheets. Handing
+          // the full map here would inline a same-origin sheet's body a second time
+          // whenever one stylesheet @imports another that is also top-level.
+          getNestedInlinedCss: (abs) =>
+            nestedSet.has(abs) && inlinedByUrl.has(abs) ? inlinedByUrl.get(abs) : null,
         });
         // A non-rebuilt block (one that also holds real rules) is left intact but
         // still gets its relative @import/url() refs absolutized so it loads online.
@@ -291,7 +397,183 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
  * Runs only for the HTML snapshot. The print/PDF popup is a live document with
  * network access and needs none of this.
  */
-async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}) {
+function feSnapshotAssetIsSameOrigin(abs) {
+  try {
+    const u = new URL(abs);
+    return u.origin === window.location.origin && (u.protocol === "http:" || u.protocol === "https:");
+  } catch {
+    return false;
+  }
+}
+
+/** An https URL on the webfont host allowlist. See FE_EXPORT_FONT_CDN_HOSTS. */
+function feSnapshotIsAllowedFontCdn(abs) {
+  try {
+    const u = new URL(abs);
+    return u.protocol === "https:" && FE_EXPORT_FONT_CDN_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `credentials` for one asset/stylesheet fetch.
+ *
+ * MUST be "omit" cross-origin. A response carrying `Access-Control-Allow-Origin: *`
+ * — which is what every CDN here sends — is REJECTED by the browser outright when
+ * the request was made with credentials; the wildcard and credentialed mode are
+ * mutually exclusive per the CORS spec. Sending "include" everywhere would make
+ * every cross-origin font fail with a CORS error rather than embed.
+ *
+ * Same-origin keeps "include": Foundry gates its own routes on the session cookie.
+ * The URL may still be relative here (feBuildEmbeddedCookieRunFontCSS passes
+ * `/modules/…`), so resolve against the document before deciding — a bare
+ * `new URL(url)` would throw on those and wrongly downgrade them to "omit".
+ */
+function feSnapshotFetchCredentials(url) {
+  try {
+    return new URL(url, window.location.href).origin === window.location.origin ? "include" : "omit";
+  } catch {
+    return "include";
+  }
+}
+
+/**
+ * The font families the archive document actually resolved, lowercased.
+ *
+ * `document.fonts` is a live FontFaceSet whose entries carry a `status` of
+ * "unloaded" / "loading" / "loaded" / "error". By the time a snapshot is built the
+ * window has rendered the whole chat log, so a family that is "loaded" is one that
+ * really painted glyphs, and one still "unloaded" is a face the browser never
+ * needed — the lazy-load behaviour of @font-face makes this precise rather than a
+ * heuristic.
+ *
+ * Returns an empty set on any failure, which the callers treat as "embed nothing
+ * extra" — i.e. the pre-existing same-origin-only behaviour.
+ */
+function feCollectLoadedFontFamilies(doc) {
+  const out = new Set();
+  try {
+    for (const face of doc?.fonts ?? []) {
+      if (face?.status !== "loaded") continue;
+      const family = String(face.family ?? "").trim().replace(/^["']|["']$/g, "").toLowerCase();
+      if (family) out.add(family);
+    }
+  } catch {
+    return out;
+  }
+  return out;
+}
+
+/**
+ * Cross-origin webfont URLs that may be embedded: every woff2 named by an
+ * `@font-face` whose `font-family` is in `loadedFamilies` and whose host is on the
+ * allowlist. Returns a Set of absolute URLs exactly as written in the CSS.
+ */
+function feCollectSnapshotCdnFontUrls(styleEls, loadedFamilies) {
+  const allow = new Set();
+  if (!loadedFamilies?.size) return allow;
+
+  for (const el of styleEls) {
+    const text = el?.textContent || "";
+    if (!text.includes("@font-face")) continue;
+    FE_EXPORT_FONT_FACE_RE.lastIndex = 0;
+    for (let face = FE_EXPORT_FONT_FACE_RE.exec(text); face !== null; face = FE_EXPORT_FONT_FACE_RE.exec(text)) {
+      const body = face[1] || "";
+      const familyMatch = FE_EXPORT_FONT_FAMILY_DECL_RE.exec(body);
+      if (!familyMatch) continue;
+      const family = String(familyMatch[1] ?? "").trim().replace(/^["']|["']$/g, "").toLowerCase();
+      if (!family || !loadedFamilies.has(family)) continue;
+
+      FE_EXPORT_CSS_URL_RE.lastIndex = 0;
+      for (let m = FE_EXPORT_CSS_URL_RE.exec(body); m !== null; m = FE_EXPORT_CSS_URL_RE.exec(body)) {
+        const url = String(m[2] ?? "").trim();
+        if (!FE_EXPORT_ASSET_WOFF2_RE.test(url)) continue;
+        if (!feSnapshotIsAllowedFontCdn(url)) continue;
+        allow.add(url);
+      }
+    }
+  }
+  return allow;
+}
+
+/**
+ * Shared fetch/dedup/budget state for the asset-embedding passes.
+ *
+ * Created once per snapshot and handed to BOTH passes so a URL referenced from a
+ * <style> block and from an inline style attribute is fetched once and embedded
+ * once, and so the byte budgets are global rather than per-pass.
+ */
+function feCreateSnapshotAssetStore() {
+  const embedded = new Map(); // url string (as written) -> data URL
+  const spent = { font: 0, image: 0 };
+
+  const admit = async (urls, kind) => {
+    const fresh = urls.filter((u) => !embedded.has(u));
+    if (!fresh.length) return;
+    const perFileCap = kind === "font" ? FE_EXPORT_ASSET_FONT_MAX_BYTES : FE_EXPORT_ASSET_IMAGE_MAX_BYTES;
+    const totalCap = kind === "font" ? FE_EXPORT_ASSET_FONT_TOTAL_BYTES : FE_EXPORT_ASSET_IMAGE_TOTAL_BYTES;
+
+    let next = 0;
+    const results = new Array(fresh.length).fill(null);
+    const worker = async () => {
+      while (true) {
+        const i = next++;
+        if (i >= fresh.length) return;
+        // Cannot pre-check the budget here (workers race); admission below is what
+        // enforces it, and a fetch we then decline costs only bandwidth.
+        try {
+          results[i] = await feFetchAsDataURLCapped(fresh[i], perFileCap);
+        } catch {
+          results[i] = null;
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(FE_EXPORT_EMBED_CONCURRENCY, fresh.length) }, () => worker())
+    );
+
+    // Admission stays in first-seen order so it is deterministic across runs.
+    for (let i = 0; i < fresh.length; i += 1) {
+      const got = results[i];
+      if (!got?.dataUrl) continue;
+      if (spent[kind] + got.bytes > totalCap) continue;
+      embedded.set(fresh[i], got.dataUrl);
+      spent[kind] += got.bytes;
+    }
+  };
+
+  return { embedded, spent, admit };
+}
+
+/**
+ * Split a list of candidate URLs into font/image groups, dropping anything that is
+ * already self-contained, cross-origin, or not a recognised asset type.
+ */
+function feClassifySnapshotAssetUrls(urls, cdnFontAllow = null) {
+  const fonts = [];
+  const images = [];
+  const seen = new Set();
+  for (const raw of urls) {
+    const value = String(raw ?? "").trim();
+    if (!value || value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("#")) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    if (!feSnapshotAssetIsSameOrigin(value)) {
+      // The ONLY cross-origin escape hatch, and it is pre-vetted: membership in
+      // `cdnFontAllow` already means allowlisted host + woff2 + a family the
+      // document loaded (feCollectSnapshotCdnFontUrls). Nothing is re-decided here.
+      if (cdnFontAllow?.has(value)) fonts.push(value);
+      continue;
+    }
+    if (FE_EXPORT_ASSET_FONT_EXT_RE.test(value)) fonts.push(value);
+    else if (FE_EXPORT_ASSET_IMAGE_EXT_RE.test(value)) images.push(value);
+  }
+  return { fonts, images };
+}
+
+async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}, store = null) {
+  const assets = store || feCreateSnapshotAssetStore();
   let styleEls = [];
   try {
     styleEls = Array.from(headClone?.querySelectorAll?.("style") ?? []);
@@ -300,76 +582,44 @@ async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}) {
   }
   if (!styleEls.length) return;
 
-  const sameOrigin = (abs) => {
-    try {
-      const u = new URL(abs);
-      return u.origin === window.location.origin && (u.protocol === "http:" || u.protocol === "https:");
-    } catch {
-      return false;
-    }
-  };
-
   // ---- Collect: unique candidate URLs, in first-seen order, classified. ----
-  const fonts = [];
-  const images = [];
-  const seen = new Set();
+  const found = [];
   for (const el of styleEls) {
     const text = el.textContent || "";
     if (!text.includes("url(")) continue;
     FE_EXPORT_CSS_URL_RE.lastIndex = 0;
     for (let m = FE_EXPORT_CSS_URL_RE.exec(text); m !== null; m = FE_EXPORT_CSS_URL_RE.exec(text)) {
-      const raw = String(m[2] ?? "").trim();
-      if (!raw || raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("#")) continue;
-      if (seen.has(raw)) continue;
-      seen.add(raw);
-      if (!sameOrigin(raw)) continue;
-      if (FE_EXPORT_ASSET_FONT_EXT_RE.test(raw)) fonts.push(raw);
-      else if (FE_EXPORT_ASSET_IMAGE_EXT_RE.test(raw)) images.push(raw);
+      found.push(m[2]);
     }
   }
+  // Cross-origin webfonts are opt-in per URL and decided here, from the SAME style
+  // elements — the allowlist has to be built against the CSS that is actually in the
+  // snapshot, not against the live document's sheets.
+  //
+  // Settle the font set first. The allowlist reads `status === "loaded"`, and a face
+  // still "loading" would be read as "unused" and silently dropped from the saved
+  // file. The print path already waits (feWaitForFonts before window.print()); the
+  // HTML-save path never did, and normally does not need to — the window has been on
+  // screen since the user opened it — so this is a cheap guard, not a real wait.
+  try {
+    const ready = doc?.fonts?.ready;
+    if (ready) await Promise.race([ready, new Promise((resolve) => setTimeout(resolve, 1500))]);
+  } catch {
+    // A rejected/absent FontFaceSet just means we classify on what is loaded now.
+  }
+  const cdnFontAllow = feCollectSnapshotCdnFontUrls(styleEls, feCollectLoadedFontFamilies(doc));
+  const { fonts, images } = feClassifySnapshotAssetUrls(found, cdnFontAllow);
   if (!fonts.length && !images.length) return;
 
   setMeta("Embedding CSS assets…");
 
-  // ---- Fetch: fonts FIRST so a large decorative image can never crowd out a
-  // face whose absence would leave unreadable tofu. Within each group the shared
-  // budget is spent in first-seen order, so admission is deterministic. ----
-  const embedded = new Map(); // original url string -> data URL
-  const budget = { admitted: 0 };
+  // Fonts FIRST so a large decorative image can never crowd out a face whose
+  // absence would leave unreadable text. (They have separate budgets now, so this
+  // is ordering for latency/predictability rather than for contention.)
+  await assets.admit(fonts, "font");
+  await assets.admit(images, "image");
 
-  const runGroup = async (urls, perFileCap) => {
-    if (!urls.length) return;
-    let next = 0;
-    const results = new Array(urls.length).fill(null);
-    const worker = async () => {
-      while (true) {
-        const i = next++;
-        if (i >= urls.length) return;
-        // Cannot pre-check the shared budget here (workers race); admission below
-        // is what enforces it, and a fetch we then decline costs only bandwidth.
-        try {
-          results[i] = await feFetchAsDataURLCapped(urls[i], perFileCap);
-        } catch {
-          results[i] = null;
-        }
-      }
-    };
-    await Promise.all(
-      Array.from({ length: Math.min(FE_EXPORT_EMBED_CONCURRENCY, urls.length) }, () => worker())
-    );
-    for (let i = 0; i < urls.length; i += 1) {
-      const got = results[i];
-      if (!got?.dataUrl) continue;
-      if (budget.admitted + got.bytes > FE_EXPORT_ASSET_TOTAL_BYTES) continue;
-      embedded.set(urls[i], got.dataUrl);
-      budget.admitted += got.bytes;
-    }
-  };
-
-  await runGroup(fonts, FE_EXPORT_ASSET_FONT_MAX_BYTES);
-  await runGroup(images, FE_EXPORT_ASSET_IMAGE_MAX_BYTES);
-
-  if (!embedded.size) return;
+  if (!assets.embedded.size) return;
 
   // ---- Substitute. A data URL contains no unescaped `)`, so re-emitting it in
   // quotes keeps the declaration parseable. ----
@@ -378,7 +628,7 @@ async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}) {
     if (!text.includes("url(")) continue;
     try {
       el.textContent = text.replace(FE_EXPORT_CSS_URL_RE, (match, quote, raw) => {
-        const dataUrl = embedded.get(String(raw ?? "").trim());
+        const dataUrl = assets.embedded.get(String(raw ?? "").trim());
         return dataUrl ? `url("${dataUrl}")` : match;
       });
     } catch {
@@ -386,6 +636,86 @@ async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}) {
       // pre-existing behaviour, not a regression.
     }
   }
+}
+
+/**
+ * Embed the `url()` assets referenced from INLINE STYLE ATTRIBUTES in the serialized
+ * body, and return the rewritten parts.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM THE <style> PASS (measured 2026-08-12 on
+ * "Chat Log – Death Wish Blues"):
+ * feMirrorLiveMessageStyles copies the live sidebar's COMPUTED styles onto cloned
+ * messages as an inline `!important` style attribute, and `background-image` is one
+ * of the mirrored properties. A computed background-image serializes as an ABSOLUTE
+ * URL, so a cloned dice roll carries
+ *     style="… background: url(&quot;http://localhost:30000/icons/svg/d20-grey.svg&quot;) … !important"
+ * Being inline and `!important`, that beats dnd5e's own rule — whose die art the
+ * <style> pass DID embed as a data URL. Offline the inline URL 404s, so the die
+ * shapes behind d4/d6/d8/d10/d12/d20 simply disappear while everything around them
+ * looks correct. The <style> pass could not see it: it only reads <style> text.
+ *
+ * Operates on the SERIALIZED HTML STRINGS, not the DOM. Rewriting the live archive
+ * document's style attributes would need an undo path (the popup stays open and the
+ * user keeps looking at it); a string pass has nothing to restore and cannot leak.
+ *
+ * ONLY ABSOLUTE same-origin URLs are embedded. A relative one in an inline style is
+ * unresolvable here on purpose: those come from CSS CUSTOM PROPERTIES, whose values
+ * are copied as raw token streams and are relative to the STYLESHEET that declared
+ * them, not to the document. dnd5e's `--dnd5e-*: url(ui/texture-gray1.webp)` really
+ * means `systems/dnd5e/ui/texture-gray1.webp`, and resolving it against the document
+ * base would silently embed the wrong file (or 404). They keep working online via
+ * <base href>, exactly as before.
+ */
+async function feEmbedSnapshotInlineStyleAssets(bodyParts, setMeta = () => {}, store = null) {
+  const parts = Array.isArray(bodyParts) ? bodyParts : [];
+  if (!parts.length || !store) return parts;
+
+  // Scan/rewrite ONLY inside `style="…"` attribute values — never bare `url(` in the
+  // body text. A <style> ELEMENT is a raw-text node where `&quot;` is NOT decoded, so
+  // emitting an entity-quoted url() into one would produce a broken declaration.
+  // Restricting both phases to the attribute makes the escaping unambiguous.
+  const found = [];
+  for (const part of parts) {
+    const text = String(part ?? "");
+    if (!text.includes("url(")) continue;
+    FE_EXPORT_HTML_STYLE_ATTR_RE.lastIndex = 0;
+    for (let a = FE_EXPORT_HTML_STYLE_ATTR_RE.exec(text); a !== null; a = FE_EXPORT_HTML_STYLE_ATTR_RE.exec(text)) {
+      const value = a[1];
+      if (!value.includes("url(")) continue;
+      FE_EXPORT_HTML_STYLE_URL_RE.lastIndex = 0;
+      for (let m = FE_EXPORT_HTML_STYLE_URL_RE.exec(value); m !== null; m = FE_EXPORT_HTML_STYLE_URL_RE.exec(value)) {
+        found.push(m[2]);
+      }
+    }
+  }
+  const { fonts, images } = feClassifySnapshotAssetUrls(found);
+  if (!fonts.length && !images.length) return parts;
+
+  setMeta("Embedding inline style assets…");
+  await store.admit(fonts, "font");
+  await store.admit(images, "image");
+  if (!store.embedded.size) return parts;
+
+  return parts.map((part) => {
+    const text = String(part ?? "");
+    if (!text.includes("url(")) return part;
+    try {
+      return text.replace(FE_EXPORT_HTML_STYLE_ATTR_RE, (attrMatch, value) => {
+        if (!value.includes("url(")) return attrMatch;
+        const rewritten = value.replace(FE_EXPORT_HTML_STYLE_URL_RE, (match, quote, raw) => {
+          const dataUrl = store.embedded.get(String(raw ?? "").trim());
+          if (!dataUrl) return match;
+          // Always entity-escaped: we are inside a double-quoted HTML attribute, so a
+          // literal `"` would terminate it and leak the rest of the declaration into
+          // the markup. A data URL itself contains no `"`, `)` or `&`.
+          return `url(&quot;${dataUrl}&quot;)`;
+        });
+        return rewritten === value ? attrMatch : `style="${rewritten}"`;
+      });
+    } catch {
+      return part;
+    }
+  });
 }
 
 async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { meta, bodyRoot = null } = {}) {
@@ -502,7 +832,12 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // Must run AFTER inlining (it operates on the inlined CSS text) and BEFORE the
   // embedded-font <style> is appended below — that block is already data: URLs and
   // its cross-origin NeoDGM @import is not ours to touch.
-  await feEmbedSnapshotCssAssets(headClone, doc, setMeta);
+  //
+  // The store is shared with feEmbedSnapshotInlineStyleAssets after the body is
+  // serialized, so an asset referenced from both a <style> block and a mirrored
+  // inline style attribute is fetched once and counted against the budget once.
+  const assetStore = feCreateSnapshotAssetStore();
+  await feEmbedSnapshotCssAssets(headClone, doc, setMeta, assetStore);
 
   // Embed custom fonts (optional).
   if (feSetting(S.EXPORT_EMBED_FONTS)) {
@@ -571,10 +906,14 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         // Shared image-byte budget for the saved HTML. Pre-embed downscaling
         // spends part of it (dsStats.bytesUsed); feEmbedImagesInNode gets only
         // what's left so downscaled + leftover-embedded images never exceed it.
-        // Shared ceiling for downscaled + embedded bytes. Raised 12MB → 24MB with the
-        // per-image cap: overflowing it is not "a smaller file", it is images that only
-        // load on this machine.
-        const HTML_EMBED_TOTAL_BYTES = 24_000_000;
+        // Shared ceiling for downscaled + embedded bytes. Overflowing it is not "a
+        // smaller file", it is images that only load on this machine (the saved HTML
+        // falls back to an absolute http://<foundry-host>/ src).
+        // 12MB → 24MB → 250MB. The last raise is an explicit user decision
+        // (2026-08-12): size does not matter, offline completeness does. Sized to
+        // carry 4-5x the 1900-message log measured that day — see the matching note
+        // on MAX_TOTAL_BYTES in feEmbedImagesInNode for the measurement.
+        const HTML_EMBED_TOTAL_BYTES = 250_000_000;
         const dsStats = {};
         let downscaleRestore = () => {};
         try {
@@ -655,6 +994,15 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
     try { restoreLayout(); } catch {}
     try { restoreShell(); } catch {}
     try { restoreBg(); } catch {}
+  }
+
+  // Inline `style="… url(…) …"` assets, embedded on the SERIALIZED strings so there
+  // is nothing to restore in the still-open archive document. Must run after the
+  // body is serialized, for the obvious reason that that is when the strings exist.
+  try {
+    bodyParts = await feEmbedSnapshotInlineStyleAssets(bodyParts, setMeta, assetStore);
+  } catch (err) {
+    console.warn("female_edition | HTML export: failed to embed inline style assets", err);
   }
 
   // ---
@@ -823,15 +1171,27 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
   // Optional: embed Hakgyoansim Geurimilgi.
   // If present, we embed it so saved file:// HTML keeps the same look.
+  //
+  // OTF FIRST — the same typeface ships as a 730KB .otf and a 6.3MB .ttf. Preferring
+  // the OTF cuts ~5.6MB of binary (≈7.5MB of base64) out of every saved archive and
+  // brings the face under the GENERIC url() embedder's per-file cap too, so it now
+  // gets embedded even when this opt-in setting is off. The TTF is kept only as a
+  // belt-and-braces second candidate (it costs one extra HEAD when the OTF is
+  // missing); it is otherwise redundant now and is a deletion candidate.
   let geurimilgiEmbedded = false;
   try {
-    const geurUrl = `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`;
-    const geurimilgiData = await fetchFont(geurUrl, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
-    if (geurimilgiData) {
+    const geurCandidates = [
+      { url: `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.otf`, fmt: "opentype" },
+      { url: `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`, fmt: "truetype" },
+    ];
+    for (const { url, fmt } of geurCandidates) {
+      const geurimilgiData = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
+      if (!geurimilgiData) continue;
       faces.push(
-        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("truetype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
+        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("${fmt}");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
       );
       geurimilgiEmbedded = true;
+      break;
     }
   } catch {}
 
@@ -1035,7 +1395,7 @@ async function feFetchAsDataURLCapped(url, maxBytes) {
   const controller = new AbortController();
   const timeoutTimer = setTimeout(() => controller.abort(), FE_EXPORT_RESOURCE_FETCH_TIMEOUT);
   try {
-    const res = await fetch(url, { credentials: "include", signal: controller.signal });
+    const res = await fetch(url, { credentials: feSnapshotFetchCredentials(url), signal: controller.signal });
     if (!res.ok) return null;
 
     // Carry the response's own MIME into the Blob we assemble from the stream.
@@ -1158,13 +1518,27 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
   // an image only the exporting user can load. So they are set well above what a
   // downscaled log needs; the console warning at the end of the pass reports any image
   // that still fell through.
-  const MAX_IMAGES = 600;
-  // ~24MB (binary) before base64/string expansion. Caller may pass a smaller cap
+  // COUNT cap, and the one that actually bit. Measured on the 2026-08-12 export
+  // (1900 messages): 2096 <img> elements, of which ~1980 kept a Foundry-origin src.
+  // With the old 600 the pass stopped after the first 600 elements no matter how
+  // much byte budget was left — a log this size could never finish embedding.
+  // 8000 covers ~4x this log; it is a runaway guard, not a tuning knob.
+  const MAX_IMAGES = 8000;
+  // Binary bytes before base64/string expansion. Caller may pass a smaller cap
   // (shared budget) — e.g. after pre-embed downscaling already spent part of it.
-  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 24_000_000;
-  // ~4MB per image. The old 0.8MB dropped full-size NPC portrait art outright
-  // whenever it escaped downscaling. Over this, the image is compressed (never dropped).
-  const MAX_PER_IMAGE = 4_000_000;
+  // Explicit user decision (2026-08-12): file size does not matter, offline
+  // completeness does. Measured demand for the 1900-message log above is ~50MB
+  // post-downscale (24.5MB actually embedded before the budget ran dry, plus 42
+  // distinct source files totalling 71.7MB on disk that downscale to ~25MB), so
+  // 250MB carries 4-5x that log. The saved HTML is assembled as an ARRAY of
+  // per-message strings passed to new Blob() (feSerializeBodyToParts), never one
+  // giant string, so V8's ~512MB max string length is not a ceiling here.
+  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 250_000_000;
+  // Over this, the image is compressed (never dropped). Raised 4MB → 16MB so that
+  // full-resolution art escaping the downscale pass is embedded as-is instead of
+  // being re-encoded; at 4MB the largest character portraits in the world above
+  // (up to ~9MB) were all taking the compressor path.
+  const MAX_PER_IMAGE = 16_000_000;
   // Absolute stop for the compress-past-the-budget path below.
   const HARD_TOTAL_CEILING = Math.round(MAX_TOTAL_BYTES * 1.5);
 

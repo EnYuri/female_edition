@@ -9,8 +9,7 @@ all bundled-font license notices.
   Font                          Files                                License
   ----------------------------  -----------------------------------  ----------------------
   CookieRun (Black/Bold/Reg.)   CookieRun *.otf / *.ttf              CookieRun Font License
-  학교안심 그림일기체          HakgyoansimGeurimilgi-R.ttf          Free font (see below)
-  Neo둥근모                     neodgm.ttf                           SIL OFL 1.1
+  학교안심 그림일기체          HakgyoansimGeurimilgi-R.otf / .ttf   Free font (see below)
   Neo둥근모 Pro                 CDN 웹폰트 (jsDelivr)                 SIL OFL 1.1
 
 
@@ -48,17 +47,12 @@ Source / official distribution:
 
 
 ========================================================================
- 3. Neo둥근모 & Neo둥근모 Pro — SIL Open Font License 1.1
+ 3. Neo둥근모 Pro — SIL Open Font License 1.1
 ========================================================================
 
-The following copyright notices apply to the fonts in this section. The
-full SIL Open Font License 1.1 text below covers both.
-
-Copyright (c) 2017-2021, Eunbin Jeong (Dalgona.)
-  <project-neodgm@dalgona.dev>
-  with Reserved Font Name "Neo둥근모", "Neo둥근모 Code",
-  "NeoDunggeunmo", and "NeoDunggeunmo Code".
-  https://github.com/neodgm/neodgm
+Neo둥근모 Pro is NOT bundled as a file — it is loaded from the official
+jsDelivr webfont CDN (see styles/ui-font.css). This notice is kept
+because the archive export embeds that face into saved HTML files.
 
 Copyright (c) 2022, Eunbin Jeong (Dalgona.)
   <project-neodgm@dalgona.dev>

@@ -423,6 +423,26 @@ function feEnsurePrintCSSOverrides() {
 
   const style = document.createElement("style");
   style.id = styleId;
+  // NOTE ON THE SELECTORS BELOW — these no longer depend on `body.game`.
+  //
+  // `body.game` DOES still exist on v14, but it does NOT come from anything a search of
+  // client/ or the view templates will show you: `dist/server/views/game.mjs` passes no
+  // bodyClass at all, and `client/game.mjs#configureUI` only adds `performance-*`,
+  // `noblur` and `theme-*`. It is an EXPRESS MIDDLEWARE DEFAULT —
+  // `dist/server/express.mjs` sets `res.locals.bodyClass = ["vtt", <first URL segment>,
+  // "system-<id>"]`, so `/game` happens to yield `vtt game system-dnd5e`. Verified in a
+  // real saved archive whose body class list starts exactly that way.
+  //
+  // Depending on a class whose only source is the request path is still a bad bet, so
+  // the gate is now `.fe-print-chatlog` — the class WE set, which is the actual
+  // precondition. `.fe-print-chatlog` is repeated to keep the ORIGINAL (0,2,1)
+  // specificity that `.game.fe-print-chatlog` had. Do not "simplify" it to one class.
+  //
+  // `#pause` is hidden by name as well as by the direct-child rule. It IS a direct
+  // child of <body> today (game.hbs declares `<template id="pause">` at top level and
+  // AppV2's _insertElement replaces it in place), but it is `position: fixed`,
+  // full-width, with a cool-blue gradient and a running `pulse` animation, so if that
+  // ever changes it would paint over every printed page.
   style.textContent = `
 @media print {
   html {
@@ -431,7 +451,7 @@ function feEnsurePrintCSSOverrides() {
     overflow: visible !important;
   }
 
-  body.game.fe-print-chatlog {
+  body.fe-print-chatlog.fe-print-chatlog {
     position: static !important;
     display: block !important;
     width: auto !important;
@@ -440,11 +460,37 @@ function feEnsurePrintCSSOverrides() {
     background: #fff !important;
   }
 
-  body.game.fe-print-chatlog > :not(#fe-chat-export-container) {
+  body.fe-print-chatlog.fe-print-chatlog > :not(#fe-chat-export-container) {
     display: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-container {
+  /* The paused banner, named explicitly rather than relying on the direct-child rule
+   * above. It is \`position: fixed\` with a full-width cool-blue gradient and a running
+   * \`pulse\` animation, so if it ever stops being a direct child of <body> it would
+   * paint over the whole printed page again — the exact symptom this block fixes. */
+  body.fe-print-chatlog.fe-print-chatlog #pause {
+    display: none !important;
+    animation: none !important;
+  }
+
+  /* Body PSEUDO-ELEMENT overlays. Neither the direct-child rule nor the #pause rule
+   * above can reach one — it is not a child and has no id. Observed live: monks-little-
+   * details paints its paused vignette as
+   *   body.mld-paused:after { box-shadow: rgba(77,208,225,.5) 0 0 100px 50px inset }
+   * and the archive copies the live <body> class list verbatim, so the cyan glow reached
+   * every exported PDF. Kept in sync with fe-chat-archive.css; this UNLAYERED copy is the
+   * one that actually wins (see the layer note there). We declare no body pseudo-element
+   * of our own, so blanking them is safe. */
+  body.fe-print-chatlog.fe-print-chatlog::before,
+  body.fe-print-chatlog.fe-print-chatlog::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-container {
     display: block !important;
     position: static !important;
     inset: auto !important;
@@ -459,11 +505,11 @@ function feEnsurePrintCSSOverrides() {
     border: 0 !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
     display: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-log {
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-log {
     display: block !important;
     flex: none !important;
     height: auto !important;
@@ -471,11 +517,45 @@ function feEnsurePrintCSSOverrides() {
     max-height: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-log .chat-message :is(.message-header, .message-sender) {
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-log .chat-message :is(.message-header, .message-sender) {
     break-inside: avoid;
     page-break-inside: avoid;
     break-after: avoid;
     page-break-after: avoid;
+  }
+
+  /* Roll breakdowns / collapsibles print OPEN. Kept in sync with the
+   * "ALWAYS EXPANDED" block in styles/fe-chat-archive.css; this UNLAYERED copy is
+   * the one that actually wins the cascade (see the layer note in that file). */
+  body.fe-print-chatlog.fe-print-chatlog .chat-message :is(
+    .dice-roll .dice-tooltip,
+    .dice-result .dice-tooltip-collapser,
+    .collapsible .collapsible-content,
+    .collapsible.collapsed .collapsible-content
+  ) {
+    display: grid !important;
+    grid-template-rows: 1fr !important;
+    transition: none !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body.fe-print-chatlog.fe-print-chatlog .chat-message :is(
+    .dice-roll .dice-tooltip > .wrapper,
+    .dice-result .dice-tooltip-collapser > .wrapper,
+    .collapsible-content > .wrapper,
+    .dice-result .dice-tooltip
+  ) {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body.fe-print-chatlog.fe-print-chatlog .chat-message :is(
+    .collapsible.collapsed .fa-caret-down,
+    .dice-roll .dice-total::after
+  ) {
+    transform: none !important;
   }
 
   @page {
@@ -780,6 +860,20 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
       void container.offsetHeight;
       void logEl.offsetHeight;
     } catch {}
+
+    // Fonts must be SETTLED before window.print(). The popup path has always done this
+    // (feEnsureArchiveEmbeddedFonts + feWaitForFonts before win.print()); this inline
+    // fallback went straight from the image wait to print, so Chromium could capture the
+    // page while a webface was still loading and rasterize the fallback font into the
+    // PDF — the "PDF에 폰트가 임베드되지 않는다" symptom, even though the same document
+    // looked correct on screen a moment later.
+    //
+    // No font CSS is injected here, unlike the popup: this IS the live Foundry document,
+    // so ui-font.css and its @font-face rules are already loaded. Injecting the archive's
+    // embedded-font block would drop an UNLAYERED `html, body { font-family: … !important }`
+    // (plus :root --font-* overrides) onto the live UI — see feBuildEmbeddedCookieRunFontCSS.
+    metaEl.textContent = "Loading fonts…";
+    await feWaitForFonts(document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
 
     metaEl.textContent = "Opening print dialog…";
 
@@ -1444,13 +1538,164 @@ function feArchiveMessageContentLooksEmpty(node) {
   }
 }
 
+// Every collapsible thing in an exported log is forced OPEN. A caret cannot be
+// clicked on paper, so a collapsed section is simply lost information — and the
+// export pipeline breaks the clipping those collapsers rely on (see the
+// "ALWAYS EXPANDED" block in styles/fe-chat-archive.css), which made a collapsed
+// die breakdown print ON TOP of the total row.
+//
+// TWO different mechanisms, and removing `.collapsed` only covers the first:
+//   dnd5e2 `.collapsible`  → collapsed is the OPT-IN state (`.collapsed`)
+//   core/dnd5e `.dice-roll`→ expanded is the OPT-IN state (`.expanded`); the
+//                            tooltip (`.dice-tooltip`) and dnd5e's
+//                            `.dice-tooltip-collapser` both sit at
+//                            `grid-template-rows: 0fr` until then.
+// Measured on the 2026-08-12 export: `collapsible collapsed` occurred 0 times
+// (already handled) while `dice-roll expanded` also occurred 0 times across all
+// 252 dice rolls — i.e. every single roll breakdown was collapsed.
 function feExpandCollapsedArchiveSections(node) {
   try {
     if (!feIsElement(node)) return;
     for (const el of node.querySelectorAll?.(".collapsible.collapsed") ?? []) {
       try { el.classList.remove("collapsed"); } catch {}
     }
+    for (const el of node.querySelectorAll?.(".dice-roll") ?? []) {
+      try { el.classList.add("expanded"); } catch {}
+    }
   } catch {}
+}
+
+// midi-qol's damage-application cards are self-titled ("HP 업데이트 됨" and a
+// per-target table) and are whispered to the GM. Their sender header is pure
+// noise in an export — it repeats the GM's own name, adds a "To: <GM>" subtitle
+// and (because our portrait injector treats them like any other message) a 64px
+// portrait, for a card that is a bookkeeping receipt.
+//
+// midi-qol hides that header itself for the two variants it tags in JS:
+//   .midi-qol-dmg-app-msg    .message-header { display:none }   (css/styles.css:686)
+//   .midi-qol-player-dmg-msg .message-header { display:none }   (css/styles.css:912)
+// Those classes come from `ChatMessageMidi._addMarkerClasses`, which keys off
+// `.xmidi-qol-flex-container` / `.midi-qol-player-damage-card` — neither of which
+// the GM template `templates/damage-results.html` emits (its root is a bare
+// `.midi-qol-damage-card.collapsible.dnd5e2-collapsible`). So the GM variant is
+// the one card in the family midi's own rules miss.
+//
+// Match the whole family on the ROOT card class instead of the marker classes,
+// so all three variants (and the "classic" card style) behave the same.
+function feMarkHeaderlessArchiveCards(node) {
+  try {
+    if (!feIsElement(node)) return;
+    const hasDamageCard = !!node.querySelector?.(
+      ":scope > .message-content .midi-qol-damage-card, :scope > .message-content .midi-qol-player-damage-card"
+    );
+    node.classList.toggle("fe-archive-headerless-card", hasDamageCard);
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// dnd5e-icon inlining
+//
+// dnd5e renders its SVG icons through a CUSTOM ELEMENT whose content lives in a
+// **closed** shadow root (`attachShadow({mode:"closed"})`, dnd5e.mjs IconElement,
+// `:host{display:contents}`). Two consequences for an export:
+//   1. `cloneNode` never copies a shadow root, so our cloned message carries an
+//      empty `<dnd5e-icon src="…">`.
+//   2. The archive popup / saved HTML file has no dnd5e JS, so the element is
+//      never upgraded and nothing is ever painted — not even a broken-image glyph,
+//      because an undefined custom element is just an empty inline box.
+// Measured on the 2026-08-12 export: 57 `<dnd5e-icon>` tags, 0 containing an
+// `<svg>`. Every dnd5e icon was missing (damage types, statuses, the healing
+// icon next to a heal total); only the last one was noticed.
+//
+// Fix: fetch each distinct SVG ONCE from the live (same-origin) document and
+// graft it into the element as a light-DOM child, reproducing IconElement.CSS in
+// the archive stylesheet. No shadow root, no custom element, no network at view
+// time — and the snapshot serializer picks it up for free because it is now
+// ordinary inline markup.
+// ---------------------------------------------------------------------------
+
+const FE_DND5E_ICON_SVG_CACHE = new Map(); // src → Promise<string|null>
+const FE_DND5E_ICON_FETCH_TIMEOUT = 4000;
+
+function feFetchDnd5eIconSvg(src) {
+  if (FE_DND5E_ICON_SVG_CACHE.has(src)) return FE_DND5E_ICON_SVG_CACHE.get(src);
+  const promise = (async () => {
+    try {
+      // A bare relative fetch resolves against the current URL (/game), not the
+      // app root — same trap as fe-animated-tile.js. Go through the <base href>.
+      const base = feGetFoundryBaseHref() || document.baseURI;
+      const url = new URL(src, base).href;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FE_DND5E_ICON_FETCH_TIMEOUT);
+      let text = null;
+      try {
+        const res = await fetch(url, { signal: ctrl.signal });
+        if (res.ok) text = await res.text();
+      } finally {
+        clearTimeout(timer);
+      }
+      return text;
+    } catch {
+      return null;
+    }
+  })();
+  FE_DND5E_ICON_SVG_CACHE.set(src, promise);
+  return promise;
+}
+
+async function feInlineDnd5eIcons(rootEl, targetDoc) {
+  try {
+    if (!feIsElement(rootEl)) return;
+    const doc = targetDoc || rootEl.ownerDocument || document;
+    const nodes = Array.from(
+      rootEl.querySelectorAll?.("dnd5e-icon[src], i.dnd5e-icon[data-src]") ?? []
+    ).filter((el) => el.dataset?.feIconInlined !== "1" && !el.querySelector?.("svg"));
+    if (!nodes.length) return;
+
+    // Group by source so a chat log with 57 icons issues ~10 fetches.
+    const bySrc = new Map();
+    for (const el of nodes) {
+      const src = el.getAttribute("src") || el.dataset?.src;
+      if (!src) continue;
+      if (!bySrc.has(src)) bySrc.set(src, []);
+      bySrc.get(src).push(el);
+    }
+
+    await Promise.all(
+      Array.from(bySrc.entries()).map(async ([src, els]) => {
+        const text = await feFetchDnd5eIconSvg(src);
+        if (!text) return;
+        let template = null;
+        try {
+          const parsed = new DOMParser().parseFromString(text, "image/svg+xml");
+          const root = parsed.documentElement;
+          if (!root || root.nodeName.toLowerCase() !== "svg") return;
+          // Defensive: an SVG can carry <script>/on* handlers. The archive is
+          // written to a file the user opens directly, so strip them.
+          for (const bad of root.querySelectorAll("script, foreignObject")) bad.remove();
+          for (const el of [root, ...root.querySelectorAll("*")]) {
+            for (const attr of Array.from(el.attributes ?? [])) {
+              if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+            }
+          }
+          template = root;
+        } catch { return; }
+        for (const el of els) {
+          try {
+            const svg = doc.importNode(template, true);
+            svg.classList.add("fe-dnd5e-icon-svg");
+            // Width/height come from CSS (IconElement.CSS), matching live sizing.
+            svg.removeAttribute("width");
+            svg.removeAttribute("height");
+            el.replaceChildren(svg);
+            el.dataset.feIconInlined = "1";
+          } catch {}
+        }
+      })
+    );
+  } catch (err) {
+    console.warn("female_edition | dnd5e-icon inlining failed", err);
+  }
 }
 
 function feFinalizeArchiveSpecialMessageState(node, msg, liveEl = null) {
@@ -1760,6 +2005,12 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
     } catch {}
   }
 
+  if (feIsElement(node)) {
+    try {
+      feMarkHeaderlessArchiveCards(node);
+    } catch {}
+  }
+
   return feIsElement(node) ? node : null;
 }
 
@@ -2012,6 +2263,36 @@ async function feRenderChatArchiveWindow(win, {
         transform: none !important;
       }
 
+      /* …and the roll breakdowns, which collapse the OTHER way round: core and
+       * dnd5e keep .dice-tooltip / .dice-tooltip-collapser at
+       * grid-template-rows:0fr until .dice-roll gains .expanded.
+       * feExpandCollapsedArchiveSections adds that class; this is the CSS
+       * backstop for nodes that never went through it.
+       * NO BACKTICKS IN THIS BLOCK — it lives inside a JS template literal, so a
+       * backtick terminates the string (this already broke the export once). */
+      #fe-chat-export-log .dice-roll .dice-tooltip,
+      #fe-chat-export-log .dice-result .dice-tooltip-collapser {
+        grid-template-rows: 1fr !important;
+      }
+      #fe-chat-export-log .dice-roll .dice-tooltip > .wrapper,
+      #fe-chat-export-log .dice-result .dice-tooltip-collapser > .wrapper,
+      #fe-chat-export-log .dice-result .dice-tooltip {
+        overflow: visible !important;
+      }
+
+      /* dnd5e SVG icons grafted in by feInlineDnd5eIcons. Reproduces
+       * IconElement.CSS from dnd5e.mjs, whose :host / svg rules live in a closed
+       * shadow root that does not survive an export. The host keeps
+       * display:contents so surrounding flex/grid layout is unchanged. */
+      #fe-chat-export-log dnd5e-icon {
+        display: contents;
+      }
+      #fe-chat-export-log svg.fe-dnd5e-icon-svg {
+        fill: var(--icon-fill, #000);
+        width: var(--icon-width, var(--icon-size, 1em));
+        height: var(--icon-height, var(--icon-size, 1em));
+      }
+
       @media print {
         html, body {
           -webkit-print-color-adjust: exact !important;
@@ -2062,6 +2343,18 @@ async function feRenderChatArchiveWindow(win, {
           break-after: auto !important;
           page-break-after: auto !important;
           margin-bottom: 0 !important;
+        }
+
+        /* Bordered boxes must not be split across a page boundary — see the identical
+         * block in styles/fe-chat-archive.css for the full rationale. Keep the two
+         * selector lists in sync. */
+        #fe-chat-export-log :is(
+          .dice-roll, .dice-total, .dice-formula, .dice-result, .dice-tooltip,
+          .card-header, .card-footer, .card-buttons button, .pill, .tag,
+          [class*="midi-qol-"]
+        ) {
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
 
         /* PDF 안정성: 이미지 숨김 옵션 */
@@ -2394,6 +2687,12 @@ async function feRenderChatArchiveWindow(win, {
     feNormalizeArchiveShellLayout(win.document);
     feNormalizeArchiveMessageLayout(logEl);
   } catch {}
+
+  // Must run BEFORE the snapshot/print steps: it turns empty <dnd5e-icon> custom
+  // elements into real inline <svg>. Awaited (a handful of same-origin fetches,
+  // cached by src) so the icons exist for both the popup paint and the serializer.
+  if (metaEl) metaEl.textContent = "Inlining icons…";
+  await feInlineDnd5eIcons(logEl, win.document);
 
   try {
     feFireArchiveRenderUpdated(win.document, logEl);

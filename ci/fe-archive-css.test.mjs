@@ -112,13 +112,15 @@ test("assemble: layer ORDER is preserved even when the first sheet fails to inli
   assert.ok(importIdx < blockIdx, "network @import must precede the @layer{} block");
 });
 
-test("assemble: nested @import inside an inlined body is hoisted to the top", () => {
+test("assemble: an UNINLINABLE nested @import is hoisted to the top", () => {
   const block = '@import "modules/fe/styles/ui-font.css" layer(layouts);';
   const inlined =
     '@import url("https://cdn.example/neodgm.css");\n@font-face{font-family:X;src:url("http://localhost:30000/modules/fe/font/x.ttf")}';
   const { text } = feAssembleInlinedStyleBlock(block, {
     resolveAbs,
-    getInlinedCss: () => inlined,
+    // Only the parent resolves; the nested CDN sheet does not (cross-origin host not
+    // on the allowlist, fetch failed, over budget — all reach here as null).
+    getInlinedCss: (abs) => (abs.includes("ui-font.css") ? inlined : null),
   });
   // The nested CDN import is hoisted out of the @layer block...
   const nestedIdx = text.indexOf('@import "https://cdn.example/neodgm.css";');
@@ -129,6 +131,53 @@ test("assemble: nested @import inside an inlined body is hoisted to the top", ()
   const body = text.slice(layerIdx);
   assert.ok(!body.includes("neodgm.css"), "nested @import must not stay inside @layer{}");
   assert.match(body, /@font-face\{font-family:X/);
+});
+
+test("assemble: an inlinable nested @import is substituted in place, not hoisted", () => {
+  const block = '@import "modules/fe/styles/ui-font.css" layer(layouts);';
+  const parent =
+    '@import url("https://cdn.example/neodgm.css");\n@font-face{font-family:X;src:url("http://localhost:30000/modules/fe/font/x.ttf")}';
+  const nested = '@font-face{font-family:"NeoDunggeunmo Pro";src:url("https://cdn.example/neodgm_pro.woff2")}';
+  const { text } = feAssembleInlinedStyleBlock(block, {
+    resolveAbs,
+    getInlinedCss: (abs) => (abs.includes("ui-font.css") ? parent : null),
+    getNestedInlinedCss: (abs) => (abs.includes("neodgm.css") ? nested : null),
+  });
+  // The nested body lands inside the layer block; @font-face is layer-agnostic.
+  const layerIdx = text.indexOf("@layer layouts {");
+  assert.ok(layerIdx !== -1, "parent must still be inlined into its layer block");
+  const body = text.slice(layerIdx);
+  assert.match(body, /@font-face\{font-family:"NeoDunggeunmo Pro"/);
+  assert.match(body, /neodgm_pro\.woff2/);
+  // Nothing is left pointing at the nested stylesheet itself.
+  assert.ok(!text.includes('@import "https://cdn.example/neodgm.css"'), "must not also hoist it");
+  assert.ok(!body.includes("@import"), "no @import may remain inside @layer{}");
+});
+
+test("assemble: a nested @import carrying its own layer() is never inlined", () => {
+  const block = '@import "modules/fe/styles/ui-font.css" layer(layouts);';
+  const parent = '@import url("https://cdn.example/other.css") layer(extra);\n.a{color:red}';
+  const { text } = feAssembleInlinedStyleBlock(block, {
+    resolveAbs,
+    getInlinedCss: (abs) => (abs.includes("ui-font.css") ? parent : null),
+    getNestedInlinedCss: () => "SHOULD-NOT-BE-USED",
+  });
+  assert.ok(!text.includes("SHOULD-NOT-BE-USED"), "layered nested import must not be inlined");
+  assert.match(text, /@import "https:\/\/cdn\.example\/other\.css" layer\(extra\);/);
+});
+
+test("assemble: without getNestedInlinedCss, nested imports still hoist (no double-inline)", () => {
+  // The regression guard for the split: getInlinedCss alone must NEVER inline a
+  // nested import. The caller's top-level map holds every same-origin sheet, so a
+  // sheet that @imports another top-level sheet would otherwise be emitted twice.
+  const block = '@import "modules/fe/a.css" layer(layouts);';
+  const parent = '@import url("http://localhost:30000/modules/fe/b.css");\n.a{color:red}';
+  const { text } = feAssembleInlinedStyleBlock(block, {
+    resolveAbs,
+    getInlinedCss: (abs) => (abs.includes("a.css") ? parent : ".b{color:blue}"),
+  });
+  assert.ok(!text.includes(".b{color:blue}"), "nested body must not be inlined via getInlinedCss");
+  assert.match(text, /@import "http:\/\/localhost:30000\/modules\/fe\/b\.css";/);
 });
 
 test("assemble: media-qualified import stays a network import (never inlined)", () => {

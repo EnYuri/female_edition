@@ -109,6 +109,32 @@ body.fe-print-chatlog > :not(#fe-chat-export-container) {
   display: none !important;
 }
 
+/* Full-screen overlays painted as BODY PSEUDO-ELEMENTS survive everything above:
+ * a pseudo-element is not a child, so the `> :not(#fe-chat-export-container)` rule
+ * cannot reach it, and it has no id to name the way `#pause` is named.
+ *
+ * Observed live (2026-08-12, "PDF 저장.pdf" / "HTML 저장 후 PDF 저장.pdf"):
+ * monks-little-details paints its paused vignette as
+ *   body.mld-paused:after { box-shadow: rgba(77,208,225,.5) 0 0 100px 50px inset }
+ * The archive copies the live <body> class list verbatim, so `mld-paused` rides along
+ * into the popup, into every printed PDF, AND into the saved HTML (whose inliner also
+ * embeds MLD's sheet) — i.e. all three export artifacts kept the cyan pause glow.
+ *
+ * Killing body pseudo-elements outright is safe: female_edition declares none
+ * (grep `body::before|body::after` over styles/ returns nothing), and no chat content
+ * lives in one. Do NOT narrow this to `.mld-paused` — any module can do the same trick.
+ */
+body.fe-print-chatlog.fe-print-chatlog::before,
+body.fe-print-chatlog.fe-print-chatlog::after,
+body.fe-chat-archive.fe-chat-archive::before,
+body.fe-chat-archive.fe-chat-archive::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
 body.fe-print-chatlog #fe-chat-export-title {
   margin: 0 0 6px 0;
   padding: 0;
@@ -141,12 +167,22 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   }
 
   /*
-   * Foundry runs the app in a fixed viewport (body.game) with overflow hidden.
-   * If we don't reset *that specific selector* for print, Chromium will only
-   * print the visible viewport (1 page) even if the export log is long.
+   * Foundry runs the app in a fixed viewport with overflow hidden. If we don't reset
+   * it for print, Chromium will only print the visible viewport (1 page) even if the
+   * export log is long.
    *
-   * We intentionally target body.game.fe-print-chatlog to beat Foundry's own
-   * body.game rules (often marked !important).
+   * These no longer gate on `body.game`. That class DOES exist on v14, but not from
+   * anywhere in client/ or the view templates — it is an Express middleware default
+   * (`dist/server/express.mjs`: bodyClass = ["vtt", <first URL segment>, "system-<id>"],
+   * so /game yields `vtt game system-dnd5e`). Gating our print rules on a class whose
+   * only source is the request path is a bad bet, so they now gate on `.fe-print-chatlog`
+   * — the class we set ourselves, which is the real precondition. It is repeated to
+   * preserve the original (0,2,1) specificity; do not collapse it to one class.
+   *
+   * This sheet is layer(modules), so its !important LOSES to any core !important in an
+   * earlier layer (see CLAUDE.md — !important layer order is reversed). The rules that
+   * actually win the fight are the identical, UNLAYERED ones injected by
+   * feEnsurePrintCSSOverrides in fe-chat-archive.js. Keep the two in sync.
    */
   html {
     width: auto !important;
@@ -154,7 +190,7 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
     overflow: visible !important;
   }
 
-  body.game.fe-print-chatlog {
+  body.fe-print-chatlog.fe-print-chatlog {
     position: static !important;
     display: block !important;
     width: auto !important;
@@ -163,11 +199,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
     background: #fff !important;
   }
 
-  body.game.fe-print-chatlog > :not(#fe-chat-export-container) {
+  body.fe-print-chatlog.fe-print-chatlog > :not(#fe-chat-export-container) {
     display: none !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-container {
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-container {
     display: block !important;
     position: static !important;
     inset: auto !important;
@@ -182,11 +218,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
     border: 0 !important;
   }
 
-  body.game.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
+  body.fe-print-chatlog.fe-print-chatlog #fe-chat-export-container .fe-chat-export-toolbar {
     display: none !important;
   }
 
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
+  body.fe-print-chatlog.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) {
     display: block !important;
     flex: none !important;
     height: auto !important;
@@ -195,17 +231,44 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
   }
 
   /* Keep message headers together and attached to content */
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message :is(.message-header, .message-sender) {
+  body.fe-print-chatlog.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message :is(.message-header, .message-sender) {
     break-inside: avoid;
     page-break-inside: avoid;
     break-after: avoid;
     page-break-after: avoid;
   }
 
-  body.game.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message:last-child {
+  body.fe-print-chatlog.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) .chat-message:last-child {
     break-after: auto !important;
     page-break-after: auto !important;
     margin-bottom: 0 !important;
+  }
+
+  /*
+   * Bordered boxes must not be split across a page boundary.
+   *
+   * CSS `box-decoration-break` defaults to `slice`, which means a fragmented box gets
+   * NO border on its cut edge — the bottom border stays behind on page N and the top
+   * border is not redrawn on page N+1. Visually that reads as "the box's outline is
+   * partly missing / faded", which is exactly the reported symptom on the last page.
+   *
+   * This is deliberately NOT applied to `.chat-message` itself. Measured on a real
+   * export at print width (718px = A4 minus 10mm margins): messages are 106 / 1182 /
+   * 679 / … px tall against a 1047px printable page height, so a whole-message
+   * `avoid` would either be ignored (over-tall messages) or push short ones onto a
+   * fresh page and leave large blank areas. Only the inner boxes are targeted.
+   *
+   * `[class*="midi-qol-"]` is broad on purpose and is safe: per spec a UA IGNORES
+   * `break-inside: avoid` when the fragment cannot fit a page, so an over-tall
+   * midi-qol wrapper simply splits as it does today rather than blanking a page.
+   */
+  body.fe-print-chatlog.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) :is(
+    .dice-roll, .dice-total, .dice-formula, .dice-result, .dice-tooltip,
+    .card-header, .card-footer, .card-buttons button, .pill, .tag,
+    [class*="midi-qol-"]
+  ) {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   @page {
@@ -905,7 +968,7 @@ body.fe-retro-theme .fe-chat-export-action:hover {
 }
 
 @media print {
-  body.game.fe-print-chatlog.fe-retro-theme {
+  body.fe-print-chatlog.fe-print-chatlog.fe-retro-theme {
     background: #000000 !important;
   }
 }
@@ -1093,4 +1156,91 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
   min-width: 0 !important;
   min-inline-size: 0 !important;
   box-sizing: border-box !important;
+}
+
+
+/* ==========================================================================
+ * Roll breakdowns & collapsibles: ALWAYS EXPANDED in exports
+ * ==========================================================================
+ * Reported 2026-08-12 ("HTML 저장 → PDF 인쇄" path): the collapsed die
+ * breakdown printed ON TOP of the total/HP row.
+ *
+ * There are THREE independent 0fr-grid collapsers in play, all of which rely
+ * on the child wrapper clipping:
+ *   core   .dice-roll .dice-tooltip            { display:grid; grid-template-rows:0fr }
+ *          .dice-roll .dice-tooltip > .wrapper { overflow:hidden }
+ *          .dice-roll.expanded .dice-tooltip   { grid-template-rows:1fr }
+ *   dnd5e  .dice-result .dice-tooltip-collapser{ display:grid; grid-template-rows:0fr }
+ *          .dice-roll.expanded .dice-tooltip-collapser { grid-template-rows:1fr }
+ *   dnd5e2 .collapsible .collapsible-content   { display:grid; grid-template-rows:1fr }
+ *          .collapsible.collapsed …            { grid-template-rows:0fr }
+ *
+ * The export pipeline breaks that clipping in two places — the print rule
+ * `.collapsible-content > .wrapper { overflow: visible }` further up, and the
+ * `display: block !important` this file forces onto
+ * `.details.collapsible-content.card-content` (which destroys the grid, so
+ * `grid-template-rows: 0fr` no longer constrains anything). A collapsed
+ * breakdown then lays out at full height with nothing hiding it.
+ *
+ * Rather than restore the clipping, force everything OPEN — explicit user
+ * decision: a printed log should show every die result, not hide it behind a
+ * caret that cannot be clicked on paper. This also makes the whole class of
+ * "collapsed content leaks" bugs unreachable instead of re-tuning the clip.
+ *
+ * SPECIFICITY: the `display: block !important` rule above is (1,5,0)
+ * (`#fe-chat-export-container … > :is(… .details.collapsible-content.card-content)`).
+ * The id/class is doubled here so these land at (2,x,0) / (0,x+1,0) and win
+ * regardless of source order. Do NOT "simplify" the doubled selectors away.
+ */
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-roll .dice-tooltip,
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-result .dice-tooltip-collapser,
+#fe-chat-export-container#fe-chat-export-container .chat-message .collapsible .collapsible-content,
+#fe-chat-export-container#fe-chat-export-container .chat-message .collapsible.collapsed .collapsible-content,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-roll .dice-tooltip,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-result .dice-tooltip-collapser,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .collapsible .collapsible-content,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .collapsible.collapsed .collapsible-content {
+  display: grid !important;
+  grid-template-rows: 1fr !important;
+  transition: none !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-roll .dice-tooltip > .wrapper,
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-result .dice-tooltip-collapser > .wrapper,
+#fe-chat-export-container#fe-chat-export-container .chat-message .collapsible-content > .wrapper,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-roll .dice-tooltip > .wrapper,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-result .dice-tooltip-collapser > .wrapper,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .collapsible-content > .wrapper {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* dnd5e clips `.dice-result .dice-tooltip` itself (overflow:hidden) on top of
+ * the collapser grid — harmless while open, but it also clips the last row's
+ * bottom border at print scale. */
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-result .dice-tooltip,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-result .dice-tooltip {
+  overflow: visible !important;
+}
+
+/* The caret must read "open" — core/dnd5e rotate it -90deg while collapsed. */
+#fe-chat-export-container#fe-chat-export-container .chat-message .collapsible.collapsed .fa-caret-down,
+#fe-chat-export-container#fe-chat-export-container .chat-message .dice-roll .dice-total::after,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .collapsible.collapsed .fa-caret-down,
+body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-roll .dice-total::after {
+  transform: none !important;
+}
+
+
+/* midi-qol damage-application cards carry no useful sender header in an export —
+ * see feMarkHeaderlessArchiveCards in fe-chat-archive.js for why midi's own
+ * `.midi-qol-dmg-app-msg` / `.midi-qol-player-dmg-msg` rules miss the GM variant.
+ * The class is stamped per message, so this covers the archive window, the saved
+ * HTML and both print paths at once. */
+#fe-chat-export-container .chat-message.fe-archive-headerless-card > .message-header,
+body.fe-print-chatlog .chat-message.fe-archive-headerless-card > .message-header {
+  display: none !important;
 }

@@ -25,9 +25,17 @@
  * 1) @font-face 등록 (항상 로드)
  * =================================================== */
 
+/* OTF 우선, TTF 폴백 — CookieRun과 동일한 구성.
+ * 두 파일은 같은 서체이고 OTF가 730KB, TTF가 6.3MB로 8.6배 차이가 난다. 이 크기 차이는
+ * 아카이브 내보내기에서 결정적이다: HTML 스냅샷의 폰트 임베드는 base64 팽창으로 인한
+ * Chromium/Electron OOM을 막으려고 파일당 상한(1.2MB)을 두는데, TTF는 그 상한을 넘어
+ * 항상 제외되고 저장된 파일에서 face 로드가 실패했다(document.fonts → "FE Geurimilgi: error").
+ * OTF는 상한 아래라 자동으로 임베드된다. 순서를 뒤집지 말 것. */
 @font-face {
   font-family: "FE Geurimilgi";
-  src: url("../font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
+  src:
+    url("../font/HakgyoansimGeurimilgi-R.otf") format("opentype"),
+    url("../font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
