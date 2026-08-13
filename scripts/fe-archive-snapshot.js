@@ -1382,7 +1382,26 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
   font-family: var(--fe-font-secondary) !important;
 }
 
-/* Re-assert Font Awesome over the `.chat-message *` chat-font rule above.
+/* Re-assert Font Awesome over the '.chat-message *' chat-font rule above.
+ *
+ * NEVER PUT A RAW BACKTICK ANYWHERE IN THIS BLOCK — not even inside prose, and not
+ * even inside a comment like this one. Everything from the "const css =" opener down
+ * to the closing line is ONE template literal, so a backtick here does not quote
+ * anything: it ENDS the literal. This very line carried a pair of them from 2.6.3
+ * (2026-08-12), and the result parsed as perfectly valid JS:
+ *
+ *     css = <template>.chat - message * <template2>
+ *
+ * i.e. a member access, a subtraction against an undefined identifier, and a
+ * multiplication. So "node --check" passes and the module loads; the ReferenceError
+ * fires only when feBuildEmbeddedCookieRunFontCSS is actually CALLED, and lands in
+ * its own catch, which returns "". Every caller reads "" as "no fonts to embed", so
+ * for two versions EVERY export silently shipped with no embedded fonts and rendered
+ * in the system face — on the saved HTML and the print/PDF popup alike. That is the
+ * "PDF/HTML로 인쇄하면 기본 고딕으로 나온다" report.
+ *
+ * Use apostrophes in prose here. "npm run lint" (no-undef) is what catches a relapse;
+ * the syntax check provably cannot.
  *
  * MUST stay a VERSION-AGNOSTIC STACK. Foundry v13 shipped FA6, v14 ships FA7, and
  * the families are named per major version — v14's fontawesome/css/all.min.css
