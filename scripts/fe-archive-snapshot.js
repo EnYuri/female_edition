@@ -1146,6 +1146,26 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     return got.dataUrl;
   };
 
+  // Module font URL builder. MUST route through feGetFoundryBaseHref(), which
+  // resolves foundry.utils.getRoute("/") — i.e. the server's `routePrefix`.
+  //
+  // These four fetches used to be hardcoded root-absolute (`/modules/…`). On any
+  // world served under a route prefix or a reverse proxy subpath — the normal shape
+  // of a remotely hosted world, and something a localhost GM never sees — every one
+  // of them 404s, `faces.length` is 0, and the function returns the NeoDGM rule
+  // alone. Nothing then overrides --fe-font-primary in the export, so the saved HTML
+  // has no embedded CookieRun and falls straight through to the system face
+  // ("PDF/HTML로 인쇄하면 기본 고딕으로 나온다"). The failure is silent: the caller
+  // treats an empty result as "nothing to embed", not as an error.
+  //
+  // Do NOT "simplify" this back to a relative `modules/…` string either: the fetches
+  // run in whichever document invoked the export, and the archive popup's own URL is
+  // about:blank, where a relative path resolves to nothing.
+  const fontUrl = (file) => {
+    const rel = `modules/${MODULE_ID}/font/${file}`;
+    try { return new URL(rel, feGetFoundryBaseHref()).href; } catch { return `/${rel}`; }
+  };
+
   // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
   const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
   const weights = [
@@ -1161,7 +1181,7 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     let fmt = null;
 
     for (const f of w.files) {
-      const url = `/modules/${MODULE_ID}/font/${f}`;
+      const url = fontUrl(f);
       const attempt = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_COOKIE });
       if (!attempt) continue;
       dataUrl = attempt;
@@ -1188,8 +1208,8 @@ async function feBuildEmbeddedCookieRunFontCSS() {
   let geurimilgiEmbedded = false;
   try {
     const geurCandidates = [
-      { url: `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.otf`, fmt: "opentype" },
-      { url: `/modules/${MODULE_ID}/font/HakgyoansimGeurimilgi-R.ttf`, fmt: "truetype" },
+      { url: fontUrl("HakgyoansimGeurimilgi-R.otf"), fmt: "opentype" },
+      { url: fontUrl("HakgyoansimGeurimilgi-R.ttf"), fmt: "truetype" },
     ];
     for (const { url, fmt } of geurCandidates) {
       const geurimilgiData = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
@@ -1228,6 +1248,16 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
   // Even if optional local faces fail to load, preserve the NeoDGM Pro webfont
   // rule so the selected pixel-font mode does not silently fall back.
   if (!faces.length) {
+    // LOUD on purpose. This is the exact state a user reports as "PDF/HTML로 인쇄하면
+    // 기본 고딕으로 나온다", and it was previously indistinguishable from a healthy
+    // export: the caller only sees a CSS string and an empty face list is not an error
+    // to it. Everything that can put us here (route prefix, 404, HEAD/size over cap,
+    // a 12s fetch timeout on a slow link) is invisible from the outside, so name the
+    // URL that was actually tried.
+    console.warn(
+      `female_edition | 아카이브 폰트 임베드 실패: CookieRun 페이스를 하나도 가져오지 못했습니다. ` +
+      `내보낸 파일은 시스템 기본 폰트로 렌더됩니다. 시도한 경로: ${fontUrl("CookieRun%20Regular.otf")}`
+    );
     // Do not cache the fallback-only result: local font requests may have failed
     // transiently, and a later export should get another chance to embed them.
     return neodgmRule;
