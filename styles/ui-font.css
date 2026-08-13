@@ -703,6 +703,33 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
   font-synthesis: style;
 }
 
+/* THE ONE RULE IN THIS FILE THAT IS NOT GATED ON `body.fe-fonts-enabled`, on
+ * purpose. Everything else here styles the custom-font look and must vanish with
+ * the toggle; this only guarantees that a saved archive keeps its italics.
+ *
+ * Why it is needed: the rule above is the only forced italic that covers
+ * `#fe-chat-export-log`, and `enableFonts` is one of the three GM-priority
+ * EXCLUDED keys — so a player exporting with custom fonts off gets a different
+ * cascade than the GM, with no fallback but the browser's own
+ * `em { font-style: italic }`.
+ *
+ * Why it is HERE and not in fe-chat-v13-compat.css (which already carries the
+ * same guard for #chat-notifications): that sheet is `layer(modules)`, and for
+ * `!important` the layer order reverses — `layouts` > `system` > `modules`.
+ * Measured in a real saved archive (which preserves the full layer order
+ * statement): with the rule in `modules`, a `@layer system` competitor declaring
+ * `font-style: normal !important` won and the text rendered upright; the same
+ * rule in `layouts` holds. A modules-layer guard would have been decorative.
+ *
+ * `font-synthesis: style` is the load-bearing half for pixel fonts — they ship
+ * `font-style: normal` faces only and must synthesize the oblique. */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.message-content, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) em {
+  font-style: italic !important;
+  font-synthesis: style;
+}
+
 /* ===================================================
  * 5) dnd5e 시트 폰트 적용
  * =================================================== */

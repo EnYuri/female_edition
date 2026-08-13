@@ -209,9 +209,11 @@ body.fe-fonts-enabled
   :is(.chat-message, .message)
   .message-content h6 { font-size: 1em; }
 
+/* Prose lists only — a Roll's `.dice-rolls` is an <ol> too (see fe-chat-enhance.css). */
 #chat-notifications
   :is(.chat-message, .message)
-  .message-content :is(ul, ol) {
+  .message-content :is(ul, ol):not(.dice-rolls,
+    :is(.dice-roll, .dice-result, .dice-tooltip, .chat-card, .midi-chat-card) :is(ul, ol)) {
   margin: 0.5em 0 0.5em 1.2em;
 }
 
@@ -221,6 +223,9 @@ body.fe-fonts-enabled
   font-size: 1.12em;
 }
 
+/* The archive log's equivalent guard is NOT here — this sheet is `layer(modules)`,
+ * where an `!important` loses to any system sheet's `!important`. It lives in
+ * ui-font.css (`layer(layouts)`) instead. See the comment there. */
 #chat-notifications
   :is(.chat-message, .message)
   .message-content em,

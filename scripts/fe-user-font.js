@@ -62,6 +62,56 @@ function feFamilyFromFile(fileName) {
   return `FEU ${base}`;
 }
 
+// Mirror the folder fonts into a REAL @font-face <style> in document.head.
+//
+// `new FontFace(...)` + `document.fonts.add()` registers a face on THIS document only,
+// and leaves no CSS text behind. Two export paths depend on CSS text existing:
+//
+//   1. The archive window is a separate Document. It is built by copying every
+//      `link[rel=stylesheet]` and `style` element out of document.head
+//      (feCollectHeadStylesHTML) — a JS-registered FontFace is in neither, so a
+//      `FEU *` family resolved to nothing there and the log printed in the default
+//      system stack.
+//   2. The saved standalone HTML embeds fonts by scanning those same `<style>`
+//      elements for `url(…)` and data-URL-ing the same-origin hits
+//      (feEmbedSnapshotStyleElementAssets). No url(), no embed.
+//
+// The URL is made ABSOLUTE against document.baseURI on purpose: feCollectHeadStylesHTML
+// rewrites hrefs only on <link> elements and copies <style> text verbatim, and the
+// archive window's own URL is about:blank — a relative `modules/…` src would resolve
+// against about:blank and 404. (Same reason the animated-tile fetch is absolutised.)
+//
+// The JS FontFace registration is KEPT alongside this: it is what `await face.load()`
+// gives us — a definite success/failure per file, which drives the picker list and the
+// console warning. The duplicate declaration costs nothing; the browser dedupes the
+// fetch by URL.
+function feInjectFolderFontFaceCSS(entries) {
+  try {
+    if (!entries?.length || !document?.head) return;
+    const ID = "fe-user-folder-fonts";
+    const rules = entries
+      .map(({ family, url }) => {
+        let abs = url;
+        try { abs = new URL(url, document.baseURI).href; } catch {}
+        // `family` is derived from a filename, so it can contain quotes only if the
+        // file did; strip them rather than emit an unparseable declaration.
+        const fam = String(family).replace(/["\\]/g, "");
+        return `@font-face{font-family:"${fam}";src:url("${abs}");font-display:swap;}`;
+      })
+      .join("\n");
+    if (!rules) return;
+    let styleEl = document.getElementById(ID);
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = ID;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `/* female_edition: font/ folder fonts (export-visible) */\n${rules}`;
+  } catch (e) {
+    console.warn("female_edition | failed to inject folder @font-face CSS", e);
+  }
+}
+
 // Scan font/ and register every non-builtin font as a FontFace. Idempotent +
 // cached: the FontFace objects are added to document.fonts once.
 async function feRegisterModuleFolderFonts() {
@@ -85,9 +135,9 @@ async function feRegisterModuleFolderFonts() {
         if (FE_BUILTIN_FONT_FILES.has(fileName.toLowerCase())) continue;
         const family = feFamilyFromFile(fileName);
         const label = fileName.replace(FONT_EXT_RE, "");
+        const url = `${FONT_DIR}/${rawName}`;
         try {
           if (!_moduleFontsRegistered) {
-            const url = `${FONT_DIR}/${rawName}`;
             const face = new FontFace(family, `url("${url}")`, { display: "swap" });
             await face.load();
             document.fonts.add(face);
@@ -96,8 +146,11 @@ async function feRegisterModuleFolderFonts() {
           console.warn(`female_edition | failed to load user font: ${fileName}`, e);
           continue;
         }
-        out.push({ family, label });
+        out.push({ family, label, url });
       }
+      // Only the faces that actually loaded reach this point, so the emitted CSS can
+      // never advertise a family the browser could not resolve.
+      feInjectFolderFontFaceCSS(out);
       _moduleFontsRegistered = true;
     } catch (e) {
       console.warn("female_edition | font/ folder scan failed", e);

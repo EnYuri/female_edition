@@ -375,7 +375,12 @@ body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-lo
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h5 { font-size: 1.05em; }
 :is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content h6 { font-size: 1.00em; }
 
-:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content :is(ul, ol) {
+/* Prose lists only. A Roll's `.dice-rolls` is an <ol> as well, and indenting it pushes the dice
+ * faces off the formula's left edge — that layout belongs to core/the system, not to markdown
+ * styling. Same exclusion set the archive rules use. */
+:is(#chat-log, .chat-log, ol.chat-log) .chat-message .message-content
+  :is(ul, ol):not(.dice-rolls,
+    :is(.dice-roll, .dice-result, .dice-tooltip, .chat-card, .midi-chat-card) :is(ul, ol)) {
   margin: 0.5em 0 0.5em 1.2em;
 }
 

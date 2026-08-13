@@ -20,6 +20,7 @@ import {
   feSetChatGroupOutlineClass,
   feSetRetroThemeClass,
   feSetNeodgmModeClass,
+  feSetUserFontMode,
   feSetSystemMsgColorClass,
   feSetAccentTextOverrideClass,
   feApplyChatMerge,
@@ -2633,6 +2634,15 @@ async function feRenderChatArchiveWindow(win, {
   feSetChatGroupOutlineClass(win.document);
   feSetRetroThemeClass(win.document);
   feSetNeodgmModeClass(win.document);
+  // MUST stay next to feSetNeodgmModeClass — user-font mode is the sixth font mode and
+  // was the ONE missing from this list, so an archive/PDF exported while 유저 로컬 폰트
+  // was active always rendered in the default system stack ("PDF/HTML로 인쇄하면 기본
+  // 고딕으로 나온다"). Note the CSS variable alone was already arriving:
+  // feSetUserFontMode writes --fe-user-font-family onto documentElement.style, and
+  // feSyncArchiveDocumentChrome copies <html>'s whole style attribute. What it does NOT
+  // copy is <body>'s class (explicitly skipped there), and the var is only consumed by
+  // `body.fe-user-font-mode` rules — so the value was present and unreachable.
+  feSetUserFontMode(win.document);
   feSetSystemMsgColorClass(win.document);
   feSetAccentTextOverrideClass(win.document);
   feSyncArchiveMergeBodyClasses(win.document);
