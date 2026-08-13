@@ -364,12 +364,51 @@ export function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) 
   const changed = [];
   try {
     if (!root?.querySelectorAll) return () => {};
-    const targets = [];
+    // A Set, NOT an array + `includes` (MUST keep — measured, do not "simplify").
+    // This runs once over the WHOLE archive log, so `targets` holds roughly ten
+    // elements per message: ~25,000 entries for a 2,938-message campaign log.
+    // `Array#includes` made every push a linear scan of everything collected so
+    // far — O(n^2), ~3x10^8 comparisons — and showed up live (v14.365) as a
+    // single ~4,000 ms `longtask` immediately after render, during which the
+    // archive window and Foundry itself (same event loop) ignored clicks.
+    // A Set dedupes in O(1) and preserves insertion order, so the write order
+    // below is byte-for-byte the same.
+    const targets = new Set();
     const push = (el) => {
-      if (el && !targets.includes(el)) targets.push(el);
+      if (el) targets.add(el);
     };
     const messages = root.matches?.("li.chat-message") ? [root] : Array.from(root.querySelectorAll("li.chat-message"));
+    // Per-message idempotence stamp (MUST keep — measured, do not remove as
+    // "premature optimization"). Every message is normalized ONCE while it is
+    // rendered (`feRenderExportMessageNode`) and then AGAIN by the whole-log
+    // call in `feRenderChatArchiveWindow` — the second pass re-derived the same
+    // ~10 targets per message and rewrote the same ~75 `!important` inline
+    // properties. Measured live on v14.365 with a 2,938-message dx3rd log, the
+    // whole-log pass alone was 223,237 setProperty + 84,708 querySelector calls
+    // inside the single ~4,000 ms `longtask` that follows render — the window
+    // (and Foundry, same event loop) ignored clicks for those seconds.
+    //
+    // The stamp is deliberately a flat marker and NOT a class signature. Every
+    // class this function actually branches on is structural and set once when
+    // the node is built (chat-message / message-header / message-content /
+    // fe-archive-standard-content / chat-card / card-* / dice-* / message-sender
+    // / name-stacked / title / subtitle / message-flavor / message-metadata).
+    // The classes that DO change afterwards — `fe-merge-*`, user-colour classes,
+    // `fe-archive-headerless` — are not consulted here at all, so keying the
+    // stamp on the class attribute invalidated ~all 2,938 messages while
+    // changing none of the output. Measured: with a class-attribute stamp the
+    // whole-log pass still accounted for 1,506 of 2,513 samples inside the
+    // block; a flat marker skips it outright.
+    // Restore mode drops the stamp instead of setting it, so the re-normalize
+    // after a print teardown always runs.
+    const stamps = [];
     for (const msg of messages) {
+      if (restore) {
+        try { delete msg.dataset.feArchLayout; } catch { /* no-op */ }
+      } else {
+        if (msg.dataset?.feArchLayout === "1") continue;
+        stamps.push(msg);
+      }
       push(msg);
       push(msg.querySelector?.(":scope > .message-header"));
       push(msg.querySelector?.(":scope > .message-content"));
@@ -470,6 +509,12 @@ export function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) 
       } catch {
         /* no-op */
       }
+    }
+
+    // Stamped only after the writes actually landed, so a throw mid-pass leaves
+    // the message unstamped and it is retried on the next call.
+    for (const msg of stamps) {
+      try { msg.dataset.feArchLayout = "1"; } catch { /* no-op */ }
     }
   } catch {
     /* no-op */

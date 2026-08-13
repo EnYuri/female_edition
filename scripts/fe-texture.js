@@ -160,29 +160,100 @@ function feSanitizePseudoNoneInWindow(win, el, varName) {
   }
 }
 
-function feStripChatTexturesInWindow(win, rootEl) {
+// ---------------------------------------------------------------------------
+// Read/write split (MUST keep — measured, do not fold back into one loop)
+//
+// The per-element helpers above each do getComputedStyle() -> style.setProperty().
+// Called in a single loop that is a textbook layout thrash: every write
+// invalidates style, so every following read forces a fresh recalculation.
+// It is invisible on a live sidebar (a few dozen messages) and catastrophic on
+// an archive of a full campaign.
+//
+// Measured live, v14.365, a real 2938-message dx3rd archive window:
+//   3 x 2938 computed-style reads (element + ::before + ::after), no writes ....   96 ms
+//   the same reads with ONE style write interleaved per iteration ............. 9037 ms
+// i.e. ~94x. It showed up as a single 4363 ms `longtask` right after render —
+// the archive window (and Foundry itself, same event loop) simply stopped
+// responding to clicks for those seconds. 2789 of the 2938 messages take the
+// pseudo write, so nearly every iteration invalidated the next one's reads.
+//
+// So: PLAN every element in a read-only pass, then APPLY every write. Ordering
+// within each phase is preserved, and the planners never read a value that an
+// earlier write could have changed — an element's background-image write does
+// not affect its own pseudo-elements (background-image is not inherited by
+// ::before/::after), and the `--fe-*-bgimg` vars are only ever read back
+// through those pseudos, never by the plain-background planner.
+// ---------------------------------------------------------------------------
+
+function fePlanElementBackground(win, el, out) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return;
+    const styleAttr = el.getAttribute?.("style") || "";
+    const cs = win.getComputedStyle?.(el);
+    const bgImage = cs?.backgroundImage || "";
+
+    if (!FE_TEX_RE.test(bgImage) && !FE_TEX_RE.test(styleAttr)) return;
+
+    const stripped = feStripTextureLayers(feSplitBgLayers(bgImage));
+    const finalLayers = stripped.length ? stripped : ["none"];
+    out.push({ el, prop: "background-image", value: finalLayers.join(", "), priority: "important", cls: "fe-bg-sanitized" });
+  } catch { /* planning is best-effort, a bad element is simply skipped */ }
+}
+
+function fePlanPseudoBackground(win, el, pseudo, varName, out) {
+  try {
+    if (!win || !el || !(el instanceof win.Element)) return;
+    const cs = win.getComputedStyle?.(el, pseudo);
+    const bgImage = cs?.backgroundImage || "";
+    if (!FE_TEX_RE.test(bgImage)) return;
+
+    const stripped = feStripTextureLayers(feSplitBgLayers(bgImage));
+    const finalLayers = stripped.length ? stripped : ["none"];
+    out.push({ el, prop: varName, value: finalLayers.join(", "), priority: "", cls: "fe-pseudo-sanitized" });
+  } catch { /* planning is best-effort, a bad element is simply skipped */ }
+}
+
+function feApplyBackgroundPlan(plan) {
+  for (const step of plan) {
+    try {
+      step.el.style.setProperty(step.prop, step.value, step.priority || "");
+      step.el.classList.add(step.cls);
+    } catch { /* a detached/dead node must not abort the rest of the plan */ }
+  }
+}
+
+// `nodes` lets a caller hand in a pre-sliced batch of messages so a huge archive
+// log can be stripped in chunks with a yield between them (see
+// feRunArchiveChunkedPass in fe-chat-archive.js). Omitted → the whole root.
+function feStripChatTexturesInWindow(win, rootEl, { nodes = null } = {}) {
   try {
     if (!win || !rootEl) return;
     const root = rootEl instanceof win.Element ? rootEl : win.document;
-    const messages = Array.from(root.querySelectorAll?.(".chat-message") ?? []);
+    const messages = Array.isArray(nodes) ? nodes : Array.from(root.querySelectorAll?.(".chat-message") ?? []);
+    const plan = [];
+
     for (const msg of messages) {
       const specialKind = feGetSpecialMessageKindInWindow(win, msg);
       if (specialKind === "narrator") {
-        feSanitizeNarratorBackgroundInWindow(win, msg);
+        // Narrator messages are forced to "none" unconditionally — no read at
+        // all — so these steps only ride along to keep the write order intact.
+        plan.push({ el: msg, prop: "background-image", value: "none", priority: "important", cls: "fe-bg-sanitized" });
         msg.querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")
-          ?.forEach?.((el) => feSanitizeNarratorBackgroundInWindow(win, el));
-        feSanitizePseudoNoneInWindow(win, msg, "--fe-before-bgimg");
-        feSanitizePseudoNoneInWindow(win, msg, "--fe-after-bgimg");
+          ?.forEach?.((el) => plan.push({ el, prop: "background-image", value: "none", priority: "important", cls: "fe-bg-sanitized" }));
+        plan.push({ el: msg, prop: "--fe-before-bgimg", value: "none", priority: "", cls: "fe-pseudo-sanitized" });
+        plan.push({ el: msg, prop: "--fe-after-bgimg", value: "none", priority: "", cls: "fe-pseudo-sanitized" });
         continue;
       }
       if (specialKind === "round-marker") continue;
 
-      feSanitizeElementBackgroundInWindow(win, msg);
+      fePlanElementBackground(win, msg, plan);
       msg.querySelectorAll?.(".chat-card, .midi-chat-card, .message-content, .message-header")
-        ?.forEach?.((el) => feSanitizeElementBackgroundInWindow(win, el));
-      feSanitizePseudoInWindow(win, msg, "::before", "--fe-before-bgimg");
-      feSanitizePseudoInWindow(win, msg, "::after", "--fe-after-bgimg");
+        ?.forEach?.((el) => fePlanElementBackground(win, el, plan));
+      fePlanPseudoBackground(win, msg, "::before", "--fe-before-bgimg", plan);
+      fePlanPseudoBackground(win, msg, "::after", "--fe-after-bgimg", plan);
     }
+
+    feApplyBackgroundPlan(plan);
   } catch (err) {
     console.warn("female_edition | archive texture strip failed", err);
   }

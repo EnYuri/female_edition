@@ -1290,10 +1290,10 @@ function feNormalizeArchivePortraitImages(rootEl, renderProfile = null) {
   }
 }
 
-function feRefreshPortraitsForLog(logEl, renderProfile = null) {
+function feRefreshPortraitsForLog(logEl, renderProfile = null, { nodes = null } = {}) {
   try {
     if (!logEl?.querySelectorAll) return;
-    for (const el of logEl.querySelectorAll("li.chat-message")) {
+    for (const el of (Array.isArray(nodes) ? nodes : logEl.querySelectorAll("li.chat-message"))) {
       const id = feGetMessageIdFromElement(el);
       const msg = (id ? game.messages?.get(id) : null) || el.__feMessage || null;
       if (!msg) continue;
@@ -1302,6 +1302,45 @@ function feRefreshPortraitsForLog(logEl, renderProfile = null) {
     }
   } catch {
     /* no-op */
+  }
+}
+
+// Chunk size for the post-render sweeps below. Measured on v14.365 with a
+// 2,938-message dx3rd log: the portrait sweep costs ~0.77 ms per message (a
+// 150-message chunk measured 110-130 ms, i.e. still several dropped frames), so
+// the chunk is sized from the measurement rather than from a round number. The
+// yield itself is a MessageChannel round-trip, so ~50 extra chunks cost nothing
+// worth measuring — do not raise this back for "fewer yields".
+const FE_ARCHIVE_POST_PASS_CHUNK = 60;
+
+/**
+ * Run a per-message sweep over the whole archive log in yielding chunks.
+ *
+ * MUST keep the yields (measured, v14.365, 2,938 messages). The post-render
+ * sweeps — texture strip, portrait upsert, layout normalize — ran back to back
+ * with no await between them, so they coalesced into ONE ~4,000 ms `longtask`.
+ * The archive popup and Foundry share an event loop, so for those seconds
+ * NEITHER window responded to a click; that is the whole of the reported
+ * "아카이브 렌더 직후 클릭이 지연된다". The work itself is irreducible (every
+ * message really does need each pass) — what was wrong was doing it in one
+ * uninterruptible block.
+ * @param {Window} win
+ * @param {Element[]} nodes
+ * @param {(batch: Element[]) => void} fn
+ */
+async function feRunArchiveChunkedPass(win, nodes, fn) {
+  if (!Array.isArray(nodes) || !nodes.length) return;
+  for (let i = 0; i < nodes.length; i += FE_ARCHIVE_POST_PASS_CHUNK) {
+    // Same reason feRenderMessagesIntoLog bails at its batch boundary: the user
+    // can close the popup mid-sweep, and every remaining chunk would then style
+    // nodes in a dead document — with a MessageChannel yield between each one.
+    if (feArchiveWindowClosed(win)) return;
+    try {
+      fn(nodes.slice(i, i + FE_ARCHIVE_POST_PASS_CHUNK));
+    } catch {
+      /* one bad batch must not abort the remaining log */
+    }
+    await feMaybeYieldForUI(win);
   }
 }
 
@@ -2770,22 +2809,32 @@ async function feRenderChatArchiveWindow(win, {
   // sanitization logic used in the live chat log (chat-bg-stripper.js).
   // This is required for the archive window + downloaded HTML to match the
   // on-screen chat saturation/overlay behavior.
-  if (effectiveOptimize) {
+  // Every sweep from here to the merge is chunked through feRunArchiveChunkedPass
+  // so the popup stays clickable while it runs — see that function for why.
+  const postPassNodes = (() => {
     try {
-      if (metaEl) metaEl.textContent = "Applying texture stripping…";
-      feStripChatTexturesInWindow(win, logEl);
-    } catch {}
+      return Array.from(logEl.querySelectorAll?.("li.chat-message") ?? []);
+    } catch {
+      return [];
+    }
+  })();
+
+  if (effectiveOptimize) {
+    if (metaEl) metaEl.textContent = "Applying texture stripping…";
+    await feRunArchiveChunkedPass(win, postPassNodes, (batch) => feStripChatTexturesInWindow(win, logEl, { nodes: batch }));
   }
 
   // Apply merge styling in the archive window if enabled.
   if (feSetting(S.MERGE_ENABLED)) {
     try {
-      feApplyChatMergeInWindow(win, renderProfile);
+      feApplyChatMergeInWindow(win, renderProfile, { skipPortraits: true });
     } catch (err) {
       console.warn("female_edition | archive merge failed", err);
     }
-  } else if (renderProfile.deferPortraits) {
-    feRefreshPortraitsForLog(logEl, renderProfile);
+  }
+  if (renderProfile.deferPortraits) {
+    if (metaEl) metaEl.textContent = "Applying portraits…";
+    await feRunArchiveChunkedPass(win, postPassNodes, (batch) => feRefreshPortraitsForLog(logEl, renderProfile, { nodes: batch }));
   }
 
   try {
@@ -3385,7 +3434,10 @@ async function feMaybeYieldForUI(targetWindow = window) {
 //                                   live-tree mirror, message style mirror)
 // ===========================================================================
 
-function feApplyChatMergeInWindow(win, renderProfile = null) {
+// `skipPortraits` is set by the archive render path, which runs the portrait
+// sweep itself in yielding chunks right after this call. Left default (false)
+// for every other caller so the old one-shot behaviour is unchanged.
+function feApplyChatMergeInWindow(win, renderProfile = null, { skipPortraits = false } = {}) {
   try {
     const logEl =
       win.document.getElementById("fe-chat-export-log") ||
@@ -3395,7 +3447,7 @@ function feApplyChatMergeInWindow(win, renderProfile = null) {
 
     feSyncArchiveMergeBodyClasses(win.document);
     feApplyRenderedStateToLog(logEl, feArchiveMergeOptions());
-    feRefreshPortraitsForLog(logEl, renderProfile);
+    if (!skipPortraits) feRefreshPortraitsForLog(logEl, renderProfile);
   } catch (err) {
     console.warn("female_edition | feApplyChatMergeInWindow failed", err);
   }

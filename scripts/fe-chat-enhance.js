@@ -1006,7 +1006,12 @@ function feApplyRenderedStateToMessageElement(message, messageEl, { allowNarrato
   }
 }
 
-function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
+// `edgeLookahead` defaults OFF so the ARCHIVE caller (fe-chat-archive.js:3449,
+// which passes feArchiveMergeOptions()) can never turn a deliberately truncated
+// export range into a "continues outside the file" render. That archive call is
+// the ONLY direct one; every live path arrives via feScheduleRenderedLogRefresh,
+// which supplies `true` by default — see the note on that function.
+function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false, edgeLookahead = false } = {}) {
   try {
     if (!feHasRenderedStateWork()) return;
     if (!feIsElementNode(logEl)) return;
@@ -1017,7 +1022,7 @@ function feApplyRenderedStateToLog(logEl, { allowNarratorMerge = false } = {}) {
       if (!msg) continue;
       feApplyRenderedStateToMessageElement(msg, li, { allowNarratorMerge });
     }
-    if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge, preNodes: nodes });
+    if (feSetting(S.MERGE_ENABLED)) feApplyChatMerge(logEl, { allowNarratorMerge, preNodes: nodes, edgeLookahead });
   } catch {
     /* no-op */
   }
@@ -1074,7 +1079,10 @@ function feFlushRenderedLogsForWindow(win = window) {
     const pending = Array.from(fePendingRenderedLogs).filter((log) => (log?.ownerDocument?.defaultView ?? window) === win);
     for (const log of pending) {
       fePendingRenderedLogs.delete(log);
-      const opts = fePendingRenderedLogOptions.get(log) ?? {};
+      // Defensive only — feScheduleRenderedLogRefresh always stores opts before
+      // adding the log. The fallback mirrors that scheduler's defaults so a lost
+      // WeakMap entry cannot silently downgrade a live log to no-lookahead.
+      const opts = fePendingRenderedLogOptions.get(log) ?? { allowNarratorMerge: false, edgeLookahead: true };
       fePendingRenderedLogOptions.delete(log);
       try {
         feDedupeChatMessagesInLog(log);
@@ -1087,12 +1095,27 @@ function feFlushRenderedLogsForWindow(win = window) {
   }
 }
 
-function feScheduleRenderedLogRefresh(logEl, { delay = 24, allowNarratorMerge = false } = {}) {
+// `edgeLookahead` defaults **ON** here, unlike feApplyRenderedStateToLog (which
+// defaults OFF to protect its one direct caller, the ARCHIVE at
+// fe-chat-archive.js:3449). Every route into THIS scheduler is a live-log path —
+// the render/create/delete/settings hooks and fe-merge.js's missing-doc retry —
+// so opting in per call site is exactly the bookkeeping that already failed once:
+// the parameter was threaded all the way to feApplyRenderedStateToLog and then
+// dropped here, so every scheduled refresh re-ran a full feApplyChatMerge WITHOUT
+// lookahead and stripped the continuation classes the merge pass had just applied
+// (a visible flicker on create, and a permanent misclassification on DELETE, whose
+// path schedules no trailing feScheduleFullMergePass to repair it).
+// An explicit `false` still wins — destructuring defaults only fill `undefined` —
+// so fe-merge.js's retry keeps forwarding the archive's OFF verdict intact. And if
+// an export log ever does reach here (feGetChatLogs also finds the inline export
+// container), feApplyChatMerge's own feIsExportLogElement guard is the backstop.
+function feScheduleRenderedLogRefresh(logEl, { delay = 24, allowNarratorMerge = false, edgeLookahead = true } = {}) {
   try {
     if (!feHasRenderedStateWork()) return;
     if (!feIsElementNode(logEl)) return;
-    const opts = fePendingRenderedLogOptions.get(logEl) ?? { allowNarratorMerge: false };
+    const opts = fePendingRenderedLogOptions.get(logEl) ?? { allowNarratorMerge: false, edgeLookahead: false };
     opts.allowNarratorMerge = opts.allowNarratorMerge || !!allowNarratorMerge;
+    opts.edgeLookahead = opts.edgeLookahead || !!edgeLookahead;
     fePendingRenderedLogOptions.set(logEl, opts);
     fePendingRenderedLogs.add(logEl);
 
@@ -1117,10 +1140,10 @@ function feScheduleRenderedLogRefresh(logEl, { delay = 24, allowNarratorMerge = 
   }
 }
 
-function feScheduleRenderedStateRefreshForAllLogs({ delay = 24, allowNarratorMerge = false } = {}) {
+function feScheduleRenderedStateRefreshForAllLogs({ delay = 24, allowNarratorMerge = false, edgeLookahead = true } = {}) {
   try {
     if (!feHasRenderedStateWork()) return;
-    for (const log of feGetChatLogs()) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge });
+    for (const log of feGetChatLogs()) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge, edgeLookahead });
   } catch {
     /* no-op */
   }
@@ -1150,7 +1173,7 @@ function feScheduleFullMergePass({ delay = 120 } = {}) {
   }
 }
 
-function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, allowNarratorMerge = false, doc = document } = {}) {
+function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, allowNarratorMerge = false, edgeLookahead = true, doc = document } = {}) {
   try {
     if (!feHasRenderedStateWork()) return;
     const id = feNormalizeChatMessageId(messageId);
@@ -1170,12 +1193,12 @@ function feScheduleRenderedStateRefreshForMessageId(messageId, { delay = 24, all
       for (const log of fallbackLogs) logs.add(log);
     }
     if (!logs.size) {
-      feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge });
+      feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge, edgeLookahead });
       return;
     }
-    for (const log of logs) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge });
+    for (const log of logs) feScheduleRenderedLogRefresh(log, { delay, allowNarratorMerge, edgeLookahead });
   } catch {
-    feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge });
+    feScheduleRenderedStateRefreshForAllLogs({ delay, allowNarratorMerge, edgeLookahead });
   }
 }
 
@@ -1218,10 +1241,10 @@ function feFlushQueuedRenderedMessageRefreshes() {
           // anchors > 1: one full-log pass (1× querySelectorAll+sort) beats N neighborhood passes.
           // anchors ≤ 1: targeted neighborhood is lighter — skip the full-log class-write sweep.
           if (anchors.size > 1) {
-            feApplyChatMerge(log, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge });
+            feApplyChatMerge(log, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, edgeLookahead: true });
           } else {
             for (const el of anchors)
-              feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true });
+              feApplyChatMergeAroundElement(el, { allowNarratorMerge: feQueuedRenderedMessageNarratorMerge, skipDedup: true, edgeLookahead: true });
           }
         }
       }

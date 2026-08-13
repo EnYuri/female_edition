@@ -240,7 +240,7 @@ export function feInstallChatLogPrune() {
         // The new boundary element may have stale fe-merge-* classes — reclassify it
         const newFirst = log.firstElementChild;
         if (newFirst) {
-          try { feApplyChatMergeAroundElement(newFirst, { skipDedup: true }); } catch { /* no-op */ }
+          try { feApplyChatMergeAroundElement(newFirst, { skipDedup: true, edgeLookahead: true }); } catch { /* no-op */ }
         }
       } finally {
         restoreStickyScroll();
@@ -297,7 +297,7 @@ export function feInstallChatLogPrune() {
           // The new boundary element may have stale fe-merge-* classes — reclassify it
           const newLast = log.lastElementChild;
           if (newLast) {
-            try { feApplyChatMergeAroundElement(newLast, { skipDedup: true }); } catch { /* no-op */ }
+            try { feApplyChatMergeAroundElement(newLast, { skipDedup: true, edgeLookahead: true }); } catch { /* no-op */ }
           }
         }
       } finally {
@@ -453,7 +453,9 @@ export function feInstallChatLogPrune() {
     #settleMergeClasses(log) {
       try {
         if (!feSetting(S.MERGE_ENABLED)) return;
-        feApplyChatMerge(log);
+        // This log is pruned BY DEFINITION — it is the one place the DOM window's
+        // edges are guaranteed not to be the true ends of the conversation.
+        feApplyChatMerge(log, { edgeLookahead: true });
       } catch { /* no-op */ }
     }
 
