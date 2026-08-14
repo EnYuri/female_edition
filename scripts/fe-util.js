@@ -628,10 +628,10 @@ function feGetRoundMarkerFlagValue(source) {
   return null;
 }
 
-// dx3rd(DX3 System) 전투 진행 알림 — 라운드 N / 셋업·이니셔티브·메인·클린업 프로세스.
-// combat.js emits every one of them as `<h3 class="dx3rd-combat-msg">…</h3>` with a GM
-// (or, for 메인 프로세스, the acting actor's) speaker. They are system round/phase notices,
-// not anybody's utterance, so they are classified as round markers: no user-color tint,
+// dx3rd (DX3 System) combat progress notices: round N, plus the setup / initiative /
+// main / cleanup phases. combat.js emits each as `<h3 class="dx3rd-combat-msg">…</h3>`
+// with a GM speaker (or the acting actor's, on the main phase). They are system round/phase
+// notices, not anybody's utterance, so they are classified as round markers: no user tint,
 // no merge, no portrait — and, unlike other modules' markers, the sender header is hidden
 // outright (fe-chat-portrait.js), since the speaker there carries no information.
 const FE_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";

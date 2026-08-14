@@ -1,24 +1,27 @@
 // fe-filepicker-preview.js
-// FilePicker(코어 ApplicationV2) 오른쪽에 "미리보기 사이드바"를 추가한다.
-//   · 미리보기 대상 = (1) 파일 리스트에서 선택(.picked)한 파일, (2) 사이드바에 드롭한(업로드할) 파일 한정.
-//   · 드롭 업로드는 코어와 "똑같이" 현재 보고 있는 폴더로 올린다(공개 FilePicker.upload + browse).
-//     별도 dragupload 분류 폴더는 두지 않는다(렌더러에서 드롭 파일의 디스크 경로를 신뢰성 있게 얻을 수 없어
-//     내부/외부 위치 판별이 불가능 → 코어의 "현재 폴더 업로드"를 그대로 활용).
+// Adds a preview sidebar to the right of core's FilePicker.
 //
-// 비침습 구현: renderFilePicker 훅에서 .window-content 를 grid 로 만들고 오른쪽 컬럼에 <aside> 하나만 append.
-//   기존 파트(tabs/subheader/body/subfooter/footer)는 DOM 위치/구조를 건드리지 않으므로 코어의 부분 재렌더
-//   (querySelector([data-application-part]) → replaceWith 제자리 교체)에 그대로 살아남는다. aside 는 파트가
-//   아니라 재렌더 대상이 아니다.
+// Previews either the file selected in the list (.picked) or a file dropped onto the
+// sidebar. A drop uploads to the folder currently being browsed, exactly like core does
+// (public FilePicker.upload + browse) — there is deliberately no separate dragupload
+// folder, because the renderer cannot resolve a dropped file's disk path and so cannot
+// tell an internal location from an external one.
+//
+// Non-invasive by design: the renderFilePicker hook makes .window-content a grid and
+// appends ONE <aside>. Core's application parts (tabs/subheader/body/subfooter/footer) keep
+// their DOM position, so a partial re-render (querySelector([data-application-part]) →
+// replaceWith) leaves everything intact, and the aside is not a part so it is never
+// re-rendered.
 
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
-const PREVIEW_WIDTH = 288; // 사이드바 폭(px). CSS grid-template-columns 와 일치시킬 것.
+const PREVIEW_WIDTH = 288; // sidebar width in px — must match CSS grid-template-columns
 function _enabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
 Hooks.once("init", () => game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS, {
   name: "코어 UI: 파일 픽커 미리보기 및 개선", hint: "파일 픽커 미리보기와 정렬 개선을 표시합니다.",
   scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS],
 }));
 
-// ─── 확장자 분류 ──────────────────────────────────────────────────────────────
+// ─── Extension classification ──────────────────────────────────────────────
 function _extSet(constKey, fallback) {
   const c = CONST?.[constKey];
   if (c && typeof c === "object") return new Set(Object.keys(c).map(e => e.toLowerCase()));
@@ -53,7 +56,7 @@ function _fmtSize(bytes) {
   return `${n >= 100 || i === 0 ? Math.round(n) : n.toFixed(1)} ${u[i]}`;
 }
 
-// ─── HEAD 메타데이터(크기/수정일) — 선택 파일용. 동시성/캐시 ──────────────────
+// ─── HEAD metadata (size / mtime) for the picked file, with dedup + cache ──
 const _metaCache = new Map();
 const _META_CACHE_MAX = 512;
 
@@ -82,7 +85,7 @@ async function _headMeta(url) {
   return p;
 }
 
-// ─── 레이아웃 주입 ────────────────────────────────────────────────────────────
+// ─── Layout injection ──────────────────────────────────────────────────────
 function _ensureSidebar(el, app) {
   const content = el.querySelector(".window-content");
   if (!content) return null;
@@ -102,7 +105,7 @@ function _ensureSidebar(el, app) {
 
   _bindDrop(aside, el, app);
 
-  // 폭은 한 번만 넓힌다(부분 재렌더에서 코어가 height:auto 만 다시 잡으므로 폭은 유지됨).
+  // Widen once. A partial re-render only re-measures height:auto, so the width sticks.
   if (!app._feFpWidened) {
     app._feFpWidened = true;
     const w = (app.position?.width || 560) + PREVIEW_WIDTH;
@@ -111,7 +114,7 @@ function _ensureSidebar(el, app) {
   return aside;
 }
 
-// ─── 드롭 → 코어와 동일하게 현재 폴더로 업로드 ───────────────────────────────
+// ─── Drop: upload to the current folder, exactly as core does ──────────────
 function _canUpload(el, app) {
   const input = el.querySelector('input[name="upload"]');
   return !!input && !input.disabled && (app.canUpload !== false);
@@ -129,7 +132,7 @@ function _bindDrop(aside, el, app) {
     const files = [...(e.dataTransfer?.files || [])];
     if (!files.length) return;
 
-    // 업로드 전, 첫 파일을 즉시 로컬 미리보기(업로드할 파일 미리보기).
+    // Preview the first file locally before the upload even starts.
     _previewLocal(aside, files[0]);
 
     if (!_canUpload(el, app)) {
@@ -137,7 +140,8 @@ function _bindDrop(aside, el, app) {
       return;
     }
 
-    // 코어 #onDrop/#onUpload 와 동일: 현재 활성 소스의 현재 target 폴더로 업로드 후 재탐색.
+    // Same as core #onDrop/#onUpload: upload into the active source's current target
+    // folder, then re-browse it.
     const target = el.querySelector('input[name="target"]')?.value ?? app.target;
     const bucket = el.querySelector('[name="bucket"]')?.value || null;
     aside.classList.add("fe-fp-uploading");
@@ -155,7 +159,7 @@ function _bindDrop(aside, el, app) {
   });
 }
 
-// ─── 미리보기 렌더 ────────────────────────────────────────────────────────────
+// ─── Preview rendering ─────────────────────────────────────────────────────
 function _revoke(aside) {
   if (aside._feObjUrl) { try { URL.revokeObjectURL(aside._feObjUrl); } catch (_) {} aside._feObjUrl = null; }
 }
@@ -183,7 +187,7 @@ function _renderMedia(cat, url, name) {
 
 function _clearPreview(aside) {
   if (!aside || aside.classList.contains("fe-fp-empty")) {
-    // 이미 비어있어도 objectURL 누수 방지만 처리.
+    // Already empty — still revoke, so no object URL leaks.
     _revoke(aside);
     if (aside) aside.dataset.fePreviewKey = "";
     return;
@@ -210,7 +214,7 @@ function _writePreview(aside, { url, name, cat, sizeText = "", dateText = "", is
       `<div class="fe-fp-dim" data-fe-dim></div>` +
     `</div>`;
 
-  // 추가 메타(이미지 해상도 / 미디어 길이 / 폰트 로드) 비동기 보강
+  // Fill in extra metadata asynchronously: image resolution, media duration, font load.
   const dim = body.querySelector("[data-fe-dim]");
   const media = body.querySelector("[data-fe-media]");
   if (cat === "image" && media) {
@@ -266,15 +270,15 @@ async function _previewPicked(aside, url, name) {
   }
 }
 
-// 현재 선택(.picked)된 파일을 미리보기 — 초기 렌더 및 선택 변경 시.
-// 선택된 파일이 없으면(폴더 이동 등) 미리보기를 비운다.
+// Preview the currently picked file, on first render and on every selection change.
+// With nothing picked (e.g. after navigating to another folder) the preview is cleared.
 function _previewCurrentPick(el, aside) {
   const li = el.querySelector("li.file.picked[data-file]") || el.querySelector("li.file[data-file].picked");
   if (li?.dataset?.path) _previewPicked(aside, li.dataset.path, li.dataset.name || li.dataset.path.split("/").pop());
   else _clearPreview(aside);
 }
 
-// ─── 훅 ───────────────────────────────────────────────────────────────────────
+// ─── Hooks ─────────────────────────────────────────────────────────────────
 function _hookRoot(element, app) {
   let el = element;
   if (el && el.jquery) el = el[0];
@@ -287,13 +291,13 @@ Hooks.on("renderFilePicker", (app, element) => {
   const el = _hookRoot(element, app);
   if (!el?.querySelector) return;
 
-  // 폴더 선택기(이미지/오디오 등 파일을 고르는 게 아닌)에는 미리보기 불필요.
+  // A folder picker selects directories, not files — nothing to preview.
   if (app?.type === "folder") return;
 
   const aside = _ensureSidebar(el, app);
   if (!aside) return;
 
-  // 선택(클릭) → 미리보기. 캡처가 아닌 버블 단계에서 코어가 .picked 를 갱신한 뒤 읽는다.
+  // Click → preview. Bubble phase, not capture, so core has already updated .picked.
   if (!el._feFpPreviewBound) {
     el._feFpPreviewBound = true;
     el.addEventListener("click", e => {
@@ -304,6 +308,6 @@ Hooks.on("renderFilePicker", (app, element) => {
     });
   }
 
-  // 초기/재렌더 시: 이미 선택된 파일이 있으면 미리보기.
+  // On first render and re-render: preview whatever is already picked.
   _previewCurrentPick(el, aside);
 });

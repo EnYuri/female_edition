@@ -238,16 +238,16 @@ const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 // GM priority is ON, almost everything is forced — the GM turns the whole feature
 // OFF if they want players to keep personal taste. Only THREE categories stay
 // personal regardless:
-//   1. 커스텀 폰트 유무 (UI_ENABLE_FONTS) + 유저 로컬 폰트(UI_USE_USER_FONT/
+//   1. Custom fonts on/off (UI_ENABLE_FONTS) + user local fonts (UI_USE_USER_FONT/
 //      USER_FONT_FAMILY) — opt-in per player (glyph/icon breakage risk; the user
 //      font depends on what is actually installed on each client)
-//   2. 채팅 아카이브 / 내보내기 (EXPORT_*) — output preference
-//   3. 툴바 접기 (SC_COLLAPSE_ENABLED) — personal toolbar layout
+//   2. Chat archive / export (EXPORT_*) — output preference
+//   3. Toolbar collapse (SC_COLLAPSE_ENABLED) — personal toolbar layout
 // GM_PRIORITY_ENABLED is a world-scope sentinel; GM_SPEAK_AS_SELF is GM-only and
 // client-scoped so each GM can keep their own speaker behavior. Neither is
 // client-forced.
 const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
-  // 채팅 아카이브 / 내보내기 — output preference, always personal.
+  // Chat archive / export — output preference, always personal.
   S.EXPORT_ENABLED,
   S.EXPORT_AUTO_PRINT,
   S.EXPORT_OPTIMIZE,
@@ -256,14 +256,13 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   S.EXPORT_EXCLUDE_WHISPERS,
   S.EXPORT_PRINT_IMAGE_MODE,
   S.EXPORT_DESKTOP_EXTERNAL_MODE,
-  // 커스텀 폰트 유무 — players opt in individually.
+  // Custom fonts on/off — players opt in individually.
   S.UI_ENABLE_FONTS,
-  // 유저(로컬/모듈 폴더) 폰트 — 각 클라이언트에 실제 설치/존재하는
-  // 폰트에 의존하므로
-  // GM이 강제하면 폰트가 없는 플레이어는 깨진다. 항상 개인 설정으로 유지.
+  // User fonts (local install or module folder) depend on what each client actually
+  // has, so forcing them would break players who lack the font. Always personal.
   S.UI_USE_USER_FONT,
   S.USER_FONT_FAMILY,
-  // 툴바 접기 — personal toolbar preference.
+  // Toolbar collapse — personal toolbar preference.
   S.SC_COLLAPSE_ENABLED,
   // World-scope sentinels (never client-forced anyway).
   S.GM_PRIORITY_ENABLED,

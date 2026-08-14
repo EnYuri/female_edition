@@ -217,7 +217,7 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
     // ever write the flag. While the panel-level lock is on, offering the flag toggle was
     // a row that lied twice over: it read "위치 고정" on a panel that was already locked,
     // and pressing it changed nothing anyone could see. Name the real source instead —
-    // the owner releases it from the sheet's 위치 고정 checkbox. No `onClick`, so the row
+    // the owner releases it from the sheet's "위치 고정" checkbox. No `onClick`, so the row
     // renders permanently disabled.
     if (actor.system?.locked) {
       add({ icon: "fa-solid fa-lock", label: L("FESP.Menu.LockedByPanel") });

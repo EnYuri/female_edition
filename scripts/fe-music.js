@@ -65,7 +65,8 @@ function musicUploadDir() {
   return normalizeDataDir(musicSetting(S.MUSIC_UPLOAD_ROOT)) || "assets/uploadedmusic";
 }
 
-/** GM이 실행: 단일 공용 플레이리스트 생성 / 권한(default:OWNER) 보정. 이름은 생성 시에만 사용. */
+/** GM only: create the single shared playlist, or repair its default:OWNER permission.
+ *  The name is applied at creation time only. */
 async function ensureSharedPlaylist({ notify = true } = {}) {
   if (!isPrimaryActiveGm()) return null;
 
@@ -84,7 +85,7 @@ async function ensureSharedPlaylist({ notify = true } = {}) {
     return pl;
   }
 
-  // 이름은 안 건드림. default:OWNER 권한만 보정.
+  // Leave the name alone; only repair the default:OWNER permission.
   if ((pl.ownership?.default ?? 0) !== OWNER) {
     await pl.update({ ownership: { ...(pl.ownership ?? {}), default: OWNER } });
   }
@@ -104,12 +105,12 @@ async function ensureMusicUploadDirectory({ notify = false } = {}) {
   }
 }
 
-/** 공용 음악 문서(플레이리스트 / 트랙) 여부 */
+/** Is this a shared music document (playlist or track)? */
 function isSharedPlaylist(pl) {
   return pl?.getFlag?.(MODULE_ID, SHARED_FLAG) === true;
 }
 
-/** ===== 업로드 수신 버퍼(GM, 프록시 폴백 전용) ===== */
+/** ===== Upload receive buffer (GM side, proxy fallback only) ===== */
 const uploads = new Map();
 const UPLOAD_TTL_MS = 10 * 60 * 1000;
 const MAX_RETRY = 5;
@@ -198,7 +199,7 @@ function registerSocket() {
     // typing-indicator): only handle the `music:`-namespaced types, bail on the rest.
     if (!msg?.type || !String(msg.type).startsWith("music:")) return;
 
-    /** ===== 요청자 수신(업로드 응답) ===== */
+    /** ===== Requester side: upload responses ===== */
     // Gated on "is NOT the authority", not on "is not a GM". `User#isGM` is
     // ASSISTANT-or-higher (common/documents/user.mjs:124), while FILES_UPLOAD is
     // revocable from ASSISTANT — its `requiredRoles` is [GAMEMASTER] alone
@@ -252,11 +253,11 @@ function registerSocket() {
     const sender = feResolveSocketSender(senderId, msg.fromUserId, "music-request");
     if (!sender) return;
 
-    /** ===== 대표 GM 처리 (프록시 업로드만) ===== */
+    /** ===== Authority GM side (proxy uploads only) ===== */
 
-    // 폴더 생성 요청: 플레이어가 브라우즈/생성 권한이 없어도 GM 권한으로 업로드 폴더 생성.
-    // 클라이언트가 보낸 경로는 무시하고, GM 자신의 설정(musicUploadDir)만 사용 —
-    // 임의 폴더 생성을 유도당하지 않기 위함.
+    // Directory creation on behalf of a player who lacks browse/create permission. The
+    // client-supplied path is IGNORED — only the GM's own musicUploadDir setting is used,
+    // so a client cannot induce the creation of an arbitrary folder.
     if (msg.type === MUSIC_MSG.ENSURE_DIR) {
       const { reqId } = msg;
       const fromUserId = sender.id;
@@ -272,7 +273,7 @@ function registerSocket() {
       return;
     }
 
-    // 업로드 INIT
+    // Upload INIT
     if (msg.type === MUSIC_MSG.UP_INIT) {
       const { uploadId, fileName, fileType, fileSize, chunkSize: chunkSizeRaw } = msg;
       const fromUserId = sender.id;
@@ -291,7 +292,7 @@ function registerSocket() {
       // A client has no way to cancel a GM-side session: closing the window or
       // reloading mid-transfer just abandons it, and it then survives for the full
       // UPLOAD_TTL_MS. Rejecting the retry left that user locked out for up to ten
-      // minutes ("이미 업로드가 진행 중입니다") with nothing they could do about it,
+      // minutes, with nothing they could do about it,
       // and the dead session still counted against MAX_CONCURRENT_UPLOADS for
       // everyone else. Supersede instead of reject — the one-session-per-user cap is
       // unchanged (the old record is dropped before the new one is created), it is
@@ -308,7 +309,7 @@ function registerSocket() {
       const cleanName = sanitizeFileName(fileName);
       const displayName = sanitizeFileName(msg.displayName ?? stripExt(fileName), { maxLen: 120 });
 
-      // 이름+크기 중복 검사. 동일하면 청크 전송 없이 즉시 트랙만 보장.
+      // Dedup on name + size: on a match, skip the chunk transfer and just ensure the track.
       const target = await resolveUploadTarget(dir, cleanName, size);
       if (target.reused) {
         try { await ensureTrack(pl, target.path, displayName); } catch (_) {}
@@ -337,7 +338,7 @@ function registerSocket() {
       return;
     }
 
-    // 업로드 CHUNK
+    // Upload CHUNK
     if (msg.type === MUSIC_MSG.UP_CHUNK) {
       const { uploadId, index, data } = msg;
       const rec = uploads.get(uploadId);
@@ -361,7 +362,7 @@ function registerSocket() {
 
       // TTL is an ABANDONMENT timeout, not a transfer deadline. It was armed once
       // at UP_INIT, so a large file on a slow link could have its session collected
-      // out from under it mid-transfer and fail at UP_FINISH with "업로드 세션 없음".
+      // out from under it mid-transfer and fail at UP_FINISH with a missing-session error.
       // Re-arm on progress: an actually-abandoned session still expires
       // UPLOAD_TTL_MS after its LAST chunk, and the client's own
       // FINISH_ACK_TIMEOUT_MS is only awaited after the final chunk is sent, so it
@@ -371,7 +372,7 @@ function registerSocket() {
       return;
     }
 
-    // 업로드 FINISH
+    // Upload FINISH
     if (msg.type === MUSIC_MSG.UP_FINISH) {
       const { uploadId } = msg;
       const rec = uploads.get(uploadId);
@@ -407,9 +408,8 @@ function registerSocket() {
   });
 }
 
-/** 공용 플레이리스트가 바뀌면(추가/삭제/재생상태) 열려 있는 음악 창을 갱신.
- *  직접 업로드/재생은 소켓을 타지 않으므로, 문서 변경 훅으로 모든 클라이언트의
- *  창을 라이브 동기화한다. */
+/** Refresh any open music window when the shared playlist changes. Direct upload and
+ *  playback never touch the socket, so document hooks are what keep every client live. */
 function registerLiveRefresh() {
   const onSound = (sound) => { if (isSharedPlaylist(sound?.parent)) notifyClientRefresh(); };
   Hooks.on("createPlaylistSound", onSound);
@@ -418,7 +418,7 @@ function registerLiveRefresh() {
   Hooks.on("updatePlaylist", (pl) => { if (isSharedPlaylist(pl)) notifyClientRefresh(); });
 }
 
-/** 비-GM의 공용 플레이리스트/트랙 삭제 차단 (default:OWNER 부작용 가드) */
+/** Block non-GM deletion of the shared playlist/tracks — a default:OWNER side effect. */
 function registerDeleteGuards() {
   Hooks.on("preDeletePlaylist", (doc) => {
     if (!isSharedPlaylist(doc) || game.user.isGM) return;
@@ -768,7 +768,7 @@ function registerPlaylistSeekControls() {
   });
 }
 
-/** 사이드바(Playlists 탭) 버튼 자동 삽입 */
+/** Auto-inject the sidebar (Playlists tab) button */
 function registerSidebarButton() {
   function getPlaylistDirectoryClass() {
     return (
@@ -780,7 +780,7 @@ function registerSidebarButton() {
     );
   }
 
-  // 1) 공식 Header Controls (ApplicationV2)
+  // 1) Official Header Controls (ApplicationV2)
   Hooks.on("getHeaderControlsApplicationV2", (app, controls) => {
     const PD = getPlaylistDirectoryClass();
     if (typeof PD !== "function" || !(app instanceof PD)) return;
@@ -794,7 +794,7 @@ function registerSidebarButton() {
     });
   });
 
-  // 2) DOM 주입 (fallback, 중복 방지)
+  // 2) DOM injection fallback, guarded against duplicates
   function injectIntoDirectoryHeader(root) {
     const el =
       root instanceof HTMLElement ? root :
@@ -839,7 +839,7 @@ function registerSidebarButton() {
 
   Hooks.on("renderPlaylistDirectory", (app, html) => injectIntoDirectoryHeader(html));
 
-  // 모듈을 월드 실행 중에 켠 경우 대비
+  // Covers enabling the module while the world is already running
   Hooks.on("ready", () => {
     try { if (ui?.playlists?.element) injectIntoDirectoryHeader(ui.playlists.element); } catch (_) {}
   });
@@ -847,7 +847,7 @@ function registerSidebarButton() {
 
 Hooks.once("init", () => {
   // World-scope GM config. config:false — surfaced via the unified settings menu
-  // (음악 section), never the core Module Settings sheet, per project convention.
+  // (the "음악" section), never the core Module Settings sheet, per project convention.
   game.settings.register(MODULE_ID, S.MUSIC_ENABLED, {
     scope: "world", config: false, type: Boolean,
     default: FE_DEFAULTS[S.MUSIC_ENABLED], requiresReload: true
@@ -895,7 +895,7 @@ Hooks.once("ready", async () => {
   registerLiveRefresh();
 
   if (isPrimaryActiveGm()) {
-    // 공용 플레이리스트 생성/권한 보정(이름은 생성 시에만). 첫 부트스트랩 1회 알림.
+    // Create the shared playlist or repair its permission; notify once on first bootstrap.
     const done = game.settings.get(MODULE_ID, AUTO_INIT_KEY);
     await ensureSharedPlaylist({ notify: false });
     await ensureMusicUploadDirectory({ notify: true });

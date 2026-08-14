@@ -44,7 +44,7 @@ const FE_PANEL_DEFAULT_SIZE = 400;
 const FE_PANEL_COMMON_ATTR_NAMES = [
   // dnd5e
   "hp", "ac", "str", "dex", "con", "int", "wis", "cha",
-  // double-cross-3rd (침식률 + 능력치 body/sense/mind/social)
+  // double-cross-3rd (encroachment + body/sense/mind/social attributes)
   "encroachment", "body", "sense", "mind", "social",
 ];
 

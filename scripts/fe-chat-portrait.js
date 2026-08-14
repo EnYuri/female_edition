@@ -320,9 +320,9 @@ function cpGetRoundMarkerFlagValue(source) {
   return null;
 }
 
-// dx3rd(DX3 System) 전투 진행 알림 — 라운드 N / 셋업·이니셔티브·메인·클린업 프로세스.
-// The system emits every one of them as `<h3 class="dx3rd-combat-msg">…</h3>` with a GM
-// (or, for 메인 프로세스, the acting actor's) speaker. Duplicated from fe-util.js's
+// dx3rd (DX3 System) combat progress notices: round N, plus the setup / initiative /
+// main / cleanup phases. The system emits each as `<h3 class="dx3rd-combat-msg">…</h3>`
+// with a GM speaker (or the acting actor's, on the main phase). Duplicated from
 // feIsSystemCombatNoticeContent — this script is deliberately import-free.
 const CP_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
 
@@ -632,8 +632,8 @@ function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderCo
   } else {
     img.style.setProperty("border-radius",   shape === "square" ? "0" : "50%", "important");
     img.style.setProperty("object-fit", "cover", "important");
-    // anchorTop(채팅 포트레이트): 상단(얼굴/머리)을 보존하고 하단만 잘라낸다.
-    // 그 외(컴뱃 트래커 등): 기존대로 중앙 기준으로 자른다.
+    // anchorTop (chat portraits): keep the top of the image (face/head) and crop only
+    // the bottom. Everything else (combat tracker, ...) keeps the centered crop.
     img.style.setProperty("object-position",
       anchorTop ? "center top" : "center center", "important");
     img.style.setProperty("clip-path",

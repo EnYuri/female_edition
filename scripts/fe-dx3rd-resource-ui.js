@@ -1,22 +1,22 @@
 // fe-dx3rd-resource-ui.js
-// 픽셀 테마 캐릭터 스테이터스 — 시트 헤더/컨텍스트 메뉴로 직접 핀한 액터를 패널로 표시.
-// 월드 액터는 토큰 존재 여부와 무관. 비연결 토큰의 합성 액터는 현재 씬에서 별도 수집.
+// Pixel-theme character status panels. An actor gets a card only while it carries
+// SHOW_FLAG (toggled from the sheet header or context menu). Visibility is a separate
+// on/off that only changes container `display` — card DOM is never torn down.
 //
-// 카드 존재: 액터에 SHOW_FLAG가 있는 경우만 (시트 헤더·컨텍스트 메뉴로 토글).
-// 채팅 토글: 전체 가시성 on/off — 카드 DOM은 유지하고 display만 변경.
+// World actors are shown regardless of whether a token exists; unlinked tokens' synthetic
+// actors are not in game.actors, so the current scene's TokenDocuments are scanned too.
 //
-// 레이아웃:
-//   · PC 외 액터(enemy 등) → #fe-dx3rd-rui-container     : 좌측 기본(left:8px), 세로 정렬
-//        - 기본 top은 PC 스테이터스(우상단) 바로 아래 높이 (_npcDefaultTop), PC 없으면 nav 아래
-//   · PC 액터(character)   → #fe-dx3rd-rui-container-own : 우상단 기본, 가로 정렬
-//   · 두 컨테이너 모두 드래그로 이동 가능 (위치 localStorage 저장)
+// Layout: non-PC actors go into #fe-dx3rd-rui-container (left:8px, vertical), PCs into
+// #fe-dx3rd-rui-container-own (top right, horizontal). Both are draggable and persist
+// their position in localStorage. The NPC container's default top sits just below the PC
+// container (_npcDefaultTop), falling back to below the nav when there are no PC cards.
 
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 
-// hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0.
+// hex → { h: 0-360, s: 0-1 }. Achromatic input (s≈0) yields h=0.
 function _hexToHs(hex) {
   hex = String(hex).replace(/^#/, "");
   if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
@@ -41,9 +41,9 @@ function _hexToHs(hex) {
 const CONTAINER_ID     = "fe-dx3rd-rui-container";
 const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
 
-// 카드 줄바꿈(wrap) 한계 — 화면 밖으로 나가지 않도록.
-const PC_CARDS_PER_ROW    = 5; // 우상단 가로 컨테이너: 5개마다 다음 행
-const ENEMY_CARDS_PER_COL = 8; // 좌상단 세로 컨테이너: 8개마다 우측 새 열
+// Wrap limits, so cards never run off screen.
+const PC_CARDS_PER_ROW    = 5; // horizontal container: new row every 5
+const ENEMY_CARDS_PER_COL = 8; // vertical container: new column every 8
 const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
 const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → RUI에 표시 (토큰 무관)
 const MASK_FLAG        = "maskResourceValues"; // 수치 값을 ??로 숨김
@@ -62,13 +62,13 @@ const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
 
 function _isDx3rd()      { return DX3RD_SYSTEM_IDS.has(game.system?.id); }
 function _isDnd5e()      { return game.system?.id === "dnd5e"; }
-// Systems where this status panel is available. DX3rd shows HP + 침식률(encroachment);
+// Systems where this status panel is available. DX3rd shows HP + encroachment;
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
 function _ruiEnabled()   { try { return feSetting(S.DX3RD_RUI_ENABLED) === true; } catch { return false; } }
 function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
-// 스테이터스 UI 가시성 — 채팅 토글 버튼에서 모듈 설정으로 이전. 기본 표시(true).
+// Panel visibility, moved from a chat toggle button to a module setting. Defaults to on.
 function _isGlobalOn()   { try { return feSetting(S.DX3RD_RUI_VISIBLE) !== false; } catch { return true; } }
 
 function _portraitW() {
@@ -103,7 +103,7 @@ function _enc(actor) {
 
 // ─── actor type ────────────────────────────────────────────────────────────
 // DX3rd actor.system.actorType: "PlayerCharacter" | "Enemy" | "NPC" | "Ally" | "Troop"
-// PlayerCharacter → 우상단 가로 컨테이너 / 그 외 → 좌상단 세로 컨테이너.
+// PlayerCharacter → top-right horizontal container; everything else → left vertical one.
 
 function _isPC(actor) {
   // DX3rd: system.actorType === "PlayerCharacter". Other systems (dnd5e): the
@@ -114,8 +114,9 @@ function _isPC(actor) {
 }
 
 // ─── pinned actors ─────────────────────────────────────────────────────────
-// 월드 액터는 토큰 존재 여부와 무관하다. 비연결 토큰의 합성 액터는 game.actors에
-// 들어 있지 않으므로 현재 씬의 TokenDocument.actor도 함께 수집한다.
+// World actors count regardless of whether a token exists. Unlinked tokens' synthetic
+// actors are absent from game.actors, so the current scene's TokenDocument.actor is
+// collected too.
 
 function _actorKey(actor) {
   return actor?.uuid ?? actor?.id ?? "";
@@ -184,9 +185,9 @@ function _savePos(key, left, top) {
 }
 
 // ─── drag ──────────────────────────────────────────────────────────────────
-// 컨테이너 자체를 드래그 가능하게 만든다.
-// 카드에서 mousedown이 버블업되면 5px 임계값 이후 드래그로 전환.
-// 임계값 미만은 일반 클릭으로 처리 (카드 상호작용 보존).
+// Make the container itself draggable. A mousedown bubbling up from a card becomes a drag
+// only past a 5px threshold; below it the event stays an ordinary click so card
+// interactions keep working.
 
 function _makeDraggable(container, posKey) {
   let dragging = false;
@@ -235,7 +236,7 @@ function _makeDraggable(container, posKey) {
     document.addEventListener("mouseup",   onUp,   true);
   });
 
-  // 드래그 직후 발생하는 click 억제 (카드 클릭 오작동 방지)
+  // Swallow the click that follows a drag, so it does not fire a card action.
   container.addEventListener("click", e => {
     if (wasDragging) { e.stopPropagation(); e.preventDefault(); wasDragging = false; }
   }, true);
@@ -291,7 +292,7 @@ function _showCardContextMenu(actor, e) {
     menu.appendChild(item);
   }
 
-  // 뷰포트 경계 클램프: 먼저 DOM에 삽입한 뒤 실제 크기 측정
+  // Clamp to the viewport: insert first, then measure the real size.
   menu.style.left = "0";
   menu.style.top  = "0";
   document.body.appendChild(menu);
@@ -367,7 +368,7 @@ function _updateCard(card, actor) {
     card.querySelector(".fedr-hp-lbl").textContent = masked ? "??" : `${hp.value}/${hp.max}`;
   }
 
-  // 침식률(encroachment) bar: present only on systems that have it (DX3rd).
+  // Encroachment bar: present only on systems that have it (DX3rd).
   // On dnd5e and any system without an encroachment attribute, hide the whole
   // bar-group so the card shows the HP bar only.
   const encGroup = card.querySelector(".fedr-enc")?.closest(".fedr-bar-group");
@@ -393,16 +394,15 @@ function _navBottom() {
   return nav ? Math.round(nav.getBoundingClientRect().bottom) + 8 : 8;
 }
 
-// NPC(적/기타) 컨테이너 기본 top.
-// 씬 컨트롤 접힘으로 좌상단이 비어, NPC 스테이터스를 PC 스테이터스(우상단 가로
-// 컨테이너) 바로 아래 높이까지 끌어올린다. 좌우(left)는 그대로 8px 유지.
-// PC 카드가 있을 때만 PC 하단에 맞추고, 없으면 기존 nav 아래로 폴백.
+// Default top for the NPC container. With the scene controls collapsed the top-left is
+// free, so NPC cards rise to just below the PC container's bottom (left stays 8px).
+// Only when PC cards exist — otherwise fall back to below the nav.
 function _npcDefaultTop() {
   const pc = document.getElementById(CONTAINER_OWN_ID);
   const hasPcCards = pc && pc.querySelector(".fedr-actor-card");
   if (hasPcCards) {
     const r = pc.getBoundingClientRect();
-    // 보이는 상태면 실제 하단을, 숨김(display:none)이면 기본 top(8) + 카드 높이로 추정.
+    // Use the real bottom when visible; estimate from default top + card height when hidden.
     if (r.height > 0) return Math.round(r.bottom) + 8;
     return 8 + _cardH() + 44;
   }
@@ -421,9 +421,8 @@ function _getOrCreateContainer(id, posKey) {
   el.style.flexDirection = id === CONTAINER_OWN_ID ? "row" : "column";
   el.style.alignItems    = id === CONTAINER_OWN_ID ? "flex-start" : "";
 
-  // 줄바꿈(wrap) — 주축 크기를 N개 카드 풋프린트로 제한해 다음 줄/열로 넘긴다.
-  //   카드 본체 = pw + panelW (또는 높이 ch), margin 10px*2 = 풋프린트 +20px.
-  //   PC(가로): 5개마다 아래 행, 우측 정렬 유지. enemy(세로): 8개마다 우측 새 열.
+  // Wrapping: cap the main-axis size at N card footprints so the rest spills to the next
+  // row/column. One footprint is the card body (pw + panelW, or ch tall) plus 2x10px margin.
   el.style.flexWrap = "wrap";
   const footW = _portraitW() + _panelW() + 20;
   const footH = _cardH() + 20;
@@ -457,8 +456,8 @@ function _getOrCreateContainer(id, posKey) {
   return el;
 }
 
-// 카드 수 + 전역 가시성으로 컨테이너 display 결정.
-// 채팅 토글과 카드 추가/제거 양쪽에서 호출.
+// Container display is a function of card count and global visibility. Called from both
+// the visibility toggle and card add/remove.
 function _applyContainerDisplay(cnt) {
   const hasCards = cnt.querySelectorAll(".fedr-actor-card").length > 0;
   cnt.style.display = (hasCards && _isGlobalOn()) ? "" : "none";
@@ -485,7 +484,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
   _applyContainerDisplay(cnt);
 }
 
-// 전체 재빌드 — 핀된 액터 목록 기준으로 양쪽 컨테이너 동기화.
+// Full rebuild: sync both containers against the pinned-actor list.
 function feRebuildDx3rdResourceUI() {
   if (!_isSupported() || !_ruiEnabled()) {
     document.getElementById(CONTAINER_ID)?.remove();
@@ -498,8 +497,8 @@ function feRebuildDx3rdResourceUI() {
   const panelW = _panelW();
   const ch = _cardH();
 
-  // PC(우상단) 컨테이너를 먼저 빌드/배치해야 NPC 컨테이너 기본 top을
-  // PC 스테이터스 바로 아래로 계산할 수 있다 (_npcDefaultTop이 PC rect를 측정).
+  // Build/place the PC container FIRST — _npcDefaultTop measures its rect to position the
+  // NPC container just below it.
   const cntPcs = _getOrCreateContainer(CONTAINER_OWN_ID, POS_OWN_KEY);
   _syncContainerCards(cntPcs, pcs, pw, panelW, ch);
 
@@ -507,7 +506,7 @@ function feRebuildDx3rdResourceUI() {
   _syncContainerCards(cntEnemies, enemies, pw, panelW, ch);
 }
 
-// 단일 액터 데이터 갱신 — 핀된 액터의 HP·침식률 업데이트.
+// Update one pinned actor's HP/encroachment in place.
 function feUpdateDx3rdResourceUI(actorRef) {
   if (!_isSupported()) return;
 
@@ -520,7 +519,7 @@ function feUpdateDx3rdResourceUI(actorRef) {
 
   let card = _findActorCard(cnt, actor);
   if (!card) {
-    // actorType 변경 등으로 컨테이너가 달라진 경우
+    // The card moved containers (e.g. actorType changed)
     card = _buildCard(actor, _portraitW(), _panelW(), _cardH());
     cnt.appendChild(card);
     _applyContainerDisplay(cnt);
@@ -566,11 +565,11 @@ function _removeActorCard(actorRef) {
 function _toggleActorPin(actor) {
   const willPin = !_isActorPinned(actor);
   if (actor.isOwner) {
-    // 직접 수정 권한 있음 — updateActor hook이 모든 클라이언트에서 재빌드 처리
+    // We can write directly; the updateActor hook rebuilds on every client.
     if (willPin) actor.setFlag(MODULE_ID, SHOW_FLAG, true);
     else actor.unsetFlag(MODULE_ID, SHOW_FLAG);
   } else {
-    // 직접 수정 불가 — GM에게 소켓으로 요청
+    // No write permission — ask the GM over the socket.
     game.socket.emit(`module.${MODULE_ID}`, {
       type: "ruiPinToggle",
       actorUuid: _actorKey(actor),
@@ -578,7 +577,7 @@ function _toggleActorPin(actor) {
       requesterId: game.user.id,
       pinned: willPin,
     });
-    // 낙관적 로컬 업데이트 (updateActor로 최종 확정)
+    // Optimistic local update; updateActor confirms it.
     if (willPin) _addActorCard(actor);
     else _removeActorCard(actor);
   }
@@ -641,10 +640,10 @@ function _flushAccentPreview() {
 }
 
 function _injectAccentBtn() {
-  // 액센트 색 선택기는 레트로 테마 전용(비-레트로엔 액센트 오버라이드가 없음).
-  // 레트로 테마는 전 시스템 공용이므로 시스템 게이트 없이, 테마 ON + GM 이면 주입한다.
-  // (이전엔 _isDx3rd() 로 묶여 dnd5e 등에서 강조색 스와치가 안 보였다.)
-  // 테마가 꺼졌으면 이미 주입된 버튼을 제거하고 빠진다.
+  // The accent picker is retro-theme-only (nothing else honours the accent override), and
+  // the retro theme is system-agnostic — so gate on theme + GM, NOT on the system. It used
+  // to be wrapped in _isDx3rd(), which hid the swatch on dnd5e and elsewhere.
+  // Remove any already-injected button when the theme is off.
   if (!_isThemeOn() || !game.user?.isGM) {
     document.getElementById(ACCENT_BTN_ID)?.remove();
     return;
@@ -690,9 +689,9 @@ function _injectAccentBtn() {
   controls.append(label);
 }
 
-// ─── 가시성 적용 ─────────────────────────────────────────────────────────────
-// 가시성은 모듈 설정(DX3RD_RUI_VISIBLE)으로 관리 — 설정 onChange 에서 호출.
-// 카드 DOM은 건드리지 않고 컨테이너 display만 갱신.
+// ─── Visibility ──────────────────────────────────────────────────────────────
+// Driven by the DX3RD_RUI_VISIBLE setting's onChange. Only container display changes;
+// card DOM is left alone.
 
 function _refreshVisibility() {
   for (const id of [CONTAINER_ID, CONTAINER_OWN_ID]) {
@@ -701,19 +700,19 @@ function _refreshVisibility() {
   }
 }
 
-// ─── 컨텍스트 메뉴 (사이드바 액터 / 캔버스 토큰 우클릭) ──────────────────────
+// ─── Context menus (sidebar actor / canvas token right-click) ────────────────
 
-// 사이드바 액터 디렉터리 우클릭
+// Sidebar Actor directory right-click
 // v14: getActorContextOptions / v13: getActorContextMenuOptions
 function _ruiContextEntry(html, options) {
   if (!_isSupported() || !_ruiEnabled()) return;
   if (options.some(o => o.name === "스테이터스 토글")) return;
-  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
-  // 최소 지원이 v13이므로 양쪽 키를 모두 넣는다.
+  // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
+  // v16). Minimum support is v13, so emit both key pairs.
   const visible = li => {
     const el = li instanceof jQuery ? li[0] : li;
     const id = el?.dataset?.documentId ?? el?.dataset?.entryId ?? el?.dataset?.actorId;
-    // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+    // Owned actors only — isOwner is everything for a GM, own actors for a player.
     return !!game.actors.get(id)?.isOwner;
   };
   const item = {
@@ -729,10 +728,10 @@ function _ruiContextEntry(html, options) {
       if (actor) _toggleActorPin(actor);
     },
   };
-  // "편집"(SIDEBAR.Edit) 아래 무대 항목 그룹 끝에 합류시킨다(맨 아래 push 금지).
-  // 무대 항목(fe-theatre)이 이미 있으면 그 그룹 끝, 없으면(훅 실행 순서상 theatre
-  // 미실행) "편집" 바로 아래. 두 훅 중 무엇이 먼저 실행돼도 최종 순서는
-  // [편집, 무대에 추가/제거, 무대 설정, 스테이터스 토글] 으로 수렴한다.
+  // Join the end of the stage-entry group under SIDEBAR.Edit — do NOT push to the bottom.
+  // If fe-theatre's entries are already there, append after them; otherwise (theatre's hook
+  // has not run yet) sit directly under Edit. Either hook order converges on the same final
+  // order: [Edit, stage add/remove, stage settings, status toggle].
   let at = -1;
   for (let i = 0; i < options.length; i++) {
     if (typeof options[i]?.name === "string" && options[i].name.startsWith("무대")) at = i;
@@ -749,10 +748,9 @@ function _ruiContextEntry(html, options) {
 Hooks.on("getActorContextOptions",     _ruiContextEntry);
 Hooks.on("getActorContextMenuOptions", _ruiContextEntry);
 
-// 신규 액터는 마스킹 상태로 시작. createActor는 접속 중인 모든 클라이언트에서
-// 발화하므로 생성자 본인(=소유 권한 보유)만 기록한다. 게이트가 없으면 다른
-// 플레이어 클라이언트가 남의 액터에 update를 날려
-// "User X lacks permission to update Actor [...]" 가 반복 발생한다.
+// New actors start masked. createActor fires on EVERY connected client, so only the
+// creator (who owns it) may write — without that gate, other clients spam
+// "User X lacks permission to update Actor [...]".
 Hooks.on("createActor", (actor, _options, userId) => {
   if (!_isDx3rd()) return;
   if (game.user.id !== userId || !actor.isOwner) return;
@@ -760,8 +758,8 @@ Hooks.on("createActor", (actor, _options, userId) => {
     .catch(err => console.warn(`[${MODULE_ID}] failed to set default mask flag`, err));
 });
 
-// 캔버스 토큰 우클릭 → Token HUD(아이콘 패널)에 버튼 주입.
-// getTokenEntries 는 코어 훅이 아니므로(존재하지 않음) renderTokenHUD 를 사용한다.
+// Canvas token right-click: inject buttons into the Token HUD. There is no core
+// getTokenEntries hook, so renderTokenHUD is the entry point.
 function _hudIconBtn(label, faIcon, onClick) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -786,12 +784,12 @@ function _injectTokenHudButtons(app, el) {
   const actor = app?.actor ?? app?.document?.actor ?? app?.object?.actor;
   if (!actor) return;
 
-  // 무대 항목은 좌측 컬럼(설정·잠금 등 GM 컨트롤 열), 스테이터스 토글은 우측 컬럼.
+  // Stage entries go in the left column (the GM control column); the status toggle right.
   const colLeft  = root.querySelector(".col.left")  ?? root;
   const colRight = root.querySelector(".col.right") ?? colLeft;
   root.querySelectorAll(".fedr-hud-btn").forEach(b => b.remove());
 
-  // 무대(fe-theatre) 항목 — theatre API 가 있고 액터를 소유한 경우에만. (좌측)
+  // Stage (fe-theatre) entries — only when the theatre API exists and the actor is owned.
   const hasStage = typeof globalThis.fetAddToStage === "function";
   if (hasStage && actor.isOwner) {
     const onStage = !!globalThis.fetIsOnStage?.(actor.id);
@@ -806,7 +804,7 @@ function _injectTokenHudButtons(app, el) {
     }
   }
 
-  // 스테이터스 UI 토글 — 지원 시스템 + 기능 활성 시에만. (우측)
+  // Status toggle — supported systems with the feature enabled only.
   if (_isSupported() && _ruiEnabled()) {
     const pinned = _isActorPinned(actor);
     colRight.appendChild(_hudIconBtn(
@@ -818,12 +816,12 @@ function _injectTokenHudButtons(app, el) {
 
 Hooks.on("renderTokenHUD", _injectTokenHudButtons);
 
-// ─── 액터 시트 헤더 버튼 ──────────────────────────────────────────────────────
+// ─── Actor sheet header buttons ──────────────────────────────────────────────
 
 // ApplicationV2 sheets already ship their own header-controls dropdown (the
 // "⋯" button, `data-action="toggleControls"` — core application.mjs
 // `_getHeaderControls()` / `_headerControlButtons()`). Rather than building a
-// bespoke dropdown, 수치 숨기기/드러내기 is pushed straight into THAT menu via
+// bespoke dropdown, the mask/unmask entry is pushed straight into THAT menu via
 // the `getHeaderControls{ClassName}` hook chain, which always includes the
 // base class name too ("getHeaderControlsApplicationV2" —
 // `Application#_callHooks` walks `inheritanceChain()` and fires one hook per
@@ -884,7 +882,7 @@ function _injectSheetStatusBtn(app, el) {
   if (headerBtns) {
     // Append (not prepend) so our button sorts AFTER any core/system buttons
     // already present in the container — lower priority than the existing
-    // header menu, not first. 수치 숨기기/드러내기 lives in the sheet's own
+    // header menu, not first. The mask/unmask entry lives in the sheet's own
     // native "⋯" controls dropdown instead — see _ruiOnGetHeaderControls above.
     headerBtns.append(btn);
   } else {
@@ -978,10 +976,9 @@ Hooks.on("ready", () => {
   _injectAccentBtn();
   feRebuildDx3rdResourceUI();
 
-  // 다른 클라이언트의 소켓 메시지 수신
   game.socket.on(`module.${MODULE_ID}`, async (data, senderId) => {
     if (data?.type === "ruiPinToggle" && game.user.isGM) {
-      // 직접 수정 권한 없는 플레이어 대신 GM이 플래그 변경 처리
+      // Apply the flag change on behalf of a player who cannot write it themselves.
       const requester = feResolveSocketSender(senderId, data.requesterId, "resource-ui");
       if (!requester) return;
       let actor = null;
@@ -998,16 +995,16 @@ Hooks.on("ready", () => {
 Hooks.on("updateActor", (actor, change) => {
   if (!_isSupported() || !_ruiEnabled()) return; // skip entirely when the status UI is off
   if (change.system?.actorType !== undefined || change.flags?.[MODULE_ID] !== undefined) {
-    // actorType 변경 또는 SHOW_FLAG 변경 → 전체 재빌드 (모든 클라이언트에서 동기화)
+    // actorType or SHOW_FLAG changed → full rebuild (syncs on every client)
     feRebuildDx3rdResourceUI();
   } else {
-    // HP·침식률 등 데이터 변경 → 해당 카드만 갱신
+    // plain data change (HP, encroachment) → refresh just that card
     feUpdateDx3rdResourceUI(actor);
   }
 });
 
-// 합성 액터는 현재 씬의 TokenDocument를 통해서만 열거할 수 있다. 씬 전환과
-// 비연결 토큰 삭제 시 월드 액터 목록만으로는 남은 카드를 정리할 수 없으므로 재빌드한다.
+// Synthetic actors are only enumerable through the current scene's TokenDocuments, so a
+// scene change or an unlinked-token delete cannot be reconciled from game.actors alone.
 Hooks.on("canvasReady", feRebuildDx3rdResourceUI);
 Hooks.on("deleteToken", feRebuildDx3rdResourceUI);
 

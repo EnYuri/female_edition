@@ -62,29 +62,19 @@ function feFamilyFromFile(fileName) {
   return `FEU ${base}`;
 }
 
-// Mirror the folder fonts into a REAL @font-face <style> in document.head.
+// Mirror the folder fonts into a real @font-face <style> in document.head.
 //
-// `new FontFace(...)` + `document.fonts.add()` registers a face on THIS document only,
-// and leaves no CSS text behind. Two export paths depend on CSS text existing:
+// `new FontFace()` + `document.fonts.add()` registers on THIS document only and leaves
+// no CSS text, but both export paths need CSS text: the archive window is built by
+// copying <link>/<style> out of document.head, and the saved standalone HTML embeds
+// fonts by scanning those same <style> elements for url(). No CSS text, no font.
 //
-//   1. The archive window is a separate Document. It is built by copying every
-//      `link[rel=stylesheet]` and `style` element out of document.head
-//      (feCollectHeadStylesHTML) — a JS-registered FontFace is in neither, so a
-//      `FEU *` family resolved to nothing there and the log printed in the default
-//      system stack.
-//   2. The saved standalone HTML embeds fonts by scanning those same `<style>`
-//      elements for `url(…)` and data-URL-ing the same-origin hits
-//      (feEmbedSnapshotStyleElementAssets). No url(), no embed.
+// URLs are absolutised against document.baseURI because <style> text is copied verbatim
+// and the archive window's own URL is about:blank.
 //
-// The URL is made ABSOLUTE against document.baseURI on purpose: feCollectHeadStylesHTML
-// rewrites hrefs only on <link> elements and copies <style> text verbatim, and the
-// archive window's own URL is about:blank — a relative `modules/…` src would resolve
-// against about:blank and 404. (Same reason the animated-tile fetch is absolutised.)
-//
-// The JS FontFace registration is KEPT alongside this: it is what `await face.load()`
-// gives us — a definite success/failure per file, which drives the picker list and the
-// console warning. The duplicate declaration costs nothing; the browser dedupes the
-// fetch by URL.
+// The JS FontFace registration is kept alongside this — `await face.load()` is what
+// gives a definite per-file success/failure for the picker list. The browser dedupes
+// the duplicate declaration by URL.
 function feInjectFolderFontFaceCSS(entries) {
   try {
     if (!entries?.length || !document?.head) return;

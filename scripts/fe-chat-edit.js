@@ -77,8 +77,8 @@ function feCanEditMessage(msg) {
   }
 }
 
-// HTML → 평문(문단/줄바꿈은 \n 으로 보존). DOMParser 우선 — 속성값에 ">" 가 든
-// 경우(data-x="1>2")까지 브라우저 파서가 올바로 처리한다.
+// HTML -> plain text, preserving paragraphs and line breaks as \n. DOMParser first, so
+// even a ">" inside an attribute value (data-x="1>2") is parsed correctly.
 function feHtmlToPlainText(html) {
   try {
     const doc = new DOMParser().parseFromString(String(html ?? ""), "text/html");
@@ -101,10 +101,10 @@ function feHtmlToPlainText(html) {
 function feGetEditableRaw(msg) {
   const stored = msg?.getFlag?.(MODULE_ID, "raw") ?? msg?.getFlag?.(MODULE_ID, "plain") ?? null;
   if (stored != null) {
-    // raw 는 평문 마크다운 원본이라 보통 그대로 돌려준다(사용자가 일부러 입력한
-    // 리터럴 태그도 보존). 단, 구 내레이터는 raw 에 <br> 을 저장했었는데(현재는
-    // \n 으로 저장) 그런 레거시 메시지를 마크다운 모드로 수정하면 <br> 이
-    // &lt;br&gt; 로 이스케이프돼 노출됐다 → 그 한 경우만 좁게 줄바꿈으로 정규화.
+    // `raw` holds the plain markdown source, so it is normally returned untouched
+    // (literal tags the user typed on purpose stay literal). The one exception: the old
+    // narrator stored <br> in raw (it now stores \n), and editing such a legacy message
+    // in markdown mode escaped it to &lt;br&gt;. Normalize that single case only.
     const raw = String(stored);
     return feUnwrapProseMirrorHTML(raw) ?? raw.replace(/<br\s*\/?>/gi, "\n");
   }
@@ -183,7 +183,7 @@ function feEnsureInlineEditorUI() {
       feCommitInlineEdit();
       return;
     }
-    // Escape => cancel (stopPropagation: ESC가 Foundry 게임 메뉴로 버블링되지 않도록)
+    // Escape = cancel. stopPropagation keeps ESC out of Foundry's game menu.
     if (ev.key === "Escape") {
       ev.preventDefault();
       ev.stopPropagation();
@@ -539,8 +539,8 @@ function feInstallEditContextMenuEarly() {
       return feCanEditMessage(msg);
     };
 
-    // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
-    // 최소 지원이 v13이므로 양쪽 키를 모두 넣어 v13 동작과 v14 무경고를 동시에 만족시킨다.
+    // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated
+    // for v16); v13 reads only name/condition, so fill both.
     options.unshift({
       feId: "fe-edit-message",
       label: "메시지 수정",

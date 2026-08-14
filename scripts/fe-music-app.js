@@ -159,14 +159,14 @@ export function markUploadError(uploadId, reason) {
   const rec = localUploads.get(uploadId);
   if (!rec) return;
 
-  // INIT_ACK 대기 중이면 종료
+  // Bail out while waiting on INIT_ACK
   if (rec.ackTimer) clearTimeout(rec.ackTimer);
   try { rec.ackReject?.(new Error(`UP_ERR:${reason ?? "unknown"}`)); } catch (_) {}
   rec.ackResolve = null;
   rec.ackReject = null;
   rec.ackTimer = null;
 
-  // FINISH_ACK 대기 중이면 종료
+  // Bail out while waiting on FINISH_ACK
   if (rec.doneTimer) clearTimeout(rec.doneTimer);
   try { rec.doneReject?.(new Error(`UP_ERR:${reason ?? "unknown"}`)); } catch (_) {}
   rec.doneResolve = null;
@@ -174,7 +174,7 @@ export function markUploadError(uploadId, reason) {
   rec.doneTimer = null;
 }
 
-/** GM 누락 청크 요청 → 자동 재전송 */
+/** GM asked for missing chunks -> resend automatically */
 export async function resendMissingChunks({ uploadId, missing, attempt }) {
   const rec = localUploads.get(uploadId);
   if (!rec) return;

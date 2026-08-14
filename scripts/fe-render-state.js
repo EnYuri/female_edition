@@ -445,8 +445,8 @@ function feCaptureMessageRenderFlagsOnPreUpdate(message, changed = {}, userId = 
 // The per-message user-color marker (.fe-has-user-color + --fe-user-color-rgb)
 // drives TWO independent features that both key off which messages carry a
 // resolvable user color:
-//   1) 유저 색상 틴트 (USE_USER_COLOR_BG)     — per-user color overlay
-//   2) 채팅카드 하부 배경 (USER_COLOR_BG_BASE) — solid opaque card background
+//   1) user color tint  (USE_USER_COLOR_BG)     - per-user color overlay
+//   2) card base layer  (USER_COLOR_BG_BASE)    - solid opaque card background
 // Historically both were gated on the tint toggle, so turning the tint off also
 // killed the solid background. They are now decoupled: the marker class is added
 // whenever EITHER feature is active, and the tint-only CSS var is set only when

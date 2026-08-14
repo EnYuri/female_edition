@@ -23,7 +23,7 @@ function feStoreInlineRollSnapshot(message, anchors) {
     if (!id || !Array.isArray(anchors) || !anchors.length) return null;
     const stored = { anchors: anchors.map((h) => String(h ?? "").trim()).filter(Boolean) };
     if (!stored.anchors.length) return null;
-    // 오래된 항목 정리: Map은 삽입 순서를 유지하므로 첫 번째 항목이 가장 오래됨
+    // Evict the oldest entry; Map preserves insertion order, so it is the first key.
     if (feInlineRollSnapshots.size >= FE_INLINE_ROLL_SNAPSHOT_MAX && !feInlineRollSnapshots.has(id)) {
       feInlineRollSnapshots.delete(feInlineRollSnapshots.keys().next().value);
     }
@@ -63,18 +63,18 @@ function feContentHasFreezeTarget(message) {
 }
 
 function feAnchorHasUnresolvedVariable(anchorHtml) {
-  // DOMParser 없이 문자열 수준에서 검사:
-  // data-roll="<base64>" → base64 디코딩 후 @variable 패턴 확인
-  // aria-label / title 속성 → 텍스트 추출 후 확인
+  // Checked at the string level, without DOMParser:
+  //   data-roll="<base64>" -> decode, then look for an @variable pattern
+  //   aria-label / title    -> extract the text, then look for the same
   try {
     const s = String(anchorHtml ?? "");
 
-    // data-roll attribute 추출 (base64)
+    // Extract the data-roll attribute (base64)
     const dataRollMatch = s.match(/\bdata-roll="([^"]*)"/);
     if (dataRollMatch?.[1]) {
       try {
         const decoded = atob(dataRollMatch[1]);
-        // JSON 파싱 시도
+        // Try to parse it as JSON
         try {
           const json = JSON.parse(decoded);
           const formula = json?.formula ?? json?._formula ?? "";
@@ -83,11 +83,11 @@ function feAnchorHasUnresolvedVariable(anchorHtml) {
           if (/@\w/.test(decoded)) return true;
         }
       } catch {
-        /* base64 decode 실패 — 무시 */
+        /* base64 decode failed - ignore */
       }
     }
 
-    // aria-label / title 속성 추출
+    // Extract the aria-label / title attributes
     const labelMatch = s.match(/\baria-label="([^"]*)"/) ?? s.match(/\btitle="([^"]*)"/);
     if (labelMatch?.[1] && /@\w/.test(labelMatch[1])) return true;
   } catch {
@@ -150,7 +150,7 @@ function feSnapshotOrRestoreInlineRolls(message, rootEl) {
     }
 
     if (snapshot.anchors.length !== current.length) {
-      // 스냅샷과 현재 inline roll 개수 불일치 — stale 스냅샷을 현재 상태로 교체
+      // Inline-roll count differs from the snapshot: replace the stale snapshot.
       const anchors = current.map((a) => a.outerHTML);
       feStoreInlineRollSnapshot(message, anchors);
       return;

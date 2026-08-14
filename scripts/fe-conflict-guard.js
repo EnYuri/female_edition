@@ -156,7 +156,7 @@ const FE_CG_CONFLICTS = [
   },
   {
     // Novel-game-style bottom message window (portrait + typewriter text).
-    // Functionally a SUBSET of fe-theatre (무대): both turn chat messages into a
+    // Functionally a SUBSET of fe-theatre ("무대"): both turn chat messages into a
     // VN-style portrait+message overlay. Actively maintained (v13, recent) → warn,
     // never neutralize. Soft conflict (only bites when BOTH features are on): a
     // staged-actor line double-shows (stage bubble + SMW window), and SMW does not

@@ -633,8 +633,8 @@ Hooks.once("init", () => {
     type: String,
     default: FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT],
     onChange: async (value) => {
-      // GM priority override를 먼저 갱신해야 feSetting()이 새 값을 반환.
-      // 갱신 전 feApplyStyleVarsFromSettings를 호출하면 낡은 override 값으로 accent-h가 덮어써짐.
+      // The GM-priority override must be refreshed BEFORE feApplyStyleVarsFromSettings,
+      // or accent-h is written from the stale override value.
       await feMirrorGmPrioritySetting(S.DX3RD_PIXEL_ACCENT, value);
       feApplyStyleVarsFromSettings(document);
     },
@@ -770,8 +770,8 @@ Hooks.once("init", () => {
     default: FE_DEFAULTS[S.ACCENT_TEXT_OVERRIDE],
     onChange: () => {
       feSetAccentTextOverrideClass(document);
-      // 오버라이드 OFF → 강조색 전체(텍스트·테두리·무늬)를 기본 백색으로 되돌리고,
-      // ON → 저장된 강조색을 복원. feApplyStyleVarsFromSettings 가 두 경우를 모두 처리.
+      // Override OFF resets every accent-driven surface (text, borders, pattern) to the
+      // default white; ON restores the saved accent. feApplyStyleVarsFromSettings does both.
       feApplyStyleVarsFromSettings(document);
     },
   });

@@ -1038,7 +1038,12 @@ function feCollectHeadStylesHTML() {
         return n.outerHTML;
       })
       .join("\n");
-  } catch {
+  } catch (err) {
+    // "" is indistinguishable from "the head had no stylesheets", and the caller
+    // interpolates it straight into the popup's <head> — a throw here yields a
+    // completely unstyled archive window. Keep returning "" (better than no archive
+    // at all); only the silence is fixed.
+    console.warn("female_edition | archive window style collection failed — rendering without CSS.", err);
     return "";
   }
 }
@@ -1653,8 +1658,8 @@ function feArchiveMessageContentLooksEmpty(node) {
 // `.collapsible` wrapper anywhere (`class="[^"]*\bcollapsible\b[^-]` matches 0
 // times in the whole system). So `.collapsible.collapsed` — and every
 // `.collapsible .collapsible-content` rule in styles/fe-chat-archive.css —
-// misses it completely, and an exported dx3rd item card loses its 설명 /
-// 이펙트 / 무기 / 술식 sections outright.
+// misses it completely, and an exported dx3rd item card loses its description,
+// effect, weapon and technique sections outright.
 //
 // Two independent things hide them, so BOTH must be undone here:
 //   1. `.dx3rd-item-chat .collapsible-content.collapsed{display:none!important}`
@@ -2499,7 +2504,7 @@ async function feRenderChatArchiveWindow(win, {
           page-break-inside: avoid;
         }
 
-        /* PDF 안정성: 이미지 숨김 옵션 */
+        /* PDF stability: hide-images option */
         body.fe-print-hide-avatars #fe-chat-export-log :is(
           .message-header img,
           .message-sender .avatar,
@@ -2635,7 +2640,7 @@ async function feRenderChatArchiveWindow(win, {
   feSetRetroThemeClass(win.document);
   feSetNeodgmModeClass(win.document);
   // MUST stay next to feSetNeodgmModeClass — user-font mode is the sixth font mode and
-  // was the ONE missing from this list, so an archive/PDF exported while 유저 로컬 폰트
+  // was the ONE missing from this list, so an archive/PDF exported while "유저 로컬 폰트"
   // was active always rendered in the default system stack ("PDF/HTML로 인쇄하면 기본
   // 고딕으로 나온다"). Note the CSS variable alone was already arriving:
   // feSetUserFontMode writes --fe-user-font-family onto documentElement.style, and
@@ -2760,7 +2765,7 @@ async function feRenderChatArchiveWindow(win, {
     rangeSpec = preRangeSpec;
   } else {
     rangeSpec = await feShowArchiveRangeDialog(allMessages.length);
-    // rejectClose:false → ESC/X 닫기 시 undefined 반환, OK 취소 시 null 가능
+    // rejectClose:false -> ESC/X returns undefined; cancelling OK can return null
     if (rangeSpec == null) {
       // User cancelled — close the archive window and abort.
       try { win.close(); } catch {}
@@ -3305,7 +3310,7 @@ async function feArchivePrint(win) {
   // its `document.visibilityState` is "hidden" (verified) and Chromium does not run
   // rAF for a hidden window at all. `win.focus()` two lines up does not help: focus
   // stealing is blocked. The old `catch` never fired either — a rAF that is simply
-  // never serviced does not throw. So the user pressed 인쇄 and waited a minute-plus
+  // never serviced does not throw. So the user pressed "인쇄" and waited a minute-plus
   // for a frame that only arrived when the compositor happened to wake the window,
   // which is why the delay looked random.
   //

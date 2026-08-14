@@ -120,7 +120,7 @@ function _ihRegisterSettings() {
       const token = canvas.tokens?.hover;
       if (token) {
         if (_ihKeyToggled) {
-          // 이미 표시 중 → 취소
+          // already shown → cancel
           _ihKeyToggled = false;
           _ihHud()?.close();
         } else {
@@ -130,7 +130,7 @@ function _ihRegisterSettings() {
         return;
       }
 
-      // 캔버스 토큰이 아니라 DOM 포트레이트(상태 UI / 캐릭터시트) 위일 때
+      // Over a DOM portrait (status UI / character sheet) rather than a canvas token
       if (_ihHoverArtUrl) {
         if (_ihDomToggled) {
           _ihHideDomArt();
@@ -139,7 +139,7 @@ function _ihRegisterSettings() {
           const url = _ihHoverArtUrl;
           clearTimeout(_ihDomDelayTimer);
           _ihDomDelayTimer = setTimeout(() => {
-            // 지연 후 재검증: 같은 포트레이트를 계속 호버 중이어야 표시
+            // Re-check after the delay: only show if still hovering the same portrait
             if (_ihDomToggled && _ihHoverArtUrl === url) _ihShowDomArt(url);
           }, _ihDelay);
         }
@@ -147,7 +147,7 @@ function _ihRegisterSettings() {
     },
     onUp: () => {
       if (!_ihActive()) return false;
-      // 키를 떼도 이미지 유지 — 토큰 이탈 시 hoverToken hook이 해제
+      // The image survives key-up; the hoverToken hook clears it when the token is left
     },
   });
 
@@ -405,11 +405,10 @@ function _ihResolveHoverArt(target) {
     if (src && !src.startsWith("data:")) return src;
   }
 
-  // 채팅 포트레이트(.message-header 안) — 아래의 .message-content 분기가 잡지 못한다.
-  // src 에는 HQ 리샘플 결과인 표시 크기(≈64px) data: URL 이 들어 있을 수 있으므로,
-  // cpUpsertPortrait 가 보존해 둔 원본 경로(fePortraitOrigSrc)를 최우선으로 쓴다.
-  // 원본 경로를 모르는 채로 data: 를 돌려주면 64px 비트맵을 확대해 보여주게 되므로,
-  // 그 경우엔 아무것도 표시하지 않는다.
+  // Chat portraits live in .message-header, which the .message-content branch below does
+  // not reach. Their src may hold an HQ-resampled ~64px data: URL, so prefer the original
+  // path cpUpsertPortrait stashed in fePortraitOrigSrc. Without a known original, showing
+  // the data: URL would just magnify a 64px bitmap — so show nothing instead.
   const portrait = target.closest("img.fe-chat-portrait");
   if (portrait) {
     const orig = portrait.dataset?.fePortraitOrigSrc || portrait.dataset?.feHqSrc;
@@ -419,8 +418,8 @@ function _ihResolveHoverArt(target) {
     return null;
   }
 
-  // 채팅 메시지 본문 이미지(업로드/임베드/마크다운/카드 아트) — 호버+X 로 표시.
-  // 임베드 base64(data:) 도 실제 이미지 소스이므로 허용한다.
+  // Chat message body images (uploads, embeds, markdown, card art) — hover + X to show.
+  // Embedded base64 (data:) is a genuine image source here, so it is allowed.
   const chatImg = target.closest("img");
   if (chatImg && chatImg.closest(".message-content")) {
     const orig = chatImg.dataset?.feHqSrc;
@@ -672,12 +671,12 @@ Hooks.on("hoverToken", (token, hovered) => {
   const hud = _ihHud();
   if (!hud) return;
   if (!hovered) {
-    // 토큰에서 마우스가 떠남 → 래치 해제 + 이미지 닫기
+    // Mouse left the token → release the latch and close the image
     _ihKeyToggled = false;
     hud.close();
     return;
   }
-  // 호버 진입: X 키를 누를 때까지 이미지 자동 표시 없음
+  // On hover enter: nothing is shown until X is pressed
 });
 
 /** Inject GM-only options into the token config appearance tab. */
@@ -730,7 +729,7 @@ async function _ihInjectTokenConfigFields(app, html, _data) {
   });
 }
 
-// v14: TokenApplication  |  v13: TokenConfig (FormApplication → AppV2 이름이 다를 수 있음)
+// v14: TokenApplication | v13: TokenConfig — the class name differs between versions
 Hooks.on("renderTokenApplication", _ihInjectTokenConfigFields);
 Hooks.on("renderTokenConfig",      _ihInjectTokenConfigFields);
 

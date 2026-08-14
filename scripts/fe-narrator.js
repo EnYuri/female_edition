@@ -7,10 +7,10 @@
  *
  * FOUR DISTINCT CHAT CHANNELS — all typed into the one sidebar chatbox, all
  * routed independently:
- *   1. 일반 사이드바 채팅   — Foundry default
- *   2. 무대 채팅 (fe-theatre) — speakingAs a staged actor (flags.female_edition.stageId)
- *   3. 내레이터 채팅 (this)  — /narrate /describe /note  (flags.female_edition.isNarrator)
- *   4. 원본/플레인          — anything else
+ *   1. ordinary sidebar chat   - Foundry default
+ *   2. stage chat (fe-theatre) - speakingAs a staged actor (flags.female_edition.stageId)
+ *   3. narrator chat (this)    - /narrate /describe /note (flags.female_edition.isNarrator)
+ *   4. raw / plain             - anything else
  *
  * Narrator messages carry `flags.female_edition.isNarrator = true`. This is the
  * SAME flag fe-render-state.js already reads (fe-render-state.js:201), so merge
@@ -397,9 +397,9 @@ function _fnCreateMessage(type, message, options = {}) {
   if (type === "narration" && game.user.role < _fnPermNarrate) return;
   if (type !== "narration" && game.user.role < _fnPermDescribe) return;
 
-  // raw 플래그는 "평문 원본"(줄바꿈 = \n)으로 저장한다. 이전엔 \n→<br> 로 바꾼
-  // HTML 문자열을 raw 에 넣어, 메시지 수정 시 마크다운 재변환에서 <br> 이
-  // &lt;br&gt; 로 이스케이프돼 채팅에 그대로 노출됐다.
+  // The raw flag stores the PLAIN source, with line breaks as \n. It used to store the
+  // HTML (\n already turned into <br>), and re-converting that through markdown on edit
+  // escaped it to &lt;br&gt;, which then showed up verbatim in chat.
   const plain    = String(message ?? "").replace(/\\n/g, "\n");
   const forRender = plain.replace(/\n/g, "<br>");
 

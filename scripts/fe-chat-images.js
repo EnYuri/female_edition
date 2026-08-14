@@ -293,8 +293,8 @@ function ciExtractFiles(dataTransfer) {
   }
 }
 
-// data: URL → blob: URL. data: 는 최신 Chromium 에서 새 창 top-level 탐색이 차단되지만
-// blob: 은 허용되므로, 임베드 base64 이미지를 새 브라우저 창에 띄울 때 변환해 쓴다.
+// data: URL → blob: URL. Current Chromium blocks top-level navigation to a data: URL but
+// allows blob:, so embedded base64 images are converted before opening a browser window.
 function ciDataUrlToBlobUrl(dataUrl) {
   const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(dataUrl));
   if (!m) return null;
@@ -311,11 +311,10 @@ function ciDataUrlToBlobUrl(dataUrl) {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 }
 
-// 화면 중앙에 놓인 팝업 창 features 문자열. window.open 의 3번째 인자가 **비어 있으면**
-// 브라우저는 target=_blank 를 새 탭으로 처리한다(HTML 표준: "window features" 가 없으면
-// 탭 여부는 UA 재량이고, Chromium 은 항상 탭). 별도 OS 창을 원하면 features 를 반드시
-// 넘겨야 하며, 그중에서도 popup=yes + width/height 조합이 있어야 탭이 아닌 창이 된다.
-// (fe-chat-archive.js 의 feOpenChatArchiveWindow 도 같은 이유로 features 를 넘긴다.)
+// Screen-centred popup features. window.open's third argument MUST be non-empty: with no
+// window features the UA decides, and Chromium always picks a tab. popup=yes plus
+// width/height is what actually produces a separate OS window. (feOpenChatArchiveWindow in
+// fe-chat-archive.js passes features for the same reason.)
 function ciBuildPopupFeatures() {
   try {
     const availW = Math.max(320, Number(window.screen?.availWidth) || 1280);
@@ -330,8 +329,8 @@ function ciBuildPopupFeatures() {
   }
 }
 
-// 실제 브라우저 새 창으로 이미지를 연다(ImagePopout 헤더의 "새 창으로 보기" 버튼).
-// 상대경로는 절대화, data: 는 blob: 으로 변환(top-level 탐색 차단 회피).
+// Open the image in a real browser window (the "새 창으로 보기" ImagePopout header button).
+// Relative paths are absolutised; data: is converted to blob: to dodge the navigation block.
 function ciOpenImageInBrowser(src) {
   if (!src) return;
   let url = String(src);
@@ -365,31 +364,31 @@ function ciOpenImageInBrowser(src) {
   }
 }
 
-// 현재 열려 있는 이미지 창: src → app. ciOpenImagePopout 의 토글 판정에 쓴다.
+// Currently open image windows: src → app. Drives ciOpenImagePopout's toggle decision.
 const _ciOpenPopouts = new Map();
 
-// ImagePopout(AppV2) 서브클래스 — 닫기 버튼 바로 왼쪽에 "새 창으로 보기" 프레임 버튼을
-// 추가한다(_getFrameButtons → frame-buttons.hbs → close 앞 beforebegin 삽입).
+// ImagePopout (AppV2) subclass that adds an "open in browser" frame button immediately left
+// of the close button.
 let _ciImagePopoutSub = null;
 function ciGetImagePopoutSubclass() {
   if (_ciImagePopoutSub) return _ciImagePopoutSub;
   const Base = foundry?.applications?.apps?.ImagePopout;
-  if (!Base) return null; // 레거시(v11/v12): AppV2 ImagePopout 없음 → 폴백 경로 사용
+  if (!Base) return null; // legacy (v11/v12): no AppV2 ImagePopout → use the fallback path
   _ciImagePopoutSub = class FeChatImagePopout extends Base {
     static DEFAULT_OPTIONS = {
-      // 부모 actions(shareImage)와 deep-merge 된다(체인 머지).
+      // Deep-merges with the parent's actions (shareImage).
       actions: { feOpenInBrowser: function () { ciOpenImageInBrowser(this.options?.src); } },
     };
     _getFrameButtons(options) {
       const buttons = super._getFrameButtons(options);
-      buttons.push({ // 배열 마지막 = 닫기 버튼 바로 왼쪽
+      buttons.push({ // last in the array = immediately left of close
         icon: "fa-solid fa-up-right-from-square",
         action: "feOpenInBrowser",
         label: "새 창으로 보기",
       });
       return buttons;
     }
-    // 큰 이미지를 클릭하면 창을 닫는다(X 버튼과 동일 동작).
+    // Clicking the enlarged image closes the window, same as the X button.
     _onRender(context, options) {
       super._onRender?.(context, options);
       try {
@@ -405,11 +404,10 @@ function ciGetImagePopoutSubclass() {
         }
       } catch {}
     }
-    // X 버튼·ESC 등 어떤 경로로 닫히든 추적 항목을 지운다(다음 클릭이 다시 열도록).
-    // _onClose 가 아니라 _preClose 인 이유: 코어의 #close 는 닫기 애니메이션
-    // (_awaitTransition, 최대 1000ms)을 기다린 뒤에야 _onClose 를 호출한다. 그 사이 채팅
-    // 이미지를 다시 클릭하면 아직 남아 있는 항목 때문에 "열기"가 아니라 "닫기"로 소모된다.
-    // _preClose 는 애니메이션 전에 실행되므로 닫기 시작 즉시 항목이 사라진다.
+    // Drop the tracking entry however the window closes (X, ESC, …) so the next click
+    // reopens it. _preClose, NOT _onClose: core's #close awaits the close animation
+    // (_awaitTransition, up to 1000ms) before calling _onClose, and a click during that
+    // window would find the stale entry and be spent closing instead of opening.
     async _preClose(options) {
       await super._preClose?.(options);
       if (_ciOpenPopouts.get(this.options?.src) === this) _ciOpenPopouts.delete(this.options.src);
@@ -418,14 +416,13 @@ function ciGetImagePopoutSubclass() {
   return _ciImagePopoutSub;
 }
 
-// 채팅 이미지를 FVTT 내부 창(ImagePopout)에 큰 크기로 띄운다(클릭 동작).
-// 같은 이미지를 이미 띄운 창이 있으면 새로 열지 않고 그 창을 닫는다(클릭 = 토글).
-// 그러지 않으면 클릭하는 대로 동일 이미지 창이 무한정 쌓인다.
+// Open a chat image enlarged in an in-app ImagePopout. Clicking the same image again closes
+// the existing window (click = toggle); otherwise windows would pile up without limit.
 function ciOpenImagePopout(src) {
   try {
-    // 맵에 있으면 = 열려 있거나 여는 중 → 무조건 닫는다. `rendered` 로 판정하면 안 된다:
-    // render(true) 는 비동기라 아직 렌더 중인 창은 rendered=false 라서 "이미 닫힘"으로
-    // 오판하고 창을 하나 더 만든다(연타 시 누수).
+    // Present in the map = open OR opening → always close. Do NOT test `rendered`:
+    // render(true) is async, so a still-rendering window reports false and a rapid second
+    // click would build another window instead of closing this one.
     const open = _ciOpenPopouts.get(src);
     if (open) { _ciOpenPopouts.delete(src); open.close(); return; }
 
@@ -433,10 +430,10 @@ function ciOpenImagePopout(src) {
     let app = null;
     if (Sub) app = new Sub({ src, editable: false, shareable: true });
     else {
-      // 레거시 폴백 (v11/v12): (src, options) 시그니처
+      // Legacy fallback (v11/v12): the (src, options) signature.
       const Popout = ciGetImagePopoutClass();
       if (Popout) app = new Popout(src, { editable: false, shareable: true });
-      // AppV1 에는 _onClose 훅이 없으므로 인스턴스의 close 를 감싸 항목을 정리한다.
+      // AppV1 has no _onClose hook, so wrap the instance's close to clear the entry.
       if (app) {
         const close = app.close.bind(app);
         app.close = (...args) => { _ciOpenPopouts.delete(src); return close(...args); };
@@ -448,10 +445,10 @@ function ciOpenImagePopout(src) {
   } catch {}
 }
 
-// 채팅 메시지 본문(.message-content) 안의 이미지를 클릭하면 FVTT 내부 창(ImagePopout)에
-// 크게 띄운다. 업로드/임베드/마크다운/카드 아트 모두 포함(헤더 포트레이트는 .message-content
-// 밖이라 제외 — 그쪽은 이미지 호버가 담당). 자체 클릭 동작이 있는 인터랙티브 카드 요소
-// (a/button/[data-action]) 안의 이미지는 건드리지 않는다.
+// Bind click-to-enlarge on every image inside .message-content — uploads, embeds, markdown
+// and card art alike. Header portraits live outside .message-content and are image-hover's
+// job. Images inside interactive card elements (a/button/[data-action]) are left alone,
+// since those already have their own click behaviour.
 function ciBindRenderedImages(root) {
   if (!root?.querySelectorAll) return;
   for (const img of root.querySelectorAll(".message-content img")) {

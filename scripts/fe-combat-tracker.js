@@ -3,7 +3,7 @@
  *
  * A lean, native combat tracker for female_edition — a top-of-screen strip
  * of combatant portraits (in turn order) with a centered GM control panel
- * (이전 라운드 / 이전 턴 / 일시정지 / 다음 턴 / 다음 라운드).
+ * (previous round / previous turn / pause / next turn / next round).
  *
  * Scope is deliberately a FOCUSED subset of theripper93's "Carousel Combat
  * Tracker" (`combat-tracker-dock`), NOT a clone: portrait strip + center GM
@@ -21,9 +21,9 @@
  */
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
-// 포트레이트는 거대한 원본을 작게 표시 → CSS image-rendering 으로는 고품질 축소가
-// 불가능하다(fe-portrait-hq.js 주석 참고). 트래커 포트레이트(편집 불가 표시용 img)는
-// 안전한 src 스왑 HQ 경로를 그대로 쓸 수 있어 안티에일리어싱이 살아난다.
+// Tracker portraits shrink huge sources, which CSS image-rendering cannot do well (see
+// fe-portrait-hq.js). They are display-only, non-editable images, so the safe src-swap HQ
+// path applies.
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 
 const CTD_ID = "combat-tracker-dock"; // original Carousel Combat Tracker — we yield to it
@@ -31,7 +31,7 @@ const TRACKER_DOM_ID = "fe-combat-tracker";
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
 
-// 트래커 접힘(최소화) 상태 — 클라이언트 런타임 플래그(새로고침 시 초기화).
+// Collapsed (minimized) state — a client runtime flag, reset on reload.
 let _ctCollapsed = false;
 
 // ── settings access ─────────────────────────────────────────────────────────
@@ -62,8 +62,8 @@ function feCtUsesLocalPlayerTurnEndWorkflow() {
 // ── data helpers ────────────────────────────────────────────────────────────
 
 function feCtGetCombat() {
-  // viewed 폴백: "전투 일시종료"(active:false)로 비활성화돼도 추적기에서 보이는 전투를
-  // 계속 표시 → 트래커에서 바로 "재개"할 수 있다(비활성화 후 트래커가 사라지지 않도록).
+  // The `viewed` fallback keeps a deactivated encounter (active:false) on screen so it can
+  // be resumed straight from the tracker instead of the tracker vanishing.
   return game.combat ?? game.combats?.active ?? game.combats?.viewed ?? null;
 }
 
@@ -218,12 +218,12 @@ function feCtPortraitHTML(c, active, canEndTurn) {
         `style="width:${hp.pct}%;background:${hp.color}"></div></div>`;
     }
   }
-  // 호버 시 나타나는 「턴 종료」 >> 표식 — 현재 턴이면서 이 유저가 그 전투원의
-  // 턴을 종료할 수 있을 때만(GM은 모두, 플레이어는 자신 소유) 렌더한다. 배경 채우기
-  // 없이 포트레이트 중앙에 큰 글로우 처리된 글자만 띄우고(예시 모듈 방식), 컨테이너는
-  // pointer-events:none 이라 글자 밖 영역의 선택/패닝/더블클릭(시트 열기)은 그대로다.
-  // 클릭 대상은 글자 그 자체. 레트로 테마에서는 fa 아이콘 대신 각진 픽셀 폰트 ">>"가
-  // 노출되도록 두 표현을 함께 담아 CSS로 전환한다.
+  // Hover ">>" end-turn marker. Rendered only for the active combatant, and only for a user
+  // allowed to end that combatant's turn (GM: all, player: owned). It is a large glowing
+  // glyph centred on the portrait with no background fill; the container is
+  // pointer-events:none so selection/panning/double-click outside the glyph still work —
+  // the glyph itself is the click target. Both an fa icon and a plain ">>" are emitted so
+  // the retro theme can swap to the pixel font via CSS.
   const endTurnBtn = canEndTurn
     ? `<div class="fe-ct-endturn">` +
         `<i class="fas fa-angles-right fe-ct-endturn-icon" data-ct-endturn="1" ` +
@@ -255,7 +255,7 @@ function feCtBtnHTML(action, icon, label) {
 }
 
 function feCtCollapseBtnHTML() {
-  // 트래커 UI 끄기/최소화 — GM·플레이어 공통(개인 UI 토글이므로 권한 무관).
+  // Collapse/minimize is a personal UI toggle, so it is offered to GMs and players alike.
   const label = _ctCollapsed
     ? feCtL("FECT.Expand", "컴뱃 트래커 펼치기")
     : feCtL("FECT.Collapse", "컴뱃 트래커 최소화");
@@ -355,13 +355,13 @@ function feCtRender() {
   const portraits = combatants
     .map((c) => {
       const isActive = c.id === activeId;
-      // 현재 턴인 전투원에 한해, 그 턴을 종료할 권한이 있는 유저에게만 >> 노출
+      // ">>" only on the active combatant, and only for a user allowed to end that turn
       const canEndTurn = isActive && feCtCanEndTurnForCombatant(combat, c);
       return feCtPortraitHTML(c, isActive, canEndTurn);
     })
     .join("");
 
-  // 컨트롤 패널은 GM 전용. 단, 최소화 버튼만은 플레이어에게도 노출(개인 UI 토글).
+  // The control panel is GM-only; the collapse button alone is also shown to players.
   const center = isGM
     ? `<div class="fe-ct-controlbar">${feCtControlsHTML(combat)}</div>`
     : `<div class="fe-ct-controlbar fe-ct-controlbar-player">${feCtCollapseBtnHTML()}</div>`;
@@ -378,8 +378,8 @@ function feCtRender() {
   root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   root.classList.toggle("fe-ct-paused", combat.active === false);
 
-  // 포트레이트 고품질 다운스케일 — 표시 크기로 (size × size*aspect). 표시 전용 img라
-  // src 스왑이 안전(편집 불가). 캐시 히트면 즉시 교체되어 깜박임 없음.
+  // HQ downscale to the display size (size x size*aspect). These are display-only images,
+  // so the src swap is safe; a cache hit applies synchronously with no flicker.
   const hpx = Math.round(size * aspect);
   root.querySelectorAll(".fe-ct-frame img").forEach((im) => {
     const src = im.dataset.feSrc;
@@ -397,7 +397,7 @@ function feCtBindRootEvents(root) {
       await feCtHandleAction(btn.dataset.ctAction);
       return;
     }
-    // 포트레이트 위 호버 >> 버튼: 클릭 즉시 턴 종료(포트레이트 선택/패닝보다 우선).
+    // The hover ">>" button ends the turn immediately, ahead of portrait select/pan.
     const endBtn = ev.target.closest?.("[data-ct-endturn]");
     if (endBtn) {
       ev.preventDefault();
@@ -410,13 +410,13 @@ function feCtBindRootEvents(root) {
     if (port) feCtHandlePortraitClick(port.dataset.combatantId);
   });
   root.addEventListener("dblclick", (ev) => {
-    // >> 버튼 위 더블클릭은 시트를 열지 않는다(단일 클릭이 이미 턴을 종료).
+    // Double-clicking the ">>" button must not open the sheet — one click already ended it.
     if (ev.target.closest?.("[data-ct-endturn]")) return;
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitDblClick(port.dataset.combatantId);
   });
-  // 우클릭 → 전투원 드롭다운 메뉴. GM은 전체 관리 메뉴, 플레이어는 자신이
-  // 소유한 전투원의 "턴 종료"만 노출한다.
+  // Right-click opens the combatant menu: full management for a GM, only "end turn" on an
+  // owned combatant for a player.
   root.addEventListener("contextmenu", (ev) => {
     const port = ev.target.closest?.("[data-combatant-id]");
     if (!port) return;
@@ -426,7 +426,7 @@ function feCtBindRootEvents(root) {
     ev.preventDefault();
     feCtOpenContextMenu(port.dataset.combatantId, ev.clientX, ev.clientY);
   });
-  // 마우스 휠로 포트레이트 스트립을 좌우 스크롤(세로 휠 → 가로 이동).
+  // Wheel scrolls the portrait strip horizontally (vertical wheel → horizontal move).
   root.addEventListener("wheel", (ev) => {
     const strip = ev.target.closest?.(".fe-ct-combatants");
     if (!strip || strip.scrollWidth <= strip.clientWidth) return;
@@ -436,7 +436,7 @@ function feCtBindRootEvents(root) {
 }
 
 async function feCtHandleAction(action) {
-  // 최소화 토글은 권한 무관(개인 UI). GM 게이트보다 먼저 처리.
+  // The collapse toggle is personal UI, so handle it before the GM gate.
   if (action === "toggle-collapse") {
     _ctCollapsed = !_ctCollapsed;
     feCtScheduleRender(); // 버튼 아이콘/툴팁도 상태에 맞게 갱신
@@ -462,7 +462,7 @@ async function feCtHandleAction(action) {
         break;
       }
       case "end-combat": await combat.endCombat(); break;
-      // 인카운터 활성/비활성 토글: 전투를 삭제하지 않고 일시정지/재개(네이티브 트래커와 동일 상태)
+      // Pause/resume the encounter without deleting it (same state the native tracker uses)
       case "toggle-active": await combat.update({ active: !combat.active }); break;
     }
   } catch (e) {
@@ -489,8 +489,8 @@ function feCtHandlePortraitDblClick(id) {
   try { c?.actor?.sheet?.render(true); } catch {}
 }
 
-// 호버 >> 버튼 클릭 → 턴 종료. 컨텍스트 메뉴의 "턴 종료"와 동일한 경로(권한 검사 +
-// GM 직접 처리 / 플레이어는 소켓 프록시)를 그대로 탄다.
+// Hover ">>" click → end turn, through exactly the same path as the context-menu entry:
+// permission check, then GM handles it directly while a player proxies over the socket.
 async function feCtHandleEndTurnClick(id) {
   const combat = feCtGetCombat();
   const c = combat?.combatants?.get(id);
@@ -559,7 +559,7 @@ function feCtOpenContextMenu(id, x, y) {
   );
 
   // Mirrors core's `visible` conditions (combat-tracker.mjs#_getEntryContextOptions):
-  // 초기화 only when an initiative is actually set, 이동 기록 only when there is history.
+  // reset only when an initiative is actually set, movement history only when it exists.
   // `clearMovementHistory` is v14-only — v13 combatants have no movement history at all.
   if (isGM && Number.isFinite(c.initiative)) {
     items.push({
@@ -840,7 +840,7 @@ async function feCtMoveCombatant(combat, c, dir) {
   await c.update({ initiative: newInit });
 }
 
-// Remove a combatant from the encounter (native tracker's "전투원 제거"). Deleting the
+// Remove a combatant from the encounter (the native tracker's own entry). Deleting the
 // Combatant is all that is needed — core's Combat#_onDeleteDescendantDocuments re-runs
 // setupTurns() and fixes up `turn` when the removed one was the current/earlier turn.
 // Confirmed first because it is destructive and the tracker has no undo.

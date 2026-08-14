@@ -29,7 +29,7 @@ const _fet = {
   inserts: new Map(),
   /** Map<theatreId, insertObj> — receive-only render targets for other users' stage chat */
   displayInserts: new Map(),
-  /** local client: theatreId the current user is speaking as, or null (자신으로 말하기), or _FET_NONE (없음) */
+  /** local client: theatreId being spoken as, null for "자신으로 말하기", _FET_NONE for "없음" */
   speakingAs: _FET_NONE,
   /** ChatMessage id currently selected by cross-speaker history recall, or null for live mode. */
   recallMessageId: null,
@@ -259,7 +259,7 @@ function _fetBuildUserState() {
     worldId: _fetWorldId(),
     userId: game.user?.id ?? null,
     updatedAt: Date.now(),
-    // 무대 구성은 복원하지만 발화자는 다음 세션에 넘기지 않는다.
+    // Stage composition is restored, but the active speaker never carries into a new session.
     speakingAs: _FET_NONE,
     inserts,
   };
@@ -353,8 +353,8 @@ async function _fetRestoreUserState() {
       if (row.emote) _fetSetEmote(theatreId, row.emote, true);
     }
 
-    // 화자 선택은 해당 채팅 세션에서만 유효하다. 복원된 무대 구성은 유지하되,
-    // 이전 세션의 액터 화자가 다음 접속의 기본 발화자가 되지 않게 한다.
+    // The speaker choice is per chat session. Keep the restored stage composition, but do
+    // not let the previous session's actor become this login's default speaker.
     _fetSetSpeakingAs(_FET_NONE);
   } finally {
     _fetSuppressLocalSave--;
@@ -492,7 +492,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const contentEl = document.createElement("div");
   contentEl.className = "fe-stage-textbox-content";
 
-  // 우상단 버튼 툴바: [이전 발화 불러오기 <] [닫기 ✕]
+  // Top-right tool bar: [recall previous <] [close x]
   const toolsEl = document.createElement("div");
   toolsEl.className = "fe-stage-textbox-tools";
 
@@ -523,7 +523,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   textboxEl.append(nameEl, toolsEl, contentEl);
   el.appendChild(textboxEl);
 
-  // 우클릭으로 대사창 즉시 닫기 (로컬 전용)
+  // Right-click dismisses the bubble immediately (local only)
   const onDismiss = (e) => {
     e.preventDefault();
     const ins = _fetGetDisplayInsert(theatreId);
@@ -1015,17 +1015,17 @@ function _fetDismissInsert(insert) {
 
 // ── Text / typewriter ──────────────────────────────────────────────────────
 
-// 말풍선용 평문 추출. content 를 DOMParser(브라우징 컨텍스트 없음 → 리소스 미로드,
-// onerror 미실행)로 textContent 화한다. innerHTML 직접 주입을 피하는 보안 경로.
+// Plain text for the bubble. DOMParser has no browsing context, so nothing is fetched and
+// no onerror runs — this is the path that avoids injecting raw content as innerHTML.
 function _fetPlainTextFromContent(content) {
   return (new DOMParser()
     .parseFromString(String(content ?? ""), "text/html")
     .body.textContent ?? "").trim();
 }
 
-// 채팅 로그에 이미 렌더(=정제)된 메시지 본문을 복제한다. 원본 content 문자열을
-// innerHTML 로 직접 넣으면 `<img onerror=…>` 등이 실행될 수 있어, Foundry 가 이미
-// 렌더한 안전한 DOM 노드를 cloneNode 하는 방식을 쓴다(없으면 null → 평문 폴백).
+// Clone the message body Foundry already rendered (and sanitized) into the chat log.
+// Injecting the raw content string as innerHTML could execute `<img onerror=…>`, so we
+// cloneNode the safe DOM instead. null when it is not in the log → plain-text fallback.
 function _fetGetRenderedContentClone(messageId) {
   if (!messageId) return null;
   let sel;
@@ -1035,12 +1035,13 @@ function _fetGetRenderedContentClone(messageId) {
   return node ? node.cloneNode(true) : null;
 }
 
-// 말풍선에 리치 표시(이미지·표 등)가 필요한지 — 임베드 미디어가 있을 때만 true.
+// Whether the bubble needs rich rendering — true only when embedded media is present.
 function _fetContentHasMedia(node) {
   return !!node?.querySelector?.("img, video, picture, table");
 }
 
-// 미디어가 포함된 메시지면 복제 노드를 말풍선에 그대로 렌더(즉시·스크롤 가능).
+// For a message with media, render the cloned node straight into the bubble (immediate,
+// scrollable) instead of running the typewriter.
 function _fetTryRenderRichContent(insert, messageId) {
   const clone = _fetGetRenderedContentClone(messageId);
   if (!clone || !_fetContentHasMedia(clone)) return false;
@@ -1098,9 +1099,9 @@ function _fetRecallTargetForMessage(message) {
   };
 }
 
-// 무대 발화와 일반 액터 발화를 아우르는 타임라인. 일반 액터 발화는 회수할 때만
-// receive-only 표시 무대를 만들어 재생한다. 필요하면 설정에 따라 액터 없는
-// 일반/OOC 메시지도 같은 커서에 포함한다. 굴림 전용·빈 메시지는 제외한다.
+// One timeline spanning stage lines and ordinary actor lines. Ordinary lines only get a
+// receive-only display stage when recalled. Depending on the setting, actor-less plain/OOC
+// messages share the same cursor. Roll-only and empty messages are excluded.
 function _fetRecallMessages() {
   return (game.messages?.contents ?? [])
     .filter((message) =>
@@ -1116,7 +1117,7 @@ function _fetRecallMessages() {
     });
 }
 
-// "<" 버튼: 현재 표시 메시지보다 한 칸 이전(과거)의 발화를 말풍선에 불러온다.
+// The "<" button: load the line one step older than the one currently shown.
 function _fetRecallPrev(theatreId) {
   const insert = _fetGetDisplayInsert(theatreId);
   if (!insert) return;
@@ -1152,10 +1153,10 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   if (!insert) return;
 
   const recall = !!opts.recall;
-  // 새 라이브 발화가 오면 전역 회상 위치 초기화(다시 "<" 누르면 최신부터 거슬러 감).
+  // A new live line resets the recall cursor, so "<" starts from the newest again.
   if (!recall) _fet.recallMessageId = null;
-  // 현재 말풍선이 표시 중인 메시지 id — 지연 rAF 미디어 업그레이드가 그새 도착한
-  // 다른 메시지를 덮어쓰지 않도록 식별용으로 기록한다(경쟁 조건 방지).
+  // Record which message the bubble currently shows, so the deferred rAF media upgrade
+  // cannot overwrite a different message that arrived in the meantime.
   insert.currentMessageId = opts.messageId ?? null;
 
   clearTimeout(insert.decayTimeout);
@@ -1176,7 +1177,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   }
   insert.el.classList.add("fe-stage-insert--visible");
 
-  // "Pop" pulse animation on the portrait (회상 탐색 시엔 생략 — 과한 흔들림 방지)
+  // "Pop" pulse on the portrait — skipped while recalling, which would be too jittery.
   if (!recall) {
     insert.el.classList.remove("fe-stage-insert--pop");
     void insert.el.offsetWidth; // force reflow to restart animation
@@ -1191,7 +1192,8 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
     insert.textboxEl.style.setProperty("--fet-speaker-color", userColor);
   }
 
-  // 본문 — 임베드 미디어가 있으면 리치(복제) 렌더, 없으면 타자기(또는 회상=즉시).
+  // Body: rich (cloned) render when media is embedded, otherwise typewriter — or instant
+  // while recalling.
   insert.cancelTypewriter?.();
   insert.contentEl.classList.remove("fe-stage-textbox-content--rich");
   insert.contentEl.textContent = "";
@@ -1203,8 +1205,8 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
       insert.contentEl.textContent = text;
     } else {
       insert.cancelTypewriter = _fetTypewriter(insert.contentEl, text);
-      // 라이브 메시지는 createChatMessage 시점에 채팅 로그 DOM 이 아직 없을 수
-      // 있어, 다음 프레임에 한 번 더 미디어 렌더를 시도한다.
+      // At createChatMessage time a live message may not be in the chat log DOM yet, so
+      // retry the media render once on the next frame.
       if (opts.messageId) {
         requestAnimationFrame(() => {
           if (_fetGetDisplayInsert(theatreId) === insert &&
@@ -1218,7 +1220,7 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   }
 
   // Auto-decay: hide textbox AND portrait together, then collapse layout space
-  // (회상 탐색 중엔 자동 소멸하지 않음 — 천천히 훑어볼 수 있게)
+  // Never auto-decays while recalling, so history can be browsed at leisure.
   if (_fetAutoDecay && !recall) {
     const readTime = _fetDecayTime + text.length * 38;
     insert.decayTimeout = setTimeout(() => {
@@ -1426,8 +1428,8 @@ Hooks.on("createChatMessage", (chatMessage) => {
   // Strip HTML → plain text for the speech bubble (DOMParser = inert, no resource
   // load / no onerror execution).
   const text = _fetPlainTextFromContent(chatMessage.content);
-  // 평문이 비어도 이미지/표 등 임베드 미디어만 있는 발화는 말풍선을 띄운다
-  // (리치 렌더가 다음 프레임에 미디어를 채운다).
+  // Media-only lines (an image or table with no text) still deserve a bubble; the rich
+  // render fills it in on the next frame.
   const hasMedia = /<(?:img|video|picture|table)\b/i.test(String(chatMessage.content ?? ""));
   if (!text && !hasMedia) return;
   if (!_fetEnsureMessageDisplayInsert(chatMessage, theatreId)) return;
@@ -1610,18 +1612,16 @@ function _fetGetActorIdFromLi(li) {
 }
 
 function _fetRegisterContextOptions(_html, options) {
-  // 주의: 여기서 _fetEnabled 로 early-return 하면 안 된다. 디렉터리 컨텍스트
-  // 메뉴는 사이드바 최초 렌더(= ready 이전)에 "한 번만"(fixed) 빌드되는데,
-  // _fetEnabled 는 ready 의 _fetLoadSettings() 에서야 설정된다. 빌드 시점엔 아직
-  // false 라 early-return 하면 항목이 영영 메뉴에 안 들어간다(메뉴는 재빌드 X).
-  // → 활성 여부는 각 항목 condition(우클릭마다 재평가, ready 이후)에서 검사한다.
+  // Do NOT early-return on _fetEnabled here. The directory context menu is built ONCE, at
+  // the sidebar's first render (before ready), while _fetEnabled is only assigned in
+  // _fetLoadSettings() at ready — so returning early would keep the entries out forever
+  // (the menu is never rebuilt). Each entry's own condition, re-evaluated per right-click,
+  // is where enablement is checked.
   // Guard against both hooks firing simultaneously (V13 + V14 compat shim)
   if (options.some((o) => o.name === "무대에 추가")) return;
 
-  // 스크린 패널(female_edition.screenPanel)은 캐릭터가 아니라 표시용 보드라
-  // 무대·무대 채팅의 대상이 아니다(_fetInjectSheetButtons 가 시트 헤더 버튼을
-  // 빼는 것과 같은 이유). 여기서도 같은 제외를 걸어야 액터 디렉토리 우클릭에
-  // "무대에 추가"가 뜨지 않는다.
+  // Screen panels are display boards, not characters, so they are excluded from the stage
+  // entirely — same reason _fetInjectSheetButtons omits their sheet header buttons.
   const _fetActorForMenu = (li) => {
     const id = _fetGetActorIdFromLi(li);
     const actor = id ? game.actors.get(id) : null;
@@ -1629,20 +1629,20 @@ function _fetRegisterContextOptions(_html, options) {
     return actor;
   };
 
-  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
-  // 최소 지원이 v13이라 양쪽 키를 모두 채운다(v13은 name/condition만 읽는다).
-  // 아래 "무대" 접두사 탐색(fe-dx3rd-resource-ui)도 name 을 보므로 name 은 유지.
+  // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
+  // v16); v13 reads only name/condition, so fill both. `name` must stay regardless —
+  // fe-dx3rd-resource-ui locates this group by matching it.
   const entry = ({ label, icon, visible, callback }) =>
     ({ label, name: label, icon, visible, condition: visible, callback });
 
-  // 무대 추가/제거 — "편집"(SIDEBAR.Edit) 항목 바로 아래에 끼워 넣는다.
+  // Stage add/remove, inserted directly below the core "SIDEBAR.Edit" entry.
   const stageItems = [
     entry({
       label: "무대에 추가",
       icon: '<i class="fas fa-theater-masks"></i>',
       visible: (li) => {
         if (!_fetEnabled) return false;
-        // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+        // Owned actors only — isOwner is everything for a GM, own actors for a player.
         const actor = _fetActorForMenu(li);
         if (!actor?.isOwner) return false;
         return !_fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + actor.id));
@@ -1657,7 +1657,7 @@ function _fetRegisterContextOptions(_html, options) {
       icon: '<i class="fas fa-door-open"></i>',
       visible: (li) => {
         if (!_fetEnabled) return false;
-        // 소유 캐릭터에만 노출 (isOwner: GM 은 전체, 플레이어는 본인 소유만)
+        // Owned actors only — isOwner is everything for a GM, own actors for a player.
         const actor = _fetActorForMenu(li);
         if (!actor?.isOwner) return false;
         return _fetIsUserStageInsert(_fet.inserts.get(_FET_ID_PREFIX + actor.id));
@@ -1667,8 +1667,7 @@ function _fetRegisterContextOptions(_html, options) {
         if (id) _fetRemoveInsert(_FET_ID_PREFIX + id);
       },
     }),
-    // 무대 설정도 무대 항목 그룹으로 묶어 "편집" 아래에 함께 배치. 소유자 기준
-    // (GM 은 모든 액터의 소유자) — 위 추가/제거 항목과 동일한 게이트.
+    // Stage settings joins the same group under Edit, behind the same ownership gate.
     entry({
       label: "무대 설정",
       icon: '<i class="fas fa-cog"></i>',
@@ -1680,9 +1679,9 @@ function _fetRegisterContextOptions(_html, options) {
     }),
   ];
 
-  // 코어 "편집" 항목의 인덱스를 찾는다. v14 코어는 `label: "SIDEBAR.Edit"`(미지역화
-  // 키), v13/일부 모듈은 `name`을 쓰고 훅 시점에 이미 지역화돼 있을 수 있어
-  // 키·지역화 문자열 양쪽을 모두 매칭한다. 못 찾으면 맨 위로 폴백.
+  // Find the core Edit entry. v14 uses an unlocalized `label: "SIDEBAR.Edit"`, while v13
+  // and some modules use `name` and may already be localized by hook time — so match both
+  // the key and the localized string. Falls back to the top when absent.
   const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
   const isEdit = (o) =>
     o?.label === "SIDEBAR.Edit" || o?.name === "SIDEBAR.Edit" ||
@@ -1755,19 +1754,19 @@ function _fetGetActorSheetActor(app) {
 // ApplicationV2 sheets already ship their own header-controls dropdown (the
 // "⋯" button, `data-action="toggleControls"` — core
 // application.mjs `_getHeaderControls()` / `_headerControlButtons()`). Rather
-// than building a bespoke dropdown, 무대 설정 is pushed straight into THAT
+// than building a bespoke dropdown, "무대 설정" is pushed straight into THAT
 // menu via the `getHeaderControls{ClassName}` hook chain, which always
 // includes the base class name too ("getHeaderControlsApplicationV2" —
 // `Application#_callHooks` walks `inheritanceChain()` and fires one hook per
 // class, ApplicationV2 last), so this single registration covers every AppV2
 // actor sheet regardless of system. v1 sheets (classic FormApplication, e.g.
-// DX3rd) have no such menu at all — those keep 무대 설정 as a plain header
+// DX3rd) have no such menu at all — those keep "무대 설정" as a plain header
 // button (see the windowHeader fallback branch in _fetInjectSheetButtons).
 function _fetOnGetHeaderControls(app, controls) {
   if (!_fetEnabled) return;
   const actor = _fetGetActorSheetActor(app);
-  // 소유자면 자기 액터의 무대 설정(표시 이름/포트레이트/감정 표정)을 직접 편집할 수
-  // 있다. 저장 경로는 actor.setFlag 뿐이라 코어 OWNER 권한으로 이미 충분하다.
+  // Owners may edit their own actor's stage settings (display name, portrait, emotes).
+  // The only write path is actor.setFlag, so core's OWNER permission already suffices.
   if (!actor?.isOwner) return;
   if (actor.type === "female_edition.screenPanel") return;
   controls.push({
@@ -1823,8 +1822,8 @@ function _fetInjectSheetButtons(app, el) {
     // Container mode: append in forward visual order, AFTER whatever core/system
     // buttons are already in the container — our injected controls sort last
     // (lower priority than the existing header menu), not first.
-    // Final order (left → right): [Foundry 기본 버튼들] [추가/전환] [제거]
-    // 무대 설정(소유자) lives in the sheet's own native "⋯" controls dropdown
+    // Final order (left → right): [core buttons] [add/switch] [remove].
+    // "무대 설정" (owners only) lives in the sheet's own native "⋯" controls dropdown
     // instead — see _fetOnGetHeaderControls above.
     if (onStage) {
       headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
@@ -1837,14 +1836,14 @@ function _fetInjectSheetButtons(app, el) {
     }
   } else {
     // Header fallback: insert before the close button (forward order, left → right).
-    // Final order: [Foundry 기본 버튼들] [추가/전환] [제거] [설정] before [close]
+    // Final order: [core buttons] [add/switch] [remove] [settings] before [close]
     // AppV2 (dnd5e 5.x) close button is `button[data-action="close"]` (class
     // .header-control), not `.header-button.close`/`.close-window`. Without matching
     // it the buttons were appended AFTER close (to its right). Match all variants.
     // This branch also catches AppV2 sheets that simply lack the dnd5e-style
     // .header-buttons container — those DO have the native "⋯" dropdown (it's
     // part of every ApplicationV2 frame, see application.mjs _renderFrame),
-    // so 무대 설정 must NOT be added here too or it would duplicate the
+    // so "무대 설정" must NOT be added here too or it would duplicate the
     // _fetOnGetHeaderControls entry. Only genuine v1 sheets (no
     // [data-action="toggleControls"] at all) get the plain fallback button.
     const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');

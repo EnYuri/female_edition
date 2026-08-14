@@ -597,7 +597,7 @@ function applyPanelTileVisibility(tile) {
     // No actor → not ours any more (feResolvePanelPlacementActor). MUST bail BEFORE the
     // `disabled` branch: the per-user gate below hides the placeable from everyone who
     // is not an OBSERVER of the panel, and "no actor" fails that test for EVERY user
-    // including the GM. A ghost that happened to be left in 표시 끔 would have been
+    // including the GM. A ghost that happened to be left in "표시 끔" would have been
     // invisible to the whole world, permanently and with no UI to reveal it — the one
     // state where it really would have been unreachable. This subtracts nothing now, so
     // core's own visibility (recomputed first, see onPanelPlaceableUpdate) stands.
@@ -1832,7 +1832,7 @@ Hooks.on("deleteTile", (doc) => {
  * 2. **Force a state refresh when our own panel FLAG changed (MUST keep).** Core assigns
  *    render flags strictly from the document's own fields — `tile.mjs` / `token.mjs`
  *    `_onUpdate` list `hidden`/`sort`/`locked`/`x`/`y`/`texture`/… and nothing else — so
- *    a **flags-only** update (표시 전환 `disabled`, 위치 고정 `locked`, or a face flip
+ *    a **flags-only** update ("표시 전환" `disabled`, "위치 고정" `locked`, or a face flip
  *    between two faces that share an image) sets NO flags at all. `RenderFlags#set` then
  *    adds the object to `pendingRenderFlags` with an empty set, and
  *    `PlaceableObject#applyRenderFlags` early-returns on `!this.renderFlags.size` — so
@@ -2135,7 +2135,7 @@ Hooks.on("dropCanvasData", fePanelGated((_canvas, data) => {
   return false;
 }));
 
-// Add panel entries to the Actor directory context menu. Gated: 토큰화 / 씬에 올리기 are
+// Add panel entries to the Actor directory context menu. Gated: "토큰화" / "씬에 올리기" are
 // placement operations, and nothing may be placed while the feature is off.
 Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
   const actorOf = (li) => {
@@ -2151,8 +2151,8 @@ Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
   // sheet at all. Two mutually exclusive entries rather than one that changes label:
   // a ContextMenu entry's `name` is read once when the menu is built, so a single
   // stateful label would go stale. Each names the ACTION, not the current state.
-  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
-  // 최소 지원이 v13이므로 양쪽 키를 모두 채워 넣는다(v13은 name/condition만 읽는다).
+  // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
+  // v16); v13 reads only name/condition, so fill both.
   const entry = ({ label, icon, visible, callback }) =>
     ({ label, name: label, icon, visible, condition: visible, callback });
 
@@ -2204,8 +2204,8 @@ function feSceneCleanupContextEntry(_directory, options) {
     const el = li instanceof HTMLElement ? li : li?.[0];
     return game.scenes.get(el?.dataset?.entryId ?? el?.dataset?.documentId);
   };
-  // v14부터 ContextMenuEntry#name/#condition은 label/visible로 대체(삭제 예정: v16).
-  // 최소 지원이 v13이므로 양쪽 키를 모두 채워 넣는다(v13은 name/condition만 읽는다).
+  // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
+  // v16); v13 reads only name/condition, so fill both.
   const label = game.i18n.localize("FESP.Cleanup.MenuLabel");
   const visible = (li) => {
     if (!game.user.isGM || !isPanelFeatureEnabled()) return false;

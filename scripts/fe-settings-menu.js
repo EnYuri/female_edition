@@ -489,7 +489,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     try { this.#wireDependentControls(); } catch { /* no-op */ }
   }
 
-  // Wires up the 폰트 section's user-font UI (added in fe-settings-menu.hbs):
+  // Wires up the "폰트" section's user-font UI (added in fe-settings-menu.hbs):
   //   · the "유저 폰트 사용" checkbox shows the user-font row and hides the module
   //     font dropdown (and vice-versa);
   //   · the picker <select> writes into the ceUserFontFamily text input;

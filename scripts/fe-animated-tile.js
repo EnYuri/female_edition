@@ -319,7 +319,7 @@ function feAtTick() {
     while (entry.elapsed >= delays[index] && guard-- > 0) {
       entry.elapsed -= delays[index];
       if (index === last && !entry.loop) {
-        // 반복 없음: hold the final frame instead of wrapping, and stop consuming ticks.
+        // No "반복": hold the final frame instead of wrapping, and stop consuming ticks.
         entry.elapsed = 0;
         entry.playing = false;
         break;
@@ -426,7 +426,7 @@ Hooks.on("updateTile", (doc, changed) => {
   const next = feAtPlaybackOf(doc);
   entry.loop = next.loop;
   // Only autoplay's own transitions move the play state — do not resume a clip the user paused
-  // by clearing 반복 on a finished non-looping animation.
+  // by clearing "반복" on a finished non-looping animation.
   if ("autoplay" in changed.video) {
     entry.playing = next.playing;
     if (entry.playing) entry.elapsed = 0;

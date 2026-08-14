@@ -54,75 +54,38 @@ const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
 
 // CSS `url()` asset embedding (see feEmbedSnapshotCssAssets).
 //
-// FONT PER-FILE CAP — 700_000 WAS TOO SMALL AND SILENTLY DROPPED OUR OWN FONTS.
-// The first version of this sized the cap off "the largest face Foundry ships"
-// (fa-thin-100.woff2, ~574KB) and forgot the module's own `font/` directory, which
-// is the entire point of the feature. Measured on a real export
-// ("Chat Log – Death Wish Blues", 2026-08-12): CookieRun Regular/Bold/Black .otf are
-// 948/978/929KB — every one over the cap — so all three were skipped and the saved
-// file's `document.fonts` reported `FE CookieRun: error`, i.e. the chat rendered in a
-// fallback face. Keep this at parity with `MAX_PER_FILE_BYTES_COOKIE` inside
-// feBuildEmbeddedCookieRunFontCSS; the two caps describe the same files.
+// Font cap must cover the module's own font/ faces (CookieRun .otf are 929-978KB) and
+// the largest CDN face we can select (Mona12-Bold.woff2, 1_304_316B). Keep at parity
+// with MAX_PER_FILE_BYTES_COOKIE in feBuildEmbeddedCookieRunFontCSS. Do NOT raise past
+// ~1.4MB to catch Geurimilgi (6.3MB TTF) — base64 expansion is an OOM risk there, and
+// the "커스텀 폰트 임베드" setting already routes it through a separate 7MB allowance.
 //
-// Hakgyoansim Geurimilgi (6.3MB TTF) is DELIBERATELY still over the cap. It is the
-// one face big enough to make base64 expansion an OOM risk in Chromium/Electron, and
-// there is already a user-facing opt-in for exactly it — the "커스텀 폰트 임베드"
-// setting routes it through feBuildEmbeddedCookieRunFontCSS's own 7MB allowance. Do
-// not raise this cap past ~1.2MB to catch it; turn that setting on instead.
-//
-// Images keep a tight cap on purpose: the small ones that matter in a chat log
-// (d20-black.svg, lozenge.svg, the notable-corner SVGs, texture-gray1.webp, dnd5e's
-// badge webps) are all well under it, while dnd5e's decorative sheet banners —
-// hundreds of KB each and never visible in a chat message — fall out for free.
-// 1_400_000 rather than 1_200_000 so the largest ONLINE face the module can select
-// fits: measured 2026-08-12 over the CDN, Mona12-Bold.woff2 is 1_304_316 bytes and
-// Mona12.woff2 is 1_247_648. Everything the paragraph above rules out is still ruled
-// out — CookieRun's TTFs are 2.1–2.3MB and Geurimilgi's is 6.3MB.
+// The tight image cap is deliberate: chat-relevant art (small SVGs, badge webps) fits,
+// while decorative sheet banners never visible in a message fall out for free.
 const FE_EXPORT_ASSET_FONT_MAX_BYTES = 1_400_000;
 const FE_EXPORT_ASSET_IMAGE_MAX_BYTES = 160_000;
-// SEPARATE totals, not one shared pool. They used to share 8MB, which meant raising
-// the font cap above would have let the fonts (measured: ~4.1MB of faces even before
-// CookieRun) crowd out the images — trading one reported bug for another. Fonts are
-// correctness-critical (a missing face is unreadable text); images are decoration.
-// Raised 8MB → 12MB when cross-origin webfonts became embeddable (below). The
-// online faces are large: measured over the CDN, the Mona family alone is ~4.3MB
-// across 7 files. Only the faces the document ACTUALLY USES are fetched, so a
-// typical export spends far less than this; the headroom exists so that a font
-// admitted late in first-seen order cannot be dropped by a budget the same-origin
-// faces have already half-spent.
+// SEPARATE totals, not one shared pool — otherwise fonts (~4.3MB for the Mona family
+// alone) crowd out images. A missing face is unreadable text; a missing image is
+// cosmetic. Only faces the document actually uses are fetched, so the headroom exists
+// so a late-admitted font is not dropped by a budget earlier faces already spent.
 const FE_EXPORT_ASSET_FONT_TOTAL_BYTES = 12_000_000;
 const FE_EXPORT_ASSET_IMAGE_TOTAL_BYTES = 8_000_000;
 const FE_EXPORT_ASSET_FONT_EXT_RE = /\.(?:woff2?|ttf|otf|eot)(?:[?#]|$)/i;
 const FE_EXPORT_ASSET_IMAGE_EXT_RE = /\.(?:svg|png|webp|jpe?g|gif|avif)(?:[?#]|$)/i;
 
-// ---------------------------------------------------------------------------
-// Cross-origin webfont embedding.
+// Cross-origin webfont embedding. Three of ui-font.css's six font modes (NeoDGM Pro,
+// Mona, Galmuri) load from a CDN, so a same-origin-only snapshot fell back to a system
+// face offline while the local CookieRun/Geurimilgi modes embedded fine.
 //
-// ui-font.css serves three of its six font modes from a CDN rather than from the
-// module's own `font/` directory — NeoDGM Pro (an @import of the project's own
-// style.css), the Mona family, and Galmuri. Everything else in the snapshot is
-// gated on same-origin, so those three modes produced a saved HTML file whose text
-// fell back to a system face the moment it was opened offline, while CookieRun and
-// Geurimilgi (local files) embedded fine. That asymmetry was the bug.
+// The gate is an explicit HOST ALLOWLIST, never "any cross-origin URL" — a snapshot must
+// not become a crawler for whatever host a stylesheet names. jsdelivr qualifies because
+// ui-font.css chose it and it answers with `Access-Control-Allow-Origin: *`.
 //
-// The gate is an explicit HOST ALLOWLIST, not "any cross-origin URL". A snapshot
-// must never turn into a crawler for whatever third-party host a stylesheet happens
-// to name. jsdelivr is here because ui-font.css itself chose it, and because it
-// answers with `Access-Control-Allow-Origin: *` (verified 2026-08-12) — without CORS
-// the fetch could not produce bytes at all.
-//
-// Three deliberate narrowings:
-//   1. FONTS ONLY. Cross-origin images stay excluded; a missing decorative image is
-//      cosmetic, a missing face is unreadable text.
-//   2. woff2 ONLY. Webfont CSS commonly lists woff2/woff/ttf in one `src` as a
-//      compatibility ladder (NeoDGM Pro lists all three). Embedding every entry
-//      would triple the cost to embed two faces no browser that can open the file
-//      will ever choose.
-//   3. ONLY FACES THE DOCUMENT ACTUALLY LOADED. See feCollectLoadedFontFamilies —
-//      the archive window has already rendered the chat, so `document.fonts` knows
-//      exactly which families resolved. The font modes are mutually exclusive, so
-//      without this a CookieRun export would still carry ~4.3MB of unused Mona.
-// ---------------------------------------------------------------------------
+// Three deliberate narrowings: fonts only (a missing image is cosmetic); woff2 only
+// (webfont CSS lists woff2/woff/ttf as a ladder no modern browser walks past the first
+// rung of); and only families `document.fonts` reports as actually loaded (see
+// feCollectLoadedFontFamilies) — the modes are mutually exclusive, so otherwise a
+// CookieRun export would still carry ~4.3MB of unused Mona.
 const FE_EXPORT_FONT_CDN_HOSTS = new Set(["cdn.jsdelivr.net"]);
 const FE_EXPORT_ASSET_WOFF2_RE = /\.woff2(?:[?#]|$)/i;
 const FE_EXPORT_FONT_FACE_RE = /@font-face\s*\{([^}]*)\}/gi;
@@ -1146,21 +1109,10 @@ async function feBuildEmbeddedCookieRunFontCSS() {
     return got.dataUrl;
   };
 
-  // Module font URL builder. MUST route through feGetFoundryBaseHref(), which
-  // resolves foundry.utils.getRoute("/") — i.e. the server's `routePrefix`.
-  //
-  // These four fetches used to be hardcoded root-absolute (`/modules/…`). On any
-  // world served under a route prefix or a reverse proxy subpath — the normal shape
-  // of a remotely hosted world, and something a localhost GM never sees — every one
-  // of them 404s, `faces.length` is 0, and the function returns the NeoDGM rule
-  // alone. Nothing then overrides --fe-font-primary in the export, so the saved HTML
-  // has no embedded CookieRun and falls straight through to the system face
-  // ("PDF/HTML로 인쇄하면 기본 고딕으로 나온다"). The failure is silent: the caller
-  // treats an empty result as "nothing to embed", not as an error.
-  //
-  // Do NOT "simplify" this back to a relative `modules/…` string either: the fetches
-  // run in whichever document invoked the export, and the archive popup's own URL is
-  // about:blank, where a relative path resolves to nothing.
+  // MUST route through feGetFoundryBaseHref() so the server's routePrefix applies.
+  // Root-absolute `/modules/…` 404s on any world behind a route prefix or proxy
+  // subpath (invisible to a localhost GM), and a bare relative path resolves against
+  // the archive popup's about:blank. Either way every face silently drops out.
   const fontUrl = (file) => {
     const rel = `modules/${MODULE_ID}/font/${file}`;
     try { return new URL(rel, feGetFoundryBaseHref()).href; } catch { return `/${rel}`; }
@@ -1248,12 +1200,10 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
   // Even if optional local faces fail to load, preserve the NeoDGM Pro webfont
   // rule so the selected pixel-font mode does not silently fall back.
   if (!faces.length) {
-    // LOUD on purpose. This is the exact state a user reports as "PDF/HTML로 인쇄하면
-    // 기본 고딕으로 나온다", and it was previously indistinguishable from a healthy
-    // export: the caller only sees a CSS string and an empty face list is not an error
-    // to it. Everything that can put us here (route prefix, 404, HEAD/size over cap,
-    // a 12s fetch timeout on a slow link) is invisible from the outside, so name the
-    // URL that was actually tried.
+    // Loud on purpose: an empty face list is not an error to the caller, so this state
+    // is otherwise indistinguishable from a healthy export. Everything that can cause
+    // it (route prefix, 404, size cap, fetch timeout) is invisible from outside, hence
+    // naming the URL actually tried.
     console.warn(
       `female_edition | 아카이브 폰트 임베드 실패: CookieRun 페이스를 하나도 가져오지 못했습니다. ` +
       `내보낸 파일은 시스템 기본 폰트로 렌더됩니다. 시도한 경로: ${fontUrl("CookieRun%20Regular.otf")}`
@@ -1372,7 +1322,7 @@ html, body {
 #fe-chat-export-container .chat-message * {
   font-family: var(--fe-chat-font-family) !important;
 }
-/* 카드/박스 내부 — 라이브 ui-font.css와 동일하게 토글을 따른다. */
+/* Inside cards and boxes - follows the toggle, exactly like the live ui-font.css. */
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
   font-family: var(--fe-chat-card-system-font-family) !important;
@@ -1384,38 +1334,18 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
 
 /* Re-assert Font Awesome over the '.chat-message *' chat-font rule above.
  *
- * NEVER PUT A RAW BACKTICK ANYWHERE IN THIS BLOCK — not even inside prose, and not
- * even inside a comment like this one. Everything from the "const css =" opener down
- * to the closing line is ONE template literal, so a backtick here does not quote
- * anything: it ENDS the literal. This very line carried a pair of them from 2.6.3
- * (2026-08-12), and the result parsed as perfectly valid JS:
+ * NEVER PUT A RAW BACKTICK IN THIS BLOCK, not even in prose. This whole CSS body is
+ * one template literal, so a backtick ENDS it rather than quoting anything -- and the
+ * result stays syntactically valid JS (member access + subtraction + multiplication),
+ * so the syntax check passes and only a ReferenceError at call time reveals it. That
+ * happened in 2.6.3 and, swallowed by this function's own catch, silently shipped two
+ * versions of font-less exports. Use apostrophes; "npm run lint" is the guard.
  *
- *     css = <template>.chat - message * <template2>
- *
- * i.e. a member access, a subtraction against an undefined identifier, and a
- * multiplication. So "node --check" passes and the module loads; the ReferenceError
- * fires only when feBuildEmbeddedCookieRunFontCSS is actually CALLED, and lands in
- * its own catch, which returns "". Every caller reads "" as "no fonts to embed", so
- * for two versions EVERY export silently shipped with no embedded fonts and rendered
- * in the system face — on the saved HTML and the print/PDF popup alike. That is the
- * "PDF/HTML로 인쇄하면 기본 고딕으로 나온다" report.
- *
- * Use apostrophes in prose here. "npm run lint" (no-undef) is what catches a relapse;
- * the syntax check provably cannot.
- *
- * MUST stay a VERSION-AGNOSTIC STACK. Foundry v13 shipped FA6, v14 ships FA7, and
- * the families are named per major version — v14's fontawesome/css/all.min.css
- * declares ONLY "Font Awesome 7 Pro" / "7 Brands" / "7 Duotone" (plus the FA5
- * aliases and bare "FontAwesome"). The old three-family list here named
- * "Font Awesome 6 Free" / "6 Pro" / "5 Free" — none of which exist on v14 — and
- * because this <style> is UNLAYERED its !important outranks every layer, so it
- * beat FA's own "font-family: var(--_fa-family)" and every icon fell through to
- * the text font and rendered as tofu (□ / ✗). That hit BOTH the saved HTML and
- * the print popup (feEnsureArchiveEmbeddedFonts injects this same CSS there).
- *
- * Font fallback is per-GLYPH, so one stack covers solid/regular/brands/duotone:
- * a brand glyph is absent from "… Pro" and falls through to "… Brands". Do NOT
- * narrow this back to the families of whichever Foundry version is current.
+ * MUST stay a VERSION-AGNOSTIC STACK: v13 ships FA6, v14 ships FA7, and the families
+ * are named per major version. This <style> is unlayered, so its !important outranks
+ * FA's own "font-family: var(--_fa-family)" -- naming only one version's families
+ * turns every icon into tofu on the other. Fallback is per-glyph, so one stack covers
+ * solid/regular/brands/duotone.
  */
 #fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
   font-family:

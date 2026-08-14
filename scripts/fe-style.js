@@ -1,7 +1,7 @@
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
-// accent hex → { h: 0-360, s: 0-1 }. 무채색(s≈0)이면 h=0으로 고정.
+// accent hex -> { h: 0-360, s: 0-1 }. Achromatic input (s~0) pins h to 0.
 function feAccentToHs(hex) {
   hex = String(hex).replace(/^#/, "");
   if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
@@ -262,16 +262,16 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
 
-    // 텍스트 색조 오버라이드가 꺼지면 강조색이 적용되는 모든 것(텍스트·테두리·체커보드
-    // 무늬)을 기본 백색(#ffffff, H=0·S=0%)으로 되돌려 "진짜 off" 상태로 만든다.
-    // 채팅 컨트롤의 강조색 스와치 버튼은 fe-chat-controls-menu.css 가 같은 조건으로 숨긴다.
+    // With the text-tint override off, every accent-driven surface (text, borders,
+    // checkerboard pattern) returns to plain white (#ffffff, H=0 S=0%) so "off" is
+    // genuinely off. fe-chat-controls-menu.css hides the accent swatch on the same test.
     const accentOverrideOn = !!feSetting(S.ACCENT_TEXT_OVERRIDE);
     const accent = accentOverrideOn
       ? (String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff")
       : "#ffffff";
     root.style.setProperty("--fe-dx3rd-accent", accent);
 
-    // H/S만 분해 — §20 CSS가 고정 명도와 조합해 사용 (명도 오염 방지)
+    // Decompose to H/S only - section 20 CSS pairs them with a fixed lightness.
     const { h, s } = feAccentToHs(accent);
     root.style.setProperty("--fe-dx3rd-accent-h", `${Math.round(h)}deg`);
     root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
