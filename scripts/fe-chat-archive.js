@@ -1297,17 +1297,65 @@ function feNormalizeArchivePortraitImages(rootEl, renderProfile = null) {
 }
 
 function feRefreshPortraitsForLog(logEl, renderProfile = null, { nodes = null } = {}) {
-  try {
-    if (!logEl?.querySelectorAll) return;
-    for (const el of (Array.isArray(nodes) ? nodes : logEl.querySelectorAll("li.chat-message"))) {
+  if (!logEl?.querySelectorAll) return;
+  let failed = 0;
+  let firstFailedId = "";
+  for (const el of (Array.isArray(nodes) ? nodes : logEl.querySelectorAll("li.chat-message"))) {
+    try {
       const id = feGetMessageIdFromElement(el);
       const msg = (id ? game.messages?.get(id) : null) || el.__feMessage || null;
       if (!msg) continue;
       feChatPortraitUpsert(msg, el);
       feNormalizeArchivePortraitImages(el, renderProfile);
+    } catch {
+      failed += 1;
+      if (!firstFailedId) firstFailedId = feGetMessageIdFromElement(el) || "unknown";
     }
-  } catch {
-    /* no-op */
+  }
+  // One malformed/system-specific message must never abort portrait injection
+  // for the rest of its render batch. Keep diagnostics aggregate-only: retaining
+  // errors or per-message records for a multi-thousand-message log would add
+  // memory precisely where the archive is already under pressure.
+  if (failed > 0) {
+    console.warn(`female_edition | archive portrait refresh skipped ${failed} message(s); first=${firstFailedId}`);
+  }
+}
+
+/**
+ * Last-chance repair for messages whose portrait DOM is absent immediately
+ * before print preparation. This deliberately scans the live HTMLCollection
+ * instead of materializing an array and touches ONLY missing portraits, so the
+ * pass adds constant bookkeeping memory and does not restart HQ work for the
+ * portraits that are already healthy.
+ */
+function feRepairMissingArchivePortraitsForPrint(logEl, renderProfile = null) {
+  if (!logEl?.children || !feSetting("chatPortraitEnabled")) return;
+
+  let repaired = 0;
+  let failed = 0;
+  let firstFailedId = "";
+  for (const el of logEl.children) {
+    try {
+      if (!el?.matches?.("li.chat-message")) continue;
+      if (el.querySelector?.("img.fe-chat-portrait")) continue;
+
+      const id = feGetMessageIdFromElement(el);
+      const msg = (id ? game.messages?.get(id) : null) || el.__feMessage || null;
+      if (!msg) continue;
+
+      feChatPortraitUpsert(msg, el);
+      if (!el.querySelector?.("img.fe-chat-portrait")) continue;
+      feNormalizeArchivePortraitImages(el, renderProfile);
+      repaired += 1;
+    } catch {
+      failed += 1;
+      if (!firstFailedId) firstFailedId = feGetMessageIdFromElement(el) || "unknown";
+    }
+  }
+
+  if (repaired > 0) console.info(`female_edition | print repaired ${repaired} missing portrait(s)`);
+  if (failed > 0) {
+    console.warn(`female_edition | print portrait repair skipped ${failed} message(s); first=${firstFailedId}`);
   }
 }
 
@@ -2533,17 +2581,30 @@ async function feRenderChatArchiveWindow(win, {
       .fe-chat-export-status {
         background: #000000 !important;
         color: rgba(230,230,230,0.82) !important;
+        border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
       }
       .fe-chat-export-action {
         background: #000000 !important;
         color: rgba(230,230,230,0.82) !important;
+        border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+      }
+      /* This inline pixel fallback must own hover too. Its base background is
+       * !important, so the normal (non-important) hover rule above cannot change
+       * it when the popup's copied @import stylesheet is late or unavailable.
+       * The buttons still click in that state, but appear completely inert. */
+      .fe-chat-export-action:hover {
+        background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
       }
       #fe-chat-export-log .chat-message {
         background: #000000 !important;
         background-color: #000000 !important;
         background-image: none !important;
         color: rgba(230,230,230,0.82) !important;
-        border-color: rgba(255,255,255,0.7) !important;
+        /* Fallback only: an OOC message carries the author's border color as
+         * an inline style. Making this important erased that core distinction
+         * on rebuilt/older messages while live-cloned messages kept it through
+         * their mirrored inline-important style. */
+        border-color: rgba(255,255,255,0.7);
       }
       #fe-chat-export-log .chat-message::before,
       #fe-chat-export-log .chat-message::after {
@@ -2574,7 +2635,8 @@ async function feRenderChatArchiveWindow(win, {
         background-color: #000000 !important;
         background-image: none !important;
         color: rgba(230,230,230,0.82) !important;
-        border-color: rgba(255,255,255,0.7) !important;
+        /* Preserve semantic/system inline card borders when present. */
+        border-color: rgba(255,255,255,0.7);
       }
       #fe-chat-export-log .chat-message :is(
         .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat
@@ -3091,6 +3153,9 @@ async function feArchivePrint(win) {
     doc.body.classList.toggle("fe-print-downscale", mode === "downscale");
     doc.body.classList.toggle("fe-print-downscale-lite", mode === "downscaleLite");
     feNormalizeArchivePortraitImages(logEl, renderProfile);
+    if (mode !== "hideAll" && mode !== "hideAvatars") {
+      feRepairMissingArchivePortraitsForPrint(logEl, renderProfile);
+    }
   } catch {}
 
   // ---

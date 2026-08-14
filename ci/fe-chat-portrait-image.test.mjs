@@ -5,7 +5,15 @@ import {
   cpEffectiveExportTarget,
   cpComputeSourceCrop,
   cpComputeDrawRect,
+  cpMayWriteScreenPortraitSource,
 } from "../scripts/fe-chat-portrait-image.js";
+
+test("screen portrait writers yield ownership to the export marker", () => {
+  assert.equal(cpMayWriteScreenPortraitSource({ dataset: {} }), true);
+  assert.equal(cpMayWriteScreenPortraitSource({ dataset: { feExportPortrait: "0" } }), true);
+  assert.equal(cpMayWriteScreenPortraitSource({ dataset: { feExportPortrait: "1" } }), false);
+  assert.equal(cpMayWriteScreenPortraitSource(null), true);
+});
 
 // ---------------------------------------------------------------------------
 // cpEffectiveExportTarget

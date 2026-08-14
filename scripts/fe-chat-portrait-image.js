@@ -449,7 +449,7 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
     // render and `feUpgradePortraitsForExport` awaits network fetches, so which one lands
     // last varies per source (a big source decodes slower and lands after ⇒ that speaker is
     // the one that comes out blurry). It correlates with an actor's art, never with ownership.
-    if (img.dataset?.feExportPortrait === "1") return;
+    if (!cpMayWriteScreenPortraitSource(img)) return;
     if (!size || size <= 0) return;
     if (size > 256) return; // sanity cap
     if (!cpShouldUseHQResample(img, shape)) return;
@@ -515,7 +515,7 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
           // simply consuming the one-shot listener would leave a portrait that never got its
           // screen bitmap parked on the browser-downscaled original after the export undo.
           // Re-arm: the undo restores the previous src, which fires `load` again.
-          if (img.dataset?.feExportPortrait === "1") {
+          if (!cpMayWriteScreenPortraitSource(img)) {
             img.addEventListener?.("load", onLoad, { once: true });
             return;
           }
@@ -544,7 +544,7 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
       // marked the element, so the guard at the top of the function saw nothing. Caching
       // the result above is still correct — it is a valid SCREEN bitmap — but applying it
       // to an element the export pass owns would undo the upgrade.
-      if (img.dataset?.feExportPortrait === "1") return;
+      if (!cpMayWriteScreenPortraitSource(img)) return;
       // Only apply if this image still refers to the same request.
       if (img.dataset?.fePortraitResampleKey === key) {
         img.src = dataUrl;
@@ -555,6 +555,18 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
   } catch {
     /* no-op */
   }
+}
+
+/**
+ * Whether the screen-HQ pipeline may replace an element's current source.
+ *
+ * The export pass owns a marked element until its restore callback runs. Keep
+ * this as a tiny pure predicate so every screen-source writer shares exactly
+ * the same boundary (including cpUpsertPortrait, which can run from an async
+ * archive-render refresh after export preparation has already started).
+ */
+function cpMayWriteScreenPortraitSource(img) {
+  return img?.dataset?.feExportPortrait !== "1";
 }
 
 function cpShouldUseHQResample(img, shape) {
@@ -746,6 +758,7 @@ async function cpBuildExportPortrait(
 
 export {
   cpMaybeApplyHQResample,
+  cpMayWriteScreenPortraitSource,
   cpShouldUseHQResample,
   cpResampleCacheGet,
   cpBuildExportPortrait,

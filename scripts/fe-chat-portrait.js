@@ -13,6 +13,7 @@ import {
 import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 import {
   cpMaybeApplyHQResample,
+  cpMayWriteScreenPortraitSource,
   cpShouldUseHQResample,
   cpResampleCacheGet,
 } from "./fe-chat-portrait-image.js";
@@ -900,14 +901,23 @@ function cpUpsertPortrait(message, messageEl) {
   const prevKey = img.dataset?.fePortraitResampleKey;
   const prevOrig = img.dataset?.fePortraitOrigSrc;
 
-  if (prevKey !== key || prevOrig !== src) {
-    img.dataset.fePortraitOrigSrc = src;
-    img.dataset.fePortraitResampleKey = key;
-    img.src = cached || src;
-  } else {
-    // Same request; only swap to cache if it arrived since the last render.
-    if (cached && img.src !== cached) img.src = cached;
-    else if (!allowHQResample && img.src !== src) img.src = src;
+  // An archive-render UI refresh is scheduled asynchronously. It normally
+  // settles while the popup is loading, but it can also arrive after the print
+  // pass has replaced this element with its export-resolution bitmap. In that
+  // interval the export marker owns `src`; putting the cached 64px screen image
+  // (or the original path) back here races the PDF preparation and can leave an
+  // unresolved image for the final straggler pass to blank. Styling and alt text
+  // may still refresh, but every screen-source write must respect the marker.
+  if (cpMayWriteScreenPortraitSource(img)) {
+    if (prevKey !== key || prevOrig !== src) {
+      img.dataset.fePortraitOrigSrc = src;
+      img.dataset.fePortraitResampleKey = key;
+      img.src = cached || src;
+    } else {
+      // Same request; only swap to cache if it arrived since the last render.
+      if (cached && img.src !== cached) img.src = cached;
+      else if (!allowHQResample && img.src !== src) img.src = src;
+    }
   }
 
   img.alt = cpGetPortraitAlt(message);
