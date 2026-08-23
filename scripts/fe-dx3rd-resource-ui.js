@@ -11,7 +11,7 @@
 // their position in localStorage. The NPC container's default top sits just below the PC
 // container (_npcDefaultTop), falling back to below the nav when there are no PC cards.
 
-import { MODULE_ID, S } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
@@ -58,9 +58,7 @@ let _pendingAccentPreview = null;
 
 // ─── guards ────────────────────────────────────────────────────────────────
 
-const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
-
-function _isDx3rd()      { return DX3RD_SYSTEM_IDS.has(game.system?.id); }
+function _isDx3rd()      { return feIsDx3rdSystemId(game.system?.id); }
 function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // Systems where this status panel is available. DX3rd shows HP + encroachment;
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card

@@ -1,6 +1,6 @@
 /* ================================================================
  * fe-dx3rd-compat.css
- * female_edition — DX3rd / dx3rd-emanim 픽셀 고대비 테마
+ * female_edition — DX3rd 시스템군 픽셀 고대비 테마
  *
  * 활성화: body.fe-retro-theme. DX3rd 전용 표면은
  *         body.fe-retro-theme.fe-retro-system-dx3rd로 한정한다.
@@ -50,7 +50,8 @@ body.fe-retro-theme :is(
   .dx3rd-sub-action-ui-condition-btn,
   .dx3rd-sub-action-ui-spell-btn,
   .dx3rd-sub-action-ui-item-btn,
-  .dx3rd-sub-action-ui-timing-btn
+  .dx3rd-sub-action-ui-timing-btn,
+  .dx3rd-side-control-btn
 ):hover:not(:disabled) {
   transform:    skewX(-20deg) !important; /* scale 제거 */
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -143,20 +144,45 @@ body.fe-retro-theme .dx3rd-item-selection-btn:hover {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 10  dx3rd 채팅 아이템 카드 (.dx3rd-item-chat)
+ * § 10  dx3rd 채팅 아이템 카드 (:is(.dx3rd-item-chat, .dx3rd-item-info))
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme .dx3rd-item-chat {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) {
   border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat button:not([disabled]):hover {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) button:not([disabled]):hover {
   outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   outline-offset: 0 !important;
 }
 
+/* 원본 dx3rd는 아이템 카드와 판정 카드 모두 `.header .title`에 검정을 직접
+   지정한다. 레트로 채팅의 검정 바탕에서는 상속만으로 복구되지 않으므로 원본
+   래퍼 안에서 명시적으로 밝은 액센트 톤을 되돌린다. */
+body.fe-retro-theme.fe-retro-system-dx3rd
+  :is(.dx3rd-item-info, .dx3rd-roll) > .header .title {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info > .header {
+  border-bottom: 1px solid var(--fe-ac-22) !important;
+}
+
+/* 원본 카드의 동작 버튼은 `.chat-btn`, 접힌 목록은 `.effect-list` / `.weapon-list`를
+   사용한다. 현대 시스템의 use-item-btn 계열과 같은 외곽선형 대비를 준다. */
+body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info .chat-btn {
+  background: transparent !important;
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info
+  :is(.effect-list, .weapon-list) .item-name {
+  border-color: var(--fe-ac-22) !important;
+}
+
 /* 이펙트 이름 토글 hover — 시스템 #4a9eff 파란색 → 액센트 흰색 + 글로우 */
-body.fe-retro-theme .dx3rd-item-chat .item-name-toggle:hover {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-name-toggle:hover {
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
   text-shadow:
     0 0 4px var(--fe-dx3rd-accent, #ffffff),
@@ -165,8 +191,8 @@ body.fe-retro-theme .dx3rd-item-chat .item-name-toggle:hover {
 
 /* dx3rd 오류 메시지 — 순수 적색 + 노란 윤곽(inline style color도 override)
    §4의 text-shadow:none(명시도 0,1,1)보다 이 규칙(0,3,0)이 우위이므로 shadow가 의도적으로 유지됨. */
-body.fe-retro-theme .dx3rd-item-chat .dx3rd-error,
-body.fe-retro-theme .dx3rd-item-chat .dx3rd-error strong {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .dx3rd-error,
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .dx3rd-error strong {
   color:       #ff0000 !important;
   text-shadow: 1px  1px 0 #ffee00,
               -1px  1px 0 #ffee00,
@@ -182,7 +208,7 @@ body.fe-retro-theme .dx3rd-item-chat .dx3rd-error strong {
  *        outline으로 강조
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) :is(input, select, textarea):focus {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) :is(input, select, textarea):focus {
   outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.7) !important;
   outline-offset: 0 !important;
 }
@@ -191,7 +217,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) :is(input, select, tex
    다이얼로그만 대상으로 하며, 16/20/22px 크기·margin·filter는 시스템 CSS가
    소유한다. 전역 checkbox 규칙을 두지 않아 표 셀과 아이템 제어가 붕괴하지 않는다. */
 body.fe-retro-theme.fe-retro-system-dx3rd
-  :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
+  :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
   :is(input[type="checkbox"], input[type="radio"]) {
   --checkbox-background-color: rgb(0 0 0 / 0.42) !important;
   --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -199,7 +225,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 }
 
 body.fe-retro-theme.fe-retro-system-dx3rd
-  :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
+  :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
   :is(input[type="checkbox"], input[type="radio"]):disabled {
   --checkbox-background-color: rgb(0 0 0 / 0.22) !important;
   --checkbox-checked-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
@@ -208,14 +234,14 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 /* 시스템의 공통 다이얼로그 input:focus glow가 장비 체크박스와 주문 선택
    라디오(같은 클래스 사용)에도 적용된다. 레트로에서는 하드 outline만 남긴다. */
 body.fe-retro-theme.fe-retro-system-dx3rd
-  :is(.double-cross-3rd, .dx3rd-emanim) input.equipment-checkbox {
+  :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input.equipment-checkbox {
   box-shadow: none !important;
 }
 
 /* 아이템 이름 밑줄은 상태 전환이 아니라 정보 탐색의 시각적 단서다. 전역 1ms
    규칙에서 이 의도적 hover 드로우만 제외해, 시스템 본래의 250ms 폭 전환을 유지한다. */
 body.fe-retro-theme.fe-retro-system-dx3rd
-  :is(.double-cross-3rd, .dx3rd-emanim) .item-label::after {
+  :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-label::after {
   transition-duration: 250ms !important;
   transition-delay: 0ms !important;
 }
@@ -225,12 +251,12 @@ body.fe-retro-theme.fe-retro-system-dx3rd
  * § 12  드롭 존 — 픽셀 스타일 점선 → 실선
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .items-list[data-drop-zone].drag-over {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[data-drop-zone].drag-over {
   border:           2px solid var(--fe-dx3rd-accent, #ffffff) !important;
   background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .items-list[data-drop-zone="spells"]:empty::before {
   border:      2px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
   border-style: dashed !important;        /* 점선은 유지 (UX 힌트) */
@@ -390,7 +416,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
   background: #000000 !important;
   color:      var(--fe-ac-90) !important;
 }
@@ -400,7 +426,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content,
       .card-header.description, .details.card-content, .collapsible-content.card-content) {
   background: transparent !important;
@@ -410,7 +436,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
   border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
@@ -420,7 +446,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.fe-has-user-color)
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
   border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
@@ -888,37 +914,37 @@ body.fe-retro-theme .fedr-ctx-item:hover {
    적용되며, 픽셀 테마와 무관한 레이아웃 보정이라 테마 게이트 없이 둔다.
    AppV2 actor-sheet-v2는 시스템 appv2-sheets.css가 자체 보정하므로 제외한다.
    (fe-portrait-hq.js 의 고품질 축소본도 비율 보존 풀이미지라 동일하게 동작) */
-:is(.double-cross-3rd, .dx3rd-emanim):not(.actor-sheet-v2) .grid-img .profile-img,
-:is(.double-cross-3rd, .dx3rd-emanim):not(.actor-sheet-v2) .simple-sheet-portrait .profile-img {
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd):not(.actor-sheet-v2) .grid-img .profile-img,
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd):not(.actor-sheet-v2) .simple-sheet-portrait .profile-img {
   object-position: top center !important;
 }
 
 /* ── 시트: 헤더·제목 텍스트 ─────────────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .progress-bar input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .progress-bar input {
   color: var(--fe-ac-90) !important;
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header .header-fields input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header .header-fields input {
   border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
 }
 
 /* ── 시트: 이름박스·스탯리스트 테두리 제거(#404040 bg는 유지) ────── */
 /* 사용자 요청: 회색 사다리꼴 박스의 밝은 강조 외곽선을 제거. 배경은 유지. */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .stat-box .stat-list::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .stat-list::before {
   border-color: transparent !important;
 }
 
 /* ── 시트: 노란색 호버(#ffbb00) 모두 강조색으로 ─────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-stat .main-grid .stat-box .skill-create:hover i,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-stat .main-grid .skill-box .skill-edit:hover,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-attributes .plus-addon button:hover i {
   color: var(--fe-ac-90) !important;
 }
@@ -945,9 +971,9 @@ body.fe-retro-theme .encroachment-value-input {
 }
 
 /* 침식률 바 입력칸 — 바 채움이 보이도록 투명 배경 복원.
-   일반 :is(.double-cross-3rd, .dx3rd-emanim) input { background:#000 } 규칙을 예외 처리.
+   일반 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input { background:#000 } 규칙을 예외 처리.
    overflow:hidden 바 안에서 text-shadow 외곽선은 가장자리가 잘리므로 글리프 stroke를 쓴다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-value-input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-value-input {
   background: transparent !important;
   border: none !important;
   text-shadow: none !important;
@@ -962,13 +988,13 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-value-in
    stroke 는 상속되므로 .dice-addon 에 한 번 걸면
    라벨 아이콘·슬래시·입력 텍스트 전부에 동일한 외곽선이 적용된다.
    글자색은 강조색(색조 오버라이드), 외곽선은 검정 stroke 로 어떤 채움색 위에서도 판독. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar .dice-addon {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar .dice-addon {
   text-shadow: none !important;
   -webkit-text-fill-color: var(--fe-ac-90) !important;
   -webkit-text-stroke: 2px #000000 !important;
   paint-order: stroke fill !important;
 }
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar .dice-addon input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar .dice-addon input {
   background: transparent !important;
   border:     none !important;
   color:      var(--fe-ac-90) !important;
@@ -977,8 +1003,8 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar .dic
 /* 침식률 바 내부 입력칸(값·주사위·레벨)은 바보다 좁고 우측으로 치우쳐 있어,
    범용 input hover/focus outline(§10·§11)이 바와 어긋난 사각형으로 그려진다.
    바 자체가 이미 흰색 테두리로 강조되므로, 내부 입력칸의 outline 은 억제한다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar input:is(:hover, :focus, :focus-visible, :active),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar select:is(:hover, :focus, :focus-visible, :active) {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar input:is(:hover, :focus, :focus-visible, :active),
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar select:is(:hover, :focus, :focus-visible, :active) {
   outline: none !important;
 }
 
@@ -987,21 +1013,21 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .encroachment-bar sele
    값칸까지 hover/focus outline(§6·§7·§11)을 그리면 이중으로 산만해진다.
    해설 탭 이하 입력(.sheet-attributes, 별도 컨테이너)은 대상이 아니므로 outline 을 유지한다.
    특이도 (0,4,2) 로 §6(0,2,1)·§7(0,3,2)·§11(0,3,2) 을 모두 이긴다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-stat :is(input, select, textarea):is(:hover, :focus, :focus-visible, :active) {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-stat :is(input, select, textarea):is(:hover, :focus, :focus-visible, :active) {
   outline: none !important;
 }
 
 /* ── 시트: 주사위 색상(폭주/침식) ──────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .dice-term.ds .dice-face.fumble,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .chat-message .dice-face.fumble {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .dice-term.ds .dice-face.fumble,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .chat-message .dice-face.fumble {
   color: var(--fe-ac-90) !important;
   outline: 1px solid #2e7d32 !important;
   outline-offset: 1px !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .dice-term.ds .dice-face.exploded,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .chat-message .dice-face.exploded,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .dice-term.ds .dice-face.exploded,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .chat-message .dice-face.exploded,
 body.fe-retro-theme .dice-rolls .dice.exploded {
   color: var(--fe-ac-90) !important;
   outline: none !important;
@@ -1010,17 +1036,17 @@ body.fe-retro-theme .dice-rolls .dice.exploded {
 
 /* ── 시트: 소진 아이템(crimson) · titus ─────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item.item-exhausted {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item.item-exhausted {
   outline: 1px solid #dc143c !important;
   outline-offset: -1px !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item.item-exhausted .item-name .item-label,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item.item-exhausted .item-control {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item.item-exhausted .item-name .item-label,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item.item-exhausted .item-control {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .items-list .titus {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .items-list .titus {
   color: var(--fe-ac-90) !important;
   outline: 1px solid crimson !important;
   outline-offset: -1px !important;
@@ -1028,12 +1054,12 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .items-
 
 /* ── 시트: 드롭존 ─────────────────────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .items-list[data-drop-zone="spells"].drag-over {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[data-drop-zone="spells"].drag-over {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
   background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .items-list[data-drop-zone="spells"]:empty::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[data-drop-zone="spells"]:empty::before {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
   color: rgb(from var(--fe-ac-90) r g b / 0.5) !important;
 }
@@ -1093,8 +1119,10 @@ body.fe-retro-theme :is(
 body.fe-retro-theme .dx3rd-side-control-btn:hover {
   color: #000000 !important;
   background: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: 0 0 0 1px rgba(68,68,68,0.6), 0 2px 8px rgba(0,0,0,0.4),
-              0 0 15px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  box-shadow: none !important;
+  outline: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+  outline-offset: 0 !important;
 }
 
 body.fe-retro-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
@@ -1316,50 +1344,50 @@ body.fe-retro-theme :is(.equipment-dialog-buttons, .weapon-dialog-buttons) butto
 
 /* ── 스킬 설정 다이얼로그 ─────────────────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .attribute-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .attribute-header {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skills-settings-form h4,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-key {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skills-settings-form h4,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-key {
   color: rgb(from var(--fe-ac-90) r g b / 0.5) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-row {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-row {
   border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-name input,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-key input[readonly] {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-name input,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-key input[readonly] {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.05) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-key input.clickable-skill-key {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-key input.clickable-skill-key {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.1) !important;
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .skill-key input.clickable-skill-key:hover {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .skill-key input.clickable-skill-key:hover {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .delete-skill {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .delete-skill {
   color: #dc3545 !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .delete-skill.disabled,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .delete-skill.disabled:hover {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .delete-skill.disabled,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .delete-skill.disabled:hover {
   color: rgb(from var(--fe-ac-90) r g b / 0.3) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .add-skill {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .add-skill {
   color: #28a745 !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim).skills-settings-dialog .save-skills {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .save-skills {
   color: var(--fe-ac-90) !important;
 }
 
@@ -1457,6 +1485,25 @@ body.fe-retro-theme .item-extend-dialog .btn-secondary {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
 }
 
+/* double-cross-3rd 1.x uses .dialog-footer + dx3rd-dialog-* rather than the
+   successor's .form-buttons + btn-primary/secondary footer. */
+body.fe-retro-theme .item-extend-dialog .dialog-footer {
+  border-top: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
+}
+
+body.fe-retro-theme .item-extend-dialog :is(.dx3rd-dialog-confirm, .dx3rd-dialog-cancel) {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .item-extend-dialog .dx3rd-dialog-confirm,
+body.fe-retro-theme .item-extend-dialog :is(.dx3rd-dialog-confirm, .dx3rd-dialog-cancel):hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
 body.fe-retro-theme .item-extend-dialog input:not([type="checkbox"]):not([type="radio"]).disabled,
 body.fe-retro-theme .item-extend-dialog select.disabled,
 body.fe-retro-theme .item-extend-dialog input:not([type="checkbox"]):not([type="radio"])[disabled],
@@ -1467,8 +1514,26 @@ body.fe-retro-theme .item-extend-dialog select[disabled] {
 
 /* ── 콤보 다이얼로그 ─────────────────────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .combo-dialog .info-table th,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .combo-dialog .info-table td {
+body.fe-retro-theme .dx3rd-combo-selection-dialog {
+  background: #000000 !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .dx3rd-combo-selection-btn {
+  background: #000000 !important;
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.45) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .dx3rd-combo-selection-btn:hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .combo-dialog .info-table th,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .combo-dialog .info-table td {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
 }
 
@@ -1607,10 +1672,10 @@ body.fe-retro-theme.fe-retro-system-dx3rd .application.minimized .window-header 
 
 /* ── F. DX3rd 시트 배경 오버라이드 ─────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-body,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-stat,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-body,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-stat,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-header {
   background:       #000 !important;
   background-image: none !important;
 }
@@ -1619,43 +1684,73 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-header {
    DX3rd non-!important explicit 규칙이 흰색을 덮어쓰는 것 방지.
    더 구체적인 하위 규칙들(progress-bar input, backtrack-btn button 등)은
    더 높은 명시도로 별도 처리되므로 충돌 없음. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-header {
   color: var(--fe-ac-90) !important;
 }
 
 /* 아이템 시트 헤더 — DX3rd { color: #fff } 명시 규칙 상속값 덮어씀 방지 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header input {
   color: var(--fe-ac-90) !important;
 }
 
 /* Simple sheet — DX3rd { color: #fff !important } 카운터 오버라이드
    명시도: (0,4,1) > DX3rd의 (0,2,0) → !important 중 우리 규칙 우선 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .simple-sheet-name .actor-name {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .simple-sheet-name .actor-name {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .simple-sheet-description .cell--title {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .simple-sheet-description .cell--title {
   color: var(--fe-ac-90) !important;
   background: var(--fe-ac-06) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .simple-sheet-description .description-content {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .simple-sheet-description .description-content {
   color:      var(--fe-ac-90) !important;
   background: #000 !important;
+}
+
+/* double-cross-3rd-only V1 enemy/book surfaces. The successor replaced these
+   layouts, while the upstream inline translucent-black panels disappear against
+   the retro sheet's black background. */
+body.fe-retro-theme .double-cross-3rd.enemy-sheet .applied-effect-item,
+body.fe-retro-theme .double-cross-3rd .enemy-sheet .applied-effect-item {
+  background: var(--fe-ac-06) !important;
+  border: 1px solid var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .double-cross-3rd.enemy-sheet .applied-effect-item h4,
+body.fe-retro-theme .double-cross-3rd .enemy-sheet .applied-effect-item h4 {
+  border-bottom-color: var(--fe-ac-22) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme .double-cross-3rd.enemy-sheet .no-effects,
+body.fe-retro-theme .double-cross-3rd .enemy-sheet .no-effects {
+  color: var(--fe-ac-t33) !important;
+}
+
+body.fe-retro-theme .double-cross-3rd .spell-header {
+  border: 1px solid var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme .double-cross-3rd .spell-description {
+  background: var(--fe-ac-06) !important;
+  border: 1px solid var(--fe-ac-22) !important;
+  color: var(--fe-ac-80) !important;
 }
 
 /* 회색 skew pseudo-element 배경 (#404040 → 강조색 색조 유지, 박스 형태 보존)
    사용자 요청: 값칸(HP/능력치/스킬 등) 사다리꼴의 밝은 강조 외곽선을 제거한다.
    배경(ac-22 회색 채움)은 유지하여 박스 형태는 남고, 테두리만 투명화한다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .stat-box .stat-list::before,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .value::before,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .skill-box .title::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .stat-list::before,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .value::before,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .skill-box .title::before {
   background:   var(--fe-ac-22) !important;
   border-color: transparent !important;
 }
@@ -1664,14 +1759,14 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
    skew 박스(.title::before). 사용자 요청: 검은 배경 라벨 박스는 외곽선을 유지한다
    (회색 값칸/스킬 박스만 외곽선 제거 — 그쪽은 위 규칙에서 gray bg + transparent 처리).
    회색 skill-box .title 은 .main-grid .skill-box .title::before(특이도 상위)에서 투명화. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .title::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .title::before {
   border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
 }
 
 /* 요구 1: 능력치 헤더(육체/감각/정신/사회)의 외곽선이 아래 기능치 사다리꼴 박스에
    묻히지 않도록 stat-header를 기능치 박스(같은 stat-box 스태킹 컨텍스트 내 z:2)보다
    위로 올린다. 라벨 ::before(z:-1)까지 헤더 컨텍스트째 상단에 렌더된다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .stat-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .stat-header {
   position: relative !important;
   z-index:  5 !important;
 }
@@ -1681,45 +1776,45 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
    ::before 에 덮여 묻힌다 → 나중에(위에) 그려지는 아래 박스의 상단(border-top)에
    그려 묻힘을 방지한다(위/첫 행 제외). 같은 divider 라인이라 위치는 동일.
    위 .main-grid .skill-box .title::before(투명화)보다 특이도 상위. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .skill-box label.skill:not(:first-of-type) .title.skill-roll::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .skill-box label.skill:not(:first-of-type) .title.skill-roll::before {
   border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
 }
 
 /* 스탯박스 입력 — 투명 배경으로 ::before 강조색 색조 노출.
    background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
    padding-right 복원 — 전역 select 규칙의 20px 화살표 여백 불필요. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat select {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat select {
   background:    transparent !important;
   padding-right: 0.5rem !important;
 }
 
 /* 다이아몬드 배경 (#404040 → 강조색 색조) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond {
   background:  var(--fe-ac-06) !important;
   box-shadow:  0 0 0 2px var(--fe-ac-57) inset !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond:hover {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond:hover {
   box-shadow: 0 0 0 2px var(--fe-ac-80) inset,
               0 0 6px var(--fe-ac-12) !important;
 }
 
 /* DX3rd 시트 탭 — 비활성(--fe-ac-80) · 활성(--fe-ac-90) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .tabs .item {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .tabs .item {
   background:   #000000 !important;
   color:        var(--fe-ac-80) !important;
   border-color: var(--fe-ac-12) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .tabs .item.active {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .tabs .item.active {
   color:        #000000 !important;
   background:   var(--fe-ac-90) !important;
   border-color: var(--fe-ac-90) !important;
 }
 
 /* DX3rd 시트 일반 텍스트 (레이블·셀·단락) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) :is(label, td, th, p) {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) :is(label, td, th, p) {
   color: var(--fe-ac-80) !important;
 }
 
@@ -1727,9 +1822,9 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) :is(label, td, th, p) 
    위 :is(label,td,th,p) 에 안 잡혀 코어 기본 회색으로 남았다. 액센트로 교체.
    .item-name span 으로 중첩 span(실제 텍스트)까지 직접 덮는다.
    (item-exhausted 의 색은 §… 별도 규칙이 더 높은 명시도로 유지됨) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item-name,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item-label,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item-name span {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-name,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-label,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-name span {
   color: var(--fe-ac-90) !important;
 }
 
@@ -1738,7 +1833,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item-name span {
    layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다.
 
    파란색 글자 외곽선(text-shadow 스트로크)은 제거됨 — 액센트 색 + bold 만 유지. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .highlight {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .highlight {
   color:        var(--fe-ac-90) !important;
   font-weight:  bold !important;
   text-shadow:  none !important;
@@ -1746,7 +1841,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .highlight {
 
 /* sheet-stat .title 텍스트 — DX3rd { color: white } (0,4,0) 일반 규칙 무력화
    stat-box·dice-info 내 skew 레이블 모두 포함 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .title {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .title {
   color: var(--fe-ac-90) !important;
   text-shadow:
     -1px -1px 0 #000000, 1px -1px 0 #000000,
@@ -1757,8 +1852,8 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
 
 /* DX3rd 입력 필드 전반 (일반 규칙, !important 없는 DX3rd 규칙 무력화)
    체크박스/라디오는 시스템의 전용 크기 보정과 브라우저 네이티브 페인트를 유지한다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) input:not([type="checkbox"]):not([type="radio"]),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) select {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input:not([type="checkbox"]):not([type="radio"]),
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) select {
   color:            var(--fe-ac-90) !important;
   background-color: #000 !important;
   border-color:     var(--fe-ac-22) !important;
@@ -1768,21 +1863,21 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) select {
    우리 명시도: input:not() → (0,6,2), select/textarea → (0,4,2)
    background는 건드리지 않음 — line 1719 transparent 규칙이 담당
    ※ .sheet-main은 §26이 별도 처리 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat select,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat textarea {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat select,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat textarea {
   color: var(--fe-ac-90) !important;
 }
 
 /* addon-critical-min 흰 박스 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .dice-info .title .addon-critical-min {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info .title .addon-critical-min {
   background:   #000 !important;
   color:        var(--fe-ac-90) !important;
   border:       1px solid var(--fe-ac-22) !important;
 }
 
 /* stat / attribute 입력 투명 배경 유지 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper :is(
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper :is(
   .stat-list .stat,
   .sheet-attributes .attribute-value,
   .sheet-attributes .attribute-input
@@ -1806,13 +1901,13 @@ body.fe-retro-theme :is(.chat-btn.invoke-spell, .chat-btn.spell-overflow):hover 
 
 /* ── DX3rd 시트 헤더 백트랙 버튼 ───────────────────────────── */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .backtrack-btn button {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .backtrack-btn button {
   background:   #000 !important;
   color:        var(--fe-ac-90) !important;
   border:       1px solid var(--fe-ac-45) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .backtrack-btn button:hover {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .backtrack-btn button:hover {
   background:   var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -1823,19 +1918,19 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
    line-height: normal 로 라인박스를 글리프에 맞추면 UA 의 select 내부 center
    정렬이 정확해진다. 테마 무관(픽셀/일반 공통) — layouts 레이어(7)라 코어
    elements 레이어(3) 일반 선언을 이긴다(!important 불필요). */
-:is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .select-box {
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .select-box {
   line-height: normal;
 }
 
 /* ── sheet-header .select-box — DX3rd { color: white; background: black } (0,4,0) 무력화.
    background: #000(무채색) → var(--fe-ac-06)(색조 포함 극도 어두운 배경)으로 hue 오버라이드. */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .select-box {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .select-box {
   color:            var(--fe-ac-90) !important;
   background-color: var(--fe-ac-06) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-header .select-box option {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .select-box option {
   color:      var(--fe-ac-70) !important;
   background: #000 !important;
 }
@@ -1847,7 +1942,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
      좌우 패딩을 4px 대칭으로 통일해 진짜 중앙 정렬. layouts 레이어라 시스템(8) 을
      이기려면 !important. 좌측정렬 필드(이름/코드네임 .name)는 제외 — 의도된 좌측 패딩 보존.
      체크박스/라디오는 네이티브 페인트가 padding-box와 따로 그려져 내부/외곽이 어긋나므로 제외. */
-:is(.double-cross-3rd, .dx3rd-emanim)
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   input:not([type="checkbox"]):not([type="radio"]):not(.name):not([name="name"]):not([name="system.codeName"]) {
   padding-left:  4px !important;
   padding-right: 4px !important;
@@ -1859,7 +1954,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
      (:is(#…) 추정)로 박아둬 어떤 author 스타일시트 규칙으로도 못 이긴다(인라인 !important
      만 가능). 그래서 가로 픽셀단위 중앙 정렬은 scripts/fe-dx3rd-input-align.js 가 렌더 시
      인라인으로 마무리한다. 이 CSS 규칙들은 그 전 단계의 first-paint 베이스라인이다. */
-:is(.double-cross-3rd, .dx3rd-emanim) select {
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) select {
   line-height:     normal !important;
   text-align:      center !important;
   text-align-last: center !important;
@@ -1883,19 +1978,19 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
    유지보수 원칙: dx3rd CSS에서 새 정렬 버그를 발견하면 그 요소가 이 "line-height ==
      box height" 패턴을 쓰는지 먼저 확인할 것 — padding 미세조정 대신 flex 치환으로
      고치면 폰트가 무엇이든 재발하지 않는다. */
-:is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .main-grid .stat-box .title {
+:is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .title {
   display:         flex !important;
   align-items:     center !important;
   justify-content: center !important;
   line-height:     normal !important;
 }
 
-/* ── 채팅카드(.dx3rd-item-chat) 피쳐 설명 — gray 오버라이드 ── */
+/* ── 채팅카드(:is(.dx3rd-item-chat, .dx3rd-item-info)) 피쳐 설명 — gray 오버라이드 ── */
 
 body.fe-retro-theme
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
-  .dx3rd-item-chat :is(.item-description, .description-content) {
+  :is(.dx3rd-item-chat, .dx3rd-item-info) :is(.item-description, .description-content) {
   color:        var(--fe-ac-90) !important;
   border-color: var(--fe-ac-22) !important;
 }
@@ -1908,16 +2003,16 @@ body.fe-retro-theme
  * ══════════════════════════════════════════════════════════════ */
 
 /* (1) 흰 배경 addon 수정 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .cell--title .left-addon,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .cell--title .addon {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .cell--title .left-addon,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .cell--title .addon {
   background: var(--fe-ac-06) !important;
   color:      var(--fe-ac-90) !important;
 }
 
 /* (2) 특성 입력칸 (커버·출신·경험·배우·각성·충동·욕망 등) — 밝은 강조색 테두리 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell input:not([type="checkbox"]):not([type="radio"]),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell select,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell textarea {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell input:not([type="checkbox"]):not([type="radio"]),
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell select,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell textarea {
   border: 1px solid var(--fe-ac-57) !important;
 }
 
@@ -1931,26 +2026,26 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
    경계는 시트 본래 영역 모양이 아니며, 안쪽 .title 의 치우친 사다리꼴(skew)
    레이블과 어긋나 보인다. 강조 윤곽선은 아래에서 사다리꼴 ::before 에만 부여.
    배경 틴트(L=6%)는 검정 바탕에서의 영역 구분용으로 유지. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .dice-info {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info {
   background:       var(--fe-ac-06) !important;
 }
 
 /* 다이스 레이블(.title)의 skew 사다리꼴 ::before. 다이스 박스는 어두운 틴트(ac-06)
    바탕의 검은 라벨 박스이므로 사용자 요청대로 외곽선을 유지한다.
    .dice-info .title 은 상위 .sheet-stat .title 규칙보다 특이도가 높으므로 여기서 명시. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-stat .dice-info .title::before {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info .title::before {
   border: 1px solid var(--fe-ac-57) !important;
 }
 
 /* 상태이상·기타 조건 셀 헤더(.cell--title) — 어두운 틴트 + 테두리 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .cell .cell--title {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .cell .cell--title {
   background:   var(--fe-ac-06) !important;
   border:       1px solid var(--fe-ac-22) !important;
   color:        var(--fe-ac-90) !important;
 }
 
 /* 조건 셀 전체 외곽 — 약한 구분선으로 각 셀 경계 표시 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-attributes .cell {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell {
   outline:        1px solid var(--fe-ac-12) !important;
   outline-offset: -1px !important;
 }
@@ -1971,10 +2066,10 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
 
 /* background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
    padding-right 복원 — sheet-main은 좁은 입력칸이 많아 20px 화살표 여백 불필요. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main
   input:not([type="checkbox"]):not([type="radio"]),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main select,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main textarea {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main select,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main textarea {
   background:    hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 20%) !important;
   color:         var(--fe-ac-90) !important;
   border-color:  var(--fe-ac-22) !important;
@@ -1982,15 +2077,15 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
 }
 
 /* :focus 상태 — 시스템 CSS (0,6,1) 대비 (0,7,2) 명시도로 완전 덮어씀 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main
   input:not([type="checkbox"]):not([type="radio"]):focus,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main select:focus,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main textarea:focus {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main select:focus,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main textarea:focus {
   background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 20%) !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main input:not([type="checkbox"]):not([type="radio"]):disabled,
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-main input:not([type="checkbox"]):not([type="radio"])[disabled] {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main input:not([type="checkbox"]):not([type="radio"]):disabled,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main input:not([type="checkbox"]):not([type="radio"])[disabled] {
   opacity:    1 !important;
   background: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 10%) !important;
   color:      var(--fe-ac-t22) !important;
@@ -1998,9 +2093,9 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .sheet-wrapper .sheet-
 
 /* 침식률 프로그래스 바 최종 예외 — 뒤쪽 범용 input 규칙이 검정 배경을
    다시 입히므로, 바 위의 텍스트/입력은 이 위치에서 투명 배경으로 고정한다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar :is(input:not([type="checkbox"]):not([type="radio"]), label, .dice-addon, .encroachment-value-text),
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-value-input {
   background: transparent !important;
   background-color: transparent !important;
@@ -2012,7 +2107,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
   paint-order: stroke fill !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar input:not([type="checkbox"]):not([type="radio"]) {
   box-sizing: border-box !important;
   height: 22px !important;
@@ -2021,14 +2116,14 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
   padding: 0 !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar input.encroachment-value-input:not([type="checkbox"]):not([type="radio"]) {
   height: 24px !important;
   line-height: 24px !important;
   overflow: visible !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar .dice-addon {
   align-items: center !important;
   flex: 0 0 auto !important;
@@ -2039,7 +2134,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
   padding-right: 4px !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar .dice-addon :is(label, .slash, i) {
   align-items: center !important;
   display: inline-flex !important;
@@ -2048,7 +2143,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
   overflow: visible !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar .dice-addon input:not([type="checkbox"]):not([type="radio"]) {
   appearance: none !important;
   box-sizing: content-box !important;
@@ -2063,7 +2158,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
   width: 3ch !important;
 }
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   input:not([type="checkbox"]):not([type="radio"]):not(.name):not([name="name"]):not([name="system.codeName"]):is(
     [name="system.attributes.encroachment.dice"],
     [name="system.attributes.encroachment.level"]
@@ -2076,7 +2171,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim)
 /* 에디터 편집 연필(prose-mirror > button.icon.toggle) — 전역 button 규칙(§30)의
    1px 테두리가 Foundry 기본 좌우 패딩(0 8px)과 겹쳐 작은 연필 아이콘보다
    헐거운 사각 외곽선을 만든다. 패딩 제거 + 정사각으로 외곽선을 아이콘에 맞춘다. */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) prose-mirror.editor button.icon.toggle {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) prose-mirror.editor button.icon.toggle {
   padding: 0 !important;
   box-sizing: border-box !important;
   width: 1.75rem !important;
@@ -2129,14 +2224,14 @@ body.fe-retro-theme .dx3rd-action-ui-title {
  * ══════════════════════════════════════════════════════════════ */
 
 /* 아이템 시트 헤더 우측 플렉스 입력칸 (방어력·이동력 등 수치) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header .flex-item input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header .flex-item input {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
   border:     1px solid var(--fe-ac-45) !important;
 }
 
 /* 아이템 레벨 입력칸 */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header .header-fields .level input {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header .header-fields .level input {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
   border:     1px solid var(--fe-ac-22) !important;
@@ -2149,7 +2244,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .item .sheet-header .h
  *        .header-fields .level 은 레이아웃 컨테이너 div이므로 제외.
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .combo-item .item-name .level,
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .combo-item .item-name .level,
 body.fe-retro-theme .combo-items-dialog .level {
   background: var(--fe-dx3rd-accent, #ffffff) !important;
   color:      #000000 !important;
@@ -2173,8 +2268,8 @@ body.fe-retro-theme .combo-items-dialog .level {
    글자색과 비슷하게 보여 텍스트가 묻히는 문제가 있었다(사용자 보고).
    → 공격 버튼도 다른 버튼과 동일하게 외곽선형으로 통일한다.
    반전 채움 강조는 success / win-check 버튼에만 남긴다. */
-body.fe-retro-theme .dx3rd-item-chat .use-item-btn,
-body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .use-item-btn,
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .attack-roll-btn {
   background: transparent !important;
   background-color: transparent !important;
   color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -2196,8 +2291,8 @@ body.fe-retro-theme .dx3rd-win-check-btn:hover:not(:disabled) {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .use-item-btn:hover:not(:disabled),
-body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn:hover:not(:disabled) {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .use-item-btn:hover:not(:disabled),
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .attack-roll-btn:hover:not(:disabled) {
   background: transparent !important;
   background-color: transparent !important;
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
@@ -2208,61 +2303,61 @@ body.fe-retro-theme .dx3rd-item-chat .attack-roll-btn:hover:not(:disabled) {
 
 /* ── (2) 내부 구분선 · 섹션 테두리 ──────────────────────────── */
 
-body.fe-retro-theme .dx3rd-item-chat .item-header {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-header {
   border-bottom-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .effect-details {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .effect-details {
   border-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .effect-details .detail-row {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .effect-details .detail-row {
   border-bottom-color: var(--fe-ac-12) !important;
 }
 
 /* detail-row 짝수 줄 배경 — 원본 rgba(0,0,0,0.05) 는 검정에서 불가시 → 미세 틴트 */
-body.fe-retro-theme .dx3rd-item-chat .effect-details .detail-row:nth-child(even) {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .effect-details .detail-row:nth-child(even) {
   background: var(--fe-ac-06) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .combo-section-header {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-section-header {
   background:   var(--fe-ac-06) !important;
   border-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .combo-items-list {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-items-list {
   border-left-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .combo-item {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-item {
   background:   var(--fe-ac-06) !important;
   border-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .combo-item-header {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-item-header {
   border-bottom-color: var(--fe-ac-12) !important;
 }
 
 /* ── (3) combo-toggle-btn:hover — item-name-toggle 패턴 ──────── */
 
-body.fe-retro-theme .dx3rd-item-chat .combo-toggle-btn:hover {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-toggle-btn:hover {
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
 }
 
 /* ── (4) 보조 텍스트 · 작은 버튼 ────────────────────────────── */
 
 /* item-type 소형 부제목 (#888 → t33) */
-body.fe-retro-theme .dx3rd-item-chat .item-type {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-type {
   color: var(--fe-ac-t33) !important;
 }
 
 /* protect-unequip — 비활성(회색) 소형 버튼 */
-body.fe-retro-theme .dx3rd-item-chat .protect-unequip-btn {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .protect-unequip-btn {
   border-color: var(--fe-ac-22) !important;
   color:        var(--fe-ac-57) !important;
 }
 
-body.fe-retro-theme .dx3rd-item-chat .protect-unequip-btn:hover:not(:disabled) {
+body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .protect-unequip-btn:hover:not(:disabled) {
   border-color: var(--fe-ac-57) !important;
   color:        var(--fe-ac-90) !important;
 }
@@ -2301,13 +2396,13 @@ body.fe-retro-theme .book-spell-list-dialog .owned-spell .info-table :is(th, td)
  * ══════════════════════════════════════════════════════════════ */
 
 /* 어트리뷰트 헤더 (#AAA 테두리) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .attributes-header {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .attributes-header {
   background:   var(--fe-ac-06) !important;
   border-color: var(--fe-ac-22) !important;
 }
 
 /* 어트리뷰트 목록 항목 하단 구분선 (#AAA) */
-body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim) .attributes-list li > * {
+body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .attributes-list li > * {
   border-bottom-color: var(--fe-ac-12) !important;
 }
 

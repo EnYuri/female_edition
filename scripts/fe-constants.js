@@ -1,5 +1,18 @@
 const MODULE_ID = "female_edition";
 
+// The maintained companion, its direct upstream fork, and the original system all
+// share the DX3rd actor resource schema and most sheet/chat markup. Keep package-ID
+// gates centralized so a feature cannot silently support only part of the family.
+const FE_DX3RD_SYSTEM_IDS = Object.freeze([
+  "dx3rd-emanim",
+  "double-cross-3rd",
+  "dx3rd",
+]);
+
+function feIsDx3rdSystemId(systemId) {
+  return FE_DX3RD_SYSTEM_IDS.includes(String(systemId ?? ""));
+}
+
 const LEGACY_UI_FONT_KEY = "ceUiUse" + "D" + "o" + "n" + "g" + "l" + "e";
 
 const S = {
@@ -281,6 +294,8 @@ const FE_MERGE_CLASS_SORTED = ["fe-divider-before", "fe-merge-end", "fe-merge-fo
 
 export {
   MODULE_ID,
+  FE_DX3RD_SYSTEM_IDS,
+  feIsDx3rdSystemId,
   LEGACY_UI_FONT_KEY,
   S,
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,

@@ -1,7 +1,7 @@
 import { FE_TEX_RE } from "./fe-constants.js";
 import {
   feGetMessageFromElementOrCollection, feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
-  feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_CLASS,
+  feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_SELECTOR,
 } from "./fe-util.js";
 
 function feSplitBgLayers(value) {
@@ -106,7 +106,7 @@ function feIsRoundMarkerMessageElementInWindow(win, msgEl) {
   try {
     if (!win || !msgEl || !(msgEl instanceof win.Element)) return false;
     if (msgEl.classList?.contains?.("round-marker") || msgEl.classList?.contains?.("fe-round-marker-chat")) return true;
-    if (msgEl.querySelector?.(`.round-marker, .${FE_SYSTEM_COMBAT_NOTICE_CLASS}`)) return true;
+    if (msgEl.querySelector?.(`.round-marker, ${FE_SYSTEM_COMBAT_NOTICE_SELECTOR}`)) return true;
 
     const rawId =
       msgEl.dataset?.messageId ||

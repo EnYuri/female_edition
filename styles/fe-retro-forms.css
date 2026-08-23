@@ -47,7 +47,7 @@
  * ══════════════════════════════════════════════════════════════ */
 
 /* DX3rd 자체 시트는 구조별 호환 규칙이 소유한다. */
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd)
   :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
   background-color: #000 !important;
   color: var(--fe-ac-90) !important;
@@ -83,7 +83,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
  *      아래변 오른쪽 30px 만 남는 것을 눈으로 확인했다.)
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd)
   :is(color-picker, file-picker, formula-input,
       :is(document-tags, string-tags) > .input-group) {
   background: #000 !important;
@@ -100,7 +100,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
    file-picker 의 버튼은 높이 32px 로 껍데기 border-box 를 정확히 채워서
    불투명하면 위·아래·오른쪽 테두리를 전부 덮는다 (실측 확인). 껍데기의 표면
    계약에 속하므로 § F2 가 소유한다. */
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd)
   :is(color-picker, file-picker, formula-input,
       :is(document-tags, string-tags) > .input-group)
   > :is(input[type="text"], input[type="color"], button) {
@@ -111,7 +111,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
 
 /* 껍데기 부품 버튼의 hover 피드백은 면이 아니라 글자색으로 준다 — 면을 칠하면
    위 문제가 hover 시에만 재발한다. */
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim)
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd)
   :is(color-picker, file-picker, formula-input,
       :is(document-tags, string-tags) > .input-group)
   > button:hover:not([disabled]) {
@@ -135,7 +135,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
 
 body.fe-retro-theme :is(.window-app, .application)
   input[type="checkbox"]:not(
-    :is(.double-cross-3rd, .dx3rd-emanim, .item-extend-dialog, .dx3rd-casting-dialog,
+    :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd, .item-extend-dialog, .dx3rd-casting-dialog,
         .dx3rd-scene-open-dialog, .dnd5e, .dnd5e2, .tidy5e-sheet) *
   ) {
   --checkbox-background-color: var(--fe-ac-70) !important;

@@ -19,7 +19,7 @@
  * Self-contained except for constants. Own DOM (`#fe-combat-tracker` on <body>) +
  * own CSS (styles/fe-combat-tracker.css, unlayered — no system-layer conflict).
  */
-import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import { MODULE_ID, S, FE_DEFAULTS, feIsDx3rdSystemId } from "./fe-constants.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 // Tracker portraits shrink huge sources, which CSS image-rendering cannot do well (see
 // fe-portrait-hq.js). They are display-only, non-editable images, so the safe src-swap HQ
@@ -56,7 +56,7 @@ function feCtOriginalActive() {
 // handler to continue the initiative process. Running it through our GM proxy
 // would put the choice dialog on the GM's screen instead.
 function feCtUsesLocalPlayerTurnEndWorkflow() {
-  return game.system?.id === "dx3rd-emanim";
+  return feIsDx3rdSystemId(game.system?.id);
 }
 
 // ── data helpers ────────────────────────────────────────────────────────────

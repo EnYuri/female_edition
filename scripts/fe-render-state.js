@@ -6,7 +6,7 @@ import {
   feExtractHTMLElement, feNormalizeChatMessageId,
   feGetMessageIdFromElement,
   feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
-  feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_CLASS,
+  feIsSystemCombatNoticeContent, FE_SYSTEM_COMBAT_NOTICE_SELECTOR,
 } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
 
@@ -176,8 +176,8 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
 function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");
-    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b)[^"']*["']/i.test(src)) return true;
-    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card')) return true;
+    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b)[^"']*["']/i.test(src)) return true;
+    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info')) return true;
     return false;
   } catch {
     return false;
@@ -363,7 +363,7 @@ function feIsNarratorToolsMessage(message, messageEl) {
 function feIsRoundMarkerMessage(message, messageEl) {
   try {
     if (messageEl?.classList?.contains?.("round-marker") || messageEl?.classList?.contains?.("fe-round-marker-chat")) return true;
-    if (messageEl?.querySelector?.(`.round-marker, .${FE_SYSTEM_COMBAT_NOTICE_CLASS}`)) return true;
+    if (messageEl?.querySelector?.(`.round-marker, ${FE_SYSTEM_COMBAT_NOTICE_SELECTOR}`)) return true;
   } catch {}
 
   try {

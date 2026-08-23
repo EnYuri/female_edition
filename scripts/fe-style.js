@@ -1,4 +1,4 @@
-import { MODULE_ID, S } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
 // accent hex -> { h: 0-360, s: 0-1 }. Achromatic input (s~0) pins h to 0.
@@ -145,14 +145,188 @@ function feSetRetroThemeClass(doc = document) {
     // The master switch remains deliberately singular. These are implementation
     // scope markers, not user-facing settings: system CSS can opt in only where
     // its markup actually exists instead of treating every retro world as DX3rd.
-    // Keep both known DX3rd package IDs: older worlds still use double-cross-3rd.
+    // Scope DX3rd-native styling to every supported package in the system family.
     const systemId = String(globalThis.game?.system?.id ?? "");
     body.classList.toggle("fe-retro-system-dnd5e", enabled && systemId === "dnd5e");
     body.classList.toggle(
       "fe-retro-system-dx3rd",
-      enabled && (systemId === "dx3rd-emanim" || systemId === "double-cross-3rd"),
+      enabled && feIsDx3rdSystemId(systemId),
     );
+
+    // double-cross-3rd's legacy token-adjacent combat buttons are PIXI.Graphics,
+    // not DOM nodes, so the CSS theme cannot reach them. Repaint any live button
+    // container when the toggle changes; the installer below handles containers
+    // created later by middle-click / combat process changes.
+    feApplyDoubleCrossLegacyPixiTheme(doc);
   } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// double-cross-3rd legacy combat buttons (PIXI)
+// ---------------------------------------------------------------------------
+// The upstream system draws these directly into canvas.interface with hard-coded
+// navy/red/yellow colors. Its implementation is closure-private, so we preserve
+// every system listener and add a non-interactive child Graphics behind the text.
+// That child covers only the original Graphics paint, leaving hit testing and all
+// actions owned by the system. This adapter is intentionally package-specific:
+// dx3rd-emanim replaced this UI, and original dx3rd never shipped it.
+const FE_DOUBLE_CROSS_SYSTEM_ID = "double-cross-3rd";
+const FE_DOUBLE_CROSS_COMBAT_CONTAINER = "dx3rd-combat-buttons";
+const FE_DOUBLE_CROSS_RETRO_OVERLAY = "fe-double-cross-retro-overlay";
+const _feDoubleCrossBoundStages = new WeakSet();
+let _feDoubleCrossPixiThemeInstalled = false;
+let _feDoubleCrossPixiThemeFrame = null;
+
+function _feDoubleCrossAccentNumber() {
+  // Match feApplyStyleVarsFromSettings: the saved swatch is dormant while the
+  // accent override toggle is off, and every accent-driven surface is white.
+  if (!feSetting(S.ACCENT_TEXT_OVERRIDE)) return 0xffffff;
+  let hex = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(hex)) hex = hex.split("").map((c) => c + c).join("");
+  return /^[0-9a-f]{6}$/i.test(hex) ? Number.parseInt(hex, 16) : 0xffffff;
+}
+
+function _feDoubleCrossRetroEnabled(doc = document) {
+  const classes = doc?.body?.classList;
+  return String(globalThis.game?.system?.id ?? "") === FE_DOUBLE_CROSS_SYSTEM_ID
+    && classes?.contains?.("fe-retro-theme")
+    && classes?.contains?.("fe-retro-system-dx3rd");
+}
+
+function _feDoubleCrossCombatContainer() {
+  try {
+    const group = globalThis.canvas?.interface;
+    return group?.getChildByName?.(FE_DOUBLE_CROSS_COMBAT_CONTAINER)
+      ?? group?.children?.find?.((child) => child?.name === FE_DOUBLE_CROSS_COMBAT_CONTAINER)
+      ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function _feDoubleCrossButtonText(button) {
+  return button?.children?.find?.((child) => (
+    child?.name !== FE_DOUBLE_CROSS_RETRO_OVERLAY
+    && child?.style
+    && (typeof child.text === "string" || child.text != null)
+  )) ?? null;
+}
+
+function _feDoubleCrossButtonRect(button) {
+  const stored = button?.userData?.feDoubleCrossRetroRect;
+  if (stored && [stored.x, stored.y, stored.width, stored.height].every(Number.isFinite)) return stored;
+  try {
+    const bounds = button?.getLocalBounds?.();
+    if (!bounds || !Number.isFinite(bounds.width) || !Number.isFinite(bounds.height)) return null;
+    const rect = {
+      x: Number(bounds.x) || 0,
+      y: Number(bounds.y) || 0,
+      width: Number(bounds.width),
+      height: Number(bounds.height),
+    };
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    button.userData ??= {};
+    button.userData.feDoubleCrossRetroRect = rect;
+    return rect;
+  } catch {
+    return null;
+  }
+}
+
+function _feStyleDoubleCrossPixiButton(button, doc = document) {
+  if (!button) return;
+  button.userData ??= {};
+  const text = _feDoubleCrossButtonText(button);
+  let overlay = button.getChildByName?.(FE_DOUBLE_CROSS_RETRO_OVERLAY)
+    ?? button.children?.find?.((child) => child?.name === FE_DOUBLE_CROSS_RETRO_OVERLAY)
+    ?? null;
+
+  if (!_feDoubleCrossRetroEnabled(doc)) {
+    if (overlay) {
+      try { button.removeChild?.(overlay); } catch { /* no-op */ }
+      try { overlay.destroy?.(); } catch { /* no-op */ }
+    }
+    if (text?.style) text.style.fill = button.userData.feDoubleCrossRetroHover ? 0xffbb00 : 0xffffff;
+    return;
+  }
+
+  const rect = _feDoubleCrossButtonRect(button);
+  const Graphics = globalThis.PIXI?.Graphics;
+  if (!rect || typeof Graphics !== "function") return;
+  if (!overlay) {
+    overlay = new Graphics();
+    overlay.name = FE_DOUBLE_CROSS_RETRO_OVERLAY;
+    overlay.eventMode = "none";
+    overlay.interactive = false;
+    button.addChildAt?.(overlay, 0);
+  } else if (button.getChildIndex?.(overlay) !== 0) {
+    try { button.setChildIndex?.(overlay, 0); } catch { /* no-op */ }
+  }
+
+  const accent = _feDoubleCrossAccentNumber();
+  const hovered = button.userData.feDoubleCrossRetroHover === true;
+  overlay.clear?.();
+  overlay.lineStyle?.(hovered ? 2 : 1, accent, 1);
+  overlay.beginFill?.(hovered ? accent : 0x000000, 1);
+  overlay.drawRect?.(rect.x, rect.y, rect.width, rect.height);
+  overlay.endFill?.();
+  if (text?.style) text.style.fill = hovered ? 0x000000 : accent;
+
+  if (!button.userData.feDoubleCrossRetroListeners) {
+    button.userData.feDoubleCrossRetroListeners = true;
+    button.on?.("pointerover", () => {
+      button.userData.feDoubleCrossRetroHover = true;
+      _feStyleDoubleCrossPixiButton(button, doc);
+    });
+    button.on?.("pointerout", () => {
+      button.userData.feDoubleCrossRetroHover = false;
+      _feStyleDoubleCrossPixiButton(button, doc);
+    });
+  }
+}
+
+function feApplyDoubleCrossLegacyPixiTheme(doc = document) {
+  if (String(globalThis.game?.system?.id ?? "") !== FE_DOUBLE_CROSS_SYSTEM_ID) return;
+  const container = _feDoubleCrossCombatContainer();
+  for (const button of container?.children ?? []) {
+    try { _feStyleDoubleCrossPixiButton(button, doc); } catch { /* per-button, non-fatal */ }
+  }
+}
+
+function _feScheduleDoubleCrossLegacyPixiTheme() {
+  if (String(globalThis.game?.system?.id ?? "") !== FE_DOUBLE_CROSS_SYSTEM_ID) return;
+  if (_feDoubleCrossPixiThemeFrame != null) return;
+  const run = () => {
+    _feDoubleCrossPixiThemeFrame = null;
+    feApplyDoubleCrossLegacyPixiTheme(document);
+  };
+  const raf = globalThis.requestAnimationFrame;
+  _feDoubleCrossPixiThemeFrame = typeof raf === "function" ? raf(run) : setTimeout(run, 0);
+}
+
+function _feBindDoubleCrossLegacyStage() {
+  const stage = globalThis.canvas?.stage;
+  if (!stage?.on || _feDoubleCrossBoundStages.has(stage)) return;
+  _feDoubleCrossBoundStages.add(stage);
+  // The system creates/toggles the container in its own earlier mousedown
+  // listener. Defer one frame so its synchronous draw has completed.
+  stage.on("mousedown", (event) => {
+    if ((event?.data?.button ?? event?.button) === 1) _feScheduleDoubleCrossLegacyPixiTheme();
+  });
+}
+
+function feInstallDoubleCrossLegacyPixiTheme() {
+  if (String(globalThis.game?.system?.id ?? "") !== FE_DOUBLE_CROSS_SYSTEM_ID) return;
+  _feBindDoubleCrossLegacyStage();
+  feApplyDoubleCrossLegacyPixiTheme(document);
+  if (_feDoubleCrossPixiThemeInstalled) return;
+  _feDoubleCrossPixiThemeInstalled = true;
+  Hooks.on("canvasReady", () => {
+    _feBindDoubleCrossLegacyStage();
+    _feScheduleDoubleCrossLegacyPixiTheme();
+  });
+  Hooks.on("refreshToken", () => _feScheduleDoubleCrossLegacyPixiTheme());
+  Hooks.on("updateCombat", () => _feScheduleDoubleCrossLegacyPixiTheme());
 }
 
 function feSetUserColorBgClass(doc = document) {
@@ -536,6 +710,8 @@ export {
   feSetNeodgmModeClass,
   feSetUserFontMode,
   feSetRetroThemeClass,
+  feApplyDoubleCrossLegacyPixiTheme,
+  feInstallDoubleCrossLegacyPixiTheme,
   feSetUserColorBgClass,
   feSetPaperOverlayClass,
   feSetUserColorBgBaseClass,

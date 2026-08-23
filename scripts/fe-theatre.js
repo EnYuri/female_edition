@@ -698,6 +698,7 @@ export function fetAddToStage(actorOrId) {
     _fetAttachStageOption(existing);
     _fetScheduleSaveUserState();
     _fetRefreshSheetHeaders();
+    _fetSetSpeakingAs(theatreId);
     return;
   }
 
@@ -705,9 +706,14 @@ export function fetAddToStage(actorOrId) {
   if (promoted) {
     _fetScheduleSaveUserState();
     _fetRefreshSheetHeaders();
+    _fetSetSpeakingAs(theatreId);
     return;
   }
   _fetInjectInsert(theatreId, actor.id, name, src, emotes, false);
+  // Adding an actor is an explicit local action, so make that actor the active
+  // stage speaker immediately. Session restore uses the internal inject/promote
+  // helpers directly and therefore still starts in the deliberate "없음" mode.
+  _fetSetSpeakingAs(theatreId);
 }
 
 // Global exposure for macros/RUI interaction
@@ -1349,7 +1355,7 @@ function _fetIsSystemMessage(chatMessage, data) {
   }
   const content = data?.content ?? chatMessage.content ?? "";
   if (typeof content === "string" && content &&
-      /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdnd5e2\b)[^"']*["']/i.test(content)) {
+      /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b|\bdnd5e2\b)[^"']*["']/i.test(content)) {
     return true;
   }
   return false;

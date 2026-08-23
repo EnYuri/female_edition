@@ -7,16 +7,17 @@
 // finish happens here, inline.
 //
 // A MutationObserver watches inputs and selects added or re-rendered inside a dx3rd
-// window (.dx3rd-emanim / legacy .double-cross-3rd), covering sheets, items and every
-// custom dialog, and aligns them inline:
+// window (.dx3rd-emanim / .double-cross-3rd / original .dx3rd), covering sheets,
+// items and every custom dialog, and aligns them inline:
 //   input  - only centered value fields get symmetric 4px padding; left-aligned fields
 //            (name, codename) are skipped.
 //   select - line-height normal for vertical centering plus symmetric padding. Selects
 //            with an arrow reserve room on the right, and the padding shrinks
 //            automatically when the field is too narrow, so text never clips.
 
-const DX3RD_SYSTEM_IDS = new Set(["dx3rd-emanim", "double-cross-3rd"]);
-const DX3RD_ROOT_SELECTOR = ".dx3rd-emanim, .double-cross-3rd";
+import { feIsDx3rdSystemId } from "./fe-constants.js";
+
+const DX3RD_ROOT_SELECTOR = ".dx3rd-emanim, .double-cross-3rd, .dx3rd";
 const _measCtx = document.createElement("canvas").getContext("2d");
 
 function _textWidth(text, cs) {
@@ -63,7 +64,7 @@ function _alignRoot(root) {
 
 let _started = false;
 function _start() {
-  if (_started || !DX3RD_SYSTEM_IDS.has(game.system?.id)) return;
+  if (_started || !feIsDx3rdSystemId(game.system?.id)) return;
   _started = true;
 
   // Handle dx3rd windows that are already open

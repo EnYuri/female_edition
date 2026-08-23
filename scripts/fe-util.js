@@ -628,17 +628,56 @@ function feGetRoundMarkerFlagValue(source) {
   return null;
 }
 
-// dx3rd (DX3 System) combat progress notices: round N, plus the setup / initiative /
-// main / cleanup phases. combat.js emits each as `<h3 class="dx3rd-combat-msg">…</h3>`
-// with a GM speaker (or the acting actor's, on the main phase). They are system round/phase
-// notices, not anybody's utterance, so they are classified as round markers: no user tint,
-// no merge, no portrait — and, unlike other modules' markers, the sender header is hidden
-// outright (fe-chat-portrait.js), since the speaker there carries no information.
+// DX3rd-family combat progress notices: round N, plus the setup / initiative /
+// main / cleanup phases. double-cross-3rd additionally gives combat start/end
+// their own sibling classes. They are system notices, not anybody's utterance,
+// so they are classified as round markers: no user tint, no merge, no portrait —
+// and the sender header is hidden outright (fe-chat-portrait.js).
 const FE_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
+const FE_SYSTEM_COMBAT_NOTICE_CLASSES = Object.freeze([
+  FE_SYSTEM_COMBAT_NOTICE_CLASS,
+  "dx3rd-combat-start-msg",
+  "dx3rd-combat-end-msg",
+]);
+const FE_SYSTEM_COMBAT_NOTICE_SELECTOR = FE_SYSTEM_COMBAT_NOTICE_CLASSES
+  .map((className) => `.${className}`)
+  .join(", ");
+
+function _feIsLegacyDx3rdCombatNoticeContent(content) {
+  try {
+    if (globalThis.game?.system?.id !== "dx3rd") return false;
+    const src = String(content ?? "");
+    if (!/<[^>]*\bdx3rd-roll\b/i.test(src)) return false;
+
+    const text = src
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&(?:nbsp|ensp|emsp);/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const localize = (key) => {
+      const value = String(game.i18n?.localize?.(key) ?? "").trim();
+      return value && value !== key ? value : "";
+    };
+    const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const round = localize("DX3rd.Round");
+    if (round && new RegExp(`(?:^|\\s)${escapeRe(round)}\\s*\\d+(?:\\s|$)`, "i").test(text)) return true;
+
+    const process = localize("DX3rd.Process");
+    if (!process) return false;
+    return ["Setup", "Initiative", "Main", "Cleanup"].some((phaseKey) => {
+      const phase = localize(`DX3rd.${phaseKey}`);
+      return phase && text.includes(`${phase} ${process}`);
+    });
+  } catch {
+    return false;
+  }
+}
 
 function feIsSystemCombatNoticeContent(content = "") {
   try {
-    return /<[^>]*\bdx3rd-combat-msg\b/i.test(String(content ?? ""));
+    return /<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(String(content ?? ""))
+      || _feIsLegacyDx3rdCombatNoticeContent(content);
   } catch {
     return false;
   }
@@ -691,4 +730,6 @@ export {
   feLooksLikeRoundMarkerFlavor,
   feIsSystemCombatNoticeContent,
   FE_SYSTEM_COMBAT_NOTICE_CLASS,
+  FE_SYSTEM_COMBAT_NOTICE_CLASSES,
+  FE_SYSTEM_COMBAT_NOTICE_SELECTOR,
 };

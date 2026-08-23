@@ -12,7 +12,7 @@
  */
 
 import {
-  MODULE_ID, LEGACY_UI_FONT_KEY, S,
+  MODULE_ID, FE_DX3RD_SYSTEM_IDS, feIsDx3rdSystemId, LEGACY_UI_FONT_KEY, S,
   FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY,
 } from "./fe-constants.js";
@@ -41,6 +41,7 @@ import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapPro
 import {
   feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
   feSetUiFontClass, feSetNeodgmModeClass, feSetUserFontMode, feSetRetroThemeClass,
+  feApplyDoubleCrossLegacyPixiTheme, feInstallDoubleCrossLegacyPixiTheme,
   feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetPaperOverlayClass, feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
@@ -637,6 +638,7 @@ Hooks.once("init", () => {
       // or accent-h is written from the stale override value.
       await feMirrorGmPrioritySetting(S.DX3RD_PIXEL_ACCENT, value);
       feApplyStyleVarsFromSettings(document);
+      feApplyDoubleCrossLegacyPixiTheme(document);
     },
   });
 
@@ -773,6 +775,7 @@ Hooks.once("init", () => {
       // Override OFF resets every accent-driven surface (text, borders, pattern) to the
       // default white; ON restores the saved accent. feApplyStyleVarsFromSettings does both.
       feApplyStyleVarsFromSettings(document);
+      feApplyDoubleCrossLegacyPixiTheme(document);
     },
   });
 
@@ -944,6 +947,7 @@ Hooks.once("ready", async () => {
   // goes into CONFIG.canvasTextStyle. Safe before the first canvas draw — later
   // draws clone the updated CONFIG value.)
   feApplyVisualSettingsToDocument(document);
+  feInstallDoubleCrossLegacyPixiTheme();
   if (feHasRenderedStateWork()) feScheduleRenderedStateRefreshForAllLogs({ delay: 0 });
   // Guarantee a correct full merge once the log is populated (the incremental
   // path misses groups when messages arrive in a single batch / via chat-prune).
@@ -1478,6 +1482,8 @@ Hooks.on("preUpdateChatMessage", (message, changed, _options, userId) => {
 
 export {
   MODULE_ID,
+  FE_DX3RD_SYSTEM_IDS,
+  feIsDx3rdSystemId,
   S,
   FE_DEFAULTS,
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,

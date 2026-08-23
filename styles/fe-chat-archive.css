@@ -302,11 +302,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
    of specificity — so the geurimilgi rule can only win by sitting in the SAME layer and
    out-specifying it (this selector is (1,5,1) vs the cookie rule's (1,1,0)). ui-font.css's
    card rule is in the earlier `layer(layouts)` and covers the card CONTAINER only, so it
-   already makes `.dx3rd-item-chat` itself geurimilgi but leaves the descendants to fall
+   already makes `:is(.dx3rd-item-chat, .dx3rd-item-info)` itself geurimilgi but leaves the descendants to fall
    through — this rule catches them. Names/titles live in `.message-header` (outside these
    card selectors) so they keep the primary font. */
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) * {
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) * {
   font-family: var(--fe-font-secondary) !important;
 }
 
@@ -1031,9 +1031,9 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message :i
 
 /* Chat cards (dnd5e, dx3rd, midi) */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat),
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat) {
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
   background:       #000000 !important;
   background-color: #000000 !important;
   background-image: none    !important;
@@ -1042,10 +1042,10 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
 
 /* Card sub-sections: header/content/description */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content) {
   background:       transparent !important;
   background-color: transparent !important;
@@ -1054,9 +1054,9 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
 
 /* Text colours inside cards / sender areas */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat),
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat) {
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
   color: var(--fe-ac-90) !important;
 }
 
@@ -1205,6 +1205,17 @@ body.fe-print-chatlog.fe-print-chatlog .chat-message .collapsible.collapsed .col
   transition: none !important;
   height: auto !important;
   max-height: none !important;
+}
+
+/* Original dx3rd has no collapsible wrapper or state class: these three card
+   sections are hidden by the system stylesheet until its chat toggle runs. */
+#fe-chat-export-container#fe-chat-export-container .dx3rd-item-info
+  :is(.effect-list, .weapon-list, .item-description),
+body.fe-print-chatlog.fe-print-chatlog .dx3rd-item-info
+  :is(.effect-list, .weapon-list, .item-description) {
+  display: block !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 #fe-chat-export-container#fe-chat-export-container .chat-message .dice-roll .dice-tooltip > .wrapper,

@@ -1152,6 +1152,11 @@ async function feScreenPanelGrantRights(actor) {
   });
 }
 
+// Only one quick value editor may exist on this client at a time. The state is
+// installed before DialogV2 begins rendering, so repeated pointerdown events in
+// the same frame cannot race each other into opening duplicate dialogs.
+let _barValueEditor = null; // { app: DialogV2|null, promise: Promise|null }
+
 /**
  * Quick numeric editor for a value-bar overlay's live attribute, opened by
  * clicking the bar during actual play (see pickPanelBarAt / onBoardPointerDown).
@@ -1161,14 +1166,27 @@ async function feScreenPanelGrantRights(actor) {
  * an arbitrarily-linked other actor like our per-overlay model needs.
  */
 async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
+  if (_barValueEditor) {
+    try {
+      _barValueEditor.app?.bringToFront?.();
+      _barValueEditor.app?.element?.querySelector?.('input[name="value"]')?.focus();
+    } catch { /* dialog may still be between render states */ }
+    return _barValueEditor.promise;
+  }
+
+  const editor = { app: null, promise: null };
+  _barValueEditor = editor;
   const content = `
     <div class="form-group">
       <label>${feEscapeHtml(linkedActor.name)} — ${feEscapeHtml(attr)}</label>
       <input type="number" name="value" value="${currentValue ?? 0}" step="any" autofocus>
     </div>`;
-  await foundry.applications.api.DialogV2.prompt({
+  editor.promise = foundry.applications.api.DialogV2.prompt({
     window: { title: game.i18n.localize("FESP.Bar.EditTitle") },
     content,
+    render: (_event, dialog) => {
+      if (_barValueEditor === editor) editor.app = dialog;
+    },
     ok: {
       icon: "fa-solid fa-check",
       label: game.i18n.localize("FESP.Bar.EditApply"),
@@ -1180,6 +1198,11 @@ async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
       },
     },
   });
+  try {
+    return await editor.promise;
+  } finally {
+    if (_barValueEditor === editor) _barValueEditor = null;
+  }
 }
 
 /**

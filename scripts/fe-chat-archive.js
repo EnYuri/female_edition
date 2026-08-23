@@ -1675,7 +1675,7 @@ function feArchiveMessageContentLooksEmpty(node) {
   try {
     const content = node?.querySelector?.(':scope > .message-content');
     if (!content) return true;
-    if (content.querySelector?.('.round-marker, img, video, audio, canvas, svg, table, iframe, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, blockquote, pre, hr, ul, ol')) {
+    if (content.querySelector?.('.round-marker, img, video, audio, canvas, svg, table, iframe, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dice-roll, .dice-result, blockquote, pre, hr, ul, ol')) {
       return false;
     }
     const text = String(content.textContent ?? '').replace(/ /g, ' ').trim();
@@ -1697,7 +1697,9 @@ function feArchiveMessageContentLooksEmpty(node) {
 //                            tooltip (`.dice-tooltip`) and dnd5e's
 //                            `.dice-tooltip-collapser` both sit at
 //                            `grid-template-rows: 0fr` until then.
-//   dx3rd `.collapsible-content` → a THIRD mechanism, see below.
+//   modern dx3rd `.collapsible-content` → a THIRD mechanism, see below.
+//   original dx3rd `.effect-list` / `.weapon-list` / `.item-description`
+//                                     → always display:none in the system sheet.
 // Measured on the 2026-08-12 export: `collapsible collapsed` occurred 0 times
 // (already handled) while `dice-roll expanded` also occurred 0 times across all
 // 252 dice rolls — i.e. every single roll breakdown was collapsed.
@@ -1710,7 +1712,7 @@ function feArchiveMessageContentLooksEmpty(node) {
 // effect, weapon and technique sections outright.
 //
 // Two independent things hide them, so BOTH must be undone here:
-//   1. `.dx3rd-item-chat .collapsible-content.collapsed{display:none!important}`
+//   1. `:is(.dx3rd-item-chat, .dx3rd-item-info) .collapsible-content.collapsed{display:none!important}`
 //      (dx3rd styles.css:2347). dx3rd's sheets are in `layer(system)`, which for
 //      `!important` OUTRANKS our `layer(modules)` archive sheet — a CSS override
 //      there could never win. Dropping the class is the layer-proof fix.
@@ -1738,6 +1740,15 @@ function feExpandCollapsedArchiveSections(node) {
         el.style?.removeProperty?.("height");
         el.style?.removeProperty?.("overflow");
         el.style?.removeProperty?.("transition");
+      } catch {}
+    }
+    for (const el of node.querySelectorAll?.(
+      ".dx3rd-item-info .effect-list, .dx3rd-item-info .weapon-list, .dx3rd-item-info .item-description"
+    ) ?? []) {
+      try {
+        if (el.style?.display === "none") el.style.removeProperty("display");
+        el.style?.removeProperty?.("height");
+        el.style?.removeProperty?.("overflow");
       } catch {}
     }
   } catch {}
@@ -2462,14 +2473,18 @@ async function feRenderChatArchiveWindow(win, {
 
       /* dx3rd item cards: a THIRD collapse mechanism (collapsed sits on the
        * content element, with no .collapsible wrapper anywhere in the system).
-       * feExpandCollapsedArchiveSections drops the class and the inline
-       * display:none; this is the backstop for nodes that never went through it.
-       * It has to live in THIS inline sheet, not styles/fe-chat-archive.css:
-       * dx3rd hides them with display:none !important from layer(system), which
-       * for !important outranks our layer(modules) sheet. This tag is unlayered,
-       * so it outranks every layer. */
-      #fe-chat-export-log .dx3rd-item-chat .collapsible-content,
-      #fe-chat-export-log .dx3rd-item-chat .collapsible-content.collapsed {
+       * feExpandCollapsedArchiveSections MUST drop the class because dx3rd's
+       * display:none !important lives in layer(system), which outranks both our
+       * layer(modules) archive sheet and this unlayered inline sheet for
+       * !important declarations. Once the class is gone, this rule supplies the
+       * stable expanded geometry and also covers system CSS that was not inlined. */
+      #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info) .collapsible-content,
+      #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info) .collapsible-content.collapsed {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      #fe-chat-export-log .dx3rd-item-info :is(.effect-list, .weapon-list, .item-description) {
         display: block !important;
         height: auto !important;
         overflow: visible !important;
@@ -2629,7 +2644,8 @@ async function feRenderChatArchiveWindow(win, {
         color: rgba(230,230,230,0.82) !important;
       }
       #fe-chat-export-log .chat-message :is(
-        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+        .dx3rd-item-chat, .dx3rd-item-info
       ) {
         background: #000000 !important;
         background-color: #000000 !important;
@@ -2639,7 +2655,8 @@ async function feRenderChatArchiveWindow(win, {
         border-color: rgba(255,255,255,0.7);
       }
       #fe-chat-export-log .chat-message :is(
-        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+        .dx3rd-item-chat, .dx3rd-item-info
       ) :is(header, section, footer, .card-header, .card-content, .collapsible-content,
             .details, .wrapper) {
         background: transparent !important;

@@ -1,7 +1,10 @@
 // Female-cupwhi: Unified settings menu (collapsible sections)
 // This dialog is the primary UI because individual settings are hidden from core Module Settings.
 
-import { MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES, feSetting, feCaptureWorldSettings } from "./fe-chat-enhance.js";
+import {
+  MODULE_ID, S, FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
+  feIsDx3rdSystemId, feSetting, feCaptureWorldSettings,
+} from "./fe-chat-enhance.js";
 import { feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported } from "./fe-user-font.js";
 
 // ── Portrait settings (registered by fe-chat-portrait.js under MODULE_ID) ──
@@ -202,7 +205,7 @@ function feIsChatPortraitModuleActive() {
 }
 
 function feIsDx3rdSystem() {
-  try { return ["dx3rd-emanim", "double-cross-3rd"].includes(game?.system?.id); } catch { return false; }
+  try { return feIsDx3rdSystemId(game?.system?.id); } catch { return false; }
 }
 
 function feIsDnd5eSystem() {

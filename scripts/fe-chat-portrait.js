@@ -321,20 +321,57 @@ function cpGetRoundMarkerFlagValue(source) {
   return null;
 }
 
-// dx3rd (DX3 System) combat progress notices: round N, plus the setup / initiative /
-// main / cleanup phases. The system emits each as `<h3 class="dx3rd-combat-msg">…</h3>`
-// with a GM speaker (or the acting actor's, on the main phase). Duplicated from
-// feIsSystemCombatNoticeContent — this script is deliberately import-free.
+// DX3rd-family combat progress notices. double-cross-3rd uses sibling classes
+// for combat start/end. Duplicated from feIsSystemCombatNoticeContent — this
+// script is deliberately import-free.
 const CP_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
+const CP_SYSTEM_COMBAT_NOTICE_SELECTOR = [
+  CP_SYSTEM_COMBAT_NOTICE_CLASS,
+  "dx3rd-combat-start-msg",
+  "dx3rd-combat-end-msg",
+].map((className) => `.${className}`).join(", ");
+
+function cpIsLegacyDx3rdCombatNoticeContent(content) {
+  try {
+    if (globalThis.game?.system?.id !== "dx3rd") return false;
+    const src = String(content ?? "");
+    if (!/<[^>]*\bdx3rd-roll\b/i.test(src)) return false;
+
+    const text = src
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&(?:nbsp|ensp|emsp);/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const localize = (key) => {
+      const value = String(game.i18n?.localize?.(key) ?? "").trim();
+      return value && value !== key ? value : "";
+    };
+    const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const round = localize("DX3rd.Round");
+    if (round && new RegExp(`(?:^|\\s)${escapeRe(round)}\\s*\\d+(?:\\s|$)`, "i").test(text)) return true;
+
+    const process = localize("DX3rd.Process");
+    if (!process) return false;
+    return ["Setup", "Initiative", "Main", "Cleanup"].some((phaseKey) => {
+      const phase = localize(`DX3rd.${phaseKey}`);
+      return phase && text.includes(`${phase} ${process}`);
+    });
+  } catch {
+    return false;
+  }
+}
 
 function cpIsSystemCombatNoticeMessage(message, messageEl) {
   try {
-    if (messageEl?.querySelector?.(`.${CP_SYSTEM_COMBAT_NOTICE_CLASS}`)) return true;
+    if (messageEl?.querySelector?.(CP_SYSTEM_COMBAT_NOTICE_SELECTOR)) return true;
   } catch {
     /* no-op */
   }
   try {
-    if (/<[^>]*\bdx3rd-combat-msg\b/i.test(String(message?.content ?? ""))) return true;
+    const content = String(message?.content ?? "");
+    if (/<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(content)) return true;
+    if (cpIsLegacyDx3rdCombatNoticeContent(content)) return true;
   } catch {
     /* no-op */
   }
@@ -366,7 +403,7 @@ function cpIsRoundMarkerMessage(message, messageEl) {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
     if (cpLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
-    if (/<[^>]*\bdx3rd-combat-msg\b/i.test(content)) return true;
+    if (/<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(content)) return true;
   } catch {
     /* ignore */
   }

@@ -366,13 +366,13 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
    덮어 잘라 먹는다. 그 표면은 fe-retro-forms.css § F2 가 소유한다. 가드 없이는
    아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인. */
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
   background: #000 !important;
   color: var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) button:not([disabled]):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
   background: var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -382,7 +382,7 @@ body.fe-retro-theme :is(.window-app, .application) :is(h2, h3, h4):not(.window-t
   border-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim) :is(p, span, label, li, td, th) {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) :is(p, span, label, li, td, th) {
   color: var(--fe-ac-57) !important;
 }
 
