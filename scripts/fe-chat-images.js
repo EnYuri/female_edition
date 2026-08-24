@@ -6,8 +6,18 @@
 //  - Convert !ci|...! shortcode into image embeds
 //  - Click to open image popout
 
-import { MODULE_ID, feCaptureMessageRenderFlagsOnPreCreate } from "./fe-chat-enhance.js";
+import { MODULE_ID, feSetting, feCaptureMessageRenderFlagsOnPreCreate } from "./fe-chat-enhance.js";
 import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
+import {
+  CI_MAX_PROXY_BYTES,
+  ciNormalizeUploadDirectory,
+  ciCanUploadDirect,
+  ciHasUploadAuthorityOnline,
+  ciEnsureUploadDirectory,
+  ciUploadImageDirect,
+  ciUploadImageViaAuthority,
+  ciRegisterImageUploadSocket,
+} from "./fe-chat-image-upload.js";
 
 const CI = Object.freeze({
   ENABLED: "chatImagesEnabled",
@@ -25,7 +35,7 @@ const CI_IMAGE_FILE_RE = /\.(gif|png|jpe?g|webp|svg|bmp|tif|tiff|avif)(\?.*)?$/i
 const CI_HTML_IGNORES = ["static.wikia"];
 
 function ciGet(key) {
-  return game.settings.get(MODULE_ID, key);
+  return feSetting(key);
 }
 
 function ciConflictSuppressed() {
@@ -50,7 +60,7 @@ function ciShowButton() {
 
 function ciUploadLocation() {
   try {
-    return String(ciGet(CI.UPLOAD_LOCATION) || "uploaded-chat-images").trim() || "uploaded-chat-images";
+    return ciNormalizeUploadDirectory(ciGet(CI.UPLOAD_LOCATION)) || "uploaded-chat-images";
   } catch {
     return "uploaded-chat-images";
   }
@@ -77,59 +87,8 @@ function ciEscapeHtml(str) {
       .replaceAll("'", "&#039;");
 }
 
-function ciGetFilePickerClass() {
-  return foundry?.applications?.apps?.FilePicker?.implementation || globalThis.FilePicker;
-}
-
 function ciGetImagePopoutClass() {
   return foundry?.applications?.apps?.ImagePopout || globalThis.ImagePopout;
-}
-
-function ciCanUpload(silent = false) {
-  try {
-    if (typeof game?.user?.can === "function") {
-      const ok = !!game.user.can("FILES_UPLOAD");
-      if (!ok && !silent) ui?.notifications?.warn?.("이미지 업로드 권한이 없습니다.");
-      return ok;
-    }
-  } catch {}
-
-  try {
-    const role = game?.user?.role;
-    const perms = game?.permissions?.FILES_UPLOAD;
-    const ok = !!role && Array.isArray(perms) && perms.includes(role);
-    if (!ok && !silent) ui?.notifications?.warn?.("이미지 업로드 권한이 없습니다.");
-    return ok;
-  } catch {}
-
-  if (!silent) ui?.notifications?.warn?.("이미지 업로드 권한을 확인할 수 없습니다.");
-  return false;
-}
-
-async function ciEnsureUploadDirectory(path) {
-  const Picker = ciGetFilePickerClass();
-  if (!Picker) return;
-  const target = String(path || "uploaded-chat-images").trim() || "uploaded-chat-images";
-  try {
-    const browse = await Picker.browse("data", target);
-    if (browse?.target === ".") await Picker.createDirectory("data", target, {});
-    return;
-  } catch {}
-  try {
-    await Picker.createDirectory("data", target, {});
-  } catch {}
-}
-
-function ciFileExt(file) {
-  const name = String(file?.name || "");
-  const m = name.match(/\.[^.]+$/);
-  if (m) return m[0];
-  const type = String(file?.type || "");
-  if (type.startsWith("image/")) {
-    const sub = type.slice(6).replace(/[^a-z0-9]+/gi, "").toLowerCase();
-    if (sub) return `.${sub === "jpeg" ? "jpg" : sub}`;
-  }
-  return ".png";
 }
 
 function ciRevokeObjectUrl(src) {
@@ -482,7 +441,7 @@ function ciGetMessageStyleOOC() {
 // Maximum file size allowed for data URL embedding (fallback when upload is unavailable).
 // Large data URLs bloat ChatMessage content stored in DB and sent to all clients.
 // Users with files exceeding this limit should use the archive downscale feature instead.
-const CI_MAX_DATAURL_BYTES = 17 * 1024 * 1024; // 17 MB
+const CI_MAX_DATAURL_BYTES = CI_MAX_PROXY_BYTES; // 17 MB
 
 async function ciFileToDataUrl(file) {
   return await new Promise((resolve, reject) => {
@@ -496,27 +455,21 @@ async function ciFileToDataUrl(file) {
 async function ciResolvePendingSource(item) {
   if (!item?.file) return item?.src || item?.previewUrl || "";
 
-  const uploadAllowed = ciCanUpload(true);
-  if (uploadAllowed) {
+  if (ciCanUploadDirect()) {
     try {
-      const Picker = ciGetFilePickerClass();
-      if (Picker) {
-        const target = ciUploadLocation();
-        await ciEnsureUploadDirectory(target);
-        const ext = ciFileExt(item.file);
-        const safeFile = new File([item.file], `${item.id}${ext}`, { type: item.file.type || "image/png" });
-        const uploadFn =
-          (typeof Picker.upload === "function" && Picker.upload.bind(Picker)) ||
-          (typeof Picker.implementation?.upload === "function" && Picker.implementation.upload.bind(Picker.implementation));
-        let uploaded = null;
-        if (uploadFn) uploaded = await uploadFn("data", target, safeFile, {}, { notify: false });
-        else {
-          const picker = new Picker();
-          if (typeof picker.upload === "function") uploaded = await picker.upload("data", target, safeFile, {}, { notify: false });
-        }
-        if (uploaded?.path) return String(uploaded.path);
-      }
-    } catch {}
+      return await ciUploadImageDirect(item.file, ciUploadLocation());
+    } catch (error) {
+      console.warn("female_edition | direct chat-image upload failed; trying GM proxy", error);
+    }
+  }
+
+  if (ciHasUploadAuthorityOnline()) {
+    try {
+      return await ciUploadImageViaAuthority(item.file);
+    } catch (error) {
+      console.warn("female_edition | proxied chat-image upload failed; embedding in message", error);
+      ui?.notifications?.warn?.(`서버 이미지 업로드에 실패하여 메시지에 직접 포함합니다: ${item.name || "image"}`);
+    }
   }
 
   // Fallback: embed as data URL so players without upload permission can still send images.
@@ -841,7 +794,7 @@ function ciRefreshUi(root = document) {
 function ciRegisterSettings() {
   game.settings.register(MODULE_ID, CI.ENABLED, {
     name: "채팅 이미지 업로드/임베드 활성화",
-    hint: "chat-images 모듈 기능(업로드 버튼, 붙여넣기/드래그 앤 드롭, !ci|경로! 임베드)을 사용합니다.",
+    hint: "Foundry 파일 권한과 별개로 채팅 이미지 기능(업로드 버튼, 붙여넣기/드래그 앤 드롭, !ci|경로! 임베드)을 사용합니다.",
     scope: "client",
     config: false, // managed in the unified settings menu (fe-settings-menu)
     type: Boolean,
@@ -861,16 +814,20 @@ function ciRegisterSettings() {
 
   game.settings.register(MODULE_ID, CI.UPLOAD_LOCATION, {
     name: "채팅 이미지 업로드 경로",
-    hint: "업로드 가능한 경우 이미지를 저장할 data 폴더 경로입니다.",
+    hint: "채팅에 붙여넣기/드롭하거나 업로드 버튼으로 고른 이미지를 저장할 data 폴더 경로입니다. 파일 권한이 없는 플레이어의 이미지는 온라인 GM이 이 경로로 대리 업로드합니다.",
     scope: "world",
     config: false, // managed in the unified settings menu (fe-settings-menu)
     restricted: true,
     type: String,
     default: "uploaded-chat-images",
     onChange: async (value) => {
-      const cleaned = String(value || "uploaded-chat-images").trim().replace(/\s+/g, "-") || "uploaded-chat-images";
+      const cleaned = ciNormalizeUploadDirectory(value) || "uploaded-chat-images";
+      // A world-setting onChange runs on every client. Directory creation and any
+      // canonicalizing re-write belong only to the active GM; players may still use
+      // this shared path through the bounded GM upload proxy.
+      if (game.user !== game.users.activeGM) return;
       if (cleaned !== value) await game.settings.set(MODULE_ID, CI.UPLOAD_LOCATION, cleaned);
-      await ciEnsureUploadDirectory(cleaned);
+      try { await ciEnsureUploadDirectory(cleaned); } catch { /* retry on first upload */ }
     },
   });
 }
@@ -880,10 +837,17 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
+  ciRegisterImageUploadSocket({
+    getUploadDirectory: ciUploadLocation,
+    // The requester's chatImagesEnabled setting owns use of the feature. The
+    // authority only enforces conflict suppression plus transport validation;
+    // its own personal UI toggle must not disable another user's upload.
+    isFeatureEnabled: () => !ciConflictSuppressed(),
+  });
   if (!ciEnabled()) return;
-  try {
-    await ciEnsureUploadDirectory(ciUploadLocation());
-  } catch {}
+  if (game.user?.isGM) {
+    try { await ciEnsureUploadDirectory(ciUploadLocation()); } catch { /* retry on first upload */ }
+  }
   ciScheduleRefreshUi(document, 0);
 });
 

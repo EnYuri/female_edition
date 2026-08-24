@@ -1019,6 +1019,20 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-stat :i
 
 /* ── 시트: 주사위 색상(폭주/침식) ──────────────────────────── */
 
+/* Chat-tooltip dice number glyphs. DX/DS terms render as `<li class="roll dice">`,
+   and special results put `text-shadow:none` on an inner span. A text-shadow
+   outline therefore disappears on those results and in print normalization.
+   Use an inherited glyph stroke instead; it survives print while preserving the
+   semantic fill colors. Cover core dN terms and legacy `.dice-face` markup too. */
+body.fe-retro-theme.fe-retro-system-dx3rd .chat-message
+  :is(
+    .dice-tooltip .dice-rolls > .roll:is(.dice, .d4, .d6, .d8, .d10, .d12, .d20, .d100),
+    .dice-face
+  ) {
+  -webkit-text-stroke: 1px #000000 !important;
+  paint-order: stroke fill !important;
+}
+
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .dice-term.ds .dice-face.fumble,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .chat-message .dice-face.fumble {
   color: var(--fe-ac-90) !important;

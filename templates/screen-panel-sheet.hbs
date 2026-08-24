@@ -14,14 +14,6 @@
         {{/each}}
       </select>
     </div>
-    <div class="fe-sp-field">
-      <label>{{localize "FESP.Sheet.Width"}}</label>
-      <input type="number" name="system.width" value="{{fe.width}}" min="1" step="1" {{#unless fe.editable}}disabled{{/unless}}>
-    </div>
-    <div class="fe-sp-field">
-      <label>{{localize "FESP.Sheet.Height"}}</label>
-      <input type="number" name="system.height" value="{{fe.height}}" min="1" step="1" {{#unless fe.editable}}disabled{{/unless}}>
-    </div>
     {{!-- 설명문은 인라인 <p class="notes"> 가 아니라 호버 툴팁이다. 두 힌트의 길이가
           크게 달라(위치 고정 쪽이 거의 두 배) 그리드 두 칸의 높이를 벌려 놓았고,
           켜고 끄기만 하면 되는 토글 옆에 세 줄짜리 문단은 과했다.
@@ -103,8 +95,24 @@
               </span>
             {{/if}}
           </div>
-          <file-picker name="system.faces.{{face.index}}.img" type="image" value="{{face.img}}"
+          <file-picker class="fe-sp-face-image-picker" data-face-index="{{face.index}}"
+                       name="system.faces.{{face.index}}.img" type="image" value="{{face.img}}"
                        {{#unless ../fe.editable}}disabled{{/unless}}></file-picker>
+          <div class="fe-sp-face-size-row">
+            <label>
+              <span>{{localize "FESP.Sheet.FaceWidth"}}</span>
+              <input type="number" name="system.faces.{{face.index}}.width"
+                     value="{{face.width}}" min="1" step="1"
+                     {{#unless ../fe.editable}}disabled{{/unless}}>
+            </label>
+            <label>
+              <span>{{localize "FESP.Sheet.FaceHeight"}}</span>
+              <input type="number" name="system.faces.{{face.index}}.height"
+                     value="{{face.height}}" min="1" step="1"
+                     {{#unless ../fe.editable}}disabled{{/unless}}>
+            </label>
+            <span class="notes">{{localize "FESP.Sheet.FaceSizeHint"}}</span>
+          </div>
           <textarea name="system.faces.{{face.index}}.description" rows="2"
                     placeholder="{{localize "FESP.Sheet.DescPh"}}"
                     {{#unless ../fe.editable}}disabled{{/unless}}>{{face.description}}</textarea>
@@ -149,7 +157,8 @@
               {{#if face.linkedActorName}}
                 <div class="fe-sp-face-actor-info">
                   <span class="fe-sp-face-actor-name">{{face.linkedActorName}}</span>
-                  <select name="system.faces.{{face.index}}.linkMode" {{#unless ../fe.editable}}disabled{{/unless}}>
+                  <select class="fe-sp-face-link-mode" data-face-index="{{face.index}}"
+                          name="system.faces.{{face.index}}.linkMode" {{#unless ../fe.editable}}disabled{{/unless}}>
                     <option value="copy" {{#if (eq face.linkMode "copy")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeCopy"}}</option>
                     <option value="linked" {{#if (eq face.linkMode "linked")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeLinked"}}</option>
                   </select>

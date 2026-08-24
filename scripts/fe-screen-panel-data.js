@@ -4,7 +4,8 @@
 // that represents a CoCoFolia-style screen panel: a multi-faced image/info panel
 // that can be placed on the scene canvas as a Tile and flipped between faces.
 //
-// The Actor holds the SHARED definition (the list of faces + default size). The
+// The Actor holds the SHARED definition (the list of faces, including each face's
+// own size). The
 // per-placement runtime state (which face is showing, whether it is disabled)
 // lives on each Tile's flags — see FE_PANEL_TILE_FLAG — because the same panel
 // actor may be placed multiple times on one scene.
@@ -139,6 +140,13 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
         new f.SchemaField({
           name: new f.StringField({ required: true, blank: true, initial: "" }),
           img: new f.FilePathField({ categories: ["IMAGE"], required: false, blank: true }),
+          // Canvas size in scene pixels. 0 exists only as a migration sentinel for
+          // panels created before size became per-face; fe-screen-panel.js replaces it
+          // with that face's old aspect-fitted display size as soon as an active GM is
+          // available. New image choices are initialized from the image's natural
+          // pixel dimensions by ScreenPanelSheet.
+          width: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
+          height: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
           description: new f.HTMLField({ required: false, blank: true }),
           linkedActorUuid: new f.StringField({ required: false, blank: true, initial: "" }),
           linkMode: new f.StringField({ required: true, blank: false, initial: "copy", choices: ["copy", "linked"] }),
@@ -238,6 +246,9 @@ class ScreenPanelData extends foundry.abstract.TypeDataModel {
         { required: true, initial: [] }
       ),
       defaultFace: new f.NumberField({ required: true, integer: true, min: 0, initial: 0, nullable: false }),
+      // Legacy shared bounding box. Kept in the schema so existing actors can be
+      // migrated without changing their on-canvas appearance; it is no longer shown
+      // in the sheet or consulted once every face has its own width/height.
       width: new f.NumberField({ required: true, integer: true, min: 1, initial: FE_PANEL_DEFAULT_SIZE, nullable: false }),
       height: new f.NumberField({ required: true, integer: true, min: 1, initial: FE_PANEL_DEFAULT_SIZE, nullable: false }),
       locked: new f.BooleanField({ initial: false }),
@@ -291,13 +302,15 @@ function fePanelFace(actor, index) {
   const faces = actor?.system?.faces ?? [];
   const count = faces.length;
   let i = Number.isInteger(index) ? index : 0;
-  if (count === 0) return { name: "", img: "", description: "", overlays: [], linkedActorUuid: "", linkMode: "copy", token: {}, index: 0, count: 0 };
+  if (count === 0) return { name: "", img: "", width: 0, height: 0, description: "", overlays: [], linkedActorUuid: "", linkMode: "copy", token: {}, index: 0, count: 0 };
   if (i < 0) i = 0;
   if (i >= count) i = count - 1;
   const face = faces[i] ?? {};
   return {
     name: face.name ?? "",
     img: face.img ?? "",
+    width: Math.max(0, Number(face.width) || 0),
+    height: Math.max(0, Number(face.height) || 0),
     description: face.description ?? "",
     overlays: face.overlays ?? [],
     linkedActorUuid: face.linkedActorUuid ?? "",

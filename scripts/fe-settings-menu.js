@@ -109,6 +109,7 @@ const ALL_DEFAULTS = Object.freeze({
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
+  [S.CORE_UI_FILEPICKER_UPLOAD_LOCATION]: "uploaded-filepicker-images",
   // image-hover (world/GM: permission/art; client: enable/pos/size/delay/upscale)
   ihPermission: 0, ihArtType: "character",
   ihEnabled: true, ihPosition: "Bottom left", ihSize: 3, ihSizeWide: 1.225, ihDelay: 0, ihMaxUpscale: 0,
@@ -252,6 +253,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
       [S.CORE_UI_TOKEN_PREVIEW]: feRead(S.CORE_UI_TOKEN_PREVIEW),
       [S.CORE_UI_FILEPICKER_ENHANCEMENTS]: feRead(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
+      [S.CORE_UI_FILEPICKER_UPLOAD_LOCATION]: feRead(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION),
       [S.CORE_UI_SCENE_CONFIG_TABS]: feRead(S.CORE_UI_SCENE_CONFIG_TABS),
       [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
       [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
@@ -718,6 +720,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
         bool(S.SC_COLLAPSE_ENABLED),
         bool(S.CORE_UI_TOKEN_PREVIEW), bool(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
+        ...(game.user?.isGM ? [str(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION)] : []),
         bool(S.CORE_UI_SCENE_CONFIG_TABS),
         bool(S.TOKEN_CONFIG_TWO_COLUMN),
         ...(game.user?.isGM ? [

@@ -402,6 +402,28 @@
   margin: 0;
   padding: 0;
 }
+.fe-screen-panel-sheet .fe-sp-face-size-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: end;
+}
+.fe-screen-panel-sheet .fe-sp-face-size-row > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.fe-screen-panel-sheet .fe-sp-face-size-row input {
+  min-width: 0;
+}
+.fe-screen-panel-sheet .fe-sp-face-size-row > .notes {
+  grid-column: 1 / -1;
+  margin: 0;
+}
 
 /* ----- Per-face linked actor section ----- */
 .fe-screen-panel-sheet .fe-sp-face-actor-section {

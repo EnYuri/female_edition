@@ -189,6 +189,63 @@ function feAspectFit(boxW, boxH, natW, natH) {
 }
 
 /**
+ * The scene-pixel size authored for one face.
+ *
+ * Positive per-face dimensions are exact: unlike the removed panel-wide bounding box,
+ * the user is editing the actual size of this face. A zero is only a compatibility
+ * sentinel from the old schema. Until the active GM persists its migration, reproduce
+ * the old aspect-fitted size so an existing board never jumps to a new size merely
+ * because the module was updated.
+ */
+function feResolvedPanelFaceSize(actor, face, natW, natH) {
+  const faceW = Math.max(0, Number(face?.width) || 0);
+  const faceH = Math.max(0, Number(face?.height) || 0);
+  if (faceW > 0 && faceH > 0) return { w: Math.round(faceW), h: Math.round(faceH) };
+  if (faceW > 0 && natW > 0 && natH > 0)
+    return { w: Math.round(faceW), h: Math.max(1, Math.round(faceW * natH / natW)) };
+  if (faceH > 0 && natW > 0 && natH > 0)
+    return { w: Math.max(1, Math.round(faceH * natW / natH)), h: Math.round(faceH) };
+  const legacyW = actor?.system?.width || FE_PANEL_DEFAULT_SIZE;
+  const legacyH = actor?.system?.height || FE_PANEL_DEFAULT_SIZE;
+  return feAspectFit(legacyW, legacyH, natW, natH);
+}
+
+const _panelFaceSizeMigrations = new WeakSet();
+
+/**
+ * Persist the old shared bounding box as each legacy face's actual current display
+ * size. This is intentionally asynchronous because preserving the old appearance
+ * requires the image aspect ratio. New faces never enter this path: the sheet seeds
+ * them with a concrete size and replaces it with naturalWidth×naturalHeight when art
+ * is chosen.
+ */
+async function feMigratePanelFaceSizes(actor) {
+  if (actor?.type !== FE_PANEL_TYPE || game.user !== game.users.activeGM) return;
+  if (_panelFaceSizeMigrations.has(actor)) return;
+  const current = actor.system?.faces ?? [];
+  if (!current.some(face => !(face?.width > 0) || !(face?.height > 0))) return;
+
+  _panelFaceSizeMigrations.add(actor);
+  try {
+    const faces = foundry.utils.deepClone(current);
+    let changed = false;
+    for (const face of faces) {
+      if (face?.width > 0 && face?.height > 0) continue;
+      const nat = await feLoadImageSize(face?.img);
+      const size = feResolvedPanelFaceSize(actor, face, nat?.w, nat?.h);
+      face.width = size.w;
+      face.height = size.h;
+      changed = true;
+    }
+    if (changed) await actor.update({ "system.faces": faces });
+  } catch (err) {
+    console.warn(`${MODULE_ID} | screen panel per-face size migration failed`, err);
+  } finally {
+    _panelFaceSizeMigrations.delete(actor);
+  }
+}
+
+/**
  * World-space rect of the ACTUALLY DRAWN image (the mesh), not the tile's box.
  * This is what makes the clickable area match the visible art regardless of the
  * texture `fit` mode, anchor, or whether the aspect resize has applied yet (with
@@ -529,41 +586,44 @@ function onBoardMouseLeave() {
 // Per-user "disabled" visibility (client-side render gate)
 // --------------------------------
 
-// Render-time enforcement: every client resizes panel tiles to their image's
-// aspect ratio locally, so a plain refresh fixes legacy (square) tiles for
-// everyone — GM or player, no DB write or permission required. The natural size
-// is read straight off the tile's already-loaded PIXI texture (synchronous &
-// reliable — no async Image() that can silently fail), and the bounding box is
-// the actor's width×height (stable across face flips). updateSource mutates the
-// live doc (and _source) in memory only — no persistence needed. A texture.src
-// change triggers a full redraw (drawTile fires again with the new texture), so
-// this also covers face flips. Idempotent (±1px) → no loop.
-function enforcePanelTileSize(tile) {
+// Render-time enforcement: every client resizes a panel to the CURRENT face's
+// own scene-pixel size. The natural size is read straight off the already-loaded
+// PIXI texture (synchronous & reliable — no async Image() that can silently fail)
+// and is used only by the legacy-size compatibility fallback. updateSource mutates the
+// live doc (and _source) in memory only — no persistence needed. A concrete per-face
+// size can be applied before a replacement texture finishes loading. The legacy
+// zero-size fallback still needs the currently loaded PIXI texture, so callers handling
+// a texture-changing update can request concrete-only enforcement and let the later draw
+// retry the legacy case. Idempotent (±1px) → no loop.
+function enforcePanelTileSize(tile, { concreteOnly = false } = {}) {
   try {
     const doc = tile?.document;
     const flag = doc?.getFlag?.(MODULE_ID, FE_PANEL_TILE_FLAG);
     if (!flag?.actorId) return;
-    const tex = tile.texture;
-    const natW = tex?.width, natH = tex?.height;
-    if (!(natW > 0) || !(natH > 0)) return; // texture not ready / failed to load
     // No actor → stop enforcing. Falling back to FE_PANEL_DEFAULT_SIZE here meant a ghost
     // was re-fitted to a 400px box on EVERY draw, so resizing one with core's tile handles
     // silently snapped back on the next redraw — the size was owned by a panel that no
     // longer exists. Let the user's own dimensions stand.
     const actor = feResolvePanelPlacementActor(doc);
     if (!actor) return;
-    const boxW = actor.system?.width || FE_PANEL_DEFAULT_SIZE;
-    const boxH = actor.system?.height || FE_PANEL_DEFAULT_SIZE;
-    const { w, h } = feAspectFit(boxW, boxH, natW, natH);
+    const face = fePanelFace(actor, flag.currentFace ?? 0);
+    if (concreteOnly && (!(Number(face?.width) > 0) || !(Number(face?.height) > 0))) return;
+    // A concrete per-face width/height does not depend on a bitmap. This deliberately
+    // continues with undefined natural dimensions when the face is blank or its texture
+    // failed to load, so overlay-only faces still resize on edits and face flips. Natural
+    // dimensions are needed only by the zero-valued legacy compatibility fallback.
+    const tex = tile.texture;
+    const natW = tex?.width, natH = tex?.height;
+    const { w, h } = feResolvedPanelFaceSize(actor, face, natW, natH);
 
     // Tokenized panel: width/height are GRID UNITS, not pixels, and there is no
     // `fit` to enforce (core scales a token's texture to its box). Convert the same
-    // aspect-fitted pixel box through the grid so a face flip to a differently-shaped
+    // per-face pixel box through the grid so a face flip to a differently-sized
     // image reshapes the token exactly like it reshapes a tile.
     if (feIsPanelToken(tile)) {
       // A face whose Token settings pin an explicit size owns it — the user set it through
       // core's TokenConfig, so the aspect auto-fit must not fight them every draw.
-      if (feFaceTokenPinsSize(fePanelFace(actor, flag.currentFace ?? 0))) return;
+      if (feFaceTokenPinsSize(face)) return;
       // Do NOT read the local grid-snap preference here. Unlike a Tile (whose pixel box
       // is the same number everywhere), a Token's width/height are grid units that this
       // render gate rewrites locally — so consulting a CLIENT setting would draw the very
@@ -581,10 +641,10 @@ function enforcePanelTileSize(tile) {
       return;
     }
 
-    const fitOk = doc.texture?.fit === "contain";
+    const fitOk = doc.texture?.fit === "fill";
     // ±1px tolerance prevents rounding from causing an endless resize loop.
     if (Math.abs(doc.width - w) <= 1 && Math.abs(doc.height - h) <= 1 && fitOk) return;
-    doc.updateSource({ width: w, height: h, texture: { fit: "contain" } });
+    doc.updateSource({ width: w, height: h, texture: { fit: "fill" } });
     doc.prepareDerivedData(); // rebuild doc.shape (updateSource does not re-derive)
     tile.renderFlags?.set?.({ refreshTransform: true });
   } catch { /* no-op */ }
@@ -1223,13 +1283,11 @@ async function feScreenPanelPlaceOnScene(actor, center = {}) {
   const faceCount = actor.system.faces?.length ?? 0;
   if (faceCount === 0) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoFaces")); return; }
   const face = fePanelFace(actor, actor.system.defaultFace ?? 0);
-  // Size the tile to the image's real aspect ratio (the actor width×height act as
-  // a bounding box). The whole image shows, nothing is stretched or cropped, and
-  // the tile bounds — i.e. the clickable area — exactly match the visible art.
-  const boxW = actor.system.width || FE_PANEL_DEFAULT_SIZE;
-  const boxH = actor.system.height || FE_PANEL_DEFAULT_SIZE;
+  // Each face owns its actual scene-pixel size. New image choices are seeded from
+  // their natural dimensions; the async read here only serves a not-yet-persisted
+  // legacy face whose old shared bounding box still needs aspect fitting.
   const nat = await feLoadImageSize(face.img);
-  const { w, h } = feAspectFit(boxW, boxH, nat?.w, nat?.h);
+  const { w, h } = feResolvedPanelFaceSize(actor, face, nat?.w, nat?.h);
   const pivot = canvas.stage.pivot;
   const cx = Number.isFinite(center.x) ? center.x : pivot.x;
   const cy = Number.isFinite(center.y) ? center.y : pivot.y;
@@ -1309,7 +1367,7 @@ function feTileTopLeft(tileDoc) {
  * v13 has no anchorX/anchorY field, so schema cleaning simply drops these keys there.
  */
 function fePanelTileTextureData(img) {
-  return { texture: { src: img || "", fit: "contain", anchorX: 0, anchorY: 0 } };
+  return { texture: { src: img || "", fit: "fill", anchorX: 0, anchorY: 0 } };
 }
 
 /**
@@ -1779,8 +1837,19 @@ Hooks.once("ready", () => {
   // the entry module from the sheet).
   globalThis.feScreenPanelPlaceOnScene = feScreenPanelPlaceOnScene;
 
+  // Convert the removed panel-wide bounding box into concrete per-face sizes without
+  // changing how any existing board looks. Fire-and-forget: each Actor update is
+  // independently guarded and the render-time fallback remains correct while it runs.
+  if (game.user === game.users.activeGM) {
+    for (const actor of game.actors ?? []) void feMigratePanelFaceSizes(actor);
+  }
+
   if (canvas?.ready) attachBoardListeners();
 });
+
+// Covers an old panel imported after ready. New panels have no faces yet, and faces
+// added by our sheet already carry concrete dimensions, so this is a cheap no-op there.
+Hooks.on("createActor", (actor) => { void feMigratePanelFaceSizes(actor); });
 
 Hooks.on("canvasTearDown", () => feResetPanelCanvasState());
 
@@ -1880,7 +1949,8 @@ function onPanelPlaceableUpdate(doc, changes) {
   if (flagChange === undefined) return;
   obj.renderFlags?.set?.({ refreshState: true });
 
-  // 3. **Rebuild the overlays on a face flip that changes no texture (MUST keep).**
+  // 3. **Resize immediately, then rebuild overlays on a face flip that changes no
+  //    texture (MUST keep).**
   //    feRebuildPanelOverlays runs from drawTile/drawToken, and a flip only reaches
   //    those because a `texture.src` change sets core's redraw flag. When the two
   //    faces SHARE one image — or are both imageless — the update carries no texture
@@ -1893,7 +1963,13 @@ function onPanelPlaceableUpdate(doc, changes) {
   //    here would measure the OLD texture (`tile.texture` still holds the previous
   //    bitmap at update time), scaling every label to the wrong size.
   if (flagChange.currentFace === undefined) return;
-  if (foundry.utils.getProperty(changes ?? {}, "texture.src") !== undefined) return;
+  const textureChanged = foundry.utils.getProperty(changes ?? {}, "texture.src") !== undefined;
+  // v14.367 does not reliably fire drawTile/drawToken for an already-drawn placeable
+  // after texture.src changes. Per-face dimensions are authoritative and do not need
+  // the new bitmap, so apply them from the update hook too. A legacy zero-size face
+  // still waits for draw*, where the replacement texture's natural size is available.
+  enforcePanelTileSize(obj, { concreteOnly: textureChanged });
+  if (textureChanged) return;
   feRebuildPanelOverlays(obj);
 }
 
@@ -1918,22 +1994,49 @@ Hooks.on("renderDialogV2", (dialog, element) => {
  * Idempotent: skips faces whose image already matches, so a re-entrant
  * updateActor (from our own update below) is a harmless no-op.
  */
-function feSyncLinkedFaceImages(panelActor) {
-  const faces = panelActor.system.faces ?? [];
-  let needsUpdate = false;
-  const cloned = foundry.utils.deepClone(faces);
-  for (const face of cloned) {
-    if (face.linkMode !== "linked" || !face.linkedActorUuid) continue;
-    let linked = null;
-    try { linked = fromUuidSync(face.linkedActorUuid); } catch { continue; }
-    if (!linked) continue;
-    const target = linked.img || linked.prototypeToken?.texture?.src || "";
-    if (target && face.img !== target) {
-      face.img = target;
+async function feSyncLinkedFaceImages(panelActor) {
+  try {
+    const current = panelActor.system.faces ?? [];
+    const pending = [];
+    for (let index = 0; index < current.length; index++) {
+      const face = current[index];
+      if (face.linkMode !== "linked" || !face.linkedActorUuid) continue;
+      let linked = null;
+      try { linked = fromUuidSync(face.linkedActorUuid); } catch { continue; }
+      if (!linked) continue;
+      const target = linked.img || linked.prototypeToken?.texture?.src || "";
+      // Preserve an explicitly authored size while the linked art is unchanged. A NEW
+      // linked image follows the same rule as a FilePicker choice: start at natural size.
+      if (face.img === target) continue;
+      pending.push({ index, uuid: face.linkedActorUuid, target, natural: await feLoadImageSize(target) });
+    }
+    if (!pending.length) return;
+
+    // Image decoding yields to the event loop. Clone the latest data afterwards so an
+    // unrelated face edit made while it loaded is not overwritten by a stale snapshot.
+    const faces = foundry.utils.deepClone(panelActor.system.faces ?? []);
+    let needsUpdate = false;
+    for (const item of pending) {
+      const face = faces[item.index];
+      if (face?.linkMode !== "linked" || face.linkedActorUuid !== item.uuid) continue;
+      let linked = null;
+      try { linked = fromUuidSync(item.uuid); } catch { continue; }
+      const latestTarget = linked?.img || linked?.prototypeToken?.texture?.src || "";
+      if (latestTarget !== item.target || face.img === latestTarget) continue;
+      face.img = latestTarget;
+      if (item.natural?.w > 0 && item.natural?.h > 0) {
+        face.width = item.natural.w;
+        face.height = item.natural.h;
+      } else if (!(face.width > 0) || !(face.height > 0)) {
+        face.width = FE_PANEL_DEFAULT_SIZE;
+        face.height = FE_PANEL_DEFAULT_SIZE;
+      }
       needsUpdate = true;
     }
+    if (needsUpdate) await panelActor.update({ "system.faces": faces }, { render: false });
+  } catch (err) {
+    console.warn(`${MODULE_ID} | linked screen panel image sync failed`, err);
   }
-  if (needsUpdate) panelActor.update({ "system.faces": cloned }, { render: false });
 }
 
 Hooks.on("updateActor", (actor, changes) => {
@@ -1949,12 +2052,12 @@ Hooks.on("updateActor", (actor, changes) => {
     if (facesChanged || changes.system?.defaultFace !== undefined) {
       const face = fePanelFace(actor, actor.system.defaultFace ?? 0);
       const target = face?.img || "";
-      if (target && (actor.prototypeToken?.texture?.src ?? "") !== target)
-        actor.update({ "prototypeToken.texture.src": target, img: target }, { render: false });
-      else if (target && (actor.img ?? "") !== target)
-        actor.update({ img: target }, { render: false });
+      const sync = {};
+      if ((actor.prototypeToken?.texture?.src ?? "") !== target) sync["prototypeToken.texture.src"] = target;
+      if ((actor.img ?? "") !== target) sync.img = target;
+      if (Object.keys(sync).length) actor.update(sync, { render: false });
     }
-    if (facesChanged) feSyncLinkedFaceImages(actor);
+    if (facesChanged) void feSyncLinkedFaceImages(actor);
   }
 
   // Non-panel actor portrait changed → sync to linked panel faces.
@@ -1965,7 +2068,7 @@ Hooks.on("updateActor", (actor, changes) => {
         if (f.linkMode !== "linked" || !f.linkedActorUuid) return false;
         try { return fromUuidSync(f.linkedActorUuid)?.id === actor.id; } catch { return false; }
       });
-      if (hasLinkedFace) feSyncLinkedFaceImages(pa);
+      if (hasLinkedFace) void feSyncLinkedFaceImages(pa);
     }
   }
 
@@ -1992,11 +2095,13 @@ Hooks.on("updateActor", (actor, changes) => {
     if ("ownership" in (changes ?? {}))
       tile.renderFlags?.set?.({ refreshState: true });
 
-    // Sync tile texture with current face image when faces data changed.
-    if (isGM && facesChanged) {
+    // Sync the texture from the active GM, and enforce the current face's edited
+    // dimensions locally on every client even when the image itself did not change.
+    if (facesChanged) {
       const curFace = fePanelFace(panelActor, flag.currentFace ?? 0);
       const tileSrc = tile.document.texture?.src ?? "";
-      if (curFace.img && tileSrc !== curFace.img) tile.document.update({ "texture.src": curFace.img });
+      if (isGM && tileSrc !== (curFace.img || "")) tile.document.update({ "texture.src": curFace.img || "" });
+      else enforcePanelTileSize(tile);
     }
 
     // Overlay rebuild: only when system data actually changed (skip pure

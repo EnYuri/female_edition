@@ -432,6 +432,21 @@ body.fe-retro-theme button:not(.fe-sp-face-tab):active:not(:disabled) {
     0 0 3px 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
 }
 
+/* FilePicker sort direction: the high-specificity application-button hover rule
+   above keeps a dark --fe-ac-12 background, while the later generic button hover
+   flips only the foreground to black. Font Awesome paints the injected arrow with
+   currentColor, so that split cascade makes the glyph disappear. Keep this compact
+   control on the dark-surface palette in every interaction state. */
+body.fe-retro-theme #file-picker .fe-fp-sort-dir {
+  color: var(--fe-ac-70) !important;
+}
+
+body.fe-retro-theme #file-picker .fe-fp-sort-dir:hover:not(:disabled) {
+  background-color: var(--fe-ac-12) !important;
+  border-color: var(--fe-ac-70) !important;
+  color: var(--fe-ac-90) !important;
+}
+
 body.fe-retro-theme .sound-controls
   :is(button[data-action="soundRepeat"].inactive, a[data-action="soundRepeat"].inactive) {
   color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28) !important;

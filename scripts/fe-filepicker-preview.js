@@ -1,11 +1,9 @@
 // fe-filepicker-preview.js
 // Adds a preview sidebar to the right of core's FilePicker.
 //
-// Previews either the file selected in the list (.picked) or a file dropped onto the
-// sidebar. A drop uploads to the folder currently being browsed, exactly like core does
-// (public FilePicker.upload + browse) — there is deliberately no separate dragupload
-// folder, because the renderer cannot resolve a dropped file's disk path and so cannot
-// tell an internal location from an external one.
+// Previews either the file selected in the list (.picked) or a local image pasted/dropped
+// onto the FilePicker. External images are uploaded into the module-managed FilePicker
+// directory, then the picker changes to that directory and marks the upload as selected.
 //
 // Non-invasive by design: the renderFilePicker hook makes .window-content a grid and
 // appends ONE <aside>. Core's application parts (tabs/subheader/body/subfooter/footer) keep
@@ -14,12 +12,39 @@
 // re-rendered.
 
 import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import {
+  ciCanUploadDirect,
+  ciNormalizeUploadDirectory,
+  ciResolveImageExtension,
+  ciUploadImageDirect,
+} from "./fe-chat-image-upload.js";
+
 const PREVIEW_WIDTH = 288; // sidebar width in px — must match CSS grid-template-columns
+const EXTERNAL_UPLOAD_SETTING = S.CORE_UI_FILEPICKER_UPLOAD_LOCATION;
+const EXTERNAL_UPLOAD_DEFAULT = "uploaded-filepicker-images";
+let _activePasteContext = null;
+let _globalPasteBound = false;
 function _enabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
-Hooks.once("init", () => game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS, {
-  name: "코어 UI: 파일 픽커 미리보기 및 개선", hint: "파일 픽커 미리보기와 정렬 개선을 표시합니다.",
-  scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS],
-}));
+Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS, {
+    name: "코어 UI: 파일 픽커 미리보기 및 개선", hint: "파일 픽커 미리보기·정렬과 외부 이미지 붙여넣기/드롭 업로드를 사용합니다.",
+    scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS],
+  });
+  game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, {
+    name: "파일 픽커 외부 이미지 업로드 경로",
+    hint: "파일 픽커에 붙여넣거나 드롭한 이미지만 저장하는 data 폴더 경로입니다.",
+    scope: "world", config: false, restricted: true, type: String,
+    default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_UPLOAD_LOCATION],
+    onChange: async value => {
+      const cleaned = ciNormalizeUploadDirectory(value) || EXTERNAL_UPLOAD_DEFAULT;
+      // World-setting callbacks run on every connected client. Only the active GM may
+      // canonicalize the shared value; otherwise players would attempt a forbidden
+      // SETTINGS_MODIFY write whenever the entered path needs cleanup.
+      if (cleaned !== value && game.user === game.users.activeGM)
+        await game.settings.set(MODULE_ID, S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, cleaned);
+    },
+  });
+});
 
 // ─── Extension classification ──────────────────────────────────────────────
 function _extSet(constKey, fallback) {
@@ -99,11 +124,11 @@ function _ensureSidebar(el, app) {
     `<div class="fe-fp-preview-body" data-fe-preview-body></div>` +
     `<div class="fe-fp-preview-drop" data-fe-drop-hint>` +
       `<i class="fa-solid fa-arrow-down-to-bracket" inert></i>` +
-      `<span>여기에 파일을 드롭하면<br>현재 폴더에 업로드</span>` +
+      `<span>이미지를 창에 드롭하거나 붙여넣기<br>업로드 후 자동 선택</span>` +
     `</div>`;
   content.appendChild(aside);
 
-  _bindDrop(aside, el, app);
+  _bindExternalImages(aside, el, app);
 
   // Widen once. A partial re-render only re-measures height:auto, so the width sticks.
   if (!app._feFpWidened) {
@@ -114,49 +139,231 @@ function _ensureSidebar(el, app) {
   return aside;
 }
 
-// ─── Drop: upload to the current folder, exactly as core does ──────────────
-function _canUpload(el, app) {
-  const input = el.querySelector('input[name="upload"]');
-  return !!input && !input.disabled && (app.canUpload !== false);
+// ─── Paste / external drop: upload to the module folder and select ─────────
+function _uploadDirectory() {
+  try {
+    return ciNormalizeUploadDirectory(game.settings.get(MODULE_ID, EXTERNAL_UPLOAD_SETTING))
+      || EXTERNAL_UPLOAD_DEFAULT;
+  } catch {
+    return EXTERNAL_UPLOAD_DEFAULT;
+  }
 }
 
-function _bindDrop(aside, el, app) {
-  aside.addEventListener("dragover", e => { e.preventDefault(); aside.classList.add("fe-fp-dragover"); });
-  aside.addEventListener("dragleave", e => {
-    if (e.target === aside || !aside.contains(e.relatedTarget)) aside.classList.remove("fe-fp-dragover");
-  });
-  aside.addEventListener("drop", async e => {
-    e.preventDefault();
-    e.stopPropagation();
-    aside.classList.remove("fe-fp-dragover");
-    const files = [...(e.dataTransfer?.files || [])];
-    if (!files.length) return;
+function _pickerAcceptsImage(app, file) {
+  const ext = ciResolveImageExtension(file?.name, file?.type);
+  if (!ext) return false;
+  const allowed = Array.isArray(app?.extensions)
+    ? new Set(app.extensions.map(value => String(value).toLowerCase()))
+    : null;
+  return !allowed?.size || allowed.has(ext.toLowerCase());
+}
 
-    // Preview the first file locally before the upload even starts.
-    _previewLocal(aside, files[0]);
+function _transferImageFiles(transfer, app) {
+  const files = [];
+  const seen = new Set();
+  const add = file => {
+    if (!file || seen.has(file) || !_pickerAcceptsImage(app, file)) return;
+    seen.add(file);
+    files.push(file);
+  };
+  for (const item of Array.from(transfer?.items || [])) {
+    if (item?.kind !== "file") continue;
+    add(item.getAsFile?.());
+  }
+  // Clipboard/DataTransfer commonly exposes the same file through both
+  // collections, sometimes as different File wrapper objects. Prefer items.
+  if (files.length) return files;
+  for (const file of Array.from(transfer?.files || [])) add(file);
+  return files;
+}
 
-    if (!_canUpload(el, app)) {
-      ui.notifications?.warn("이 위치에는 업로드할 수 없습니다. 미리보기만 표시합니다.");
-      return;
-    }
+function _hasImageTransfer(transfer, app) {
+  if (_transferImageFiles(transfer, app).length) return true;
+  return Array.from(transfer?.items || []).some(item =>
+    item?.kind === "file"
+      && String(item.type || "").toLowerCase().startsWith("image/")
+      && _pickerAcceptsImage(app, { name: "", type: item.type })
+  );
+}
 
-    // Same as core #onDrop/#onUpload: upload into the active source's current target
-    // folder, then re-browse it.
-    const target = el.querySelector('input[name="target"]')?.value ?? app.target;
-    const bucket = el.querySelector('[name="bucket"]')?.value || null;
-    aside.classList.add("fe-fp-uploading");
-    try {
-      for (const f of files) {
-        const resp = await app.constructor.upload(app.activeSource, target, f, { bucket });
-        if (resp?.path) app.request = resp.path;
+function _transferImageUrls(transfer) {
+  const urls = [];
+  try {
+    const html = transfer?.getData?.("text/html");
+    if (html) {
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      for (const img of parsed.querySelectorAll("img[src]")) {
+        const src = String(img.getAttribute("src") || "").trim();
+        if (src) urls.push(src);
       }
-      await app.browse(target);
-    } catch (err) {
-      ui.notifications?.error(err, { console: true });
-    } finally {
-      aside.classList.remove("fe-fp-uploading");
     }
-  });
+  } catch (_) {}
+
+  try {
+    const uriList = String(transfer?.getData?.("text/uri-list") || "");
+    for (const line of uriList.split(/\r?\n/)) {
+      const src = line.trim();
+      if (!src || src.startsWith("#")) continue;
+      if (/^data:image\//i.test(src) || /\.(gif|png|jpe?g|webp|svg|bmp|tiff?|avif)(?:[?#]|$)/i.test(src)) urls.push(src);
+    }
+  } catch (_) {}
+  return [...new Set(urls)].slice(0, 8);
+}
+
+async function _readClipboardApiImages(app) {
+  const read = globalThis.navigator?.clipboard?.read;
+  if (typeof read !== "function") return [];
+  try {
+    const files = [];
+    for (const item of await read.call(globalThis.navigator.clipboard)) {
+      for (const type of Array.from(item?.types || [])) {
+        if (!String(type).toLowerCase().startsWith("image/")) continue;
+        const blob = await item.getType(type);
+        const ext = ciResolveImageExtension("", blob.type || type);
+        if (!ext) continue;
+        const file = new File([blob], `clipboard-image${ext}`, { type: blob.type || type });
+        if (_pickerAcceptsImage(app, file)) files.push(file);
+      }
+    }
+    return files;
+  } catch (_) {
+    return [];
+  }
+}
+
+async function _downloadImageUrls(urls, app) {
+  const files = [];
+  for (const source of urls) {
+    try {
+      const url = new URL(source, document.baseURI);
+      if (!["http:", "https:", "data:", "blob:"].includes(url.protocol)) continue;
+      const response = await fetch(url.href, { credentials: url.origin === location.origin ? "same-origin" : "omit" });
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      const leaf = url.protocol === "data:" ? "" : url.pathname.split("/").pop();
+      const ext = ciResolveImageExtension(leaf, blob.type);
+      if (!ext) continue;
+      let name = "web-image";
+      try { name = decodeURIComponent(leaf || "") || name; } catch (_) {}
+      if (!/\.[a-z0-9]+$/i.test(name)) name += ext;
+      const file = new File([blob], name, { type: blob.type || "" });
+      if (_pickerAcceptsImage(app, file)) files.push(file);
+    } catch (_) {}
+  }
+  return files;
+}
+
+function _uploadedDirectory(path) {
+  const normalized = String(path || "").replace(/\\/g, "/");
+  const slash = normalized.lastIndexOf("/");
+  return slash >= 0 ? normalized.slice(0, slash) : "";
+}
+
+function _syncUploadedPick(app, path) {
+  const root = _hookRoot(app?.element, app);
+  if (!root?.querySelector) return;
+  const input = root.querySelector('input[name="file"]');
+  if (input) input.value = path;
+
+  let picked = null;
+  for (const row of root.querySelectorAll("li.file[data-file][data-path]")) {
+    const matches = row.dataset.path === path;
+    row.classList.toggle("picked", matches);
+    if (matches) picked = row;
+  }
+  const aside = root.querySelector(":scope .fe-fp-preview");
+  if (aside && picked) _previewPicked(aside, path, picked.dataset.name || path.split("/").pop());
+}
+
+async function _selectUploadedImage(app, path) {
+  app.request = path;
+  if (app.sources?.data) app.activeSource = "data";
+  await app.browse(_uploadedDirectory(path));
+  _syncUploadedPick(app, path);
+  // ApplicationV2 may settle a part render after browse() has resolved. The
+  // request value makes core select it too; this pass covers legacy/v13 DOM.
+  setTimeout(() => _syncUploadedPick(app, path), 0);
+}
+
+async function _uploadExternalImages(files, aside, app, { clipboardFallback = false, urls = [] } = {}) {
+  if ((!files.length && !clipboardFallback && !urls.length) || app._feFpExternalUploadBusy) return;
+  if (!ciCanUploadDirect()) {
+    ui.notifications?.warn("파일 픽커 이미지 업로드에는 Foundry 파일 업로드 권한이 필요합니다.");
+    return;
+  }
+
+  app._feFpExternalUploadBusy = true;
+  aside.classList.add("fe-fp-uploading");
+  try {
+    let uploadFiles = files;
+    if (!uploadFiles.length && clipboardFallback) uploadFiles = await _readClipboardApiImages(app);
+    if (!uploadFiles.length && urls.length) uploadFiles = await _downloadImageUrls(urls, app);
+    if (!uploadFiles.length) {
+      throw new Error("업로드 가능한 이미지 데이터를 읽지 못했습니다. 클립보드 형식이나 원본 사이트의 다운로드 제한일 수 있습니다.");
+    }
+
+    _previewLocal(aside, uploadFiles[0]);
+    let selectedPath = "";
+    const directory = _uploadDirectory();
+    for (const file of uploadFiles) selectedPath = await ciUploadImageDirect(file, directory);
+    if (!selectedPath) throw new Error("업로드 결과 경로가 없습니다.");
+    await _selectUploadedImage(app, selectedPath);
+    ui.notifications?.info?.("이미지를 업로드하고 파일 픽커에서 선택했습니다.");
+  } catch (err) {
+    ui.notifications?.error(err, { console: true });
+  } finally {
+    app._feFpExternalUploadBusy = false;
+    aside.classList.remove("fe-fp-uploading");
+  }
+}
+
+function _stopExternalTransfer(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function _activatePasteContext(app) {
+  _activePasteContext = app;
+  if (_globalPasteBound) return;
+  _globalPasteBound = true;
+  document.addEventListener("paste", event => {
+    const activeApp = _activePasteContext;
+    const root = _hookRoot(activeApp?.element, activeApp);
+    if (!root?.isConnected || activeApp?.rendered === false) return;
+    const aside = root.querySelector(":scope .fe-fp-preview");
+    if (!aside) return;
+
+    const files = _transferImageFiles(event.clipboardData, activeApp);
+    const urls = files.length ? [] : _transferImageUrls(event.clipboardData);
+    if (!files.length && !urls.length && !_hasImageTransfer(event.clipboardData, activeApp)) return;
+    _stopExternalTransfer(event);
+    void _uploadExternalImages(files, aside, activeApp, { clipboardFallback: true, urls });
+  }, true);
+}
+
+function _bindExternalImages(aside, el, app) {
+  if (el._feFpExternalImagesBound) return;
+  el._feFpExternalImagesBound = true;
+  el.addEventListener("pointerdown", () => { _activePasteContext = app; }, true);
+
+  el.addEventListener("dragover", event => {
+    const types = Array.from(event.dataTransfer?.types || []);
+    if (!_hasImageTransfer(event.dataTransfer, app) && !types.includes("text/html") && !types.includes("text/uri-list")) return;
+    event.preventDefault();
+    aside.classList.add("fe-fp-dragover");
+  }, true);
+  el.addEventListener("dragleave", event => {
+    if (event.relatedTarget && el.contains(event.relatedTarget)) return;
+    aside.classList.remove("fe-fp-dragover");
+  }, true);
+  el.addEventListener("drop", event => {
+    const files = _transferImageFiles(event.dataTransfer, app);
+    const urls = files.length ? [] : _transferImageUrls(event.dataTransfer);
+    if (!files.length && !urls.length) return;
+    _stopExternalTransfer(event);
+    aside.classList.remove("fe-fp-dragover");
+    void _uploadExternalImages(files, aside, app, { urls });
+  }, true);
 }
 
 // ─── Preview rendering ─────────────────────────────────────────────────────
@@ -296,6 +503,7 @@ Hooks.on("renderFilePicker", (app, element) => {
 
   const aside = _ensureSidebar(el, app);
   if (!aside) return;
+  _activatePasteContext(app);
 
   // Click → preview. Bubble phase, not capture, so core has already updated .picked.
   if (!el._feFpPreviewBound) {

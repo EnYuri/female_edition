@@ -199,8 +199,16 @@
     <div class="form-group">
       <label>파일 픽커 미리보기 및 개선</label>
       <div class="form-fields"><input type="checkbox" name="ceCoreUiFilepickerEnhancements" data-dtype="Boolean" {{checked values.ceCoreUiFilepickerEnhancements}} /></div>
-      <p class="notes">파일 픽커의 미리보기·드롭 업로드 영역과 이름·날짜·크기 정렬을 표시합니다. 새로 여는 파일 픽커부터 반영됩니다.</p>
+      <p class="notes">파일 픽커의 미리보기·이름·날짜·크기 정렬과 이미지 붙여넣기/드롭 업로드 후 자동 선택 기능을 사용합니다. 새로 여는 파일 픽커부터 반영됩니다.</p>
     </div>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>파일 픽커 외부 이미지 업로드 경로 (GM 전용)</label>
+      <div class="form-fields"><input type="text" name="ceCoreUiFilepickerUploadLocation" value="{{values.ceCoreUiFilepickerUploadLocation}}" /></div>
+      <p class="notes">파일 픽커에 붙여넣거나 드롭한 이미지만 저장할 data 폴더입니다. 기본값은 <code>uploaded-filepicker-images</code>이며 채팅 이미지 폴더와 분리됩니다.</p>
+    </div>
+    {{/if}}
 
     <div class="form-group">
       <label>씬 설정 탭 한 줄 표시</label>
@@ -757,7 +765,7 @@
       <div class="form-fields">
         <input type="checkbox" name="chatImagesEnabled" data-dtype="Boolean" {{checked values.chatImagesEnabled}} />
       </div>
-      <p class="notes">업로드 버튼·붙여넣기·드래그 앤 드롭·<code>!ci|경로!</code> 임베드 기능을 사용합니다.</p>
+      <p class="notes">Foundry 파일 권한과 별개로 업로드 버튼·붙여넣기·드래그 앤 드롭·<code>!ci|경로!</code> 임베드 기능을 사용합니다. 직접 업로드 권한이 없으면 온라인 GM이 대리 업로드합니다.</p>
     </div>
 
     <div class="form-group">
@@ -770,11 +778,11 @@
 
     {{#if isGM}}
     <div class="form-group">
-      <label>업로드 경로 (GM 전용)</label>
+      <label>채팅 이미지 업로드 경로 (GM 전용)</label>
       <div class="form-fields">
         <input type="text" name="chatImagesUploadLocation" value="{{values.chatImagesUploadLocation}}" />
       </div>
-      <p class="notes">업로드 가능 시 이미지를 저장할 data 폴더 경로입니다.</p>
+      <p class="notes">채팅에 붙여넣기/드롭하거나 업로드 버튼으로 고른 이미지를 저장할 data 폴더 경로입니다. 파일 권한이 없는 플레이어의 이미지는 온라인 GM이 이 경로로 대리 업로드합니다.</p>
     </div>
     {{/if}}
   </section>

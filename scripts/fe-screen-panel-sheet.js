@@ -1,14 +1,14 @@
 // female_edition: Screen Panel — Actor sheet (ApplicationV2 / Handlebars).
 //
 // Edits the shared panel definition: the ordered list of faces (name + image +
-// hover description) plus the default placement size and default face. Per-
+// hover description and per-face placement size) plus the default face. Per-
 // placement state (current face / disabled) is NOT edited here — it lives on the
 // Tile and is changed via the on-canvas dropdown menu (fe-screen-panel-menu.js).
 //
 // AppV2 so it is forward-clean for v14; it also runs on v13.
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_COMMON_ATTR_NAMES, feCleanFaceTokenData, feEscapeHtml, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
+import { FE_PANEL_COMMON_ATTR_NAMES, FE_PANEL_DEFAULT_SIZE, feCleanFaceTokenData, feEscapeHtml, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
 
 // Overlay-preview zoom limits, relative to the contain-fit that zoom 1 means. The ceiling
 // is well above fe-token-preview's 4x because the fit itself can be tiny here — a 200x3000
@@ -21,6 +21,32 @@ const FE_PREVIEW_ZOOM_MAX = 20;
 // grips left to pull. "No box at all" (0 = auto / no wrap) is a separate state and is
 // reached by typing 0 in the "설정" dialog, not by collapsing the frame.
 const FE_OVERLAY_BOX_MIN_PX = 16;
+
+/** Natural image dimensions, or null when the selected path cannot be decoded. */
+function feLoadNaturalImageSize(src) {
+  if (!src) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(
+      img.naturalWidth > 0 && img.naturalHeight > 0
+        ? { width: img.naturalWidth, height: img.naturalHeight }
+        : null
+    );
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** Apply the initial editable size for newly assigned face artwork. */
+function feSeedFaceSizeFromImage(face, natural) {
+  if (natural?.width > 0 && natural?.height > 0) {
+    face.width = natural.width;
+    face.height = natural.height;
+  } else if (!(face.width > 0) || !(face.height > 0)) {
+    face.width = FE_PANEL_DEFAULT_SIZE;
+    face.height = FE_PANEL_DEFAULT_SIZE;
+  }
+}
 
 /**
  * Core's own PrototypeTokenConfig, retargeted at ONE FACE's token settings instead of the
@@ -415,6 +441,8 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         isDefault: index === (sys.defaultFace ?? 0),
         name: face.name ?? "",
         img: face.img ?? "",
+        width: Math.max(0, Number(face.width) || 0),
+        height: Math.max(0, Number(face.height) || 0),
         description: face.description ?? "",
         linkedActorUuid: faceActorUuid,
         linkedActorName: faceActor?.name ?? "",
@@ -510,8 +538,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.fe = {
       faces,
       defaultFace: sys.defaultFace ?? 0,
-      width: sys.width,
-      height: sys.height,
       locked: sys.locked,
       dblclickCycle: sys.dblclickCycle !== false,
       editable: this.isEditable,
@@ -636,6 +662,11 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    */
   #previewView = new Map();
 
+  // Image decoding is asynchronous. A quick second FilePicker choice must make the
+  // first load result stale instead of letting it overwrite the newer face image/size.
+  #faceImageRevision = new Map();
+  #faceImageRevisionCounter = 0;
+
   #previewViewFor(faceIndex) {
     let v = this.#previewView.get(faceIndex);
     if (!v) this.#previewView.set(faceIndex, (v = { pan: { x: 0, y: 0 }, zoom: 1 }));
@@ -643,10 +674,11 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
-   * Rebuild the camera map through an old-index → new-index mapping (`null` = that face is
-   * gone). A face's identity IS its array index — the schema has no per-face id — so every
-   * structural face operation has to carry the cameras along with it, exactly as it already
-   * carries `#activeFaceIndex` and `defaultFace`. Four operations shift indices: remove,
+   * Rebuild index-keyed sheet state through an old-index → new-index mapping (`null` = that
+   * face is gone). A face's identity IS its array index — the schema has no per-face id — so
+   * every structural face operation has to carry the camera and any pending image decode
+   * along with it, exactly as it already carries `#activeFaceIndex` and `defaultFace`.
+   * Four operations shift indices: remove,
    * duplicate (inserts at i+1), move up and move down. Without this, deleting face 2 hands
    * its camera to whichever face slides into slot 2, and you find yourself looking at an
    * unrelated image through someone else's zoom.
@@ -655,12 +687,16 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    * (2→1 while 3→2), so an in-place pass would overwrite entries it had not read yet.
    */
   #remapPreviewView(mapIndex) {
-    const next = new Map();
-    for (const [index, view] of this.#previewView) {
-      const to = mapIndex(index);
-      if (to !== null) next.set(to, view);
-    }
-    this.#previewView = next;
+    const remap = source => {
+      const next = new Map();
+      for (const [index, value] of source) {
+        const to = mapIndex(index);
+        if (to !== null) next.set(to, value);
+      }
+      return next;
+    };
+    this.#previewView = remap(this.#previewView);
+    this.#faceImageRevision = remap(this.#faceImageRevision);
   }
 
   /**
@@ -935,6 +971,35 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       }, { capture: true });
     }
 
+    // FilePicker's inner text input participates in the form's submitOnChange flow.
+    // Intercept only this field and commit a full faces array so width/height can be
+    // initialized atomically from the newly selected image's natural dimensions.
+    for (const picker of root.querySelectorAll("file-picker.fe-sp-face-image-picker")) {
+      picker.addEventListener("change", event => {
+        event.stopPropagation();
+        const faceIndex = Number(picker.dataset.faceIndex);
+        if (!Number.isInteger(faceIndex)) return;
+        const input = picker.querySelector("input");
+        // AbstractFormInputElement#value dispatches `change` BEFORE `_refresh()` writes
+        // the new value into the inner text input. The custom element itself is already
+        // current at that point; prefer it or a FilePicker-button choice reads the OLD path.
+        const src = String(picker.value ?? input?.value ?? "").trim();
+        void this.#setFaceImage(faceIndex, src);
+      }, { capture: true });
+    }
+
+    // Entering linked mode can assign artwork without going through the FilePicker.
+    // Commit the complete faces array ourselves so that assignment and its natural
+    // dimensions land atomically and ArrayField siblings remain intact.
+    for (const select of root.querySelectorAll("select.fe-sp-face-link-mode")) {
+      select.addEventListener("change", event => {
+        event.stopPropagation();
+        const faceIndex = Number(select.dataset.faceIndex);
+        if (!Number.isInteger(faceIndex)) return;
+        void this.#setFaceLinkMode(faceIndex, select.value);
+      }, { capture: true });
+    }
+
     // Drag-to-reposition: pressing a marker and dragging moves it live (visual
     // only, via inline left/top%), committing the final position on release.
     // Mirrors the canvas tile drag pattern in fe-screen-panel.js (window-level
@@ -1090,26 +1155,56 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   async #updateFaceLinkedActor(faceIndex, uuid) {
+    let linked = null;
+    if (uuid) {
+      try { linked = await fromUuid(uuid); } catch { /* stale uuid */ }
+    }
+    const target = linked ? (linked.img || linked.prototypeToken?.texture?.src || "") : "";
+    const natural = target ? await feLoadNaturalImageSize(target) : null;
+
+    // Clone after the awaits so other edits made while the document/image resolved
+    // are retained. The linked actor still owns the requested uuid at commit time.
     const faces = this.#cloneFaces();
     const face = faces[faceIndex];
     if (!face) return;
     face.linkedActorUuid = uuid;
-    if (uuid) {
-      let linked = null;
-      try { linked = await fromUuid(uuid); } catch { /* stale uuid */ }
-      if (linked) {
-        if (face.linkMode === "linked") {
-          const img = linked.img || linked.prototypeToken?.texture?.src || "";
-          if (img) face.img = img;
-        }
-        // Auto-copy the linked actor's trackable attributes onto THIS face.
-        face.attributes = this.#extractCopiedAttributes(linked);
+    if (linked) {
+      if (face.linkMode === "linked") {
+        face.img = target;
+        feSeedFaceSizeFromImage(face, natural);
       }
-    } else {
+      // Auto-copy the linked actor's trackable attributes onto THIS face.
+      face.attributes = this.#extractCopiedAttributes(linked);
+    } else if (!uuid) {
       // Unlinking clears the face's copied attributes (avoid stale values).
       face.attributes = [];
     }
     await this.#updateFaces(faces);
+    this.#syncFaceSizeInputs(faceIndex);
+  }
+
+  /** Persist link mode and initialize linked artwork exactly like a direct image choice. */
+  async #setFaceLinkMode(faceIndex, linkMode) {
+    const current = this.document.system.faces?.[faceIndex];
+    if (!current) return;
+    const mode = linkMode === "linked" ? "linked" : "copy";
+    let linked = null;
+    if (mode === "linked" && current.linkedActorUuid) {
+      try { linked = await fromUuid(current.linkedActorUuid); } catch { /* stale uuid */ }
+    }
+    const target = linked ? (linked.img || linked.prototypeToken?.texture?.src || "") : "";
+    const natural = target ? await feLoadNaturalImageSize(target) : null;
+
+    const faces = this.#cloneFaces();
+    const face = faces[faceIndex];
+    if (!face || face.linkedActorUuid !== current.linkedActorUuid) return;
+    face.linkMode = mode;
+    if (mode === "linked" && linked) {
+      face.img = target;
+      feSeedFaceSizeFromImage(face, natural);
+    }
+    await this.#updateFaces(faces);
+    this.#syncFaceSizeInputs(faceIndex);
   }
 
   /** Re-snapshot the active face's copied attributes from its current linked actor. */
@@ -1162,12 +1257,44 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     });
   }
 
+  /**
+   * Keep the currently-open sheet's per-face size fields in lock-step with the
+   * persisted document after an asynchronous image decode. Core normally renders
+   * an Actor sheet after `actor.update`, but a FilePicker child closes during the
+   * same async turn and that render can settle against the pre-decode part. The
+   * document is already authoritative here, so refresh just the two existing
+   * controls instead of forcing a full sheet render (which would reset scroll,
+   * focus and the overlay-preview viewport).
+   */
+  #syncFaceSizeInputs(faceIndex) {
+    const face = this.document.system.faces?.[faceIndex];
+    const root = this.element;
+    if (!face || !root?.querySelector) return;
+    const width = root.querySelector(`input[name="system.faces.${faceIndex}.width"]`);
+    const height = root.querySelector(`input[name="system.faces.${faceIndex}.height"]`);
+    if (width) width.value = String(face.width ?? "");
+    if (height) height.value = String(face.height ?? "");
+  }
+
   async #setFaceImage(faceIndex, src) {
+    const revision = ++this.#faceImageRevisionCounter;
+    this.#faceImageRevision.set(faceIndex, revision);
+    const natural = await feLoadNaturalImageSize(src);
+    // Structural operations remap the token with its face. Locate it again after
+    // decoding instead of trusting the stale DOM index captured before the await.
+    const currentEntry = [...this.#faceImageRevision].find(([, value]) => value === revision);
+    if (!currentEntry) return;
+    faceIndex = currentEntry[0];
     const faces = this.#cloneFaces();
     const face = faces[faceIndex];
     if (!face) return;
     face.img = src;
+    // Broken/temporarily unavailable paths still need a valid editable size. If the
+    // image later becomes available, choosing it again replaces this with its natural
+    // dimensions.
+    feSeedFaceSizeFromImage(face, natural);
     await this.#updateFaces(faces);
+    this.#syncFaceSizeInputs(faceIndex);
   }
 
   static #onSwitchFace(event, target) {
@@ -1277,7 +1404,10 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onAddFace() {
     const faces = this.#cloneFaces();
-    faces.push({ name: "", img: "", description: "" });
+    faces.push({
+      name: "", img: "", description: "",
+      width: FE_PANEL_DEFAULT_SIZE, height: FE_PANEL_DEFAULT_SIZE,
+    });
     this.#activeFaceIndex = faces.length - 1;
     await this.#updateFaces(faces);
   }

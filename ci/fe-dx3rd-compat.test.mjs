@@ -1,5 +1,6 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { FE_DX3RD_SYSTEM_IDS, S, feIsDx3rdSystemId } from "../scripts/fe-constants.js";
 import { feMessageHasChatCardContent } from "../scripts/fe-render-state.js";
@@ -9,6 +10,7 @@ import { feIsSystemCombatNoticeContent } from "../scripts/fe-util.js";
 const ORIGINAL_GAME = globalThis.game;
 const ORIGINAL_CANVAS = globalThis.canvas;
 const ORIGINAL_PIXI = globalThis.PIXI;
+const DX3RD_COMPAT_CSS = readFileSync(new URL("../styles/fe-dx3rd-compat.css", import.meta.url), "utf8");
 
 afterEach(() => {
   if (ORIGINAL_GAME === undefined) delete globalThis.game;
@@ -41,6 +43,20 @@ test("both modern and original DX3rd item wrappers are classified as chat cards"
   assert.equal(feMessageHasChatCardContent('<div class="dx3rd-item-chat"></div>'), true);
   assert.equal(feMessageHasChatCardContent('<div class="dx3rd-item-info"></div>'), true);
   assert.equal(feMessageHasChatCardContent('<div class="dx3rd-roll"></div>'), false);
+});
+
+test("DX3rd retro dice glyphs keep a 1px print-safe outline", () => {
+  const start = DX3RD_COMPAT_CSS.indexOf("/* Chat-tooltip dice number glyphs.");
+  const end = DX3RD_COMPAT_CSS.indexOf("body.fe-retro-theme :is(.double-cross-3rd", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const rule = DX3RD_COMPAT_CSS.slice(start, end);
+  assert.match(rule, /body\.fe-retro-theme\.fe-retro-system-dx3rd \.chat-message/);
+  assert.match(rule, /\.roll:is\(\.dice, \.d4, \.d6, \.d8, \.d10, \.d12, \.d20, \.d100\)/);
+  assert.match(rule, /\.dice-face/);
+  assert.match(rule, /-webkit-text-stroke:\s*1px #000000 !important/);
+  assert.match(rule, /paint-order:\s*stroke fill !important/);
 });
 
 test("double-cross-3rd receives the shared DX3rd retro scope marker", () => {
