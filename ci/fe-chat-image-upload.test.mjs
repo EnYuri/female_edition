@@ -2,8 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  CI_MAX_PROXY_BYTES,
+  CI_DEFAULT_MAX_UPLOAD_MB,
+  CI_MIN_MAX_UPLOAD_MB,
+  CI_MAX_MAX_UPLOAD_MB,
   CI_UPLOAD_MSG,
+  ciMaxUploadBytes,
+  ciMaxUploadMB,
   ciBuildUploadFileName,
   ciEnsureUploadDirectory,
   ciNormalizeUploadDirectory,
@@ -14,8 +18,47 @@ test("chat-image upload messages are isolated on their own socket namespace", ()
   for (const type of Object.values(CI_UPLOAD_MSG)) assert.match(type, /^chat-image:/);
 });
 
-test("chat-image proxy keeps the former 17 MB no-permission ceiling", () => {
-  assert.equal(CI_MAX_PROXY_BYTES, 17 * 1024 * 1024);
+// The size ceiling is a world setting now. Every read of it is a size check on a
+// user-supplied file, including the GM-authority one, so a missing/garbage value
+// must fall back to the shipped default rather than to "no limit".
+function withMaxUploadSetting(value, fn) {
+  const previousGame = globalThis.game;
+  globalThis.game = {
+    settings: {
+      get(namespace, key) {
+        if (namespace !== "female_edition" || key !== "chatImagesMaxUploadMB") throw new Error("unexpected setting read");
+        if (value === "throw") throw new Error("not registered");
+        return value;
+      },
+    },
+  };
+  try { return fn(); }
+  finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+  }
+}
+
+test("chat-image size ceiling comes from the world setting", () => {
+  assert.equal(withMaxUploadSetting(20, ciMaxUploadMB), 20);
+  assert.equal(withMaxUploadSetting(20, ciMaxUploadBytes), 20 * 1024 * 1024);
+});
+
+test("an unusable size setting falls back to the default, never to unlimited", () => {
+  assert.equal(CI_DEFAULT_MAX_UPLOAD_MB, 12);
+  // Infinity is deliberately grouped here, not with the clamp cases: a non-finite
+  // value is garbage, and answering "the maximum" to garbage would turn a corrupt
+  // setting into the largest ceiling instead of the safest one.
+  for (const bad of ["throw", undefined, null, "", "많이", NaN, Infinity]) {
+    assert.equal(withMaxUploadSetting(bad, ciMaxUploadMB), CI_DEFAULT_MAX_UPLOAD_MB);
+  }
+});
+
+test("the size setting is clamped to its registered bounds", () => {
+  assert.equal(withMaxUploadSetting(0, ciMaxUploadMB), CI_MIN_MAX_UPLOAD_MB);
+  assert.equal(withMaxUploadSetting(-500, ciMaxUploadMB), CI_MIN_MAX_UPLOAD_MB);
+  assert.equal(withMaxUploadSetting(4096, ciMaxUploadMB), CI_MAX_MAX_UPLOAD_MB);
+  assert.equal(withMaxUploadSetting("24", ciMaxUploadMB), 24);
 });
 
 test("upload directory is forced to a relative path below the data source", () => {

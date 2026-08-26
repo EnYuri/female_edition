@@ -9,7 +9,12 @@
 import { MODULE_ID, feSetting, feCaptureMessageRenderFlagsOnPreCreate } from "./fe-chat-enhance.js";
 import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 import {
-  CI_MAX_PROXY_BYTES,
+  CI_MAX_UPLOAD_MB_KEY,
+  CI_DEFAULT_MAX_UPLOAD_MB,
+  CI_MIN_MAX_UPLOAD_MB,
+  CI_MAX_MAX_UPLOAD_MB,
+  ciMaxUploadMB,
+  ciMaxUploadBytes,
   ciNormalizeUploadDirectory,
   ciCanUploadDirect,
   ciHasUploadAuthorityOnline,
@@ -23,6 +28,7 @@ const CI = Object.freeze({
   ENABLED: "chatImagesEnabled",
   SHOW_BUTTON: "chatImagesShowButton",
   UPLOAD_LOCATION: "chatImagesUploadLocation",
+  MAX_UPLOAD_MB: CI_MAX_UPLOAD_MB_KEY,
 });
 
 const CI_STATE = {
@@ -438,10 +444,11 @@ function ciGetMessageStyleOOC() {
   return styles?.OOC ?? 1;
 }
 
-// Maximum file size allowed for data URL embedding (fallback when upload is unavailable).
-// Large data URLs bloat ChatMessage content stored in DB and sent to all clients.
-// Users with files exceeding this limit should use the archive downscale feature instead.
-const CI_MAX_DATAURL_BYTES = CI_MAX_PROXY_BYTES; // 17 MB
+// The data-URL fallback (used when neither a direct nor a proxied upload is
+// available) shares the SAME limit as the upload paths — deliberately, and it is
+// the stricter of the two needs: a data URL is stored inside ChatMessage content
+// in the database and re-sent to every client on every render, so it must never be
+// allowed to exceed what an actual upload would have been.
 
 async function ciFileToDataUrl(file) {
   return await new Promise((resolve, reject) => {
@@ -474,10 +481,10 @@ async function ciResolvePendingSource(item) {
 
   // Fallback: embed as data URL so players without upload permission can still send images.
   // Guard against excessively large files — they bloat the DB and every client's network traffic.
-  if ((item.file.size ?? 0) > CI_MAX_DATAURL_BYTES) {
+  if ((item.file.size ?? 0) > ciMaxUploadBytes()) {
     const mb = (item.file.size / 1024 / 1024).toFixed(1);
     ui?.notifications?.error?.(
-      `이미지 "${item.name || "image"}" (${mb} MB)가 너무 큽니다. 최대 ${CI_MAX_DATAURL_BYTES / 1024 / 1024} MB까지 허용됩니다.`,
+      `이미지 "${item.name || "image"}" (${mb} MB)가 너무 큽니다. 최대 ${ciMaxUploadMB()} MB까지 허용됩니다.`,
       { permanent: false }
     );
     return "";
@@ -829,6 +836,17 @@ function ciRegisterSettings() {
       if (cleaned !== value) await game.settings.set(MODULE_ID, CI.UPLOAD_LOCATION, cleaned);
       try { await ciEnsureUploadDirectory(cleaned); } catch { /* retry on first upload */ }
     },
+  });
+
+  game.settings.register(MODULE_ID, CI.MAX_UPLOAD_MB, {
+    name: "채팅 이미지 최대 용량(MB)",
+    hint: "채팅에 올릴 수 있는 이미지 한 장의 최대 크기입니다. 직접 업로드·GM 대리 업로드·메시지 직접 포함(data URL) 모두에 적용됩니다. 대리 업로드는 GM 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 무작정 키우지 마세요.",
+    scope: "world",
+    config: false, // managed in the unified settings menu (fe-settings-menu)
+    restricted: true,
+    type: Number,
+    range: { min: CI_MIN_MAX_UPLOAD_MB, max: CI_MAX_MAX_UPLOAD_MB, step: 1 },
+    default: CI_DEFAULT_MAX_UPLOAD_MB,
   });
 }
 

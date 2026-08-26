@@ -1512,8 +1512,16 @@ async function _fetOpenActorConfig(actorId) {
   // future v14). Buttons are an array; callback is (event, button, dialog) and
   // render is (event, dialog). We read inputs via dialog.element (descendant
   // querySelector), so the DialogV2 form wrapper vs our content layout is irrelevant.
+  //
+  // MUST be DialogV2.wait(), NOT `new DialogV2({...}).render()`. `render` is NOT part of
+  // DialogV2Configuration — it belongs to DialogV2WaitOptions, and the ONLY place core
+  // consumes it is `wait()` (api/dialog.mjs:420), which wires it as
+  // `dialog.addEventListener("render", …)`. Passed to the constructor it is simply an
+  // unknown option: silently ignored, no warning. Every listener below — file picker,
+  // 감정 제거, 감정 추가 — was therefore dead, so the whole dialog was read-only apart
+  // from typing into the rows that already existed.
   const { DialogV2 } = foundry.applications.api;
-  new DialogV2({
+  await DialogV2.wait({
     window: { title: `${actor.name} — 무대 설정` },
     position: { width: 580 },
     content,
@@ -1532,6 +1540,14 @@ async function _fetOpenActorConfig(actorId) {
     render: (_event, dialog) => {
       const root = dialog.element;
       if (!root) return;
+
+      // "render" fires on EVERY render, and dialog.element is the persistent AppV2 frame —
+      // it is not replaced when the inner form is. So without this guard a re-render would
+      // stack a second copy of all three delegated handlers (one click adding two emote
+      // rows, opening two file pickers). Delegation on the frame is still required: the
+      // buttons themselves live in the form content, which _replaceHTML does swap out.
+      if (root.dataset.feStageConfigBound === "1") return;
+      root.dataset.feStageConfigBound = "1";
 
       // File picker buttons
       root.addEventListener("click", (e) => {
@@ -1553,14 +1569,16 @@ async function _fetOpenActorConfig(actorId) {
       });
 
       // Add emote row
-      root.querySelector(".fe-add-emote")?.addEventListener("click", () => {
+      root.addEventListener("click", (e) => {
+        if (!e.target.closest(".fe-add-emote")) return;
         const list = root.querySelector(".fe-config-emotes-list");
+        if (!list) return;
         const tmp = document.createElement("div");
         tmp.innerHTML = buildEmoteRow();
         if (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
       });
     },
-  }).render({ force: true });
+  });
 }
 
 async function _fetSaveActorConfig(actorId, root) {

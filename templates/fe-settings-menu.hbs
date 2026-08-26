@@ -31,8 +31,6 @@
     <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="canvas">토큰·패널</button>
   </nav>
 
-  <section class="fe-settings__section" data-fe-settings-tab="combat-tracker"></section>
-
   <section class="fe-settings__section" data-fe-settings-tab="chat-functions">
     <h3 class="fe-settings__section-title">채팅 기능</h3>
 
@@ -784,6 +782,15 @@
       </div>
       <p class="notes">채팅에 붙여넣기/드롭하거나 업로드 버튼으로 고른 이미지를 저장할 data 폴더 경로입니다. 파일 권한이 없는 플레이어의 이미지는 온라인 GM이 이 경로로 대리 업로드합니다.</p>
     </div>
+
+    <div class="form-group">
+      <label>이미지 최대 용량 (MB, GM 전용)</label>
+      <div class="form-fields">
+        <input type="range" name="chatImagesMaxUploadMB" min="1" max="64" step="1" value="{{values.chatImagesMaxUploadMB}}" data-dtype="Number" />
+        <span class="fe-range-value" data-for="chatImagesMaxUploadMB"></span>
+      </div>
+      <p class="notes">이미지 한 장의 최대 크기입니다(기본 12MB). 직접 업로드·GM 대리 업로드·메시지 직접 포함 세 경로 모두에 적용됩니다. 대리 업로드는 GM 클라이언트 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 크게 올리는 것은 권장하지 않습니다.</p>
+    </div>
     {{/if}}
   </section>
 
@@ -1204,6 +1211,24 @@
       <p class="notes">움직이지 않는 일반 이미지에는 아무 영향이 없습니다(첫 확인 후 다시 검사하지 않음). 프레임 전체를 메모리에 올려 재생하므로, 프레임이 아주 많고 해상도가 큰 파일을 여러 장 배치하면 메모리 사용량이 늘어납니다.</p>
     </div>
   </section>
+
+  {{#if isGM}}
+  <section class="fe-settings__section" data-fe-settings-tab="general">
+    <h3 class="fe-settings__section-title">충돌 모듈 가드</h3>
+
+    <div class="form-group">
+      <label>가드 동작 (GM 전용)</label>
+      <div class="form-fields">
+        <select name="ceConflictGuardMode" data-dtype="String">
+          {{selectOptions choices.conflictGuardMode selected=values.ceConflictGuardMode}}
+        </select>
+      </div>
+      <p class="notes">이 모듈이 내장한 기능(내레이터·무대·이미지 호버·채팅 정리 등)과 겹치는 다른 모듈을 감지했을 때의 동작입니다.</p>
+      <p class="notes"><b>자동</b>: 더 이상 갱신되지 않는 중복 모듈은 이번 접속 한정으로 무력화하고, 아직 유지보수되는 모듈에는 이 모듈의 해당 기능을 양보합니다. <b>양보만</b>: 상대 모듈은 절대 건드리지 않고 이 모듈 기능만 끕니다. <b>경고만</b>: 아무것도 끄지 않고 알리기만 하므로 두 모듈이 그대로 함께 돌아갑니다(중복 표시는 감수). <b>사용 안 함</b>: 감지와 경고까지 전부 끕니다.</p>
+      <p class="notes">'자동' 외의 값에서는 「Force Client Settings」가 이 모듈 설정에 걸어둔 잠금도 해제하지 않습니다. 변경하려면 새로고침이 필요합니다.</p>
+    </div>
+  </section>
+  {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="general">
     <h3 class="fe-settings__section-title">GM 설정 강제</h3>

@@ -20,7 +20,39 @@ export const CI_UPLOAD_MSG = Object.freeze({
   ERROR: "chat-image:upError",
 });
 
-export const CI_MAX_PROXY_BYTES = 17 * 1024 * 1024;
+// Maximum accepted image size, in MB, as a world setting. Registered by
+// fe-chat-images.js (which owns the whole `chatImages*` key family); the key and
+// its bounds live HERE because this module is the lower layer — fe-chat-images.js
+// imports it, so it cannot import back without a cycle.
+//
+// Both the sender-side check and the GM-authority check below read this. The
+// authority read is the one that matters: the sender's check is a courtesy, and a
+// crafted socket message can simply omit it. World scope means every client agrees
+// on the number, and only the GM can move it.
+export const CI_MAX_UPLOAD_MB_KEY = "chatImagesMaxUploadMB";
+export const CI_DEFAULT_MAX_UPLOAD_MB = 12;
+// Hard bounds on the setting itself. The ceiling is not arbitrary: the proxy path
+// buffers the whole file in the GM's memory while reassembling chunks, and the
+// data-URL fallback stores the image inside ChatMessage content that every client
+// then downloads. 64 MB is already generous for both.
+export const CI_MIN_MAX_UPLOAD_MB = 1;
+export const CI_MAX_MAX_UPLOAD_MB = 64;
+
+export function ciMaxUploadMB() {
+  let raw;
+  try { raw = game.settings.get(MODULE_ID, CI_MAX_UPLOAD_MB_KEY); }
+  catch { return CI_DEFAULT_MAX_UPLOAD_MB; }
+  // Blank/garbage must fall back to the DEFAULT, never to the clamp floor: a
+  // bare `Number("")` is 0, which would clamp to 1 MB and silently reject almost
+  // every image instead of behaving as if the setting had never been touched.
+  const mb = typeof raw === "number" ? raw : Number(String(raw ?? "").trim() || NaN);
+  if (!Number.isFinite(mb)) return CI_DEFAULT_MAX_UPLOAD_MB;
+  return Math.min(CI_MAX_MAX_UPLOAD_MB, Math.max(CI_MIN_MAX_UPLOAD_MB, mb));
+}
+
+export function ciMaxUploadBytes() {
+  return Math.round(ciMaxUploadMB() * 1024 * 1024);
+}
 
 const CI_CHUNK_SIZE = 256 * 1024;
 const CI_MIN_CHUNK_SIZE = 32 * 1024;
@@ -286,7 +318,7 @@ export async function ciUploadImageViaAuthority(file) {
   if (!ciHasUploadAuthorityOnline()) throw new Error("온라인 GM이 없습니다.");
   const size = Number(file?.size);
   if (!Number.isFinite(size) || size <= 0) throw new Error("파일 크기가 올바르지 않습니다.");
-  if (size > CI_MAX_PROXY_BYTES) throw new Error(`대리 업로드는 최대 ${CI_MAX_PROXY_BYTES / 1024 / 1024} MB까지 가능합니다.`);
+  if (size > ciMaxUploadBytes()) throw new Error(`대리 업로드는 최대 ${ciMaxUploadMB()} MB까지 가능합니다.`);
   const ext = ciResolveImageExtension(file?.name, file?.type);
   if (!ext) throw new Error("지원하지 않는 이미지 형식입니다.");
 
@@ -437,7 +469,7 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
 
       const fileSize = Number(message.fileSize);
       if (!Number.isFinite(fileSize) || fileSize <= 0) return void reject("파일 크기가 올바르지 않습니다.");
-      if (fileSize > CI_MAX_PROXY_BYTES) return void reject(`파일이 너무 큽니다. 최대 ${CI_MAX_PROXY_BYTES / 1024 / 1024} MB`);
+      if (fileSize > ciMaxUploadBytes()) return void reject(`파일이 너무 큽니다. 최대 ${ciMaxUploadMB()} MB`);
       const extension = ciResolveImageExtension(message.fileName, message.fileType);
       if (!extension) return void reject("지원하지 않는 이미지 형식입니다.");
 

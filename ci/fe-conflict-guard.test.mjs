@@ -283,6 +283,66 @@ test("unknown external feature setting never authorizes neutralization", () => {
   assert.equal(G.feCgAssessConflict(hit).action, "unknown");
 });
 
+// ── guard mode ─────────────────────────────────────────────────────────────
+
+// Every mode below is checked against the SAME hit that "auto" neutralizes, so a
+// regression that ignores the mode shows up as a neutralize verdict rather than as
+// a silently equivalent one.
+function neutralizeHit() {
+  resetSettings();
+  setSetting("female_edition", "narratorEnabled", true);
+  return {
+    id: "narrator-tools",
+    mod: { active: true, version: "1.0.1", compatibility: {} },
+    own: { features: [C.FE_CONFLICT_FEATURE.NARRATOR], settings: ["narratorEnabled"] },
+    neutralize: { verifiedVersion: "1.0.1" },
+  };
+}
+
+test("guard mode never escalates: each step is at most as invasive as auto", () => {
+  const hit = neutralizeHit();
+  assert.equal(G.feCgAssessConflict(hit, "auto").action, "neutralize");
+  assert.equal(G.feCgAssessConflict(hit, "yield").action, "yield");
+  assert.equal(G.feCgAssessConflict(hit, "warn").action, "warn");
+  assert.equal(G.feCgAssessConflict(hit, "off").action, "none");
+});
+
+test("warn mode leaves our own feature running too", () => {
+  const hit = { ...neutralizeHit(), neutralize: undefined, mode: "yield" };
+  // An auto-yield hit: warn mode must NOT suppress our feature.
+  assert.equal(G.feCgAssessConflict(hit, "auto").action, "yield");
+  assert.equal(G.feCgAssessConflict(hit, "warn").action, "warn");
+});
+
+test("yield mode falls back to a warning when there is no own feature to yield", () => {
+  const hit = neutralizeHit();
+  delete hit.own.features;
+  assert.equal(G.feCgAssessConflict(hit, "yield").action, "warn");
+});
+
+test("a mode never invents a conflict where auto found none", () => {
+  resetSettings();
+  setSetting("female_edition", "narratorEnabled", false);
+  const hit = {
+    id: "narrator-tools",
+    mod: { active: true, version: "1.0.1", compatibility: {} },
+    own: { features: [C.FE_CONFLICT_FEATURE.NARRATOR], settings: ["narratorEnabled"] },
+    neutralize: { verifiedVersion: "1.0.1" },
+  };
+  for (const mode of ["auto", "yield", "warn", "off"]) {
+    assert.equal(G.feCgAssessConflict(hit, mode).action, "none");
+  }
+});
+
+test("an unreadable/unknown mode value resolves to auto", () => {
+  resetSettings();
+  assert.equal(G.feCgMode(), G.FE_CG_MODE_DEFAULT);
+  setSetting("female_edition", G.FE_CG_MODE_KEY, "무력화해줘");
+  assert.equal(G.feCgMode(), "auto");
+  setSetting("female_edition", G.FE_CG_MODE_KEY, "warn");
+  assert.equal(G.feCgMode(), "warn");
+});
+
 // ── Force Client Settings namespace-scoped neutralization ──────────────────
 
 test("FCS neutralization removes only female_edition runtime entries", async () => {

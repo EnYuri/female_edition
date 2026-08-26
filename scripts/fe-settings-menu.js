@@ -83,15 +83,26 @@ const CP_DEFAULTS = Object.freeze({
 //     during `init` behind a gate that already returned (inject-conditions.js:87,
 //     inject-damage-type.js:65), and neither has a removal branch, so OFF also only lands on
 //     reload. World-scope → world:true → the reload broadcasts, which is correct for a CONFIG
-//     change everyone shares. Registered even on non-dnd5e worlds (inject-conditions registers
-//     before its CONFIG.DND5E check), but #applyValues only saves them under
-//     `feIsDnd5eSystem() && isGM`, so elsewhere the value cannot move and no prompt fires.
+//     change everyone shares. Their REGISTRATION differs and the difference does not matter
+//     here: inject-conditions registers before its CONFIG.DND5E check (so the key exists on
+//     every system), while inject-damage-type returns before registering when CONFIG.DND5E is
+//     absent (so on a non-dnd5e world that key is not registered at all). Either way
+//     #applyValues only saves them under `feIsDnd5eSystem() && isGM`, and both the save and
+//     the snapshot above are `has()`-guarded, so off-system the value cannot move and no
+//     prompt fires.
+//   - CONFLICT_GUARD_MODE — fe-conflict-guard resolves its whole policy once at `setup`
+//     (feCgPrepareRuntimePolicy) and, for a neutralize target, has already stripped the other
+//     module's hooks by `ready`. Neither direction can be undone live: turning the guard down
+//     cannot restore stripped hooks, and turning it up cannot retroactively suppress a feature
+//     whose ready handler already injected its UI. World-scope → world:true → the reload
+//     broadcasts, which is right because the policy governs every client.
 const FE_RELOAD_REQUIRED_KEYS = Object.freeze([
   S.CORE_UI_SCENE_CONFIG_TABS,
   S.SCREEN_PANEL_ENABLED,
   S.COMBAT_TRACKER_ENABLED,
   S.MUSIC_ENABLED,
   S.PRUNE_ENABLED,
+  "ceConflictGuardMode",
   "injectCustomConditions",
   "injectCustomDamageTypes",
 ]);
@@ -109,6 +120,9 @@ const ALL_DEFAULTS = Object.freeze({
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
+  chatImagesMaxUploadMB: 12,
+  // Conflict guard policy (fe-conflict-guard.js)
+  ceConflictGuardMode: "auto",
   [S.CORE_UI_FILEPICKER_UPLOAD_LOCATION]: "uploaded-filepicker-images",
   // image-hover (world/GM: permission/art; client: enable/pos/size/delay/upscale)
   ihPermission: 0, ihArtType: "character",
@@ -188,6 +202,13 @@ const CHOICES = {
   },
   // narrator command permission (USER_ROLES)
   narratorRole: { 0: "없음", 1: "플레이어", 2: "신뢰 플레이어", 3: "어시스턴트 GM", 4: "게임마스터" },
+  // conflict guard policy
+  conflictGuardMode: {
+    auto:  "자동 (권장)",
+    yield: "양보만 — 상대 모듈은 그대로 두고 이 모듈 기능을 끔",
+    warn:  "경고만 — 아무것도 끄지 않음",
+    off:   "사용 안 함 — 감지·경고까지 끔",
+  },
   // combat tracker
   combatTrackerAspect:    { "1": "정사각형", "1.5": "세로형", "2": "긴 세로형" },
   combatTrackerRoundness: { "0": "각짐", "8": "약간 둥글게", "16": "둥글게" },
@@ -329,6 +350,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       chatImagesEnabled:        feRead("chatImagesEnabled"),
       chatImagesShowButton:     feRead("chatImagesShowButton"),
       chatImagesUploadLocation: feRead("chatImagesUploadLocation"),
+      chatImagesMaxUploadMB:    feRead("chatImagesMaxUploadMB"),
+
+      // Conflict guard (world/GM)
+      ceConflictGuardMode: feRead("ceConflictGuardMode"),
 
       // Image Hover (standalone — migrated)
       ihPermission:   feRead("ihPermission"),
@@ -795,9 +820,12 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           num(S.DX3RD_CARD_BORDER_ALPHA),
         ] : []),
 
-        // Chat images (upload path is world-scoped/GM-only)
+        // Chat images (upload path + size cap are world-scoped/GM-only)
         bool("chatImagesEnabled"), bool("chatImagesShowButton"),
-        ...(game.user?.isGM ? [str("chatImagesUploadLocation")] : []),
+        ...(game.user?.isGM ? [str("chatImagesUploadLocation"), num("chatImagesMaxUploadMB")] : []),
+
+        // Conflict guard policy — world/GM (in FE_RELOAD_REQUIRED_KEYS → reload prompt on change)
+        ...(game.user?.isGM ? [str("ceConflictGuardMode")] : []),
 
         // Image Hover — world/GM (permission/art) gated; client prefs always saved
         ...(game.user?.isGM ? [num("ihPermission"), str("ihArtType")] : []),

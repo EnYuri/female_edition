@@ -164,7 +164,7 @@ const FE_DEFAULTS = {
   [S.UI_HIDE_PORTRAITS]: true,
   [S.UI_STRIP_TEXTURES]: true,
   [S.USE_USER_COLOR_BG]: true,
-  [S.USER_COLOR_BG_BASE]: "custom",
+  [S.USER_COLOR_BG_BASE]: "white",
   [S.USER_COLOR_BG_CUSTOM]: "#ffffff",
   [S.USER_COLOR_ALPHA]: 0.22,
   [S.SYSTEM_MSG_COLOR]: false,

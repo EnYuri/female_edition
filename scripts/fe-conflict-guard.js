@@ -39,7 +39,9 @@
  * curated targets.
  *
  * Warns the GM at `ready`. Neutralization runs on every client (per-client
- * runtime fix). No settings or CSS of its own.
+ * runtime fix). No CSS of its own. Its ONE setting is the guard mode below
+ * (`ceConflictGuardMode`), which decides how invasive the strategy above is
+ * allowed to be.
  */
 
 import {
@@ -52,6 +54,42 @@ import {
 
 // Self-markers that must NEVER be stripped (protects female_edition's own code).
 const FE_CG_SELF_GUARD = ["female_edition", "_FET_", "FemaleEdition"];
+
+// ── Guard mode (world setting, GM) ────────────────────────────────────────────
+//
+// The strategy above is the "auto" policy. A GM who deliberately wants to run a
+// duplicate module alongside ours had no way out of it, so the policy is now a
+// dial. Each step only ever makes the guard LESS invasive:
+//
+//   auto   — everything described above (default).
+//   yield  — never touch another module: a neutralize target is demoted to a
+//            yield when we have a feature to yield, otherwise to a warning.
+//            Force Client Settings is left alone too.
+//   warn   — detect and report only. Nothing is stripped and none of OUR
+//            features are turned off, so both modules run side by side. This is
+//            the "I know, I want both" escape hatch.
+//   off    — no detection, no warnings, no suppression at all.
+//
+// Read once per assessment rather than cached: the value cannot change mid-session
+// in any way that matters (the key is reload-required, see FE_RELOAD_REQUIRED_KEYS
+// in fe-settings-menu.js), and reading live keeps the pure assessor testable by
+// passing `mode` explicitly.
+const FE_CG_MODE_KEY = "ceConflictGuardMode";
+const FE_CG_MODE_DEFAULT = "auto";
+const FE_CG_MODES = Object.freeze({
+  auto:  "자동 (권장) — 무력화·양보·경고 전부",
+  yield: "양보만 — 상대 모듈은 건드리지 않고 우리 기능을 끔",
+  warn:  "경고만 — 아무것도 끄지 않고 알리기만",
+  off:   "사용 안 함 — 감지·경고까지 전부 끔",
+});
+
+function feCgMode() {
+  let raw;
+  try { raw = game.settings.get("female_edition", FE_CG_MODE_KEY); }
+  catch { return FE_CG_MODE_DEFAULT; }
+  const mode = String(raw ?? "");
+  return Object.prototype.hasOwnProperty.call(FE_CG_MODES, mode) ? mode : FE_CG_MODE_DEFAULT;
+}
 
 const FE_CG_CONFLICTS = [
   {
@@ -492,7 +530,7 @@ function feCgExternalFeatureState(hit) {
     : { known: false, enabled: false };
 }
 
-function feCgAssessConflict(hit) {
+function feCgAssessAuto(hit) {
   const own = feCgOwnFeatureState(hit);
   const external = feCgExternalFeatureState(hit);
   if (own.known && !own.enabled) return { action: "none", own, external };
@@ -517,6 +555,40 @@ function feCgAssessConflict(hit) {
     reason,
     maintained: true,
   };
+}
+
+// Apply the guard mode to the policy the "auto" strategy arrived at. Every step
+// can only soften the outcome — a mode never escalates one module's verdict into a
+// more invasive one than auto would have chosen.
+// NOTE the two different "mode"s in this file, deliberately never abbreviated to
+// the same identifier: `hit.mode` is the PER-ENTRY treatment declared in
+// FE_CG_CONFLICTS ("warn"/"yield"), while `guardMode` is the GM's world setting
+// governing all entries at once. Only the latter is passed around here.
+function feCgDemoteAction(action, hit, guardMode) {
+  if (guardMode === "auto") return { action };
+  if (action === "none") return { action };
+  if (guardMode === "off") return { action: "none", modeReason: "충돌 가드가 '사용 안 함'으로 설정됨" };
+  // "unknown" already lands in the warn bucket downstream; leave it named so the
+  // console audit keeps reporting WHY it could not be assessed.
+  if (action === "unknown") return { action };
+  if (guardMode === "warn") {
+    return action === "warn"
+      ? { action }
+      : { action: "warn", modeReason: "충돌 가드가 '경고만'으로 설정됨" };
+  }
+  if (guardMode === "yield" && action === "neutralize") {
+    return hit?.own?.features?.length
+      ? { action: "yield", modeReason: "충돌 가드가 '양보만'으로 설정됨" }
+      : { action: "warn", modeReason: "충돌 가드가 '양보만'이나 양보할 자체 기능이 없음" };
+  }
+  return { action };
+}
+
+function feCgAssessConflict(hit, guardMode = feCgMode()) {
+  const assessment = feCgAssessAuto(hit);
+  const { action, modeReason } = feCgDemoteAction(assessment.action, hit, guardMode);
+  if (action === assessment.action) return assessment;
+  return { ...assessment, action, reason: modeReason ?? assessment.reason, guardMode };
 }
 
 function feCgPrepareRuntimePolicy() {
@@ -636,12 +708,33 @@ function feCgScheduleNeutralizeSecondPass(hit) {
 
 // ── main ──────────────────────────────────────────────────────────────────
 
+// Registered at `init` because the policy is resolved at `setup`, one hook later.
+// config:false — surfaced through the unified settings menu like every other
+// setting in this module. No onChange: nothing here can be undone live (a stripped
+// hook does not come back, and a feature whose ready handler already ran cannot be
+// retroactively suppressed), so the key sits in FE_RELOAD_REQUIRED_KEYS instead.
+Hooks.once("init", () => {
+  game.settings.register("female_edition", FE_CG_MODE_KEY, {
+    name: "충돌 모듈 가드 동작",
+    hint: "female_edition이 내장한 기능과 겹치는 다른 모듈을 감지했을 때의 동작입니다. 기본값은 '자동'이며, 버려진 중복 모듈은 런타임에서 무력화하고 유지보수 중인 모듈에는 우리 기능을 양보합니다. 중복을 감수하고 두 모듈을 함께 쓰려면 '경고만'을 선택하세요. 변경하려면 새로고침이 필요합니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: String,
+    choices: FE_CG_MODES,
+    default: FE_CG_MODE_DEFAULT,
+  });
+});
+
 // All module settings have been registered by setup, while feature ready hooks
 // have not run yet. Establish runtime yields here so our own ready handlers see
 // the suppression before they inject UI or listeners.
 Hooks.once("setup", () => {
   try {
-    FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
+    // Neutralizing another module is an "auto"-only action, exactly like a
+    // neutralize spec. Under yield/warn/off the GM has asked us not to reach into
+    // other modules — so FCS keeps its lock on our settings and the GM is told.
+    if (feCgMode() === "auto") FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
     feCgPrepareRuntimePolicy();
   }
   catch (err) { console.error("[female_edition] conflict policy setup failed", err); }
@@ -649,8 +742,9 @@ Hooks.once("setup", () => {
 
 Hooks.once("ready", () => {
   try {
+    if (feCgMode() === "off") return;
     feCgInstallMldTargetConfirmationGuard();
-    if (!FE_CG_FCS_RESULT?.success) {
+    if (feCgMode() === "auto" && !FE_CG_FCS_RESULT?.success) {
       FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
     }
 
@@ -779,6 +873,11 @@ Hooks.once("ready", () => {
 export {
   FE_CG_CONFLICTS,
   FE_CG_SELF_GUARD,
+  FE_CG_MODES,
+  FE_CG_MODE_KEY,
+  FE_CG_MODE_DEFAULT,
+  feCgMode,
+  feCgDemoteAction,
   feCgGenOf,
   feCgDeclaresForwardCompat,
   feCgIsNewerThanVerified,

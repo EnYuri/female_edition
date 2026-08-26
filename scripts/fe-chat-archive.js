@@ -28,6 +28,7 @@ import {
   feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,
   feEscapeHTML,
+  feNormalizeChoice,
 } from "./fe-chat-enhance.js";
 import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 
@@ -1166,8 +1167,11 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
 function feSyncArchiveMergeBodyClasses(doc) {
   try {
     const enabled = !!feSetting(S.MERGE_ENABLED);
-    const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
-    const mode = String(feSetting(S.MERGE_MODE) ?? "standard");
+    // Same normalization as feSetBodyMergeClasses — an unknown stored value must
+    // still pick ONE mode, or the archive loses border fusion while keeping the
+    // follow-header rules (see the comment on feNormalizeChoice in fe-style.js).
+    const style = feNormalizeChoice(feSetting(S.MERGE_FOLLOW_HEADER_STYLE), ["hide", "name", "portrait"], "hide");
+    const mode = feNormalizeChoice(feSetting(S.MERGE_MODE), ["standard", "simple"], "standard");
     doc?.body?.classList?.toggle?.("fe-chat-merge", enabled);
     doc?.body?.classList?.toggle?.("fe-merge-mode-standard", enabled && mode === "standard");
     doc?.body?.classList?.toggle?.("fe-merge-mode-simple", enabled && mode === "simple");

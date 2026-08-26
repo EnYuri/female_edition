@@ -424,6 +424,19 @@ export function feInstallChatLogPrune() {
         if (fragments.length) {
           log.append(...fragments);
           this.#newestId = all[lastIdx]?.id ?? this.#newestId;
+          // Same reason as the backward path — this was missing here, and the
+          // asymmetry was not deliberate (nothing in the file or docs/chat.md ever
+          // justified it). Two distinct costs:
+          //   1) Guaranteed: the appended messages paint at least once with only
+          //      their render-time merge hint, then re-lay out when the deferred
+          //      pass lands. Those classes are height-bearing, so it is the same
+          //      scroll-jump the backward comment above documents.
+          //   2) Possible: renderChatMessageHTML fires per message inside the
+          //      `await renderMessage` loop ABOVE — i.e. BEFORE this append — so
+          //      the 120 ms debounced feScheduleFullMergePass it queues can expire
+          //      while the fragments are still detached. Nothing re-schedules it
+          //      afterwards, and the appended messages then keep the hint for good.
+          this.#settleMergeClasses(log);
         }
         // Loaded newer messages — prune oldest end to stay bounded
         this.#schedPruneOld();

@@ -35,15 +35,34 @@ function feContrastText(hex) {
   return luminance > 0.45 ? "#141414" : "#f0f0f0";
 }
 
+// A stored choice value that is neither of the known options must still land on
+// ONE of them. Without this, every mode class is left off and the whole standard
+// merge block in fe-chat-enhance.css (~216-251: border fusion, radius collapse,
+// negative margins) silently stops applying — while the follow-header rules,
+// which key off `fe-chat-merge` + the style class only, keep working. The result
+// looks exactly like "merged, header hidden, but each message still a closed
+// box": merge is clearly ON, only the fusion is gone.
+//
+// `?? "standard"` does NOT cover this: it fires on null/undefined, not on ""
+// or on any leftover value from an older build. The repair pass that WOULD fix
+// the stored value (feNormalizeChoiceSetting, via feMigrateLegacySettings) runs
+// at `ready` — but these classes are applied from `setup`, and per CLAUDE.md
+// `ready` can legitimately never fire (a .webm tile hangs canvas init forever).
+// So the fallback has to live here, not only in the stored value.
+function feNormalizeChoice(value, allowed, fallback) {
+  const v = String(value ?? "").trim();
+  return allowed.includes(v) ? v : fallback;
+}
+
 function feSetBodyMergeClasses() {
   const enabled = !!feSetting(S.MERGE_ENABLED);
   document.body.classList.toggle("fe-chat-merge", enabled);
 
-  const mode = String(feSetting(S.MERGE_MODE) ?? "standard");
+  const mode = feNormalizeChoice(feSetting(S.MERGE_MODE), ["standard", "simple"], "standard");
   document.body.classList.toggle("fe-merge-mode-standard", enabled && mode === "standard");
   document.body.classList.toggle("fe-merge-mode-simple", enabled && mode === "simple");
 
-  const style = String(feSetting(S.MERGE_FOLLOW_HEADER_STYLE) ?? "hide");
+  const style = feNormalizeChoice(feSetting(S.MERGE_FOLLOW_HEADER_STYLE), ["hide", "name", "portrait"], "hide");
   document.body.classList.toggle("fe-merge-follow-hide", enabled && style === "hide");
   document.body.classList.toggle("fe-merge-follow-name", enabled && style === "name");
   document.body.classList.toggle("fe-merge-follow-portrait", enabled && style === "portrait");
@@ -715,6 +734,7 @@ export {
   feSetUserColorBgClass,
   feSetPaperOverlayClass,
   feSetUserColorBgBaseClass,
+  feNormalizeChoice,
   feSetChatGroupOutlineClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
