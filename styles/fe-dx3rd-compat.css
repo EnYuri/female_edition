@@ -768,17 +768,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
 }
 
-/* 실제 <input type="color">: 완전히 덮어 클릭 영역 확보, 시각적으로 숨김 */
-.fe-dx3rd-accent-btn input[type="color"] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-}
+/* 스와치는 다이얼로그를 여는 버튼이다 — 내부 <input type="color"> 없음 */
 
 /* ══════════════════════════════════════════════════════════════
  * § 17-b  상태 UI 기본값 — FVTT 네이티브 톤 · 둥근 패널

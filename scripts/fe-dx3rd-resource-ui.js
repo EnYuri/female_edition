@@ -16,28 +16,6 @@ import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 
-// hex → { h: 0-360, s: 0-1 }. Achromatic input (s≈0) yields h=0.
-function _hexToHs(hex) {
-  hex = String(hex).replace(/^#/, "");
-  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
-  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return { h: 0, s: 0 };
-  const r = parseInt(hex.slice(0, 2), 16) / 255;
-  const g = parseInt(hex.slice(2, 4), 16) / 255;
-  const b = parseInt(hex.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return { h: 0, s: 0 };
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h = 0;
-  switch (max) {
-    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-    case g: h = ((b - r) / d + 2) / 6; break;
-    case b: h = ((r - g) / d + 4) / 6; break;
-  }
-  return { h: h * 360, s };
-}
-
 const CONTAINER_ID     = "fe-dx3rd-rui-container";
 const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
 
@@ -49,12 +27,6 @@ const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → R
 const MASK_FLAG        = "maskResourceValues"; // 수치 값을 ??로 숨김
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
 const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
-
-// Accent H/S variables feed a large portion of the retro stylesheet. Native color
-// pickers can emit input events faster than the browser can recalculate that CSS,
-// so keep the preview responsive without recalculating the entire UI per event.
-let _accentPreviewTimer = null;
-let _pendingAccentPreview = null;
 
 // ─── guards ────────────────────────────────────────────────────────────────
 
@@ -608,33 +580,72 @@ async function _setAccent(color) {
   }
 }
 
-function _applyAccentPreview(color) {
-  const root = document.documentElement;
-  root.style.setProperty("--fe-dx3rd-accent", color);
-  const { h, s } = _hexToHs(color);
-  root.style.setProperty("--fe-dx3rd-accent-h", `${Math.round(h)}deg`);
-  root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
+// Normalizes any user-typed hex into "#rrggbb". Returns null when unusable, so a
+// half-typed value in the text field never reaches <input type="color"> (which
+// silently clamps invalid input to #000000).
+function _normalizeHex(raw) {
+  let hex = String(raw ?? "").trim().replace(/^#/, "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+  return `#${hex.toLowerCase()}`;
 }
 
-function _queueAccentPreview(color) {
-  _pendingAccentPreview = color;
-  if (_accentPreviewTimer) return;
-  // 30fps is visually continuous for a colour swatch while leaving enough time
-  // for the expensive variable-driven style recalculation to finish.
-  _accentPreviewTimer = setTimeout(() => {
-    _accentPreviewTimer = null;
-    const next = _pendingAccentPreview;
-    _pendingAccentPreview = null;
-    if (next) _applyAccentPreview(next);
-  }, 33);
-}
+// Accent picking is EXPLICITLY confirm-gated — no live preview. The accent H/S
+// variables recolour a large part of the retro stylesheet, so dragging a native
+// colour picker used to repaint the whole UI dozens of times per second and made
+// the value hard to judge (and hard to cancel). The dialog previews only its own
+// swatch; the document is touched once, on 확인.
+async function _openAccentDialog(label) {
+  const DialogV2 = foundry?.applications?.api?.DialogV2;
+  if (!DialogV2) return;
+  const cur = _normalizeHex(_getAccent()) ?? "#ffffff";
 
-function _flushAccentPreview() {
-  if (_accentPreviewTimer) clearTimeout(_accentPreviewTimer);
-  _accentPreviewTimer = null;
-  const next = _pendingAccentPreview;
-  _pendingAccentPreview = null;
-  if (next) _applyAccentPreview(next);
+  const content =
+    `<div class="fe-accent-dialog" style="display:flex;align-items:center;gap:10px;padding:6px 2px;">` +
+      `<span class="fe-accent-dialog-preview" style="width:28px;height:28px;flex:0 0 28px;` +
+        `border:1px solid rgba(255,255,255,0.35);outline:1px solid #000;background:${cur};"></span>` +
+      `<input type="color" name="accent" value="${cur}" style="width:52px;height:28px;padding:0;cursor:pointer;">` +
+      `<input type="text" name="accentHex" value="${cur}" maxlength="7" spellcheck="false" autocomplete="off" ` +
+        `style="flex:1;min-width:90px;font-family:monospace;text-transform:lowercase;">` +
+    `</div>`;
+
+  let picked;
+  try {
+    picked = await DialogV2.prompt({
+      window: { title: "픽셀 테마 강조색" },
+      content,
+      // The two inputs mirror each other; only the colour input is authoritative,
+      // because the text field can hold a half-typed value at any moment.
+      render: (_ev, dialog) => {
+        const root  = dialog.element;
+        const color = root.querySelector('input[name="accent"]');
+        const text  = root.querySelector('input[name="accentHex"]');
+        const swab  = root.querySelector(".fe-accent-dialog-preview");
+        const paint = (hex) => { if (swab) swab.style.background = hex; };
+        color?.addEventListener("input", () => {
+          if (text) text.value = color.value;
+          paint(color.value);
+        });
+        text?.addEventListener("input", () => {
+          const hex = _normalizeHex(text.value);
+          if (!hex || !color) return;
+          color.value = hex;
+          paint(hex);
+        });
+      },
+      ok: {
+        label: "확인",
+        callback: (_ev, btn) => btn.form.elements.accent.value,
+      },
+    });
+  } catch {
+    return; // cancelled / closed — nothing was applied
+  }
+
+  const hex = _normalizeHex(picked);
+  if (!hex || hex === _normalizeHex(cur)) return;
+  label?.style.setProperty("--fe-accent-swatch", hex);
+  await _setAccent(hex);
 }
 
 function _injectAccentBtn() {
@@ -658,32 +669,19 @@ function _injectAccentBtn() {
     return;
   }
 
+  // No nested <input type="color"> any more: the native picker commits while the
+  // user is still dragging. The swatch is just a button that opens the dialog.
   const label = document.createElement("label");
   label.id        = ACCENT_BTN_ID;
   label.className = "fe-dx3rd-accent-btn";
   label.title     = "픽셀 테마 강조색";
+  label.setAttribute("role", "button");
   label.style.setProperty("--fe-accent-swatch", color);
-
-  const input = document.createElement("input");
-  input.type  = "color";
-  input.value = color;
-
-  // Live preview is rate-limited because these root variables recolour a large
-  // part of the DOM. The swatch itself still follows every native input event.
-  input.addEventListener("input", (e) => {
-    const color = e.target.value;
-    label.style.setProperty("--fe-accent-swatch", color);
-    _queueAccentPreview(color);
-  });
-  // Commit the last queued preview first, then persist it once. The setting's
-  // onChange performs the authoritative full style-variable refresh.
-  input.addEventListener("change", (e) => {
-    _pendingAccentPreview = e.target.value;
-    _flushAccentPreview();
-    void _setAccent(e.target.value);
+  label.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    void _openAccentDialog(label);
   });
 
-  label.appendChild(input);
   controls.append(label);
 }
 
