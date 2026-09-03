@@ -893,6 +893,7 @@ body.fe-fonts-enabled.fe-system-dw .sidebar-popout .sidebar-tab {
 body.fe-fonts-enabled.fe-system-dw :is(#sidebar, .sidebar-popout) .sidebar-tab :is(
   .combat-tracker-header .encounter-name,
   .combat-tracker-header .encounter-title,
+  #combat-round h3,
   .directory-item--group,
   .combat-control[data-control="startCombat"],
   .combat-control[data-control="endCombat"],

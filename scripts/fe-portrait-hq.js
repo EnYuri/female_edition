@@ -225,7 +225,11 @@ function _applyEditableSrcsetHQ(imgEl, url, cssW, cssH) {
 
 // Show the original immediately, then swap in the downscaled bitmap once ready.
 // cssW/cssH are the display size in CSS px; dpr x2 oversampling covers zoom and HiDPI.
-export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
+// opts.assumeEditable: treat as an editable [data-edit] field even if the attribute is not
+// present RIGHT NOW. Needed for sheets whose lock/unlock toggle (e.g. Tidy5e) adds/removes
+// data-edit reactively without re-touching `src` — see the CRITICAL note below and the MUST
+// KEEP note above _processSheetPortraits.
+export function feApplyHQPortrait(imgEl, url, cssW, cssH, opts) {
   if (!imgEl) return;
 
   // CRITICAL — never substitute the `src` of an editable image.
@@ -235,7 +239,7 @@ export function feApplyHQPortrait(imgEl, url, cssW, cssH) {
   // permanently replacing the real high-res file with a ~300px copy. Editable portraits get
   // HQ through `srcset` instead (see _applyEditableSrcsetHQ). Non-editable images
   // (image-hover, directory thumbnails) are not form fields and keep the src swap below.
-  if (imgEl.hasAttribute?.("data-edit")) {
+  if (imgEl.hasAttribute?.("data-edit") || opts?.assumeEditable) {
     if (url) imgEl.dataset.feHqSrc = url; // let image-hover resolve the real high-res original
     else imgEl.dataset.feHqSrc = "";
     _applyEditableSrcsetHQ(imgEl, url, cssW, cssH);
@@ -295,6 +299,22 @@ function _displaySize(imgEl) {
 // img.actor-image, stock dnd5e (quadrone) an unclassed [data-action="showArtwork"] img, and
 // generic Foundry img.profile / [data-edit="img"]. Chosen to match only large portrait
 // images, never small icons.
+//
+// MUST KEEP — every match here is processed as `assumeEditable` (see _processSheetPortraits),
+// never as a plain display image, EVEN THOUGH some of these selectors (showArtwork /
+// showPortraitArtwork) exist specifically to catch the LOCKED-sheet state where no
+// [data-edit] attribute is present yet. Verified live in Tidy5e's bundled ActorPortrait
+// component: `set_attribute(img, "data-edit", context.unlocked ? "img" : null)` — the SAME
+// <img> node loses/gains data-edit purely from the lock toggle, a client-side Svelte state
+// change that fires NO renderActorSheet(V2) hook. If this function ever substituted `src`
+// while locked (data-edit absent), unlocking afterward only flips data-edit back on — Svelte's
+// reactive `set_attribute(img, "src", actor.img)` does not re-run (its dependency, actor.img,
+// never changed), so the already-corrupted data: URL `src` survives into the now-`[data-edit]`
+// element untouched. The next unrelated form submit (any submitOnChange field) then has
+// FormDataExtended read that data: URL as the "img" field and Foundry uploads it as a new
+// ~300px file, permanently replacing the real portrait — reproduced 2026-09-03, actor.img
+// still low-res after closing and reopening the sheet. assumeEditable makes every sheet
+// portrait always go through the srcset-safe path regardless of the CURRENT data-edit state.
 const FE_SHEET_PORTRAIT_SELECTOR = [
   "img.profile-img",
   "img.actor-image",
@@ -317,7 +337,7 @@ function _processSheetPortraits(html) {
     const url = img.getAttribute("src");
     if (!url || url.startsWith("data:")) continue;
     const { w, h } = _displaySize(img);
-    feApplyHQPortrait(img, url, w, h);
+    feApplyHQPortrait(img, url, w, h, { assumeEditable: true });
   }
 }
 
