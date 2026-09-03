@@ -13,6 +13,24 @@ function feIsDx3rdSystemId(systemId) {
   return FE_DX3RD_SYSTEM_IDS.includes(String(systemId ?? ""));
 }
 
+// Dungeon World family. `Emmanim-Dungeonworld` is the maintained fork installed
+// alongside this module; `dungeonworld` is Asacolips' upstream. Both share the
+// actor schema (`system.attributes.hp`), the `.dungeonworld` sheet root, and the
+// `.dw-chat-card` / `.chat-card.move-card` chat markup, so one gate covers both.
+// Foundry package IDs are case-sensitive, but the fork's ID is mixed-case and is
+// easy to mistype in a world manifest — compare case-insensitively so a stray
+// `emmanim-dungeonworld` still gets the compat surfaces.
+const FE_DW_SYSTEM_IDS = Object.freeze([
+  "Emmanim-Dungeonworld",
+  "dungeonworld",
+]);
+
+const FE_DW_SYSTEM_IDS_LOWER = Object.freeze(FE_DW_SYSTEM_IDS.map((id) => id.toLowerCase()));
+
+function feIsDungeonWorldSystemId(systemId) {
+  return FE_DW_SYSTEM_IDS_LOWER.includes(String(systemId ?? "").toLowerCase());
+}
+
 const LEGACY_UI_FONT_KEY = "ceUiUse" + "D" + "o" + "n" + "g" + "l" + "e";
 
 const S = {
@@ -298,6 +316,8 @@ export {
   MODULE_ID,
   FE_DX3RD_SYSTEM_IDS,
   feIsDx3rdSystemId,
+  FE_DW_SYSTEM_IDS,
+  feIsDungeonWorldSystemId,
   LEGACY_UI_FONT_KEY,
   S,
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,

@@ -1,4 +1,4 @@
-import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
 // accent hex -> { h: 0-360, s: 0-1 }. Achromatic input (s~0) pins h to 0.
@@ -171,6 +171,18 @@ function feSetRetroThemeClass(doc = document) {
       "fe-retro-system-dx3rd",
       enabled && feIsDx3rdSystemId(systemId),
     );
+    body.classList.toggle(
+      "fe-retro-system-dw",
+      enabled && feIsDungeonWorldSystemId(systemId),
+    );
+
+    // Retro-independent system marker. Dungeon World hard-codes font-family on
+    // individual descendants (labels, headings, .cell__title, .sidebar-tab), so
+    // the font layer must re-take those elements directly — inheritance always
+    // loses to a declaration that matches the element itself. Those rules live
+    // in ui-font.css and must apply with the retro theme OFF, so this class is
+    // NOT gated on `enabled`.
+    body.classList.toggle("fe-system-dw", feIsDungeonWorldSystemId(systemId));
 
     // double-cross-3rd's legacy token-adjacent combat buttons are PIXI.Graphics,
     // not DOM nodes, so the CSS theme cannot reach them. Repaint any live button

@@ -788,3 +788,45 @@ body.fe-retro-theme h1.window-title,
 body.fe-retro-theme .fe-stage-textbox-name {
   color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
+
+/* ── 패키지 태그 칩 (모듈 관리 / 시스템·월드 목록) ─────────────
+ * 마크업: templates/setup/parts/package-tags.hbs
+ *   .package-list .package .package-overview.tags > span.tag
+ * 코어(foundry2.css:6880~)는 이 칩을 "채워진 면"으로 그린다 —
+ * 기본 background:var(--color-cool-4) 에 더해 종류별로 하드코딩된 색이
+ * 따로 붙는다(javascript #803c62, css #1e5c6f, compendium #3b3a80,
+ * languages #224224, unavailable #750000, unknown #b07900, badge 는
+ * --color-level-{warning,error,success}-bg).
+ *
+ * 레트로에서는 그 면이 아이콘·버전 글자를 삼켜 읽기 어렵다. 면을 걷어내고
+ * 테두리만 남긴다.
+ *
+ * ⚠️ 테두리 색을 일괄로 흰색으로 덮지 않는다. 면이 사라진 뒤에는 테두리가
+ *    상태(호환/경고/오류)를 전달하는 **유일한** 신호로 남기 때문이다.
+ *    기본 칩만 강조색으로 올리고, .badge 계열의 border-color 는 코어가
+ *    정한 값을 그대로 둔다.
+ *
+ * ⚠️ background-color 가 아니라 background 단축 속성으로 덮는다 — 코어도
+ *    단축 속성으로 주기 때문에, background-color 만 지우면 나중에 코어가
+ *    background-image 를 얹었을 때 그것이 남는다. */
+
+body.fe-retro-theme .package-list .package .tags > .tag {
+  background: transparent !important;
+  border: 1px solid var(--fe-ac-45, rgba(255, 255, 255, 0.45)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* 상태 배지는 면만 지우고 테두리색은 코어 값을 유지한다. */
+body.fe-retro-theme .package-list .package .tags > .tag.badge {
+  background: transparent !important;
+}
+
+body.fe-retro-theme .package-list .package .tags > .tag.badge.neutral {
+  border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45)) !important;
+}
+
+/* 코어는 hover / .active / .loading 상태에서 칩 면을 다시 칠한다
+   (foundry2.css:14604~). 그것도 같이 막는다. */
+body.fe-retro-theme .package-list .package:is(:hover, .active, .loading) .tags > .tag {
+  background: transparent !important;
+}

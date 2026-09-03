@@ -3,7 +3,7 @@
 	"MYCOND.Mark": "표식",
 
 	"FEAPH.Settings.EnableName": "어트리뷰트 이름 도우미",
-	"FEAPH.Settings.EnableHint": "시트나 채팅에 표시된 값 위에 마우스를 올리면, 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd 모두 지원하는 점검 도구입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
+	"FEAPH.Settings.EnableHint": "시트나 채팅에 표시된 값 위에 마우스를 올리면, 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd·던전월드 모두 지원하는 점검 도구입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
 	"FEAPH.Settings.SourceName": "어트리뷰트 이름 도우미: 소스 함께 표시",
 	"FEAPH.Settings.SourceHint": "이름이 읽힌 출처(예: name, data-property)를 이름 아래에 함께 표시합니다.",
 	"FEAPH.Keybind.InstantName": "어트리뷰트 이름 도우미: 즉시 표시",

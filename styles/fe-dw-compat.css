@@ -1,0 +1,390 @@
+/* ================================================================
+ * fe-dw-compat.css
+ * female_edition — Dungeon World(Emmanim-Dungeonworld / dungeonworld) 대비 보정
+ *
+ * 활성화:
+ *   · 시트/다이얼로그 표면    → body.fe-retro-theme.fe-retro-system-dw 전용
+ *     (fe-style.js feSetRetroThemeClass 가 feIsDungeonWorldSystemId 로 토글)
+ *   · 채팅 카드 판독성 최소분 → 레트로 + "유저 컬러 검정 베이스" 양쪽
+ *     (§ C. 검정 카드에서 글자가 아예 안 보이는 경우만 다룬다)
+ *
+ * 문제:
+ *   Dungeon World 는 흰 양피지 시트(.window-content{background:#fff})와 밝은
+ *   배경을 전제로 색을 고정한다. 대표적으로
+ *     · .cell__title / .cell__subtitle  → #2d3748 / #5b7094 네이비 밴드
+ *     · .tabs .item                     → #bcc8de, .active 는 #fff/#000
+ *     · .ability-mod                    → 흰 원 + #2d3748 글자
+ *     · 채팅 .result-label              → background:#efefef 흰 띠
+ *     · 채팅 .partial                   → color:#000
+ *     · 채팅 damage/heal 버튼           → color:#000 on rgba(0,0,0,.1)
+ *   레트로 테마(또는 유저 컬러 검정 베이스)는 표면을 검정으로 강제하므로
+ *   위 검정 계열 글자는 대비가 사실상 0 이 되어 사라지고, 흰 밴드만 남아
+ *   창 전체가 얼룩덜룩해진다.
+ *
+ * 해결:
+ *   시스템이 칠한 밝은 표면을 레트로 강조색 팔레트(--fe-ac-*)로 재도색하고,
+ *   의미가 있는 색(실패/성공, 적재 초과 등)은 색상(H)을 유지한 채 검정 위에서
+ *   읽히는 명도로만 옮긴다. 링크·인라인 롤·주사위 툴팁은 건드리지 않는다.
+ *
+ * ⚠️ CASCADE LAYER (필수): module.json 에서
+ *      { "src": "styles/fe-dw-compat.css", "layer": "layouts" } 로 등록.
+ *    Dungeon World CSS 는 system(8) 레이어에 들어가고, 그중 nightmode 규칙은
+ *    실제로 !important 를 쓴다(.window-app.nightmode … input{background:#444
+ *    !important} 등, styles/dist/dungeonworld.css). @layer 는 !important 에
+ *    대해 순서가 역전되므로 modules(9) 레이어에서는 특이도를 아무리 올려도
+ *    절대 못 이긴다. layouts(7) 에서만 이긴다 — fe-dx3rd-compat.css §4 와 동일.
+ *
+ * ⚠️ nightmode 는 무시하고 쓴다. Dungeon World 는 DwUtility.nightmode
+ *    (body.theme-dark)를 시트 options.classes 에 'nightmode' 로 밀어 넣는데,
+ *    레트로 테마는 코어 테마와 독립적인 별도 토글이라 밝은 테마 + 레트로 조합이
+ *    흔하다. 그래서 모든 셀렉터는 .nightmode 유무와 무관하게 매치되도록 쓰고,
+ *    nightmode 가 !important 로 덮는 지점만 § A7 에서 따로 되받는다.
+ * ================================================================ */
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § A  시트 표면 (레트로 전용)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── A1. 시트 본문 배경 ────────────────────────────────────────
+ * .dungeonworld .window-content 는 #fff, 액터 시트는 그 위에 헤더 장식용
+ * heath-alseike-vector-edge.svg 를 background-image 로 얹는다. 검정 위에서
+ * 그 SVG 는 회색 얼룩으로만 남으므로 배경 자체를 걷어낸다. */
+body.fe-retro-theme.fe-retro-system-dw
+  :is(.dungeonworld, .dungeonworld.actor, .dungeonworld.actor.npc, .dungeonworld.item)
+  .window-content {
+  background: #000000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* ── A2. 셀 제목 밴드 (#2d3748) · 부제 밴드 (#5b7094) ──────────
+ * 시트 전체에서 가장 많이 쓰이는 두 표면. 능력치/자원/클래스 헤더가 모두
+ * 이 두 클래스를 공유하므로 한 곳에서 재도색한다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(
+    .cell__title,
+    .cell__subtitle,
+    .resource .cell__title,
+    .sheet-attributes .cell .cell__title,
+    .sheet-resources .cell .cell__title,
+    .cell--abilities .ability .cell__title
+  ) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.cell__title, .cell__subtitle)
+  :is(a, button) {
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* 롤 가능한 헤더의 hover 강조 (#5b7094) */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(
+    .sheet-attributes .cell .cell__title.rollable:hover,
+    .sheet-resources .cell .cell__title.rollable:hover,
+    .cell--abilities .ability .rollable:hover,
+    .cell__title button:hover,
+    .cell__title button:focus,
+    .cell__subtitle button:hover,
+    .cell__subtitle button:focus
+  ) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+/* ── A3. 의미색 표면 — 색상(H)은 유지, 명도만 검정 위로 이동 ───
+ * 적재/경고/오류는 "무슨 색인지"가 곧 정보다. 무채색으로 뭉개면 신호가
+ * 사라지므로 원래 H 를 유지한 채 배경 L 만 22% 로 낮추고 글자는 팔레트로 올린다.
+ *   encumbered   #f78c01 → H 34   |  overencumbered #ca0000 → H 0
+ *   .warning     #e6ad54 → H 34   |  .error          #d68888 → H 0 */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.sheet-attributes, .sheet-resources)
+  .encumbered
+  .cell__title,
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.cell__title, .cell__subtitle).warning {
+  background: hsl(34deg 62% 22%) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: inset 0 0 0 1px hsl(34deg 62% 42%) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.sheet-attributes, .sheet-resources)
+  .overencumbered
+  .cell__title,
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.cell__title, .cell__subtitle).error {
+  background: hsl(0deg 62% 22%) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: inset 0 0 0 1px hsl(0deg 62% 42%) !important;
+}
+
+/* ── A4. 능력치 보정치 원판 (.ability-mod) ─────────────────────
+ * 흰 원 + #2d3748 글자 + #2d3748 2px 테두리. border-radius 는 레트로 전역
+ * 규칙이 이미 0 으로 만들었으므로 색만 뒤집는다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  .cell--abilities .ability .ability-mod {
+  background: #000000 !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* ── A5. 탭 ────────────────────────────────────────────────────
+ * 비활성 #bcc8de, 활성 #fff/#000. 활성 탭은 fe-retro-common.css 의 탭 처리와
+ * 같은 언어(밑줄 강조)로 맞춘다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet .tabs .item {
+  background: var(--fe-ac-06, rgba(255, 255, 255, 0.06)) !important;
+  color: var(--fe-ac-57, rgba(230, 230, 230, 0.57)) !important;
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  text-shadow: none !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet .tabs .item:is(:hover, :focus) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet .tabs .item.active,
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld .window-app .tabs .item.active {
+  background: #000000 !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: inset 0 -2px 0 var(--fe-dx3rd-accent, #ffffff) !important;
+  text-shadow: none !important;
+}
+
+/* ── A6. 목록 구분선 · 드롭 영역 · 에디터 표면 ─────────────────
+ * nightmode 가 .items-list .item+.item 을 #444 !important 로 고정한다. */
+body.fe-retro-theme.fe-retro-system-dw
+  :is(.dungeonworld, .window-app.nightmode)
+  :is(.items-list .item + .item, .class .item + .item) {
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet
+  :is(.editor, .class .drop-area, .class .resource-wrapper, .item-form .cell--image) {
+  background: var(--fe-ac-06, rgba(255, 255, 255, 0.06)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* ── A7. nightmode 가 !important 로 고정한 지점 되받기 ─────────
+ * 아래 규칙들은 Dungeon World 가 layer(system) 에서 !important 로 박아둔
+ * 것이라, layouts 레이어가 아니면 절대 이길 수 없다(파일 상단 ⚠️ 참고).
+ * 입력 컨트롤의 일반적인 레트로 도색은 fe-retro-forms.css 소유이므로 여기서는
+ * 시스템이 덮어쓴 값만 무효화하고 팔레트는 그 파일과 동일한 토큰을 쓴다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .window-app.nightmode .window-content
+  :is(input[type="text"], input[type="number"], textarea, select, select option, .editor) {
+  background: var(--fe-ac-06, rgba(255, 255, 255, 0.06)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .window-app.nightmode .window-content
+  :is(input[type="text"], input[type="number"], textarea, .editor):is(:hover, :focus) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .window-app.nightmode .window-content
+  :is(.sheet-header, .sheet-attributes .cell__title) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .window-app.nightmode .window-content
+  .sheet-attributes .cell__title.rollable:hover {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+/* nightmode 는 셀 제목/부제/결과 라벨 글자를 #65a3e1 로 고정한다(!important 아님).
+   § A2 가 이미 배경을 바꿨으므로 글자만 팔레트로 되돌린다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .window-app.nightmode .window-content
+  :is(.cell__title, .cell__subtitle, .result-label) {
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* ── A8. Tagify 드롭다운 ───────────────────────────────────────
+ * 태그 입력(장비/NPC 태그)의 자동완성 목록. 시스템 스킨이 밝은 회색이다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld .tags-look .tagify__dropdown__item {
+  background: #000000 !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld .tags-look
+  :is(.tagify__dropdown__item:hover, .tagify__dropdown__item--active) {
+  background: var(--fe-dx3rd-accent, #ffffff) !important;
+  color: #000000 !important;
+}
+
+
+/* ── A9. 태그 칩 + 남은 파랑 강조 ─────────────────────────────
+ * 액션(무브) 목록에서 이름 옆에 붙는 능력치 칩이 파랗게 보이는 자리다.
+ * 마크업은 .item-meta.tags.roll-type > .tag (templates/parts/sheet-moves.html)
+ * 이고, 색은 두 곳에서 온다.
+ *   · 기본        .tag{background:#edf2f7; color:#2d3748}   (연푸른 회색 칩)
+ *   · nightmode   .window-app.nightmode .window-content .tag{background:#344460}
+ *                 ← 코어 다크 테마에서 실제로 보이는 남색이 이쪽이다.
+ * nightmode 규칙이 더 구체적이므로 둘 다 덮으려면 .nightmode 를 요구하지 않는
+ * 선택자 + layouts 레이어 !important 조합이어야 한다(파일 상단 ⚠️ 참고).
+ *
+ * 팔레트는 --fe-ac-* 로 통일한다. 이 토큰들은 레트로 강조색의 H/S 를 그대로
+ * 따라가고 기본값이 0deg 0% 라서, 손대지 않은 월드에서는 완전한 모노톤이 되고
+ * 강조색을 지정한 월드에서는 그 색조로 함께 움직인다. 고정 회색을 박으면
+ * 강조색 설정이 이 칩에서만 무시되므로 하드코딩하지 말 것. */
+body.fe-retro-theme.fe-retro-system-dw .dungeonworld .tag {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+/* 태그 입력(.tagging)의 칩은 #5b7094 로 더 진하다. 삭제 버튼(.tag-i)은 흰색
+   글자를 전제로 하므로 함께 옮긴다. */
+body.fe-retro-theme.fe-retro-system-dw .dungeonworld .tagging .tag {
+  background-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw .dungeonworld .tagging .tag .tag-i {
+  color: var(--fe-ac-57, rgba(230, 230, 230, 0.57)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld .tagging .tag :is(.tag-i:hover, .tag-i:focus) {
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* Tagify 위젯 본체는 색을 CSS 변수로 받는다. nightmode 가 그 변수들을 남색
+   계열(--tag-bg:#344460, --tag-hover:#65a3e1, 포커스 테두리 #3595f6)로 재정의
+   하므로, 규칙을 하나씩 덮는 대신 변수를 다시 정의하는 편이 정확하다.
+   nightmode 의 background/color 만 !important 라서 그 둘은 별도로 되받는다.
+   변수 선언에 !important 가 붙어 있는 것은 오타가 아니다 — 커스텀 프로퍼티도
+   일반 선언이라 !important 가 없으면 레이어 순서상 나중인 system(8)이 이긴다.
+   layouts(7)에서 이기려면 !important 여야 하고, 그때서야 순서가 역전된다. */
+body.fe-retro-theme.fe-retro-system-dw .dungeonworld .tagify {
+  --tag-bg: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  --tag-hover: var(--fe-ac-33, rgba(255, 255, 255, 0.33)) !important;
+  --tag-text-color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  --tag-text-color--edit: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  --tags-border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  --tags-hover-border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45)) !important;
+  --tags-focus-border-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  --placeholder-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45)) !important;
+  background: #000000 !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* 남은 파랑: 링크 hover, 롤 가능한 항목 hover, 활성 탭 글자가 모두 #5b7094 로
+   고정돼 있다. text-shadow 까지 같은 남색이라 글로우가 파랗게 번지므로 함께
+   옮긴다. 다이스 툴팁·인라인 롤은 이 선택자에 들어가지 않는다 — 전역 규칙 소유. */
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld .window-app :is(a:hover, a:focus),
+body.fe-retro-theme.fe-retro-system-dw
+  .dungeonworld.sheet :is(.rollable:hover, .rollable:focus) {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+  text-shadow: 0 0 5px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * § B  채팅 카드 표면 (레트로 전용)
+ *
+ * 카드 배경을 검정으로 강제하는 것은 레트로 테마이므로, 밴드/테두리 재도색은
+ * 레트로에서만 한다. 순수 판독성(검정 글자) 문제는 § C 가 더 넓게 담당한다.
+ * ══════════════════════════════════════════════════════════════ */
+
+/* .result-label 은 background:#efefef 흰 띠 + #ccc 밑줄. */
+body.fe-retro-theme.fe-retro-system-dw
+  .chat-message :is(.dw-chat-card, .chat-card.move-card) .result-label {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  border-bottom-color: var(--fe-ac-33, rgba(255, 255, 255, 0.33)) !important;
+}
+
+/* .chat-title 은 rgba(0,0,0,.05) 테두리, .cell__title 은 2px solid #000 밑줄 —
+   검정 위에서 둘 다 사라진다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .chat-message :is(.dw-chat-card, .chat-card.move-card) .chat-title {
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dw
+  .chat-message :is(.dw-chat-card, .chat-card.move-card) .cell__title {
+  border-bottom-color: var(--fe-ac-33, rgba(255, 255, 255, 0.33)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+/* XP / 피해 버튼 기본 스킨(#2d3748 + #7e94bd inset). 의미색이 아니므로 팔레트로.
+   .damage/.heal 변형은 자기 배경·테두리를 따로 칠하므로 여기서 제외한다. */
+body.fe-retro-theme.fe-retro-system-dw
+  .chat-message .message-content
+  :is(.xp-button, .chat-damage-buttons .button):not(.damage, .heal) {
+  background: var(--fe-ac-12, rgba(255, 255, 255, 0.12)) !important;
+  border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+  box-shadow: none !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § C  검정 카드에서 "글자가 아예 안 보이는" 경우
+ *      (레트로 + 유저 컬러 검정 베이스 양쪽)
+ *
+ * 레트로만이 카드를 검게 만드는 건 아니다. 채팅 배경 모드를 "유저 컬러 /
+ * 검정 베이스"로 두면 레트로가 꺼져 있어도 메시지 표면이 검정이 된다
+ * (chat-bg-stripper.css, body.fe-userbg-base-black). Dungeon World 가
+ * color:#000 을 고정한 지점은 그 조합에서 대비가 0 이 되므로, 판독성만
+ * 복구하는 최소분을 두 조건 모두에 건다.
+ *
+ * .failure(#b31a1a) / .success(#1a6dc3) 는 결과 등급을 나타내는 의미색이다.
+ * 색상(H)은 그대로 두고 검정 위에서 읽히는 명도(L=68%)로만 올린다.
+ * ══════════════════════════════════════════════════════════════ */
+
+body:is(.fe-retro-theme.fe-retro-system-dw, .fe-userbg-base-black)
+  .chat-message :is(.dw-chat-card, .chat-card.move-card)
+  .partial {
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}
+
+body:is(.fe-retro-theme.fe-retro-system-dw, .fe-userbg-base-black)
+  .chat-message :is(.dw-chat-card, .chat-card.move-card)
+  .failure {
+  color: hsl(0deg 70% 68%) !important;
+}
+
+body:is(.fe-retro-theme.fe-retro-system-dw, .fe-userbg-base-black)
+  .chat-message :is(.dw-chat-card, .chat-card.move-card)
+  .success {
+  color: hsl(210deg 70% 68%) !important;
+}
+
+/* 피해/치유 버튼은 color:#000 on rgba(0,0,0,.1) — 검정 카드에서 완전히 소실.
+   버튼의 의미색(빨강/초록 inset + border)은 유지하고 글자만 올린다.
+   :hover 는 시스템이 이미 #fff 를 주므로 건드리지 않는다. */
+body:is(.fe-retro-theme.fe-retro-system-dw, .fe-userbg-base-black)
+  .chat-message .message-content
+  .chat-damage-buttons .button:is(.damage, .heal):not(:hover) {
+  color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
+}

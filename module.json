@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.7.9",
+  "version": "2.8.0",
   "authors": [
     {
       "name": "nayuri",
@@ -60,6 +60,7 @@
     { "src": "styles/fe-retro-common.css", "layer": "layouts" },
     { "src": "styles/fe-retro-forms.css", "layer": "layouts" },
     { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" },
+    { "src": "styles/fe-dw-compat.css", "layer": "layouts" },
     { "src": "styles/fe-crlngn-compat.css", "layer": "layouts" },
     "styles/fe-image-hover.css",
     "styles/fe-theatre.css",
@@ -96,7 +97,7 @@
     "verified": "14.367",
     "maximum": "14"
   },
-  "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd and dnd5e. 「부레옥잠-!」",
+  "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd, dnd5e and Dungeon World. 「부레옥잠-!」",
   "url": "https://github.com/EnYuri/female_edition",
   "bugs": "https://github.com/EnYuri/female_edition/issues",
   "manifest": "https://github.com/EnYuri/female_edition/releases/latest/download/module.json",

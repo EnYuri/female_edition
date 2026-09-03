@@ -12,9 +12,11 @@
 //     native tooltip element + positioning + 500ms long-hover delay).
 //
 // System-agnostic: the name is read from the element's own `name` / `data-*`
-// attributes, which both dnd5e and double-cross-3rd author on their editable
-// fields and many display elements. A few dnd5e semantic shortcuts
-// (data-ability / data-skill / data-tool) are mapped to canonical names.
+// attributes, which dnd5e, double-cross-3rd and Dungeon World all author on their
+// editable fields and many display elements. A few dnd5e semantic shortcuts
+// (data-ability / data-skill / data-tool) are mapped to canonical names, and
+// Dungeon World's prefix-less `data-attr` is qualified (see
+// `feAphQualifySystemPath`).
 //
 // Self-contained: two client settings (config:false; surfaced in the unified
 // female_edition settings menu) + one keybinding, no cross-module imports beyond
@@ -31,7 +33,7 @@
 // helper YIELDS image/portrait elements, so it never pops a name tooltip over
 // artwork. Disjoint by target.
 
-import { MODULE_ID, S, FE_DEFAULTS } from "./fe-constants.js";
+import { MODULE_ID, S, FE_DEFAULTS, feIsDungeonWorldSystemId } from "./fe-constants.js";
 
 // Attributes, in priority order, whose value is (or contains) a document data
 // path. `name` is handled separately first (form controls + generic name attr).
@@ -98,6 +100,25 @@ function feAphRegisterSetting() {
 // Name resolution
 // ------------------------------------------------------------------
 
+// Dungeon World authors its rollable/display elements with a `system.`-LESS
+// `data-attr` (`data-attr="attributes.hp.value"`), while its own form controls
+// carry the fully qualified `name="system.attributes.hp.value"`. Hovering the
+// two halves of the same field would otherwise report two different paths, and
+// the bare one cannot be pasted into a macro or an Active Effect key. Qualify it
+// — gated on the system so no other system's `data-attr` convention is touched,
+// and only for a known DW data root so an already-absolute or non-system path
+// (`name`, `img`, `flags.…`) is left alone.
+const FE_APH_DW_BARE_ROOTS = ["attributes.", "abilities.", "details.", "resources."];
+
+function feAphQualifySystemPath(name) {
+  if (typeof name !== "string" || !name) return name;
+  try {
+    if (!feIsDungeonWorldSystemId(globalThis.game?.system?.id)) return name;
+  } catch { return name; }
+  if (/^(?:system|flags)\./.test(name)) return name;
+  return FE_APH_DW_BARE_ROOTS.some((root) => name.startsWith(root)) ? `system.${name}` : name;
+}
+
 // Read a name from a single element (no traversal). Returns { name, source } or null.
 function feAphReadName(node) {
   if (!node || node.nodeType !== 1) return null;
@@ -113,7 +134,7 @@ function feAphReadName(node) {
 
   for (const attr of FE_APH_PATH_ATTRS) {
     const v = node.getAttribute?.(attr);
-    if (v) return { name: v, source: attr };
+    if (v) return { name: feAphQualifySystemPath(v), source: attr };
   }
 
   // dnd5e semantic shortcuts → canonical paths.
