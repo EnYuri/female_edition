@@ -516,11 +516,24 @@ body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-messag
  * systems paint the texture straight onto the message element's own `background-image`.
  * Neutralize that too so texture removal works on EVERY system — keeping the player-color
  * tint (which uses background-color + box-shadow, not background-image) intact. Narrator /
- * round-marker surfaces are excluded (they intentionally keep their own background). */
+ * round-marker surfaces are excluded (they intentionally keep their own background).
+ *
+ * `background-color: transparent` sits next to it for the same reason, added after Dungeon
+ * World exposed the gap: DW paints its message as a flat OPAQUE `.message{background:#fff}`
+ * (no image at all — verified via `styles/dist/dungeonworld.css`), so the image-only strip
+ * above left it fully white. That white paint is a plain (non-`!important`) declaration in
+ * the `system` layer, so under the module's OTHER supported systems (dnd5e/dx3rd), whose
+ * default message background is already transparent or near-transparent, this new line is a
+ * no-op — the black `.sidebar-tab` background (`fe-retro-common.css`) already showed through
+ * on its own. It only does new work for a system that opaquely paints the message itself.
+ * Stays `!important` and same selector/exclusions as the image strip above so both properties
+ * share one gate and the player-color tint (which needs `.fe-has-user-color`, one class more
+ * specific than this selector) keeps winning over it unchanged. */
 body.fe-strip-chat-textures
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
   :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background-image: none !important;
+  background-color: transparent !important;
 }
 
 /* Optional flat paper-tone correction. OFF leaves a stripped card without a

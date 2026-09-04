@@ -328,6 +328,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       [S.SYSTEM_MSG_BG_COLOR]: feRead(S.SYSTEM_MSG_BG_COLOR),
       [S.FORCE_NORMAL_MSG_COLOR]: feRead(S.FORCE_NORMAL_MSG_COLOR),
       [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
+      [S.MSG_BORDER_USER_COLOR]: feRead(S.MSG_BORDER_USER_COLOR),
       [S.ACCENT_TEXT_OVERRIDE]: feRead(S.ACCENT_TEXT_OVERRIDE),
 
       // Markdown / Edit
@@ -793,7 +794,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
         bool(S.SYSTEM_MSG_BG_ENABLED), str(S.SYSTEM_MSG_BG_COLOR),
         bool(S.FORCE_NORMAL_MSG_COLOR),
-        bool(S.CHAT_GROUP_OUTLINE),
+        bool(S.CHAT_GROUP_OUTLINE), bool(S.MSG_BORDER_USER_COLOR),
 
         // Retro theme (general — visible/saved in all systems). The accent is
         // edited from the chat-control swatch, so only the reset path touches it.

@@ -43,6 +43,7 @@ import {
   feSetUiFontClass, feSetNeodgmModeClass, feSetUserFontMode, feSetRetroThemeClass,
   feApplyDoubleCrossLegacyPixiTheme, feInstallDoubleCrossLegacyPixiTheme,
   feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetPaperOverlayClass, feSetChatGroupOutlineClass,
+  feSetHideMsgBorderUserColorClass,
   feNormalizeChoice,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
@@ -157,6 +158,7 @@ function feApplyVisualSettingsToDocument(doc = document) {
   try { feSetPaperOverlayClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgBaseClass(doc); } catch { /* no-op */ }
   try { feSetChatGroupOutlineClass(doc); } catch { /* no-op */ }
+  try { feSetHideMsgBorderUserColorClass(doc); } catch { /* no-op */ }
   try { feSetAccentTextOverrideClass(doc); } catch { /* no-op */ }
   try { feSetSystemMsgColorClass(doc); } catch { /* no-op */ }
   try { feSetForceNormalMsgColorClass(doc); } catch { /* no-op */ }
@@ -762,6 +764,16 @@ Hooks.once("init", () => {
     type: Boolean,
     default: FE_DEFAULTS[S.CHAT_GROUP_OUTLINE],
     onChange: () => feSetChatGroupOutlineClass(document),
+  });
+
+  game.settings.register(MODULE_ID, S.MSG_BORDER_USER_COLOR, {
+    name: "채팅: 메시지 테두리 유저색 표시",
+    hint: "코어 Foundry가 화자 없는(OOC) 메시지 테두리에 자동으로 입히는 발신자 유저 색상을 표시합니다. 끄면 기본 테두리색(레트로 테마에서는 레트로 강조색)으로 되돌립니다. '병합 그룹 외곽선'이 켜져 있으면 그쪽이 우선합니다.",
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: FE_DEFAULTS[S.MSG_BORDER_USER_COLOR],
+    onChange: () => feSetHideMsgBorderUserColorClass(document),
   });
 
   game.settings.register(MODULE_ID, S.ACCENT_TEXT_OVERRIDE, {
@@ -1521,6 +1533,7 @@ export {
   feSetUserColorBgClass,
   feSetPaperOverlayClass,
   feSetChatGroupOutlineClass,
+  feSetHideMsgBorderUserColorClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,

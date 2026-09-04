@@ -381,6 +381,13 @@ function feSetChatGroupOutlineClass(doc = document) {
   } catch {}
 }
 
+function feSetHideMsgBorderUserColorClass(doc = document) {
+  try {
+    const enabled = !!feSetting(S.MSG_BORDER_USER_COLOR);
+    doc?.body?.classList?.toggle("fe-hide-msg-border-usercolor", !enabled);
+  } catch {}
+}
+
 function feSetAccentTextOverrideClass(doc = document) {
   try {
     const enabled = !!feSetting(S.ACCENT_TEXT_OVERRIDE);
@@ -748,6 +755,7 @@ export {
   feSetUserColorBgBaseClass,
   feNormalizeChoice,
   feSetChatGroupOutlineClass,
+  feSetHideMsgBorderUserColorClass,
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
