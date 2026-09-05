@@ -516,23 +516,48 @@ body.fe-strip-chat-textures #fe-chat-export-container :is(.message, .chat-messag
  * systems paint the texture straight onto the message element's own `background-image`.
  * Neutralize that too so texture removal works on EVERY system — keeping the player-color
  * tint (which uses background-color + box-shadow, not background-image) intact. Narrator /
- * round-marker surfaces are excluded (they intentionally keep their own background).
- *
- * `background-color: transparent` sits next to it for the same reason, added after Dungeon
- * World exposed the gap: DW paints its message as a flat OPAQUE `.message{background:#fff}`
- * (no image at all — verified via `styles/dist/dungeonworld.css`), so the image-only strip
- * above left it fully white. That white paint is a plain (non-`!important`) declaration in
- * the `system` layer, so under the module's OTHER supported systems (dnd5e/dx3rd), whose
- * default message background is already transparent or near-transparent, this new line is a
- * no-op — the black `.sidebar-tab` background (`fe-retro-common.css`) already showed through
- * on its own. It only does new work for a system that opaquely paints the message itself.
- * Stays `!important` and same selector/exclusions as the image strip above so both properties
- * share one gate and the player-color tint (which needs `.fe-has-user-color`, one class more
- * specific than this selector) keeps winning over it unchanged. */
+ * round-marker surfaces are excluded (they intentionally keep their own background). */
 body.fe-strip-chat-textures
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
   :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background-image: none !important;
+}
+
+/* `background-color: transparent` — same reason, added after Dungeon World exposed the gap:
+ * DW paints its message as a flat OPAQUE `.message{background:#fff}` (no image at all —
+ * verified via `styles/dist/dungeonworld.css`), so the image-only strip above left it fully
+ * white. That white paint is a plain (non-`!important`) declaration in the `system` layer, so
+ * under the module's OTHER supported systems (dnd5e/dx3rd), whose default message background
+ * is already transparent or near-transparent, this line is a no-op — the black `.sidebar-tab`
+ * background (`fe-retro-common.css`) already showed through on its own. It only does new work
+ * for a system that opaquely paints the message itself.
+ *
+ * Kept as a SEPARATE rule from the `background-image` one above (not merged back into it)
+ * because it needs one more exclusion: `.fe-system-msg`. A GM/system message's own opaque
+ * background (`body.fe-system-msg-bg … .chat-message.fe-system-msg { background: var(...)
+ * !important }`, further up this file) carries only ONE extra class over `:is(.message,
+ * .chat-message)`, while this rule's six `:not()` clauses (each counts toward specificity)
+ * made it MORE specific than that dedicated rule — so this transparent paint was winning and
+ * silently blanking the system-message background feature (live report: GM/system messages
+ * went transparent and the opaque bg setting stopped doing anything, while narrator chat —
+ * /desc, /narrate — stayed fine, since those already had their own exclusion here).
+ * `.fe-system-msg` is excluded now for the same reason narrator/round-marker already are: it
+ * intentionally keeps its own background, gated by a different toggle (ceSystemMsgBgEnabled).
+ *
+ * That fix immediately created a SECOND, subtler one: adding a 7th `:not()` pushed this
+ * selector's specificity to an exact TIE with the ordinary player opaque-background rule
+ * (`body:is(.fe-userbg-base-white, …) .chat-message.fe-has-user-color:not(…)×6`, further up
+ * this file) — both land on 1 ID + 9 classes. A specificity tie falls back to source order,
+ * and this rule sits LATER in the file, so it started winning there too: every non-GM
+ * player's card background went transparent/dark, even with "채팅카드 하부 배경" configured.
+ * Verified live. `:not(.fe-has-user-color)` closes that gap — a message carrying that class
+ * already has its own dedicated background story (the base-white/black/custom rule, or the
+ * tint), so this rule has no business repainting it regardless of how the specificity math
+ * happens to land. Any FUTURE exclusion added here needs the same sanity check: does its new
+ * specificity total still lose to every rule this selector is supposed to defer to? */
+body.fe-strip-chat-textures
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
+  :is(.message, .chat-message):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)):not(.fe-system-msg):not(.fe-has-user-color) {
   background-color: transparent !important;
 }
 
