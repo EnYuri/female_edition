@@ -349,6 +349,47 @@ body.fe-system-msg-bg #chat-notifications
   color: var(--fe-system-msg-text, inherit) !important;
 }
 
+/* 레트로 테마 + 하부 배경색 켜짐: 배경(사용자가 고른 색)은 그대로 두고, 발신자
+ * 이름만 다른 모든 메시지와 똑같이 레트로 강조색으로 되돌린다.
+ *
+ * 이유: fe-retro-common.css 의 "공통 최상위 강조 텍스트" 규칙
+ * (`body.fe-retro-theme .message-sender { color: var(--fe-dx3rd-accent) !important }`)
+ * 이 모든 발신자 이름을 강조색으로 칠하는데, 그 선택자는 클래스 2개(ID 없음)뿐이라
+ * 위쪽 `.fe-system-msg .message-header .message-sender` 규칙(ID 1개 + 클래스 5개,
+ * `--fe-system-msg-text` 사용)에 명시도로 밀린다. 그래서 GM/시스템 메시지만
+ * 발신자 이름이 (배경색 기준 흑백 대비인) `--fe-system-msg-text` 로 남고 다른
+ * 메시지처럼 강조색이 적용되지 않았다 — 신고된 그 문제.
+ *
+ * 본문(.message-content)은 손대지 않는다 — 다른 발신자 이름 강조 규칙도 본문까지는
+ * 건드리지 않고, 배경 대비로 계산된 `--fe-system-msg-text` 가 본문 가독성에는
+ * 여전히 맞는 값이다. */
+body.fe-retro-theme.fe-system-msg-bg
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-system-msg .message-header .message-sender,
+body.fe-retro-theme.fe-system-msg-bg #chat-notifications
+  .message.fe-system-msg .message-header .message-sender {
+  color: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* 레트로 테마 + 하부 배경색 꺼짐: "하부 배경색" 자체를 안 켰다고 해서 배경이
+ * 없어야 하는 건 아니다 — 레트로는 기본적으로 채팅을 검게 칠하는 테마이므로,
+ * GM/시스템 메시지도 기본값은 검정이어야 한다. 이 규칙이 없으면 §2d 텍스처
+ * 제거 규칙이 `.fe-system-msg` 를 일부러 건드리지 않게 걸어 둔 exclusion 때문에
+ * (이 파일 위쪽 "System-agnostic element-level texture strip" 참고), 시스템별로
+ * 원래 있던 배경(예:
+ * Dungeon World 의 `.message{background:#fff}`)이 그대로 새어 나온다 —
+ * "하부 배경색을 설정 안 해도 기본은 검정이어야 한다"는 것과 반대로 흰색이
+ * 남는 상태. `:not(.fe-system-msg-bg)` 로 이 규칙과 위 사용자 지정 배경 규칙이
+ * 서로 배타적으로 갈리게 해서, 사용자가 직접 색을 고르면 항상 그 색이 이긴다. */
+body.fe-retro-theme:not(.fe-system-msg-bg)
+  :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-message.fe-system-msg,
+body.fe-retro-theme:not(.fe-system-msg-bg) #chat-notifications
+  .message.fe-system-msg {
+  background: #000000 !important;
+  background-blend-mode: normal !important;
+}
+
 /* Optional GM-color tint for speakerless system messages. This is independent
  * from the ordinary user-color tint, so it never recolors normal chat cards. */
 body.fe-system-msg-color
