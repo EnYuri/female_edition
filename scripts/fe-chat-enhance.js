@@ -15,6 +15,7 @@ import {
   MODULE_ID, FE_DX3RD_SYSTEM_IDS, feIsDx3rdSystemId, LEGACY_UI_FONT_KEY, S,
   FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY,
+  FE_CORE_PRIORITY_OVERRIDES_KEY, FE_CORE_PRIORITY_BACKUP_KEY,
 } from "./fe-constants.js";
 
 import {
@@ -35,6 +36,13 @@ import {
   feHydrateWorldSettings, feCaptureWorldSettings, feIsPerWorldSettingKey,
   feFireChatUiUpdated, feSetting,
 } from "./fe-gm-priority.js";
+
+import {
+  feSyncingLocalCoreSettings,
+  feIsCorePriorityEnabled, feIsCorePriorityKey, feHasCoreOverride,
+  feMirrorCoreSetting, feSyncLocalCoreSettings, feRestoreLocalCoreSettings,
+  feSeedCoreOverridesFromLocal,
+} from "./fe-core-priority.js";
 
 import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapProseMirrorHTML } from "./fe-markdown.js";
 
@@ -227,6 +235,27 @@ Hooks.once("init", () => {
   // See fe-gm-priority.js (feSyncLocalGmPrioritySettings / feRestoreLocalGmPrioritySettings).
   game.settings.register(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {
     name: "(internal) GM-priority value backup",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
+  });
+
+  // Core-setting enforcement stores. Same shape as the pair above but for
+  // Foundry's own "core" namespace — see fe-core-priority.js.
+  game.settings.register(MODULE_ID, FE_CORE_PRIORITY_OVERRIDES_KEY, {
+    name: "(internal) core-setting overrides",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => {
+      void feSyncLocalCoreSettings();
+    },
+  });
+
+  game.settings.register(MODULE_ID, FE_CORE_PRIORITY_BACKUP_KEY, {
+    name: "(internal) core-setting value backup",
     scope: "client",
     config: false,
     type: Object,
@@ -859,6 +888,27 @@ Hooks.once("init", () => {
     },
   });
 
+  game.settings.register(MODULE_ID, S.CORE_PRIORITY_ENABLED, {
+    name: "일반 환경 설정 GM 강제",
+    hint: "활성화 시 Foundry 자체의 '환경 설정' 항목(광원 애니메이션, 토큰 시야 애니메이션, 말풍선, 성능 모드, 최대 FPS, 언어, 광과민성 모드 등)이 GM의 값으로 모든 플레이어에게 강제 적용됩니다. 클라이언트 설정은 브라우저 주소(오리진)별로 따로 저장되므로, 같은 서버를 로컬 주소와 외부 주소로 접속하면 값이 서로 달라집니다 — 이 기능은 그 차이를 GM 기준으로 통일합니다. 끄면 각 플레이어의 원래 값으로 되돌아갑니다.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: FE_DEFAULTS[S.CORE_PRIORITY_ENABLED],
+    onChange: (value) => {
+      // World-scope toggle — this onChange fires on every connected client.
+      if (value) {
+        void (async () => {
+          if (game.user?.isGM) await feSeedCoreOverridesFromLocal({ force: true });
+          await feSyncLocalCoreSettings();
+        })();
+      } else {
+        void feRestoreLocalCoreSettings();
+      }
+    },
+  });
+
   game.settings.register(MODULE_ID, S.GM_SPEAK_AS_SELF, {
     name: "GM: PC 토큰 선택 시 본인 이름으로 채팅",
     hint: "활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.",
@@ -910,8 +960,25 @@ function _feScheduleWorldCapture() {
 
 Hooks.on("clientSettingChanged", (fullKey, value) => {
   try {
-    if (feSyncingLocalGmPrioritySettings) return;
     const keyPath = String(fullKey ?? "").trim();
+
+    // Foundry's OWN client settings (fe-core-priority.js). Handled before the
+    // module-namespace branch below because they live under "core.", not
+    // "female_edition.", and would otherwise be filtered out entirely.
+    if (keyPath.startsWith("core.")) {
+      if (feSyncingLocalCoreSettings) return;
+      if (!feIsCorePriorityEnabled()) return;
+      const coreKey = keyPath.slice(5);
+      if (!feIsCorePriorityKey(coreKey)) return;
+      // The GM edited it in Foundry's settings panel → publish to players.
+      if (game.user?.isGM) void feMirrorCoreSetting(coreKey, value);
+      // A player edited a key the GM is forcing → put it straight back. Without
+      // this the enforcement would only hold until the player opened 환경 설정.
+      else if (feHasCoreOverride(coreKey)) void feSyncLocalCoreSettings({ keys: [coreKey] });
+      return;
+    }
+
+    if (feSyncingLocalGmPrioritySettings) return;
     if (!keyPath.startsWith(`${MODULE_ID}.`)) return;
     const key = keyPath.slice(MODULE_ID.length + 1);
     // Capture per-world for ALL client-scope keys (incl. GM-priority-excluded
@@ -953,6 +1020,14 @@ Hooks.once("ready", async () => {
     // Enforcement is off — undo any forced values left over from a previous
     // session (e.g. the GM disabled it while this client was offline).
     await feRestoreLocalGmPrioritySettings();
+  }
+  // Same two-way handling for Foundry's own client settings. Independent of the
+  // module's GM priority above — the two features are separately toggled.
+  if (feIsCorePriorityEnabled()) {
+    if (game.user?.isGM) await feSeedCoreOverridesFromLocal();
+    await feSyncLocalCoreSettings();
+  } else {
+    await feRestoreLocalCoreSettings();
   }
   // Re-apply now that world settings are hydrated and GM priority is synced —
   // the `setup` pass above painted from un-synced values. Same idempotent call.

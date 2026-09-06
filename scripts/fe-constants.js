@@ -96,6 +96,12 @@ const S = {
   EDIT_ENABLED: "ceEditEnabled",
   GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
   GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
+  // Forces Foundry's OWN client-scope settings (the 환경 설정 panel) from the GM
+  // onto every player. Separate from GM_PRIORITY_ENABLED and default OFF: that
+  // one only redirects reads of THIS module's settings, while this one
+  // write-through overwrites core values in each player's localStorage.
+  // See fe-core-priority.js.
+  CORE_PRIORITY_ENABLED: "ceCorePriorityEnabled",
   DX3RD_RUI_ENABLED: "ceDx3rdRuiEnabled",
   DX3RD_RUI_VISIBLE: "ceDx3rdRuiVisible",
   DX3RD_RUI_PORTRAIT_WIDTH: "ceDx3rdRuiPortraitWidth",
@@ -206,6 +212,7 @@ const FE_DEFAULTS = {
   [S.EDIT_ENABLED]: true,
   [S.GM_PRIORITY_ENABLED]: true,
   [S.GM_SPEAK_AS_SELF]: false,
+  [S.CORE_PRIORITY_ENABLED]: false,
   [S.DX3RD_RUI_ENABLED]: true,
   [S.DX3RD_RUI_VISIBLE]: true,
   [S.DX3RD_RUI_PORTRAIT_WIDTH]: 100,
@@ -267,6 +274,31 @@ const FE_GM_PRIORITY_BACKUP_KEY = "feGmPriorityBackup";
 // id so each world keeps an independent copy of the user's preferences.
 const FE_WORLD_SETTINGS_KEY = "feWorldSettings";
 
+// ---------------------------------------------------------------------
+// Core client-setting enforcement stores (fe-core-priority.js). Deliberately
+// separate documents from the GM-priority pair above: those hold THIS module's
+// keys, these hold Foundry's own "core" namespace keys, and mixing the two
+// namespaces in one object would make every key lookup ambiguous.
+// ---------------------------------------------------------------------
+
+// World-scope. { [coreSettingKey]: value } — the GM's values for Foundry's own
+// client settings, seeded from the GM's local values and pushed to players.
+const FE_CORE_PRIORITY_OVERRIDES_KEY = "feCorePriorityOverrides";
+
+// Client-scope. Each player's OWN core-setting values, captured the first time a
+// key is overwritten by a force-sync. Unlike the module-settings case (which can
+// intercept at read time), core enforcement must overwrite the real stored value,
+// so this backup is the ONLY record of the player's choice and the only way
+// turning the feature off can restore it.
+const FE_CORE_PRIORITY_BACKUP_KEY = "feCorePriorityBackup";
+
+// Core setting keys NEVER forced. Empty by explicit decision (2026-09-06): the
+// GM asked for all 14 user-facing core client settings to be forced, accepting
+// that this includes 성능 모드 / 최대 FPS (ignores each player's hardware) and
+// 광과민성 모드 (an accessibility setting). Kept as a named, wired-up set so a
+// single key can be carved out later without touching fe-core-priority.js.
+const FE_CORE_PRIORITY_EXCLUDED_KEYS = new Set([]);
+
 // Keys NEVER forced by "GM 설정 전역 강제" (feSeedGmPriorityOverridesFromLocal
 // seeds EVERY other client-scope module setting, so anything NOT listed here IS
 // forced onto all players when GM priority is enabled). Policy (per request): when
@@ -302,6 +334,7 @@ const FE_GM_PRIORITY_EXCLUDED_KEYS = new Set([
   // World-scope sentinels (never client-forced anyway).
   S.GM_PRIORITY_ENABLED,
   S.GM_SPEAK_AS_SELF,
+  S.CORE_PRIORITY_ENABLED,
 ]);
 
 const FE_RENDER_STATE_FLAG = "renderState";
@@ -328,6 +361,9 @@ export {
   FE_GM_PRIORITY_BACKUP_KEY,
   FE_WORLD_SETTINGS_KEY,
   FE_GM_PRIORITY_EXCLUDED_KEYS,
+  FE_CORE_PRIORITY_OVERRIDES_KEY,
+  FE_CORE_PRIORITY_BACKUP_KEY,
+  FE_CORE_PRIORITY_EXCLUDED_KEYS,
   FE_RENDER_STATE_FLAG,
   FE_RENDER_SPECIAL_KIND_FLAG,
   FE_RENDER_MERGE_HINT_FLAG,

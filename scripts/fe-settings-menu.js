@@ -6,6 +6,7 @@ import {
   feIsDx3rdSystemId, feSetting, feCaptureWorldSettings,
 } from "./fe-chat-enhance.js";
 import { feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported } from "./fe-user-font.js";
+import { feListCorePriorityKeys } from "./fe-core-priority.js";
 
 // ── Portrait settings (registered by fe-chat-portrait.js under MODULE_ID) ──
 
@@ -338,6 +339,7 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       // GM priority
       [S.GM_PRIORITY_ENABLED]: feRead(S.GM_PRIORITY_ENABLED),
       [S.GM_SPEAK_AS_SELF]:    feRead(S.GM_SPEAK_AS_SELF),
+      [S.CORE_PRIORITY_ENABLED]: feRead(S.CORE_PRIORITY_ENABLED),
 
       // DND5e injection
       injectCustomConditions:  feRead("injectCustomConditions"),
@@ -467,6 +469,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       localFontsSupported: feLocalFontsSupported(),
       warnings: { chatPortraitDup: feIsChatPortraitModuleActive() },
       isGM:     !!game.user?.isGM,
+      // Rendered as the "이런 것들이 강제됩니다" list. Read from the LIVE core
+      // settings registry rather than hardcoded in the template, so a Foundry
+      // update that adds or drops a client setting cannot make the note lie.
+      corePriorityKeys: feListCorePriorityKeys(),
       isDx3rd:  feIsDx3rdSystem(),
       isDnd5e:  feIsDnd5eSystem(),
       // Status UI (fe-dx3rd-resource-ui) works on both dx3rd and dnd5e.
@@ -763,7 +769,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
         bool(S.MARKDOWN_ENABLED), bool(S.EDIT_ENABLED),
 
         // GM priority (world-scoped — non-GMs lack write permission)
-        ...(game.user?.isGM ? [bool(S.GM_PRIORITY_ENABLED), bool(S.GM_SPEAK_AS_SELF)] : []),
+        ...(game.user?.isGM ? [
+          bool(S.GM_PRIORITY_ENABLED), bool(S.GM_SPEAK_AS_SELF),
+          bool(S.CORE_PRIORITY_ENABLED),
+        ] : []),
 
         // Export
         bool(S.EXPORT_ENABLED), bool(S.EXPORT_AUTO_PRINT), bool(S.EXPORT_OPTIMIZE),

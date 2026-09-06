@@ -1,5 +1,20 @@
-import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS } from "./fe-constants.js";
+import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS, FE_CORE_PRIORITY_OVERRIDES_KEY, FE_CORE_PRIORITY_BACKUP_KEY } from "./fe-constants.js";
 import { feHasOwn, feValuesEqual } from "./fe-util.js";
+
+// Infrastructure stores — module-namespace settings that hold OTHER settings'
+// values. They must never themselves be GM-forced or captured per-world, or the
+// enforcement/per-world machinery would recursively rewrite its own bookkeeping.
+// FE_CORE_PRIORITY_BACKUP_KEY especially: it is client-scope like a normal
+// preference, so without this list it WOULD be swept up by both, and forcing one
+// player's core-setting backup onto everyone else would destroy the only record
+// of their personal values.
+const FE_INFRASTRUCTURE_KEYS = new Set([
+  FE_GM_PRIORITY_OVERRIDES_KEY,
+  FE_GM_PRIORITY_BACKUP_KEY,
+  FE_WORLD_SETTINGS_KEY,
+  FE_CORE_PRIORITY_OVERRIDES_KEY,
+  FE_CORE_PRIORITY_BACKUP_KEY,
+]);
 
 let feSyncingLocalGmPrioritySettings = false;
 let feHydratingWorldSettings = false;
@@ -22,9 +37,7 @@ function feIsGmPriorityEnabled() {
 
 function feIsGmPrioritySettingKey(key) {
   try {
-    if (!key || key === FE_GM_PRIORITY_OVERRIDES_KEY) return false;
-    if (key === FE_GM_PRIORITY_BACKUP_KEY) return false;
-    if (key === FE_WORLD_SETTINGS_KEY) return false;
+    if (!key || FE_INFRASTRUCTURE_KEYS.has(key)) return false;
     if (FE_GM_PRIORITY_EXCLUDED_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
@@ -311,8 +324,7 @@ function feGetWorldId() {
 // female_edition setting that is not one of the infrastructure stores.
 function feIsPerWorldSettingKey(key) {
   try {
-    if (!key) return false;
-    if (key === FE_WORLD_SETTINGS_KEY || key === FE_GM_PRIORITY_OVERRIDES_KEY || key === FE_GM_PRIORITY_BACKUP_KEY) return false;
+    if (!key || FE_INFRASTRUCTURE_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
     return String(cfg.scope ?? "") === "client";
