@@ -34,6 +34,24 @@ const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
 // Collapsed (minimized) state — a client runtime flag, reset on reload.
 let _ctCollapsed = false;
 
+// Entrance animation ("위에서 부드럽게 내려와 정지"). Must be per-combatant and
+// TIME-BASED, not a plain CSS class: feCtRender rebuilds the strip with innerHTML on
+// every combat/actor/token hook, so a freshly-created node would replay (or, once the
+// id is known, abruptly lose) its animation on any unrelated update mid-flight.
+// _ctEnterStart remembers WHEN each combatant's animation began; a re-render hands the
+// node a negative `animation-delay` so it resumes exactly where it was.
+//
+// It is deliberately split in two, because `.fe-ct-combatants` is `overflow-y: hidden`
+// (it must be — the strip's scrollbar is flipped to the top): a portrait animated with a
+// vertical travel INSIDE the strip would simply be clipped and never seen. So the
+// "위에서 내려온다" travel is played by the whole bar (`.fe-ct-inner`, which nothing
+// clips), while individual portraits fade/scale in place with a stagger.
+const CT_ENTER_MS = 420;
+const CT_ENTER_STAGGER_MS = 55;
+const CT_BAR_ENTER_MS = 520;
+const _ctEnterStart = new Map(); // combatantId -> performance.now() timestamp
+let _ctBarEnterStart = 0;        // 0 = tracker is not on screen; set when it appears
+
 // ── settings access ─────────────────────────────────────────────────────────
 
 function feCtSetting(key) {
@@ -153,6 +171,43 @@ function feCtCanEndTurnForCombatant(combat, combatant, user = game.user) {
   return combat.combatant?.id === combatant.id;
 }
 
+// ── initiative rolling ──────────────────────────────────────────────────────
+//
+// Rolling goes through `combat.rollInitiative([id])` — core's own path — for a
+// deliberate reason: on dnd5e that method builds the roll from
+// `Actor5e#getInitiativeRoll()`, i.e. the actor sheet's OWN advantage/disadvantage
+// fields, and evaluates it directly. The 유리/불리 prompt the user sees in the
+// native encounter tab comes from the OTHER dnd5e entry point
+// (`actor.rollInitiativeDialog()`, combat-tracker action "rollInitiative"), which
+// we intentionally never call — rolling from this tracker must be one click.
+// For the same reason no `{event}` is forwarded: dnd5e reads keyboard modifiers
+// off it to flip advantage.
+
+// In-flight guard. The rollable test reads the LIVE `initiative`, which is still null
+// until the roll's update round-trips — so a double-click (or an impatient second click
+// on 전체 굴림) would pass the guard twice and roll the same combatant twice before the
+// first call resolves. dblclick on the d20 is already ignored for opening the sheet, but
+// a dblclick still delivers TWO click events, so this has to be handled here.
+const _ctRollingIds = new Set();
+let _ctRollingAll = false;
+
+function feCtNeedsInitiative(c) {
+  return !!c && (c.initiative === null || c.initiative === undefined);
+}
+
+// A combatant is rollable by this user when it has no initiative yet and the user
+// owns it (GM owns everything). Core's rollInitiative skips non-owners anyway, so
+// this only decides whether the affordance is drawn.
+function feCtCanRollInitiative(c, user = game.user) {
+  if (!feCtNeedsInitiative(c) || _ctRollingIds.has(c.id)) return false;
+  return feCtUserOwnsCombatant(c, user);
+}
+
+// Does the current user have anything left to roll in this encounter?
+function feCtHasUnrolledCombatants(combat) {
+  return !!combat?.turns?.some((c) => feCtCanRollInitiative(c));
+}
+
 function feCtEsc(s) {
   const fn = foundry.utils?.escapeHTML;
   if (typeof fn === "function") return fn(String(s ?? ""));
@@ -185,12 +240,13 @@ function feCtEnsureRoot() {
   return root;
 }
 
-function feCtPortraitHTML(c, active, canEndTurn) {
+function feCtPortraitHTML(c, active, canEndTurn, enterDelay = null) {
   const img = feCtPortraitImage(c);
   const name = feCtEsc(c.name);
   const init = c.initiative;
   const cls = ["fe-ct-portrait"];
   if (active) cls.push("is-active");
+  if (enterDelay != null) cls.push("is-entering");
   if (c.isDefeated) cls.push("is-defeated");
   if (c.hidden) cls.push("is-hidden");
 
@@ -232,8 +288,25 @@ function feCtPortraitHTML(c, active, canEndTurn) {
           `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.EndTurn", "턴 종료"))}">&gt;&gt;</span>` +
       `</div>`
     : "";
+
+  // Roll-initiative affordance: a d20 centred on the portrait, drawn only when this
+  // combatant has NO initiative yet and the viewer owns it. Suppressed while the
+  // end-turn ">>" is showing so the two never overlap on one portrait.
+  const rollInitBtn =
+    !canEndTurn && feCtCanRollInitiative(c)
+      ? `<div class="fe-ct-rollinit">` +
+          // `far` (regular) = the outline d20 — the same icon Carousel Combat Tracker
+          // uses (`scripts/systems.js` default `rollIcon: "far fa-dice-d20"`). Foundry
+          // bundles Font Awesome PRO webfonts (fa-regular-400.woff2 is present), so the
+          // regular weight really renders instead of falling back to solid.
+          `<i class="far fa-dice-d20" data-ct-rollinit="1" ` +
+            `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.RollInit", "이니셔티브 굴리기"))}"></i>` +
+        `</div>`
+      : "";
+
+  const enterStyle = enterDelay != null ? ` style="animation-delay:${Math.round(enterDelay)}ms"` : "";
   return (
-    `<div class="${cls.join(" ")}" data-combatant-id="${c.id}" data-tooltip="${name}">` +
+    `<div class="${cls.join(" ")}" data-combatant-id="${c.id}" data-tooltip="${name}"${enterStyle}>` +
     `<div class="fe-ct-frame"${frameStyle}>` +
       `<img src="${feCtEsc(img)}" data-fe-src="${feCtEsc(img)}" alt="">` +
     `</div>` +
@@ -243,6 +316,7 @@ function feCtPortraitHTML(c, active, canEndTurn) {
     `${initBadge}` +
     `${hpBar}` +
     `${endTurnBtn}` +
+    `${rollInitBtn}` +
     `</div>`
   );
 }
@@ -269,7 +343,13 @@ function feCtControlsHTML(combat) {
   const startButton = started
     ? ""
     : feCtBtnHTML("start-combat", "fa-circle-play", feCtL("FECT.StartCombat", "전투 개시"));
+  // Shown only while somebody still needs a roll — same self-explanatory pattern as
+  // 전투 개시 (which disappears once the encounter has started).
+  const rollAllButton = feCtHasUnrolledCombatants(combat)
+    ? feCtBtnHTML("roll-all", "fa-dice-d20", feCtL("FECT.RollAll", "이니셔티브 전체 굴림"))
+    : "";
   return (
+    rollAllButton +
     startButton +
     feCtBtnHTML("end-combat", "fa-flag-checkered", feCtL("FECT.EndCombat", "전투 종료")) +
     feCtBtnHTML(
@@ -332,6 +412,9 @@ function feCtRender() {
   if (!combat || !combat.turns?.length) {
     root.classList.remove("fe-ct-active");
     root.innerHTML = "";
+    // Tracker left the screen — the next encounter drops in fresh.
+    _ctBarEnterStart = 0;
+    _ctEnterStart.clear();
     return;
   }
 
@@ -352,14 +435,33 @@ function feCtRender() {
     (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
   );
   const activeId = combat.combatant?.id;
+  // Entrance animation timing. A combatant seen for the first time gets a start stamp
+  // staggered behind the other newcomers in this same pass (so a whole encounter cascades
+  // in), and every render passes the REMAINING delay: positive = not started yet,
+  // negative = resume mid-flight, past the window = no class at all.
+  const nowMs = performance.now();
+  if (!_ctBarEnterStart) _ctBarEnterStart = nowMs;
+  const barDelay = _ctBarEnterStart - nowMs;
+  const barEntering = barDelay > -CT_BAR_ENTER_MS;
+  let newcomers = 0;
   const portraits = combatants
     .map((c) => {
       const isActive = c.id === activeId;
       // ">>" only on the active combatant, and only for a user allowed to end that turn
       const canEndTurn = isActive && feCtCanEndTurnForCombatant(combat, c);
-      return feCtPortraitHTML(c, isActive, canEndTurn);
+      let start = _ctEnterStart.get(c.id);
+      if (start === undefined) {
+        start = nowMs + newcomers * CT_ENTER_STAGGER_MS;
+        newcomers += 1;
+        _ctEnterStart.set(c.id, start);
+      }
+      const delay = start - nowMs;
+      return feCtPortraitHTML(c, isActive, canEndTurn, delay > -CT_ENTER_MS ? delay : null);
     })
     .join("");
+  // Drop stamps for combatants that are gone, so a re-added one animates in again.
+  const liveIds = new Set(combatants.map((c) => c.id));
+  for (const id of [..._ctEnterStart.keys()]) if (!liveIds.has(id)) _ctEnterStart.delete(id);
 
   // The control panel is GM-only; the collapse button alone is also shown to players.
   const center = isGM
@@ -369,8 +471,11 @@ function feCtRender() {
   // .fe-ct-combatants scrolls (overflow-x), so the retro pixel-border decoration
   // (an inset:-10px pseudo-element) would be clipped/scroll with it — wrap it in
   // a non-scrolling positioned wrapper that carries the border instead.
+  const innerAttrs = barEntering
+    ? ` class="fe-ct-inner is-entering" style="animation-delay:${Math.round(barDelay)}ms"`
+    : ` class="fe-ct-inner"`;
   root.innerHTML =
-    `<div class="fe-ct-inner">` +
+    `<div${innerAttrs}>` +
     `<div class="fe-ct-combatants-wrap"><div class="fe-ct-combatants">${portraits}</div></div>` +
     `${center}` +
     `</div>`;
@@ -406,12 +511,22 @@ function feCtBindRootEvents(root) {
       if (port) await feCtHandleEndTurnClick(port.dataset.combatantId);
       return;
     }
+    // The d20 overlay rolls initiative, ahead of portrait select/pan.
+    const rollBtn = ev.target.closest?.("[data-ct-rollinit]");
+    if (rollBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const p = rollBtn.closest?.("[data-combatant-id]");
+      if (p) await feCtRollInitiativeFor(p.dataset.combatantId);
+      return;
+    }
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitClick(port.dataset.combatantId);
   });
   root.addEventListener("dblclick", (ev) => {
-    // Double-clicking the ">>" button must not open the sheet — one click already ended it.
+    // Double-clicking the ">>" / d20 button must not open the sheet — one click already acted.
     if (ev.target.closest?.("[data-ct-endturn]")) return;
+    if (ev.target.closest?.("[data-ct-rollinit]")) return;
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitDblClick(port.dataset.combatantId);
   });
@@ -462,6 +577,19 @@ async function feCtHandleAction(action) {
         break;
       }
       case "end-combat": await combat.endCombat(); break;
+      // Core's rollAll() already filters to owned combatants whose initiative is null,
+      // and on dnd5e it routes through Combat#rollInitiative → no 유리/불리 dialog.
+      case "roll-all": {
+        if (_ctRollingAll) break;
+        if (!feCtHasUnrolledCombatants(combat)) {
+          ui.notifications?.info(feCtL("FECT.NothingToRoll", "이니셔티브를 굴릴 전투원이 없습니다."));
+          break;
+        }
+        _ctRollingAll = true;
+        try { await combat.rollAll(); }
+        finally { _ctRollingAll = false; feCtScheduleRender(); }
+        break;
+      }
       // Pause/resume the encounter without deleting it (same state the native tracker uses)
       case "toggle-active": await combat.update({ active: !combat.active }); break;
     }
@@ -499,6 +627,28 @@ async function feCtHandleEndTurnClick(id) {
     await feCtRequestEndTurn(combat, c);
   } catch (e) {
     console.error("[female_edition] combat-tracker end-turn (>>) failed", e);
+  }
+}
+
+// Portrait d20 click → roll this one combatant's initiative. Players roll their own:
+// core's Combat#rollInitiative writes through updateEmbeddedDocuments, which a combatant
+// OWNER is allowed to do, so no GM socket proxy is needed (unlike ending a turn, which
+// mutates the Combat document itself).
+async function feCtRollInitiativeFor(id) {
+  const combat = feCtGetCombat();
+  const c = combat?.combatants?.get(id);
+  if (!combat || !c) return;
+  if (!feCtCanRollInitiative(c)) return;
+  _ctRollingIds.add(c.id);
+  try {
+    await combat.rollInitiative([c.id]);
+  } catch (e) {
+    console.error("[female_edition] combat-tracker roll initiative failed", e);
+  } finally {
+    _ctRollingIds.delete(c.id);
+    // The updateCombatant hook normally repaints, but a failed/no-op roll fires nothing —
+    // repaint anyway so the d20 comes back instead of staying silently hidden.
+    feCtScheduleRender();
   }
 }
 

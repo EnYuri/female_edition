@@ -60,8 +60,8 @@ body.crlngn-ui #chat-notifications .message:is(.round-marker, .fe-round-marker-c
   color: var(--fe-round-marker-fg, #f2efe8) !important;
 }
 
-body.crlngn-ui :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker),
-body.crlngn-ui #chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker) {
+body.crlngn-ui :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker, .message-flavor, .flavor-text),
+body.crlngn-ui #chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker, .message-flavor, .flavor-text) {
   color: var(--fe-round-marker-fg, #f2efe8) !important;
 }
 

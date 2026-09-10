@@ -144,8 +144,8 @@
   color: var(--fe-round-marker-fg, #f2efe8) !important;
 }
 
-:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker),
-#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker) {
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker, .message-flavor, .flavor-text),
+#chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-header, .message-content, .message-metadata, .round-marker, .message-flavor, .flavor-text) {
   color: var(--fe-round-marker-fg, #f2efe8) !important;
 }
 
@@ -359,6 +359,22 @@ body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #
   display: none !important;
 }
 
+/* 병합이 접는 것은 "화자 정보"(이름/포트레이트/타임스탬프)이지 메시지 내용이 아니다.
+   flavor 텍스트(core 템플릿의 header > span.flavor-text)는 그 메시지에만 있는 내용이라
+   후속 메시지에서도 살려야 한다 — 내용이 flavor 에만 있는 메시지(굴림 flavor 등)는
+   헤더를 통째로 숨기면 글자가 아예 사라져 버린다.
+   그래서 hide 모드에서는 헤더를 지우는 대신 flavor 를 제외한 자식만 지운다. */
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text:not(:empty)) {
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text:not(:empty)) > *:not(.flavor-text) {
+  display: none !important;
+}
+
 /* Update-notice card: reuse the merge header-hide to drop the speaker header
    (unconditional — not gated on the merge feature toggle). */
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-update-notice-card .message-header {
@@ -369,8 +385,7 @@ body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #
   display: none !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata,
-body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-flavor {
+body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata {
   display: none !important;
 }
 
@@ -384,8 +399,7 @@ body.fe-chat-merge.fe-merge-follow-name :is(#chat-log, .chat-log, ol.chat-log, #
 }
 
 body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-sender,
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata,
-body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-flavor {
+body.fe-chat-merge.fe-merge-follow-portrait :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header .message-metadata {
   display: none !important;
 }
 
