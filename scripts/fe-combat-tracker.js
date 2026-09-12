@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 /**
  * fe-combat-tracker.js
  *
@@ -1016,123 +1017,16 @@ async function feCtRemoveCombatant(c) {
 // ── lifecycle ───────────────────────────────────────────────────────────────
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_ENABLED, {
-    name: "FECT.Settings.EnableName",
-    hint: "FECT.Settings.EnableHint",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_ENABLED],
-    // Inert here — core reads requiresReload only in SettingsConfig's own submit and
-    // this setting is config:false. Kept as documentation of intent; the ACTUAL reload
-    // prompt comes from FE_RELOAD_REQUIRED_KEYS in fe-settings-menu.js.
-    requiresReload: true,
-    // World-scope, so this fires on every connected client — each one clears its own
-    // tracker. Only the OFF direction is handled: turning it back on needs the `ready`
-    // block that never ran, which is what the reload prompt is for.
-    onChange: (v) => { if (!v) feCtTeardown(); },
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_PORTRAIT_SIZE, {
-    name: "FECT.Settings.SizeName",
-    hint: "FECT.Settings.SizeHint",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_PORTRAIT_SIZE],
-    range: { min: 48, max: 160, step: 4 },
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_ASPECT, {
-    name: "FECT.Settings.AspectName",
-    hint: "FECT.Settings.AspectHint",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      "1": "FECT.Settings.Aspect.Square",
-      "1.5": "FECT.Settings.Aspect.Portrait",
-      "2": "FECT.Settings.Aspect.Long",
-    },
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_ASPECT],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_ROUNDNESS, {
-    name: "FECT.Settings.RoundnessName",
-    hint: "FECT.Settings.RoundnessHint",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      "0": "FECT.Settings.Roundness.Sharp",
-      "8": "FECT.Settings.Roundness.Soft",
-      "16": "FECT.Settings.Roundness.Round",
-    },
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_ROUNDNESS],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_ALIGNMENT, {
-    name: "FECT.Settings.AlignmentName",
-    hint: "FECT.Settings.AlignmentHint",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      left: "FECT.Settings.Alignment.Left",
-      center: "FECT.Settings.Alignment.Center",
-      right: "FECT.Settings.Alignment.Right",
-    },
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_ALIGNMENT],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_PORTRAIT_IMAGE, {
-    name: "FECT.Settings.ImageName",
-    hint: "FECT.Settings.ImageHint",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      actor: "FECT.Settings.Image.Actor",
-      token: "FECT.Settings.Image.Token",
-    },
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_PORTRAIT_IMAGE],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_SHOW_INITIATIVE, {
-    name: "FECT.Settings.ShowInitName",
-    hint: "FECT.Settings.ShowInitHint",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_SHOW_INITIATIVE],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_SHOW_DISPOSITION, {
-    name: "FECT.Settings.ShowDispName",
-    hint: "FECT.Settings.ShowDispHint",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_SHOW_DISPOSITION],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_HIDE_DEFEATED, {
-    name: "FECT.Settings.HideDefeatedName",
-    hint: "FECT.Settings.HideDefeatedHint",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_HIDE_DEFEATED],
-    onChange: () => feCtScheduleRender(),
-  });
-  game.settings.register(MODULE_ID, S.COMBAT_TRACKER_SHOW_HP, {
-    name: "FECT.Settings.ShowHpName",
-    hint: "FECT.Settings.ShowHpHint",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.COMBAT_TRACKER_SHOW_HP],
-    onChange: () => feCtScheduleRender(),
-  });
+  feRegisterSetting(S.COMBAT_TRACKER_ENABLED, (v) => { if (!v) feCtTeardown(); });
+  feRegisterSetting(S.COMBAT_TRACKER_PORTRAIT_SIZE, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_ASPECT, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_ROUNDNESS, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_ALIGNMENT, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_PORTRAIT_IMAGE, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_SHOW_DISPOSITION, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_HIDE_DEFEATED, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_SHOW_HP, () => feCtScheduleRender());
 });
 
 Hooks.once("ready", () => {

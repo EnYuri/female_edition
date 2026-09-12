@@ -1,3 +1,4 @@
+import { FE_DEFAULTS } from "./fe-settings-data.js";
 import { S, FE_MERGE_CLASS_LIST, FE_MERGE_CLASS_SORTED } from "./fe-constants.js";
 import {
   feIsElementNode, feExtractHTMLElement, feIsNotificationMessageElement,
@@ -187,7 +188,7 @@ function feCollectMergeNeighborhood(logEl, anchorEl, { allowNarratorMerge = fals
     if (!items.length) return { slice: [], firstIndex: 0, total: 0, headNeighbor: null, tailNeighbor: null, hasMissingDocs: false };
 
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
-    const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+    const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
     const orderContext = feCreateChatMessageOrderContext();
     const makeInfo = (el, fallbackIndex = 0) => {
       const msgId = feGetMessageIdFromElement(el);
@@ -256,7 +257,7 @@ function feApplyChatMergeSlice(infos, startOffset = 0, {
     if (!Array.isArray(infos) || !infos.length) return;
     const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
     const showDivider = !!feSetting(S.MERGE_DIVIDER);
-    const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
+    const mergeMode = String(feSetting(S.MERGE_MODE) ?? FE_DEFAULTS[S.MERGE_MODE]);
     const simpleMode = mergeMode === "simple";
     const canMerge = (a, b) => feCanMergePair(a, b, { onlyText, allowNarratorMerge });
 
@@ -365,9 +366,9 @@ function feApplyChatMerge(logEl, { allowNarratorMerge = false, preNodes = null, 
 
   const onlyText = !!feSetting(S.MERGE_ONLY_TEXT);
   const showDivider = !!feSetting(S.MERGE_DIVIDER);
-  const mergeMode = String(feSetting(S.MERGE_MODE) ?? "standard");
+  const mergeMode = String(feSetting(S.MERGE_MODE) ?? FE_DEFAULTS[S.MERGE_MODE]);
   const simpleMode = mergeMode === "simple";
-  const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+  const speakerBasis = String(feSetting(S.MERGE_SPEAKER_BASIS) ?? FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
   const orderContext = feCreateChatMessageOrderContext();
 
   const infos = [];

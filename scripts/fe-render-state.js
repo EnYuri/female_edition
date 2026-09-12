@@ -1,3 +1,4 @@
+import { FE_DEFAULTS } from "./fe-settings-data.js";
 import {
   MODULE_ID, S,
   FE_RENDER_STATE_FLAG, FE_RENDER_SPECIAL_KIND_FLAG, FE_RENDER_MERGE_HINT_FLAG, FE_RENDER_STATE_VERSION,
@@ -453,7 +454,7 @@ function feCaptureMessageRenderFlagsOnPreUpdate(message, changed = {}, userId = 
 // the tint itself is enabled.
 function feUserColorBgBaseActive() {
   try {
-    const base = String(feSetting(S.USER_COLOR_BG_BASE) ?? "none");
+    const base = String(feSetting(S.USER_COLOR_BG_BASE) ?? FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
     return base === "white" || base === "black" || base === "custom";
   } catch {
     return false;
@@ -780,7 +781,7 @@ function feMergeKey(info, basisOverride) {
 
   const basis = basisOverride != null
     ? String(basisOverride)
-    : String(feSetting(S.MERGE_SPEAKER_BASIS) ?? "token");
+    : String(feSetting(S.MERGE_SPEAKER_BASIS) ?? FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
 
   let speakerComponent;
   if (basis === "author") {

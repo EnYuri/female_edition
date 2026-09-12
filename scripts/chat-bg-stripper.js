@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: FVTT v13+
 // Chat message/card texture stripper — settings + CSS-class driver only.
 //
@@ -188,35 +189,11 @@ function feInstallChatContextMenuSurfaceSync() {
 Hooks.once("init", () => {
   feInstallChatContextMenuSurfaceSync();
 
-  game.settings.register(MODULE_ID, SETTINGS.ENABLE_FONTS, {
-    name: "커스텀 폰트 적용 (쿠키런/그림일기)",
-    hint: "이 모듈의 ui-font.css를 활성화합니다. CookieRun + 그림일기 폰트 및 관련 옵션(채팅 글꼴 선택 등)이 동작합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_ENABLE_FONTS],
-    onChange: value => applyFontSetting(value),
-  });
+  feRegisterSetting(SETTINGS.ENABLE_FONTS, value => applyFontSetting(value));
 
-  game.settings.register(MODULE_ID, SETTINGS.HIDE_PORTRAITS, {
-    name: "채팅 기본 포트레이트 숨김(내부/기본)",
-    hint: "채팅 카드 헤더의 기본 아바타/포트레이트(및 chat-portrait 모듈이 추가하는 일부 아이콘)를 숨깁니다. 이 모듈이 삽입하는 포트레이트(.fe-chat-portrait-wrap)는 별도 옵션에서 제어합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_HIDE_PORTRAITS],
-    onChange: value => applyPortraitSetting(value),
-  });
+  feRegisterSetting(SETTINGS.HIDE_PORTRAITS, value => applyPortraitSetting(value));
 
-  game.settings.register(MODULE_ID, SETTINGS.STRIP_TEXTURES, {
-    name: "채팅 카드 텍스쳐 제거",
-    hint: "채팅 카드의 parchment/texture 배경 이미지를 제거합니다. 평면 미색 오버레이는 '페이퍼 톤 오버레이'에서 별도로 선택합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_STRIP_TEXTURES],
-    onChange: value => applyTextureSetting(value),
-  });
+  feRegisterSetting(SETTINGS.STRIP_TEXTURES, value => applyTextureSetting(value));
 
   // Apply fe-fonts-enabled as early as possible (init) to prevent FOUC.
   // The ready hook will re-apply with the final feSetting() value (GM priority aware).

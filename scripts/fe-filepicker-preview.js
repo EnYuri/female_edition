@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-filepicker-preview.js
 // Adds a preview sidebar to the right of core's FilePicker.
 //
@@ -26,24 +27,15 @@ let _activePasteContext = null;
 let _globalPasteBound = false;
 function _enabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS, {
-    name: "코어 UI: 파일 픽커 미리보기 및 개선", hint: "파일 픽커 미리보기·정렬과 외부 이미지 붙여넣기/드롭 업로드를 사용합니다.",
-    scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS],
-  });
-  game.settings.register(MODULE_ID, S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, {
-    name: "파일 픽커 외부 이미지 업로드 경로",
-    hint: "파일 픽커에 붙여넣거나 드롭한 이미지만 저장하는 data 폴더 경로입니다.",
-    scope: "world", config: false, restricted: true, type: String,
-    default: FE_DEFAULTS[S.CORE_UI_FILEPICKER_UPLOAD_LOCATION],
-    onChange: async value => {
+  feRegisterSetting(S.CORE_UI_FILEPICKER_ENHANCEMENTS);
+  feRegisterSetting(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, async value => {
       const cleaned = ciNormalizeUploadDirectory(value) || EXTERNAL_UPLOAD_DEFAULT;
       // World-setting callbacks run on every connected client. Only the active GM may
       // canonicalize the shared value; otherwise players would attempt a forbidden
       // SETTINGS_MODIFY write whenever the entered path needs cleanup.
       if (cleaned !== value && game.user === game.users.activeGM)
         await game.settings.set(MODULE_ID, S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, cleaned);
-    },
-  });
+    });
 });
 
 // ─── Extension classification ──────────────────────────────────────────────

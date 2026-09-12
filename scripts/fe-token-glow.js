@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // Female-cupwhi: Token selection glow.
 //
 // When a token is controlled (selected) or hovered, add a soft additive glow (a halo
@@ -823,52 +824,11 @@ function feTgRedrawSightlines() {
 /* -------------------------------------------- */
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.TOKEN_GLOW_ENABLED, {
-    name: "토큰 선택 글로우 사용",
-    hint: "토큰을 선택/호버하면 격자 사각형 대신 이미지 실루엣을 따라 글로우를 표시합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_GLOW_ENABLED],
-    onChange: () => feTgRebuildAll(),
-  });
-  game.settings.register(MODULE_ID, S.TOKEN_GLOW_HOVER, {
-    name: "호버 시에도 글로우",
-    hint: "마우스를 올린 토큰에도 글로우를 표시합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_GLOW_HOVER],
-    onChange: () => feTgRebuildAll(),
-  });
-  game.settings.register(MODULE_ID, S.TOKEN_GLOW_STRENGTH, {
-    name: "글로우 세기",
-    hint: "글로우의 밝기/퍼짐 강도입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.TOKEN_GLOW_STRENGTH],
-    range: { min: 1, max: 10, step: 1 },
-    onChange: () => feTgRebuildAll(),
-  });
-  game.settings.register(MODULE_ID, S.TOKEN_GLOW_TARGET, {
-    name: "타겟 표시 글로우",
-    hint: "타겟(T)으로 지정한 토큰의 모서리 화살표 표시에도 글로우를 적용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_GLOW_TARGET],
-    onChange: () => feTgRebuildAll(),
-  });
-  game.settings.register(MODULE_ID, S.TOKEN_GLOW_SIGHTLINE, {
-    name: "타겟 조준선",
-    hint: "선택한 토큰에서 타겟으로 이어지는 조준선을 그립니다. 다른 플레이어에게도 표시되며(소유자 색상), 선 끝에 거리가 표시됩니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_GLOW_SIGHTLINE],
-    onChange: () => feTgUpdateLocalSightlines(),
-  });
+  feRegisterSetting(S.TOKEN_GLOW_ENABLED, () => feTgRebuildAll());
+  feRegisterSetting(S.TOKEN_GLOW_HOVER, () => feTgRebuildAll());
+  feRegisterSetting(S.TOKEN_GLOW_STRENGTH, () => feTgRebuildAll());
+  feRegisterSetting(S.TOKEN_GLOW_TARGET, () => feTgRebuildAll());
+  feRegisterSetting(S.TOKEN_GLOW_SIGHTLINE, () => feTgUpdateLocalSightlines());
 });
 
 Hooks.once("ready", () => {

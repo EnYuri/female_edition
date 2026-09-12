@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-typing-indicator.js
 // "다른 사람이 입력하고 있습니다" typing indicator for Foundry VTT v13 + v14.
 //
@@ -279,28 +280,11 @@ function feClearAllTyping() {
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.TYPING_ENABLED, {
-    name: "타이핑 인디케이터 표시('…님이 입력 중')",
-    hint: "다른 사용자가 채팅을 입력 중일 때 입력창 위에 표시합니다. CautiousGamemastersPack(CGMP)의 타이핑 알림이 활성화되어 있으면 자동으로 비활성화되어 CGMP에 양보합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: (value) => {
+  feRegisterSetting(S.TYPING_ENABLED, (value) => {
       if (!value || feCgmpActive()) { feEmitTypingEnd(); feClearAllTyping(); }
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.TYPING_SHOW_TO_PLAYERS, {
-    name: "타이핑 인디케이터: 플레이어에게도 표시",
-    hint: "끄면 GM만 다른 사용자의 입력 중 표시를 볼 수 있습니다. (월드 설정 — GM 전용)",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: () => feClearAllTyping(),
-  });
+  feRegisterSetting(S.TYPING_SHOW_TO_PLAYERS, () => feClearAllTyping());
 
   // Coexists with fe-theatre's listener on the same channel (type-discriminated).
   try { game.socket.on(SOCKET_CHANNEL, feHandleSocket); } catch { /* no-op */ }

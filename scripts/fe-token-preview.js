@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Token Visual Preview — enhances the Prototype Token Config's
 // appearance tab with a live grid preview (token on a grid with anchor crosshair)
 // and pixel readout for anchor coordinates.
@@ -595,23 +596,12 @@ function feApplyPreviewSheetSize(app, root) {
 }
 
 function feRegisterTokenPreviewSettings() {
-  game.settings.register(MODULE_ID, S.CORE_UI_TOKEN_PREVIEW, {
-    name: "코어 UI: 토큰 설정 미리보기", hint: "프로토타입 토큰 비주얼 탭에 라이브 미리보기를 표시합니다.",
-    scope: "client", config: false, type: Boolean, default: FE_DEFAULTS[S.CORE_UI_TOKEN_PREVIEW],
-  });
-  game.settings.register(MODULE_ID, S.TOKEN_CONFIG_TWO_COLUMN, {
-    name: "프로토타입 토큰 설정: 다른 탭 2열 정렬",
-    hint: "비주얼 미리보기 때문에 넓어진 토큰 설정 창에서, 비주얼 탭이 아닌 탭들도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_CONFIG_TWO_COLUMN],
-    onChange: (value) => {
+  feRegisterSetting(S.CORE_UI_TOKEN_PREVIEW);
+  feRegisterSetting(S.TOKEN_CONFIG_TWO_COLUMN, (value) => {
       for (const el of document.querySelectorAll(".prototype-token-config.fe-tp-active, .token-config.fe-tp-active")) {
         el.classList.toggle("fe-tp-two-column", !!value);
       }
-    },
-  });
+    });
 
 }
 

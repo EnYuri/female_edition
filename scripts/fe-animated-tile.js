@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // Female-cupwhi: Animated tile textures (gif / animated webp / apng / animated avif).
 //
 // WHY THIS EXISTS
@@ -384,15 +385,7 @@ function feAtPruneCache() {
 /* -------------------------------------------- */
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.ANIMATED_TILE_ENABLED, {
-    name: "타일 애니메이션 이미지 재생",
-    hint: "타일에 지정한 움직이는 gif/webp/apng를 실제로 재생합니다. Foundry 기본 동작은 첫 프레임 정지 이미지입니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.ANIMATED_TILE_ENABLED],
-    onChange: () => feAtRefreshAll(),
-  });
+  feRegisterSetting(S.ANIMATED_TILE_ENABLED, () => feAtRefreshAll());
 });
 
 // `drawTile` fires from PlaceableObject#draw (placeable-object.mjs:546) after Tile#_draw has

@@ -6,6 +6,7 @@
 // validates the file, ignores client-supplied paths, sanitizes the supplied
 // basename, and writes only to the module-configured chat-image directory.
 
+import { FE_DEFAULTS, FE_SETTING_DEFINITIONS } from "./fe-settings-data.js";
 import { MODULE_ID } from "./fe-constants.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 
@@ -22,21 +23,20 @@ export const CI_UPLOAD_MSG = Object.freeze({
 
 // Maximum accepted image size, in MB, as a world setting. Registered by
 // fe-chat-images.js (which owns the whole `chatImages*` key family); the key and
-// its bounds live HERE because this module is the lower layer — fe-chat-images.js
-// imports it, so it cannot import back without a cycle.
+// bounds are re-exported from fe-settings.js so registration and transport agree.
 //
 // Both the sender-side check and the GM-authority check below read this. The
 // authority read is the one that matters: the sender's check is a courtesy, and a
 // crafted socket message can simply omit it. World scope means every client agrees
 // on the number, and only the GM can move it.
 export const CI_MAX_UPLOAD_MB_KEY = "chatImagesMaxUploadMB";
-export const CI_DEFAULT_MAX_UPLOAD_MB = 12;
+export const CI_DEFAULT_MAX_UPLOAD_MB = FE_DEFAULTS[CI_MAX_UPLOAD_MB_KEY];
 // Hard bounds on the setting itself. The ceiling is not arbitrary: the proxy path
 // buffers the whole file in the GM's memory while reassembling chunks, and the
 // data-URL fallback stores the image inside ChatMessage content that every client
 // then downloads. 64 MB is already generous for both.
-export const CI_MIN_MAX_UPLOAD_MB = 1;
-export const CI_MAX_MAX_UPLOAD_MB = 64;
+export const CI_MIN_MAX_UPLOAD_MB = FE_SETTING_DEFINITIONS[CI_MAX_UPLOAD_MB_KEY].range.min;
+export const CI_MAX_MAX_UPLOAD_MB = FE_SETTING_DEFINITIONS[CI_MAX_UPLOAD_MB_KEY].range.max;
 
 export function ciMaxUploadMB() {
   let raw;

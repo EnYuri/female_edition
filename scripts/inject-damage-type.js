@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // inject-damage-type.js — Custom dnd5e damage types with user-configurable names.
 // Guarded by CONFIG?.DND5E presence. Standalone — no imports.
 
@@ -36,29 +37,11 @@ Hooks.once("init", () => {
   const config = CONFIG?.DND5E;
   if (!config) return;
 
-  game.settings.register(_MOD, "injectCustomDamageTypes", {
-    name: "[DND5e] 커스텀 피해 타입 주입 활성화",
-    hint: "이 모듈의 커스텀 피해 타입 8종을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    requiresReload: true,
-  });
+  feRegisterSetting("injectCustomDamageTypes");
 
   // 1. Register label settings first so get() works immediately after.
   for (const { key, idx } of _DMG_ENTRIES) {
-    game.settings.register(_MOD, _settingKey(idx), {
-      name: `[DND5e] 커스텀 피해 타입 ${idx} 이름`,
-      hint: "이 슬롯에 표시될 피해 타입 이름. 비워두면 번호로 표시됩니다.",
-      scope: "world",
-      config: false,
-      restricted: true,
-      type: String,
-      default: String(idx),
-      onChange: (value) => _applyLabel(key, value.trim() || String(idx)),
-    });
+    feRegisterSetting(_settingKey(idx), (value) => _applyLabel(key, value.trim() || String(idx)));
   }
 
   // 2. Register damage types into all CONFIG.DND5E tables using stored names (guarded).

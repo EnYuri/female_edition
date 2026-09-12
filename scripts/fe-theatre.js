@@ -1,3 +1,4 @@
+import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
 /**
  * fe-theatre.js — Portrait stage & speech bubble system
  *
@@ -36,20 +37,23 @@ const _fet = {
 };
 
 // Settings cache — updated on init and on settings close
-let _fetEnabled       = false;
-let _fetExcludeSystemMessages = true;
-let _fetRecallIncludeNonActor = false;
-let _fetAutoDecay     = true;
-let _fetDecayTime     = 30000;
-let _fetPortraitHeight = 130;
-let _fetPortraitLayout = "inset";
-let _fetPortraitWidth = 226;
-let _fetBoxWidth      = 488;
-let _fetBoxHeight     = 276;
-let _fetBoxBottom     = 30;
-let _fetBoxLeft       = 266;
-let _fetTextSize      = 17;
-const _fetInsetBox = { BoxWidth: 864, BoxHeight: 176, BoxBottom: 30, BoxLeft: 298, TextSize: 14 };
+let _fetEnabled       = FE_DEFAULTS.stageEnabled;
+let _fetExcludeSystemMessages = FE_DEFAULTS.stageExcludeSystemMessages;
+let _fetNameUserColor = FE_DEFAULTS.stageNameUserColor;
+let _fetRecallIncludeNonActor = FE_DEFAULTS.stageRecallIncludeNonActor;
+let _fetAutoDecay     = FE_DEFAULTS.stageAutoDecay;
+let _fetDecayTime     = FE_DEFAULTS.stageDecayTime;
+let _fetPortraitHeight = FE_DEFAULTS.stagePortraitHeight;
+let _fetPortraitLayout = FE_DEFAULTS.stagePortraitLayout;
+let _fetPortraitWidth = FE_DEFAULTS.stagePortraitWidth;
+let _fetBoxWidth      = FE_DEFAULTS.stageBoxWidth;
+let _fetBoxHeight     = FE_DEFAULTS.stageBoxHeight;
+let _fetBoxBottom     = FE_DEFAULTS.stageBoxBottom;
+let _fetBoxLeft       = FE_DEFAULTS.stageBoxLeft;
+let _fetTextSize      = FE_DEFAULTS.stageTextSize;
+const _fetInsetBox = Object.fromEntries(
+  ["BoxWidth", "BoxHeight", "BoxBottom", "BoxLeft", "TextSize"].map(suffix => [suffix, FE_DEFAULTS[`stageInset${suffix}`]])
+);
 
 // DOM anchors (set in _fetInjectUI / renderChatLog)
 let _fetDockEl   = null;   // #fe-stage-dock
@@ -64,29 +68,10 @@ const _FET_PRELOAD_MAX = 256;
 // ── Settings ───────────────────────────────────────────────────────────────
 
 function _fetRegisterSettings() {
-  for (const [suffix, label, min, max, step] of [
-    ["BoxWidth", "대사창 가로 크기", 200, 1600, 4],
-    ["BoxHeight", "대사창 세로 크기", 100, 600, 4],
-    ["BoxBottom", "화면 하단 여백", 0, 300, 2],
-    ["BoxLeft", "화면 좌측 여백", 0, 1200, 4],
-    ["TextSize", "대사 폰트 크기", 10, 32, 1],
-  ]) {
-    game.settings.register(_FET_MODULE, `stageInset${suffix}`, {
-      name: `무대 채팅: 내부 ${label} (px)`,
-      scope: "client", config: false, type: Number,
-      range: { min, max, step }, default: _fetInsetBox[suffix],
-      onChange: (v) => { _fetInsetBox[suffix] = v; _fetApplyBoxVars(); },
-    });
+  for (const suffix of Object.keys(_fetInsetBox)) {
+    feRegisterSetting(`stageInset${suffix}`, (v) => { _fetInsetBox[suffix] = v; _fetApplyBoxVars(); });
   }
-  game.settings.register(_FET_MODULE, "stageEnabled", {
-    name: "무대(Stage) 기능 활성화",
-    hint: "활성화 시 채팅 컨트롤에 무대 UI가 표시되고 배우 컨텍스트 메뉴에 무대 항목이 추가됩니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: (v) => {
+  feRegisterSetting("stageEnabled", (v) => {
       _fetEnabled = !!v && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
       if (!_fetEnabled) {
         _fetClearAll(true);
@@ -101,141 +86,41 @@ function _fetRegisterSettings() {
         void _fetRestoreUserState();
         _fetRefreshSheetHeaders();
       }
-    },
-  });
+    });
 
-  game.settings.register(_FET_MODULE, "stageExcludeSystemMessages", {
-    name: "무대 채팅: 시스템 메시지 제외",
-    hint: "아이템/공격 카드, 이니셔티브, 타 모듈이 생성한 시스템 메시지는 무대 발화로 내보내지 않고 원래 화자 그대로 둡니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: (v) => { _fetExcludeSystemMessages = v; },
-  });
+  feRegisterSetting("stageExcludeSystemMessages", (v) => { _fetExcludeSystemMessages = v; });
+  feRegisterSetting("stageNameUserColor", (v) => { _fetNameUserColor = !!v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageRecallIncludeNonActor", {
-    name: "무대 채팅: 이전 발화에 비액터 메시지 포함",
-    hint: "이전 발화 버튼이 액터가 없는 일반/OOC 메시지도 함께 훑습니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: false,
-    onChange: (v) => {
+  feRegisterSetting("stageRecallIncludeNonActor", (v) => {
       _fetRecallIncludeNonActor = v;
       if (!v) {
         const insert = _fet.inserts.get(_FET_RECALL_NON_ACTOR_ID);
         if (insert) _fetDismissInsert(insert);
       }
-    },
-  });
+    });
 
-  game.settings.register(_FET_MODULE, "stageAutoDecay", {
-    name: "무대 채팅: 대화 상자 자동 소멸",
-    hint: "일정 시간 후 대화 상자 텍스트가 자동으로 사라집니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: false,
-    onChange: (v) => { _fetAutoDecay = v; },
-  });
+  feRegisterSetting("stageAutoDecay", (v) => { _fetAutoDecay = v; });
 
-  game.settings.register(_FET_MODULE, "stageDecayTime", {
-    name: "무대 채팅: 대화 상자 소멸 시간 (ms)",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Number,
-    range: { min: 5000, max: 120000, step: 5000 },
-    default: 30000,
-    onChange: (v) => { _fetDecayTime = v; },
-  });
+  feRegisterSetting("stageDecayTime", (v) => { _fetDecayTime = v; });
 
-  game.settings.register(_FET_MODULE, "stagePortraitLayout", {
-    name: "무대 채팅: 포트레이트 표시 방식",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: { above: "상단", inset: "내부" },
-    default: "inset",
-    onChange: (v) => { _fetPortraitLayout = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stagePortraitLayout", (v) => { _fetPortraitLayout = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stagePortraitHeight", {
-    name: "무대 채팅: 기본 포트레이트 높이 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 50, max: 700, step: 1 },
-    default: 318,
-    onChange: (v) => {
+  feRegisterSetting("stagePortraitHeight", (v) => {
       _fetPortraitHeight = v;
       _fetApplyBoxVars();
-    },
-  });
+    });
 
-  game.settings.register(_FET_MODULE, "stagePortraitWidth", {
-    name: "무대 채팅: 내부 포트레이트 너비 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 50, max: 700, step: 1 },
-    default: 226,
-    onChange: (v) => { _fetPortraitWidth = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stagePortraitWidth", (v) => { _fetPortraitWidth = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageBoxWidth", {
-    name: "무대 채팅: 대사창 가로 크기 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 200, max: 1600, step: 4 },
-    default: 764,
-    onChange: (v) => { _fetBoxWidth = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stageBoxWidth", (v) => { _fetBoxWidth = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageBoxHeight", {
-    name: "무대 채팅: 대사창 세로 크기 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 100, max: 600, step: 4 },
-    default: 176,
-    onChange: (v) => { _fetBoxHeight = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stageBoxHeight", (v) => { _fetBoxHeight = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageBoxBottom", {
-    name: "무대 채팅: 화면 하단 여백 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 0, max: 300, step: 2 },
-    default: 30,
-    onChange: (v) => { _fetBoxBottom = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stageBoxBottom", (v) => { _fetBoxBottom = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageBoxLeft", {
-    name: "무대 채팅: 화면 좌측 여백 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 0, max: 1200, step: 4 },
-    default: 392,
-    onChange: (v) => { _fetBoxLeft = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stageBoxLeft", (v) => { _fetBoxLeft = v; _fetApplyBoxVars(); });
 
-  game.settings.register(_FET_MODULE, "stageTextSize", {
-    name: "무대 채팅: 대사 폰트 크기 (px)",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 10, max: 32, step: 1 },
-    default: 14,
-    onChange: (v) => { _fetTextSize = v; _fetApplyBoxVars(); },
-  });
+  feRegisterSetting("stageTextSize", (v) => { _fetTextSize = v; _fetApplyBoxVars(); });
 }
 
 function _fetLoadSettings() {
@@ -245,6 +130,7 @@ function _fetLoadSettings() {
   _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled")
     && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
   _fetExcludeSystemMessages = game.settings.get(_FET_MODULE, "stageExcludeSystemMessages");
+  _fetNameUserColor = game.settings.get(_FET_MODULE, "stageNameUserColor");
   _fetRecallIncludeNonActor = game.settings.get(_FET_MODULE, "stageRecallIncludeNonActor");
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
   _fetDecayTime      = game.settings.get(_FET_MODULE, "stageDecayTime");
@@ -409,6 +295,7 @@ async function _fetRestoreUserState() {
 
 function _fetApplyBoxVars() {
   if (!_fetDockEl) return;
+  _fetDockEl.classList.toggle("fe-stage-dock--plain-name", !_fetNameUserColor);
   _fetDockEl.classList.toggle("fe-stage-dock--inset", _fetPortraitLayout === "inset");
   _fetDockEl.style.setProperty("--fet-portrait-height", `${_fetPortraitHeight}px`);
   _fetDockEl.style.setProperty("--fet-portrait-width", `${_fetPortraitWidth}px`);

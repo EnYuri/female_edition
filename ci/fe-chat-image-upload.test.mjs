@@ -45,7 +45,7 @@ test("chat-image size ceiling comes from the world setting", () => {
 });
 
 test("an unusable size setting falls back to the default, never to unlimited", () => {
-  assert.equal(CI_DEFAULT_MAX_UPLOAD_MB, 12);
+  assert.equal(CI_DEFAULT_MAX_UPLOAD_MB, 20);
   // Infinity is deliberately grouped here, not with the clamp cases: a non-finite
   // value is garbage, and answering "the maximum" to garbage would turn a corrupt
   // setting into the largest ceiling instead of the safest one.

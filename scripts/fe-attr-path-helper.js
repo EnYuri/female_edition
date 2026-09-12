@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition — Attribute Name Helper.
 //
 // Developer / GM inspection aid. Plain HOVER over any element that displays an
@@ -71,22 +72,8 @@ function feAphSourceEnabled() {
 }
 
 function feAphRegisterSetting() {
-  game.settings.register(MODULE_ID, S.ATTR_PATH_HELPER, {
-    name: "FEAPH.Settings.EnableName",
-    hint: "FEAPH.Settings.EnableHint",
-    scope: "client",
-    config: false, // surfaced via the unified female_edition settings menu
-    type: Boolean,
-    default: FE_DEFAULTS[S.ATTR_PATH_HELPER],
-  });
-  game.settings.register(MODULE_ID, S.ATTR_PATH_HELPER_SOURCE, {
-    name: "FEAPH.Settings.SourceName",
-    hint: "FEAPH.Settings.SourceHint",
-    scope: "client",
-    config: false, // surfaced via the unified female_edition settings menu
-    type: Boolean,
-    default: FE_DEFAULTS[S.ATTR_PATH_HELPER_SOURCE],
-  });
+  feRegisterSetting(S.ATTR_PATH_HELPER);
+  feRegisterSetting(S.ATTR_PATH_HELPER_SOURCE);
 
   game.keybindings.register(MODULE_ID, "ceAphInstantKey", {
     name: "FEAPH.Keybind.InstantName",

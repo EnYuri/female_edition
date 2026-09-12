@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: FVTT v13+ / v14
 // Scene-controls "dropdown" collapse.
 //
@@ -100,15 +101,7 @@ function onDocumentKeydown(event) {
 // --------------------------------
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.SC_COLLAPSE_ENABLED, {
-    name: "화면 좌상단 컨트롤 접기(드롭다운)",
-    hint: "토큰/타일 등 레이어 줄과 도구 줄을 평소엔 현재 선택된 1칸만 보이도록 접습니다. 칸을 클릭하면 펼쳐지고, 항목을 고르면 다시 접힙니다. 바깥을 클릭하거나 Esc로도 접힙니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SC_COLLAPSE_ENABLED],
-    onChange: value => applyCollapseSetting(value),
-  });
+  feRegisterSetting(S.SC_COLLAPSE_ENABLED, value => applyCollapseSetting(value));
 
   // Capture-phase listeners are attached once and persist across re-renders.
   document.addEventListener("click", onDocumentClickCapture, true);

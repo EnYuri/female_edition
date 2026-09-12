@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // Female-cupwhi: Actor name -> token name synchronization.
 // Document behavior only: no Token Config DOM or canvas-rendering concerns.
 
@@ -14,23 +15,9 @@ function fePlacedTokenNameSyncEnabled() {
 }
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.TOKEN_SYNC_NAME, {
-    name: "액터 이름을 프로토타입 토큰 이름에 동기화",
-    hint: "액터 이름을 바꾸면 프로토타입 토큰 이름도 함께 바꿉니다. 이미 씬에 배치된 토큰까지 바꾸려면 아래의 별도 옵션을 켜세요.",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_SYNC_NAME],
-  });
+  feRegisterSetting(S.TOKEN_SYNC_NAME);
 
-  game.settings.register(MODULE_ID, S.TOKEN_SYNC_PLACED_NAME, {
-    name: "액터 이름을 배치 토큰 이름에도 동기화",
-    hint: "액터 이름을 바꾸면 모든 씬에 배치된 해당 액터 토큰의 이름도 함께 바꿉니다. 켜진 동안 개별 토큰에 따로 붙인 이름도 다음 액터 개명 때 액터 이름으로 바뀝니다.",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.TOKEN_SYNC_PLACED_NAME],
-  });
+  feRegisterSetting(S.TOKEN_SYNC_PLACED_NAME);
 });
 
 // Foundry initializes a prototype token name from the actor name only when the

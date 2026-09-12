@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 
 // Chat Images integration (ported from chat-images, adapted for female_edition)
 // Features:
@@ -10,9 +11,6 @@ import { MODULE_ID, feSetting, feCaptureMessageRenderFlagsOnPreCreate } from "./
 import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
 import {
   CI_MAX_UPLOAD_MB_KEY,
-  CI_DEFAULT_MAX_UPLOAD_MB,
-  CI_MIN_MAX_UPLOAD_MB,
-  CI_MAX_MAX_UPLOAD_MB,
   ciMaxUploadMB,
   ciMaxUploadBytes,
   ciNormalizeUploadDirectory,
@@ -799,35 +797,11 @@ function ciRefreshUi(root = document) {
 }
 
 function ciRegisterSettings() {
-  game.settings.register(MODULE_ID, CI.ENABLED, {
-    name: "채팅 이미지 업로드/임베드 활성화",
-    hint: "Foundry 파일 권한과 별개로 채팅 이미지 기능(업로드 버튼, 붙여넣기/드래그 앤 드롭, !ci|경로! 임베드)을 사용합니다.",
-    scope: "client",
-    config: false, // managed in the unified settings menu (fe-settings-menu)
-    type: Boolean,
-    default: true,
-    onChange: () => ciScheduleRefreshUi(document, 0),
-  });
+  feRegisterSetting(CI.ENABLED, () => ciScheduleRefreshUi(document, 0));
 
-  game.settings.register(MODULE_ID, CI.SHOW_BUTTON, {
-    name: "채팅 이미지 업로드 버튼 표시",
-    hint: "채팅 입력창 오른쪽 컨트롤에 이미지 업로드 버튼을 표시합니다. 꺼도 붙여넣기/드래그 앤 드롭은 사용할 수 있습니다.",
-    scope: "client",
-    config: false, // managed in the unified settings menu (fe-settings-menu)
-    type: Boolean,
-    default: true,
-    onChange: () => ciScheduleRefreshUi(document, 0),
-  });
+  feRegisterSetting(CI.SHOW_BUTTON, () => ciScheduleRefreshUi(document, 0));
 
-  game.settings.register(MODULE_ID, CI.UPLOAD_LOCATION, {
-    name: "채팅 이미지 업로드 경로",
-    hint: "채팅에 붙여넣기/드롭하거나 업로드 버튼으로 고른 이미지를 저장할 data 폴더 경로입니다. 파일 권한이 없는 플레이어의 이미지는 온라인 GM이 이 경로로 대리 업로드합니다.",
-    scope: "world",
-    config: false, // managed in the unified settings menu (fe-settings-menu)
-    restricted: true,
-    type: String,
-    default: "uploaded-chat-images",
-    onChange: async (value) => {
+  feRegisterSetting(CI.UPLOAD_LOCATION, async (value) => {
       const cleaned = ciNormalizeUploadDirectory(value) || "uploaded-chat-images";
       // A world-setting onChange runs on every client. Directory creation and any
       // canonicalizing re-write belong only to the active GM; players may still use
@@ -835,19 +809,9 @@ function ciRegisterSettings() {
       if (game.user !== game.users.activeGM) return;
       if (cleaned !== value) await game.settings.set(MODULE_ID, CI.UPLOAD_LOCATION, cleaned);
       try { await ciEnsureUploadDirectory(cleaned); } catch { /* retry on first upload */ }
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, CI.MAX_UPLOAD_MB, {
-    name: "채팅 이미지 최대 용량(MB)",
-    hint: "채팅에 올릴 수 있는 이미지 한 장의 최대 크기입니다. 직접 업로드·GM 대리 업로드·메시지 직접 포함(data URL) 모두에 적용됩니다. 대리 업로드는 GM 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 무작정 키우지 마세요.",
-    scope: "world",
-    config: false, // managed in the unified settings menu (fe-settings-menu)
-    restricted: true,
-    type: Number,
-    range: { min: CI_MIN_MAX_UPLOAD_MB, max: CI_MAX_MAX_UPLOAD_MB, step: 1 },
-    default: CI_DEFAULT_MAX_UPLOAD_MB,
-  });
+  feRegisterSetting(CI.MAX_UPLOAD_MB);
 }
 
 Hooks.once("init", () => {

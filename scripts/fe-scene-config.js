@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 /**
  * fe-scene-config.js — Scene Config sheet fixes (theme-independent).
  *
@@ -24,7 +25,7 @@
 // Entry-point scripts pull the public API from fe-chat-enhance.js in one import (same as
 // chat-bg-stripper.js and fe-scene-controls-collapse.js); only sub-modules reach into
 // fe-gm-priority.js directly.
-import { MODULE_ID, S, FE_DEFAULTS, feSetting } from "./fe-chat-enhance.js";
+import { S, FE_DEFAULTS, feSetting } from "./fe-chat-enhance.js";
 
 /**
  * Scene Config window default width in px. The measured label run tops out around 650px
@@ -70,16 +71,7 @@ function feApplySceneConfigTabs(enabled) {
 }
 
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, S.CORE_UI_SCENE_CONFIG_TABS, {
-    name: "코어 UI: 씬 설정 탭 한 줄 표시",
-    hint: "씬 설정 창의 탭 이름이 두 줄로 접히지 않게 합니다. 창 기본 폭도 함께 넓어집니다. 변경하려면 새로고침이 필요합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.CORE_UI_SCENE_CONFIG_TABS],
-    // No onChange — it cannot reach cached sheets, so it would only pretend to apply.
-    // fe-settings-menu.js owns the reload prompt.
-  });
+  feRegisterSetting(S.CORE_UI_SCENE_CONFIG_TABS);
 
   // Applying at init also means position.width is still core's own value when
   // _feSceneConfigCoreWidth is captured.

@@ -63,7 +63,7 @@
     <div class="form-group">
       <label>DOM 정리: 최대 유지 메시지 수</label>
       <div class="form-fields">
-        <input type="number" name="cePruneMaxMessages" data-dtype="Number" value="{{values.cePruneMaxMessages}}" step="10" min="20" max="200" />
+        <input type="number" name="cePruneMaxMessages" data-dtype="Number" value="{{values.cePruneMaxMessages}}" step="{{ranges.cePruneMaxMessages.step}}" min="{{ranges.cePruneMaxMessages.min}}" max="{{ranges.cePruneMaxMessages.max}}" />
       </div>
       <p class="notes">이 수를 초과하면 오래된 메시지를 제거합니다. 스크롤 1회에 이 값의 절반만큼 불러옵니다. (즉시 적용, 기본값: 60)</p>
     </div>
@@ -246,7 +246,7 @@
     <div class="form-group">
       <label>페이퍼 톤 오버레이 농도</label>
       <div class="form-fields">
-        <input type="number" name="ceMessageBgSaturation" data-dtype="Number" value="{{values.ceMessageBgSaturation}}" step="0.01" min="0.05" max="1" />
+        <input type="number" name="ceMessageBgSaturation" data-dtype="Number" value="{{values.ceMessageBgSaturation}}" step="{{ranges.ceMessageBgSaturation.step}}" min="{{ranges.ceMessageBgSaturation.min}}" max="{{ranges.ceMessageBgSaturation.max}}" />
       </div>
       <p class="notes">위 오버레이를 켰을 때만 사용합니다. 값이 높을수록 더 밝고 채도가 약해집니다.</p>
     </div>
@@ -280,7 +280,7 @@
     <div class="form-group">
       <label>유저 색상 틴트 농도</label>
       <div class="form-fields">
-        <input type="number" name="ceUserColorAlpha" data-dtype="Number" value="{{values.ceUserColorAlpha}}" step="0.01" min="0.05" max="0.6" />
+        <input type="number" name="ceUserColorAlpha" data-dtype="Number" value="{{values.ceUserColorAlpha}}" step="{{ranges.ceUserColorAlpha.step}}" min="{{ranges.ceUserColorAlpha.min}}" max="{{ranges.ceUserColorAlpha.max}}" />
       </div>
       <p class="notes">유저 색상이 배경에 입혀지는 진하기(0.05~0.6). 값이 클수록 진해집니다.</p>
     </div>
@@ -344,7 +344,7 @@
     <div class="form-group">
       <label>채팅: 메시지 카드 간격(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="1" min="0" max="24" />
+        <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="{{ranges.ceChatMessageSpacing.step}}" min="{{ranges.ceChatMessageSpacing.min}}" max="{{ranges.ceChatMessageSpacing.max}}" />
       </div>
       <p class="notes">모든 채팅 메시지 카드 사이의 기본 간격(flex gap)입니다. 병합 여부와 무관하게 적용됩니다.</p>
     </div>
@@ -352,7 +352,7 @@
     <div class="form-group">
       <label>채팅: 헤더-콘텐츠 간격(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceHeaderContentGap" data-dtype="Number" value="{{values.ceHeaderContentGap}}" step="1" min="0" max="20" />
+        <input type="number" name="ceHeaderContentGap" data-dtype="Number" value="{{values.ceHeaderContentGap}}" step="{{ranges.ceHeaderContentGap.step}}" min="{{ranges.ceHeaderContentGap.min}}" max="{{ranges.ceHeaderContentGap.max}}" />
       </div>
       <p class="notes">액터 이름·포트레이트 헤더와 메시지 내용 사이의 세로 여백입니다.</p>
     </div>
@@ -360,28 +360,28 @@
     <div class="form-group">
       <label>채팅: 액터 이름 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceActorNameSize" data-dtype="Number" value="{{values.ceActorNameSize}}" step="1" min="10" max="40" />
+        <input type="number" name="ceActorNameSize" data-dtype="Number" value="{{values.ceActorNameSize}}" step="{{ranges.ceActorNameSize.step}}" min="{{ranges.ceActorNameSize.min}}" max="{{ranges.ceActorNameSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
       <label>채팅: 플레이어 이름 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="cePlayerNameSize" data-dtype="Number" value="{{values.cePlayerNameSize}}" step="1" min="8" max="28" />
+        <input type="number" name="cePlayerNameSize" data-dtype="Number" value="{{values.cePlayerNameSize}}" step="{{ranges.cePlayerNameSize.step}}" min="{{ranges.cePlayerNameSize.min}}" max="{{ranges.cePlayerNameSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
       <label>채팅: 메시지 글자 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceMessageTextSize" data-dtype="Number" value="{{values.ceMessageTextSize}}" step="1" min="9" max="24" />
+        <input type="number" name="ceMessageTextSize" data-dtype="Number" value="{{values.ceMessageTextSize}}" step="{{ranges.ceMessageTextSize.step}}" min="{{ranges.ceMessageTextSize.min}}" max="{{ranges.ceMessageTextSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
       <label>채팅: 주문/아이템/피처 설명 글자 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceChatCardTextSize" data-dtype="Number" value="{{values.ceChatCardTextSize}}" step="1" min="9" max="24" />
+        <input type="number" name="ceChatCardTextSize" data-dtype="Number" value="{{values.ceChatCardTextSize}}" step="{{ranges.ceChatCardTextSize.step}}" min="{{ranges.ceChatCardTextSize.min}}" max="{{ranges.ceChatCardTextSize.max}}" />
       </div>
     </div>
   </section>
@@ -421,7 +421,7 @@
     <div class="form-group">
       <label>채팅 병합: 그룹 간 간격(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceMergeGroupSpacing" data-dtype="Number" value="{{values.ceMergeGroupSpacing}}" step="1" min="0" max="40" />
+        <input type="number" name="ceMergeGroupSpacing" data-dtype="Number" value="{{values.ceMergeGroupSpacing}}" step="{{ranges.ceMergeGroupSpacing.step}}" min="{{ranges.ceMergeGroupSpacing.min}}" max="{{ranges.ceMergeGroupSpacing.max}}" />
       </div>
       <p class="notes">서로 다른 화자(그룹) 사이의 여백(px)입니다. 채팅카드(dnd5e 아이템/주문 등)처럼 병합 외 메시지 전후에도 동일하게 적용됩니다.</p>
     </div>
@@ -429,7 +429,7 @@
     <div class="form-group">
       <label>채팅 병합: 연속 메시지 내부 간격(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="1" min="0" max="40" />
+        <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="{{ranges.ceMergeInnerGap.step}}" min="{{ranges.ceMergeInnerGap.min}}" max="{{ranges.ceMergeInnerGap.max}}" />
       </div>
       <p class="notes">같은 화자의 연속 병합 메시지 사이 세로 여백입니다. 표준 모드에서는 위아래 합산(×2)이 실제 간격이 됩니다.</p>
     </div>
@@ -560,14 +560,14 @@
     <div class="form-group">
       <label>포트레이트 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="1" min="16" max="128" />
+        <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="{{ranges.chatPortraitSize.step}}" min="{{ranges.chatPortraitSize.min}}" max="{{ranges.chatPortraitSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
       <label>채팅 카드 아이콘 크기(px)</label>
       <div class="form-fields">
-        <input type="number" name="chatPortraitCardIconSize" data-dtype="Number" value="{{values.chatPortraitCardIconSize}}" step="1" min="0" max="128" />
+        <input type="number" name="chatPortraitCardIconSize" data-dtype="Number" value="{{values.chatPortraitCardIconSize}}" step="{{ranges.chatPortraitCardIconSize.step}}" min="{{ranges.chatPortraitCardIconSize.min}}" max="{{ranges.chatPortraitCardIconSize.max}}" />
       </div>
       <p class="notes">midi-qol/dnd5e 채팅 카드 안의 아이콘 크기를 강제 조정합니다. 0이면 비활성화.</p>
     </div>
@@ -593,7 +593,7 @@
     <div class="form-group">
       <label>포트레이트 테두리 두께(px)</label>
       <div class="form-fields">
-        <input type="number" name="chatPortraitBorderWidth" data-dtype="Number" value="{{values.chatPortraitBorderWidth}}" step="1" min="0" max="12" />
+        <input type="number" name="chatPortraitBorderWidth" data-dtype="Number" value="{{values.chatPortraitBorderWidth}}" step="{{ranges.chatPortraitBorderWidth.step}}" min="{{ranges.chatPortraitBorderWidth.min}}" max="{{ranges.chatPortraitBorderWidth.max}}" />
       </div>
       <p class="notes">테두리 모드가 '플레이어 색상' 또는 '사용자 지정'일 때 적용됩니다.</p>
     </div>
@@ -726,7 +726,7 @@
     <div class="form-group">
       <label>캐릭터 스테이터스 포트레이트 너비(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceDx3rdRuiPortraitWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPortraitWidth}}" step="4" min="32" max="256" />
+        <input type="number" name="ceDx3rdRuiPortraitWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPortraitWidth}}" step="{{ranges.ceDx3rdRuiPortraitWidth.step}}" min="{{ranges.ceDx3rdRuiPortraitWidth.min}}" max="{{ranges.ceDx3rdRuiPortraitWidth.max}}" />
       </div>
       <p class="notes">포트레이트 이미지 영역의 너비. 기본 100.</p>
     </div>
@@ -734,7 +734,7 @@
     <div class="form-group">
       <label>캐릭터 스테이터스 자원 칸 너비(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceDx3rdRuiPanelWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPanelWidth}}" step="4" min="60" max="300" />
+        <input type="number" name="ceDx3rdRuiPanelWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPanelWidth}}" step="{{ranges.ceDx3rdRuiPanelWidth.step}}" min="{{ranges.ceDx3rdRuiPanelWidth.min}}" max="{{ranges.ceDx3rdRuiPanelWidth.max}}" />
       </div>
       <p class="notes">HP·침식률 바가 표시되는 패널의 너비. 기본 128.</p>
     </div>
@@ -742,7 +742,7 @@
     <div class="form-group">
       <label>캐릭터 스테이터스 카드 높이(px)</label>
       <div class="form-fields">
-        <input type="number" name="ceDx3rdRuiCardHeight" data-dtype="Number" value="{{values.ceDx3rdRuiCardHeight}}" step="4" min="32" max="200" />
+        <input type="number" name="ceDx3rdRuiCardHeight" data-dtype="Number" value="{{values.ceDx3rdRuiCardHeight}}" step="{{ranges.ceDx3rdRuiCardHeight.step}}" min="{{ranges.ceDx3rdRuiCardHeight.min}}" max="{{ranges.ceDx3rdRuiCardHeight.max}}" />
       </div>
       <p class="notes">카드 전체 높이. 기본 80.</p>
     </div>
@@ -756,7 +756,7 @@
     <div class="form-group">
       <label>채팅 카드 테두리 투명도</label>
       <div class="form-fields">
-        <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="0.05" min="0" max="1" />
+        <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="{{ranges.ceDx3rdCardBorderAlpha.step}}" min="{{ranges.ceDx3rdCardBorderAlpha.min}}" max="{{ranges.ceDx3rdCardBorderAlpha.max}}" />
       </div>
       <p class="notes">픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값. 0 = 완전 투명, 1 = 완전 불투명.</p>
     </div>
@@ -794,7 +794,7 @@
     <div class="form-group">
       <label>이미지 최대 용량 (MB, GM 전용)</label>
       <div class="form-fields">
-        <input type="range" name="chatImagesMaxUploadMB" min="1" max="64" step="1" value="{{values.chatImagesMaxUploadMB}}" data-dtype="Number" />
+        <input type="range" name="chatImagesMaxUploadMB" min="{{ranges.chatImagesMaxUploadMB.min}}" max="{{ranges.chatImagesMaxUploadMB.max}}" step="{{ranges.chatImagesMaxUploadMB.step}}" value="{{values.chatImagesMaxUploadMB}}" data-dtype="Number" />
         <span class="fe-range-value" data-for="chatImagesMaxUploadMB"></span>
       </div>
       <p class="notes">이미지 한 장의 최대 크기입니다(기본 20MB). 직접 업로드·GM 대리 업로드·메시지 직접 포함 세 경로 모두에 적용됩니다. 대리 업로드는 GM 클라이언트 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 크게 올리는 것은 권장하지 않습니다.</p>
@@ -823,27 +823,27 @@
     <div class="form-group">
       <label>이미지 크기 — 화면 너비의 1/N</label>
       <div class="form-fields">
-        <input type="number" name="ihSize" data-dtype="Number" value="{{values.ihSize}}" step="0.5" min="3" max="20" />
+        <input type="number" name="ihSize" data-dtype="Number" value="{{values.ihSize}}" step="{{ranges.ihSize.step}}" min="{{ranges.ihSize.min}}" max="{{ranges.ihSize.max}}" />
       </div>
       <p class="notes">값이 작을수록 이미지가 커집니다.</p>
     </div>
     <div class="form-group">
       <label>가로 이미지 크기 — 화면 높이의 1/N</label>
       <div class="form-fields">
-        <input type="number" name="ihSizeWide" data-dtype="Number" value="{{values.ihSizeWide}}" step="0.025" min="1" max="20" />
+        <input type="number" name="ihSizeWide" data-dtype="Number" value="{{values.ihSizeWide}}" step="{{ranges.ihSizeWide.step}}" min="{{ranges.ihSizeWide.min}}" max="{{ranges.ihSizeWide.max}}" />
       </div>
       <p class="notes">가로로 긴 이미지(가로:세로 &ge; 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다.</p>
     </div>
     <div class="form-group">
       <label>표시 지연 시간 (ms)</label>
       <div class="form-fields">
-        <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="100" min="0" max="5000" />
+        <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="{{ranges.ihDelay.step}}" min="{{ranges.ihDelay.min}}" max="{{ranges.ihDelay.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>최대 업스케일 배율</label>
       <div class="form-fields">
-        <input type="range" name="ihMaxUpscale" data-dtype="Number" value="{{values.ihMaxUpscale}}" min="0" max="5" step="0.05" />
+        <input type="range" name="ihMaxUpscale" data-dtype="Number" value="{{values.ihMaxUpscale}}" min="{{ranges.ihMaxUpscale.min}}" max="{{ranges.ihMaxUpscale.max}}" step="{{ranges.ihMaxUpscale.step}}" />
         <span class="fe-range-value" data-for="ihMaxUpscale">{{values.ihMaxUpscale}}</span>
       </div>
       <p class="notes">원본 해상도 대비 최대 확대 한도. 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. <b>0 = 제한 없음</b>(항상 설정 크기로 표시).</p>
@@ -879,7 +879,7 @@
     <div class="form-group">
       <label>표시 시간 배수</label>
       <div class="form-fields">
-        <input type="number" name="narratorDurationMult" data-dtype="Number" value="{{values.narratorDurationMult}}" step="0.25" min="0.25" max="4" />
+        <input type="number" name="narratorDurationMult" data-dtype="Number" value="{{values.narratorDurationMult}}" step="{{ranges.narratorDurationMult.step}}" min="{{ranges.narratorDurationMult.min}}" max="{{ranges.narratorDurationMult.max}}" />
       </div>
     </div>
     <div class="form-group">
@@ -942,11 +942,18 @@
     <div class="form-group">
       <label>대사창 소멸 시간 (ms, GM)</label>
       <div class="form-fields">
-        <input type="number" name="stageDecayTime" data-dtype="Number" value="{{values.stageDecayTime}}" step="5000" min="5000" max="120000" />
+        <input type="number" name="stageDecayTime" data-dtype="Number" value="{{values.stageDecayTime}}" step="{{ranges.stageDecayTime.step}}" min="{{ranges.stageDecayTime.min}}" max="{{ranges.stageDecayTime.max}}" />
       </div>
     </div>
     {{/if}}
 
+    <div class="form-group">
+      <label>액터 이름 색상</label>
+      <div class="form-fields">
+        <input type="checkbox" name="stageNameUserColor" data-dtype="Boolean" {{checked values.stageNameUserColor}} />
+      </div>
+      <p class="notes">액터 이름의 색상을 유저의 색상으로 틴트합니다. 끄면 대사창의 기본 글자색을 사용합니다.</p>
+    </div>
     <div class="form-group">
       <label>액터 포트레이트 표시 방식</label>
       <div class="form-fields">
@@ -956,73 +963,73 @@
     <div class="form-group">
       <label>포트레이트 높이 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="1" min="50" max="700" />
+        <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="{{ranges.stagePortraitHeight.step}}" min="{{ranges.stagePortraitHeight.min}}" max="{{ranges.stagePortraitHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>포트레이트 너비 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stagePortraitWidth" data-dtype="Number" value="{{values.stagePortraitWidth}}" step="1" min="50" max="700" />
+        <input type="number" name="stagePortraitWidth" data-dtype="Number" value="{{values.stagePortraitWidth}}" step="{{ranges.stagePortraitWidth.step}}" min="{{ranges.stagePortraitWidth.min}}" max="{{ranges.stagePortraitWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 가로 너비 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="4" min="200" max="1600" />
+        <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="{{ranges.stageBoxWidth.step}}" min="{{ranges.stageBoxWidth.min}}" max="{{ranges.stageBoxWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 세로 높이 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="4" min="100" max="600" />
+        <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="{{ranges.stageBoxHeight.step}}" min="{{ranges.stageBoxHeight.min}}" max="{{ranges.stageBoxHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 하단 여백 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="2" min="0" max="300" />
+        <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="{{ranges.stageBoxBottom.step}}" min="{{ranges.stageBoxBottom.min}}" max="{{ranges.stageBoxBottom.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 좌측 여백 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="4" min="0" max="1200" />
+        <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="{{ranges.stageBoxLeft.step}}" min="{{ranges.stageBoxLeft.min}}" max="{{ranges.stageBoxLeft.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사 폰트 크기 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="1" min="10" max="32" />
+        <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="{{ranges.stageTextSize.step}}" min="{{ranges.stageTextSize.min}}" max="{{ranges.stageTextSize.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 가로 너비 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageInsetBoxWidth" data-dtype="Number" value="{{values.stageInsetBoxWidth}}" step="4" min="200" max="1600" />
+        <input type="number" name="stageInsetBoxWidth" data-dtype="Number" value="{{values.stageInsetBoxWidth}}" step="{{ranges.stageInsetBoxWidth.step}}" min="{{ranges.stageInsetBoxWidth.min}}" max="{{ranges.stageInsetBoxWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 세로 높이 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageInsetBoxHeight" data-dtype="Number" value="{{values.stageInsetBoxHeight}}" step="4" min="100" max="600" />
+        <input type="number" name="stageInsetBoxHeight" data-dtype="Number" value="{{values.stageInsetBoxHeight}}" step="{{ranges.stageInsetBoxHeight.step}}" min="{{ranges.stageInsetBoxHeight.min}}" max="{{ranges.stageInsetBoxHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 하단 여백 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageInsetBoxBottom" data-dtype="Number" value="{{values.stageInsetBoxBottom}}" step="2" min="0" max="300" />
+        <input type="number" name="stageInsetBoxBottom" data-dtype="Number" value="{{values.stageInsetBoxBottom}}" step="{{ranges.stageInsetBoxBottom.step}}" min="{{ranges.stageInsetBoxBottom.min}}" max="{{ranges.stageInsetBoxBottom.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사창 좌측 여백 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageInsetBoxLeft" data-dtype="Number" value="{{values.stageInsetBoxLeft}}" step="4" min="0" max="1200" />
+        <input type="number" name="stageInsetBoxLeft" data-dtype="Number" value="{{values.stageInsetBoxLeft}}" step="{{ranges.stageInsetBoxLeft.step}}" min="{{ranges.stageInsetBoxLeft.min}}" max="{{ranges.stageInsetBoxLeft.max}}" />
       </div>
     </div>
     <div class="form-group">
       <label>대사 폰트 크기 (px)</label>
       <div class="form-fields">
-        <input type="number" name="stageInsetTextSize" data-dtype="Number" value="{{values.stageInsetTextSize}}" step="1" min="10" max="32" />
+        <input type="number" name="stageInsetTextSize" data-dtype="Number" value="{{values.stageInsetTextSize}}" step="{{ranges.stageInsetTextSize.step}}" min="{{ranges.stageInsetTextSize.min}}" max="{{ranges.stageInsetTextSize.max}}" />
       </div>
     </div>
   </section>
@@ -1104,7 +1111,7 @@
     <div class="form-group">
       <label>최대 업로드 크기 (MB)</label>
       <div class="form-fields">
-        <input type="number" name="ceMusicMaxUploadMB" value="{{values.ceMusicMaxUploadMB}}" min="1" step="1" />
+        <input type="number" name="ceMusicMaxUploadMB" value="{{values.ceMusicMaxUploadMB}}" min="{{ranges.ceMusicMaxUploadMB.min}}" step="{{ranges.ceMusicMaxUploadMB.step}}" />
       </div>
       <p class="notes">GM 프록시 업로드의 파일당 크기 제한입니다. 기본값은 27MB 입니다.</p>
     </div>
@@ -1137,7 +1144,7 @@
     <div class="form-group">
       <label>포트레이트 크기 (px)</label>
       <div class="form-fields">
-        <input type="range" name="ceCombatTrackerPortraitSize" data-dtype="Number" value="{{values.ceCombatTrackerPortraitSize}}" min="48" max="160" step="4" />
+        <input type="range" name="ceCombatTrackerPortraitSize" data-dtype="Number" value="{{values.ceCombatTrackerPortraitSize}}" min="{{ranges.ceCombatTrackerPortraitSize.min}}" max="{{ranges.ceCombatTrackerPortraitSize.max}}" step="{{ranges.ceCombatTrackerPortraitSize.step}}" />
         <span class="fe-range-value" data-for="ceCombatTrackerPortraitSize">{{values.ceCombatTrackerPortraitSize}}</span>
       </div>
     </div>
@@ -1226,7 +1233,7 @@
     <div class="form-group">
       <label>글로우 세기</label>
       <div class="form-fields">
-        <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="1" max="10" step="1" />
+        <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="{{ranges.ceTokenGlowStrength.min}}" max="{{ranges.ceTokenGlowStrength.max}}" step="{{ranges.ceTokenGlowStrength.step}}" />
         <span class="fe-range-value" data-for="ceTokenGlowStrength">{{values.ceTokenGlowStrength}}</span>
       </div>
     </div>

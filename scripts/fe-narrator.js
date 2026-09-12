@@ -1,3 +1,4 @@
+import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
 /**
  * fe-narrator.js — Narrator overlay + styled narrator chat
  *
@@ -37,12 +38,12 @@ const _FN_NARRATOR_FLAG = "isNarrator"; // flags.female_edition.isNarrator
 const _FN_TYPE_FLAG     = "narratorType";
 
 // ── Settings cache ───────────────────────────────────────────────────────────
-let _fnEnabled       = true;
-let _fnDurationMult  = 1;
-let _fnAllowCopy     = true;
-let _fnPermNarrate   = 4; // CONST.USER_ROLES.GAMEMASTER
-let _fnPermDescribe  = 4;
-let _fnPermAs        = 4;
+let _fnEnabled       = FE_DEFAULTS.narratorEnabled;
+let _fnDurationMult  = FE_DEFAULTS.narratorDurationMult;
+let _fnAllowCopy     = FE_DEFAULTS.narratorAllowCopy;
+let _fnPermNarrate   = FE_DEFAULTS.narratorPermNarrate; // CONST.USER_ROLES.GAMEMASTER
+let _fnPermDescribe  = FE_DEFAULTS.narratorPermDescribe;
+let _fnPermAs        = FE_DEFAULTS.narratorPermAs;
 
 // ── Runtime ────────────────────────────────────────────────────────────────
 const _fn = {
@@ -74,67 +75,23 @@ function _fnAnimate(el, keyframes, duration, easing = "ease-in-out") {
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 function _fnRegisterSettings() {
-  game.settings.register(_FN_MODULE, "narratorEnabled", {
-    name: "내레이터 기능 활성화",
-    hint: "사이드바 채팅에서 /narrate, /describe, /note, /as 명령과 시네마틱 내레이션 오버레이를 사용합니다. (무대 채팅과 별개의 채널)",
-    scope: "world", config: false, restricted: true, type: Boolean, default: true,
-    onChange: (v) => {
+  feRegisterSetting("narratorEnabled", (v) => {
       _fnEnabled = !!v && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR);
       if (!_fnEnabled) _fnForceClose();
-    },
-  });
-  game.settings.register(_FN_MODULE, "narratorDurationMult", {
-    name: "내레이터: 표시 시간 배수",
-    hint: "/narrate 오버레이가 화면에 머무는 시간을 이 값으로 곱합니다.",
-    scope: "world", config: false, restricted: true, type: Number,
-    range: { min: 0.25, max: 4, step: 0.25 }, default: 1,
-    onChange: (v) => { _fnDurationMult = v; },
-  });
-  game.settings.register(_FN_MODULE, "narratorAllowCopy", {
-    name: "내레이터: 복사 버튼 표시",
-    scope: "world", config: false, restricted: true, type: Boolean, default: true,
-    onChange: (v) => { _fnAllowCopy = v; },
-  });
-  game.settings.register(_FN_MODULE, "narratorPermNarrate", {
-    name: "내레이터: /narrate 최소 권한",
-    scope: "world", config: false, restricted: true, type: Number,
-    choices: _fnRoleChoices(), default: 4,
-    onChange: (v) => { _fnPermNarrate = Number(v); },
-  });
-  game.settings.register(_FN_MODULE, "narratorPermDescribe", {
-    name: "내레이터: /describe·/note 최소 권한",
-    scope: "world", config: false, restricted: true, type: Number,
-    choices: _fnRoleChoices(), default: 4,
-    onChange: (v) => { _fnPermDescribe = Number(v); },
-  });
-  game.settings.register(_FN_MODULE, "narratorPermAs", {
-    name: "내레이터: /as 최소 권한",
-    scope: "world", config: false, restricted: true, type: Number,
-    choices: _fnRoleChoices(), default: 4,
-    onChange: (v) => { _fnPermAs = Number(v); },
-  });
+    });
+  feRegisterSetting("narratorDurationMult", (v) => { _fnDurationMult = v; });
+  feRegisterSetting("narratorAllowCopy", (v) => { _fnAllowCopy = v; });
+  feRegisterSetting("narratorPermNarrate", (v) => { _fnPermNarrate = Number(v); });
+  feRegisterSetting("narratorPermDescribe", (v) => { _fnPermDescribe = Number(v); });
+  feRegisterSetting("narratorPermAs", (v) => { _fnPermAs = Number(v); });
 
   // World-scope shared overlay state — drives ALL clients via onChange.
   // (A world setting, not a socket: state persists so a late-joining client
   //  still sees an open narration, and there is no socket/setting race.)
-  game.settings.register(_FN_MODULE, _FN_STATE, {
-    name: "Narrator Shared State",
-    scope: "world", config: false,
-    default: { narration: { id: 0, display: false, message: "", paused: false } },
-    onChange: (state) => _fnController(state),
-  });
+  feRegisterSetting(_FN_STATE, (state) => _fnController(state));
 }
 
-function _fnRoleChoices() {
-  const R = CONST.USER_ROLES ?? { NONE: 0, PLAYER: 1, TRUSTED: 2, ASSISTANT: 3, GAMEMASTER: 4 };
-  return {
-    [R.NONE]: "없음",
-    [R.PLAYER]: "플레이어",
-    [R.TRUSTED]: "신뢰 플레이어",
-    [R.ASSISTANT]: "어시스턴트 GM",
-    [R.GAMEMASTER]: "게임마스터",
-  };
-}
+
 
 function _fnLoadSettings() {
   _fnEnabled      = game.settings.get(_FN_MODULE, "narratorEnabled")
@@ -148,7 +105,7 @@ function _fnLoadSettings() {
 
 // ── Shared state accessors ─────────────────────────────────────────────────
 function _fnGetState() {
-  return game.settings.get(_FN_MODULE, _FN_STATE) ?? { narration: { id: 0, display: false, message: "", paused: false } };
+  return game.settings.get(_FN_MODULE, _FN_STATE) ?? structuredClone(FE_DEFAULTS[_FN_STATE]);
 }
 function _fnSetNarration(narration) {
   const s = { ...(_fnGetState()), narration };

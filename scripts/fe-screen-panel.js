@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Screen Panel — entry / orchestrator (registered in module.json).
 //
 // Hybrid feature: a module-defined Actor sub-type (data + native ownership +
@@ -1783,27 +1784,10 @@ Hooks.once("init", () => {
   // `ready` because core rebuilds that object after `setup` — see the function.
   feInstallDottedTypeAliases();
 
-  game.settings.register(MODULE_ID, S.SCREEN_PANEL_ENABLED, {
-    // Pass localization KEYS — at the `init` hook i18n is not yet loaded; the
-    // settings UI localizes name/hint at render time.
-    name: "FESP.Settings.EnableName",
-    hint: "FESP.Settings.EnableHint",
-    scope: "world",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SCREEN_PANEL_ENABLED],
-    requiresReload: true,
-  });
+  feRegisterSetting(S.SCREEN_PANEL_ENABLED);
 
   // Per-client drag preference: snap panels to the scene grid while dragging.
-  game.settings.register(MODULE_ID, S.SCREEN_PANEL_GRID_SNAP, {
-    name: "FESP.Settings.GridSnapName",
-    hint: "FESP.Settings.GridSnapHint",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SCREEN_PANEL_GRID_SNAP],
-  });
+  feRegisterSetting(S.SCREEN_PANEL_GRID_SNAP);
 
 });
 

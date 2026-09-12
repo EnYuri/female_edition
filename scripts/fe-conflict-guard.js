@@ -1,3 +1,4 @@
+import { feRegisterSetting, FE_DEFAULTS, FE_SETTING_DEFINITIONS } from "./fe-settings-data.js";
 /**
  * fe-conflict-guard.js
  *
@@ -75,13 +76,8 @@ const FE_CG_SELF_GUARD = ["female_edition", "_FET_", "FemaleEdition"];
 // in fe-settings-menu.js), and reading live keeps the pure assessor testable by
 // passing `mode` explicitly.
 const FE_CG_MODE_KEY = "ceConflictGuardMode";
-const FE_CG_MODE_DEFAULT = "auto";
-const FE_CG_MODES = Object.freeze({
-  auto:  "자동 (권장) — 무력화·양보·경고 전부",
-  yield: "양보만 — 상대 모듈은 건드리지 않고 우리 기능을 끔",
-  warn:  "경고만 — 아무것도 끄지 않고 알리기만",
-  off:   "사용 안 함 — 감지·경고까지 전부 끔",
-});
+const FE_CG_MODE_DEFAULT = FE_DEFAULTS[FE_CG_MODE_KEY];
+const FE_CG_MODES = FE_SETTING_DEFINITIONS[FE_CG_MODE_KEY].choices;
 
 function feCgMode() {
   let raw;
@@ -714,16 +710,7 @@ function feCgScheduleNeutralizeSecondPass(hit) {
 // hook does not come back, and a feature whose ready handler already ran cannot be
 // retroactively suppressed), so the key sits in FE_RELOAD_REQUIRED_KEYS instead.
 Hooks.once("init", () => {
-  game.settings.register("female_edition", FE_CG_MODE_KEY, {
-    name: "충돌 모듈 가드 동작",
-    hint: "female_edition이 내장한 기능과 겹치는 다른 모듈을 감지했을 때의 동작입니다. 기본값은 '자동'이며, 버려진 중복 모듈은 런타임에서 무력화하고 유지보수 중인 모듈에는 우리 기능을 양보합니다. 중복을 감수하고 두 모듈을 함께 쓰려면 '경고만'을 선택하세요. 변경하려면 새로고침이 필요합니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: String,
-    choices: FE_CG_MODES,
-    default: FE_CG_MODE_DEFAULT,
-  });
+  feRegisterSetting(FE_CG_MODE_KEY);
 });
 
 // All module settings have been registered by setup, while feature ready hooks

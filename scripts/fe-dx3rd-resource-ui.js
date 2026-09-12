@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-dx3rd-resource-ui.js
 // Pixel-theme character status panels. An actor gets a card only while it carries
 // SHOW_FLAG (toggled from the sheet header or context menu). Visibility is a separate
@@ -919,50 +920,15 @@ Hooks.on("renderActorSheetV2", _onRenderActorSheet);
 
 Hooks.on("init", () => {
   if (!_isSupported()) return;
-  game.settings.register(MODULE_ID, S.DX3RD_RUI_ENABLED, {
-    name: "스테이터스 UI 표시",
-    hint: "핀 고정한 액터의 HP·자원 카드(스테이터스 UI)를 화면에 표시합니다. 끄면 스테이터스 UI 전체와 채팅의 토글 버튼이 비활성화됩니다.",
-    // config:false — managed in the unified settings menu (fe-settings-menu) "스테이터스 UI" section.
-    scope: "client", config: false, type: Boolean,
-    default: true,
-    onChange: () => {
+  feRegisterSetting(S.DX3RD_RUI_ENABLED, () => {
       feRebuildDx3rdResourceUI();
       // Clean up header buttons on already-open sheets when toggling off (no re-render).
       if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
-    },
-  });
-  game.settings.register(MODULE_ID, S.DX3RD_RUI_VISIBLE, {
-    name: "스테이터스 UI 표시(가시성)",
-    hint: "스테이터스 UI 카드를 화면에 표시합니다. 끄면 핀 고정은 유지한 채 카드만 숨깁니다. (이전 채팅 토글 버튼을 대체)",
-    // config:false — managed in the unified settings menu (fe-settings-menu) "스테이터스 UI" section.
-    scope: "client", config: false, type: Boolean,
-    default: true,
-    onChange: _refreshVisibility,
-  });
-  game.settings.register(MODULE_ID, S.DX3RD_RUI_PORTRAIT_WIDTH, {
-    name: "[DX3rd] 캐릭터 스테이터스 포트레이트 너비(px)",
-    hint: "포트레이트 이미지 영역의 너비. 기본 100.",
-    scope: "client", config: false, type: Number,
-    default: 100,
-    range: { min: 32, max: 256, step: 4 },
-    onChange: feRebuildDx3rdResourceUI,
-  });
-  game.settings.register(MODULE_ID, S.DX3RD_RUI_PANEL_WIDTH, {
-    name: "[DX3rd] 캐릭터 스테이터스 자원 칸 너비(px)",
-    hint: "HP·침식률 바가 표시되는 패널의 너비. 기본 128.",
-    scope: "client", config: false, type: Number,
-    default: 128,
-    range: { min: 60, max: 300, step: 4 },
-    onChange: feRebuildDx3rdResourceUI,
-  });
-  game.settings.register(MODULE_ID, S.DX3RD_RUI_CARD_HEIGHT, {
-    name: "[DX3rd] 캐릭터 스테이터스 카드 높이(px)",
-    hint: "카드 전체 높이. 기본 80.",
-    scope: "client", config: false, type: Number,
-    default: 80,
-    range: { min: 32, max: 200, step: 4 },
-    onChange: feRebuildDx3rdResourceUI,
-  });
+    });
+  feRegisterSetting(S.DX3RD_RUI_VISIBLE, _refreshVisibility);
+  feRegisterSetting(S.DX3RD_RUI_PORTRAIT_WIDTH, feRebuildDx3rdResourceUI);
+  feRegisterSetting(S.DX3RD_RUI_PANEL_WIDTH, feRebuildDx3rdResourceUI);
+  feRegisterSetting(S.DX3RD_RUI_CARD_HEIGHT, feRebuildDx3rdResourceUI);
 });
 
 // ─── Foundry hooks ─────────────────────────────────────────────────────────

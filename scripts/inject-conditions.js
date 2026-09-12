@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 /**
  * Custom condition injections for dnd5e.
  *
@@ -71,16 +72,7 @@ function feBuildConditions() {
 }
 
 Hooks.once("init", () => {
-  game.settings.register("female_edition", "injectCustomConditions", {
-    name: "[DND5e] 커스텀 컨디션 주입 활성화",
-    hint: "이 모듈의 커스텀 컨디션을 dnd5e에 등록합니다. 무엇인지 모르면 활성화를 추천하지 않습니다. 변경 후 세계 새로고침이 필요합니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: false,
-    requiresReload: true,
-  });
+  feRegisterSetting("injectCustomConditions");
 
   const types = CONFIG?.DND5E?.conditionTypes;
   if (!types) return;

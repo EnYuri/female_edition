@@ -1,3 +1,5 @@
+import { CP } from "./fe-settings-data.js";
+import { feRegisterSetting } from "./fe-settings-data.js";
 // Chat portrait features (split)
 // Implements a small, FVTT v13-safe subset inspired by:
 // https://github.com/p4535992/foundryvtt-chat-portrait
@@ -18,25 +20,7 @@ import {
   cpResampleCacheGet,
 } from "./fe-chat-portrait-image.js";
 
-const CP = Object.freeze({
-  ENABLED: "chatPortraitEnabled",
-  HIDE_WRAP: "chatPortraitHideWrap",
-  USE_TOKEN: "chatPortraitUseTokenImage",
-  SIZE: "chatPortraitSize",
-  CARD_ICON_SIZE: "chatPortraitCardIconSize",
-  SHAPE: "chatPortraitShape",
-  BORDER_MODE: "chatPortraitBorderMode",
-  BORDER_WIDTH: "chatPortraitBorderWidth",
-  BORDER_COLOR: "chatPortraitBorderColor",
-  NAME_ALIGN: "chatPortraitNameAlign",
 
-  SHOW_IC: "chatPortraitShowIC",
-  SHOW_OOC: "chatPortraitShowOOC",
-  SHOW_EMOTE: "chatPortraitShowEmote",
-  SHOW_WHISPER: "chatPortraitShowWhisper",
-  SHOW_ROLL: "chatPortraitShowRoll",
-  SHOW_OTHER: "chatPortraitShowOther",
-});
 
 // ChatMessage flag key (stable portrait src, similar to chat-portrait module's flags.chat-portrait.src)
 const FE_FLAG_PORTRAIT_SRC = "portraitSrc";
@@ -1056,178 +1040,73 @@ export function feChatPortraitApplyVars(doc = document) {
 }
 
 function cpRegisterSettings() {
-  game.settings.register(MODULE_ID, CP.ENABLED, {
-    name: "채팅 포트레이트 사용",
-    hint: "채팅 메시지 카드에 액터(또는 토큰) 이미지를 삽입합니다. (chat-portrait 모듈이 활성화되어 있으면 포트레이트가 중복될 수 있으며, 콘솔에 경고만 표시합니다.)",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => {
+  feRegisterSetting(CP.ENABLED, () => {
       cpSetRootVars();
       cpScheduleRefreshAllChatMessages({ delay: 0 });
       feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.HIDE_WRAP, {
-    name: "채팅 포트레이트(삽입) 숨김",
-    hint: "이 모듈이 채팅 카드 헤더에 삽입하는 포트레이트(이미지)를 숨깁니다. 기존 '채팅 기본 포트레이트 숨김(내부/기본)' 옵션과 별개입니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-    onChange: () => {
-      cpSetRootVars();
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.USE_TOKEN, {
-    name: "채팅 포트레이트에 토큰 이미지 사용",
-    hint: "활성화 시 액터 포트레이트 대신 토큰 이미지를 사용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-    onChange: () => {
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.SIZE, {
-    name: "채팅 포트레이트 크기(px)",
-    hint: "포트레이트 이미지의 가로/세로 크기(px)입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 16, max: 128, step: 1 },
-    default: 64,
-    onChange: () => {
-      cpSetRootVars();
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.CARD_ICON_SIZE, {
-    name: "채팅 카드 아이콘 크기(px)",
-    hint: "midi-qol/dnd5e 채팅 카드 안의 큰 이미지(아이콘/포트레이트)가 과도하게 크게 보이는 경우를 방지하기 위해, 카드 헤더 이미지 크기를 강제로 조정합니다. 0으로 설정하면 비활성화됩니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 0, max: 128, step: 1 },
-    default: 36,
-    onChange: () => {
-      cpSetRootVars();
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-
-  game.settings.register(MODULE_ID, CP.SHAPE, {
-    name: "채팅 포트레이트 모양",
-    hint: "포트레이트 모양/자르기 방식을 설정합니다. '미적용'은 보더/자르기 없이 크기만 조절합니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: "none",
-    choices: {
-      circle: "원형",
-      square: "사각형",
-      none: "미적용(자르지 않음)",
-    },
-    onChange: () => {
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.BORDER_MODE, {
-    name: "채팅 포트레이트 테두리(보더) 모드",
-    hint: "포트레이트 이미지 테두리 스타일을 설정합니다. '테마/기본값'은 다른 테마/모듈의 스타일을 그대로 사용합니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: "none",
-    choices: {
-      theme: "테마/기본값(변경 안 함)",
-      none: "없음",
-      user: "플레이어 색상",
-      custom: "사용자 지정",
-    },
-    onChange: () => {
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.BORDER_WIDTH, {
-    name: "채팅 포트레이트 테두리 두께(px)",
-    hint: "테두리 모드가 '플레이어 색상' 또는 '사용자 지정'일 때 적용됩니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 0, max: 12, step: 1 },
-    default: 0,
-    onChange: () => {
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.BORDER_COLOR, {
-    name: "채팅 포트레이트 테두리 색상(HEX)",
-    hint: "테두리 모드가 '사용자 지정'일 때 사용합니다. 예) #000000",
-    scope: "client",
-    config: false,
-    type: String,
-    default: "#000000",
-    onChange: () => {
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  game.settings.register(MODULE_ID, CP.NAME_ALIGN, {
-    name: "채팅 포트레이트 이름 정렬",
-    hint: "헤더의 액터 이름/플레이어 이름을 가운데 정렬 또는 좌측 정렬로 표시합니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: "left",
-    choices: {
-      center: "가운데 정렬",
-      left: "좌측 정렬",
-    },
-    onChange: () => {
-      cpSetRootVars();
-      cpScheduleRefreshAllChatMessages({ delay: 0 });
-      feFireChatUiUpdated({ reason: "portrait-settings", document });
-    },
-  });
-
-  // Message type filters
-  const typeSetting = (key, name, def = true) =>
-    game.settings.register(MODULE_ID, key, {
-      name,
-      scope: "client",
-      config: false,
-      type: Boolean,
-      default: def,
-      onChange: () => {
-        cpScheduleRefreshAllChatMessages({ delay: 0 });
-      },
     });
 
-  typeSetting(CP.SHOW_IC, "포트레이트 표시: IC", true);
-  typeSetting(CP.SHOW_OOC, "포트레이트 표시: OOC", true);
-  typeSetting(CP.SHOW_EMOTE, "포트레이트 표시: EMOTE", true);
-  typeSetting(CP.SHOW_WHISPER, "포트레이트 표시: WHISPER", true);
-  typeSetting(CP.SHOW_ROLL, "포트레이트 표시: ROLL", true);
-  typeSetting(CP.SHOW_OTHER, "포트레이트 표시: 기타", true);
+  feRegisterSetting(CP.HIDE_WRAP, () => {
+      cpSetRootVars();
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.USE_TOKEN, () => {
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.SIZE, () => {
+      cpSetRootVars();
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.CARD_ICON_SIZE, () => {
+      cpSetRootVars();
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+
+  feRegisterSetting(CP.SHAPE, () => {
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.BORDER_MODE, () => {
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.BORDER_WIDTH, () => {
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.BORDER_COLOR, () => {
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  feRegisterSetting(CP.NAME_ALIGN, () => {
+      cpSetRootVars();
+      cpScheduleRefreshAllChatMessages({ delay: 0 });
+      feFireChatUiUpdated({ reason: "portrait-settings", document });
+    });
+
+  // Message type filters
+  const typeSetting = (key) =>
+    feRegisterSetting(key, () => {
+        cpScheduleRefreshAllChatMessages({ delay: 0 });
+      });
+
+  typeSetting(CP.SHOW_IC);
+  typeSetting(CP.SHOW_OOC);
+  typeSetting(CP.SHOW_EMOTE);
+  typeSetting(CP.SHOW_WHISPER);
+  typeSetting(CP.SHOW_ROLL);
+  typeSetting(CP.SHOW_OTHER);
 }
 
 Hooks.once("init", () => {

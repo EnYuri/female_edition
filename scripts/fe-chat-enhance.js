@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 /* female_edition: Chat Enhancements for Foundry VTT v13
  *
  * Features:
@@ -188,261 +189,73 @@ function feApplyGmPriorityUiRefresh(doc = document) {
 Hooks.once("init", () => {
   // DOM pruning must be registered and installed early in init so CONFIG.ui.chat
   // is replaced before Foundry instantiates the ChatLog sidebar.
-  game.settings.register(MODULE_ID, S.PRUNE_ENABLED, {
-    name: "채팅 DOM 정리(성능 최적화)",
-    hint: "메시지가 많이 쌓이면 오래된 메시지를 DOM에서 제거하여 성능을 개선합니다. 위로 스크롤하면 이전 메시지를 다시 불러옵니다. (변경 후 새로고침 필요)",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    requiresReload: true,
-  });
-  game.settings.register(MODULE_ID, S.PRUNE_MAX_MESSAGES, {
-    name: "채팅 DOM 정리: 최대 유지 메시지 수",
-    hint: "DOM에 동시에 유지할 최대 메시지 수입니다. 이 수를 초과하면 오래된 메시지를 제거합니다. 스크롤 1회에 이 값의 절반만큼 불러옵니다. (즉시 적용)",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.PRUNE_MAX_MESSAGES],
-    range: { min: 20, max: 200, step: 10 },
-  });
+  feRegisterSetting(S.PRUNE_ENABLED);
+  feRegisterSetting(S.PRUNE_MAX_MESSAGES);
   feInstallChatLogPrune();
 
-  game.settings.register(MODULE_ID, FE_GM_PRIORITY_OVERRIDES_KEY, {
-    name: "(internal) GM-priority range overrides",
-    scope: "world",
-    config: false,
-    type: Object,
-    default: {},
-    onChange: () => {
+  feRegisterSetting(FE_GM_PRIORITY_OVERRIDES_KEY, () => {
       feApplyGmPriorityUiRefresh(document);
       void feSyncLocalGmPrioritySettings();
-    },
-  });
+    });
 
   // Per-world settings store (client-scope blob, keyed by world id). See
   // fe-gm-priority.js for hydrate/capture logic.
-  game.settings.register(MODULE_ID, FE_WORLD_SETTINGS_KEY, {
-    name: "(internal) per-world settings",
-    scope: "client",
-    config: false,
-    type: Object,
-    default: {},
-  });
+  feRegisterSetting(FE_WORLD_SETTINGS_KEY);
 
   // Per-client backup of pre-force values, captured on the first GM-priority
   // overwrite of each key and consumed when enforcement is turned OFF (restore).
   // See fe-gm-priority.js (feSyncLocalGmPrioritySettings / feRestoreLocalGmPrioritySettings).
-  game.settings.register(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {
-    name: "(internal) GM-priority value backup",
-    scope: "client",
-    config: false,
-    type: Object,
-    default: {},
-  });
+  feRegisterSetting(FE_GM_PRIORITY_BACKUP_KEY);
 
   // Core-setting enforcement stores. Same shape as the pair above but for
   // Foundry's own "core" namespace — see fe-core-priority.js.
-  game.settings.register(MODULE_ID, FE_CORE_PRIORITY_OVERRIDES_KEY, {
-    name: "(internal) core-setting overrides",
-    scope: "world",
-    config: false,
-    type: Object,
-    default: {},
-    onChange: () => {
+  feRegisterSetting(FE_CORE_PRIORITY_OVERRIDES_KEY, () => {
       void feSyncLocalCoreSettings();
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, FE_CORE_PRIORITY_BACKUP_KEY, {
-    name: "(internal) core-setting value backup",
-    scope: "client",
-    config: false,
-    type: Object,
-    default: {},
-  });
+  feRegisterSetting(FE_CORE_PRIORITY_BACKUP_KEY);
 
-  game.settings.register(MODULE_ID, S.MERGE_ENABLED, {
-    name: "채팅 병합(연속 메시지 시각적 묶기)",
-    hint: "같은 화자/유저의 연속 메시지를 하나처럼 보이도록 묶습니다(문서 편집 없음).",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => {
+  feRegisterSetting(S.MERGE_ENABLED, () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
       setTimeout(() => feApplyChatMergeToAllLogs(), 200);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.MERGE_ONLY_TEXT, {
-    name: "채팅 병합: 텍스트 메시지만",
-    hint: "인라인 롤이 섞인 일반 텍스트는 병합할 수 있습니다. 전용 주사위 결과 카드 병합은 아래 옵션으로 켤 수 있으며, midi/dnd5e 채팅 카드는 기본적으로 병합하지 않습니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-    onChange: () => feApplyChatMergeToAllLogs(),
-  });
+  feRegisterSetting(S.MERGE_ONLY_TEXT, () => feApplyChatMergeToAllLogs());
 
-  game.settings.register(MODULE_ID, S.MERGE_INCLUDE_ROLL_MESSAGES, {
-    name: "채팅 병합: 주사위 결과 메시지도 포함",
-    hint: "끄면 .dice-roll / .dice-result / ChatMessage.rolls 메시지는 병합에서 제외합니다. 켜면 같은 화자의 연속 주사위 결과 메시지도 병합할 수 있습니다. midi/dnd5e 채팅 카드는 계속 제외됩니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
-  });
+  feRegisterSetting(S.MERGE_INCLUDE_ROLL_MESSAGES, () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }));
 
-  game.settings.register(MODULE_ID, S.MERGE_DIVIDER, {
-    name: "채팅 병합: 그룹 구분선 표시",
-    hint: "다른 화자의 새 그룹이 시작될 때 얇은 구분선을 표시합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-    onChange: () => feApplyChatMergeToAllLogs(),
-  });
+  feRegisterSetting(S.MERGE_DIVIDER, () => feApplyChatMergeToAllLogs());
 
-  game.settings.register(MODULE_ID, S.MERGE_GROUP_SPACING, {
-    name: "채팅 병합: 그룹 간 간격(px)",
-    hint: "서로 다른 화자(그룹) 사이의 추가 여백(px)입니다. dnd5e 채팅카드처럼 병합에서 제외되는 메시지 전후에도 동일하게 적용됩니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.MERGE_GROUP_SPACING],
-    range: { min: 0, max: 40, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.MERGE_GROUP_SPACING, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.MERGE_MODE, {
-    name: "채팅 병합 방식",
-    hint: "표준은 메시지 박스 경계까지 붙여 묶고, 간소화는 같은 화자의 후속 메시지에서 헤더만 숨깁니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      standard: "표준(경계/간격까지 묶기)",
-      simple: "간소화(후속 헤더만 숨김)",
-    },
-    default: FE_DEFAULTS[S.MERGE_MODE],
-    onChange: () => {
+  feRegisterSetting(S.MERGE_MODE, () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
       setTimeout(() => feApplyChatMergeToAllLogs(), 200);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.MERGE_FOLLOW_HEADER_STYLE, {
-    name: "채팅 병합: 후속 메시지 헤더 표시 방식",
-    hint: "같은 화자의 연속 메시지(두 번째부터)의 헤더 표시를 설정합니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      hide: "헤더 완전 숨김",
-      name: "이름만 남김",
-      portrait: "포트레이트만 남김",
-    },
-    default: "hide",
-    onChange: () => {
+  feRegisterSetting(S.MERGE_FOLLOW_HEADER_STYLE, () => {
       feSetBodyMergeClasses();
       feApplyChatMergeToAllLogs();
       setTimeout(() => feApplyChatMergeToAllLogs(), 200);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.MERGE_SPEAKER_BASIS, {
-    name: "채팅 병합: 화자 그룹 기준",
-    hint: [
-      "연속 메시지를 묶을 때 '같은 화자'를 어떻게 판단할지 결정합니다.",
-      "토큰(기본): 씬에 배치된 토큰 단위로 구분 — GM이 같은 액터를 다른 토큰으로 운용하면 별도 그룹.",
-      "액터: 액터 단위 — 같은 액터라면 다른 토큰이어도 병합.",
-      "플레이어(작성자): 작성 유저 단위 — 같은 플레이어가 보낸 메시지는 화자에 무관하게 병합.",
-    ].join(" / "),
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      token:  "토큰(기본) — 토큰+액터+씬 모두 일치해야 병합",
-      actor:  "액터 — 같은 액터면 병합 (토큰 무시)",
-      author: "플레이어(작성자) — 같은 유저면 병합",
-    },
-    default: FE_DEFAULTS[S.MERGE_SPEAKER_BASIS],
-    // Re-STAMP (not just re-merge): the merge key cached in each message's
-    // data-fe-merge-key is computed with the speaker-basis in effect at stamp time.
-    // feApplyChatMergeToAllLogs reuses that stale key, so a bare re-merge would not
-    // reflect the new basis until messages re-rendered. feScheduleRenderedStateRefreshForAllLogs
-    // re-stamps every message (recomputing the key) before re-merging.
-    onChange: () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }),
-  });
+  feRegisterSetting(S.MERGE_SPEAKER_BASIS, () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }));
 
-  game.settings.register(MODULE_ID, S.EXPORT_ENABLED, {
-    name: "채팅 로그 PDF 내보내기 버튼",
-    hint: "채팅 입력창 옆에 PDF(인쇄) 버튼을 추가합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => feFireChatUiUpdated({ reason: "export-settings", document }),
-  });
+  feRegisterSetting(S.EXPORT_ENABLED, () => feFireChatUiUpdated({ reason: "export-settings", document }));
 
-  game.settings.register(MODULE_ID, S.EXPORT_AUTO_PRINT, {
-    name: "PDF 버튼: 자동 인쇄창 열기",
-    hint: "켜면 PDF 버튼 클릭 시 아카이브 창을 연 뒤 자동으로 인쇄(프린트) 다이얼로그를 엽니다. 끄면 아카이브만 열립니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-  });
+  feRegisterSetting(S.EXPORT_AUTO_PRINT);
 
-  game.settings.register(MODULE_ID, S.EXPORT_OPTIMIZE, {
-    name: "내보내기 최적화(용량/멈춤 방지)",
-    hint: "아카이브/인쇄 시 parchment/texture 이미지와 그림자 등을 강제로 제거하여 PDF 용량과 메모리 사용량을 크게 줄입니다(권장).",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-  });
+  feRegisterSetting(S.EXPORT_OPTIMIZE);
 
-  game.settings.register(MODULE_ID, S.EXPORT_EMBED_FONTS, {
-    name: "HTML 저장: 커스텀 폰트 포함",
-    hint: "HTML로 저장할 때 CookieRun 폰트를 파일 안에 포함시켜(임베드) 나중에 단독으로 열어도 폰트가 유지되게 합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-  });
+  feRegisterSetting(S.EXPORT_EMBED_FONTS);
 
-  game.settings.register(MODULE_ID, S.EXPORT_EMBED_IMAGES, {
-    name: "HTML 저장: 이미지 포함",
-    hint: "HTML로 저장할 때 채팅 로그의 이미지(포트레이트/아이콘 등)를 파일 안에 포함시킵니다. 같은 이미지가 반복되면 자동으로 중복을 제거하여 용량을 절약합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-  });
+  feRegisterSetting(S.EXPORT_EMBED_IMAGES);
 
-  game.settings.register(MODULE_ID, S.EXPORT_EXCLUDE_WHISPERS, {
-    name: "아카이브: 귓속말 제외",
-    hint: "아카이브/저장/인쇄에서 귓속말을 제외합니다. GM은 모든 귓속말을 볼 수 있으므로, 켜지 않으면 GM이 저장한 로그에는 비공개 대화가 그대로 포함됩니다. 로그를 다른 사람과 공유할 예정이라면 켜세요.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-  });
+  feRegisterSetting(S.EXPORT_EXCLUDE_WHISPERS);
 
-  game.settings.register(MODULE_ID, S.EXPORT_PRINT_IMAGE_MODE, {
-    name: "PDF/인쇄: 이미지 처리",
-    hint: "크롬/일렉트론 인쇄(PDF)에서 이미지가 많으면 메모리가 급증해 멈출 수 있습니다. PDF 안정성을 위해 아바타/이미지를 숨기거나 다운스케일할 수 있습니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
-    default: "downscaleLite",
-  });
+  feRegisterSetting(S.EXPORT_PRINT_IMAGE_MODE);
 
   // DEPRECATED but INTENTIONALLY still registered — do not delete.
   // Nothing reads this key any more: the Electron export path was rewritten to
@@ -451,161 +264,39 @@ Hooks.once("init", () => {
   // button, and feOpenArchiveInExternalBrowser's mode gate). The registration is
   // kept so worlds that still have a stored value do not end up holding an
   // unregistered setting, and the name/hint carry the deprecation notice.
-  game.settings.register(MODULE_ID, S.EXPORT_DESKTOP_EXTERNAL_MODE, {
-    name: "[이전 버전 호환] FVTT 데스크톱 외부 브라우저 열기",
-    hint: "더 이상 사용되지 않습니다. FVTT 데스크톱 앱에서는 HTML 아카이브만 저장하며, 저장한 파일을 브라우저에서 열어 PDF로 저장하세요.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      off: "사용 안 함(앱 내부 인쇄)",
-      button: "시스템 브라우저에서 열기",
-      auto: "시스템 브라우저에서 열기",
-    },
-    default: "button",
-  });
+  feRegisterSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE);
 
   // Style settings (CSS vars)
 
-  game.settings.register(MODULE_ID, S.STYLE_ACTOR_NAME_SIZE, {
-    name: "채팅: 액터 이름 크기(px)",
-    hint: "채팅 메시지 헤더의 액터(캐릭터) 이름 글자 크기입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE],
-    range: { min: 10, max: 40, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_ACTOR_NAME_SIZE, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_PLAYER_NAME_SIZE, {
-    name: "채팅: 플레이어 이름 크기(px)",
-    hint: "채팅 메시지 헤더의 플레이어 이름(서브타이틀) 글자 크기입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE],
-    range: { min: 8, max: 28, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_PLAYER_NAME_SIZE, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_MESSAGE_TEXT_SIZE, {
-    name: "채팅: 메시지 글자 크기(px)",
-    hint: "일반 채팅 텍스트(메시지 내용)의 글자 크기입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 14,
-    range: { min: 9, max: 24, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_MESSAGE_TEXT_SIZE, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_CHATCARD_TEXT_SIZE, {
-    name: "채팅: 주문/아이템/피처 설명 글자 크기(px)",
-    hint: "dnd5e 채팅 카드(주문/아이템/피처) 설명 영역의 기본 글자 크기입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 12,
-    range: { min: 9, max: 24, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_CHATCARD_TEXT_SIZE, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_CHAT_MESSAGE_SPACING, {
-    name: "채팅: 메시지 카드 간격(px)",
-    hint: "모든 채팅 메시지 카드 사이의 기본 간격(flex gap)입니다. 병합 여부와 무관하게 적용됩니다. (v14 사이드바 부작용 방지를 위해 --fe-chat-message-spacing 변수로 관리합니다)",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING],
-    range: { min: 0, max: 24, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_CHAT_MESSAGE_SPACING, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_HEADER_CONTENT_GAP, {
-    name: "채팅: 헤더-콘텐츠 간격(px)",
-    hint: "메시지 헤더(액터 이름·포트레이트)와 메시지 내용 사이의 세로 여백입니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.STYLE_HEADER_CONTENT_GAP],
-    range: { min: 0, max: 20, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_HEADER_CONTENT_GAP, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.MERGE_INNER_GAP, {
-    name: "채팅 병합: 연속 메시지 내부 간격(px)",
-    hint: "같은 화자의 연속 병합 메시지 사이의 세로 여백(px)입니다. 간소화 모드: 박스 간 실질 간격 = 이 값. 표준 모드: 상하 패딩 합산(×2)이 컨텐츠 간 실질 간격이 됩니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.MERGE_INNER_GAP],
-    range: { min: 0, max: 40, step: 1 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.MERGE_INNER_GAP, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.CHAT_FONT_CHOICE, {
-    name: "채팅/UI 글꼴 선택",
-    hint: "채팅 메시지·헤더·UI에 사용할 기본 글꼴을 선택합니다. '쿠키런 + 그림일기'는 UI/시트 기본 글꼴도 그림일기로 처리합니다. '커스텀 폰트 적용'이 꺼져 있으면 효과가 없습니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      cookie: "쿠키런 + 그림일기",
-      cookieAll: "쿠키런",
-      geurimilgi: "그림일기",
-      neodgm: "NeoDGM",
-      mona: "Mona10(웹폰트)",
-      galmuri: "갈무리11(웹폰트)",
-    },
-    default: FE_DEFAULTS[S.CHAT_FONT_CHOICE],
-    onChange: () => {
+  feRegisterSetting(S.CHAT_FONT_CHOICE, () => {
       feSetChatCardFontClass(document);
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
       feApplyCanvasTextFont(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.CANVAS_TEXT_FONT, {
-    name: "토큰 이름표·커서 글꼴",
-    hint: "씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다. '커스텀 폰트 적용'이 켜져 있어야 합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.CANVAS_TEXT_FONT],
-    onChange: () => feApplyCanvasTextFont(document),
-  });
+  feRegisterSetting(S.CANVAS_TEXT_FONT, () => feApplyCanvasTextFont(document));
 
-  game.settings.register(MODULE_ID, S.CANVAS_DRAWING_FONT, {
-    name: "캔버스 글꼴 (그리기·지도 노트)",
-    hint: "모듈 글꼴을 Foundry의 글꼴 목록에 등록해, 그리기(드로잉)·지도 노트·저널 편집기의 글꼴 선택 창에서 직접 고를 수 있게 합니다. 이 설정을 켜면 글꼴이 '기본값'인 그리기/노트는 위에서 고른 글꼴로 표시되고, 끄면 Foundry 기본 글꼴로 돌아갑니다(목록 등록은 유지). '커스텀 폰트 적용'이 켜져 있어야 합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.CANVAS_DRAWING_FONT],
-    onChange: () => feApplyCanvasTextFont(document),
-  });
+  feRegisterSetting(S.CANVAS_DRAWING_FONT, () => feApplyCanvasTextFont(document));
 
-  game.settings.register(MODULE_ID, S.UI_USE_GEURIMILGI, {
-    name: "(internal) UI/시트 그림일기 동기화",
-    hint: "레거시 호환용 내부 값입니다. 현재는 '채팅/UI 글꼴 선택'의 '쿠키런 + 그림일기' 프리셋에서 자동으로 동기화됩니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_USE_GEURIMILGI],
-    onChange: () => feSetUiFontClass(document),
-  });
+  feRegisterSetting(S.UI_USE_GEURIMILGI, () => feSetUiFontClass(document));
 
-  game.settings.register(MODULE_ID, S.UI_USE_USER_FONT, {
-    name: "유저(로컬) 폰트 사용",
-    hint: "켜면 이 모듈의 커스텀 폰트(쿠키런/그림일기) 대신, 아래에서 고른 '유저 폰트'(컴퓨터에 설치된 폰트 또는 모듈 font 폴더의 폰트)를 채팅·UI 전체에 적용합니다. '커스텀 폰트 적용'이 켜져 있어야 합니다. (개인 설정 — GM 전역 강제 대상 아님)",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_USE_USER_FONT],
-    onChange: () => {
+  feRegisterSetting(S.UI_USE_USER_FONT, () => {
       feSetUserFontMode(document);
       feApplyCanvasTextFont(document);
       feSetChatCardFontClass(document);
@@ -613,17 +304,9 @@ Hooks.once("init", () => {
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.USER_FONT_FAMILY, {
-    name: "유저 폰트 패밀리",
-    hint: "적용할 폰트의 패밀리 이름(예: Malgun Gothic). 설정 메뉴에서 설치 폰트 목록·모듈 폰트 중 선택하거나 직접 입력할 수 있습니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: FE_DEFAULTS[S.USER_FONT_FAMILY],
-    onChange: () => {
+  feRegisterSetting(S.USER_FONT_FAMILY, () => {
       feSetUserFontMode(document);
       feApplyCanvasTextFont(document);
       feSetChatCardFontClass(document);
@@ -631,245 +314,78 @@ Hooks.once("init", () => {
       feSetChatFontChoiceClass(document);
       feSetUiFontClass(document);
       feSetNeodgmModeClass(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.UI_RETRO_THEME, {
-    name: "레트로 테마 (픽셀 고대비)",
-    hint: "모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용할 수 있으며, DX3rd·D&D 5e 전용 레이아웃 보정은 해당 시스템에서만 적용됩니다. NeoDGM 폰트 모드와 함께 사용 권장.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.UI_RETRO_THEME],
-    onChange: () => {
+  feRegisterSetting(S.UI_RETRO_THEME, () => {
       feSetRetroThemeClass(document);
       feFireChatUiUpdated({ reason: "retro-theme", document });
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.DX3RD_CARD_BORDER_ALPHA, {
-    name: "[DX3rd] 채팅 카드 테두리 투명도",
-    hint: "픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값입니다. 0 = 완전 투명, 1 = 완전 불투명.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA],
-    range: { min: 0, max: 1, step: 0.05 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.DX3RD_CARD_BORDER_ALPHA, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.DX3RD_PIXEL_ACCENT, {
-    name: "[DX3rd] 픽셀 테마 강조색",
-    hint: "픽셀 테마에서 테두리·글자·체커보드 무늬에 적용되는 강조 색상입니다. 채팅 컨트롤의 색상 스와치로 변경하세요.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT],
-    onChange: async (value) => {
+  feRegisterSetting(S.DX3RD_PIXEL_ACCENT, async (value) => {
       // The GM-priority override must be refreshed BEFORE feApplyStyleVarsFromSettings,
       // or accent-h is written from the stale override value.
       await feMirrorGmPrioritySetting(S.DX3RD_PIXEL_ACCENT, value);
       feApplyStyleVarsFromSettings(document);
       feApplyDoubleCrossLegacyPixiTheme(document);
-    },
-  });
+    });
 
   // Migration-only flag (read by feMigrateLegacySettings, then reset to false).
   // Hidden from the user-facing settings panel.
-  game.settings.register(MODULE_ID, LEGACY_UI_FONT_KEY, {
-    name: "(legacy) UI font toggle",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: false,
-  });
+  feRegisterSetting(LEGACY_UI_FONT_KEY);
 
-  game.settings.register(MODULE_ID, S.USE_USER_COLOR_BG, {
-    name: "채팅 메시지 배경: 유저 색상 적용(Chat Portrait 스타일)",
-    hint: "각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.USE_USER_COLOR_BG],
-    onChange: () => {
+  feRegisterSetting(S.USE_USER_COLOR_BG, () => {
       feSetUserColorBgClass(document);
       feApplyUserColorBgToAllLogs(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.USER_COLOR_BG_BASE, {
-    name: "채팅 메시지 배경: 채팅카드 하부 배경(불투명)",
-    hint: "채팅카드에 불투명한 배경(흰색/검정/사용자 지정)을 깔아 가독성을 높입니다. 유저 색상 틴트와 독립적으로 동작하므로, 틴트가 꺼져 있어도 단독으로 적용됩니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    choices: {
-      white: "흰색(권장)",
-      black: "검정",
-      none: "사용 안 함(기존 방식)",
-      custom: "사용자 지정 색상",
-    },
-    default: FE_DEFAULTS[S.USER_COLOR_BG_BASE],
-    onChange: () => {
+  feRegisterSetting(S.USER_COLOR_BG_BASE, () => {
       // Base mode now drives .fe-has-user-color independently of the tint,
       // so a none↔white/black/custom change must re-classify existing messages.
       feSetUserColorBgBaseClass(document);
       feApplyUserColorBgToAllLogs(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.USER_COLOR_BG_CUSTOM, {
-    name: "채팅 메시지 배경: 사용자 지정 하부 배경색",
-    hint: "하부 배경을 '사용자 지정 색상'으로 설정했을 때 사용할 색.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: FE_DEFAULTS[S.USER_COLOR_BG_CUSTOM],
-    onChange: () => feSetUserColorBgBaseClass(document),
-  });
+  feRegisterSetting(S.USER_COLOR_BG_CUSTOM, () => feSetUserColorBgBaseClass(document));
 
-  game.settings.register(MODULE_ID, S.USER_COLOR_ALPHA, {
-    name: "채팅 메시지 배경: 유저 색상 틴트 농도",
-    hint: "유저 색상이 배경에 입혀지는 진하기(0.05~0.6). 값이 클수록 진해집니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    range: { min: 0.05, max: 0.6, step: 0.01 },
-    default: FE_DEFAULTS[S.USER_COLOR_ALPHA],
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.USER_COLOR_ALPHA, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.SYSTEM_MSG_COLOR, {
-    name: "시스템 메시지에도 GM 유저 색상 틴트 적용",
-    hint: "화자(캐릭터)가 없는 시스템 메시지에 GM의 유저 색상과 틴트 농도를 적용합니다. 내레이터 채팅(/narrate·/describe·/note)은 제외됩니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SYSTEM_MSG_COLOR],
-    onChange: () => {
+  feRegisterSetting(S.SYSTEM_MSG_COLOR, () => {
       feSetSystemMsgColorClass(document);
       feApplyUserColorBgToAllLogs(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.SYSTEM_MSG_BG_ENABLED, {
-    name: "시스템 메시지 하부 배경색 적용",
-    hint: "화자 없는 시스템 메시지에 지정한 불투명 하부 배경색을 적용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.SYSTEM_MSG_BG_ENABLED],
-    onChange: () => feSetSystemMsgColorClass(document),
-  });
+  feRegisterSetting(S.SYSTEM_MSG_BG_ENABLED, () => feSetSystemMsgColorClass(document));
 
-  game.settings.register(MODULE_ID, S.SYSTEM_MSG_BG_COLOR, {
-    name: "시스템 메시지 하부 배경색",
-    hint: "시스템 메시지 하부 배경색 적용이 켜져 있을 때 사용할 색입니다.",
-    scope: "client",
-    config: false,
-    type: String,
-    default: FE_DEFAULTS[S.SYSTEM_MSG_BG_COLOR],
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.SYSTEM_MSG_BG_COLOR, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.FORCE_NORMAL_MSG_COLOR, {
-    name: "일반 메시지 카드·글씨 색 강제 정의(시스템 기본값)",
-    hint: "켜면 일반 채팅 메시지(특수 메시지·유저 색상 제외)의 카드 배경과 글씨 색을 시스템/테마 기본값으로 강제합니다. Carolingian UI 등 채팅을 통째로 다시 칠하는 모듈이 일반 메시지를 덮어써 가독성이 떨어질 때 되돌리는 용도입니다. 끄면 해당 모듈의 채팅 스타일을 그대로 둡니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.FORCE_NORMAL_MSG_COLOR],
-    onChange: () => {
+  feRegisterSetting(S.FORCE_NORMAL_MSG_COLOR, () => {
       feSetForceNormalMsgColorClass(document);
       feScheduleRenderedStateRefreshForAllLogs?.({ delay: 0 });
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.CHAT_GROUP_OUTLINE, {
-    name: "채팅: 병합 그룹 외곽선",
-    hint: "병합된 메시지 그룹(또는 단일 메시지)을 외곽선(유저 색상)으로 감싸 박스처럼 표시합니다. 끄면 색조 배경만 사용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.CHAT_GROUP_OUTLINE],
-    onChange: () => feSetChatGroupOutlineClass(document),
-  });
+  feRegisterSetting(S.CHAT_GROUP_OUTLINE, () => feSetChatGroupOutlineClass(document));
 
-  game.settings.register(MODULE_ID, S.MSG_BORDER_USER_COLOR, {
-    name: "채팅: 메시지 테두리 유저색 표시",
-    hint: "코어 Foundry가 화자 없는(OOC) 메시지 테두리에 자동으로 입히는 발신자 유저 색상을 표시합니다. 끄면 기본 테두리색(레트로 테마에서는 레트로 강조색)으로 되돌립니다. '병합 그룹 외곽선'이 켜져 있으면 그쪽이 우선합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.MSG_BORDER_USER_COLOR],
-    onChange: () => feSetHideMsgBorderUserColorClass(document),
-  });
+  feRegisterSetting(S.MSG_BORDER_USER_COLOR, () => feSetHideMsgBorderUserColorClass(document));
 
-  game.settings.register(MODULE_ID, S.ACCENT_TEXT_OVERRIDE, {
-    name: "레트로: 텍스트 색조 오버라이드",
-    hint: "레트로 테마의 강조색(텍스트·테두리·체커보드 무늬)을 픽셀 테마 강조색 스와치 기반 톤으로 통일합니다. 끄면 강조색 전체를 기본 백색(흰/회색)으로 되돌리고 채팅 컨트롤의 강조색 스와치 버튼도 숨깁니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.ACCENT_TEXT_OVERRIDE],
-    onChange: () => {
+  feRegisterSetting(S.ACCENT_TEXT_OVERRIDE, () => {
       feSetAccentTextOverrideClass(document);
       // Override OFF resets every accent-driven surface (text, borders, pattern) to the
       // default white; ON restores the saved accent. feApplyStyleVarsFromSettings does both.
       feApplyStyleVarsFromSettings(document);
       feApplyDoubleCrossLegacyPixiTheme(document);
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.STYLE_PAPER_OVERLAY_ENABLED, {
-    name: "채팅: 페이퍼 톤 오버레이",
-    hint: "텍스쳐 제거 시 평면 미색 오버레이를 추가해 채도를 낮춥니다. 별도 선택 기능이며 기본값은 꺼짐입니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: FE_DEFAULTS[S.STYLE_PAPER_OVERLAY_ENABLED],
-    onChange: () => feSetPaperOverlayClass(document),
-  });
+  feRegisterSetting(S.STYLE_PAPER_OVERLAY_ENABLED, () => feSetPaperOverlayClass(document));
 
-  game.settings.register(MODULE_ID, S.STYLE_BG_SATURATION, {
-    name: "채팅: 페이퍼 톤 오버레이 농도",
-    hint: "페이퍼 톤 오버레이를 켰을 때 적용되는 미색층의 알파 값입니다. 값이 높을수록 더 밝고 채도가 약해집니다.",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: FE_DEFAULTS[S.STYLE_BG_SATURATION],
-    range: { min: 0.05, max: 1.0, step: 0.01 },
-    onChange: () => feApplyStyleVarsFromSettings(document),
-  });
+  feRegisterSetting(S.STYLE_BG_SATURATION, () => feApplyStyleVarsFromSettings(document));
 
-  game.settings.register(MODULE_ID, S.MARKDOWN_ENABLED, {
-    name: "채팅 입력 마크다운 지원",
-    hint: "채팅 입력 텍스트를 마크다운으로 처리합니다(이미지/링크/제목/굵게/기울임/취소선/인용구).",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-  });
+  feRegisterSetting(S.MARKDOWN_ENABLED);
 
-  game.settings.register(MODULE_ID, S.EDIT_ENABLED, {
-    name: "채팅 수정(편집) 다이얼로그",
-    hint: "메시지 수정 버튼 클릭 시 마크다운 기반 편집 다이얼로그를 사용합니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => feFireChatUiUpdated({ reason: "edit-settings", document }),
-  });
+  feRegisterSetting(S.EDIT_ENABLED, () => feFireChatUiUpdated({ reason: "edit-settings", document }));
 
-  game.settings.register(MODULE_ID, S.GM_PRIORITY_ENABLED, {
-    name: "GM 설정 전역 강제",
-    hint: "활성화 시 아래 3가지를 제외한 GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑 등 포함). 항상 개인 유지: 커스텀 폰트 유무/유저 로컬 폰트 · 채팅 아카이브/내보내기 · 툴바 접기. 플레이어가 개인 취향대로 쓰게 하려면 이 기능을 끄세요.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: true,
-    onChange: (value) => {
+  feRegisterSetting(S.GM_PRIORITY_ENABLED, (value) => {
       feApplyGmPriorityUiRefresh(document);
       // World-scope toggle — this onChange fires on every connected client.
       if (value) {
@@ -885,18 +401,9 @@ Hooks.once("init", () => {
         // stays forced once enforcement is disabled.
         void feRestoreLocalGmPrioritySettings();
       }
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.CORE_PRIORITY_ENABLED, {
-    name: "일반 환경 설정 GM 강제",
-    hint: "활성화 시 Foundry 자체의 '환경 설정' 항목(광원 애니메이션, 토큰 시야 애니메이션, 말풍선, 성능 모드, 최대 FPS, 언어, 광과민성 모드 등)이 GM의 값으로 모든 플레이어에게 강제 적용됩니다. 클라이언트 설정은 브라우저 주소(오리진)별로 따로 저장되므로, 같은 서버를 로컬 주소와 외부 주소로 접속하면 값이 서로 달라집니다 — 이 기능은 그 차이를 GM 기준으로 통일합니다. 끄면 각 플레이어의 원래 값으로 되돌아갑니다.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: FE_DEFAULTS[S.CORE_PRIORITY_ENABLED],
-    onChange: (value) => {
+  feRegisterSetting(S.CORE_PRIORITY_ENABLED, (value) => {
       // World-scope toggle — this onChange fires on every connected client.
       if (value) {
         void (async () => {
@@ -906,18 +413,9 @@ Hooks.once("init", () => {
       } else {
         void feRestoreLocalCoreSettings();
       }
-    },
-  });
+    });
 
-  game.settings.register(MODULE_ID, S.GM_SPEAK_AS_SELF, {
-    name: "GM: PC 토큰 선택 시 본인 이름으로 채팅",
-    hint: "활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.",
-    scope: "client",
-    config: false,
-    restricted: true,
-    type: Boolean,
-    default: false,
-  });
+  feRegisterSetting(S.GM_SPEAK_AS_SELF);
 
   Hooks.on("renderChatLog", (_app, html) => {
     try {

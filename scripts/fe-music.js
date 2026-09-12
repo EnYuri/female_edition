@@ -1,3 +1,4 @@
+import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Music feature — entry point (in module.json).
 //
 // Ported from the standalone "emanim-music" module, then restructured:
@@ -848,27 +849,15 @@ function registerSidebarButton() {
 Hooks.once("init", () => {
   // World-scope GM config. config:false — surfaced via the unified settings menu
   // (the "음악" section), never the core Module Settings sheet, per project convention.
-  game.settings.register(MODULE_ID, S.MUSIC_ENABLED, {
-    scope: "world", config: false, type: Boolean,
-    default: FE_DEFAULTS[S.MUSIC_ENABLED], requiresReload: true
-  });
-  game.settings.register(MODULE_ID, S.MUSIC_PLAYLIST_NAME, {
-    scope: "world", config: false, type: String, default: FE_DEFAULTS[S.MUSIC_PLAYLIST_NAME]
-  });
-  game.settings.register(MODULE_ID, S.MUSIC_UPLOAD_ROOT, {
-    scope: "world", config: false, type: String, default: FE_DEFAULTS[S.MUSIC_UPLOAD_ROOT],
-    onChange: () => {
+  feRegisterSetting(S.MUSIC_ENABLED);
+  feRegisterSetting(S.MUSIC_PLAYLIST_NAME);
+  feRegisterSetting(S.MUSIC_UPLOAD_ROOT, () => {
       if (!musicEnabled()) return;
       ensureMusicUploadDirectory({ notify: true });
-    }
-  });
-  game.settings.register(MODULE_ID, S.MUSIC_MAX_MB, {
-    scope: "world", config: false, type: Number, default: FE_DEFAULTS[S.MUSIC_MAX_MB]
-  });
+    });
+  feRegisterSetting(S.MUSIC_MAX_MB);
   // One-time auto-init flag (hidden).
-  game.settings.register(MODULE_ID, AUTO_INIT_KEY, {
-    scope: "world", config: false, type: Boolean, default: false
-  });
+  feRegisterSetting(AUTO_INIT_KEY);
 
   if (!musicEnabled()) return;
 

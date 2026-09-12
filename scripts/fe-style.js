@@ -1,3 +1,4 @@
+import { FE_DEFAULTS } from "./fe-settings-data.js";
 import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 
@@ -75,7 +76,7 @@ function feSetChatCardFontClass(doc = document) {
     // keep the preset self-contained instead.
     const enabled = !!feSetting(S.UI_ENABLE_FONTS)
       && !feUserFontActive()
-      && String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie") === "cookie";
+      && String(feSetting(S.CHAT_FONT_CHOICE) ?? FE_DEFAULTS[S.CHAT_FONT_CHOICE]) === "cookie";
     doc?.body?.classList?.toggle("fe-chatcard-custom-font", enabled);
   } catch {}
 }
@@ -86,13 +87,13 @@ function feSetChatCardFontClass(doc = document) {
 // non-pixel user font).
 function feUserFontActive() {
   try {
-    return !!feSetting(S.UI_USE_USER_FONT) && String(feSetting(S.USER_FONT_FAMILY) ?? "").trim().length > 0;
+    return !!feSetting(S.UI_USE_USER_FONT) && String(feSetting(S.USER_FONT_FAMILY) ?? FE_DEFAULTS[S.USER_FONT_FAMILY]).trim().length > 0;
   } catch { return false; }
 }
 
 function feSetChatFontChoiceClass(doc = document) {
   try {
-    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
     const body = doc?.body;
     if (!body) return;
     const userFont = feUserFontActive();
@@ -107,7 +108,7 @@ function feSetUiFontClass(doc = document) {
     // "UI/sheet Geurimilgi" is not an independent font mode. It only has a
     // distinct meaning in the mixed CookieRun + Geurimilgi preset; every other
     // preset remaps the UI font variables to its own single font already.
-    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
     const enabled = !feUserFontActive() && choice === "cookie";
     doc?.body?.classList?.toggle("fe-ui-font-geurimilgi", enabled);
   } catch (_e) {
@@ -117,7 +118,7 @@ function feSetUiFontClass(doc = document) {
 
 function feSetNeodgmModeClass(doc = document) {
   try {
-    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? "cookie");
+    const choice = String(feSetting(S.CHAT_FONT_CHOICE) ?? FE_DEFAULTS[S.CHAT_FONT_CHOICE]);
     const body = doc?.body;
     if (!body) return;
     const userFont = feUserFontActive();
@@ -136,7 +137,7 @@ function feSetUserFontMode(doc = document) {
     const body = doc?.body;
     if (!root || !body) return;
     const enabled = !!feSetting(S.UI_USE_USER_FONT);
-    const fam = String(feSetting(S.USER_FONT_FAMILY) ?? "").trim();
+    const fam = String(feSetting(S.USER_FONT_FAMILY) ?? FE_DEFAULTS[S.USER_FONT_FAMILY]).trim();
     const active = enabled && fam.length > 0;
     if (active) {
       // Quote a bare family name (handles spaces/Hangul); leave an already-quoted
@@ -212,7 +213,7 @@ function _feDoubleCrossAccentNumber() {
   // Match feApplyStyleVarsFromSettings: the saved swatch is dormant while the
   // accent override toggle is off, and every accent-driven surface is white.
   if (!feSetting(S.ACCENT_TEXT_OVERRIDE)) return 0xffffff;
-  let hex = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim().replace(/^#/, "");
+  let hex = String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT]).trim().replace(/^#/, "");
   if (/^[0-9a-f]{3}$/i.test(hex)) hex = hex.split("").map((c) => c + c).join("");
   return /^[0-9a-f]{6}$/i.test(hex) ? Number.parseInt(hex, 16) : 0xffffff;
 }
@@ -412,7 +413,7 @@ function feSetForceNormalMsgColorClass(doc = document) {
 
 function feSetUserColorBgBaseClass(doc = document) {
   try {
-    const mode = String(feSetting(S.USER_COLOR_BG_BASE) ?? "white");
+    const mode = String(feSetting(S.USER_COLOR_BG_BASE) ?? FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
     const body = doc?.body;
     if (!body?.classList) return;
     body.classList.toggle("fe-userbg-base-white", mode === "white");
@@ -420,7 +421,7 @@ function feSetUserColorBgBaseClass(doc = document) {
     body.classList.toggle("fe-userbg-base-custom", mode === "custom");
     if (mode === "custom") {
       // Feed the custom base color to CSS as "r g b" (inherited down to messages).
-      const hex = String(feSetting(S.USER_COLOR_BG_CUSTOM) ?? "#1b1b1b").trim();
+      const hex = String(feSetting(S.USER_COLOR_BG_CUSTOM) ?? FE_DEFAULTS[S.USER_COLOR_BG_CUSTOM]).trim();
       const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
       const rgb = m ? `${parseInt(m[1], 16)} ${parseInt(m[2], 16)} ${parseInt(m[3], 16)}` : "27 27 27";
       body.style.setProperty("--fe-user-bg-base-rgb", rgb);
@@ -448,38 +449,38 @@ function feApplyStyleVarsFromSettings(doc = document) {
     };
 
     // User-color tint strength (clamped to the registered range).
-    const ucAlpha = num(feSetting(S.USER_COLOR_ALPHA), 0.22);
+    const ucAlpha = num(feSetting(S.USER_COLOR_ALPHA), FE_DEFAULTS[S.USER_COLOR_ALPHA]);
     root.style.setProperty("--fe-user-color-alpha", String(Math.min(0.6, Math.max(0.05, ucAlpha))));
 
-    root.style.setProperty("--fe-chat-title-size", px(feSetting(S.STYLE_ACTOR_NAME_SIZE), 22));
-    root.style.setProperty("--fe-chat-subtitle-size", px(feSetting(S.STYLE_PLAYER_NAME_SIZE), 14));
-    root.style.setProperty("--fe-chat-message-font-size", px(feSetting(S.STYLE_MESSAGE_TEXT_SIZE), 14));
-    root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), 12));
+    root.style.setProperty("--fe-chat-title-size", px(feSetting(S.STYLE_ACTOR_NAME_SIZE), FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]));
+    root.style.setProperty("--fe-chat-subtitle-size", px(feSetting(S.STYLE_PLAYER_NAME_SIZE), FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE]));
+    root.style.setProperty("--fe-chat-message-font-size", px(feSetting(S.STYLE_MESSAGE_TEXT_SIZE), FE_DEFAULTS[S.STYLE_MESSAGE_TEXT_SIZE]));
+    root.style.setProperty("--fe-chat-card-font-size", px(feSetting(S.STYLE_CHATCARD_TEXT_SIZE), FE_DEFAULTS[S.STYLE_CHATCARD_TEXT_SIZE]));
 
-    const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), 2);
+    const chatSpacing = px(feSetting(S.STYLE_CHAT_MESSAGE_SPACING), FE_DEFAULTS[S.STYLE_CHAT_MESSAGE_SPACING]);
     root.style.setProperty("--fe-chat-message-spacing", chatSpacing);
     // Do NOT set --chat-message-spacing on :root — Foundry v14 uses this variable
     // for layout beyond just message gap (causes sidebar spacing side-effects).
     // chat-bg-stripper.css scopes it correctly inside chat-sidebar.
 
-    root.style.setProperty("--fe-merge-group-spacing", px(feSetting(S.MERGE_GROUP_SPACING), 14));
-    root.style.setProperty("--fe-header-content-gap", px(feSetting(S.STYLE_HEADER_CONTENT_GAP), 4));
-    root.style.setProperty("--fe-merge-inner-gap", px(feSetting(S.MERGE_INNER_GAP), 8));
+    root.style.setProperty("--fe-merge-group-spacing", px(feSetting(S.MERGE_GROUP_SPACING), FE_DEFAULTS[S.MERGE_GROUP_SPACING]));
+    root.style.setProperty("--fe-header-content-gap", px(feSetting(S.STYLE_HEADER_CONTENT_GAP), FE_DEFAULTS[S.STYLE_HEADER_CONTENT_GAP]));
+    root.style.setProperty("--fe-merge-inner-gap", px(feSetting(S.MERGE_INNER_GAP), FE_DEFAULTS[S.MERGE_INNER_GAP]));
 
-    root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), 0.42)));
+    root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), FE_DEFAULTS[S.STYLE_BG_SATURATION])));
 
-    const systemBg = String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? "#ffffff").trim() || "#ffffff";
+    const systemBg = String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? FE_DEFAULTS[S.SYSTEM_MSG_BG_COLOR]).trim() || "#ffffff";
     root.style.setProperty("--fe-system-msg-bg", systemBg);
     root.style.setProperty("--fe-system-msg-text", feContrastText(systemBg));
 
-    root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), 0.5)));
+    root.style.setProperty("--fe-dx3rd-card-border-alpha", String(num(feSetting(S.DX3RD_CARD_BORDER_ALPHA), FE_DEFAULTS[S.DX3RD_CARD_BORDER_ALPHA])));
 
     // With the text-tint override off, every accent-driven surface (text, borders,
     // checkerboard pattern) returns to plain white (#ffffff, H=0 S=0%) so "off" is
     // genuinely off. fe-chat-controls-menu.css hides the accent swatch on the same test.
     const accentOverrideOn = !!feSetting(S.ACCENT_TEXT_OVERRIDE);
     const accent = accentOverrideOn
-      ? (String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? "#ffffff").trim() || "#ffffff")
+      ? (String(feSetting(S.DX3RD_PIXEL_ACCENT) ?? FE_DEFAULTS[S.DX3RD_PIXEL_ACCENT]).trim() || "#ffffff")
       : "#ffffff";
     root.style.setProperty("--fe-dx3rd-accent", accent);
 
@@ -656,7 +657,7 @@ function feResolveFontConfig() {
 function feCollectEditorFontFamilies() {
   const out = [...FE_EDITOR_FONT_FAMILIES, ..._feExtraEditorFamilies];
   try {
-    const chosen = String(game.settings.get(MODULE_ID, S.USER_FONT_FAMILY) ?? "").trim();
+    const chosen = String(game.settings.get(MODULE_ID, S.USER_FONT_FAMILY) ?? FE_DEFAULTS[S.USER_FONT_FAMILY]).trim();
     if (chosen) out.push(chosen);
   } catch { /* pre-init */ }
   return out;

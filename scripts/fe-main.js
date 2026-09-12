@@ -18,7 +18,7 @@ import "./chat-bg-stripper.js";
 import "./fe-chat-enhance.js";
 
 // ALL module settings are config: false — managed exclusively through the unified
-// settings panel (fe-settings-menu.js). This includes the once-standalone features
+// settings panel (fe-settings.js). This includes the once-standalone features
 // (fe-chat-images / fe-image-hover / fe-narrator / fe-theatre / fe-screen-panel),
 // whose settings were migrated into the unified menu (no native Module Settings
 // entries). Their modules still READ via game.settings.get; the menu writes them.
@@ -51,7 +51,7 @@ import "./fe-scene-controls-collapse.js";
 
 // Screen panel + unified settings
 import "./fe-screen-panel.js";
-import "./fe-settings-menu.js";
+import "./fe-settings.js";
 
 // FilePicker enhancements
 import "./fe-filepicker-sort.js";

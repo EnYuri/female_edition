@@ -1,3 +1,4 @@
+import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
 /**
  * fe-image-hover.js — Token image hover overlay
  * Ported from image-hover v3.1 (MIT) into female_edition namespace.
@@ -41,14 +42,14 @@ let _ihHoverArtUrl = null;
 let _ihDomDelayTimer;
 
 // Runtime settings cache (populated in init, refreshed on settings close)
-let _ihPermission = 0;
-let _ihEnabled = true; // per-client toggle
-let _ihPosition = "Bottom left";
-let _ihSize = 3;
-let _ihSizeWide = 1.225; // size divisor for wide (landscape) images — applied to screen HEIGHT
-let _ihArtType = "character";
-let _ihDelay = 0;
-let _ihMaxUpscale = _IH_MAX_UPSCALE; // resolution-based upscale cap factor; 0 = no cap (unlimited)
+let _ihPermission = FE_DEFAULTS.ihPermission;
+let _ihEnabled = FE_DEFAULTS.ihEnabled; // per-client toggle
+let _ihPosition = FE_DEFAULTS.ihPosition;
+let _ihSize = FE_DEFAULTS.ihSize;
+let _ihSizeWide = FE_DEFAULTS.ihSizeWide; // size divisor for wide (landscape) images — applied to screen HEIGHT
+let _ihArtType = FE_DEFAULTS.ihArtType;
+let _ihDelay = FE_DEFAULTS.ihDelay;
+let _ihMaxUpscale = FE_DEFAULTS.ihMaxUpscale; // resolution-based upscale cap factor; 0 = no cap (unlimited)
 
 /** Effective enabled state for this client. */
 function _ihActive() {
@@ -72,44 +73,11 @@ function _ihHud() {
 // ── Settings ───────────────────────────────────────────────────────────────
 
 function _ihRegisterSettings() {
-  game.settings.register(_IH_MODULE, "ihPermission", {
-    name: "Image Hover: 아트 표시 최소 권한",
-    hint: "캐릭터 아트를 보기 위해 필요한 최소 Actor 권한.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    choices: { 0: "없음", 1: "제한됨", 2: "관찰자", 3: "소유자" },
-    default: 0,
-    type: Number,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihPermission", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihArtType", {
-    name: "Image Hover: 표시할 아트 유형",
-    hint: "호버 시 표시할 아트 종류.",
-    scope: "world",
-    config: false,
-    restricted: true,
-    choices: {
-      character: "캐릭터 아트",
-      token: "토큰 아트",
-      wildcard: "와일드카드일 때 토큰 아트",
-      linked: "연결 해제된 토큰일 때 토큰 아트",
-    },
-    default: "character",
-    type: String,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihArtType", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihEnabled", {
-    name: "Image Hover: 활성화/비활성화",
-    hint: "비활성화 시 이 클라이언트에서 Image Hover를 끕니다.",
-    scope: "client",
-    config: false,
-    type: Boolean,
-    default: true,
-    onChange: () => { _ihLoadSettings(); _ihHud()?.close(); },
-  });
+  feRegisterSetting("ihEnabled", () => { _ihLoadSettings(); _ihHud()?.close(); });
 
   game.keybindings.register(_IH_MODULE, "ihKeybind", {
     name: "Image Hover: 아트 표시 토글 키",
@@ -151,70 +119,15 @@ function _ihRegisterSettings() {
     },
   });
 
-  game.settings.register(_IH_MODULE, "ihPosition", {
-    name: "Image Hover: 이미지 위치",
-    hint: "화면 내 이미지 표시 위치입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
-    scope: "client",
-    config: false,
-    choices: {
-      "Bottom left":  "왼쪽 아래",
-      "Bottom right": "오른쪽 아래",
-      "Top left":     "왼쪽 위",
-      "Top right":    "오른쪽 위",
-      Centre:         "중앙",
-    },
-    default: "Bottom left",
-    type: String,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihPosition", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihSize", {
-    name: "Image Hover: 이미지 크기 (화면 너비의 1/N)",
-    hint: "값이 작을수록 이미지가 커집니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
-    scope: "client",
-    config: false,
-    range: { min: 3, max: 20, step: 0.5 },
-    default: 3,
-    type: Number,
-    // Refresh runtime cache immediately. Without this, _ihSize only reloaded on
-    // closeSettingsConfig, so a programmatic/per-world-hydrated change (which
-    // fires onChange, not the dialog-close hook) left the cache stale until the
-    // settings dialog was next closed → first hover used the old size.
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihSize", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihSizeWide", {
-    name: "Image Hover: 가로 이미지 크기 (화면 높이의 1/N)",
-    hint: "가로로 긴 이미지(가로:세로 ≥ 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
-    scope: "client",
-    config: false,
-    range: { min: 1, max: 20, step: 0.025 },
-    default: 1.225,
-    type: Number,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihSizeWide", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihMaxUpscale", {
-    name: "Image Hover: 최대 업스케일 배율",
-    hint: "원본 해상도 대비 최대 확대 한도입니다. 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. 0이면 제한 없음(항상 설정 크기로 표시). GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
-    scope: "client",
-    config: false,
-    range: { min: 0, max: 5, step: 0.05 },
-    default: 0,
-    type: Number,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihMaxUpscale", () => _ihLoadSettings());
 
-  game.settings.register(_IH_MODULE, "ihDelay", {
-    name: "Image Hover: 표시 지연 시간 (ms)",
-    hint: "아트 표시 키를 누른 후 이미지가 나타나기까지 대기 시간(밀리초)입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.",
-    scope: "client",
-    config: false,
-    range: { min: 0, max: 5000, step: 100 },
-    default: 0,
-    type: Number,
-    onChange: () => _ihLoadSettings(),
-  });
+  feRegisterSetting("ihDelay", () => _ihLoadSettings());
 }
 
 function _ihLoadSettings() {

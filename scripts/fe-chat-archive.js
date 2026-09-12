@@ -1,3 +1,4 @@
+import { FE_DEFAULTS } from "./fe-settings-data.js";
 // Chat archive + HTML/PDF export (split)
 // Kept in its own module so export-only logic can be isolated.
 
@@ -2264,7 +2265,7 @@ async function feRenderChatArchiveWindow(win, {
   const externalBtnHTML = "";
 
   // Print/PDF image handling (Chrome/Electron can freeze on image-heavy pages)
-  const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
+  const printImgMode = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
   const printImgClass =
     printImgMode === "hideAll"
       ? " fe-print-hide-all"
@@ -3106,7 +3107,7 @@ async function feArchivePrint(win) {
     }
   })();
 
-  const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? "downscaleLite");
+  const requested = String(feSetting(S.EXPORT_PRINT_IMAGE_MODE) ?? FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
   const isElectron = feIsElectron();
   let mode = requested;
 
