@@ -71,6 +71,13 @@ body.fe-retro-theme .fe-settings-menu .fe-settings__tab:is(:hover, .active) {
   font-size: 16px;
 }
 
+/* Uniform row spacing from decay time through both appearance modes. */
+.fe-settings-menu [data-fe-settings-tab="stage"] > .form-group:has([name="stageDecayTime"]),
+.fe-settings-menu [data-fe-settings-tab="stage"] > .form-group:has([name="stagePortraitLayout"]),
+.fe-settings-menu [data-fe-settings-tab="stage"] > .form-group:has([name="stagePortraitLayout"]) ~ .form-group {
+  padding-block: 2px;
+}
+
 .fe-settings-menu .fe-settings__warning {
   border: 1px solid rgba(255, 180, 0, 0.35);
   background: rgba(255, 180, 0, 0.12);

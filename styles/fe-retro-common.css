@@ -633,7 +633,7 @@ body.fe-retro-theme .fe-stage-textbox::after {
           mask-border: none !important;
 }
 
-body.fe-retro-theme .fe-stage-portrait-wrap {
+body.fe-retro-theme .fe-stage-dock:not(.fe-stage-dock--inset) .fe-stage-portrait-wrap {
   bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
 }
 

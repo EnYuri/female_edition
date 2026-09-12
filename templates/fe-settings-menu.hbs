@@ -12,7 +12,7 @@
   {{#if warnings.chatPortraitDup}}
   <div class="fe-settings__warning">
     <p><b>경고:</b> 외부 모듈 <code>chat-portrait</code> 가 활성화되어 있습니다. 이 모듈의 <b>채팅 포트레이트</b> 기능과 중복 표시될 수 있습니다.</p>
-    <p class="notes">중복이 보이면 둘 중 하나를 끄세요.</p>
+    <p class="notes">중복되는 둘 중 한 모듈을 월드에서 제외하세요(저 살려주실거죠??).</p>
   </div>
   {{/if}}
 
@@ -797,7 +797,7 @@
         <input type="range" name="chatImagesMaxUploadMB" min="1" max="64" step="1" value="{{values.chatImagesMaxUploadMB}}" data-dtype="Number" />
         <span class="fe-range-value" data-for="chatImagesMaxUploadMB"></span>
       </div>
-      <p class="notes">이미지 한 장의 최대 크기입니다(기본 12MB). 직접 업로드·GM 대리 업로드·메시지 직접 포함 세 경로 모두에 적용됩니다. 대리 업로드는 GM 클라이언트 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 크게 올리는 것은 권장하지 않습니다.</p>
+      <p class="notes">이미지 한 장의 최대 크기입니다(기본 20MB). 직접 업로드·GM 대리 업로드·메시지 직접 포함 세 경로 모두에 적용됩니다. 대리 업로드는 GM 클라이언트 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 크게 올리는 것은 권장하지 않습니다.</p>
     </div>
     {{/if}}
   </section>
@@ -910,11 +910,11 @@
   {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="stage">
-    <h3 class="fe-settings__section-title">무대(극장) 채팅</h3>
+    <h3 class="fe-settings__section-title">무대 채팅</h3>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>무대 기능 활성화 (GM)</label>
+      <label>무대 채팅 기능 활성화 (GM)</label>
       <div class="form-fields">
         <input type="checkbox" name="stageEnabled" data-dtype="Boolean" {{checked values.stageEnabled}} />
       </div>
@@ -927,20 +927,20 @@
       <p class="notes">아이템/공격 카드, 이니셔티브, 타 모듈이 만든 시스템 메시지는 무대 발화로 내보내지 않고 원래 화자로 둡니다.</p>
     </div>
     <div class="form-group">
-      <label>이전 발화에 비액터 메시지 포함 (GM)</label>
+      <label>이전 메세지에 비액터 메시지 포함 (GM)</label>
       <div class="form-fields">
         <input type="checkbox" name="stageRecallIncludeNonActor" data-dtype="Boolean" {{checked values.stageRecallIncludeNonActor}} />
       </div>
-      <p class="notes">끄면 이전 발화 버튼은 현재 무대에 있는 액터들의 발화만 훑습니다.</p>
+      <p class="notes">끄면 이전 메세지 버튼은 현재 무대에 있는 액터들의 메세지만 훑습니다.</p>
     </div>
     <div class="form-group">
-      <label>대화 상자 자동 소멸 (GM)</label>
+      <label>대사창 자동 소멸 (GM)</label>
       <div class="form-fields">
         <input type="checkbox" name="stageAutoDecay" data-dtype="Boolean" {{checked values.stageAutoDecay}} />
       </div>
     </div>
     <div class="form-group">
-      <label>대화 상자 소멸 시간 (ms, GM)</label>
+      <label>대사창 소멸 시간 (ms, GM)</label>
       <div class="form-fields">
         <input type="number" name="stageDecayTime" data-dtype="Number" value="{{values.stageDecayTime}}" step="5000" min="5000" max="120000" />
       </div>
@@ -948,31 +948,43 @@
     {{/if}}
 
     <div class="form-group">
+      <label>액터 포트레이트 표시 방식</label>
+      <div class="form-fields">
+        <select name="stagePortraitLayout" data-dtype="String">{{selectOptions choices.stagePortraitLayout selected=values.stagePortraitLayout}}</select>
+      </div>
+    </div>
+    <div class="form-group">
       <label>포트레이트 높이 (px)</label>
       <div class="form-fields">
         <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="1" min="50" max="700" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 가로 (px)</label>
+      <label>포트레이트 너비 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stagePortraitWidth" data-dtype="Number" value="{{values.stagePortraitWidth}}" step="1" min="50" max="700" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 가로 너비 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="4" min="200" max="1600" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 세로 (px)</label>
+      <label>대사창 세로 높이 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="4" min="100" max="600" />
       </div>
     </div>
     <div class="form-group">
-      <label>화면 하단 여백 (px)</label>
+      <label>대사창 하단 여백 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="2" min="0" max="300" />
       </div>
     </div>
     <div class="form-group">
-      <label>화면 좌측 여백 (px)</label>
+      <label>대사창 좌측 여백 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="4" min="0" max="1200" />
       </div>
@@ -981,6 +993,36 @@
       <label>대사 폰트 크기 (px)</label>
       <div class="form-fields">
         <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="1" min="10" max="32" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 가로 너비 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stageInsetBoxWidth" data-dtype="Number" value="{{values.stageInsetBoxWidth}}" step="4" min="200" max="1600" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 세로 높이 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stageInsetBoxHeight" data-dtype="Number" value="{{values.stageInsetBoxHeight}}" step="4" min="100" max="600" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 하단 여백 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stageInsetBoxBottom" data-dtype="Number" value="{{values.stageInsetBoxBottom}}" step="2" min="0" max="300" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사창 좌측 여백 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stageInsetBoxLeft" data-dtype="Number" value="{{values.stageInsetBoxLeft}}" step="4" min="0" max="1200" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대사 폰트 크기 (px)</label>
+      <div class="form-fields">
+        <input type="number" name="stageInsetTextSize" data-dtype="Number" value="{{values.stageInsetTextSize}}" step="1" min="10" max="32" />
       </div>
     </div>
   </section>
@@ -1064,7 +1106,7 @@
       <div class="form-fields">
         <input type="number" name="ceMusicMaxUploadMB" value="{{values.ceMusicMaxUploadMB}}" min="1" step="1" />
       </div>
-      <p class="notes">GM 프록시 업로드의 파일당 크기 제한입니다.</p>
+      <p class="notes">GM 프록시 업로드의 파일당 크기 제한입니다. 기본값은 27MB 입니다.</p>
     </div>
   </section>
   {{/if}}

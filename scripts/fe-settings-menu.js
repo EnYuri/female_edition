@@ -121,7 +121,7 @@ const ALL_DEFAULTS = Object.freeze({
   chatImagesEnabled: true,
   chatImagesShowButton: true,
   chatImagesUploadLocation: "uploaded-chat-images",
-  chatImagesMaxUploadMB: 12,
+  chatImagesMaxUploadMB: 20,
   // Conflict guard policy (fe-conflict-guard.js)
   ceConflictGuardMode: "auto",
   [S.CORE_UI_FILEPICKER_UPLOAD_LOCATION]: "uploaded-filepicker-images",
@@ -135,6 +135,10 @@ const ALL_DEFAULTS = Object.freeze({
   stageEnabled: true, stageExcludeSystemMessages: true,
   stageRecallIncludeNonActor: false,
   stageAutoDecay: false, stageDecayTime: 30000,
+  stagePortraitLayout: "inset",
+  stagePortraitWidth: 226,
+  stageInsetBoxWidth: 864, stageInsetBoxHeight: 176,
+  stageInsetBoxBottom: 30, stageInsetBoxLeft: 298, stageInsetTextSize: 14,
   stagePortraitHeight: 318, stageBoxWidth: 764, stageBoxHeight: 176,
   stageBoxBottom: 30, stageBoxLeft: 392, stageTextSize: 14,
 });
@@ -201,6 +205,7 @@ const CHOICES = {
     "Top right":    "오른쪽 위",
     Centre:         "중앙",
   },
+  stagePortraitLayout: { above: "상단", inset: "내부" },
   // narrator command permission (USER_ROLES)
   narratorRole: { 0: "없음", 1: "플레이어", 2: "신뢰 플레이어", 3: "어시스턴트 GM", 4: "게임마스터" },
   // conflict guard policy
@@ -382,7 +387,14 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
       stageRecallIncludeNonActor: feRead("stageRecallIncludeNonActor"),
       stageAutoDecay:      feRead("stageAutoDecay"),
       stageDecayTime:      feRead("stageDecayTime"),
+      stagePortraitLayout: feRead("stagePortraitLayout"),
       stagePortraitHeight: feRead("stagePortraitHeight"),
+      stagePortraitWidth: feRead("stagePortraitWidth"),
+      stageInsetBoxWidth: feRead("stageInsetBoxWidth"),
+      stageInsetBoxHeight: feRead("stageInsetBoxHeight"),
+      stageInsetBoxBottom: feRead("stageInsetBoxBottom"),
+      stageInsetBoxLeft: feRead("stageInsetBoxLeft"),
+      stageInsetTextSize: feRead("stageInsetTextSize"),
       stageBoxWidth:       feRead("stageBoxWidth"),
       stageBoxHeight:      feRead("stageBoxHeight"),
       stageBoxBottom:      feRead("stageBoxBottom"),
@@ -524,6 +536,29 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
     // A disabled dependent control is omitted from FormData. Keep the UI and
     // the targeted save-preservation rules below in sync.
     try { this.#wireDependentControls(); } catch { /* no-op */ }
+    try { this.#wireStagePortraitControls(); } catch { /* no-op */ }
+  }
+
+  #wireStagePortraitControls() {
+    const root = this.element;
+    const layout = root?.querySelector('[name="stagePortraitLayout"]');
+    if (!layout) return;
+    const heightRow = root.querySelector('[name="stagePortraitHeight"]')?.closest(".form-group");
+    const widthRow = root.querySelector('[name="stagePortraitWidth"]')?.closest(".form-group");
+    const sync = () => {
+      const inset = layout.value === "inset";
+      // Hide without disabling so both independent values survive form saves.
+      if (heightRow) heightRow.hidden = inset;
+      if (widthRow) widthRow.hidden = !inset;
+      for (const suffix of ["BoxWidth", "BoxHeight", "BoxBottom", "BoxLeft", "TextSize"]) {
+        const basicRow = root.querySelector(`[name="stage${suffix}"]`)?.closest(".form-group");
+        const insetRow = root.querySelector(`[name="stageInset${suffix}"]`)?.closest(".form-group");
+        if (basicRow) basicRow.hidden = inset;
+        if (insetRow) insetRow.hidden = !inset;
+      }
+    };
+    layout.addEventListener("change", sync);
+    sync();
   }
 
   // Wires up the "폰트" section's user-font UI (added in fe-settings-menu.hbs):
@@ -855,8 +890,10 @@ class FemaleEditionSettingsMenu extends HandlebarsApplicationMixin(ApplicationV2
           bool("stageRecallIncludeNonActor"),
           bool("stageAutoDecay"), ...(saveDecayTime ? [num("stageDecayTime")] : []),
         ] : []),
-        num("stagePortraitHeight"), num("stageBoxWidth"), num("stageBoxHeight"),
+        str("stagePortraitLayout"), num("stagePortraitHeight"), num("stagePortraitWidth"), num("stageBoxWidth"), num("stageBoxHeight"),
         num("stageBoxBottom"), num("stageBoxLeft"), num("stageTextSize"),
+        num("stageInsetBoxWidth"), num("stageInsetBoxHeight"),
+        num("stageInsetBoxBottom"), num("stageInsetBoxLeft"), num("stageInsetTextSize"),
 
         // Screen Panel — world/GM (in FE_RELOAD_REQUIRED_KEYS → reload prompt on change)
         ...(game.user?.isGM ? [bool(S.SCREEN_PANEL_ENABLED)] : []),

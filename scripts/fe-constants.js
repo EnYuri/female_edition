@@ -255,7 +255,7 @@ const FE_DEFAULTS = {
   [S.MUSIC_ENABLED]: true,
   [S.MUSIC_PLAYLIST_NAME]: "player-uploads",
   [S.MUSIC_UPLOAD_ROOT]: "assets/uploadedmusic",
-  [S.MUSIC_MAX_MB]: 20,
+  [S.MUSIC_MAX_MB]: 27,
 };
 
 const FE_GM_PRIORITY_OVERRIDES_KEY = "feGmPriorityOverrides";

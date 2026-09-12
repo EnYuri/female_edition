@@ -42,11 +42,14 @@ let _fetRecallIncludeNonActor = false;
 let _fetAutoDecay     = true;
 let _fetDecayTime     = 30000;
 let _fetPortraitHeight = 130;
+let _fetPortraitLayout = "inset";
+let _fetPortraitWidth = 226;
 let _fetBoxWidth      = 488;
 let _fetBoxHeight     = 276;
 let _fetBoxBottom     = 30;
 let _fetBoxLeft       = 266;
 let _fetTextSize      = 17;
+const _fetInsetBox = { BoxWidth: 864, BoxHeight: 176, BoxBottom: 30, BoxLeft: 298, TextSize: 14 };
 
 // DOM anchors (set in _fetInjectUI / renderChatLog)
 let _fetDockEl   = null;   // #fe-stage-dock
@@ -61,6 +64,20 @@ const _FET_PRELOAD_MAX = 256;
 // ── Settings ───────────────────────────────────────────────────────────────
 
 function _fetRegisterSettings() {
+  for (const [suffix, label, min, max, step] of [
+    ["BoxWidth", "대사창 가로 크기", 200, 1600, 4],
+    ["BoxHeight", "대사창 세로 크기", 100, 600, 4],
+    ["BoxBottom", "화면 하단 여백", 0, 300, 2],
+    ["BoxLeft", "화면 좌측 여백", 0, 1200, 4],
+    ["TextSize", "대사 폰트 크기", 10, 32, 1],
+  ]) {
+    game.settings.register(_FET_MODULE, `stageInset${suffix}`, {
+      name: `무대 채팅: 내부 ${label} (px)`,
+      scope: "client", config: false, type: Number,
+      range: { min, max, step }, default: _fetInsetBox[suffix],
+      onChange: (v) => { _fetInsetBox[suffix] = v; _fetApplyBoxVars(); },
+    });
+  }
   game.settings.register(_FET_MODULE, "stageEnabled", {
     name: "무대(Stage) 기능 활성화",
     hint: "활성화 시 채팅 컨트롤에 무대 UI가 표시되고 배우 컨텍스트 메뉴에 무대 항목이 추가됩니다.",
@@ -137,8 +154,18 @@ function _fetRegisterSettings() {
     onChange: (v) => { _fetDecayTime = v; },
   });
 
+  game.settings.register(_FET_MODULE, "stagePortraitLayout", {
+    name: "무대 채팅: 포트레이트 표시 방식",
+    scope: "client",
+    config: false,
+    type: String,
+    choices: { above: "상단", inset: "내부" },
+    default: "inset",
+    onChange: (v) => { _fetPortraitLayout = v; _fetApplyBoxVars(); },
+  });
+
   game.settings.register(_FET_MODULE, "stagePortraitHeight", {
-    name: "무대 채팅: 포트레이트 높이 (px)",
+    name: "무대 채팅: 기본 포트레이트 높이 (px)",
     scope: "client",
     config: false,
     type: Number,
@@ -148,6 +175,16 @@ function _fetRegisterSettings() {
       _fetPortraitHeight = v;
       _fetApplyBoxVars();
     },
+  });
+
+  game.settings.register(_FET_MODULE, "stagePortraitWidth", {
+    name: "무대 채팅: 내부 포트레이트 너비 (px)",
+    scope: "client",
+    config: false,
+    type: Number,
+    range: { min: 50, max: 700, step: 1 },
+    default: 226,
+    onChange: (v) => { _fetPortraitWidth = v; _fetApplyBoxVars(); },
   });
 
   game.settings.register(_FET_MODULE, "stageBoxWidth", {
@@ -202,6 +239,9 @@ function _fetRegisterSettings() {
 }
 
 function _fetLoadSettings() {
+  for (const suffix of Object.keys(_fetInsetBox)) {
+    _fetInsetBox[suffix] = game.settings.get(_FET_MODULE, `stageInset${suffix}`);
+  }
   _fetEnabled        = game.settings.get(_FET_MODULE, "stageEnabled")
     && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.STAGE);
   _fetExcludeSystemMessages = game.settings.get(_FET_MODULE, "stageExcludeSystemMessages");
@@ -209,6 +249,8 @@ function _fetLoadSettings() {
   _fetAutoDecay      = game.settings.get(_FET_MODULE, "stageAutoDecay");
   _fetDecayTime      = game.settings.get(_FET_MODULE, "stageDecayTime");
   _fetPortraitHeight = game.settings.get(_FET_MODULE, "stagePortraitHeight");
+  _fetPortraitLayout = game.settings.get(_FET_MODULE, "stagePortraitLayout");
+  _fetPortraitWidth = game.settings.get(_FET_MODULE, "stagePortraitWidth");
   _fetBoxWidth       = game.settings.get(_FET_MODULE, "stageBoxWidth");
   _fetBoxHeight      = game.settings.get(_FET_MODULE, "stageBoxHeight");
   _fetBoxBottom      = game.settings.get(_FET_MODULE, "stageBoxBottom");
@@ -367,12 +409,18 @@ async function _fetRestoreUserState() {
 
 function _fetApplyBoxVars() {
   if (!_fetDockEl) return;
+  _fetDockEl.classList.toggle("fe-stage-dock--inset", _fetPortraitLayout === "inset");
   _fetDockEl.style.setProperty("--fet-portrait-height", `${_fetPortraitHeight}px`);
-  _fetDockEl.style.setProperty("--fet-box-width",  `${_fetBoxWidth}px`);
-  _fetDockEl.style.setProperty("--fet-box-height", `${_fetBoxHeight}px`);
-  _fetDockEl.style.setProperty("--fet-box-bottom", `${_fetBoxBottom}px`);
-  _fetDockEl.style.setProperty("--fet-box-left",   `${_fetBoxLeft}px`);
-  _fetDockEl.style.setProperty("--fet-text-size",  `${_fetTextSize}px`);
+  _fetDockEl.style.setProperty("--fet-portrait-width", `${_fetPortraitWidth}px`);
+  const box = _fetPortraitLayout === "inset" ? _fetInsetBox : {
+    BoxWidth: _fetBoxWidth, BoxHeight: _fetBoxHeight,
+    BoxBottom: _fetBoxBottom, BoxLeft: _fetBoxLeft, TextSize: _fetTextSize,
+  };
+  _fetDockEl.style.setProperty("--fet-box-width",  `${box.BoxWidth}px`);
+  _fetDockEl.style.setProperty("--fet-box-height", `${box.BoxHeight}px`);
+  _fetDockEl.style.setProperty("--fet-box-bottom", `${box.BoxBottom}px`);
+  _fetDockEl.style.setProperty("--fet-box-left",   `${box.BoxLeft}px`);
+  _fetDockEl.style.setProperty("--fet-text-size",  `${box.TextSize}px`);
 }
 
 /** Returns true if the current user may speak as the given actorId (GM or owner). */

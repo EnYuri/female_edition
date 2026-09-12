@@ -6,6 +6,7 @@
 
 #fe-stage-dock {
   --fet-portrait-height: 130px;
+  --fet-portrait-width: 226px;
   --fet-box-width: 488px;
   --fet-box-height: 276px;
   --fet-box-bottom: 30px;
@@ -298,6 +299,66 @@ body.fe-fonts-enabled .fe-stage-textbox-name,
 body.fe-fonts-enabled .fe-stage-label,
 body.fe-fonts-enabled .fe-stage-textbox-content {
   font-family: var(--fe-font-primary) !important;
+}
+
+/* Inset mode: sibling portrait paints above the entire textbox, including the
+   retro border's isolated stacking context. Keep the original mode untouched. */
+#fe-stage-dock.fe-stage-dock--inset {
+  /* Leave room for speech even when the configured box is very narrow. */
+  --fet-portrait-lane: min(var(--fet-portrait-width), calc(100% - 120px));
+}
+
+.fe-stage-dock--inset .fe-stage-portrait-wrap {
+  bottom: 4px;
+  left: 8px;
+  width: var(--fet-portrait-lane);
+  z-index: 5;
+}
+
+.fe-stage-dock--inset .fe-stage-portrait {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  object-position: bottom left;
+}
+
+.fe-stage-dock--inset .fe-stage-label {
+  display: none;
+}
+
+#fe-stage-dock.fe-stage-dock--inset .fe-stage-textbox {
+  padding: 16px 18px 14px calc(var(--fet-portrait-lane) + 24px);
+}
+
+.fe-stage-dock--inset .fe-stage-textbox-name {
+  display: block;
+  position: static;
+  transform: none;
+  flex: 0 0 auto;
+  background: transparent;
+  padding: 0 42px 6px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+
+body.fe-retro-theme #fe-stage-dock.fe-stage-dock--inset .fe-stage-textbox {
+  padding-top: 28px;
+}
+
+body.fe-retro-theme .fe-stage-dock--inset .fe-stage-textbox-name {
+  position: absolute;
+  top: 0;
+  left: calc(var(--fet-portrait-lane) + 24px);
+  max-width: calc(100% - var(--fet-portrait-lane) - 72px);
+  transform: translateY(-50%);
+  background: #000;
+  padding: 1px 3px;
+}
+
+/* Only remove the ordinary speech tail; retro uses ::after for its border. */
+body:not(.fe-retro-theme) .fe-stage-dock--inset .fe-stage-textbox::after {
+  display: none;
 }
 
 /* ── Nav bar (speak-as dropdown above chat input) ─────────────── */
