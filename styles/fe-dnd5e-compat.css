@@ -3390,6 +3390,11 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   z-index: 4 !important;
 }
 
+/* Header menus must also cover the positioned ability modifiers and focus glow. */
+body.fe-retro-theme .tidy5e-sheet.application.actor > .controls-dropdown {
+  z-index: 30 !important;
+}
+
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .ability-scores
   .ability-score
