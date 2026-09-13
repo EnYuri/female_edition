@@ -965,6 +965,46 @@ function _fetPlainTextFromContent(content) {
     .body.textContent ?? "").trim();
 }
 
+// 말풍선에 남길 서식 태그. 속성은 하나도 복사하지 않으므로(`onerror`/`href` 포함)
+// 마크다운 결과 HTML을 그대로 붙여도 스크립트가 실행될 수 없다. 허용 목록에 없는
+// 요소는 껍데기만 벗기고 자식 텍스트는 살린다.
+const _FET_MD_TAGS = new Set([
+  "P", "BR", "HR", "STRONG", "B", "EM", "I", "S", "DEL", "U", "CODE", "PRE",
+  "BLOCKQUOTE", "UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "SPAN",
+]);
+
+const _FET_MD_FORMAT_SELECTOR =
+  "strong, b, em, i, s, del, u, code, pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6, hr, br, p + p";
+
+// 채팅과 동일한 마크다운 결과(fe-markdown.js가 preCreateChatMessage에서 만들어 둔 HTML)를
+// 말풍선에서도 보여주기 위한 안전 파서. DOMParser는 브라우징 컨텍스트가 없어 리소스를
+// 불러오지 않고, 여기서 다시 요소를 새로 만들며 속성을 전부 버린다.
+function _fetBuildFormattedFragment(content) {
+  const doc = new DOMParser().parseFromString(String(content ?? ""), "text/html");
+  const frag = document.createDocumentFragment();
+  const convert = (src, dest) => {
+    for (const node of src.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node.nodeValue) dest.appendChild(document.createTextNode(node.nodeValue));
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = node.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE") continue;
+      if (!_FET_MD_TAGS.has(tag)) { convert(node, dest); continue; }
+      const el = document.createElement(tag.toLowerCase());
+      convert(node, el);
+      dest.appendChild(el);
+    }
+  };
+  convert(doc.body, frag);
+  return frag;
+}
+
+function _fetFragmentHasFormatting(frag) {
+  return !!frag?.querySelector?.(_FET_MD_FORMAT_SELECTOR);
+}
+
 // Clone the message body Foundry already rendered (and sanitized) into the chat log.
 // Injecting the raw content string as innerHTML could execute `<img onerror=…>`, so we
 // cloneNode the safe DOM instead. null when it is not in the log → plain-text fallback.
@@ -990,6 +1030,10 @@ function _fetTryRenderRichContent(insert, messageId) {
   insert.cancelTypewriter?.();
   insert.contentEl.textContent = "";
   insert.contentEl.classList.add("fe-stage-textbox-content--rich");
+  // 미디어가 섞인 메시지도 본문의 마크다운 서식은 동일하게 보여야 한다.
+  if (_fetFragmentHasFormatting(clone)) {
+    insert.contentEl.classList.add("fe-stage-textbox-content--md");
+  }
   insert.contentEl.appendChild(clone);
   insert.contentEl.scrollTop = 0;
   return true;
@@ -1084,6 +1128,7 @@ function _fetRecallPrev(theatreId) {
   const color = u?.color?.css ?? (typeof u?.color === "string" ? u.color : "");
   _fetShowText(row.target.theatreId, text, color, {
     messageId: msg.id,
+    content: msg.content,
     recall: true,
     displayName: row.target.displayName,
     portraitSrc: msg.flags?.[_FET_MODULE]?.portraitSrc,
@@ -1138,15 +1183,22 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
   // while recalling.
   insert.cancelTypewriter?.();
   insert.contentEl.classList.remove("fe-stage-textbox-content--rich");
+  insert.contentEl.classList.remove("fe-stage-textbox-content--md");
   insert.contentEl.textContent = "";
   insert.contentEl.scrollTop = 0;
 
   const renderedRich = opts.messageId ? _fetTryRenderRichContent(insert, opts.messageId) : false;
   if (!renderedRich) {
+    // 채팅에 적용된 마크다운 결과 HTML을 말풍선에서도 동일하게 보여준다. 마크다운이
+    // 꺼져 있거나 평문이면 텍스트 노드 하나짜리 프래그먼트가 되어 예전과 같다.
+    const frag = _fetBuildFormattedFragment(opts.content ?? text);
+    if (_fetFragmentHasFormatting(frag)) {
+      insert.contentEl.classList.add("fe-stage-textbox-content--md");
+    }
     if (recall) {
-      insert.contentEl.textContent = text;
+      insert.contentEl.appendChild(frag);
     } else {
-      insert.cancelTypewriter = _fetTypewriter(insert.contentEl, text);
+      insert.cancelTypewriter = _fetTypewriter(insert.contentEl, frag);
       // At createChatMessage time a live message may not be in the chat log DOM yet, so
       // retry the media render once on the next frame.
       if (opts.messageId) {
@@ -1198,13 +1250,29 @@ function _fetEnsureMessageDisplayInsert(chatMessage, theatreId) {
   return _fetInjectDisplayInsert(theatreId, actorId, name, src, emotes);
 }
 
-function _fetTypewriter(el, text) {
-  const chars = [...text]; // unicode-aware split
-  let i = 0;
+// 서식이 붙은 DOM을 그대로 심어 둔 뒤, 텍스트 노드를 순서대로 비웠다가 한 글자씩
+// 되돌려 채우는 타자기. 문자열을 이어 붙이는 방식이면 <strong> 같은 태그가 매 프레임
+// 다시 파싱되므로, 노드를 유지한 채 nodeValue만 늘린다.
+function _fetTypewriter(el, frag) {
+  el.appendChild(frag);
+
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const slots = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const chars = [...(node.nodeValue ?? "")]; // unicode-aware split
+    if (!chars.length) continue;
+    slots.push({ node, chars });
+    node.nodeValue = "";
+  }
+
+  let si = 0;
+  let ci = 0;
   let handle;
   const step = () => {
-    if (i >= chars.length) return;
-    el.textContent += chars[i++];
+    while (si < slots.length && ci >= slots[si].chars.length) { si++; ci = 0; }
+    if (si >= slots.length) return;
+    const slot = slots[si];
+    slot.node.nodeValue += slot.chars[ci++];
     el.scrollTop = el.scrollHeight;
     handle = setTimeout(step, 38);
   };
@@ -1380,6 +1448,7 @@ Hooks.on("createChatMessage", (chatMessage) => {
   const color = _u?.color?.css ?? (typeof _u?.color === "string" ? _u.color : "");
   _fetShowText(theatreId, text, color, {
     messageId: chatMessage.id,
+    content: chatMessage.content,
     displayName: chatMessage.speaker?.alias,
     portraitSrc: chatMessage.flags?.[_FET_MODULE]?.portraitSrc,
   });

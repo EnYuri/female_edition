@@ -223,6 +223,82 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
 .fe-stage-textbox-content--rich p:first-child { margin-top: 0; }
 .fe-stage-textbox-content--rich p:last-child  { margin-bottom: 0; }
 
+/* ── 말풍선 마크다운 서식 (채팅창과 동일한 문법) ─────────────────
+   fe-markdown.js가 만든 결과 HTML을 그대로 재현한다. 말풍선은 높이가 고정된
+   좁은 영역이라 여백/글자 크기만 채팅보다 촘촘하게 조인다. */
+
+.fe-stage-textbox-content--md p {
+  margin: 0 0 0.45em;
+}
+
+.fe-stage-textbox-content--md > :first-child { margin-top: 0; }
+.fe-stage-textbox-content--md > :last-child  { margin-bottom: 0; }
+
+.fe-stage-textbox-content--md :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.2em 0 0.3em;
+  line-height: 1.25;
+  font-weight: 700;
+  border: none;
+  color: inherit;
+}
+
+.fe-stage-textbox-content--md h1 { font-size: 1.9em; }
+.fe-stage-textbox-content--md h2 { font-size: 1.6em; }
+.fe-stage-textbox-content--md h3 { font-size: 1.35em; }
+.fe-stage-textbox-content--md h4 { font-size: 1.18em; }
+.fe-stage-textbox-content--md h5 { font-size: 1.06em; }
+.fe-stage-textbox-content--md h6 { font-size: 1em; opacity: 0.85; }
+
+.fe-stage-textbox-content--md :is(strong, b) { font-weight: 700; }
+
+/* font-synthesis: 이탤릭 자형이 없는 폰트(한글 웹폰트 대부분)에서도 기울임이
+   실제로 보이도록 브라우저 합성을 허용한다. ui-font.css의 채팅 규칙과 같은 이유. */
+.fe-stage-textbox-content--md :is(em, i) {
+  font-style: italic;
+  font-synthesis: style;
+}
+
+.fe-stage-textbox-content--md code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  padding: 0 0.25em;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.fe-stage-textbox-content--md pre {
+  margin: 0 0 0.45em;
+  padding: 0.4em 0.6em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.28);
+  overflow-x: auto;
+}
+
+.fe-stage-textbox-content--md pre code {
+  padding: 0;
+  background: none;
+}
+
+.fe-stage-textbox-content--md blockquote {
+  margin: 0 0 0.45em;
+  padding: 0 0 0 0.7em;
+  border-left: 2px solid var(--fet-speaker-color, rgba(255, 255, 255, 0.35));
+  opacity: 0.9;
+}
+
+.fe-stage-textbox-content--md :is(ul, ol) {
+  margin: 0 0 0.45em;
+  padding-left: 1.4em;
+}
+
+.fe-stage-textbox-content--md li { margin: 0; }
+
+.fe-stage-textbox-content--md hr {
+  margin: 0.5em 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 /* ── 말풍선 우상단 버튼 툴바: [이전 발화 <] [닫기 ✕] ───────────── */
 
 .fe-stage-textbox-tools {
