@@ -15,7 +15,7 @@ test("a single korean language file holds every translation without duplicate ke
   assert.equal(entries[0].path, "lang/ko.json");
   const source = readFileSync(new URL(entries[0].path, root), "utf8");
   const seen = new Set();
-  for (const match of source.matchAll(/^	"([^"]+)":/gm)) {
+  for (const match of source.matchAll(/^\t"([^"]+)":/gm)) {
     assert.equal(seen.has(match[1]), false, `Duplicate translation: ${match[1]}`);
     seen.add(match[1]);
   }
