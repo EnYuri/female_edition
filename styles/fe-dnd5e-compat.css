@@ -3955,3 +3955,220 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(.fvtt.quest, .fvtt.advice)
   color: var(--fe-ac-80) !important;
   --icon-fill: var(--fe-ac-80) !important;
 }
+
+/* Description headers share the palette in sheets and native/Midi chat cards. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  .card-header.description.collapsible {
+  background: var(--fe-ac-22) !important;
+  color: var(--fe-ac-90) !important;
+  border-color: var(--fe-ac-33) !important;
+  --icon-fill: var(--fe-ac-80) !important;
+  --icon-stroke: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  .card-header.description.collapsible :is(span, label, h3, h4) {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  .card-header.description.collapsible :is(i, svg, dnd5e-icon) {
+  color: var(--fe-ac-80) !important;
+}
+
+/* Quadrone semantic colors: use the retro palette in light, dark and basic modes. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor,
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor :where(.theme-light, .theme-dark, .theme-basic) {
+  --t5e-color-gold: var(--fe-ac-80) !important;
+  --t5e-color-palette-gold-35: var(--fe-ac-33) !important;
+  --t5e-color-palette-gold-45: var(--fe-ac-45) !important;
+  --t5e-color-palette-gold-56: var(--fe-ac-57) !important;
+  --t5e-color-palette-gold-62: var(--fe-ac-70) !important;
+  --t5e-color-palette-gold-75: var(--fe-ac-80) !important;
+  --t5e-color-palette-gold-89: var(--fe-ac-90) !important;
+  --t5e-color-palette-gold-94: var(--fe-ac-90) !important;
+  --t5e-color-filigree: var(--fe-ac-33) !important;
+  --t5e-color-hp-dark: var(--fe-ac-33) !important;
+  --t5e-color-hp-hd-dark: var(--fe-ac-33) !important;
+  --t5e-color-hp-hd-light: var(--fe-ac-80) !important;
+  --t5e-color-hp-hd-medium: var(--fe-ac-57) !important;
+  --t5e-color-hp-light: var(--fe-ac-80) !important;
+  --t5e-color-hp-medium: var(--fe-ac-57) !important;
+  --t5e-color-hp-temp: var(--fe-ac-57) !important;
+  --t5e-color-hp-temp-dark: var(--fe-ac-33) !important;
+  --t5e-color-icon-button: var(--fe-ac-80) !important;
+  --t5e-color-icon-dark: var(--fe-ac-80) !important;
+  --t5e-color-icon-default: var(--fe-ac-80) !important;
+  --t5e-color-icon-diminished: var(--fe-ac-57) !important;
+  --t5e-color-icon-disabled: var(--fe-ac-45) !important;
+  --t5e-color-icon-light: var(--fe-ac-80) !important;
+  --t5e-color-icon-lighter: var(--fe-ac-70) !important;
+  --t5e-color-icon-ondefault-button: var(--fe-ac-80) !important;
+  --t5e-color-icon-ondefault-default: var(--fe-ac-80) !important;
+  --t5e-color-icon-ondefault-diminished: var(--fe-ac-57) !important;
+  --t5e-color-icon-ondefault-disabled: var(--fe-ac-45) !important;
+  --t5e-color-icon-oninverse-button: var(--fe-ac-80) !important;
+  --t5e-color-icon-oninverse-default: var(--fe-ac-80) !important;
+  --t5e-color-icon-oninverse-diminished: var(--fe-ac-57) !important;
+  --t5e-color-icon-oninverse-disabled: var(--fe-ac-45) !important;
+  --t5e-color-inventory-dark: var(--fe-ac-33) !important;
+  --t5e-color-inventory-dark-over: var(--fe-ac-33) !important;
+  --t5e-color-inventory-light: var(--fe-ac-80) !important;
+  --t5e-color-inventory-light-over: var(--fe-ac-80) !important;
+  --t5e-color-inventory-max: var(--fe-ac-57) !important;
+  --t5e-color-inventory-max-over: var(--fe-ac-57) !important;
+  --t5e-color-link-default: var(--fe-ac-80) !important;
+  --t5e-color-link-hover: var(--fe-ac-80) !important;
+  --t5e-color-spellcasting-always: var(--fe-ac-45) !important;
+  --t5e-color-spellcasting-atwill: var(--fe-ac-45) !important;
+  --t5e-color-spellcasting-innate: var(--fe-ac-45) !important;
+  --t5e-color-spellcasting-pact: var(--fe-ac-45) !important;
+  --t5e-color-spellcasting-ritual: var(--fe-ac-45) !important;
+  --t5e-color-spellcasting-spell: var(--fe-ac-45) !important;
+  --t5e-color-text-default: var(--fe-ac-90) !important;
+  --t5e-color-text-disabled: var(--fe-ac-45) !important;
+  --t5e-color-text-gold: var(--fe-ac-80) !important;
+  --t5e-color-text-gold-emphasis: var(--fe-ac-80) !important;
+  --t5e-color-text-gold-light: var(--fe-ac-80) !important;
+  --t5e-color-text-lighter: var(--fe-ac-70) !important;
+  --t5e-color-text-lightest: var(--fe-ac-57) !important;
+  --t5e-color-text-oninverse-default: var(--fe-ac-90) !important;
+  --t5e-color-text-oninverse-disabled: var(--fe-ac-45) !important;
+  --t5e-color-text-oninverse-gold: var(--fe-ac-80) !important;
+  --t5e-color-text-oninverse-gold-emphasis: var(--fe-ac-80) !important;
+  --t5e-color-text-oninverse-gold-light: var(--fe-ac-80) !important;
+  --t5e-color-text-oninverse-lighter: var(--fe-ac-70) !important;
+  --t5e-color-text-oninverse-lightest: var(--fe-ac-57) !important;
+  --t5e-component-ability-background: var(--fe-ac-12) !important;
+  --t5e-component-card-dark-darker: var(--fe-ac-06) !important;
+  --t5e-component-card-dark-default: var(--fe-ac-12) !important;
+  --t5e-component-card-dark-lighter: var(--fe-ac-22) !important;
+  --t5e-component-card-darker: var(--fe-ac-06) !important;
+  --t5e-component-card-default: var(--fe-ac-12) !important;
+  --t5e-component-card-foreground: var(--fe-ac-90) !important;
+  --t5e-component-card-foreground-diminished: var(--fe-ac-57) !important;
+  --t5e-component-card-foreground-disabled: var(--fe-ac-45) !important;
+  --t5e-component-card-light-darker: var(--fe-ac-06) !important;
+  --t5e-component-card-light-default: var(--fe-ac-12) !important;
+  --t5e-component-card-light-lighter: var(--fe-ac-22) !important;
+  --t5e-component-card-lighter: var(--fe-ac-22) !important;
+  --t5e-component-card-oninverse-darker: var(--fe-ac-06) !important;
+  --t5e-component-card-oninverse-default: var(--fe-ac-12) !important;
+  --t5e-component-card-oninverse-lighter: var(--fe-ac-22) !important;
+  --t5e-component-enricher-background: var(--fe-ac-12) !important;
+  --t5e-component-enricher-background-hover: var(--fe-ac-22) !important;
+  --t5e-component-enricher-border: var(--fe-ac-33) !important;
+  --t5e-component-enricher-icon: var(--fe-ac-80) !important;
+  --t5e-component-enricher-icon-hover: var(--fe-ac-80) !important;
+  --t5e-component-enricher-text-hover-shadow: none !important;
+  --t5e-component-field-background: var(--fe-ac-06) !important;
+  --t5e-component-field-background-active: var(--fe-ac-22) !important;
+  --t5e-component-field-background-disabled: var(--fe-ac-06) !important;
+  --t5e-component-field-background-hover: var(--fe-ac-22) !important;
+  --t5e-component-field-background-hover-emphasis: var(--fe-ac-22) !important;
+  --t5e-component-field-border: var(--fe-ac-33) !important;
+  --t5e-component-field-border-hover: var(--fe-ac-33) !important;
+  --t5e-component-field-focus: var(--fe-ac-45) !important;
+  --t5e-component-pill-background: var(--fe-ac-12) !important;
+  --t5e-component-pill-border: var(--fe-ac-33) !important;
+  --t5e-component-pill-border-interactive: var(--fe-ac-33) !important;
+  --t5e-component-pill-oninverse-background: var(--fe-ac-12) !important;
+  --t5e-component-pill-oninverse-border: var(--fe-ac-33) !important;
+  --t5e-component-pill-oninverse-border-interactive: var(--fe-ac-33) !important;
+  --t5e-component-tab-border: var(--fe-ac-33) !important;
+  --t5e-component-toggle-toggled-background: var(--fe-ac-22) !important;
+  --t5e-component-toggle-toggled-background-hover: var(--fe-ac-22) !important;
+  --t5e-component-toggle-toggled-border: var(--fe-ac-33) !important;
+  --t5e-component-toggle-toggled-text: var(--fe-ac-90) !important;
+  --t5e-table-header-background-container: var(--fe-ac-12) !important;
+  --t5e-table-header-background-default: var(--fe-ac-12) !important;
+  --t5e-table-header-background-left: var(--fe-ac-12) !important;
+  --t5e-table-header-background-right: var(--fe-ac-12) !important;
+  --t5e-table-header-border-color: var(--fe-ac-33) !important;
+  --t5e-table-header-box-shadow: none !important;
+  --t5e-table-row-background-default: var(--fe-ac-12) !important;
+  --t5e-table-row-background-expanded: var(--fe-ac-12) !important;
+  --t5e-table-row-border-image: none !important;
+  --t5e-table-row-divider: var(--fe-ac-33) !important;
+  --t5e-theme-color-darker: var(--fe-ac-45) !important;
+  --t5e-theme-color-darkest: var(--fe-ac-45) !important;
+  --t5e-theme-color-default: var(--fe-ac-45) !important;
+  --t5e-theme-color-foreground: var(--fe-ac-90) !important;
+  --t5e-theme-color-foreground-darker: var(--fe-ac-90) !important;
+  --t5e-theme-color-foreground-darker-diminished: var(--fe-ac-57) !important;
+  --t5e-theme-color-foreground-darker-disabled: var(--fe-ac-45) !important;
+  --t5e-theme-color-foreground-diminished: var(--fe-ac-57) !important;
+  --t5e-theme-color-foreground-disabled: var(--fe-ac-45) !important;
+  --t5e-theme-color-header: var(--fe-ac-45) !important;
+  --t5e-theme-color-highlight: var(--fe-ac-45) !important;
+  --t5e-theme-color-highlight-hover: var(--fe-ac-45) !important;
+  --t5e-theme-color-lighter: var(--fe-ac-45) !important;
+  --t5e-theme-color-lightest: var(--fe-ac-45) !important;
+  --fe-dnd5e-mono-surface: var(--fe-ac-06);
+  --fe-dnd5e-mono-surface-2: var(--fe-ac-12);
+  --fe-dnd5e-mono-surface-3: var(--fe-ac-22);
+  --fe-dnd5e-mono-line-faint: var(--fe-ac-22);
+  --fe-dnd5e-mono-line: var(--fe-ac-33);
+  --fe-dnd5e-mono-line-strong: var(--fe-ac-45);
+  --fe-dnd5e-mono-hover: var(--fe-ac-12);
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor .tidy-table-header-row {
+  --t5e-table-header-background-left: var(--fe-ac-22) !important;
+  --t5e-table-header-background-right: var(--fe-ac-12) !important;
+  --t5e-table-header-border-color: var(--fe-ac-33) !important;
+}
+
+/* Do not desaturate the accent together with the badge artwork. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor :is(.ability-bonus-container, .initiative-score-container, .shield) {
+  filter: none !important;
+  --icon-fill: var(--fe-ac-80) !important;
+  --icon-stroke: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  :is(svg, dnd5e-icon, tidy-icon):not(:where(#context-menu, .context-menu) *) {
+  color: var(--fe-ac-80) !important;
+  --icon-fill: var(--fe-ac-80) !important;
+  --icon-stroke: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  svg:not([fill="none"]):not(:where(#context-menu, .context-menu) *),
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  svg [fill]:not([fill="none"]):not(:where(#context-menu, .context-menu) *) {
+  fill: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  svg[stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *),
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  svg [stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *) {
+  stroke: var(--fe-ac-80) !important;
+}
+
+/* External SVG icon files cannot inherit fill from their containing document. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+  img[src*=".svg"]:not([data-edit], .portrait, .actor-portrait, .item-image, .token-image) {
+  filter: brightness(0) invert(0.8) sepia(1)
+    saturate(calc(var(--fe-dx3rd-accent-s, 0%) / 1% * 0.06))
+    hue-rotate(calc(var(--fe-dx3rd-accent-h, 0deg) - 45deg)) !important;
+}
+
+/* Restore field boundaries erased by the shared borderless control cleanup. */
+body.fe-retro-theme form.tidy5e-sheet.application.quadrone.actor .window-content
+  :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
+      select, textarea, .input-group, search, prose-mirror, code-mirror, fieldset):not(:where(.input-group, search) input) {
+  border: 1px solid var(--fe-ac-33) !important;
+  border-radius: 0 !important;
+  background-color: var(--fe-ac-06) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.quadrone.actor .window-content
+  :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
+      select, textarea, .input-group, search, prose-mirror, code-mirror):not(:where(.input-group, search) input):is(:hover, :focus-within) {
+  border-color: var(--fe-ac-45) !important;
+}

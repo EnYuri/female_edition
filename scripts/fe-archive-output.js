@@ -1,7 +1,8 @@
 import { feLocalize } from "./fe-i18n.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 // Archive output helpers: visibility filtering, reversible DOM normalization,
 // source restoration, font preparation, and image/font readiness waits.
-// Self-contained; no Foundry module imports.
+// Uses the shared sticky-scroll guard when suspending screen containment.
 
 // `keepSelfContainedSrc`: the HTML-snapshot path passes true. A portrait whose
 // src is ALREADY a data: URL (the HQ resample result — see fe-chat-portrait-image.js)
@@ -662,6 +663,18 @@ export function feGetFoundryBaseHref() {
 }
 
 const feArchiveDocumentOperations = new WeakSet();
+// Measure once after fonts/layout settle. Using real heights avoids replacing
+// thousands of off-screen messages with guessed sizes and shifting the scrollbar.
+export function feEnableArchiveScreenContainment(doc) {
+  if (!doc?.body?.classList.contains("fe-archive-lean")) return;
+  const messages = Array.from(doc.querySelectorAll("#fe-chat-export-log > li.chat-message"));
+  const heights = messages.map(message => message.getBoundingClientRect().height);
+  messages.forEach((message, index) => {
+    message.style.setProperty("--fe-archive-message-height", `${heights[index]}px`);
+  });
+  doc.body.classList.add("fe-archive-screen-ready");
+}
+
 export async function feRunArchiveDocumentOperation(doc, task) {
   if (!doc || typeof task !== "function") return false;
   if (feArchiveDocumentOperations.has(doc)) {
@@ -669,9 +682,25 @@ export async function feRunArchiveDocumentOperation(doc, task) {
     return false;
   }
   feArchiveDocumentOperations.add(doc);
+  // Output preparation reads computed styles and image geometry on every message.
+  // Suspend screen containment for the whole operation, including error cleanup.
+  const screenReady = doc.body?.classList.contains("fe-archive-screen-ready");
   try {
+    if (screenReady) {
+      const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+      try { doc.body.classList.remove("fe-archive-screen-ready"); }
+      finally { restoreStickyScroll(); }
+    }
     return await task();
   } finally {
-    feArchiveDocumentOperations.delete(doc);
+    try {
+      if (screenReady) {
+        const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+        try { doc.body.classList.add("fe-archive-screen-ready"); }
+        finally { restoreStickyScroll(); }
+      }
+    } finally {
+      feArchiveDocumentOperations.delete(doc);
+    }
   }
 }

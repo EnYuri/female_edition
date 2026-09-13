@@ -12,6 +12,17 @@
 }
 
 
+/* Large popup logs remain complete/searchable, but off-screen message subtrees
+ * need not participate in layout and paint on every scroll. Print always uses
+ * the full layout; programmatic output also suspends the ready class. */
+@media screen {
+  body.fe-chat-archive-window.fe-archive-screen-ready #fe-chat-export-log > li.chat-message {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto var(--fe-archive-message-height, 160px);
+    overflow-clip-margin: 8px;
+  }
+}
+
 :root { --fe-chat-header-meta-reserve: 64px; }
 
 /* --------------------------- */

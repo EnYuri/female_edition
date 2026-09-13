@@ -267,7 +267,6 @@
 	"FE.ChatArchive.progress2": "이전 채팅 보강 중… {value1}/{total}{suffix}",
 	"FE.ChatArchive.feCollectVisibleChatMessages4": "메시지 정렬 중…",
 	"FE.ChatArchive.feCollectVisibleChatMessages5": "메시지 {length}개 준비 완료",
-	"FE.ChatArchive.feRenderChatArchiveWindow.Text4": "인쇄",
 	"FE.ChatArchive.feRenderChatArchiveWindow": "수집된 메시지가 없습니다.",
 	"FE.ChatArchive.feArchivePrint": "Loading images… (품질 우선)",
 	"FE.ChatControlsMenu.tooltip": "채팅 메뉴",

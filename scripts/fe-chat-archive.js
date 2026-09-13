@@ -66,6 +66,7 @@ import {
   feEscapeAttr,
   feGetFoundryBaseHref,
   feRunArchiveDocumentOperation,
+  feEnableArchiveScreenContainment,
 } from "./fe-archive-output.js";
 // HTML-snapshot production (stylesheet inlining, font/image embedding, download).
 import {
@@ -2683,7 +2684,7 @@ async function feRenderChatArchiveWindow(win, {
         <div class="fe-chat-export-actions">
           <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text1")}">HTML</a>
           ${externalBtnHTML}
-          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text2")}">${feLocalizeHTML("FE.ChatArchive.feRenderChatArchiveWindow.Text4")}</a>
+          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text2")}">${feLocalizeHTML("FE.Common.Print")}</a>
           <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="${feLocalizeHTML("FE.Common.Close")}">${feLocalizeHTML("FE.Common.Close")}</a>
         </div>
       </div>
@@ -2982,6 +2983,14 @@ async function feRenderChatArchiveWindow(win, {
     if (statusEl) statusEl.hidden = true;
   } catch {
     /* no-op */
+  }
+
+  // Screen-only optimization starts after all full-document render passes finish.
+  // The desktop snapshot path skips it, since it immediately serializes output.
+  if (waitForAssets) {
+    const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+    try { feEnableArchiveScreenContainment(win.document); }
+    finally { restoreStickyScroll(); }
   }
 
   // Re-enable actions.
