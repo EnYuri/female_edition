@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { MODULE_ID } from "./fe-constants.js";
 
 let feWarnedLegacySocketSender = false;
@@ -18,7 +19,7 @@ export function feResolveSocketSender(senderId, claimedId = null, context = "soc
     if (!feWarnedLegacySocketSender) {
       feWarnedLegacySocketSender = true;
       console.warn(
-        `${MODULE_ID} | ${context}: socket sender id unavailable; using the v13 claimed-id compatibility fallback`
+        feFormat("FE.Diagnostics.SocketAuth.feResolveSocketSender", { MODULE_ID: MODULE_ID, context: context })
       );
     }
     return game.users?.get?.(claimedId) ?? null;

@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
 import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
@@ -490,7 +491,7 @@ function feApplyStyleVarsFromSettings(doc = document) {
     root.style.setProperty("--fe-dx3rd-accent-s", `${Math.round(s * 100)}%`);
 
   } catch (err) {
-    console.warn("female_edition | failed to apply style vars", err);
+    console.warn(feLocalize("FE.Diagnostics.Style.feApplyStyleVarsFromSettings"), err);
   }
 }
 
@@ -683,7 +684,7 @@ function feRegisterEditorFonts(active) {
         .catch(() => { _feEditorFontsLoaded.delete(family); });
     }
   } catch (err) {
-    console.warn("female_edition | failed to register editor fonts", err);
+    console.warn(feLocalize("FE.Diagnostics.Style.feRegisterEditorFonts"), err);
   }
 }
 
@@ -737,7 +738,7 @@ function feApplyCanvasTextFont(doc = document) {
     feApplyDefaultFontFamily(doc, fontsOn);
     feRefreshCanvasTextStyles();
   } catch (err) {
-    console.warn("female_edition | failed to apply canvas text font", err);
+    console.warn(feLocalize("FE.Diagnostics.Style.feApplyCanvasTextFont"), err);
   }
 }
 

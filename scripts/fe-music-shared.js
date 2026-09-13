@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // female_edition: Music feature — shared constants + pure helpers.
 //
 // Ported from the standalone "emanim-music" module (nayuri), then restructured:
@@ -218,7 +219,7 @@ export async function ensureDirectory(source, dir) {
   const FP = getFilePicker();
   const norm = normalizeDataDir(dir);
   if (!norm) return;
-  if (!FP?.createDirectory || !FP?.browse) throw new Error("FilePicker API를 사용할 수 없습니다.");
+  if (!FP?.createDirectory || !FP?.browse) throw new Error(feLocalize("FE.MusicShared.ensureDirectory"));
   const parts = norm.split("/").filter(Boolean);
   let cur = "";
   for (const part of parts) {
@@ -238,7 +239,7 @@ export async function ensureDirectory(source, dir) {
     try {
       await FP.browse(source, cur);
     } catch (err) {
-      throw new Error(`업로드 폴더를 만들 수 없습니다: ${cur}${err?.message ? ` (${err.message})` : ""}`);
+      throw new Error(feFormat("FE.MusicShared.ensureDirectory2", { cur: cur, value2: err?.message ? ` (${err.message})` : "" }));
     }
   }
 }

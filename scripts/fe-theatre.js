@@ -1,3 +1,4 @@
+import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
 /**
  * fe-theatre.js — Portrait stage & speech bubble system
@@ -236,7 +237,7 @@ async function _fetSaveUserStateNow() {
   try {
     await game.user?.setFlag?.(_FET_MODULE, _FET_USER_STATE_FLAG, state);
   } catch (err) {
-    console.warn("[female_edition] fe-theatre: failed to persist user stage state", err);
+    console.warn(feLocalize("FE.Diagnostics.Theatre._fetSaveUserStateNow"), err);
   }
 }
 
@@ -348,14 +349,14 @@ function _fetInjectUI() {
   // Speak-as dropdown
   const select = document.createElement("select");
   select.className = "fe-stage-select";
-  select.title = "대화 캐릭터 선택";
+  select.title = feLocalize("FE.Theatre.SelectSpeaker");
   const noneOpt = document.createElement("option");
   noneOpt.value = _FET_NONE;
-  noneOpt.textContent = "없음";
+  noneOpt.textContent = feLocalize("FE.Common.None");
   select.appendChild(noneOpt);
   const oocOpt = document.createElement("option");
   oocOpt.value = "";
-  oocOpt.textContent = "자신으로 말하기";
+  oocOpt.textContent = feLocalize("FE.Common.SpeakAsSelf");
   select.appendChild(oocOpt);
   select.addEventListener("change", () => {
     const val = select.value;
@@ -366,7 +367,7 @@ function _fetInjectUI() {
   const emoteBtn = document.createElement("button");
   emoteBtn.type = "button";
   emoteBtn.className = "fe-stage-nav-emote hidden";
-  emoteBtn.title = "감정 선택";
+  emoteBtn.title = feLocalize("FE.Theatre.SelectEmote");
   emoteBtn.innerHTML = '<i class="fas fa-theater-masks"></i>';
   emoteBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -377,7 +378,7 @@ function _fetInjectUI() {
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.className = "fe-stage-nav-remove-cur hidden";
-  removeBtn.title = "무대에서 제거";
+  removeBtn.title = feLocalize("FE.Common.RemoveFromStage");
   removeBtn.innerHTML = '<i class="fas fa-door-open"></i>';
   removeBtn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -434,7 +435,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
   prevBtn.className = "fe-stage-textbox-btn fe-stage-textbox-prev";
-  prevBtn.title = "이전 발화 불러오기";
+  prevBtn.title = feLocalize("FE.Theatre.RecallSpeech");
   prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
   prevBtn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -445,7 +446,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "fe-stage-textbox-btn fe-stage-textbox-close";
-  closeBtn.title = "대사창 닫기";
+  closeBtn.title = feLocalize("FE.Theatre.CloseSpeech");
   closeBtn.innerHTML = '<i class="fas fa-times"></i>';
   closeBtn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -479,7 +480,7 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const emoteBtn = document.createElement("button");
   emoteBtn.type = "button";
   emoteBtn.className = "fe-stage-emote-btn";
-  emoteBtn.title = "감정 선택";
+  emoteBtn.title = feLocalize("FE.Theatre.SelectEmote");
   emoteBtn.innerHTML = '<i class="fas fa-theater-masks"></i>';
   emoteBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -511,12 +512,12 @@ function _fetEnsureRecallNonActorInsert() {
   if (!_fetDockEl) return null;
 
   const { el, textboxEl, contentEl, nameEl, imgEl, labelEl } =
-    _fetCreateInsertEl(_FET_RECALL_NON_ACTOR_ID, "메시지", "icons/svg/mystery-man.svg");
+    _fetCreateInsertEl(_FET_RECALL_NON_ACTOR_ID, feLocalize("FE.Common.Message"), "icons/svg/mystery-man.svg");
   _fetDockEl.appendChild(el);
   insert = {
     theatreId: _FET_RECALL_NON_ACTOR_ID,
     actorId: null,
-    name: "메시지",
+    name: feLocalize("FE.Common.Message"),
     src: "icons/svg/mystery-man.svg",
     baseSrc: "icons/svg/mystery-man.svg",
     emote: null,
@@ -622,7 +623,7 @@ export function fetAddToStage(actorOrId) {
   const actor = typeof actorOrId === "string" ? game.actors.get(actorOrId) : actorOrId;
   if (!actor) return;
   if (!_fetCanSpeakAs(actor.id)) {
-    ui.notifications?.warn?.("이 액터를 무대에 추가할 권한이 없습니다.");
+    ui.notifications?.warn?.(feLocalize("FE.Theatre.fetAddToStage"));
     return;
   }
   const theatreId = _FET_ID_PREFIX + actor.id;
@@ -848,13 +849,13 @@ function _fetOpenRemoveMenu(anchor) {
   };
 
   menu.appendChild(mkItem(
-    removableSelected ? `${selected.name} 제거` : "현재 선택 제거",
+    removableSelected ? feFormat("FE.Theatre._fetOpenRemoveMenu", { name: selected.name }) : feLocalize("FE.Theatre.RemoveSelected"),
     "fa-door-open",
     () => { if (selectedId && removableSelected) _fetRemoveInsert(selectedId); },
     !selectedId || !removableSelected,
   ));
   menu.appendChild(mkItem(
-    "내 무대 모두 비우기",
+    feLocalize("FE.Theatre.ClearMyStage"),
     "fa-trash",
     () => _fetClearUserStage(),
     count <= 0,
@@ -924,7 +925,7 @@ function _fetOpenEmoteMenu(theatreId, anchor) {
     return item;
   };
 
-  menu.appendChild(mkItem("기본", insert.baseSrc, () => _fetSetEmote(theatreId, null), !insert.emote));
+  menu.appendChild(mkItem(feLocalize("FE.Common.Default"), insert.baseSrc, () => _fetSetEmote(theatreId, null), !insert.emote));
   for (const [key, emote] of Object.entries(insert.emotes)) {
     menu.appendChild(
       mkItem(emote.label || key, emote.img || emote.src || null,
@@ -1009,7 +1010,7 @@ function _fetRecallTargetForMessage(message) {
     const stageData = actor ? _fetGetActorStageData(actor) : null;
     return {
       theatreId: stageId,
-      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || "무대",
+      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || feLocalize("FE.Common.Stage"),
     };
   }
 
@@ -1026,7 +1027,7 @@ function _fetRecallTargetForMessage(message) {
     const stageData = actor ? _fetGetActorStageData(actor) : null;
     return {
       theatreId,
-      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || "무대",
+      displayName: insert?.name || message?.speaker?.alias || stageData?.name || actor?.name || feLocalize("FE.Common.Stage"),
     };
   }
 
@@ -1036,7 +1037,7 @@ function _fetRecallTargetForMessage(message) {
   const user = game.users.get(message?.author?.id);
   return {
     theatreId: _FET_RECALL_NON_ACTOR_ID,
-    displayName: message?.speaker?.alias || user?.name || "메시지",
+    displayName: message?.speaker?.alias || user?.name || feLocalize("FE.Common.Message"),
   };
 }
 
@@ -1178,7 +1179,7 @@ function _fetEnsureMessageDisplayInsert(chatMessage, theatreId) {
   const actor = actorId ? game.actors?.get?.(actorId) : null;
   const stageData = actor ? _fetGetActorStageData(actor) : null;
   const flags = chatMessage?.flags?.[_FET_MODULE] ?? {};
-  const name = chatMessage?.speaker?.alias || stageData?.name || actor?.name || "무대";
+  const name = chatMessage?.speaker?.alias || stageData?.name || actor?.name || feLocalize("FE.Common.Stage");
   const src = flags.portraitSrc || stageData?.src || actor?.img || "icons/svg/mystery-man.svg";
   const emotes = stageData?.emotes ?? {};
 
@@ -1407,17 +1408,17 @@ async function _fetOpenActorConfig(actorId) {
 
   const buildEmoteRow = (key = "", emote = {}) => `
     <div class="fe-config-emote-row">
-      <input type="text" name="emoteKey"   placeholder="키(영문)" value="${_fetEsc(key)}">
-      <input type="text" name="emoteLabel" placeholder="레이블"   value="${_fetEsc(emote.label ?? "")}">
+      <input type="text" name="emoteKey"   placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text1")}" value="${_fetEsc(key)}">
+      <input type="text" name="emoteLabel" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text2")}"   value="${_fetEsc(emote.label ?? "")}">
       <div class="form-fields">
-        <input type="text" name="emoteImg" placeholder="아이콘 경로" value="${_fetEsc(emote.img ?? "")}">
-        <button type="button" class="fe-pick" data-target="emoteImg" title="파일 선택"><i class="fas fa-file-import"></i></button>
+        <input type="text" name="emoteImg" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text3")}" value="${_fetEsc(emote.img ?? "")}">
+        <button type="button" class="fe-pick" data-target="emoteImg" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
       </div>
       <div class="form-fields">
-        <input type="text" name="emoteSrc" placeholder="포트레이트 경로" value="${_fetEsc(emote.src ?? "")}">
-        <button type="button" class="fe-pick" data-target="emoteSrc" title="파일 선택"><i class="fas fa-file-import"></i></button>
+        <input type="text" name="emoteSrc" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text5")}" value="${_fetEsc(emote.src ?? "")}">
+        <button type="button" class="fe-pick" data-target="emoteSrc" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
       </div>
-      <button type="button" class="fe-remove-emote" title="제거"><i class="fas fa-trash"></i></button>
+      <button type="button" class="fe-remove-emote" title="${feLocalizeHTML("FE.Common.Remove")}"><i class="fas fa-trash"></i></button>
     </div>`;
 
   const existingRows = Object.entries(flags.emotes ?? {})
@@ -1426,20 +1427,20 @@ async function _fetOpenActorConfig(actorId) {
   const content = `
     <div class="fe-stage-config-form">
       <div class="form-group">
-        <label>표시 이름</label>
+        <label>${feLocalizeHTML("FE.Theatre.content.Text1")}</label>
         <input type="text" name="stageName" value="${_fetEsc(flags.name ?? actor.name)}">
       </div>
       <div class="form-group">
-        <label>기본 포트레이트</label>
+        <label>${feLocalizeHTML("FE.Theatre.content.Text2")}</label>
         <div class="form-fields">
           <input type="text" name="stageBaseSrc" value="${_fetEsc(flags.baseSrc ?? actor.img ?? "")}">
-          <button type="button" class="fe-pick" data-target="stageBaseSrc" title="파일 선택"><i class="fas fa-file-import"></i></button>
+          <button type="button" class="fe-pick" data-target="stageBaseSrc" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
         </div>
       </div>
       <div class="form-group-stacked">
-        <label>감정 표정 <small>(키: 영문 식별자, 아이콘: 선택사항)</small></label>
+        <label>${feLocalizeHTML("FE.Theatre.content.Text4")} <small>${feLocalizeHTML("FE.Theatre.content.Text5")}</small></label>
         <div class="fe-config-emotes-list">${existingRows}</div>
-        <button type="button" class="fe-add-emote"><i class="fas fa-plus"></i> 감정 추가</button>
+        <button type="button" class="fe-add-emote"><i class="fas fa-plus"></i> ${feLocalizeHTML("FE.Theatre.content.Text6")}</button>
       </div>
     </div>`;
 
@@ -1457,20 +1458,20 @@ async function _fetOpenActorConfig(actorId) {
   // from typing into the rows that already existed.
   const { DialogV2 } = foundry.applications.api;
   await DialogV2.wait({
-    window: { title: `${actor.name} — 무대 설정` },
+    window: { title: feFormat("FE.Theatre.window.title", { name: actor.name }) },
     position: { width: 580 },
     content,
     buttons: [
       {
         action: "save",
         icon: "fas fa-save",
-        label: "저장",
+        label: feLocalize("FE.Common.Save"),
         default: true,
         callback: async (_event, _button, dialog) => {
           await _fetSaveActorConfig(actorId, dialog.element);
         },
       },
-      { action: "cancel", icon: "fas fa-times", label: "취소" },
+      { action: "cancel", icon: "fas fa-times", label: feLocalize("FE.Common.Cancel") },
     ],
     render: (_event, dialog) => {
       const root = dialog.element;
@@ -1577,7 +1578,7 @@ function _fetRegisterContextOptions(_html, options) {
   // (the menu is never rebuilt). Each entry's own condition, re-evaluated per right-click,
   // is where enablement is checked.
   // Guard against both hooks firing simultaneously (V13 + V14 compat shim)
-  if (options.some((o) => o.name === "무대에 추가")) return;
+  if (options.some((o) => o.name === feLocalize("FE.Common.AddToStage"))) return;
 
   // Screen panels are display boards, not characters, so they are excluded from the stage
   // entirely — same reason _fetInjectSheetButtons omits their sheet header buttons.
@@ -1597,7 +1598,7 @@ function _fetRegisterContextOptions(_html, options) {
   // Stage add/remove, inserted directly below the core "SIDEBAR.Edit" entry.
   const stageItems = [
     entry({
-      label: "무대에 추가",
+      label: feLocalize("FE.Common.AddToStage"),
       icon: '<i class="fas fa-theater-masks"></i>',
       visible: (li) => {
         if (!_fetEnabled) return false;
@@ -1612,7 +1613,7 @@ function _fetRegisterContextOptions(_html, options) {
       },
     }),
     entry({
-      label: "무대에서 제거",
+      label: feLocalize("FE.Common.RemoveFromStage"),
       icon: '<i class="fas fa-door-open"></i>',
       visible: (li) => {
         if (!_fetEnabled) return false;
@@ -1628,7 +1629,7 @@ function _fetRegisterContextOptions(_html, options) {
     }),
     // Stage settings joins the same group under Edit, behind the same ownership gate.
     entry({
-      label: "무대 설정",
+      label: feLocalize("FE.Common.StageConfig"),
       icon: '<i class="fas fa-cog"></i>',
       visible: (li) => _fetEnabled && !!_fetActorForMenu(li)?.isOwner,
       callback: (li) => {
@@ -1641,7 +1642,7 @@ function _fetRegisterContextOptions(_html, options) {
   // Find the core Edit entry. v14 uses an unlocalized `label: "SIDEBAR.Edit"`, while v13
   // and some modules use `name` and may already be localized by hook time — so match both
   // the key and the localized string. Falls back to the top when absent.
-  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? feLocalize("FE.Common.Edit");
   const isEdit = (o) =>
     o?.label === "SIDEBAR.Edit" || o?.name === "SIDEBAR.Edit" ||
     o?.label === editLabel       || o?.name === editLabel;
@@ -1731,7 +1732,7 @@ function _fetOnGetHeaderControls(app, controls) {
   controls.push({
     action: "fetStageConfig",
     icon: "fas fa-cog",
-    label: "무대 설정",
+    label: feLocalize("FE.Common.StageConfig"),
     onClick: () => _fetOpenActorConfig(actor.id),
   });
 }
@@ -1785,12 +1786,12 @@ function _fetInjectSheetButtons(app, el) {
     // "무대 설정" (owners only) lives in the sheet's own native "⋯" controls dropdown
     // instead — see _fetOnGetHeaderControls above.
     if (onStage) {
-      headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
+      headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", feLocalize("FE.Common.SwitchSpeaker"),
         () => _fetSetSpeakingAs(theatreId)));
-      headerBtns.append(mkBtn("fet-stage-remove", "fa-door-open", "무대에서 제거",
+      headerBtns.append(mkBtn("fet-stage-remove", "fa-door-open", feLocalize("FE.Common.RemoveFromStage"),
         () => _fetRemoveInsert(theatreId)));
     } else {
-      headerBtns.append(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
+      headerBtns.append(mkBtn("fet-stage-add", "fa-theater-masks", feLocalize("FE.Common.AddToStage"),
         () => fetAddToStage(actor)));
     }
   } else {
@@ -1810,16 +1811,16 @@ function _fetInjectSheetButtons(app, el) {
     const hasNativeControls = !!windowHeader.querySelector('[data-action="toggleControls"]');
 
     if (onStage) {
-      ins(mkBtn("fet-stage-switch", "fa-comment-dots", "발화 전환",
+      ins(mkBtn("fet-stage-switch", "fa-comment-dots", feLocalize("FE.Common.SwitchSpeaker"),
         () => _fetSetSpeakingAs(theatreId)));
-      ins(mkBtn("fet-stage-remove", "fa-door-open", "무대에서 제거",
+      ins(mkBtn("fet-stage-remove", "fa-door-open", feLocalize("FE.Common.RemoveFromStage"),
         () => _fetRemoveInsert(theatreId)));
     } else {
-      ins(mkBtn("fet-stage-add", "fa-theater-masks", "무대에 추가",
+      ins(mkBtn("fet-stage-add", "fa-theater-masks", feLocalize("FE.Common.AddToStage"),
         () => fetAddToStage(actor)));
     }
     if (actor.isOwner && !hasNativeControls) {
-      ins(mkBtn("fet-stage-config", "fa-cog", "무대 설정",
+      ins(mkBtn("fet-stage-config", "fa-cog", feLocalize("FE.Common.StageConfig"),
         () => _fetOpenActorConfig(actor.id)));
     }
   }

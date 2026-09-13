@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // Female-cupwhi: Actor name -> token name synchronization.
 // Document behavior only: no Token Config DOM or canvas-rendering concerns.
@@ -60,7 +61,7 @@ Hooks.on("updateActor", async (actor, changes) => {
   }));
   for (const result of results) {
     if (result.status === "rejected") {
-      console.error(`[${MODULE_ID}] failed to synchronize token names after actor rename`, result.reason);
+      console.error(feFormat("FE.Diagnostics.TokenNameSync.error", { MODULE_ID: MODULE_ID }), result.reason);
     }
   }
 });

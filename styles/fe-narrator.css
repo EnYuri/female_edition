@@ -87,6 +87,32 @@
   justify-content: center;
   gap: 8px;
   visibility: hidden;
+  opacity: 0;
+}
+
+/* ── Overlay state, driven by classes on #fe-narrator (fe-narrator.js) ──────
+   The JS used to write opacity/visibility/display inline on four elements. The
+   only geometry still set inline is what has to be measured at runtime: the
+   gradient band height and the button row's vertical offset. */
+#fe-narrator.fe-nt-open .fe-narrator-content {
+  opacity: 1;
+}
+
+#fe-narrator.fe-nt-open .fe-narrator-buttons {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* display:true but no text yet — hide the text, leave the band and buttons be. */
+#fe-narrator.fe-nt-open.fe-nt-empty .fe-narrator-content {
+  opacity: 0;
+}
+
+/* Non-narrator viewers get no pause/close; copy obeys the narratorAllowCopy setting. */
+#fe-narrator.fe-nt-observer .fe-nt-pause,
+#fe-narrator.fe-nt-observer .fe-nt-close,
+#fe-narrator.fe-nt-no-copy .fe-nt-copy {
+  display: none;
 }
 
 .fe-narrator-buttons button {

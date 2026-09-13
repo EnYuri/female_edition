@@ -4,45 +4,45 @@
 <form class="fe-settings">
   <div class="fe-settings__topbar flexrow">
     <div class="fe-settings__title">
-      <h2>Female-cupwhi 설정</h2>
+      <h2>{{localize "FE.Settings.Title"}}</h2>
     </div>
 
   </div>
 
   {{#if warnings.chatPortraitDup}}
   <div class="fe-settings__warning">
-    <p><b>경고:</b> 외부 모듈 <code>chat-portrait</code> 가 활성화되어 있습니다. 이 모듈의 <b>채팅 포트레이트</b> 기능과 중복 표시될 수 있습니다.</p>
-    <p class="notes">중복되는 둘 중 한 모듈을 월드에서 제외하세요(저 살려주실거죠??).</p>
+    <p>{{{localize "FE.SettingsMenu.General.Hint"}}}</p>
+    <p class="notes">{{localize "FE.SettingsMenu.General.Text"}}</p>
   </div>
   {{/if}}
 
-  <nav class="fe-settings__tabs" role="tablist" aria-label="설정 분류">
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="general">일반</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-functions">채팅 기능</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-appearance">채팅 외형</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-features">채팅 병합</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="portrait">채팅 포트레이트</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="archive">채팅 아카이브</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="system">인터페이스</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="media">이미지</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="music">음악</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="combat-tracker">컴뱃 트래커</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="stage">무대 채팅</button>
-    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="canvas">토큰·패널</button>
+  <nav class="fe-settings__tabs" role="tablist" aria-label="{{localize "FE.SettingsMenu.General.Text2"}}">
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="general">{{localize "FE.SettingsMenu.Tabs.General"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-functions">{{localize "FE.SettingsMenu.Tabs.ChatFunctions"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-appearance">{{localize "FE.SettingsMenu.Tabs.ChatAppearance"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="chat-features">{{localize "FE.SettingsMenu.Tabs.ChatMerge"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="portrait">{{localize "FE.Common.ChatPortrait"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="archive">{{localize "FE.Common.ChatArchive"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="system">{{localize "FE.SettingsMenu.Tabs.Interface"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="media">{{localize "FE.SettingsMenu.Tabs.Images"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="music">{{localize "FE.SettingsMenu.Tabs.Music"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="combat-tracker">{{localize "FE.Common.CombatTracker"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="stage">{{localize "FE.SettingsMenu.Tabs.Stage"}}</button>
+    <button type="button" class="fe-settings__tab" role="tab" data-fe-settings-tab-button="canvas">{{localize "FE.SettingsMenu.Tabs.Canvas"}}</button>
   </nav>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-functions">
-    <h3 class="fe-settings__section-title">채팅 기능</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Tabs.ChatFunctions"}}</h3>
 
     <div class="form-group">
-      <label>채팅 입력 마크다운 지원</label>
+      <label>{{localize "FE.SettingsData.ceMarkdownEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMarkdownEnabled" data-dtype="Boolean" {{checked values.ceMarkdownEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 수정(편집) 기능</label>
+      <label>{{localize "FE.SettingsMenu.ceEditEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceEditEnabled" data-dtype="Boolean" {{checked values.ceEditEnabled}} />
       </div>
@@ -50,336 +50,336 @@
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-functions">
-    <h3 class="fe-settings__section-title">채팅 DOM 정리</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.chatFunctions.Text"}}</h3>
 
     <div class="form-group">
-      <label>채팅 DOM 정리(성능 최적화)</label>
+      <label>{{localize "FE.SettingsData.cePruneEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="cePruneEnabled" data-dtype="Boolean" {{checked values.cePruneEnabled}} />
       </div>
-      <p class="notes">오래된 메시지를 DOM에서 제거해 성능을 개선합니다. 위로 스크롤하면 다시 불러옵니다. (변경 후 새로고침 필요)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.cePruneEnabled.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>DOM 정리: 최대 유지 메시지 수</label>
+      <label>{{localize "FE.SettingsMenu.cePruneMaxMessages.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="cePruneMaxMessages" data-dtype="Number" value="{{values.cePruneMaxMessages}}" step="{{ranges.cePruneMaxMessages.step}}" min="{{ranges.cePruneMaxMessages.min}}" max="{{ranges.cePruneMaxMessages.max}}" />
       </div>
-      <p class="notes">이 수를 초과하면 오래된 메시지를 제거합니다. 스크롤 1회에 이 값의 절반만큼 불러옵니다. (즉시 적용, 기본값: 60)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.cePruneMaxMessages.Text2"}}</p>
     </div>
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-functions">
-    <h3 class="fe-settings__section-title">타이핑 인디케이터</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.chatFunctions.Text2"}}</h3>
 
     <div class="form-group">
-      <label>타이핑 인디케이터 표시('…님이 입력 중')</label>
+      <label>{{localize "FE.SettingsData.ceTypingEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTypingEnabled" data-dtype="Boolean" {{checked values.ceTypingEnabled}} />
       </div>
-      <p class="notes">다른 사용자가 입력 중일 때 입력창 위에 표시합니다. CautiousGamemastersPack(CGMP)이 활성화되어 있으면 자동으로 비활성화되어 CGMP에 양보합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTypingEnabled.Text"}}</p>
     </div>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>타이핑 인디케이터: 플레이어에게도 표시</label>
+      <label>{{localize "FE.SettingsData.ceTypingShowToPlayers.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTypingShowToPlayers" data-dtype="Boolean" {{checked values.ceTypingShowToPlayers}} />
       </div>
-      <p class="notes">끄면 GM만 다른 사용자의 입력 중 표시를 볼 수 있습니다. (월드 설정 — GM 전용)</p>
+      <p class="notes">{{localize "FE.SettingsData.ceTypingShowToPlayers.hint"}}</p>
     </div>
     {{/if}}
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="general">
-    <h3 class="fe-settings__section-title">폰트</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.general.Text"}}</h3>
 
     <div class="form-group">
-      <label>커스텀 폰트 적용 (쿠키런/그림일기, 개인)</label>
+      <label>{{localize "FE.SettingsMenu.enableFonts.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="enableFonts" data-dtype="Boolean" {{checked values.enableFonts}} />
       </div>
-      <p class="notes">이 모듈의 커스텀 폰트(CookieRun/그림일기) 및 관련 옵션을 활성화합니다. 항상 개인 유지되며 GM 설정 강제 대상이 아닙니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.enableFonts.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>유저(로컬) 폰트 사용</label>
+      <label>{{localize "FE.SettingsData.ceUiUseUserFont.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceUiUseUserFont" data-dtype="Boolean" {{checked values.ceUiUseUserFont}} />
       </div>
-      <p class="notes">컴퓨터에 설치된 폰트 또는 모듈 font 폴더의 폰트를 채팅·UI 전체에 적용합니다(NeoDGM처럼 전부 교체). 켜면 아래 '채팅 글꼴 선택'(모듈 폰트) 대신 '유저 폰트 선택'이 사용됩니다. 항상 개인 유지되며 GM 설정 강제 대상이 아닙니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceUiUseUserFont.Text"}}</p>
     </div>
 
     <div class="form-group fe-module-font-row">
-      <label>채팅 글꼴 선택</label>
+      <label>{{localize "FE.SettingsMenu.ceChatFontChoice.Text"}}</label>
       <div class="form-fields">
         <select name="ceChatFontChoice" data-dtype="String">
-          {{selectOptions choices.chatFontChoice selected=values.ceChatFontChoice}}
+          {{selectOptions choices.chatFontChoice selected=values.ceChatFontChoice localize=true}}
         </select>
       </div>
-      <p class="notes">'쿠키런 + 그림일기'는 큰 글자/강조=쿠키런, 작은 글자 및 UI/시트 기본 글꼴=그림일기로 섞어 씁니다. 다른 항목은 채팅·UI·시트를 해당 글꼴로 통일합니다. (커스텀 폰트 적용이 켜져 있어야 합니다)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceChatFontChoice.Text2"}}</p>
     </div>
 
     <div class="form-group fe-user-font-row">
-      <label>유저 폰트 선택</label>
+      <label>{{localize "FE.SettingsMenu.ceUserFontFamily.Text"}}</label>
       <div class="form-fields fe-user-font-fields">
         <select class="fe-user-font-picker">
-          <option value="">— 목록에서 선택 —</option>
+          <option value="">{{localize "FE.SettingsMenu.ceUserFontFamily.Text2"}}</option>
           {{#if userFontModuleList.length}}
-          <optgroup label="모듈 font 폴더">
+          <optgroup label="{{localize "FE.FontPreview.ModuleFolder"}}">
             {{#each userFontModuleList}}
             <option value="{{this.family}}">{{this.label}}</option>
             {{/each}}
           </optgroup>
           {{/if}}
-          <optgroup class="fe-user-font-system-group" label="설치된 시스템 폰트"></optgroup>
+          <optgroup class="fe-user-font-system-group" label="{{localize "FE.FontPreview.SystemFonts"}}"></optgroup>
         </select>
-        <button type="button" class="fe-load-system-fonts">시스템 폰트 불러오기</button>
+        <button type="button" class="fe-load-system-fonts">{{localize "FE.SettingsMenu.ceUserFontFamily.Text3"}}</button>
       </div>
       <div class="form-fields">
-        <input type="text" name="ceUserFontFamily" data-dtype="String" value="{{values.ceUserFontFamily}}" placeholder="폰트 패밀리 이름 (예: Malgun Gothic)" />
+        <input type="text" name="ceUserFontFamily" data-dtype="String" value="{{values.ceUserFontFamily}}" placeholder="{{localize "FE.SettingsMenu.ceUserFontFamily.Text4"}}" />
       </div>
-      <div class="fe-user-font-preview">다람쥐 헌 쳇바퀴에 타고파 — ABCabc XYZ 0123 가나다라마바사</div>
-      <p class="notes">목록에서 고르거나 폰트 패밀리 이름을 직접 입력하세요(아래 입력칸 값이 실제 적용값). '시스템 폰트 불러오기'는 설치된 폰트 목록을 채워 줍니다 — 브라우저 권한 허용이 한 번 필요할 수 있습니다.{{#unless localFontsSupported}} 이 환경은 자동 목록을 지원하지 않아 직접 입력 또는 모듈 폴더 폰트만 사용할 수 있습니다.{{/unless}}</p>
+      <div class="fe-user-font-preview">{{localize "FE.SettingsMenu.ceUserFontFamily.Text5"}}</div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceUserFontFamily.Text6"}}{{#unless localFontsSupported}} {{localize "FE.SettingsMenu.ceUserFontFamily.Text7"}}{{/unless}}</p>
     </div>
 
     <div class="form-group">
-      <label>토큰 이름표·커서 글꼴</label>
+      <label>{{localize "FE.SettingsData.ceCanvasTextFont.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCanvasTextFont" data-dtype="Boolean" {{checked values.ceCanvasTextFont}} />
       </div>
-      <p class="notes">씬 위에 그려지는 텍스트(토큰 이름표, 다른 유저 커서 이름, 측정/템플릿 라벨 등)에도 위에서 고른 글꼴을 적용합니다. 이 텍스트는 CSS가 아니라 캔버스에 직접 그려지므로 별도 적용이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCanvasTextFont.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>캔버스 글꼴 (그리기·지도 노트)</label>
+      <label>{{localize "FE.SettingsData.ceCanvasDrawingFont.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCanvasDrawingFont" data-dtype="Boolean" {{checked values.ceCanvasDrawingFont}} />
       </div>
-      <p class="notes">모듈 글꼴을 Foundry의 글꼴 목록에 등록해, 그리기(드로잉)·지도 노트·저널 편집기의 글꼴 선택 창에서 직접 고를 수 있게 합니다. 이 설정을 켜면 글꼴이 '기본값'인 그리기/노트는 위에서 고른 글꼴로 표시되고, 끄면 Foundry 기본 글꼴로 돌아갑니다(목록 등록은 유지).</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCanvasDrawingFont.Text"}}</p>
     </div>
 
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="system">
-    <h3 class="fe-settings__section-title">인터페이스</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Tabs.Interface"}}</h3>
 
     <div class="form-group">
-      <label>화면 좌상단 컨트롤 접기(드롭다운, 개인)</label>
+      <label>{{localize "FE.SettingsMenu.ceSceneControlsCollapse.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceSceneControlsCollapse" data-dtype="Boolean" {{checked values.ceSceneControlsCollapse}} />
       </div>
-      <p class="notes">레이어/도구 줄을 평소엔 현재 선택된 1칸만 보이게 접습니다. 칸을 클릭하면 펼쳐지고, 항목을 고르면 다시 접힙니다. 바깥 클릭/Esc로도 접힙니다. 항상 개인 유지되며 GM 설정 강제 대상이 아닙니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceSceneControlsCollapse.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>어트리뷰트 이름 도우미(마우스 호버)</label>
+      <label>{{localize "FE.SettingsMenu.ceAttrPathHelper.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceAttrPathHelper" data-dtype="Boolean" {{checked values.ceAttrPathHelper}} />
       </div>
-      <p class="notes">시트나 채팅에 표시된 값 위에 마우스를 올리면 그 시스템 어트리뷰트 이름(예: system.attributes.init.value)을 툴팁으로 표시합니다. 기존 툴팁이 있으면 그 아래 줄에 덧붙고, 없으면 단독 툴팁으로 보입니다. 값은 표시하지 않습니다. dnd5e·dx3rd 공용 점검 도구입니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceAttrPathHelper.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>어트리뷰트 이름 도우미: 소스 함께 표시</label>
+      <label>{{localize "FEAPH.Settings.SourceName"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceAttrPathHelperSource" data-dtype="Boolean" {{checked values.ceAttrPathHelperSource}} />
       </div>
-      <p class="notes">이름이 읽힌 출처(예: name, data-property)를 이름 아래에 함께 표시합니다.</p>
+      <p class="notes">{{localize "FEAPH.Settings.SourceHint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>토큰 설정 미리보기</label>
+      <label>{{localize "FE.SettingsMenu.ceCoreUiTokenPreview.Text"}}</label>
       <div class="form-fields"><input type="checkbox" name="ceCoreUiTokenPreview" data-dtype="Boolean" {{checked values.ceCoreUiTokenPreview}} /></div>
-      <p class="notes">프로토타입 토큰 비주얼 탭의 격자·앵커 라이브 미리보기와 조절 슬라이더를 표시합니다. 새로 여는 토큰 설정 창부터 반영됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCoreUiTokenPreview.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>파일 픽커 미리보기 및 개선</label>
+      <label>{{localize "FE.SettingsMenu.ceCoreUiFilepickerEnhancements.Text"}}</label>
       <div class="form-fields"><input type="checkbox" name="ceCoreUiFilepickerEnhancements" data-dtype="Boolean" {{checked values.ceCoreUiFilepickerEnhancements}} /></div>
-      <p class="notes">파일 픽커의 미리보기·이름·날짜·크기 정렬과 이미지 붙여넣기/드롭 업로드 후 자동 선택 기능을 사용합니다. 새로 여는 파일 픽커부터 반영됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCoreUiFilepickerEnhancements.Text2"}}</p>
     </div>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>파일 픽커 외부 이미지 업로드 경로 (GM 전용)</label>
+      <label>{{localize "FE.SettingsMenu.ceCoreUiFilepickerUploadLocation.Text"}}</label>
       <div class="form-fields"><input type="text" name="ceCoreUiFilepickerUploadLocation" value="{{values.ceCoreUiFilepickerUploadLocation}}" /></div>
-      <p class="notes">파일 픽커에 붙여넣거나 드롭한 이미지만 저장할 data 폴더입니다. 기본값은 <code>uploaded-filepicker-images</code>이며 채팅 이미지 폴더와 분리됩니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceCoreUiFilepickerUploadLocation.Hint"}}}</p>
     </div>
     {{/if}}
 
     <div class="form-group">
-      <label>씬 설정 탭 한 줄 표시</label>
+      <label>{{localize "FE.SettingsMenu.ceCoreUiSceneConfigTabs.Text"}}</label>
       <div class="form-fields"><input type="checkbox" name="ceCoreUiSceneConfigTabs" data-dtype="Boolean" {{checked values.ceCoreUiSceneConfigTabs}} /></div>
-      <p class="notes">씬 설정 창의 탭 이름이 두 줄로 접히지 않게 하고, 탭이 한 줄에 들어가도록 창 기본 폭을 넓힙니다. 시트 창은 한 번 열면 그대로 재사용되므로, 변경 사항은 <b>새로고침 후</b> 적용됩니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceCoreUiSceneConfigTabs.Hint"}}}</p>
     </div>
 
     <div class="form-group">
-      <label>토큰 설정: 다른 탭 2열 정렬</label>
+      <label>{{localize "FE.SettingsMenu.ceTokenConfigTwoColumn.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenConfigTwoColumn" data-dtype="Boolean" {{checked values.ceTokenConfigTwoColumn}} />
       </div>
-      <p class="notes">토큰 미리보기로 넓어진 프로토타입 토큰 설정 창에서, 비주얼 탭이 아닌 탭도 좌우 2열로 정렬합니다. 끄면 Foundry 기본 1열 정렬로 표시합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTokenConfigTwoColumn.Text2"}}</p>
     </div>
 
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-appearance">
-    <h3 class="fe-settings__section-title">채팅 외형</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Tabs.ChatAppearance"}}</h3>
 
     <div class="form-group">
-      <label>채팅 카드 텍스쳐 제거</label>
+      <label>{{localize "FE.SettingsData.stripChatTextures.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stripChatTextures" data-dtype="Boolean" {{checked values.stripChatTextures}} />
       </div>
-      <p class="notes">채팅 카드의 parchment/texture 배경 이미지를 제거합니다. 평면 미색 오버레이는 아래에서 별도로 선택합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.stripChatTextures.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>페이퍼 톤 오버레이</label>
+      <label>{{localize "FE.SettingsMenu.cePaperOverlayEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="cePaperOverlayEnabled" data-dtype="Boolean" {{checked values.cePaperOverlayEnabled}} />
       </div>
-      <p class="notes">텍스쳐 제거 시 평면 미색 오버레이를 추가해 채도를 낮춥니다. 기본값은 꺼짐입니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.cePaperOverlayEnabled.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>페이퍼 톤 오버레이 농도</label>
+      <label>{{localize "FE.SettingsMenu.ceMessageBgSaturation.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceMessageBgSaturation" data-dtype="Number" value="{{values.ceMessageBgSaturation}}" step="{{ranges.ceMessageBgSaturation.step}}" min="{{ranges.ceMessageBgSaturation.min}}" max="{{ranges.ceMessageBgSaturation.max}}" />
       </div>
-      <p class="notes">위 오버레이를 켰을 때만 사용합니다. 값이 높을수록 더 밝고 채도가 약해집니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMessageBgSaturation.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 메시지 배경: 유저 색상 적용</label>
+      <label>{{localize "FE.SettingsMenu.ceUseUserColorBg.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceUseUserColorBg" data-dtype="Boolean" {{checked values.ceUseUserColorBg}} />
       </div>
-      <p class="notes">각 메시지 배경을 화자(액터 소유자/작성자)의 유저 색상으로 틴트합니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceUseUserColorBg.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅카드 하부 배경(불투명)</label>
+      <label>{{localize "FE.SettingsMenu.ceUserColorBgBase.Text"}}</label>
       <div class="form-fields">
         <select name="ceUserColorBgBase" data-dtype="String">
-          {{selectOptions choices.userColorBgBase selected=values.ceUserColorBgBase}}
+          {{selectOptions choices.userColorBgBase selected=values.ceUserColorBgBase localize=true}}
         </select>
       </div>
-      <p class="notes">채팅카드에 불투명한 배경(흰색/검정/사용자 지정)을 깔아 가독성을 높입니다. 위의 '유저 색상 적용' 틴트와 독립적으로 동작하므로, 틴트가 꺼져 있어도 단독으로 적용됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceUserColorBgBase.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅카드 하부 배경: 사용자 지정 색</label>
+      <label>{{localize "FE.SettingsMenu.ceUserColorBgCustom.Text"}}</label>
       <div class="form-fields">
         <input type="color" name="ceUserColorBgCustom" value="{{values.ceUserColorBgCustom}}" />
       </div>
-      <p class="notes">위에서 '사용자 지정 색상'을 선택했을 때 사용할 하부 배경색.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceUserColorBgCustom.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>유저 색상 틴트 농도</label>
+      <label>{{localize "FE.SettingsMenu.ceUserColorAlpha.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceUserColorAlpha" data-dtype="Number" value="{{values.ceUserColorAlpha}}" step="{{ranges.ceUserColorAlpha.step}}" min="{{ranges.ceUserColorAlpha.min}}" max="{{ranges.ceUserColorAlpha.max}}" />
       </div>
-      <p class="notes">유저 색상이 배경에 입혀지는 진하기(0.05~0.6). 값이 클수록 진해집니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceUserColorAlpha.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>시스템 메시지에도 GM 유저 색상 틴트 적용</label>
+      <label>{{localize "FE.SettingsData.ceSystemMsgColor.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceSystemMsgColor" data-dtype="Boolean" {{checked values.ceSystemMsgColor}} />
       </div>
-      <p class="notes">화자(캐릭터)가 없는 시스템 메시지에 GM의 유저 색상과 틴트 농도를 적용합니다. 내레이터 채팅(/narrate·/describe·/note)은 제외됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceSystemMsgColor.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>시스템 메시지 하부 배경색 적용</label>
+      <label>{{localize "FE.SettingsData.ceSystemMsgBgEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceSystemMsgBgEnabled" data-dtype="Boolean" {{checked values.ceSystemMsgBgEnabled}} />
       </div>
-      <p class="notes">화자 없는 시스템 메시지에 불투명한 하부 배경색을 적용합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceSystemMsgBgEnabled.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>시스템 메시지 하부 배경색</label>
+      <label>{{localize "FE.SettingsData.ceSystemMsgBgColor.name"}}</label>
       <div class="form-fields">
         <input type="color" name="ceSystemMsgBgColor" value="{{values.ceSystemMsgBgColor}}" />
       </div>
-      <p class="notes">위 옵션이 켜져 있을 때 사용할 하부 배경색입니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceSystemMsgBgColor.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>일반 메시지 카드·글씨 색 강제 정의</label>
+      <label>{{localize "FE.SettingsMenu.ceForceNormalMsgColor.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceForceNormalMsgColor" data-dtype="Boolean" {{checked values.ceForceNormalMsgColor}} />
       </div>
-      <p class="notes">일반 메시지(특수 메시지·유저 색상 제외)의 카드 배경·글씨 색을 시스템/테마 기본값으로 강제합니다. Carolingian UI 등 채팅을 통째로 다시 칠하는 모듈이 일반 메시지를 덮어써 가독성이 떨어질 때 되돌립니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceForceNormalMsgColor.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 병합 그룹 외곽선</label>
+      <label>{{localize "FE.SettingsData.ceChatGroupOutline.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceChatGroupOutline" data-dtype="Boolean" {{checked values.ceChatGroupOutline}} />
       </div>
-      <p class="notes">병합된 메시지 그룹(또는 단일 메시지)을 외곽선(유저 색상)으로 감싸 박스처럼 표시합니다. 끄면 색조 배경만 사용합니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceChatGroupOutline.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 메시지 테두리 유저색 표시</label>
+      <label>{{localize "FE.SettingsData.ceMsgBorderUserColor.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMsgBorderUserColor" data-dtype="Boolean" {{checked values.ceMsgBorderUserColor}} />
       </div>
-      <p class="notes">코어 Foundry가 화자 없는(OOC) 메시지 테두리에 자동으로 입히는 발신자 유저 색상을 표시합니다. 끄면 기본 테두리색(레트로 테마에서는 레트로 강조색)으로 되돌립니다. 위 '병합 그룹 외곽선'이 켜져 있으면 그쪽이 우선합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMsgBorderUserColor.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 기본 포트레이트 숨김(내부/기본)</label>
+      <label>{{localize "FE.SettingsData.hideChatPortraits.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="hideChatPortraits" data-dtype="Boolean" {{checked values.hideChatPortraits}} />
       </div>
-      <p class="notes">채팅 카드 헤더의 기본 아바타/포트레이트를 숨깁니다. (이 모듈이 삽입하는 포트레이트는 별도 옵션)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.hideChatPortraits.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 메시지 카드 간격(px)</label>
+      <label>{{localize "FE.SettingsData.ceChatMessageSpacing.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceChatMessageSpacing" data-dtype="Number" value="{{values.ceChatMessageSpacing}}" step="{{ranges.ceChatMessageSpacing.step}}" min="{{ranges.ceChatMessageSpacing.min}}" max="{{ranges.ceChatMessageSpacing.max}}" />
       </div>
-      <p class="notes">모든 채팅 메시지 카드 사이의 기본 간격(flex gap)입니다. 병합 여부와 무관하게 적용됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceChatMessageSpacing.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 헤더-콘텐츠 간격(px)</label>
+      <label>{{localize "FE.SettingsData.ceHeaderContentGap.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceHeaderContentGap" data-dtype="Number" value="{{values.ceHeaderContentGap}}" step="{{ranges.ceHeaderContentGap.step}}" min="{{ranges.ceHeaderContentGap.min}}" max="{{ranges.ceHeaderContentGap.max}}" />
       </div>
-      <p class="notes">액터 이름·포트레이트 헤더와 메시지 내용 사이의 세로 여백입니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceHeaderContentGap.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅: 액터 이름 크기(px)</label>
+      <label>{{localize "FE.SettingsData.ceActorNameSize.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceActorNameSize" data-dtype="Number" value="{{values.ceActorNameSize}}" step="{{ranges.ceActorNameSize.step}}" min="{{ranges.ceActorNameSize.min}}" max="{{ranges.ceActorNameSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅: 플레이어 이름 크기(px)</label>
+      <label>{{localize "FE.SettingsData.cePlayerNameSize.name"}}</label>
       <div class="form-fields">
         <input type="number" name="cePlayerNameSize" data-dtype="Number" value="{{values.cePlayerNameSize}}" step="{{ranges.cePlayerNameSize.step}}" min="{{ranges.cePlayerNameSize.min}}" max="{{ranges.cePlayerNameSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅: 메시지 글자 크기(px)</label>
+      <label>{{localize "FE.SettingsData.ceMessageTextSize.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceMessageTextSize" data-dtype="Number" value="{{values.ceMessageTextSize}}" step="{{ranges.ceMessageTextSize.step}}" min="{{ranges.ceMessageTextSize.min}}" max="{{ranges.ceMessageTextSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅: 주문/아이템/피처 설명 글자 크기(px)</label>
+      <label>{{localize "FE.SettingsData.ceChatCardTextSize.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceChatCardTextSize" data-dtype="Number" value="{{values.ceChatCardTextSize}}" step="{{ranges.ceChatCardTextSize.step}}" min="{{ranges.ceChatCardTextSize.min}}" max="{{ranges.ceChatCardTextSize.max}}" />
       </div>
@@ -387,236 +387,232 @@
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="chat-features">
-    <h3 class="fe-settings__section-title">채팅 병합</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Tabs.ChatMerge"}}</h3>
 
     <div class="form-group">
-      <label>채팅 병합(연속 메시지 시각적 묶기)</label>
+      <label>{{localize "FE.SettingsData.ceMergeEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMergeEnabled" data-dtype="Boolean" {{checked values.ceMergeEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 텍스트 메시지만</label>
+      <label>{{localize "FE.SettingsData.ceMergeOnlyText.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMergeOnlyText" data-dtype="Boolean" {{checked values.ceMergeOnlyText}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 주사위 결과 메시지도 포함</label>
+      <label>{{localize "FE.SettingsData.ceMergeIncludeRollMessages.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMergeIncludeRollMessages" data-dtype="Boolean" {{checked values.ceMergeIncludeRollMessages}} />
       </div>
-      <p class="notes">끄면 전용 주사위 결과 카드는 병합에서 제외합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMergeIncludeRollMessages.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 그룹 구분선 표시</label>
+      <label>{{localize "FE.SettingsData.ceMergeDivider.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMergeDivider" data-dtype="Boolean" {{checked values.ceMergeDivider}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 그룹 간 간격(px)</label>
+      <label>{{localize "FE.SettingsData.ceMergeGroupSpacing.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceMergeGroupSpacing" data-dtype="Number" value="{{values.ceMergeGroupSpacing}}" step="{{ranges.ceMergeGroupSpacing.step}}" min="{{ranges.ceMergeGroupSpacing.min}}" max="{{ranges.ceMergeGroupSpacing.max}}" />
       </div>
-      <p class="notes">서로 다른 화자(그룹) 사이의 여백(px)입니다. 채팅카드(dnd5e 아이템/주문 등)처럼 병합 외 메시지 전후에도 동일하게 적용됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMergeGroupSpacing.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 연속 메시지 내부 간격(px)</label>
+      <label>{{localize "FE.SettingsData.ceMergeInnerGap.name"}}</label>
       <div class="form-fields">
         <input type="number" name="ceMergeInnerGap" data-dtype="Number" value="{{values.ceMergeInnerGap}}" step="{{ranges.ceMergeInnerGap.step}}" min="{{ranges.ceMergeInnerGap.min}}" max="{{ranges.ceMergeInnerGap.max}}" />
       </div>
-      <p class="notes">같은 화자의 연속 병합 메시지 사이 세로 여백입니다. 표준 모드에서는 위아래 합산(×2)이 실제 간격이 됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMergeInnerGap.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합 방식</label>
+      <label>{{localize "FE.SettingsData.ceMergeMode.name"}}</label>
       <div class="form-fields">
         <select name="ceMergeMode" data-dtype="String">
-          {{selectOptions choices.mergeMode selected=values.ceMergeMode}}
+          {{selectOptions choices.mergeMode selected=values.ceMergeMode localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 후속 메시지 헤더 표시 방식</label>
+      <label>{{localize "FE.SettingsData.ceMergeFollowHeaderStyle.name"}}</label>
       <div class="form-fields">
         <select name="ceMergeFollowHeaderStyle" data-dtype="String">
-          {{selectOptions choices.mergeFollowHeaderStyle selected=values.ceMergeFollowHeaderStyle}}
+          {{selectOptions choices.mergeFollowHeaderStyle selected=values.ceMergeFollowHeaderStyle localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 병합: 화자 그룹 기준</label>
+      <label>{{localize "FE.SettingsData.ceMergeSpeakerBasis.name"}}</label>
       <div class="form-fields">
         <select name="ceMergeSpeakerBasis" data-dtype="String">
-          {{selectOptions choices.mergeSpeakerBasis selected=values.ceMergeSpeakerBasis}}
+          {{selectOptions choices.mergeSpeakerBasis selected=values.ceMergeSpeakerBasis localize=true}}
         </select>
       </div>
-      <p class="notes">토큰: 씬+토큰+액터 모두 일치 / 액터: 액터 id만 일치 / 플레이어: 같은 유저면 병합</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMergeSpeakerBasis.Text"}}</p>
     </div>
 
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="archive">
-    <h3 class="fe-settings__section-title">채팅 아카이브 / HTML·PDF 내보내기</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.archive.Text"}}</h3>
 
-    <p class="notes">내보내기 관련 설정은 항상 개인 유지되며 GM 설정 강제 대상이 아닙니다.</p>
+    <p class="notes">{{localize "FE.SettingsMenu.archive.Text2"}}</p>
 
     <div class="form-group">
-      <label>채팅 로그 PDF 내보내기 버튼 (개인)</label>
+      <label>{{localize "FE.SettingsMenu.ceExportEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportEnabled" data-dtype="Boolean" {{checked values.ceExportEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>PDF 버튼: 자동 인쇄창 열기</label>
+      <label>{{localize "FE.SettingsData.ceExportAutoPrint.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportAutoPrint" data-dtype="Boolean" {{checked values.ceExportAutoPrint}} />
       </div>
-      <p class="notes">끄면 아카이브만 열립니다. FVTT 데스크톱 앱(Electron)에서는 HTML 저장 방식이 사용되므로 적용되지 않습니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceExportAutoPrint.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>내보내기 최적화(용량/멈춤 방지)</label>
+      <label>{{localize "FE.SettingsData.ceExportOptimize.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportOptimize" data-dtype="Boolean" {{checked values.ceExportOptimize}} />
       </div>
-      <p class="notes">PDF 용량/메모리 사용량을 줄이기 위해 텍스쳐·그림자 등 일부 효과를 강제 제거합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceExportOptimize.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>HTML 저장: 커스텀 폰트 포함</label>
+      <label>{{localize "FE.SettingsData.ceExportEmbedFonts.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportEmbedFonts" data-dtype="Boolean" {{checked values.ceExportEmbedFonts}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>HTML 저장: 이미지 포함</label>
+      <label>{{localize "FE.SettingsData.ceExportEmbedImages.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportEmbedImages" data-dtype="Boolean" {{checked values.ceExportEmbedImages}} />
       </div>
-      <p class="notes">같은 이미지가 반복되면 자동으로 중복을 제거하여 용량을 절약합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceExportEmbedImages.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>아카이브: 귓속말 제외</label>
+      <label>{{localize "FE.SettingsData.ceExportExcludeWhispers.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceExportExcludeWhispers" data-dtype="Boolean" {{checked values.ceExportExcludeWhispers}} />
       </div>
-      <p class="notes">GM은 모든 귓속말을 볼 수 있어, 끄면 GM이 저장한 로그에 비공개 대화가 그대로 포함됩니다. 로그를 공유할 예정이라면 켜세요.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceExportExcludeWhispers.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>PDF/인쇄: 이미지 처리</label>
+      <label>{{localize "FE.SettingsData.ceExportPrintImageMode.name"}}</label>
       <div class="form-fields">
         <select name="ceExportPrintImageMode" data-dtype="String">
-          {{selectOptions choices.exportPrintImageMode selected=values.ceExportPrintImageMode}}
+          {{selectOptions choices.exportPrintImageMode selected=values.ceExportPrintImageMode localize=true}}
         </select>
       </div>
-      <p class="notes">웹 브라우저의 PDF/인쇄에만 적용됩니다. FVTT 데스크톱 앱(Electron)은 HTML 아카이브 저장 방식이라 적용되지 않습니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceExportPrintImageMode.Text"}}</p>
     </div>
 
-    <p class="notes">
-      <strong>FVTT 데스크톱 앱(Electron):</strong> 앱 내부의 PDF 인쇄는 Microsoft Print to PDF 등 OS 인쇄 기능을 사용해 느리거나 저장에 실패할 수 있습니다.
-      따라서 데스크톱 앱에서는 PDF 대신 HTML 아카이브만 저장됩니다. 저장한 HTML 파일을 Chrome/Edge에서 열어 <em>인쇄 → PDF로 저장</em>을 사용하세요.
-      일반 웹 브라우저로 접속한 경우에는 기존처럼 PDF 인쇄 기능을 사용할 수 있습니다.
-    </p>
+    <p class="notes">{{{localize "FE.SettingsMenu.ceExportPrintImageMode.Hint"}}}</p>
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="portrait">
-    <h3 class="fe-settings__section-title">채팅 포트레이트</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.Common.ChatPortrait"}}</h3>
 
     <div class="form-group">
-      <label>채팅 포트레이트 사용</label>
+      <label>{{localize "FE.SettingsData.chatPortraitEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="chatPortraitEnabled" data-dtype="Boolean" {{checked values.chatPortraitEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>삽입 포트레이트(.fe-chat-portrait-wrap) 숨김</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitHideWrap.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="chatPortraitHideWrap" data-dtype="Boolean" {{checked values.chatPortraitHideWrap}} />
       </div>
-      <p class="notes">채팅 카드에 삽입되는 포트레이트 래퍼 자체를 숨깁니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.chatPortraitHideWrap.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 대신 토큰 이미지 사용</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitUseTokenImage.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="chatPortraitUseTokenImage" data-dtype="Boolean" {{checked values.chatPortraitUseTokenImage}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 크기(px)</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitSize.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="chatPortraitSize" data-dtype="Number" value="{{values.chatPortraitSize}}" step="{{ranges.chatPortraitSize.step}}" min="{{ranges.chatPortraitSize.min}}" max="{{ranges.chatPortraitSize.max}}" />
       </div>
     </div>
 
     <div class="form-group">
-      <label>채팅 카드 아이콘 크기(px)</label>
+      <label>{{localize "FE.SettingsData.chatPortraitCardIconSize.name"}}</label>
       <div class="form-fields">
         <input type="number" name="chatPortraitCardIconSize" data-dtype="Number" value="{{values.chatPortraitCardIconSize}}" step="{{ranges.chatPortraitCardIconSize.step}}" min="{{ranges.chatPortraitCardIconSize.min}}" max="{{ranges.chatPortraitCardIconSize.max}}" />
       </div>
-      <p class="notes">midi-qol/dnd5e 채팅 카드 안의 아이콘 크기를 강제 조정합니다. 0이면 비활성화.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.chatPortraitCardIconSize.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 모양</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitShape.Text"}}</label>
       <div class="form-fields">
         <select name="chatPortraitShape" data-dtype="String">
-          {{selectOptions choices.portraitShape selected=values.chatPortraitShape}}
+          {{selectOptions choices.portraitShape selected=values.chatPortraitShape localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 테두리 모드</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitBorderMode.Text"}}</label>
       <div class="form-fields">
         <select name="chatPortraitBorderMode" data-dtype="String">
-          {{selectOptions choices.portraitBorderMode selected=values.chatPortraitBorderMode}}
+          {{selectOptions choices.portraitBorderMode selected=values.chatPortraitBorderMode localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 테두리 두께(px)</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitBorderWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="chatPortraitBorderWidth" data-dtype="Number" value="{{values.chatPortraitBorderWidth}}" step="{{ranges.chatPortraitBorderWidth.step}}" min="{{ranges.chatPortraitBorderWidth.min}}" max="{{ranges.chatPortraitBorderWidth.max}}" />
       </div>
-      <p class="notes">테두리 모드가 '플레이어 색상' 또는 '사용자 지정'일 때 적용됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.chatPortraitBorderWidth.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>포트레이트 테두리 색상</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitBorderColor.Text"}}</label>
       <div class="form-fields">
         <input type="text" name="chatPortraitBorderColor" data-dtype="String" value="{{values.chatPortraitBorderColor}}" placeholder="#000000" />
       </div>
-      <p class="notes">테두리 모드가 '사용자 지정'일 때 사용합니다. 예) #ff0000</p>
+      <p class="notes">{{localize "FE.SettingsMenu.chatPortraitBorderColor.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>이름 정렬</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitNameAlign.Text"}}</label>
       <div class="form-fields">
         <select name="chatPortraitNameAlign" data-dtype="String">
-          {{selectOptions choices.portraitNameAlign selected=values.chatPortraitNameAlign}}
+          {{selectOptions choices.portraitNameAlign selected=values.chatPortraitNameAlign localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>표시할 메시지 타입</label>
+      <label>{{localize "FE.SettingsMenu.chatPortraitShowIC.Text"}}</label>
       <div class="form-fields fe-inline-grid">
         <label class="checkbox"><input type="checkbox" name="chatPortraitShowIC" data-dtype="Boolean" {{checked values.chatPortraitShowIC}} /> IC</label>
         <label class="checkbox"><input type="checkbox" name="chatPortraitShowOOC" data-dtype="Boolean" {{checked values.chatPortraitShowOOC}} /> OOC</label>
@@ -630,236 +626,236 @@
 
   {{#if isDnd5e}}{{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="system">
-    <h3 class="fe-settings__section-title">[DND5e] 커스텀 주입</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.system.Text"}}</h3>
 
     <div class="form-group">
-      <label>커스텀 컨디션 주입 활성화</label>
+      <label>{{localize "FE.SettingsMenu.injectCustomConditions.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="injectCustomConditions" data-dtype="Boolean" {{checked values.injectCustomConditions}} />
       </div>
-      <p class="notes">커스텀 컨디션을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.injectCustomConditions.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>커스텀 피해 타입 주입 활성화</label>
+      <label>{{localize "FE.SettingsMenu.injectCustomDamageTypes.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="injectCustomDamageTypes" data-dtype="Boolean" {{checked values.injectCustomDamageTypes}} />
       </div>
-      <p class="notes">커스텀 피해 타입 8종을 dnd5e에 등록합니다. 변경 후 세계 새로고침이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.injectCustomDamageTypes.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>커스텀 피해 타입 1 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom1.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom1" value="{{values.dmgCustom1}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 2 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom2.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom2" value="{{values.dmgCustom2}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 3 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom3.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom3" value="{{values.dmgCustom3}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 4 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom4.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom4" value="{{values.dmgCustom4}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 5 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom5.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom5" value="{{values.dmgCustom5}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 6 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom6.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom6" value="{{values.dmgCustom6}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 7 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom7.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom7" value="{{values.dmgCustom7}}" /></div>
     </div>
     <div class="form-group">
-      <label>커스텀 피해 타입 8 이름</label>
+      <label>{{localize "FE.SettingsMenu.dmgCustom8.Text"}}</label>
       <div class="form-fields"><input type="text" name="dmgCustom8" value="{{values.dmgCustom8}}" /></div>
     </div>
   </section>
   {{/if}}{{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="general">
-    <h3 class="fe-settings__section-title">레트로 테마</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.general.Text2"}}</h3>
 
     <div class="form-group">
-      <label>레트로 테마 (픽셀 고대비)</label>
+      <label>{{localize "FE.SettingsData.ceUiDx3rdPixelTheme.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceUiDx3rdPixelTheme" data-dtype="Boolean" {{checked values.ceUiDx3rdPixelTheme}} />
       </div>
-      <p class="notes">모든 UI 요소를 각지게(border-radius 0), 안티에일리어싱 OFF, 트랜지션 즉각 반응으로 변환합니다. 모든 시스템에서 사용 가능. NeoDGM 폰트 모드와 함께 사용 권장.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceUiDx3rdPixelTheme.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>텍스트 색조 오버라이드</label>
+      <label>{{localize "FE.SettingsMenu.ceAccentTextOverride.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceAccentTextOverride" data-dtype="Boolean" {{checked values.ceAccentTextOverride}} />
       </div>
-      <p class="notes">레트로 테마의 강조색(텍스트·테두리·체커보드 무늬)을 픽셀 테마 강조색 스와치 기반 톤으로 통일합니다. 끄면 강조색 전체를 기본 백색(흰/회색)으로 되돌리고 채팅 컨트롤의 강조색 스와치 버튼도 숨깁니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceAccentTextOverride.hint"}}</p>
     </div>
   </section>
 
   {{#if ruiSupported}}
   <section class="fe-settings__section" data-fe-settings-tab="system">
-    <h3 class="fe-settings__section-title">스테이터스 UI</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.system.Text2"}}</h3>
 
     <div class="form-group">
-      <label>스테이터스 UI 표시</label>
+      <label>{{localize "FE.SettingsData.ceDx3rdRuiEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceDx3rdRuiEnabled" data-dtype="Boolean" {{checked values.ceDx3rdRuiEnabled}} />
       </div>
-      <p class="notes">핀 고정한 액터의 HP·자원 카드를 화면에 표시합니다. 끄면 스테이터스 UI 전체가 비활성화됩니다. (dx3rd·dnd5e 공통)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceDx3rdRuiEnabled.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>스테이터스 UI 가시성</label>
+      <label>{{localize "FE.SettingsMenu.ceDx3rdRuiVisible.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceDx3rdRuiVisible" data-dtype="Boolean" {{checked values.ceDx3rdRuiVisible}} />
       </div>
-      <p class="notes">스테이터스 카드를 화면에 표시할지 여부. 끄면 핀 고정은 유지한 채 카드만 숨깁니다. 기본 표시(켜짐). (이전 채팅의 스테이터스 토글 버튼을 대체)</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceDx3rdRuiVisible.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>캐릭터 스테이터스 포트레이트 너비(px)</label>
+      <label>{{localize "FE.SettingsMenu.ceDx3rdRuiPortraitWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceDx3rdRuiPortraitWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPortraitWidth}}" step="{{ranges.ceDx3rdRuiPortraitWidth.step}}" min="{{ranges.ceDx3rdRuiPortraitWidth.min}}" max="{{ranges.ceDx3rdRuiPortraitWidth.max}}" />
       </div>
-      <p class="notes">포트레이트 이미지 영역의 너비. 기본 100.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceDx3rdRuiPortraitWidth.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>캐릭터 스테이터스 자원 칸 너비(px)</label>
+      <label>{{localize "FE.SettingsMenu.ceDx3rdRuiPanelWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceDx3rdRuiPanelWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPanelWidth}}" step="{{ranges.ceDx3rdRuiPanelWidth.step}}" min="{{ranges.ceDx3rdRuiPanelWidth.min}}" max="{{ranges.ceDx3rdRuiPanelWidth.max}}" />
       </div>
-      <p class="notes">HP·침식률 바가 표시되는 패널의 너비. 기본 128.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceDx3rdRuiPanelWidth.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>캐릭터 스테이터스 카드 높이(px)</label>
+      <label>{{localize "FE.SettingsMenu.ceDx3rdRuiCardHeight.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceDx3rdRuiCardHeight" data-dtype="Number" value="{{values.ceDx3rdRuiCardHeight}}" step="{{ranges.ceDx3rdRuiCardHeight.step}}" min="{{ranges.ceDx3rdRuiCardHeight.min}}" max="{{ranges.ceDx3rdRuiCardHeight.max}}" />
       </div>
-      <p class="notes">카드 전체 높이. 기본 80.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceDx3rdRuiCardHeight.hint"}}</p>
     </div>
   </section>
   {{/if}}
 
   {{#if isDx3rd}}
   <section class="fe-settings__section" data-fe-settings-tab="system">
-    <h3 class="fe-settings__section-title">[DX3rd] 전용 설정</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.system.Text3"}}</h3>
 
     <div class="form-group">
-      <label>채팅 카드 테두리 투명도</label>
+      <label>{{localize "FE.SettingsMenu.ceDx3rdCardBorderAlpha.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceDx3rdCardBorderAlpha" data-dtype="Number" value="{{values.ceDx3rdCardBorderAlpha}}" step="{{ranges.ceDx3rdCardBorderAlpha.step}}" min="{{ranges.ceDx3rdCardBorderAlpha.min}}" max="{{ranges.ceDx3rdCardBorderAlpha.max}}" />
       </div>
-      <p class="notes">픽셀 테마에서 채팅 카드의 플레이어 컬러 테두리 알파값. 0 = 완전 투명, 1 = 완전 불투명.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceDx3rdCardBorderAlpha.Text2"}}</p>
     </div>
   </section>
   {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="media">
-    <h3 class="fe-settings__section-title">채팅 이미지</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.media.Text"}}</h3>
 
     <div class="form-group">
-      <label>업로드/임베드 활성화</label>
+      <label>{{localize "FE.SettingsMenu.chatImagesEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="chatImagesEnabled" data-dtype="Boolean" {{checked values.chatImagesEnabled}} />
       </div>
-      <p class="notes">Foundry 파일 권한과 별개로 업로드 버튼·붙여넣기·드래그 앤 드롭·<code>!ci|경로!</code> 임베드 기능을 사용합니다. 직접 업로드 권한이 없으면 온라인 GM이 대리 업로드합니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.chatImagesEnabled.Hint"}}}</p>
     </div>
 
     <div class="form-group">
-      <label>업로드 버튼 표시</label>
+      <label>{{localize "FE.SettingsMenu.chatImagesShowButton.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="chatImagesShowButton" data-dtype="Boolean" {{checked values.chatImagesShowButton}} />
       </div>
-      <p class="notes">채팅 입력창 컨트롤에 업로드 버튼을 표시합니다. 꺼도 붙여넣기/드래그는 가능.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.chatImagesShowButton.Text2"}}</p>
     </div>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>채팅 이미지 업로드 경로 (GM 전용)</label>
+      <label>{{localize "FE.SettingsMenu.chatImagesUploadLocation.Text"}}</label>
       <div class="form-fields">
         <input type="text" name="chatImagesUploadLocation" value="{{values.chatImagesUploadLocation}}" />
       </div>
-      <p class="notes">채팅에 붙여넣기/드롭하거나 업로드 버튼으로 고른 이미지를 저장할 data 폴더 경로입니다. 파일 권한이 없는 플레이어의 이미지는 온라인 GM이 이 경로로 대리 업로드합니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.chatImagesUploadLocation.hint"}}</p>
     </div>
 
     <div class="form-group">
-      <label>이미지 최대 용량 (MB, GM 전용)</label>
+      <label>{{localize "FE.SettingsMenu.chatImagesMaxUploadMB.Text"}}</label>
       <div class="form-fields">
         <input type="range" name="chatImagesMaxUploadMB" min="{{ranges.chatImagesMaxUploadMB.min}}" max="{{ranges.chatImagesMaxUploadMB.max}}" step="{{ranges.chatImagesMaxUploadMB.step}}" value="{{values.chatImagesMaxUploadMB}}" data-dtype="Number" />
         <span class="fe-range-value" data-for="chatImagesMaxUploadMB"></span>
       </div>
-      <p class="notes">이미지 한 장의 최대 크기입니다(기본 20MB). 직접 업로드·GM 대리 업로드·메시지 직접 포함 세 경로 모두에 적용됩니다. 대리 업로드는 GM 클라이언트 메모리에, 메시지 직접 포함은 데이터베이스와 모든 접속자의 트래픽에 그대로 얹히므로 크게 올리는 것은 권장하지 않습니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.chatImagesMaxUploadMB.Text2"}}</p>
     </div>
     {{/if}}
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="media">
-    <h3 class="fe-settings__section-title">이미지 호버 (Image Hover)</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.media.Text2"}}</h3>
 
-    <p class="notes">아래 표시 설정은 클라이언트별로 저장되지만, GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.</p>
+    <p class="notes">{{localize "FE.SettingsMenu.media.Text3"}}</p>
 
     <div class="form-group">
-      <label>활성화</label>
+      <label>{{localize "FESP.Menu.Enable"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ihEnabled" data-dtype="Boolean" {{checked values.ihEnabled}} />
       </div>
-      <p class="notes">이 클라이언트에서 토큰 호버 시 캐릭터 아트를 표시합니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ihEnabled.Text"}}</p>
     </div>
     <div class="form-group">
-      <label>이미지 위치</label>
+      <label>{{localize "FE.SettingsMenu.ihPosition.Text"}}</label>
       <div class="form-fields">
-        <select name="ihPosition" data-dtype="String">{{selectOptions choices.ihPosition selected=values.ihPosition}}</select>
+        <select name="ihPosition" data-dtype="String">{{selectOptions choices.ihPosition selected=values.ihPosition localize=true}}</select>
       </div>
     </div>
     <div class="form-group">
-      <label>이미지 크기 — 화면 너비의 1/N</label>
+      <label>{{localize "FE.SettingsMenu.ihSize.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ihSize" data-dtype="Number" value="{{values.ihSize}}" step="{{ranges.ihSize.step}}" min="{{ranges.ihSize.min}}" max="{{ranges.ihSize.max}}" />
       </div>
-      <p class="notes">값이 작을수록 이미지가 커집니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ihSize.Text2"}}</p>
     </div>
     <div class="form-group">
-      <label>가로 이미지 크기 — 화면 높이의 1/N</label>
+      <label>{{localize "FE.SettingsMenu.ihSizeWide.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ihSizeWide" data-dtype="Number" value="{{values.ihSizeWide}}" step="{{ranges.ihSizeWide.step}}" min="{{ranges.ihSizeWide.min}}" max="{{ranges.ihSizeWide.max}}" />
       </div>
-      <p class="notes">가로로 긴 이미지(가로:세로 &ge; 1.2)는 세로축 기준으로 크기를 잡습니다. 값이 작을수록 커집니다. 1.0이면 화면 높이를 꽉 채웁니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ihSizeWide.Text2"}}</p>
     </div>
     <div class="form-group">
-      <label>표시 지연 시간 (ms)</label>
+      <label>{{localize "FE.SettingsMenu.ihDelay.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ihDelay" data-dtype="Number" value="{{values.ihDelay}}" step="{{ranges.ihDelay.step}}" min="{{ranges.ihDelay.min}}" max="{{ranges.ihDelay.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>최대 업스케일 배율</label>
+      <label>{{localize "FE.SettingsMenu.ihMaxUpscale.Text"}}</label>
       <div class="form-fields">
         <input type="range" name="ihMaxUpscale" data-dtype="Number" value="{{values.ihMaxUpscale}}" min="{{ranges.ihMaxUpscale.min}}" max="{{ranges.ihMaxUpscale.max}}" step="{{ranges.ihMaxUpscale.step}}" />
         <span class="fe-range-value" data-for="ihMaxUpscale">{{values.ihMaxUpscale}}</span>
       </div>
-      <p class="notes">원본 해상도 대비 최대 확대 한도. 작은 원본을 이 배율 이상으로 키우지 않아 흐려짐을 막습니다. <b>0 = 제한 없음</b>(항상 설정 크기로 표시).</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ihMaxUpscale.Hint"}}}</p>
     </div>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>아트 표시 최소 권한 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ihPermission.Text"}}</label>
       <div class="form-fields">
-        <select name="ihPermission" data-dtype="Number">{{selectOptions choices.ihPermission selected=values.ihPermission}}</select>
+        <select name="ihPermission" data-dtype="Number">{{selectOptions choices.ihPermission selected=values.ihPermission localize=true}}</select>
       </div>
     </div>
     <div class="form-group">
-      <label>표시할 아트 유형 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ihArtType.Text"}}</label>
       <div class="form-fields">
-        <select name="ihArtType" data-dtype="String">{{selectOptions choices.ihArtType selected=values.ihArtType}}</select>
+        <select name="ihArtType" data-dtype="String">{{selectOptions choices.ihArtType selected=values.ihArtType localize=true}}</select>
       </div>
     </div>
     {{/if}}
@@ -867,80 +863,80 @@
 
   {{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="chat-functions">
-    <h3 class="fe-settings__section-title">내레이터 채팅</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.ConflictGuard.feature"}}</h3>
 
     <div class="form-group">
-      <label>내레이터 기능 활성화</label>
+      <label>{{localize "FE.SettingsData.narratorEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="narratorEnabled" data-dtype="Boolean" {{checked values.narratorEnabled}} />
       </div>
-      <p class="notes">사이드바 채팅의 /narrate · /describe · /note · /as 명령과 시네마틱 오버레이.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.narratorEnabled.Text"}}</p>
     </div>
     <div class="form-group">
-      <label>표시 시간 배수</label>
+      <label>{{localize "FE.SettingsMenu.narratorDurationMult.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="narratorDurationMult" data-dtype="Number" value="{{values.narratorDurationMult}}" step="{{ranges.narratorDurationMult.step}}" min="{{ranges.narratorDurationMult.min}}" max="{{ranges.narratorDurationMult.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>복사 버튼 표시</label>
+      <label>{{localize "FE.SettingsMenu.narratorAllowCopy.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="narratorAllowCopy" data-dtype="Boolean" {{checked values.narratorAllowCopy}} />
       </div>
     </div>
     <div class="form-group">
-      <label>/narrate 최소 권한</label>
+      <label>{{localize "FE.SettingsMenu.narratorPermNarrate.Text"}}</label>
       <div class="form-fields">
-        <select name="narratorPermNarrate" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermNarrate}}</select>
+        <select name="narratorPermNarrate" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermNarrate localize=true}}</select>
       </div>
     </div>
     <div class="form-group">
-      <label>/describe · /note 최소 권한</label>
+      <label>{{localize "FE.SettingsMenu.narratorPermDescribe.Text"}}</label>
       <div class="form-fields">
-        <select name="narratorPermDescribe" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermDescribe}}</select>
+        <select name="narratorPermDescribe" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermDescribe localize=true}}</select>
       </div>
     </div>
     <div class="form-group">
-      <label>/as 최소 권한</label>
+      <label>{{localize "FE.SettingsMenu.narratorPermAs.Text"}}</label>
       <div class="form-fields">
-        <select name="narratorPermAs" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermAs}}</select>
+        <select name="narratorPermAs" data-dtype="Number">{{selectOptions choices.narratorRole selected=values.narratorPermAs localize=true}}</select>
       </div>
     </div>
   </section>
   {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="stage">
-    <h3 class="fe-settings__section-title">무대 채팅</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Tabs.Stage"}}</h3>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>무대 채팅 기능 활성화 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.stageEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stageEnabled" data-dtype="Boolean" {{checked values.stageEnabled}} />
       </div>
     </div>
     <div class="form-group">
-      <label>시스템 메시지 제외 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.stageExcludeSystemMessages.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stageExcludeSystemMessages" data-dtype="Boolean" {{checked values.stageExcludeSystemMessages}} />
       </div>
-      <p class="notes">아이템/공격 카드, 이니셔티브, 타 모듈이 만든 시스템 메시지는 무대 발화로 내보내지 않고 원래 화자로 둡니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.stageExcludeSystemMessages.Text2"}}</p>
     </div>
     <div class="form-group">
-      <label>이전 메세지에 비액터 메시지 포함 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.stageRecallIncludeNonActor.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stageRecallIncludeNonActor" data-dtype="Boolean" {{checked values.stageRecallIncludeNonActor}} />
       </div>
-      <p class="notes">끄면 이전 메세지 버튼은 현재 무대에 있는 액터들의 메세지만 훑습니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.stageRecallIncludeNonActor.Text2"}}</p>
     </div>
     <div class="form-group">
-      <label>대사창 자동 소멸 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.stageAutoDecay.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stageAutoDecay" data-dtype="Boolean" {{checked values.stageAutoDecay}} />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 소멸 시간 (ms, GM)</label>
+      <label>{{localize "FE.SettingsMenu.stageDecayTime.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageDecayTime" data-dtype="Number" value="{{values.stageDecayTime}}" step="{{ranges.stageDecayTime.step}}" min="{{ranges.stageDecayTime.min}}" max="{{ranges.stageDecayTime.max}}" />
       </div>
@@ -948,86 +944,86 @@
     {{/if}}
 
     <div class="form-group">
-      <label>액터 이름 색상</label>
+      <label>{{localize "FE.SettingsMenu.stageNameUserColor.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="stageNameUserColor" data-dtype="Boolean" {{checked values.stageNameUserColor}} />
       </div>
-      <p class="notes">액터 이름의 색상을 유저의 색상으로 틴트합니다. 끄면 대사창의 기본 글자색을 사용합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.stageNameUserColor.Text2"}}</p>
     </div>
     <div class="form-group">
-      <label>액터 포트레이트 표시 방식</label>
+      <label>{{localize "FE.SettingsMenu.stagePortraitLayout.Text"}}</label>
       <div class="form-fields">
-        <select name="stagePortraitLayout" data-dtype="String">{{selectOptions choices.stagePortraitLayout selected=values.stagePortraitLayout}}</select>
+        <select name="stagePortraitLayout" data-dtype="String">{{selectOptions choices.stagePortraitLayout selected=values.stagePortraitLayout localize=true}}</select>
       </div>
     </div>
     <div class="form-group">
-      <label>포트레이트 높이 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stagePortraitHeight.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stagePortraitHeight" data-dtype="Number" value="{{values.stagePortraitHeight}}" step="{{ranges.stagePortraitHeight.step}}" min="{{ranges.stagePortraitHeight.min}}" max="{{ranges.stagePortraitHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>포트레이트 너비 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stagePortraitWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stagePortraitWidth" data-dtype="Number" value="{{values.stagePortraitWidth}}" step="{{ranges.stagePortraitWidth.step}}" min="{{ranges.stagePortraitWidth.min}}" max="{{ranges.stagePortraitWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 가로 너비 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageBoxWidth" data-dtype="Number" value="{{values.stageBoxWidth}}" step="{{ranges.stageBoxWidth.step}}" min="{{ranges.stageBoxWidth.min}}" max="{{ranges.stageBoxWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 세로 높이 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxHeight.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageBoxHeight" data-dtype="Number" value="{{values.stageBoxHeight}}" step="{{ranges.stageBoxHeight.step}}" min="{{ranges.stageBoxHeight.min}}" max="{{ranges.stageBoxHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 하단 여백 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxBottom.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageBoxBottom" data-dtype="Number" value="{{values.stageBoxBottom}}" step="{{ranges.stageBoxBottom.step}}" min="{{ranges.stageBoxBottom.min}}" max="{{ranges.stageBoxBottom.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 좌측 여백 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxLeft.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageBoxLeft" data-dtype="Number" value="{{values.stageBoxLeft}}" step="{{ranges.stageBoxLeft.step}}" min="{{ranges.stageBoxLeft.min}}" max="{{ranges.stageBoxLeft.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사 폰트 크기 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageTextSize.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageTextSize" data-dtype="Number" value="{{values.stageTextSize}}" step="{{ranges.stageTextSize.step}}" min="{{ranges.stageTextSize.min}}" max="{{ranges.stageTextSize.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 가로 너비 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageInsetBoxWidth" data-dtype="Number" value="{{values.stageInsetBoxWidth}}" step="{{ranges.stageInsetBoxWidth.step}}" min="{{ranges.stageInsetBoxWidth.min}}" max="{{ranges.stageInsetBoxWidth.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 세로 높이 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxHeight.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageInsetBoxHeight" data-dtype="Number" value="{{values.stageInsetBoxHeight}}" step="{{ranges.stageInsetBoxHeight.step}}" min="{{ranges.stageInsetBoxHeight.min}}" max="{{ranges.stageInsetBoxHeight.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 하단 여백 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxBottom.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageInsetBoxBottom" data-dtype="Number" value="{{values.stageInsetBoxBottom}}" step="{{ranges.stageInsetBoxBottom.step}}" min="{{ranges.stageInsetBoxBottom.min}}" max="{{ranges.stageInsetBoxBottom.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사창 좌측 여백 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageBoxLeft.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageInsetBoxLeft" data-dtype="Number" value="{{values.stageInsetBoxLeft}}" step="{{ranges.stageInsetBoxLeft.step}}" min="{{ranges.stageInsetBoxLeft.min}}" max="{{ranges.stageInsetBoxLeft.max}}" />
       </div>
     </div>
     <div class="form-group">
-      <label>대사 폰트 크기 (px)</label>
+      <label>{{localize "FE.SettingsMenu.stageTextSize.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="stageInsetTextSize" data-dtype="Number" value="{{values.stageInsetTextSize}}" step="{{ranges.stageInsetTextSize.step}}" min="{{ranges.stageInsetTextSize.min}}" max="{{ranges.stageInsetTextSize.max}}" />
       </div>
@@ -1035,114 +1031,114 @@
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
-    <h3 class="fe-settings__section-title">토큰 설정</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.canvas.Text"}}</h3>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>액터 이름을 프로토타입 토큰 이름에 동기화 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ceTokenSyncName.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenSyncName" data-dtype="Boolean" {{checked values.ceTokenSyncName}} />
       </div>
-      <p class="notes">액터 이름을 바꾸면 이후 새로 배치하는 토큰이 사용할 프로토타입 토큰 이름도 함께 바꿉니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTokenSyncName.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>액터 이름을 배치 토큰 이름에도 동기화 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ceTokenSyncPlacedName.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenSyncPlacedName" data-dtype="Boolean" {{checked values.ceTokenSyncPlacedName}} />
       </div>
-      <p class="notes">기본값: 끔. 켜면 모든 씬에 이미 배치된 해당 액터 토큰의 이름도 함께 바꿉니다. 개별 토큰에 따로 붙인 이름도 다음 액터 개명 때 액터 이름으로 바뀝니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTokenSyncPlacedName.Text2"}}</p>
     </div>
     {{/if}}
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
-    <h3 class="fe-settings__section-title">스크린 패널</h3>
+    <h3 class="fe-settings__section-title">{{localize "FESP.SheetLabel"}}</h3>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>스크린 패널 기능 사용 (GM · 재시작 필요)</label>
+      <label>{{localize "FE.SettingsMenu.ceScreenPanelEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceScreenPanelEnabled" data-dtype="Boolean" {{checked values.ceScreenPanelEnabled}} />
       </div>
-      <p class="notes">액터 서브타입을 씬 캔버스에 올려 면 전환·이동·잠금·권한 이양을 사용합니다. 변경 시 재시작이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceScreenPanelEnabled.Text2"}}</p>
     </div>
     {{/if}}
 
     <div class="form-group">
-      <label>드래그 시 격자에 스냅</label>
+      <label>{{localize "FE.SettingsMenu.ceScreenPanelGridSnap.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceScreenPanelGridSnap" data-dtype="Boolean" {{checked values.ceScreenPanelGridSnap}} />
       </div>
-      <p class="notes">패널을 드래그할 때 씬 격자(격자 없는 씬은 기본 격자 크기)에 맞춰 정렬합니다. 우클릭 메뉴에서도 토글할 수 있습니다. GM 설정 강제가 켜져 있으면 GM 값으로 통일됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceScreenPanelGridSnap.Text2"}}</p>
     </div>
 
   </section>
 
   {{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="music">
-    <h3 class="fe-settings__section-title">음악 (플레이어 업로드)</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.music.Text"}}</h3>
 
-    <p class="notes">플레이어가 자신의 오디오 파일을 <b>하나의 공용 플레이리스트</b>에 업로드하고 모두가 함께 재생/정지합니다. 업로드는 권한(FILES_UPLOAD)이 있으면 플레이어가 직접, 없으면 GM이 온라인일 때 대리 처리합니다. 같은 이름+크기 파일은 중복 없이 기존 파일을 재사용합니다. 플레이리스트 사이드바 헤더의 🎵 버튼으로 창을 엽니다. 모두 GM 전용 월드 설정입니다.</p>
+    <p class="notes">{{{localize "FE.SettingsMenu.music.Hint"}}}</p>
 
     <div class="form-group">
-      <label>음악 업로드 기능 사용 (GM · 재시작 필요)</label>
+      <label>{{localize "FE.SettingsMenu.ceMusicEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceMusicEnabled" data-dtype="Boolean" {{checked values.ceMusicEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>공용 플레이리스트 이름</label>
+      <label>{{localize "FE.SettingsMenu.ceMusicPlaylistName.Text"}}</label>
       <div class="form-fields">
         <input type="text" name="ceMusicPlaylistName" value="{{values.ceMusicPlaylistName}}" />
       </div>
-      <p class="notes">플레이리스트 <b>최초 생성 시에만</b> 사용합니다(기존 이름은 변경하지 않음). 모든 플레이어가 OWNER 권한으로 공유합니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceMusicPlaylistName.Hint"}}}</p>
     </div>
 
     <div class="form-group">
-      <label>업로드 폴더 (~data 기준 상대 경로)</label>
+      <label>{{localize "FE.SettingsMenu.ceMusicUploadRoot.Text"}}</label>
       <div class="form-fields">
         <input type="text" name="ceMusicUploadRoot" value="{{values.ceMusicUploadRoot}}" />
       </div>
-      <p class="notes"><code>~data/assets/uploadedmusic</code> 에 저장하려면 <code>assets/uploadedmusic</code>. <code>Data\</code> 또는 <code>~data/</code>가 앞에 붙어도 자동으로 제거합니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceMusicUploadRoot.Hint"}}}</p>
     </div>
 
     <div class="form-group">
-      <label>최대 업로드 크기 (MB)</label>
+      <label>{{localize "FE.SettingsMenu.ceMusicMaxUploadMB.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceMusicMaxUploadMB" value="{{values.ceMusicMaxUploadMB}}" min="{{ranges.ceMusicMaxUploadMB.min}}" step="{{ranges.ceMusicMaxUploadMB.step}}" />
       </div>
-      <p class="notes">GM 프록시 업로드의 파일당 크기 제한입니다. 기본값은 27MB 입니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMusicMaxUploadMB.Text2"}}</p>
     </div>
   </section>
   {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="combat-tracker">
-    <h3 class="fe-settings__section-title">컴뱃 트래커</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.Common.CombatTracker"}}</h3>
 
-    <p class="notes">아래 표시 설정은 클라이언트별로 저장되지만, 컴뱃 트래커는 인카운터 정보이므로 <b>GM 설정 강제</b>가 켜져 있으면 GM의 값으로 모든 플레이어에게 통일됩니다(개인값이 GM값으로 덮어써짐).</p>
+    <p class="notes">{{{localize "FE.SettingsMenu.combatTracker.Hint"}}}</p>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>컴뱃 트래커 사용 (GM · 재시작 필요)</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerEnabled" data-dtype="Boolean" {{checked values.ceCombatTrackerEnabled}} />
       </div>
-      <p class="notes">전투 중 참여자 포트레이트를 화면 상단에 가로로 표시하고, 가운데에 GM 턴/라운드 컨트롤을 둡니다. 「Carousel Combat Tracker」가 활성화되어 있으면 자동으로 비활성화되어 원본에 양보합니다. 변경 시 재시작이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerEnabled.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>패배한 전투원 숨김 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerHideDefeated.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerHideDefeated" data-dtype="Boolean" {{checked values.ceCombatTrackerHideDefeated}} />
       </div>
-      <p class="notes">끄면 패배한 전투원은 흑백 처리되어 계속 표시됩니다. 켜면 트래커에서 완전히 제거합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerHideDefeated.Text2"}}</p>
     </div>
     {{/if}}
 
     <div class="form-group">
-      <label>포트레이트 크기 (px)</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerPortraitSize.Text"}}</label>
       <div class="form-fields">
         <input type="range" name="ceCombatTrackerPortraitSize" data-dtype="Number" value="{{values.ceCombatTrackerPortraitSize}}" min="{{ranges.ceCombatTrackerPortraitSize.min}}" max="{{ranges.ceCombatTrackerPortraitSize.max}}" step="{{ranges.ceCombatTrackerPortraitSize.step}}" />
         <span class="fe-range-value" data-for="ceCombatTrackerPortraitSize">{{values.ceCombatTrackerPortraitSize}}</span>
@@ -1150,60 +1146,60 @@
     </div>
 
     <div class="form-group">
-      <label>포트레이트 비율</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerAspect.Text"}}</label>
       <div class="form-fields">
         <select name="ceCombatTrackerAspect" data-dtype="String">
-          {{selectOptions choices.combatTrackerAspect selected=values.ceCombatTrackerAspect}}
+          {{selectOptions choices.combatTrackerAspect selected=values.ceCombatTrackerAspect localize=true}}
         </select>
       </div>
-      <p class="notes">세로/긴 세로형은 전신 일러스트에 적합합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerAspect.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>모서리 둥글기</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerRoundness.Text"}}</label>
       <div class="form-fields">
         <select name="ceCombatTrackerRoundness" data-dtype="String">
-          {{selectOptions choices.combatTrackerRoundness selected=values.ceCombatTrackerRoundness}}
+          {{selectOptions choices.combatTrackerRoundness selected=values.ceCombatTrackerRoundness localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>정렬 위치</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerAlignment.Text"}}</label>
       <div class="form-fields">
         <select name="ceCombatTrackerAlignment" data-dtype="String">
-          {{selectOptions choices.combatTrackerAlignment selected=values.ceCombatTrackerAlignment}}
+          {{selectOptions choices.combatTrackerAlignment selected=values.ceCombatTrackerAlignment localize=true}}
         </select>
       </div>
     </div>
 
     <div class="form-group">
-      <label>표시 이미지</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerPortraitImage.Text"}}</label>
       <div class="form-fields">
         <select name="ceCombatTrackerPortraitImage" data-dtype="String">
-          {{selectOptions choices.combatTrackerImage selected=values.ceCombatTrackerPortraitImage}}
+          {{selectOptions choices.combatTrackerImage selected=values.ceCombatTrackerPortraitImage localize=true}}
         </select>
       </div>
-      <p class="notes">액터 포트레이트 또는 토큰 이미지 중 선택합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerPortraitImage.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>이니셔티브 표시</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerShowInitiative.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerShowInitiative" data-dtype="Boolean" {{checked values.ceCombatTrackerShowInitiative}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>성향 색상 테두리</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerShowDisposition.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerShowDisposition" data-dtype="Boolean" {{checked values.ceCombatTrackerShowDisposition}} />
       </div>
-      <p class="notes">우호/중립/적대 등 토큰 성향에 따라 테두리 색을 입힙니다. 현재 턴 전투원은 강조색 테두리가 우선합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerShowDisposition.Text2"}}</p>
     </div>
 
     <div class="form-group">
-      <label>HP 막대 표시</label>
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerShowHp.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerShowHp" data-dtype="Boolean" {{checked values.ceCombatTrackerShowHp}} />
       </div>
@@ -1211,27 +1207,27 @@
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
-    <h3 class="fe-settings__section-title">토큰 선택 글로우</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.canvas.Text2"}}</h3>
 
-    <p class="notes">캔버스에서 토큰을 선택하거나 마우스를 올리면, 격자 사각형 테두리 대신 토큰 이미지의 <b>불투명한 실루엣</b>을 따라 글로우를 표시합니다. 글로우 색은 기존 선택 테두리의 <b>색조</b>(선택=초록, 성향 색 등)를 그대로 사용합니다.</p>
+    <p class="notes">{{{localize "FE.SettingsMenu.canvas.Hint"}}}</p>
 
     <div class="form-group">
-      <label>토큰 선택 글로우 사용</label>
+      <label>{{localize "FE.SettingsData.ceTokenGlowEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenGlowEnabled" data-dtype="Boolean" {{checked values.ceTokenGlowEnabled}} />
       </div>
     </div>
 
     <div class="form-group">
-      <label>호버 시에도 글로우</label>
+      <label>{{localize "FE.SettingsData.ceTokenGlowHover.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenGlowHover" data-dtype="Boolean" {{checked values.ceTokenGlowHover}} />
       </div>
-      <p class="notes">끄면 실제로 선택(컨트롤)한 토큰에만 글로우가 표시됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTokenGlowHover.Text"}}</p>
     </div>
 
     <div class="form-group">
-      <label>글로우 세기</label>
+      <label>{{localize "FE.SettingsData.ceTokenGlowStrength.name"}}</label>
       <div class="form-fields">
         <input type="range" name="ceTokenGlowStrength" data-dtype="Number" value="{{values.ceTokenGlowStrength}}" min="{{ranges.ceTokenGlowStrength.min}}" max="{{ranges.ceTokenGlowStrength.max}}" step="{{ranges.ceTokenGlowStrength.step}}" />
         <span class="fe-range-value" data-for="ceTokenGlowStrength">{{values.ceTokenGlowStrength}}</span>
@@ -1239,59 +1235,59 @@
     </div>
 
     <div class="form-group">
-      <label>타겟 표시 글로우</label>
+      <label>{{localize "FE.SettingsData.ceTokenGlowTarget.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenGlowTarget" data-dtype="Boolean" {{checked values.ceTokenGlowTarget}} />
       </div>
-      <p class="notes">타겟(<b>T</b>)으로 지정한 토큰의 격자 모서리 화살표 표시에도 글로우를 적용합니다.</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceTokenGlowTarget.Hint"}}}</p>
     </div>
 
     <div class="form-group">
-      <label>타겟 조준선</label>
+      <label>{{localize "FE.SettingsData.ceTokenGlowSightline.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceTokenGlowSightline" data-dtype="Boolean" {{checked values.ceTokenGlowSightline}} />
       </div>
-      <p class="notes">선택(컨트롤)한 토큰에서 지정한 타겟으로 이어지는 조준선을 약한 글로우와 함께 그립니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTokenGlowSightline.Text"}}</p>
     </div>
   </section>
 
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
-    <h3 class="fe-settings__section-title">타일 애니메이션 이미지</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.canvas.Text3"}}</h3>
 
-    <p class="notes">Foundry는 타일에 지정한 <b>움직이는 gif/webp/apng</b>를 첫 프레임 정지 이미지로만 그립니다(재생되는 건 webm/mp4뿐). 이 옵션을 켜면 프레임을 직접 디코딩해 실제로 재생합니다.</p>
+    <p class="notes">{{{localize "FE.SettingsMenu.canvas.Hint2"}}}</p>
 
     <div class="form-group">
-      <label>타일 애니메이션 이미지 재생</label>
+      <label>{{localize "FE.SettingsData.ceAnimatedTileEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceAnimatedTileEnabled" data-dtype="Boolean" {{checked values.ceAnimatedTileEnabled}} />
       </div>
-      <p class="notes">움직이지 않는 일반 이미지에는 아무 영향이 없습니다(첫 확인 후 다시 검사하지 않음). 프레임 전체를 메모리에 올려 재생하므로, 프레임이 아주 많고 해상도가 큰 파일을 여러 장 배치하면 메모리 사용량이 늘어납니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceAnimatedTileEnabled.Text"}}</p>
     </div>
   </section>
 
   {{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="general">
-    <h3 class="fe-settings__section-title">충돌 모듈 가드</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.general.Text3"}}</h3>
 
     <div class="form-group">
-      <label>가드 동작 (GM 전용)</label>
+      <label>{{localize "FE.SettingsMenu.ceConflictGuardMode.Text"}}</label>
       <div class="form-fields">
         <select name="ceConflictGuardMode" data-dtype="String">
-          {{selectOptions choices.conflictGuardMode selected=values.ceConflictGuardMode}}
+          {{selectOptions choices.conflictGuardMode selected=values.ceConflictGuardMode localize=true}}
         </select>
       </div>
-      <p class="notes">이 모듈이 내장한 기능(내레이터·무대·이미지 호버·채팅 정리 등)과 겹치는 다른 모듈을 감지했을 때의 동작입니다.</p>
-      <p class="notes"><b>자동</b>: 더 이상 갱신되지 않는 중복 모듈은 이번 접속 한정으로 무력화하고, 아직 유지보수되는 모듈에는 이 모듈의 해당 기능을 양보합니다. <b>양보만</b>: 상대 모듈은 절대 건드리지 않고 이 모듈 기능만 끕니다. <b>경고만</b>: 아무것도 끄지 않고 알리기만 하므로 두 모듈이 그대로 함께 돌아갑니다(중복 표시는 감수). <b>사용 안 함</b>: 감지와 경고까지 전부 끕니다.</p>
-      <p class="notes">'자동' 외의 값에서는 「Force Client Settings」가 이 모듈 설정에 걸어둔 잠금도 해제하지 않습니다. 변경하려면 새로고침이 필요합니다.</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceConflictGuardMode.Text2"}}</p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceConflictGuardMode.Hint"}}}</p>
+      <p class="notes">{{localize "FE.SettingsMenu.ceConflictGuardMode.Text3"}}</p>
     </div>
   </section>
   {{/if}}
 
   <section class="fe-settings__section" data-fe-settings-tab="general">
-    <h3 class="fe-settings__section-title">GM 설정 강제</h3>
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.general.Text4"}}</h3>
 
     <div class="form-group">
-      <label>GM 설정 전역 강제 활성화 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text"}}</label>
       <div class="form-fields">
         {{#if isGM}}
         <input type="checkbox" name="ceGmPriorityEnabled" data-dtype="Boolean" {{checked values.ceGmPriorityEnabled}} />
@@ -1300,14 +1296,13 @@
         {{/if}}
       </div>
       <p class="notes">
-        활성화 시 아래 3가지를 <b>제외한</b> GM의 모든 모듈 설정이 모든 플레이어에게 강제 적용됩니다(채팅 병합·외형·색상, 이미지 호버, 무대, DOM 정리, 타이핑, 컴뱃 트래커 등 포함).
-        <b>항상 개인 유지:</b> 커스텀 폰트 유무/유저 로컬 폰트 · 채팅 아카이브/내보내기 · 툴바 접기.
-        플레이어가 개인 취향대로 쓰게 하려면 GM이 이 기능을 꺼야 합니다.{{#unless isGM}} 이 항목은 현재 상태만 표시하며, 변경은 GM만 할 수 있습니다.{{/unless}}
+        {{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text2"}} <b>{{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text3"}}</b> {{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text4"}}
+        <b>{{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text5"}}</b> {{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text6"}}{{#unless isGM}} {{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text7"}}{{/unless}}
       </p>
     </div>
 
     <div class="form-group">
-      <label>일반 환경 설정 GM 강제 (GM)</label>
+      <label>{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text"}}</label>
       <div class="form-fields">
         {{#if isGM}}
         <input type="checkbox" name="ceCorePriorityEnabled" data-dtype="Boolean" {{checked values.ceCorePriorityEnabled}} />
@@ -1316,42 +1311,34 @@
         {{/if}}
       </div>
       <p class="notes">
-        이 모듈 설정이 아니라 <b>Foundry 자체의 '환경 설정'</b> 항목을 GM의 값으로 통일합니다.
-        대상 {{corePriorityKeys.length}}개:
+        {{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text2"}} <b>{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text3"}}</b> {{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text4"}} {{corePriorityKeys.length}}{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text5"}}
         {{#each corePriorityKeys}}{{#unless @first}} · {{/unless}}{{this.label}}{{#if this.requiresReload}}<sup>*</sup>{{/if}}{{/each}}
-        (<sup>*</sup> 표시는 적용에 새로고침이 필요한 항목)
+        (<sup>*</sup> {{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text6"}}
       </p>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Hint"}}}</p>
       <p class="notes">
-        <b>왜 필요한가:</b> Foundry의 클라이언트 설정은 브라우저 주소(오리진)마다 따로 저장됩니다.
-        같은 서버라도 <code>localhost:30000</code>으로 접속했을 때와 외부 주소로 접속했을 때의 값이
-        서로 다르므로, 외부 주소로 들어온 사람만 광원 애니메이션이 멈춰 보이는 일이 생깁니다.
-        이 기능은 그 차이를 GM 기준으로 맞춥니다.
-      </p>
-      <p class="notes">
-        <b>주의:</b> 성능 모드 · 최대 FPS 는 각자의 PC 사양을, 광과민성 모드는 접근성 설정을 덮어씁니다.
-        언어 설정까지 강제되므로 다른 언어를 쓰는 플레이어의 UI 언어가 바뀝니다.
-        새로고침이 필요한 항목이 바뀐 플레이어에게는 새로고침 확인창이 뜹니다.
-        <b>끄면</b> 각 플레이어의 원래 값으로 되돌아갑니다.{{#unless isGM}} 이 항목은 현재 상태만 표시하며, 변경은 GM만 할 수 있습니다.{{/unless}}
+        <b>{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text7"}}</b> {{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text8"}}
+        <b>{{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text9"}}</b> {{localize "FE.SettingsMenu.ceCorePriorityEnabled.Text10"}}{{#unless isGM}} {{localize "FE.SettingsMenu.ceGmPriorityEnabled.Text7"}}{{/unless}}
       </p>
     </div>
 
     {{#if isGM}}
     <div class="form-group">
-      <label>GM: PC 토큰 선택 시 본인 이름으로 채팅</label>
+      <label>{{localize "FE.SettingsData.ceGmSpeakAsSelf.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceGmSpeakAsSelf" data-dtype="Boolean" {{checked values.ceGmSpeakAsSelf}} />
       </div>
-      <p class="notes">활성화 시 GM이 플레이어 소유 캐릭터 토큰을 선택한 상태에서 채팅을 보내도 해당 캐릭터가 아닌 GM 본인으로 표시됩니다.</p>
+      <p class="notes">{{localize "FE.SettingsData.ceGmSpeakAsSelf.hint"}}</p>
     </div>
     {{/if}}
   </section>
 
   <footer class="sheet-footer flexrow">
     <button type="button" data-action="feResetDefaults" class="fe-btn">
-      <i class="fas fa-rotate-left"></i> 기본값으로 되돌리기
+      <i class="fas fa-rotate-left"></i> {{localize "FE.Settings.Reset.Title"}}
     </button>
     <button type="button" data-action="feSave" class="fe-btn fe-btn--primary">
-      <i class="far fa-save"></i> 저장
+      <i class="far fa-save"></i> {{localize "FE.Common.Save"}}
     </button>
   </footer>
 </form>

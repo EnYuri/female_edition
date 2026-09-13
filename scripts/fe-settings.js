@@ -1,3 +1,4 @@
+import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 // Unified settings window and initialization. Static data lives separately to avoid cycles.
 import { S, CP, FE_MENU_DEFAULTS, FE_MENU_RANGES, CHOICES, FE_RELOAD_REQUIRED_KEYS } from "./fe-settings-data.js";
 import { MODULE_ID, feIsDx3rdSystemId } from "./fe-constants.js";
@@ -54,7 +55,7 @@ function feRegisterSettingsMenu({
       id: "fe-settings-menu",
       classes: ["fe-settings-menu"],
       window: {
-        title: "Female-cupwhi 설정",
+        title: feLocalize("FE.Settings.Title"),
         icon: "fas fa-sliders-h",
         resizable: true,
       },
@@ -419,7 +420,7 @@ function feRegisterSettingsMenu({
       loadBtn?.addEventListener("click", async () => {
         loadBtn.disabled = true;
         const original = loadBtn.textContent;
-        loadBtn.textContent = "불러오는 중…";
+        loadBtn.textContent = feLocalize("FE.Settings.Fonts.Loading");
         try {
           const fonts = await feQueryLocalFonts();
           if (sysGroup) {
@@ -431,9 +432,9 @@ function feRegisterSettingsMenu({
               sysGroup.appendChild(opt);
             }
           }
-          loadBtn.textContent = fonts.length ? `시스템 폰트 ${fonts.length}개` : "불러오기 실패/거부됨";
+          loadBtn.textContent = fonts.length ? feFormat("FE.Settings.textContent2", { length: fonts.length }) : feLocalize("FE.Settings.Fonts.Denied");
         } catch {
-          loadBtn.textContent = "불러오기 실패";
+          loadBtn.textContent = feLocalize("FE.Settings.Fonts.Failed");
         } finally {
           setTimeout(() => { loadBtn.disabled = false; loadBtn.textContent = original; }, 1500);
         }
@@ -530,14 +531,14 @@ function feRegisterSettingsMenu({
       event.preventDefault();
       const DialogV2 = foundry.applications.api.DialogV2;
       const ok = await DialogV2.confirm({
-        window: { title: "기본값으로 되돌리기" },
-        content: "<p>모든 Female-cupwhi 설정을 <b>모듈 기본값</b>으로 되돌릴까요?</p>"
-          + "<p class=\"notes\">월드(GM) 설정은 GM만 되돌릴 수 있습니다. 일부 항목은 되돌린 뒤 새로고침이 필요할 수 있습니다.</p>",
+        window: { title: feLocalize("FE.Settings.Reset.Title") },
+        content: `<p>${feLocalizeHTML("FE.Settings.content.Text1")} <b>${feLocalizeHTML("FE.Settings.content.Text2")}</b>${feLocalizeHTML("FE.Settings.content.Text3")}</p>`
+          + `<p class="notes">${feLocalizeHTML("FE.Settings.content.Text12")}</p>`,
         modal: true,
       }).catch(() => false);
       if (!ok) return;
       await FemaleEditionSettingsMenu.#applyValues({ ...ALL_DEFAULTS }, { resetDefaults: true });
-      ui.notifications?.info("설정을 모듈 기본값으로 되돌렸습니다.");
+      ui.notifications?.info(feLocalize("FE.Settings.Reset.Done"));
       try { await this.render(); } catch { /* no-op */ }
     }
 
@@ -556,7 +557,7 @@ function feRegisterSettingsMenu({
       const setOne = async (key, value) => {
         if (!has(key)) return;
         try { await game.settings.set(MODULE_ID, key, value); }
-        catch (err) { failed.push(key); console.warn(`[${MODULE_ID}] failed to save setting "${key}"`, err); }
+        catch (err) { failed.push(key); console.warn(feFormat("FE.Diagnostics.Settings.feRegisterSettingsMenu", { MODULE_ID: MODULE_ID, key: key }), err); }
       };
       const bool = (key) => setOne(key, !!d[key]);
       // Snapshot before the batch so we can tell whether a reload-only key actually
@@ -745,7 +746,7 @@ function feRegisterSettingsMenu({
       } catch (err) {
         // setOne swallows per-key errors, so reaching here is unexpected — but never
         // let it skip the capture below.
-        console.error(`[${MODULE_ID}] settings save batch error`, err);
+        console.error(feFormat("FE.Diagnostics.Settings.feRegisterSettingsMenu2", { MODULE_ID: MODULE_ID }), err);
       } finally {
         // ALWAYS persist the just-saved values into this world's per-world slice,
         // even if some individual keys failed. If this is skipped, feHydrateWorldSettings
@@ -755,14 +756,14 @@ function feRegisterSettingsMenu({
         try {
           await feCaptureWorldSettings();
         } catch (err) {
-          console.error(`[${MODULE_ID}] feCaptureWorldSettings failed — per-world slice not updated; settings may revert on reload`, err);
-          ui.notifications?.error("설정 저장(월드별 스냅샷) 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+          console.error(feFormat("FE.Diagnostics.Settings.feRegisterSettingsMenu3", { MODULE_ID: MODULE_ID }), err);
+          ui.notifications?.error(feLocalize("FE.Settings.feRegisterSettingsMenu2"));
         }
       }
 
       if (failed.length) {
-        console.warn(`[${MODULE_ID}] ${failed.length} setting(s) failed to save:`, failed);
-        ui.notifications?.warn(`일부 설정을 저장하지 못했습니다: ${failed.join(", ")}`);
+        console.warn(feFormat("FE.Diagnostics.Settings.feRegisterSettingsMenu4", { MODULE_ID: MODULE_ID, value2: failed.length }), failed);
+        ui.notifications?.warn(feFormat("FE.Settings.feRegisterSettingsMenu3", { value1: failed.join(", ") }));
       }
 
       // Not awaited: the caller closes this menu right after, and awaiting a modal here
@@ -784,15 +785,15 @@ function feRegisterSettingsMenu({
           catch { return false; }
         });
         foundry.applications.settings.SettingsConfig.reloadConfirm({ world })
-          .catch((err) => console.warn(`[${MODULE_ID}] reload prompt failed`, err));
+          .catch((err) => console.warn(feFormat("FE.Diagnostics.Settings.feRegisterSettingsMenu5", { MODULE_ID: MODULE_ID }), err));
       }
     }
   }
 
     game.settings.registerMenu(MODULE_ID, "settingsMenu", {
-      name: "Female-cupwhi: 통합 설정 패널",
-      label: "설정 열기",
-      hint: "카테고리/접기·펼치기 방식의 통합 설정 패널을 엽니다.",
+      name: feLocalize("FE.Settings.Menu.Name"),
+      label: feLocalize("FE.Settings.Menu.Open"),
+      hint: feLocalize("FE.Settings.Menu.Hint"),
       icon: "fas fa-sliders-h",
       type: FemaleEditionSettingsMenu,
       restricted: false,

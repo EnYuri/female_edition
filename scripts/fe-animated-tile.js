@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // Female-cupwhi: Animated tile textures (gif / animated webp / apng / animated avif).
 //
@@ -170,7 +171,7 @@ async function feAtDecodeAnimation(src) {
       totalMs: delays.reduce((a, b) => a + b, 0),
     };
   } catch (err) {
-    console.warn(`[${MODULE_ID}] animated tile decode failed for ${src}`, err);
+    console.warn(feFormat("FE.Diagnostics.AnimatedTile.feAtDecodeAnimation", { MODULE_ID: MODULE_ID, src: src }), err);
     for (const bitmap of frames) { try { bitmap.close(); } catch (_) {} }
     return null;
   } finally {
@@ -458,7 +459,7 @@ function feAtSyncTileConfig(app, root) {
       const input = fieldset.querySelector(`[name="${name}"]`);
       if (input) input.disabled = false;
     }
-    if (legend) legend.textContent = "애니메이션 재생";
+    if (legend) legend.textContent = feLocalize("FE.AnimatedTile.textContent");
     if (volumeGroup) volumeGroup.hidden = true;
     fieldset.dataset.feAnimatedTile = "1";
   } else if (fieldset.dataset.feAnimatedTile) {

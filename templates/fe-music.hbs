@@ -3,46 +3,46 @@
     <div class="fe-music__title">
       <h2>Emanim Music</h2>
       <div class="fe-music__sub">
-        <span class="tag">공용 플레이리스트: {{playlistName}}</span>
+        <span class="tag">{{localize "FE.Music.Text.Text1"}} {{playlistName}}</span>
         {{#if direct}}
-          <span class="tag ok">직접 업로드</span>
+          <span class="tag ok">{{localize "FE.Music.Text.Text2"}}</span>
         {{else if gmOnline}}
-          <span class="tag">GM 프록시 업로드</span>
+          <span class="tag">{{localize "FE.Music.Text.Text3"}}</span>
         {{else}}
-          <span class="tag warn">GM 오프라인</span>
+          <span class="tag warn">{{localize "FE.Music.Text.Text4"}}</span>
         {{/if}}
       </div>
     </div>
 
     <div class="fe-music__actions">
-      <button type="button" data-action="stopMusic" title="전체 정지">
+      <button type="button" data-action="stopMusic" title="{{localize "FE.Music.Text.Text5"}}">
         <i class="fa-solid fa-stop"></i>
       </button>
-      <button type="button" data-action="refresh" title="새로고침">
+      <button type="button" data-action="refresh" title="{{localize "FE.Common.Refresh"}}">
         <i class="fa-solid fa-rotate"></i>
       </button>
     </div>
   </header>
 
   <div class="fe-music__card">
-    <h3>업로드</h3>
+    <h3>{{localize "FE.Music.Text.Text7"}}</h3>
     <div class="fe-music__row">
-      <div class="label">저장 폴더</div>
+      <div class="label">{{localize "FE.Music.Text.Text8"}}</div>
       <div class="value"><code>{{uploadDir}}</code></div>
     </div>
 
     <div class="fe-music__drop-zone{{#if uploadDisabled}} is-disabled{{/if}}" data-drop-zone>
       <label class="fe-music__upload-btn">
         <i class="fa-solid fa-cloud-arrow-up"></i>
-        <span>{{#if uploadStatusText}}{{uploadStatusText}}{{else}}파일 선택 / 여기에 드롭{{/if}}</span>
+        <span>{{#if uploadStatusText}}{{uploadStatusText}}{{else}}{{localize "FE.Music.Text.Text9"}}{{/if}}</span>
         <input type="file" accept="audio/*" data-fe-upload multiple {{#if uploadDisabled}}disabled{{/if}}>
       </label>
-      <p class="hint">Ctrl+클릭으로 다중 선택 · 드래그 &amp; 드롭 가능 · 이름+크기가 같은 파일은 중복 없이 재사용</p>
+      <p class="hint">{{localize "FE.Music.Text.Text10"}}</p>
     </div>
   </div>
 
   <div class="fe-music__card">
-    <h3>트랙 목록 (공용)</h3>
+    <h3>{{localize "FE.Music.Text.Text11"}}</h3>
 
     {{#if sounds.length}}
       <ul class="fe-music__list">
@@ -53,17 +53,17 @@
               <span>{{name}}</span>
             </div>
             <div class="actions">
-              <button type="button" data-action="play" data-sound-id="{{id}}" title="재생">
+              <button type="button" data-action="play" data-sound-id="{{id}}" title="{{localize "FE.Common.Play"}}">
                 <i class="fa-solid fa-play"></i>
               </button>
-              <button type="button" data-action="stop" data-sound-id="{{id}}" title="정지">
+              <button type="button" data-action="stop" data-sound-id="{{id}}" title="{{localize "FE.Common.Stop"}}">
                 <i class="fa-solid fa-stop"></i>
               </button>
-              <button type="button" data-action="dj" data-sound-id="{{id}}" title="이 곡만 재생(다른 곡 정지)">
+              <button type="button" data-action="dj" data-sound-id="{{id}}" title="{{localize "FE.Music.Text.Text14"}}">
                 <i class="fa-solid fa-bolt"></i>
               </button>
               {{#if canDelete}}
-              <button type="button" data-action="del" data-sound-id="{{id}}" title="삭제 (GM)">
+              <button type="button" data-action="del" data-sound-id="{{id}}" title="{{localize "FE.Music.Text.Text15"}}">
                 <i class="fa-solid fa-trash"></i>
               </button>
               {{/if}}
@@ -72,7 +72,7 @@
         {{/each}}
       </ul>
     {{else}}
-      <p class="hint">아직 업로드된 트랙이 없습니다.</p>
+      <p class="hint">{{localize "FE.Music.Text.Text16"}}</p>
     {{/if}}
   </div>
 </section>

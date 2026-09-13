@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { CP } from "./fe-settings-data.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // Chat portrait features (split)
@@ -96,7 +97,7 @@ function cpWarnIfChatPortraitModuleActive() {
   if (!cpIsChatPortraitModuleActive()) return;
   _cpWarnedChatPortraitActive = true;
   console.warn(
-    `[${MODULE_ID}] "chat-portrait" 모듈이 활성화되어 있어 포트레이트가 중복 표시될 수 있습니다. 필요하면 둘 중 하나를 비활성화하세요.`
+    feFormat("FE.Diagnostics.ChatPortrait.cpWarnIfChatPortraitModuleActive", { MODULE_ID: MODULE_ID })
   );
 }
 

@@ -1,6 +1,7 @@
+import { feFormat } from "./fe-i18n.js";
 // Image processing for fe-chat-archive.js
 // Canvas downscale, background color freeze, blob → data-URL conversion.
-// No imports — fully self-contained.
+// Only depends on the shared localization helper.
 
 // ===========================================================================
 // Internal utilities
@@ -478,7 +479,7 @@ export async function feDownscaleImagesForPrint(
       }
     });
     if (pending.length) {
-      setMeta(`Waiting for ${pending.length} image(s) to load…`);
+      setMeta(feFormat("FE.ChatArchive.Status.WaitingImages", { value1: pending.length }));
       await feAwaitImageElements(pending, waitForPendingMs);
     }
   }
@@ -777,7 +778,7 @@ export async function feDownscaleImagesForPrint(
       swapGroup(g, imageUrl);
     }
     const gi = Math.min(start + ENCODE_CONCURRENCY, groupList.length);
-    setMeta(`Downscaling images… ${gi}/${groupList.length}`);
+    setMeta(feFormat("FE.ChatArchive.Status.DownscalingImages", { gi: gi, value2: groupList.length }));
     await feNextTick();
   }
 

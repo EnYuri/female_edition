@@ -11,6 +11,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const manifest = JSON.parse(readFileSync(new URL("module.json", new URL("../", import.meta.url)), "utf8"));
+const translations = Object.assign({}, ...manifest.languages.filter(entry => entry.lang === "ko")
+  .map(entry => JSON.parse(readFileSync(new URL(entry.path, new URL("../", import.meta.url)), "utf8"))));
 
 // ── global stubs (must exist before the dynamic import below) ─────────────────
 
@@ -45,6 +50,10 @@ globalThis.Hooks = {
   },
 };
 globalThis.game = {
+  i18n: {
+    localize: key => translations[key] ?? key,
+    format: (key, data) => (translations[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => data[name]),
+  },
   release: { generation: 14 },
   version: "14.363",
   modules: { get: () => null },

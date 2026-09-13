@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // female_edition — User font support
 //
 // Lets a user apply a font that is EITHER installed locally on their machine OR
@@ -98,7 +99,7 @@ function feInjectFolderFontFaceCSS(entries) {
     }
     styleEl.textContent = `/* female_edition: font/ folder fonts (export-visible) */\n${rules}`;
   } catch (e) {
-    console.warn("female_edition | failed to inject folder @font-face CSS", e);
+    console.warn(feLocalize("FE.Diagnostics.UserFont.feInjectFolderFontFaceCSS"), e);
   }
 }
 
@@ -133,7 +134,7 @@ async function feRegisterModuleFolderFonts() {
             document.fonts.add(face);
           }
         } catch (e) {
-          console.warn(`female_edition | failed to load user font: ${fileName}`, e);
+          console.warn(feFormat("FE.Diagnostics.UserFont.feRegisterModuleFolderFonts", { fileName: fileName }), e);
           continue;
         }
         out.push({ family, label, url });
@@ -143,7 +144,7 @@ async function feRegisterModuleFolderFonts() {
       feInjectFolderFontFaceCSS(out);
       _moduleFontsRegistered = true;
     } catch (e) {
-      console.warn("female_edition | font/ folder scan failed", e);
+      console.warn(feLocalize("FE.Diagnostics.UserFont.feRegisterModuleFolderFonts2"), e);
     }
     return out;
   })();
@@ -168,7 +169,7 @@ async function feQueryLocalFonts() {
     out.sort((a, b) => a.family.localeCompare(b.family, "ko"));
     return out;
   } catch (e) {
-    console.warn("female_edition | queryLocalFonts unavailable/denied", e);
+    console.warn(feLocalize("FE.Diagnostics.UserFont.feQueryLocalFonts"), e);
     return [];
   }
 }

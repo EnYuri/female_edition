@@ -1,6 +1,8 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // Message editing feature (split)
 // Provides inline edit and chat context menu option.
 
+import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
 import {
   MODULE_ID,
   S,
@@ -11,6 +13,9 @@ import {
   feNormalizeChatMessageId,
   feGetMessageIdFromElement,
 } from "./fe-chat-enhance.js";
+
+// Markup lives in templates/fe-chat-edit-panel.hbs; preloaded at `init` (fe-template.js).
+const [FE_EDIT_PANEL_TEMPLATE] = feRegisterTemplates("fe-chat-edit-panel.hbs");
 
 function feEnsureMessageEditControl(message, messageEl) {
   if (!(messageEl instanceof HTMLElement)) return;
@@ -44,7 +49,7 @@ function feEnsureMessageEditControl(message, messageEl) {
   const a = doc.createElement("a");
   a.classList.add("message-edit", "fe-message-edit");
   a.setAttribute("role", "button");
-  a.setAttribute("aria-label", "메시지 수정");
+  a.setAttribute("aria-label", feLocalize("FE.ChatEdit.EditMessage"));
   a.dataset.action = "feEditMessage";
   a.innerHTML = '<i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>';
   a.addEventListener(
@@ -125,37 +130,8 @@ function feEnsureInlineEditorUI() {
   wrap.id = "fe-chat-inline-editor";
   wrap.className = "fe-chat-inline-editor";
   // A floating, draggable panel (appended to <body>, position: fixed) — no longer
-  // glued above the chat form. The .fe-chat-inline-editor-frame inner wrapper carries
-  // the retro-theme pixel-border decoration (::before/::after) so the outline can sit
-  // OUTSIDE the panel content without clipping.
-  wrap.innerHTML = `
-    <div class="fe-chat-inline-editor-frame">
-      <div class="fe-chat-inline-editor-header" data-fe-drag-handle>
-        <span class="fe-edit-title"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> 메시지 수정</span>
-        <div class="fe-edit-mode-toggle">
-          <button type="button" class="fe-edit-mode-btn active" data-mode="markdown">마크다운</button>
-          <button type="button" class="fe-edit-mode-btn" data-mode="html">HTML</button>
-        </div>
-        <button type="button" class="fe-edit-close" aria-label="닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-      </div>
-      <div class="fe-chat-inline-editor-row">
-        <textarea class="fe-chat-inline-editor-text" spellcheck="false" placeholder="메시지를 입력하세요…"></textarea>
-      </div>
-      <div class="fe-chat-inline-editor-actions">
-        <span class="fe-edit-hint">Enter 저장 · Shift+Enter 줄바꿈 · Esc 취소</span>
-        <div class="fe-edit-action-btns">
-          <button type="button" class="fe-chat-inline-editor-save">
-            <i class="fa-solid fa-check"></i>
-            <span>저장</span>
-          </button>
-          <button type="button" class="fe-chat-inline-editor-cancel">
-            <i class="fa-solid fa-xmark"></i>
-            <span>취소</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+  // glued above the chat form.
+  wrap.innerHTML = feRenderTemplate(FE_EDIT_PANEL_TEMPLATE);
 
   document.body.appendChild(wrap);
 
@@ -193,7 +169,6 @@ function feEnsureInlineEditorUI() {
 
   feMakeEditorDraggable(wrap, wrap.querySelector("[data-fe-drag-handle]"));
 
-  wrap.style.display = "none";
   return wrap;
 }
 
@@ -223,10 +198,7 @@ function feMakeEditorDraggable(wrap, handle) {
     const left = Math.min(Math.max(8, baseLeft + dx), window.innerWidth - w - 8);
     const top = Math.min(Math.max(8, baseTop + dy), window.innerHeight - h - 8);
     FE_EDITOR_POS = { left, top };
-    wrap.style.left = `${left}px`;
-    wrap.style.top = `${top}px`;
-    wrap.style.right = "auto";
-    wrap.style.bottom = "auto";
+    fePlaceEditorAt(wrap, left, top);
   };
 
   const onUp = () => {
@@ -257,10 +229,7 @@ function feMakeEditorDraggable(wrap, handle) {
 function fePositionInlineEditor(wrap) {
   if (!wrap) return;
   if (FE_EDITOR_POS) {
-    wrap.style.left = `${FE_EDITOR_POS.left}px`;
-    wrap.style.top = `${FE_EDITOR_POS.top}px`;
-    wrap.style.right = "auto";
-    wrap.style.bottom = "auto";
+    fePlaceEditorAt(wrap, FE_EDITOR_POS.left, FE_EDITOR_POS.top);
     return;
   }
   // Default: anchored to the bottom-right above the chat sidebar input.
@@ -278,18 +247,23 @@ function fePositionInlineEditor(wrap) {
       let top = rect.top - h - 10;
       left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
       top = Math.min(Math.max(8, top), window.innerHeight - h - 8);
-      wrap.style.left = `${left}px`;
-      wrap.style.top = `${top}px`;
-      wrap.style.right = "auto";
-      wrap.style.bottom = "auto";
+      fePlaceEditorAt(wrap, left, top);
       return;
     }
   } catch {}
-  // Last resort: bottom-right corner.
-  wrap.style.left = "auto";
-  wrap.style.top = "auto";
-  wrap.style.right = "16px";
-  wrap.style.bottom = "120px";
+  // Last resort: the default bottom-right corner (offsets live in fe-chat-edit.css).
+  wrap.classList.add("fe-editor-corner");
+  wrap.style.removeProperty("left");
+  wrap.style.removeProperty("top");
+}
+
+// The only geometry this feature writes inline: a dragged/anchored pixel position,
+// which no stylesheet can express. Everything else (visibility, the corner fallback)
+// is a class in fe-chat-edit.css.
+function fePlaceEditorAt(wrap, left, top) {
+  wrap.classList.remove("fe-editor-corner");
+  wrap.style.left = `${left}px`;
+  wrap.style.top = `${top}px`;
 }
 
 function feSetChatInputDisabled(disabled) {
@@ -329,7 +303,7 @@ function feSetEditMode(wrap, newMode) {
 
 function feStartInlineEdit(msg) {
   if (!feCanEditMessage(msg)) {
-    ui?.notifications?.warn("이 메시지를 수정할 권한이 없습니다.");
+    ui?.notifications?.warn(feLocalize("FE.ChatEdit.feStartInlineEdit"));
     return;
   }
   const wrap = feEnsureInlineEditorUI();
@@ -350,10 +324,10 @@ function feStartInlineEdit(msg) {
     btn.classList.toggle("active", btn.dataset.mode === initialMode);
   });
 
-  wrap.style.display = "";
+  wrap.classList.add("fe-open");
   feSetChatInputDisabled(true);
 
-  // Measure-then-place: make it visible (display set above) so offsetWidth/Height
+  // Measure-then-place: make it visible (.fe-open set above) so offsetWidth/Height
   // are real before anchoring, then size the textarea to its content.
   fePositionInlineEditor(wrap);
   feAutoGrowEditorTextarea(textarea);
@@ -384,8 +358,8 @@ async function feCommitInlineEdit() {
       await feUpdateMessageFromRaw(msg, raw);
     }
   } catch (err) {
-    console.error("[female_edition] edit update failed", err);
-    ui?.notifications?.error("메시지 수정에 실패했습니다. 콘솔을 확인하세요.");
+    console.error(feLocalize("FE.Diagnostics.ChatEdit.feCommitInlineEdit"), err);
+    ui?.notifications?.error(feLocalize("FE.ChatEdit.feCommitInlineEdit"));
     return;
   }
 
@@ -395,7 +369,7 @@ async function feCommitInlineEdit() {
 function feCancelInlineEdit() {
   const wrap = document.getElementById("fe-chat-inline-editor");
   if (wrap) {
-    wrap.style.display = "none";
+    wrap.classList.remove("fe-open");
     const textarea = wrap.querySelector(".fe-chat-inline-editor-text");
     if (textarea) textarea.value = "";
   }
@@ -453,7 +427,7 @@ function feApplyRawEditPreUpdate(message, changed, userId = null) {
     // hash-mismatch issue as in preCreate. Leave [[formula]] as-is; Foundry's enrichHTML
     // evaluates it on next render, and feSnapshotOrRestoreInlineRolls captures that result.
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to prepare raw edit update`, err);
+    console.warn(feFormat("FE.Diagnostics.ChatEdit.feApplyRawEditPreUpdate", { MODULE_ID: MODULE_ID }), err);
   }
 }
 
@@ -483,14 +457,14 @@ function fePatchChatContextOptions(inject) {
         try {
           inject(options);
         } catch (e) {
-          console.warn("[female_edition] edit context inject failed", e);
+          console.warn(feLocalize("FE.Diagnostics.ChatEdit.fePatchChatContextOptions"), e);
         }
         return options;
       };
 
       host[flagKey] = true;
     } catch (e) {
-      console.warn("[female_edition] context patch failed", e);
+      console.warn(feLocalize("FE.Diagnostics.ChatEdit.fePatchChatContextOptions2"), e);
     }
   };
 
@@ -528,7 +502,7 @@ function feInstallEditContextMenuEarly() {
     // Avoid duplicates if multiple hooks/patches fire.
     if (
       options.some(
-        (o) => o?.feId === "fe-edit-message" || String(o?.name ?? "") === "메시지 수정"
+        (o) => o?.feId === "fe-edit-message" || String(o?.name ?? "") === feLocalize("FE.ChatEdit.EditMessage")
       )
     ) {
       return;
@@ -543,8 +517,8 @@ function feInstallEditContextMenuEarly() {
     // for v16); v13 reads only name/condition, so fill both.
     options.unshift({
       feId: "fe-edit-message",
-      label: "메시지 수정",
-      name: "메시지 수정",
+      label: feLocalize("FE.ChatEdit.EditMessage"),
+      name: feLocalize("FE.ChatEdit.EditMessage"),
       icon: '<i class="fa-solid fa-pen-to-square"></i>',
       visible,
       condition: visible,
@@ -610,7 +584,7 @@ function feInstallEditHandlers() {
         if (feSetting(S.EDIT_ENABLED) === false) return;
         feEnsureMessageEditControl(message, html);
       } catch (e) {
-        console.warn(`${MODULE_ID} | failed to ensure edit control`, e);
+        console.warn(feFormat("FE.Diagnostics.ChatEdit.feInstallEditHandlers", { MODULE_ID: MODULE_ID }), e);
       }
     });
   }
@@ -723,7 +697,7 @@ function feEnsureEditControlsForExistingMessages(rootLike = document) {
       feEnsureMessageEditControl(msg, li);
     }
   } catch (e) {
-    console.warn(`[${MODULE_ID}] failed to backfill edit controls`, e);
+    console.warn(feFormat("FE.Diagnostics.ChatEdit.feEnsureEditControlsForExistingMessages", { MODULE_ID: MODULE_ID }), e);
   }
 }
 
@@ -745,7 +719,7 @@ function feGuardContextMenuEntry(entry) {
         try {
           return fn.apply(this, args);
         } catch (e) {
-          console.warn(`${MODULE_ID} | a context-menu condition threw; hiding that entry`, e);
+          console.warn(feFormat("FE.Diagnostics.ChatEdit.feGuardContextMenuEntry", { MODULE_ID: MODULE_ID }), e);
           return false;
         }
       };
@@ -774,7 +748,7 @@ function feHardenContextMenuConditions() {
     };
     proto.__feConditionGuardInstalled = true;
   } catch (e) {
-    console.warn(`${MODULE_ID} | failed to harden ContextMenu conditions`, e);
+    console.warn(feFormat("FE.Diagnostics.ChatEdit.feHardenContextMenuConditions", { MODULE_ID: MODULE_ID }), e);
   }
 }
 
@@ -809,6 +783,6 @@ Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
     if (reason !== "edit-settings") return;
     feScheduleEditControlsRefresh(payload?.document ?? document, 0);
   } catch (err) {
-    console.warn("[female_edition] fe-chat-edit: refresh failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatEdit.warn"), err);
   }
 });

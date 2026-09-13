@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Token Visual Preview — enhances the Prototype Token Config's
 // appearance tab with a live grid preview (token on a grid with anchor crosshair)
@@ -99,11 +100,6 @@ function _feTPParseOr(val, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** Localize with an inline fallback, so a missing key never renders as the key itself. */
-function _feTPL(key, fallback) {
-  const s = game.i18n?.localize?.(key);
-  return s && s !== key ? s : fallback;
-}
 
 /**
  * The live value of a form control, which for a `range-picker` is NOT its own `value`.
@@ -362,9 +358,9 @@ function feRenderGridPreview(container, vals, natSize) {
 
   container.innerHTML = `
     <div class="fe-tp-viewport" style="width:${vpW}px;height:${vpH}px;"
-      title="${esc(_feTPL("FETP.Viewport.Hint", "드래그: 이동 · 휠: 확대/축소"))}">
+      title="${esc(feLocalize("FETP.Viewport.Hint"))}">
       <button type="button" class="fe-tp-view-reset"
-        title="${esc(_feTPL("FETP.ResetView", "시점 초기화"))}"><i class="fa-solid fa-arrows-to-dot"></i></button>
+        title="${esc(feLocalize("FETP.ResetView"))}"><i class="fa-solid fa-arrows-to-dot"></i></button>
       <div class="fe-tp-grid-field" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="background-size:${cellSize}px ${cellSize}px;background-position:${gridLeft}px ${gridTop}px;"></div>
       <div class="fe-tp-grid" data-base-left="${baseGridLeft}" data-base-top="${baseGridTop}" style="width:${pw}px;height:${ph}px;left:${gridLeft}px;top:${gridTop}px;">
         ${ringLayers.under}
@@ -394,7 +390,7 @@ function feRenderGridPreview(container, vals, natSize) {
       }</span>
       ${vals.alpha < 1 ? `<span class="fe-tp-info-dim">alpha ${vals.alpha.toFixed(2)}</span>` : ""}
       ${vals.tint ? `<span class="fe-tp-info-swatch" style="background:${esc(vals.tint)};"
-        title="${esc(_feTPL("FETP.Tint", "색조"))} ${esc(vals.tint)}"></span>` : ""}
+        title="${esc(feLocalize("FETP.Tint"))} ${esc(vals.tint)}"></span>` : ""}
       <span class="fe-tp-info-dim">zoom ${Math.round(zoom * 100)}%</span>
     </div>
     ${vals.ringEnabled ? `<div class="fe-tp-info">
@@ -402,7 +398,7 @@ function feRenderGridPreview(container, vals, natSize) {
       <span class="fe-tp-info-value">×${(vals.ringSubjectScale || 1).toFixed(2)}</span>
       ${art.usingSubject
         ? `<span class="fe-tp-info-dim" title="${esc(art.src)}">${
-          esc(_feTPL("FETP.Subject", "서브젝트"))}: ${esc(art.src.split("/").pop())}</span>`
+          esc(feLocalize("FETP.Subject"))}: ${esc(art.src.split("/").pop())}</span>`
         : ""}
     </div>` : ""}`;
 
@@ -817,7 +813,7 @@ function feInjectPanelBarAttributes(app, html) {
     if (sel._fePanelInjected) continue;
     sel._fePanelInjected = true;
     const group = document.createElement("optgroup");
-    group.label = game.i18n?.localize?.("FESP.Sheet.CustomAttrs") ?? "커스텀 어트리뷰트";
+    group.label = game.i18n?.localize?.("FESP.Sheet.CustomAttrs") ?? feLocalize("FESP.Sheet.CustomAttrs");
     for (let i = 0; i < customAttrs.length; i++) {
       const attr = customAttrs[i];
       if (!attr.name) continue;

@@ -25,7 +25,23 @@
   position: fixed;
   z-index: 10000;
   width: clamp(280px, 24vw, 380px);
+  /* Hidden until fe-chat-edit.js adds .fe-open — the JS no longer writes style.display.
+     left/top are the ONE thing still set inline (a dragged pixel position). */
+  display: none;
+  right: auto;
+  bottom: auto;
+}
+
+#fe-chat-inline-editor.fe-open {
   display: block;
+}
+
+/* Fallback placement when the chat form cannot be measured. */
+#fe-chat-inline-editor.fe-editor-corner {
+  left: auto;
+  top: auto;
+  right: 16px;
+  bottom: 120px;
 }
 
 #fe-chat-inline-editor .fe-chat-inline-editor-frame {

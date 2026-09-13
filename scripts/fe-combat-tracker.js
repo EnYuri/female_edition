@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 /**
  * fe-combat-tracker.js
@@ -217,12 +218,6 @@ function feCtEsc(s) {
   );
 }
 
-function feCtL(key, fallback) {
-  try {
-    const v = game.i18n?.localize?.(key);
-    return v && v !== key ? v : fallback;
-  } catch { return fallback; }
-}
 
 // ── DOM build ───────────────────────────────────────────────────────────────
 
@@ -284,9 +279,9 @@ function feCtPortraitHTML(c, active, canEndTurn, enterDelay = null) {
   const endTurnBtn = canEndTurn
     ? `<div class="fe-ct-endturn">` +
         `<i class="fas fa-angles-right fe-ct-endturn-icon" data-ct-endturn="1" ` +
-          `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.EndTurn", "턴 종료"))}"></i>` +
+          `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.EndTurn"))}"></i>` +
         `<span class="fe-ct-endturn-px" data-ct-endturn="1" ` +
-          `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.EndTurn", "턴 종료"))}">&gt;&gt;</span>` +
+          `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.EndTurn"))}">&gt;&gt;</span>` +
       `</div>`
     : "";
 
@@ -301,7 +296,7 @@ function feCtPortraitHTML(c, active, canEndTurn, enterDelay = null) {
           // bundles Font Awesome PRO webfonts (fa-regular-400.woff2 is present), so the
           // regular weight really renders instead of falling back to solid.
           `<i class="far fa-dice-d20" data-ct-rollinit="1" ` +
-            `data-tooltip="${feCtEsc(feCtL("FECT.Ctx.RollInit", "이니셔티브 굴리기"))}"></i>` +
+            `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.RollInit"))}"></i>` +
         `</div>`
       : "";
 
@@ -332,8 +327,8 @@ function feCtBtnHTML(action, icon, label) {
 function feCtCollapseBtnHTML() {
   // Collapse/minimize is a personal UI toggle, so it is offered to GMs and players alike.
   const label = _ctCollapsed
-    ? feCtL("FECT.Expand", "컴뱃 트래커 펼치기")
-    : feCtL("FECT.Collapse", "컴뱃 트래커 최소화");
+    ? feLocalize("FECT.Expand")
+    : feLocalize("FECT.Collapse");
   return feCtBtnHTML("toggle-collapse", _ctCollapsed ? "fa-window-maximize" : "fa-window-minimize", label);
 }
 
@@ -343,28 +338,28 @@ function feCtControlsHTML(combat) {
   const started = Number(round) > 0;
   const startButton = started
     ? ""
-    : feCtBtnHTML("start-combat", "fa-circle-play", feCtL("FECT.StartCombat", "전투 개시"));
+    : feCtBtnHTML("start-combat", "fa-circle-play", feLocalize("FECT.StartCombat"));
   // Shown only while somebody still needs a roll — same self-explanatory pattern as
   // 전투 개시 (which disappears once the encounter has started).
   const rollAllButton = feCtHasUnrolledCombatants(combat)
-    ? feCtBtnHTML("roll-all", "fa-dice-d20", feCtL("FECT.RollAll", "이니셔티브 전체 굴림"))
+    ? feCtBtnHTML("roll-all", "fa-dice-d20", feLocalize("FECT.RollAll"))
     : "";
   return (
     rollAllButton +
     startButton +
-    feCtBtnHTML("end-combat", "fa-flag-checkered", feCtL("FECT.EndCombat", "전투 종료")) +
+    feCtBtnHTML("end-combat", "fa-flag-checkered", feLocalize("FECT.EndCombat")) +
     feCtBtnHTML(
       "toggle-active",
       paused ? "fa-play" : "fa-pause",
       paused
-        ? feCtL("FECT.Resume", "전투 재개")
-        : feCtL("FECT.Deactivate", "전투 일시종료 (인카운터 비활성화)")
+        ? feLocalize("FECT.Resume")
+        : feLocalize("FECT.Deactivate")
     ) +
-    feCtBtnHTML("prev-round", "fa-angles-left", feCtL("FECT.PrevRound", "이전 라운드")) +
-    feCtBtnHTML("prev-turn", "fa-angle-left", feCtL("FECT.PrevTurn", "이전 턴")) +
+    feCtBtnHTML("prev-round", "fa-angles-left", feLocalize("FECT.PrevRound")) +
+    feCtBtnHTML("prev-turn", "fa-angle-left", feLocalize("FECT.PrevTurn")) +
     `<span class="fe-ct-round">R${round}</span>` +
-    feCtBtnHTML("next-turn", "fa-angle-right", feCtL("FECT.NextTurn", "다음 턴")) +
-    feCtBtnHTML("next-round", "fa-angles-right", feCtL("FECT.NextRound", "다음 라운드")) +
+    feCtBtnHTML("next-turn", "fa-angle-right", feLocalize("FECT.NextTurn")) +
+    feCtBtnHTML("next-round", "fa-angles-right", feLocalize("FECT.NextRound")) +
     feCtCollapseBtnHTML()
   );
 }
@@ -583,7 +578,7 @@ async function feCtHandleAction(action) {
       case "roll-all": {
         if (_ctRollingAll) break;
         if (!feCtHasUnrolledCombatants(combat)) {
-          ui.notifications?.info(feCtL("FECT.NothingToRoll", "이니셔티브를 굴릴 전투원이 없습니다."));
+          ui.notifications?.info(feLocalize("FECT.NothingToRoll"));
           break;
         }
         _ctRollingAll = true;
@@ -595,7 +590,7 @@ async function feCtHandleAction(action) {
       case "toggle-active": await combat.update({ active: !combat.active }); break;
     }
   } catch (e) {
-    console.error("[female_edition] combat-tracker action failed", e);
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtHandleAction"), e);
   }
 }
 
@@ -608,7 +603,7 @@ function feCtHandlePortraitClick(id) {
     if (token.isOwner) token.control({ releaseOthers: true });
     canvas?.animatePan?.({ x: token.center.x, y: token.center.y, duration: 250 });
   } catch (e) {
-    console.warn("[female_edition] combat-tracker pan failed", e);
+    console.warn(feLocalize("FE.Diagnostics.CombatTracker.feCtHandlePortraitClick"), e);
   }
 }
 
@@ -627,7 +622,7 @@ async function feCtHandleEndTurnClick(id) {
   try {
     await feCtRequestEndTurn(combat, c);
   } catch (e) {
-    console.error("[female_edition] combat-tracker end-turn (>>) failed", e);
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtHandleEndTurnClick"), e);
   }
 }
 
@@ -644,7 +639,7 @@ async function feCtRollInitiativeFor(id) {
   try {
     await combat.rollInitiative([c.id]);
   } catch (e) {
-    console.error("[female_edition] combat-tracker roll initiative failed", e);
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtRollInitiativeFor"), e);
   } finally {
     _ctRollingIds.delete(c.id);
     // The updateCombatant hook normally repaints, but a failed/no-op roll fires nothing —
@@ -681,7 +676,7 @@ function feCtOpenContextMenu(id, x, y) {
     {
       action: "end-turn",
       icon: "fa-hourglass-end",
-      label: feCtL("FECT.Ctx.EndTurn", "턴 종료"),
+      label: feLocalize("FECT.Ctx.EndTurn"),
       disabled: !feCtCanEndTurnForCombatant(combat, c),
     },
   ];
@@ -690,23 +685,23 @@ function feCtOpenContextMenu(id, x, y) {
     {
       action: "open-sheet",
       icon: "fa-edit",
-      label: feCtL("FECT.Ctx.OpenSheet", "전투원 설정"),
+      label: feLocalize("FECT.Ctx.OpenSheet"),
     },
     {
       action: "toggle-hidden",
       icon: c.hidden ? "fa-eye" : "fa-eye-slash",
-      label: c.hidden ? feCtL("FECT.Ctx.Unhide", "숨김 해제") : feCtL("FECT.Ctx.Hide", "숨기기"),
+      label: c.hidden ? feLocalize("FECT.Ctx.Unhide") : feLocalize("FECT.Ctx.Hide"),
     },
     {
       action: "toggle-defeated",
       icon: "fa-skull",
-      label: c.isDefeated ? feCtL("FECT.Ctx.Revive", "사망 해제") : feCtL("FECT.Ctx.Defeat", "사망 표시"),
+      label: c.isDefeated ? feLocalize("FECT.Ctx.Revive") : feLocalize("FECT.Ctx.Defeat"),
     },
-    { action: "adjust-hp", icon: "fa-heart", label: feCtL("FECT.Ctx.AdjustHP", "HP 조절") },
-    { action: "set-initiative", icon: "fa-dice-d20", label: feCtL("FECT.Ctx.SetInit", "이니셔티브 수정") },
-    { action: "reroll-initiative", icon: "fa-dice", label: feCtL("FECT.Ctx.Reroll", "이니셔티브 재굴림") },
-    { action: "move-up", icon: "fa-arrow-up", label: feCtL("FECT.Ctx.MoveUp", "순서 위로") },
-    { action: "move-down", icon: "fa-arrow-down", label: feCtL("FECT.Ctx.MoveDown", "순서 아래로") },
+    { action: "adjust-hp", icon: "fa-heart", label: feLocalize("FECT.Ctx.AdjustHP") },
+    { action: "set-initiative", icon: "fa-dice-d20", label: feLocalize("FECT.Ctx.SetInit") },
+    { action: "reroll-initiative", icon: "fa-dice", label: feLocalize("FECT.Ctx.Reroll") },
+    { action: "move-up", icon: "fa-arrow-up", label: feLocalize("FECT.Ctx.MoveUp") },
+    { action: "move-down", icon: "fa-arrow-down", label: feLocalize("FECT.Ctx.MoveDown") },
   );
 
   // Mirrors core's `visible` conditions (combat-tracker.mjs#_getEntryContextOptions):
@@ -716,21 +711,21 @@ function feCtOpenContextMenu(id, x, y) {
     items.push({
       action: "clear-initiative",
       icon: "fa-arrow-rotate-left",
-      label: feCtL("FECT.Ctx.ClearInit", "이니셔티브 초기화"),
+      label: feLocalize("FECT.Ctx.ClearInit"),
     });
   }
   if (isGM && typeof c.clearMovementHistory === "function" && (c.token?.movementHistory?.length > 0)) {
     items.push({
       action: "clear-movement",
       icon: "fa-shoe-prints",
-      label: feCtL("FECT.Ctx.ClearMovement", "이동 기록 초기화"),
+      label: feLocalize("FECT.Ctx.ClearMovement"),
     });
   }
 
   if (isGM) items.push({
     action: "remove-combatant",
     icon: "fa-trash",
-    label: feCtL("FECT.Ctx.Remove", "전투원 제거"),
+    label: feLocalize("FECT.Ctx.Remove"),
     danger: true,
   });
 
@@ -794,7 +789,7 @@ async function feCtHandleContextAction(action, id) {
         const eff = CONFIG?.specialStatusEffects?.DEFEATED;
         if (eff && typeof c.actor?.toggleStatusEffect === "function") {
           try { await c.actor.toggleStatusEffect(eff, { active: next, overlay: true }); }
-          catch (e) { console.warn("[female_edition] combat-tracker defeated status toggle failed", e); }
+          catch (e) { console.warn(feLocalize("FE.Diagnostics.CombatTracker.feCtHandleContextAction"), e); }
         }
         break;
       }
@@ -806,7 +801,7 @@ async function feCtHandleContextAction(action, id) {
       case "clear-movement": {
         if (typeof c.clearMovementHistory !== "function") break;
         await c.clearMovementHistory();
-        ui.notifications?.info(`${c.name}의 이동 기록을 초기화했습니다.`);
+        ui.notifications?.info(feFormat("FE.CombatTracker.feCtHandleContextAction", { name: c.name }));
         break;
       }
       case "move-up":         await feCtMoveCombatant(combat, c, -1); break;
@@ -814,15 +809,15 @@ async function feCtHandleContextAction(action, id) {
       case "remove-combatant": await feCtRemoveCombatant(c); break;
     }
   } catch (e) {
-    console.error("[female_edition] combat-tracker context action failed", e);
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtHandleContextAction2"), e);
   }
 }
 
 async function feCtRequestEndTurn(combat, c) {
   if (!feCtCanEndTurnForCombatant(combat, c)) {
     const msg = combat?.combatant?.id === c?.id
-      ? feCtL("FECT.Ctx.NoTurnPermission", "이 전투원의 턴을 종료할 권한이 없습니다.")
-      : feCtL("FECT.Ctx.NotCurrentTurn", "현재 턴인 전투원만 턴을 종료할 수 있습니다.");
+      ? feLocalize("FECT.Ctx.NoTurnPermission")
+      : feLocalize("FECT.Ctx.NotCurrentTurn");
     ui.notifications?.warn(msg);
     return;
   }
@@ -848,7 +843,7 @@ async function feCtRequestEndTurn(combat, c) {
   }
 
   if (!feCtActiveGm()) {
-    ui.notifications?.warn(feCtL("FECT.Ctx.NoGM", "GM이 접속해 있지 않아 턴을 종료할 수 없습니다."));
+    ui.notifications?.warn(feLocalize("FECT.Ctx.NoGM"));
     return;
   }
   game.socket.emit(SOCKET_CHANNEL, payload);
@@ -872,21 +867,21 @@ function feCtOnSocket(data, senderId) {
   const requester = feResolveSocketSender(senderId, data.requesterId, "combat-tracker");
   if (!requester) return;
   feCtApplyEndTurn(data, requester).catch((e) => {
-    console.error("[female_edition] combat-tracker end-turn request failed", e);
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtOnSocket"), e);
   });
 }
 
 async function feCtOpenHpDialog(c) {
   const actor = c.actor;
   if (!actor) {
-    ui.notifications?.warn(feCtL("FECT.Ctx.NoActor", "연결된 액터가 없어 HP를 조절할 수 없습니다."));
+    ui.notifications?.warn(feLocalize("FECT.Ctx.NoActor"));
     return;
   }
   const sys = actor.system ?? {};
   const hasAttr = !!sys?.attributes?.hp;
   const hasFlat = !!sys?.hp;
   if (!hasAttr && !hasFlat) {
-    ui.notifications?.warn(feCtL("FECT.Ctx.NoHP", "이 액터에서 HP 경로를 찾을 수 없습니다."));
+    ui.notifications?.warn(feLocalize("FECT.Ctx.NoHP"));
     return;
   }
   const path = hasAttr ? "system.attributes.hp.value" : "system.hp.value";
@@ -901,10 +896,10 @@ async function feCtOpenHpDialog(c) {
   let result;
   try {
     result = await DialogV2.prompt({
-      window: { title: `${feCtL("FECT.Ctx.AdjustHP", "HP 조절")} — ${c.name}` },
+      window: { title: `${feLocalize("FECT.Ctx.AdjustHP")} — ${c.name}` },
       content,
       ok: {
-        label: feCtL("FECT.Apply", "적용"),
+        label: feLocalize("FECT.Apply"),
         callback: (ev, btn) => btn.form.elements.hp.value,
       },
     });
@@ -928,17 +923,17 @@ async function feCtOpenInitiativeDialog(combat, c) {
   const DialogV2 = foundry.applications.api.DialogV2;
   const content =
     `<div class="fe-ct-init-dialog" style="padding:6px 2px;display:flex;align-items:center;gap:8px;">` +
-    `<label style="font-weight:bold;">${feCtEsc(feCtL("FECT.Ctx.Initiative", "이니셔티브"))}</label>` +
+    `<label style="font-weight:bold;">${feCtEsc(feLocalize("FECT.Ctx.Initiative"))}</label>` +
     `<input type="number" name="init" value="${feCtEsc(curStr)}" step="any" autofocus ` +
-    `placeholder="${feCtEsc(feCtL("FECT.Ctx.InitEmpty", "비움 = 미설정"))}" ` +
+    `placeholder="${feCtEsc(feLocalize("FECT.Ctx.InitEmpty"))}" ` +
     `style="flex:1;min-width:90px;"></div>`;
   let result;
   try {
     result = await DialogV2.prompt({
-      window: { title: `${feCtL("FECT.Ctx.SetInit", "이니셔티브 수정")} — ${c.name}` },
+      window: { title: `${feLocalize("FECT.Ctx.SetInit")} — ${c.name}` },
       content,
       ok: {
-        label: feCtL("FECT.Apply", "적용"),
+        label: feLocalize("FECT.Apply"),
         callback: (ev, btn) => btn.form.elements.init.value,
       },
     });
@@ -954,7 +949,7 @@ async function feCtOpenInitiativeDialog(combat, c) {
   }
   const val = Number(raw);
   if (!Number.isFinite(val)) {
-    ui.notifications?.warn(feCtL("FECT.Ctx.InitInvalid", "유효한 이니셔티브 값이 아닙니다."));
+    ui.notifications?.warn(feLocalize("FECT.Ctx.InitInvalid"));
     return;
   }
   // write only this combatant's initiative — core's setupTurns() does the re-sort
@@ -975,7 +970,7 @@ async function feCtMoveCombatant(combat, c, dir) {
   const beyond = turns[j + dir];      // the one just past it (for a midpoint), may be undefined
   const nInit = Number(neighbor.initiative);
   if (!Number.isFinite(nInit)) {
-    ui.notifications?.warn(feCtL("FECT.Ctx.NeedInit", "이니셔티브가 없는 전투원은 순서를 바꿀 수 없습니다."));
+    ui.notifications?.warn(feLocalize("FECT.Ctx.NeedInit"));
     return;
   }
 
@@ -1000,9 +995,9 @@ async function feCtRemoveCombatant(c) {
   let ok = false;
   try {
     ok = await DialogV2.confirm({
-      window: { title: feCtL("FECT.Ctx.Remove", "전투원 제거") },
+      window: { title: feLocalize("FECT.Ctx.Remove") },
       content: `<p>${feCtEsc(
-        feCtL("FECT.Ctx.RemoveConfirm", "이 전투원을 전투에서 제거합니다.")
+        feLocalize("FECT.Ctx.RemoveConfirm")
       )}</p><p><strong>${feCtEsc(c.name ?? "")}</strong></p>`,
       rejectClose: false,
       modal: true,
@@ -1033,8 +1028,8 @@ Hooks.once("ready", () => {
   if (!feCtEnabled()) return;
   if (feCtOriginalActive()) {
     console.warn(
-      `[female_edition] combat-tracker: 「Carousel Combat Tracker」(${CTD_ID}) 활성 — ` +
-        `내장 컴뱃 트래커를 끄고 원본에 양보합니다.`
+      feFormat("FE.Diagnostics.CombatTracker.warn", { CTD_ID: CTD_ID }) +
+        feLocalize("FE.Diagnostics.CombatTracker.warn2")
     );
     return;
   }

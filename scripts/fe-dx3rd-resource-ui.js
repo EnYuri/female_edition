@@ -1,3 +1,4 @@
+import { feLocalize, feLocalizeHTML, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-dx3rd-resource-ui.js
 // Pixel-theme character status panels. An actor gets a card only while it carries
@@ -229,24 +230,24 @@ function _showCardContextMenu(actor, e) {
 
   const items = [
     ...(onStage ? [{
-      label:  "발화 전환",
+      label:  feLocalize("FE.Common.SwitchSpeaker"),
       icon:   "fa-comment-dots",
       action: () => globalThis.fetSetSpeakingAs?.(actor.id),
     }] : []),
     ...(hasStage ? [{
-      label:  onStage ? "무대에서 제거" : "무대에 추가",
+      label:  onStage ? feLocalize("FE.Common.RemoveFromStage") : feLocalize("FE.Common.AddToStage"),
       icon:   "fa-theater-masks",
       action: () => onStage
         ? globalThis.fetRemoveFromStage?.(actor.id)
         : globalThis.fetAddToStage?.(actor),
     }] : []),
     {
-      label:  pinned ? "스테이터스에서 제거" : "스테이터스에 추가",
+      label:  pinned ? feLocalize("FE.Dx3rdResourceUi.label") : feLocalize("FE.Dx3rdResourceUi.label2"),
       icon:   "fa-eye",
       action: () => _toggleActorPin(actor),
     },
     {
-      label:  masked ? "수치 표시" : "수치 숨기기 (??)",
+      label:  masked ? feLocalize("FE.Dx3rdResourceUi.label3") : feLocalize("FE.Dx3rdResourceUi.label4"),
       icon:   masked ? "fa-eye" : "fa-question-circle",
       action: () => _toggleActorMask(actor),
     },
@@ -303,7 +304,7 @@ function _buildCard(actor, pw, panelW, ch) {
           `<div class="fedr-bar-group">` +
             `<div class="fedr-bar fedr-enc"><div class="fedr-fill"></div></div>` +
             `<div class="fedr-label-row">` +
-              `<span class="fedr-label-key">침식률</span>` +
+              `<span class="fedr-label-key">${feLocalizeHTML("FE.Dx3rdResourceUi.Encroachment")}</span>` +
               `<span class="fedr-label fedr-enc-lbl"></span>` +
             `</div>` +
           `</div>` +
@@ -577,7 +578,7 @@ async function _setAccent(color) {
     // but await-ing here guarantees it before any quick refresh.)
     await feCaptureWorldSettings();
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to persist accent color`, err);
+    console.warn(feFormat("FE.Diagnostics.Dx3rdResourceUi._setAccent", { MODULE_ID: MODULE_ID }), err);
   }
 }
 
@@ -613,7 +614,7 @@ async function _openAccentDialog(label) {
   let picked;
   try {
     picked = await DialogV2.prompt({
-      window: { title: "픽셀 테마 강조색" },
+      window: { title: feLocalize("FE.Dx3rdResourceUi.window.title") },
       content,
       // The two inputs mirror each other; only the colour input is authoritative,
       // because the text field can hold a half-typed value at any moment.
@@ -635,7 +636,7 @@ async function _openAccentDialog(label) {
         });
       },
       ok: {
-        label: "확인",
+        label: feLocalize("FE.Common.Confirm"),
         callback: (_ev, btn) => btn.form.elements.accent.value,
       },
     });
@@ -675,7 +676,7 @@ function _injectAccentBtn() {
   const label = document.createElement("label");
   label.id        = ACCENT_BTN_ID;
   label.className = "fe-dx3rd-accent-btn";
-  label.title     = "픽셀 테마 강조색";
+  label.title     = feLocalize("FE.Dx3rdResourceUi.window.title");
   label.setAttribute("role", "button");
   label.style.setProperty("--fe-accent-swatch", color);
   label.addEventListener("click", (ev) => {
@@ -703,7 +704,7 @@ function _refreshVisibility() {
 // v14: getActorContextOptions / v13: getActorContextMenuOptions
 function _ruiContextEntry(html, options) {
   if (!_isSupported() || !_ruiEnabled()) return;
-  if (options.some(o => o.name === "스테이터스 토글")) return;
+  if (options.some(o => o.name === feLocalize("FE.Dx3rdResourceUi._ruiContextEntry"))) return;
   // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
   // v16). Minimum support is v13, so emit both key pairs.
   const visible = li => {
@@ -713,8 +714,8 @@ function _ruiContextEntry(html, options) {
     return !!game.actors.get(id)?.isOwner;
   };
   const item = {
-    label: "스테이터스 토글",
-    name: "스테이터스 토글",
+    label: feLocalize("FE.Dx3rdResourceUi._ruiContextEntry"),
+    name: feLocalize("FE.Dx3rdResourceUi._ruiContextEntry"),
     icon: '<i class="fas fa-eye"></i>',
     visible,
     condition: visible,
@@ -731,10 +732,10 @@ function _ruiContextEntry(html, options) {
   // order: [Edit, stage add/remove, stage settings, status toggle].
   let at = -1;
   for (let i = 0; i < options.length; i++) {
-    if (typeof options[i]?.name === "string" && options[i].name.startsWith("무대")) at = i;
+    if (typeof options[i]?.name === "string" && options[i].name.startsWith(feLocalize("FE.Common.Stage"))) at = i;
   }
   if (at < 0) {
-    const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+    const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? feLocalize("FE.Common.Edit");
     at = options.findIndex(o =>
       o?.label === "SIDEBAR.Edit" || o?.name === "SIDEBAR.Edit" ||
       o?.label === editLabel       || o?.name === editLabel);
@@ -752,7 +753,7 @@ Hooks.on("createActor", (actor, _options, userId) => {
   if (!_isDx3rd()) return;
   if (game.user.id !== userId || !actor.isOwner) return;
   actor.setFlag(MODULE_ID, MASK_FLAG, true)
-    .catch(err => console.warn(`[${MODULE_ID}] failed to set default mask flag`, err));
+    .catch(err => console.warn(feFormat("FE.Diagnostics.Dx3rdResourceUi.warn", { MODULE_ID: MODULE_ID }), err));
 });
 
 // Canvas token right-click: inject buttons into the Token HUD. There is no core
@@ -791,12 +792,12 @@ function _injectTokenHudButtons(app, el) {
   if (hasStage && actor.isOwner) {
     const onStage = !!globalThis.fetIsOnStage?.(actor.id);
     if (onStage) {
-      colLeft.appendChild(_hudIconBtn("발화 전환", "fa-comment-dots",
+      colLeft.appendChild(_hudIconBtn(feLocalize("FE.Common.SwitchSpeaker"), "fa-comment-dots",
         () => globalThis.fetSetSpeakingAs?.(actor.id)));
-      colLeft.appendChild(_hudIconBtn("무대에서 제거", "fa-theater-masks",
+      colLeft.appendChild(_hudIconBtn(feLocalize("FE.Common.RemoveFromStage"), "fa-theater-masks",
         () => globalThis.fetRemoveFromStage?.(actor.id)));
     } else {
-      colLeft.appendChild(_hudIconBtn("무대에 추가", "fa-theater-masks",
+      colLeft.appendChild(_hudIconBtn(feLocalize("FE.Common.AddToStage"), "fa-theater-masks",
         () => globalThis.fetAddToStage?.(actor)));
     }
   }
@@ -805,7 +806,7 @@ function _injectTokenHudButtons(app, el) {
   if (_isSupported() && _ruiEnabled()) {
     const pinned = _isActorPinned(actor);
     colRight.appendChild(_hudIconBtn(
-      pinned ? "스테이터스 UI에서 제거" : "스테이터스 UI 토글",
+      pinned ? feLocalize("FE.Dx3rdResourceUi._injectTokenHudButtons") : feLocalize("FE.Dx3rdResourceUi._injectTokenHudButtons2"),
       pinned ? "fa-eye-slash" : "fa-eye",
       () => _toggleActorPin(actor)));
   }
@@ -833,7 +834,7 @@ function _ruiOnGetHeaderControls(app, controls) {
   controls.push({
     action: "fedrToggleMask",
     icon: "fas fa-question-circle",
-    label: _isMasked(actor) ? "수치 표시" : "수치 숨기기 (??)",
+    label: _isMasked(actor) ? feLocalize("FE.Dx3rdResourceUi.label3") : feLocalize("FE.Dx3rdResourceUi.label4"),
     onClick: () => _toggleActorMask(actor),
   });
 }
@@ -864,14 +865,14 @@ function _injectSheetStatusBtn(app, el) {
 
   const btn = document.createElement("a");
   btn.className = "header-button fedr-sheet-btn";
-  btn.title = pinned ? "숨기기" : "스테이터스";
+  btn.title = pinned ? feLocalize("FECT.Ctx.Hide") : feLocalize("FE.Dx3rdResourceUi.title");
   btn.setAttribute("aria-label", btn.title);
   btn.innerHTML = `<i class="fas ${pinned ? "fa-eye" : "fa-eye-slash"}" inert></i>`;
   btn.addEventListener("click", e => { e.preventDefault(); _toggleActorPin(actor); });
 
   const maskBtn = document.createElement("a");
   maskBtn.className = "header-button fedr-sheet-btn";
-  maskBtn.title = masked ? "수치 표시" : "수치 숨기기 (??)";
+  maskBtn.title = masked ? feLocalize("FE.Dx3rdResourceUi.label3") : feLocalize("FE.Dx3rdResourceUi.label4");
   maskBtn.setAttribute("aria-label", maskBtn.title);
   maskBtn.innerHTML = `<i class="fas fa-question-circle" inert></i>`;
   maskBtn.addEventListener("click", e => { e.preventDefault(); _toggleActorMask(actor); });

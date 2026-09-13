@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // Archive HTML-snapshot production for fe-chat-archive.js.
 //
 // Sub-module of fe-chat-archive.js. Owns the "self-contained HTML file" concern:
@@ -172,7 +173,7 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
     try { return new URL(abs).origin === window.location.origin; } catch { return false; }
   };
 
-  setMeta("Embedding styles…");
+  setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingStyles"));
 
   // -----------------------------------------------------------------------
   // Phase A: module/system stylesheets that Foundry injects as
@@ -581,7 +582,7 @@ async function feEmbedSnapshotCssAssets(headClone, doc, setMeta = () => {}, stor
   const { fonts, images } = feClassifySnapshotAssetUrls(found, cdnFontAllow);
   if (!fonts.length && !images.length) return;
 
-  setMeta("Embedding CSS assets…");
+  setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingCssAssets"));
 
   // Fonts FIRST so a large decorative image can never crowd out a face whose
   // absence would leave unreadable text. (They have separate budgets now, so this
@@ -661,7 +662,7 @@ async function feEmbedSnapshotInlineStyleAssets(bodyParts, setMeta = () => {}, s
   const { fonts, images } = feClassifySnapshotAssetUrls(found);
   if (!fonts.length && !images.length) return parts;
 
-  setMeta("Embedding inline style assets…");
+  setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingInlineAssets"));
   await store.admit(fonts, "font");
   await store.admit(images, "image");
   if (!store.embedded.size) return parts;
@@ -812,7 +813,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // Embed custom fonts (optional).
   if (feSetting(S.EXPORT_EMBED_FONTS)) {
     try {
-      setMeta("Embedding fonts…");
+      setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingFonts"));
       const fontCss = await feBuildEmbeddedCookieRunFontCSS();
       if (fontCss) {
         const styleEl = doc.createElement("style");
@@ -822,7 +823,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         feInjectExportFontReadyBootstrap(headClone, doc);
       }
     } catch (err) {
-      console.warn("female_edition | HTML export: failed to embed fonts", err);
+      console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob"), err);
     }
   }
 
@@ -856,7 +857,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
         // (size × dpr — 64px on a dpr-1 machine) and turns blocky the moment the saved
         // file is printed or zoomed. See feUpgradePortraitsForExport.
         portraitRestore = await feUpgradePortraitsForExport(snapshotRoot, { meta: setMeta }) || (() => {});
-        setMeta("Embedding images…");
+        setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingImages"));
         // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade above,
         // or — only when the upgrade could not run at all, e.g. a dead source or a spent
         // budget — the live HQ result) stays as-is. A source the upgrade merely could not
@@ -912,7 +913,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
             });
           }
         } catch (e) {
-          console.warn("female_edition | HTML export: pre-embed downscale failed", e);
+          console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob2"), e);
         }
         const embedRestore = await feEmbedImagesInNode(snapshotRoot, {
           meta: setMeta,
@@ -941,7 +942,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
           portraitRestore = () => {};
         }
       } catch (err) {
-        console.warn("female_edition | HTML export: failed to embed images", err);
+        console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob3"), err);
         // Fallback: still produce a valid snapshot. Self-contained portrait srcs
         // are kept for the same reason as the main path above.
         const restore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts, keepSelfContainedSrc: true });
@@ -972,7 +973,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   try {
     bodyParts = await feEmbedSnapshotInlineStyleAssets(bodyParts, setMeta, assetStore);
   } catch (err) {
-    console.warn("female_edition | HTML export: failed to embed inline style assets", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob4"), err);
   }
 
   // ---
@@ -1026,10 +1027,10 @@ async function feDownloadArchiveHTMLUnlocked(win, titleText = "Chat Log", { body
   try {
     const doc = win.document;
 
-    setMeta("Preparing HTML…");
+    setMeta(feLocalize("FE.ChatArchive.Status.PreparingHtml"));
     const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta, bodyRoot });
 
-    setMeta("Downloading…");
+    setMeta(feLocalize("FE.ChatArchive.Status.Downloading"));
     const url = URL.createObjectURL(blob);
     const a = doc.createElement("a");
     a.href = url;
@@ -1040,7 +1041,7 @@ async function feDownloadArchiveHTMLUnlocked(win, titleText = "Chat Log", { body
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return true;
   } catch (err) {
-    console.warn("female_edition | failed to download archive HTML", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feDownloadArchiveHTMLUnlocked"), err);
     return false;
   } finally {
     setMeta(originalMeta);
@@ -1205,8 +1206,8 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
     // it (route prefix, 404, size cap, fetch timeout) is invisible from outside, hence
     // naming the URL actually tried.
     console.warn(
-      `female_edition | 아카이브 폰트 임베드 실패: CookieRun 페이스를 하나도 가져오지 못했습니다. ` +
-      `내보낸 파일은 시스템 기본 폰트로 렌더됩니다. 시도한 경로: ${fontUrl("CookieRun%20Regular.otf")}`
+      feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildEmbeddedCookieRunFontCSS") +
+      feFormat("FE.Diagnostics.ArchiveSnapshot.feBuildEmbeddedCookieRunFontCSS2", { value1: fontUrl("CookieRun%20Regular.otf") })
     );
     // Do not cache the fallback-only result: local font requests may have failed
     // transiently, and a later export should get another chance to embed them.
@@ -1598,7 +1599,7 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
             maxSide: 1400,
           });
           if (!shrunk) {
-            console.warn("female_edition | HTML export: image over per-image cap and not compressible", abs, blob.size);
+            console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode"), abs, blob.size);
             return null;
           }
           return { dataUrl: shrunk.dataUrl, size: shrunk.size, compressed: true };
@@ -1608,7 +1609,7 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
         // memoized entry doesn't pin bytes for the rest of the run.
         return { dataUrl: await feBlobToDataURL(blob), size: blob.size, blob };
       } catch (err) {
-        console.warn("female_edition | HTML export: failed to embed image", abs, err);
+        console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode2"), abs, err);
         return null;
       } finally {
         inflight -= 1;
@@ -1646,11 +1647,11 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
       // far past any sane file size.
       if (embeddedCount >= MAX_IMAGES || embeddedBytes >= HARD_TOTAL_CEILING) {
         setMeta(
-          `Embedding images… stopped (limit reached: ${embeddedCount} images, ${(
+          feFormat("FE.ChatArchive.Status.ImageLimitReached", { embeddedCount: embeddedCount, value2: (
             embeddedBytes /
             1024 /
             1024
-          ).toFixed(1)}MB)`
+          ).toFixed(1) })
         );
         break;
       }
@@ -1674,7 +1675,7 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
         continue;
       }
 
-      setMeta(`Embedding images… ${embeddedCount}/${MAX_IMAGES} (scanning ${i + 1}/${imgs.length})`);
+      setMeta(feFormat("FE.ChatArchive.Status.EmbeddingImageProgress", { embeddedCount: embeddedCount, MAX_IMAGES: MAX_IMAGES, value3: i + 1, value4: imgs.length }));
 
       let result = await startFetch(abs);
       if (!result) continue;
@@ -1734,11 +1735,11 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
       }
       if (leftovers.length) {
         console.warn(
-          `female_edition | HTML export: ${leftovers.length} image(s) could NOT be embedded and still ` +
-          `reference this server — they will appear broken for other viewers.`,
+          feFormat("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode3", { value1: leftovers.length }) +
+          feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode4"),
           leftovers.slice(0, 10)
         );
-        setMeta(`Warning: ${leftovers.length} image(s) left un-embedded`);
+        setMeta(feFormat("FE.ChatArchive.Status.ImagesNotEmbedded", { value1: leftovers.length }));
       }
     } catch {}
 
@@ -1749,7 +1750,7 @@ async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
   } catch (err) {
     // The caller still gets `restore` with whatever's been recorded so far,
     // so the live archive window can recover from partial mutation.
-    console.warn("female_edition | HTML export: embed pass aborted", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode5"), err);
   }
 
   return restore;
@@ -1798,10 +1799,10 @@ function feDeduplicateInlineDataUrlsInNode(root, setMeta = () => {}) {
       scriptEl.textContent = '(function(){var cs=document.currentScript;if(cs&&cs.hasAttribute("data-fe-skip-bootstrap"))return;try{var m={};document.querySelectorAll(\'img[data-fe-img-ref][src^="data:"]\').forEach(function(el){var k=el.getAttribute("data-fe-img-ref");if(k&&!m[k])m[k]=el.getAttribute("src");});document.querySelectorAll("img[data-fe-img-ref]:not([src])").forEach(function(el){var s=m[el.getAttribute("data-fe-img-ref")];if(s)el.setAttribute("src",s);});}catch(_e){}})();';
       root.appendChild(scriptEl);
       scriptEl.removeAttribute("data-fe-skip-bootstrap");
-      try { setMeta(`Deduplicated ${dedupCount} inline image(s) (~${(savedBytes / 1024 / 1024).toFixed(1)}MB saved)`); } catch {}
+      try { setMeta(feFormat("FE.ChatArchive.Status.DeduplicatedImages", { dedupCount: dedupCount, value2: (savedBytes / 1024 / 1024).toFixed(1) })); } catch {}
     }
   } catch (err) {
-    console.warn("female_edition | HTML export: image dedup pass failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feDeduplicateInlineDataUrlsInNode"), err);
   }
   return () => {
     try { scriptEl?.remove(); } catch {}
@@ -2067,13 +2068,13 @@ export async function feUpgradePortraitsForExport(
         } catch {}
         done += 1;
         if (done === imgs.length || done % CONCURRENCY === 0) {
-          meta(`Preparing portraits… ${done}/${imgs.length}`);
+          meta(feFormat("FE.ChatArchive.Status.PreparingPortraits", { done: done, value2: imgs.length }));
         }
       }
     });
     await Promise.all(workers);
   } catch (err) {
-    console.warn("female_edition | HTML export: portrait upgrade failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feUpgradePortraitsForExport"), err);
   }
   return () => {
     for (const it of changed) {
@@ -2144,7 +2145,7 @@ async function feDownloadExportHTMLFromCurrentDocument() {
     // Foundry UI and out-of-range chat DOM never enter the saved file.
     return await feDownloadArchiveHTML(window, titleText, { bodyRoot: container });
   } catch (err) {
-    console.warn("female_edition | failed to download export HTML", err);
+    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feDownloadExportHTMLFromCurrentDocument"), err);
     return false;
   }
 }

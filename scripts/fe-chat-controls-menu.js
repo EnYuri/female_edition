@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 // fe-chat-controls-menu.js
 // Collapses #message-modes, .control-buttons, .fe-export-pdf, #ci-upload-image
 // into a hamburger toggle dropdown inside #chat-controls to save horizontal space.
@@ -118,8 +119,8 @@ function feRebuildCtrlMenu() {
     toggle.type = "button";
     toggle.id   = FE_CTRL_TOGGLE_ID;
     toggle.className = "ui-control icon fa-solid fa-bars";
-    toggle.dataset.tooltip = "채팅 메뉴";
-    toggle.ariaLabel = "채팅 메뉴";
+    toggle.dataset.tooltip = feLocalize("FE.ChatControlsMenu.tooltip");
+    toggle.ariaLabel = feLocalize("FE.ChatControlsMenu.tooltip");
     toggle.addEventListener("click", () => {
       const p = document.getElementById(FE_CTRL_PANEL_ID);
       if (!p) return;
@@ -174,7 +175,7 @@ function feScheduleCtrlMenuRebuild(delay = 80) {
   _rebuildTimer = setTimeout(() => {
     _rebuildTimer = null;
     try { feRebuildCtrlMenu(); } catch (err) {
-      console.warn("[female_edition] fe-chat-controls-menu: rebuild failed", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatControlsMenu.feScheduleCtrlMenuRebuild"), err);
     }
   }, delay);
 }

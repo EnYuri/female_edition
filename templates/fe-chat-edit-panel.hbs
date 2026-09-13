@@ -1,0 +1,32 @@
+{{!--
+  female_edition: floating chat message editor panel.
+  Injected once into <body> by fe-chat-edit.js (feEnsureInlineEditorUI).
+  .fe-chat-inline-editor-frame carries the retro-theme pixel border (::before/::after)
+  so the outline can sit OUTSIDE the panel content without clipping.
+--}}
+<div class="fe-chat-inline-editor-frame">
+  <div class="fe-chat-inline-editor-header" data-fe-drag-handle>
+    <span class="fe-edit-title"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> {{localize "FE.ChatEdit.EditMessage"}}</span>
+    <div class="fe-edit-mode-toggle">
+      <button type="button" class="fe-edit-mode-btn active" data-mode="markdown">{{localize "FE.ChatEdit.ModeMarkdown"}}</button>
+      <button type="button" class="fe-edit-mode-btn" data-mode="html">HTML</button>
+    </div>
+    <button type="button" class="fe-edit-close" aria-label="{{localize "FE.Common.Close"}}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+  </div>
+  <div class="fe-chat-inline-editor-row">
+    <textarea class="fe-chat-inline-editor-text" spellcheck="false" placeholder="{{localize "FE.ChatEdit.Placeholder"}}"></textarea>
+  </div>
+  <div class="fe-chat-inline-editor-actions">
+    <span class="fe-edit-hint">{{localize "FE.ChatEdit.Hint"}}</span>
+    <div class="fe-edit-action-btns">
+      <button type="button" class="fe-chat-inline-editor-save">
+        <i class="fa-solid fa-check"></i>
+        <span>{{localize "FE.Common.Save"}}</span>
+      </button>
+      <button type="button" class="fe-chat-inline-editor-cancel">
+        <i class="fa-solid fa-xmark"></i>
+        <span>{{localize "FE.Common.Cancel"}}</span>
+      </button>
+    </div>
+  </div>
+</div>

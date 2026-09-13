@@ -353,7 +353,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
       #sidebar #chat, #chat-notifications, .chat-popout #chat, .chat-message, .chat-card)
   :is(span, div, p, a, button, label, td, th, dt, dd, li, small, em, strong, b,
       h1, h2, h3, h4, h5, h6, .label, .name, .title, .value, .mod,
-      .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link) {
+      .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link):not(.key) {
   color: var(--fe-ac-90, #e6e6e6) !important;
   transition: none !important;
 }
@@ -1114,6 +1114,110 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   text-shadow: none !important;
 }
 
+
+/* ----------------------------------------------------------------
+ * Tidy5e Classic: 위 일괄 투명화의 예외 + 능력치 블록 구분 (실측 v14.367 /
+ * Tidy 13.7.0)
+ *
+ * 바로 위 두 규칙은 Tidy 시트의 모든 input/textarea/select 를 투명하게 만든다
+ * (스탯·인벤토리 행 위에 얹힌 입력칸에 박스가 생기지 않게 하려는 의도). 그런데
+ * 유틸리티 툴바의 '검색' 필드는 독립된 입력 필드라 경계가 보여야 한다.
+ *
+ * 1) 검색 필드 — 코어 input 과 같은 --fe-ac-33 테두리. Tidy 가 이미 4면에
+ *    `1px solid transparent` 를 갖고 있어 색만 올리면 되고 레이아웃은 안 변한다.
+ *    --fe-ac-22 는 L22% 라 검정 위에서 보이지 않았다 (실측 후 한 단계 상향).
+ *
+ * 2) 능력치 값 밑줄 — border-bottom 이 아니라 text-decoration 이다. 보더는 칸
+ *    전체 폭(50px)에 그어지지만 요구사항은 "글자 폭만큼"이다.
+ *
+ * 3) 수정치 │ 내성굴림 수직선 — ::before 로 그린다. box-shadow 로는 안 된다:
+ *    fe-retro-theme.css 의 전역 `* { box-shadow: none !important }` 와 이 파일의
+ *    Tidy 투명 버튼 예외 블록들이 여러 겹으로 box-shadow 를 지우고 있어 경쟁이
+ *    지저분하고, 실측에서 실제로 먹지 않았다. 의사 요소 배경은 그 경쟁 밖이다.
+ *
+ * 수정치/내성굴림의 불투명도는 여기서 건드리지 않는다. Tidy 의 classic.css 가
+ * 이 둘에 `opacity: 0.4` 를 걸지만, 이 파일 뒤쪽의
+ * `.actor-stats .ability-score-container > .ability-modifiers
+ *  :is(.ability-mod, .ability-save)` 규칙이 이미 `opacity: 1 !important` 로
+ * 되돌린다 — 명시도 (0,9,2) 로, 여기에 같은 취지의 규칙을 추가해도 (0,7,2) 라
+ * 항상 진다. 한때 0.85 규칙을 넣었다가 죽은 코드임을 확인하고 제거했다. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tab [data-tidy-sheet-part="utility-toolbar"] input.search {
+  border: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tab [data-tidy-sheet-part="utility-toolbar"] input.search:is(:hover, :focus, :focus-visible, :active) {
+  border-color: var(--fe-ac-57) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-stats .ability-score-container .block-score > input {
+  text-decoration: underline solid var(--fe-ac-33) from-font !important;
+  text-underline-offset: 2px !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .ability-score-container .ability-modifiers {
+  position: relative !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .ability-score-container .ability-modifiers::before {
+  background: var(--fe-ac-33) !important;
+  bottom: 2px !important;
+  content: "" !important;
+  left: 50% !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  top: 2px !important;
+  width: 1px !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * Tidy5e Classic: 포트레이트 하단 체력 바 · 휴식 아이콘
+ * (실측 v14.367 / Tidy 13.7.0)
+ *
+ * 1) 체력 바 — Tidy 는 `.bar` 에 인라인으로 `--bar-color: var(--t5e-hp-bar-color)`
+ *    를 심고 CSS 가 그 변수를 배경으로 쓴다. 기본값이 `#32953299` 로 알파 0x99
+ *    (60%) 라, 바 뒤의 액터 이미지가 그대로 비쳐 보인다. `.bar` 의 배경색을
+ *    직접 덮지 않고 변수만 불투명판으로 재정의한다 — Tidy 의 색 계산 경로를
+ *    그대로 두면 추후 색이 바뀌어도 알파만 빠진 채 따라간다.
+ *
+ * 2) 휴식 아이콘 — 배경을 받는 건 `button.rest` 가 아니다. 그 버튼은 hover 시
+ *    슬라이드해 들어오는 요소이고, 평소에는 부모 `.resting` 의
+ *    `overflow: hidden` 밖으로 밀려나 보이지 않는다 (실측: 버튼 x=348,
+ *    `.resting` 는 x=307 부터 34px). 평소 보이는 것은 `.resting` 안의
+ *    `span.resting-icon > i.fa-bed` 다. 그래서 배경은 항상 그 자리를 차지하는
+ *    `.resting` 에 건다 — hover 로 버튼이 들어와도 박스가 유지된다. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-profile-wrap .portrait-hp {
+  --t5e-hp-bar-color: #329532 !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-profile-wrap .rest-container .resting {
+  background: rgb(0 0 0 / 0.66) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .encumbrance-bar {
+  background-color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application .tidy-info-card span.key {
+  color: #000 !important;
+}
+
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   :where(.window-content)
   .actor-stats
@@ -1281,10 +1385,38 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
+/* Tidy5e Classic 탭 본문 구분선 — 툴바 "아래"로 내린다.
+ *
+ * 원래는 `.tidy-tab.active` 에 `inset 0 1px 0` 으로 탭 본문 맨 위에 그었다. 그런데
+ * `section.utility-toolbar`(검색창 + 필터 버튼)가 탭 본문의 첫 자식이면서 위로
+ * 올라와 있어 — 실측 v14.367 / Tidy 13.7.0: 탭 본문 top 284, 툴바 274~309 — 그 1px
+ * 선이 툴바 밴드 "안쪽"(y=284)을 지나 검색·필터 문자열 뒤를 가로질렀다.
+ *
+ * 그래서 선을 툴바의 border-bottom 으로 옮긴다. 툴바는 이미 1px border-bottom
+ * (rgba(120,120,120,0.1) — 사실상 안 보임)을 갖고 있으므로 색만 올리면 되고
+ * 레이아웃은 변하지 않는다. 결과적으로 "툴바 │ 아래 목록"을 가르는 선이 된다.
+ *
+ * 툴바는 7개 탭 중 4개(속성·인벤토리·주문책·특성)에만 있다. 효과·일대기·저널은
+ * 툴바가 없어 이 선을 잃으므로 그 세 탭에는 기존의 본문 상단 선을 남긴다 — 아래
+ * 세 번째 규칙. 첫 규칙과 명시도가 (0,7,2) 로 동률이라 소스 순서로 이긴다:
+ * 순서를 바꾸면 조용히 뒤집힌다. */
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   :where(.window-content)
   :is([data-tab-contents-for], .tidy-tab.active) {
   border-top-color: transparent !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tab > [data-tidy-sheet-part="utility-toolbar"] {
+  border-bottom: 1px solid var(--fe-tidy-rule) !important;
+  box-shadow: none !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .tidy-tab:not(:has([data-tidy-sheet-part="utility-toolbar"])) {
   box-shadow: inset 0 1px 0 var(--fe-tidy-rule) !important;
 }
 
@@ -1730,7 +1862,8 @@ body.fe-retro-theme .tidy5e-sheet .tidy-info-card > * {
 body.fe-retro-theme
   :is(
     .tidy5e-sheet.application.quadrone,
-    .dnd5e2.application.sheet.actor.standard-form
+    .dnd5e2.application.sheet.actor.standard-form,
+    .dnd5e2.application.sheet.standard-form.config-sheet
   ) {
   --fe-dnd5e-mono-bg: #000000;
   --fe-dnd5e-mono-surface: hsl(
@@ -1764,7 +1897,8 @@ body.fe-retro-theme
    현재 레트로 액센트로 연결해 두면 아이템/주문/효과 편집 화면에도
    같은 색조가 전파된다. 시스템 전용 마커로 제한해 다른 시스템의
    --dnd5e-* 호환 변수와도 충돌하지 않는다. */
-body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standard-form {
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standard-form,
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form.config-sheet {
   --dnd5e-color-gold: var(--fe-dnd5e-mono-line-strong) !important;
   --dnd5e-color-blue: var(--fe-dx3rd-accent, #ffffff) !important;
   --dnd5e-color-green: var(--fe-dnd5e-state-fill) !important;
@@ -3407,4 +3541,26 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
   position: absolute !important;
   right: 8px !important;
   top: calc(100% + 2px) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form.config-sheet
+  :is(fieldset.card, fieldset.traits) {
+  background: var(--fe-dnd5e-mono-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form.config-sheet
+  fieldset.card > .header {
+  background-color: var(--fe-dnd5e-mono-surface-2, #141414) !important;
+  background-image: none !important;
+  border: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form.config-sheet
+  legend {
+  background: var(--fe-dnd5e-mono-surface-2, #141414) !important;
+  background-image: none !important;
+  border: 1px solid var(--fe-ac-33) !important;
+  color: var(--fe-ac-90) !important;
 }

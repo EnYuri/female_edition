@@ -1,3 +1,4 @@
+import { feLocalize, feLocalizeHTML } from "./fe-i18n.js";
 // fe-filepicker-sort.js
 // Adds a sort-order control to core's FilePicker.
 //
@@ -134,7 +135,7 @@ function _updateControl(element, key, dir) {
   if (btn) {
     btn.classList.remove("fa-arrow-up-short-wide", "fa-arrow-down-wide-short");
     btn.classList.add(dir === "asc" ? "fa-arrow-up-short-wide" : "fa-arrow-down-wide-short");
-    btn.setAttribute("aria-label", dir === "asc" ? "오름차순" : "내림차순");
+    btn.setAttribute("aria-label", dir === "asc" ? feLocalize("FE.FilepickerSort.Ascending") : feLocalize("FE.FilepickerSort.Descending"));
   }
 }
 
@@ -148,11 +149,11 @@ function _injectControl(element) {
   const row = document.createElement("div");
   row.className = "form-group slim fe-fp-controls-row";
   row.innerHTML =
-    `<label class="fe-fp-ctl-label">정렬 기준</label>` +
-    `<select class="fe-fp-sort-key" aria-label="정렬 기준">` +
-      `<option value="name">이름순</option>` +
-      `<option value="date">수정 날짜순</option>` +
-      `<option value="size">크기순</option>` +
+    `<label class="fe-fp-ctl-label">${feLocalizeHTML("FE.FilepickerSort.SortBy")}</label>` +
+    `<select class="fe-fp-sort-key" aria-label="${feLocalizeHTML("FE.FilepickerSort.SortBy")}">` +
+      `<option value="name">${feLocalizeHTML("FE.FilepickerSort.Name")}</option>` +
+      `<option value="date">${feLocalizeHTML("FE.FilepickerSort.Date")}</option>` +
+      `<option value="size">${feLocalizeHTML("FE.FilepickerSort.Size")}</option>` +
     `</select>`;
 
   // Move core's display-mode label + split-button into this row and drop the old group.
@@ -168,7 +169,7 @@ function _injectControl(element) {
   dirBtn.type = "button";
   dirBtn.className = "ui-control icon fa-solid fe-fp-sort-dir";
   dirBtn.setAttribute("data-tooltip", "");
-  dirBtn.setAttribute("aria-label", "정렬 방향");
+  dirBtn.setAttribute("aria-label", feLocalize("FE.FilepickerSort.Direction"));
   row.appendChild(dirBtn);
 
   if (modeGroup) modeGroup.replaceWith(row); else sub.appendChild(row);

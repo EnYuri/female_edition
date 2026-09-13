@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // fe-chat-prune.js
 // DOM pruning subclass for ChatLog.
 // Imported by fe-chat-enhance.js; NOT listed in module.json.
@@ -17,7 +18,7 @@ import { feIsActiveModuleFeatureEnabled } from "./fe-conflict-state.js";
 export function feInstallChatLogPrune() {
   // chatlog-prune module handles this already — don't double-install
   if (feIsActiveModuleFeatureEnabled("chatlog-prune", "enabled", { unknown: true })) {
-    console.log("female_edition | chatlog-prune pruning enabled — skipping built-in DOM pruning");
+    console.log(feLocalize("FE.Diagnostics.ChatPrune.feInstallChatLogPrune"));
     return;
   }
 
@@ -565,5 +566,5 @@ export function feInstallChatLogPrune() {
   }
 
   CONFIG.ui.chat = FeChatLogPrune;
-  console.log(`female_edition | DOM pruning enabled (extending ${BaseChatLog.name})`);
+  console.log(feFormat("FE.Diagnostics.ChatPrune.feInstallChatLogPrune2", { value1: BaseChatLog.name }));
 }

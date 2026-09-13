@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting, FE_DEFAULTS, FE_SETTING_DEFINITIONS } from "./fe-settings-data.js";
 /**
  * fe-conflict-guard.js
@@ -90,11 +91,11 @@ function feCgMode() {
 const FE_CG_CONFLICTS = [
   {
     id: "narrator-tools",
-    feature: "내레이터 채팅",
-    detail: "내레이션 오버레이와 슬래시 명령이 이중으로 실행됩니다.",
+    get feature() { return feLocalize("FE.ConflictGuard.feature"); },
+    get detail() { return feLocalize("FE.ConflictGuard.detail"); },
     own: { features: [FE_CONFLICT_FEATURE.NARRATOR], settings: ["narratorEnabled"] },
     yieldWhenMaintained: true,
-    yieldDetail: "유지보수 중인 원본의 내레이터 기능이 활성화되어 female_edition 내레이터를 런타임에서 껐습니다.",
+    get yieldDetail() { return feLocalize("FE.ConflictGuard.yieldDetail"); },
     // Verified live: arrow handlers carry "NarratorTools" in source; the three
     // chat hooks are `Method.bind(NarratorTools)` → identified by fn.name
     // ("bound _chatMessage" …). Overlay is `<div id="narrator">` + a
@@ -115,11 +116,11 @@ const FE_CG_CONFLICTS = [
   },
   {
     id: "theatre",
-    feature: "무대(극장) 채팅",
-    detail: "채팅 스피커 라우팅이 정면 충돌합니다.",
+    get feature() { return feLocalize("FE.ConflictGuard.feature2"); },
+    get detail() { return feLocalize("FE.ConflictGuard.detail2"); },
     own: { features: [FE_CONFLICT_FEATURE.STAGE], settings: ["stageEnabled"] },
     yieldWhenMaintained: true,
-    yieldDetail: "유지보수 중인 원본의 무대 기능이 활성화되어 female_edition 무대를 런타임에서 껐습니다.",
+    get yieldDetail() { return feLocalize("FE.ConflictGuard.yieldDetail2"); },
     // Markers are tokens unique to the ORIGINAL theatre (fe-theatre never uses
     // these and is additionally protected by the self-guard).
     neutralize: {
@@ -146,12 +147,12 @@ const FE_CG_CONFLICTS = [
   },
   {
     id: "vino",
-    feature: "시네마틱 채팅(vino)",
-    detail: "오버레이/플래그 처리가 충돌하며, v9 API라 현재 코어에서 깨집니다.",
+    get feature() { return feLocalize("FE.ConflictGuard.feature3"); },
+    get detail() { return feLocalize("FE.ConflictGuard.detail3"); },
     own: { features: [FE_CONFLICT_FEATURE.STAGE], settings: ["stageEnabled"] },
     externalCheck: "vinoActors",
     yieldWhenMaintained: true,
-    yieldDetail: "유지보수 중인 원본의 시네마틱 채팅이 활성화되어 female_edition 무대를 런타임에서 껐습니다.",
+    get yieldDetail() { return feLocalize("FE.ConflictGuard.yieldDetail3"); },
     neutralize: {
       verifiedVersion: "1.0.0",
       markers: ["VNOverlay", "_getMood", "vino-overlay", "flags.vino"],
@@ -161,12 +162,12 @@ const FE_CG_CONFLICTS = [
   },
   {
     id: "image-hover",
-    feature: "토큰 이미지 호버",
-    detail: "토큰 호버 HUD가 두 개 표시됩니다.",
+    get feature() { return feLocalize("FE.ConflictGuard.feature4"); },
+    get detail() { return feLocalize("FE.ConflictGuard.detail4"); },
     own: { features: [FE_CONFLICT_FEATURE.IMAGE_HOVER], settings: ["ihEnabled"] },
     externalSetting: "userEnableModule",
     yieldWhenMaintained: true,
-    yieldDetail: "유지보수 중인 원본의 이미지 호버가 이 클라이언트에서 활성화되어 female_edition 이미지 호버를 런타임에서 껐습니다.",
+    get yieldDetail() { return feLocalize("FE.ConflictGuard.yieldDetail4"); },
     // fe-image-hover is a direct port and shares the `canvas.hud.imageHover`
     // slot + much vocabulary, so markers must be tokens UNIQUE to the original:
     // its keybind id "image-hover.userKeybindButton", the globals showSpecificArt
@@ -197,7 +198,7 @@ const FE_CG_CONFLICTS = [
     // recognise female_edition's `flags.female_edition.isNarrator`, so /narrate
     // also double-shows. No hooks to strip / no DOM clash (#smw-* ≠ #fe-*).
     id: "simple-message-window",
-    feature: "무대(노벨게임풍 메시지 창)",
+    get feature() { return feLocalize("FE.ConflictGuard.feature5"); },
     mode: "warn",
     own: {
       features: [FE_CONFLICT_FEATURE.STAGE, FE_CONFLICT_FEATURE.NARRATOR],
@@ -205,15 +206,15 @@ const FE_CG_CONFLICTS = [
       match: "any",
     },
     externalSetting: "smwEnable",
-    detail: "채팅을 입그림+메시지 창으로 표시하는 기능이 female_edition 무대(fe-theatre)와 겹칩니다. 둘 다 켜면 무대 발화가 이중 표시되고, /narrate 내레이션도 두 곳에 표시됩니다. 한쪽만 사용하세요.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail5"); },
   },
   {
     id: "chatlog-prune",
-    feature: "채팅 자동 정리",
+    get feature() { return feLocalize("FE.ConflictGuard.feature6"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.CHAT_PRUNE], settings: ["cePruneEnabled"] },
     externalSetting: "enabled",
-    detail: "female_edition 내장 채팅 정리 기능을 끄고 이 모듈에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail6"); },
   },
   {
     // fe-typing-indicator ALREADY fully yields to CGMP's typing notifier:
@@ -221,11 +222,11 @@ const FE_CG_CONFLICTS = [
     // socket display, or listeners), so there is no double indicator. This entry
     // is purely informational — same yield pattern as chatlog-prune.
     id: "CautiousGamemastersPack",
-    feature: "타이핑 알림",
+    get feature() { return feLocalize("FE.ConflictGuard.feature7"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.TYPING], settings: ["ceTypingEnabled"] },
     externalSetting: "notifyTyping",
-    detail: "female_edition이 타이핑 인디케이터를 끄고 이 모듈의 타이핑 알림에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail7"); },
   },
   {
     // fe-combat-tracker.js ALREADY fully yields: feCtOriginalActive() returns true
@@ -234,31 +235,31 @@ const FE_CG_CONFLICTS = [
     // pattern as chatlog-prune. Carousel is actively maintained, so we never
     // neutralize it.
     id: "combat-tracker-dock",
-    feature: "컴뱃 트래커",
+    get feature() { return feLocalize("FE.Common.CombatTracker"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.COMBAT_TRACKER], settings: ["ceCombatTrackerEnabled"] },
-    detail: "female_edition이 내장 컴뱃 트래커를 끄고 이 모듈(Carousel Combat Tracker)에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail8"); },
   },
   {
     id: "chat-portrait",
-    feature: "채팅 포트레이트",
+    get feature() { return feLocalize("FE.Common.ChatPortrait"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.CHAT_PORTRAIT], settings: ["chatPortraitEnabled"] },
-    detail: "female_edition이 내장 채팅 포트레이트를 런타임에서 끄고 원본 모듈에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail9"); },
   },
   {
     id: "chat-images",
-    feature: "채팅 이미지 업로드/임베드",
+    get feature() { return feLocalize("FE.ConflictGuard.feature10"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.CHAT_IMAGES], settings: ["chatImagesEnabled"] },
-    detail: "female_edition이 내장 채팅 이미지 기능을 런타임에서 끄고 원본 모듈에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail10"); },
   },
   {
     id: "emanim-music",
-    feature: "공용 음악 업로드/재생",
+    get feature() { return feLocalize("FE.ConflictGuard.feature11"); },
     mode: "yield",
     own: { features: [FE_CONFLICT_FEATURE.MUSIC], settings: ["ceMusicEnabled"] },
-    detail: "female_edition이 내장 음악 기능을 런타임에서 끄고 원본 모듈에 양보했습니다.",
+    get detail() { return feLocalize("FE.ConflictGuard.detail11"); },
   },
 ];
 
@@ -311,7 +312,7 @@ function feCgNeutralizeForceClientSettings(runtime = feCgGetForceClientSettingsR
       active: true,
       success: false,
       removed: [],
-      reason: "ForceClientSettings 런타임 맵에 접근할 수 없음",
+      reason: feLocalize("FE.ConflictGuard.reason"),
     };
   }
 
@@ -333,14 +334,14 @@ function feCgNeutralizeForceClientSettings(runtime = feCgGetForceClientSettingsR
   try {
     if (!runtime._feOwnNamespaceGuardInstalled) {
       if (typeof runtime.forceSetting !== "function" || typeof runtime.restrictSetting !== "function") {
-        throw new Error("예상한 forceSetting/restrictSetting 메서드가 없음");
+        throw new Error(feLocalize("FE.ConflictGuard.feCgNeutralizeForceClientSettings"));
       }
       const wrapMutator = (methodName) => {
         const original = runtime[methodName];
         runtime[methodName] = function feCgFcsOwnNamespaceGuard(key, ...args) {
           if (feCgIsOwnSettingKey(key)) {
             console.warn(
-              `[female_edition] Force Client Settings의 ${key} ${methodName} 요청을 차단했습니다.`
+              feFormat("FE.Diagnostics.ConflictGuard.feCgFcsOwnNamespaceGuard", { key: key, methodName: methodName })
             );
             return Promise.resolve(false);
           }
@@ -360,7 +361,7 @@ function feCgNeutralizeForceClientSettings(runtime = feCgGetForceClientSettingsR
       active: true,
       success: false,
       removed,
-      reason: `재강제 차단 설치 실패: ${err?.message ?? err}`,
+      reason: feFormat("FE.ConflictGuard.reason2", { value1: err?.message ?? err }),
     };
   }
 
@@ -409,7 +410,7 @@ function feCgInstallMldTargetConfirmationGuard() {
         if (!this._feCgMldPositionWarned) {
           this._feCgMldPositionWarned = true;
           console.warn(
-            "[female_edition] monks-little-details/midi-qol TargetConfirmation setPosition 오류를 우회했습니다.",
+            feLocalize("FE.Diagnostics.ConflictGuard.feCgMldSetPositionGuard"),
             err
           );
         }
@@ -423,7 +424,7 @@ function feCgInstallMldTargetConfirmationGuard() {
         proto.setPosition._feCgMldGuard = true;
         return true;
       } catch (err) {
-        console.warn("[female_edition] libWrapper guard registration failed; falling back to manual wrapper", err);
+        console.warn(feLocalize("FE.Diagnostics.ConflictGuard.feCgInstallMldTargetConfirmationGuard"), err);
       }
     }
 
@@ -436,7 +437,7 @@ function feCgInstallMldTargetConfirmationGuard() {
         if (!this._feCgMldPositionWarned) {
           this._feCgMldPositionWarned = true;
           console.warn(
-            "[female_edition] monks-little-details/midi-qol TargetConfirmation setPosition 오류를 우회했습니다.",
+            feLocalize("FE.Diagnostics.ConflictGuard.feCgMldSetPositionGuard"),
             err
           );
         }
@@ -447,7 +448,7 @@ function feCgInstallMldTargetConfirmationGuard() {
     proto.setPosition = wrapped;
     return true;
   } catch (err) {
-    console.warn("[female_edition] monks-little-details TargetConfirmation guard install failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ConflictGuard.feCgInstallMldTargetConfirmationGuard2"), err);
     return false;
   }
 }
@@ -532,7 +533,7 @@ function feCgAssessAuto(hit) {
   if (own.known && !own.enabled) return { action: "none", own, external };
   if (external.known && !external.enabled) return { action: "none", own, external };
   if (!own.known || !external.known) {
-    return { action: "unknown", own, external, reason: "기능 활성 설정을 확인할 수 없음" };
+    return { action: "unknown", own, external, reason: feLocalize("FE.ConflictGuard.reason3") };
   }
   if (hit.mode === "yield") return { action: "yield", own, external };
   if (!hit.neutralize) return { action: "warn", own, external };
@@ -542,8 +543,8 @@ function feCgAssessAuto(hit) {
   if (!fwd && !newer) return { action: "neutralize", own, external };
 
   const reason = fwd
-    ? "상위 코어 호환 선언 — 유지보수 중으로 판단"
-    : `검증 버전(${hit.neutralize.verifiedVersion})보다 높음(현재 ${hit.mod.version})`;
+    ? feLocalize("FE.ConflictGuard.reason4")
+    : feFormat("FE.ConflictGuard.reason5", { verifiedVersion: hit.neutralize.verifiedVersion, version: hit.mod.version });
   return {
     action: hit.yieldWhenMaintained ? "yield" : "warn",
     own,
@@ -563,19 +564,19 @@ function feCgAssessAuto(hit) {
 function feCgDemoteAction(action, hit, guardMode) {
   if (guardMode === "auto") return { action };
   if (action === "none") return { action };
-  if (guardMode === "off") return { action: "none", modeReason: "충돌 가드가 '사용 안 함'으로 설정됨" };
+  if (guardMode === "off") return { action: "none", modeReason: feLocalize("FE.ConflictGuard.modeReason") };
   // "unknown" already lands in the warn bucket downstream; leave it named so the
   // console audit keeps reporting WHY it could not be assessed.
   if (action === "unknown") return { action };
   if (guardMode === "warn") {
     return action === "warn"
       ? { action }
-      : { action: "warn", modeReason: "충돌 가드가 '경고만'으로 설정됨" };
+      : { action: "warn", modeReason: feLocalize("FE.ConflictGuard.modeReason2") };
   }
   if (guardMode === "yield" && action === "neutralize") {
     return hit?.own?.features?.length
-      ? { action: "yield", modeReason: "충돌 가드가 '양보만'으로 설정됨" }
-      : { action: "warn", modeReason: "충돌 가드가 '양보만'이나 양보할 자체 기능이 없음" };
+      ? { action: "yield", modeReason: feLocalize("FE.ConflictGuard.modeReason3") }
+      : { action: "warn", modeReason: feLocalize("FE.ConflictGuard.modeReason4") };
   }
   return { action };
 }
@@ -694,7 +695,7 @@ function feCgScheduleNeutralizeSecondPass(hit) {
       const moreHookCount = Object.values(moreHooks).reduce((a, b) => a + b, 0);
       if (moreHookCount || moreDom) {
         console.warn(
-          `[female_edition] conflict-guard 2차 strip 「${hit.id}」 — 훅 +${moreHookCount}, DOM +${moreDom}`,
+          feFormat("FE.Diagnostics.ConflictGuard.feCgScheduleNeutralizeSecondPass", { value1: hit.id, moreHookCount: moreHookCount, moreDom: moreDom }),
           moreHooks
         );
       }
@@ -724,7 +725,7 @@ Hooks.once("setup", () => {
     if (feCgMode() === "auto") FE_CG_FCS_RESULT = feCgNeutralizeForceClientSettings();
     feCgPrepareRuntimePolicy();
   }
-  catch (err) { console.error("[female_edition] conflict policy setup failed", err); }
+  catch (err) { console.error(feLocalize("FE.Diagnostics.ConflictGuard.error"), err); }
 });
 
 Hooks.once("ready", () => {
@@ -767,52 +768,52 @@ Hooks.once("ready", () => {
         const result = feCgNeutralize(hit);
         const minimumHooks = Math.max(1, Number(hit.neutralize?.minimumHooks) || 1);
         if (result.hookCount < minimumHooks) {
-          hit._skipReason = `무력화 검증 실패(제거 훅 ${result.hookCount}/${minimumHooks})`;
+          hit._skipReason = feFormat("FE.ConflictGuard._skipReason", { hookCount: result.hookCount, minimumHooks: minimumHooks });
           warnConflicts.push(hit);
           continue;
         }
         neutralized.push({ hit, result });
         feCgScheduleNeutralizeSecondPass(hit);
       } catch (e) {
-        console.error(`[female_edition] neutralize failed for ${hit.id}`, e);
-        hit._skipReason = "무력화 실패(예외)";
+        console.error(feFormat("FE.Diagnostics.ConflictGuard.error2", { value1: hit.id }), e);
+        hit._skipReason = feLocalize("FE.ConflictGuard._skipReason2");
         warnConflicts.push(hit);
       }
     }
 
     // ── console audit ──
     console.warn(
-      "%c[female_edition] 충돌/중복 모듈 감지",
+      feLocalize("FE.Diagnostics.ConflictGuard.warn"),
       "color:#e67e22;font-weight:bold;font-size:1.1em"
     );
     for (const { hit, result } of neutralized) {
       console.warn(
-        ` 🔧 「${hit.title}」(${hit.id}) — 버려진 중복 모듈 → 무력화: ` +
-          `훅 ${result.hookCount}개 제거, DOM ${result.dom}개 제거`,
+        feFormat("FE.Diagnostics.ConflictGuard.warn2", { value1: hit.title, value2: hit.id }) +
+          feFormat("FE.Diagnostics.ConflictGuard.warn3", { value1: result.hookCount, value2: result.dom }),
         result.hooks
       );
     }
     for (const hit of warnConflicts) {
-      const why = hit._skipReason ? ` [무력화 보류: ${hit._skipReason}]` : "";
+      const why = hit._skipReason ? feFormat("FE.ConflictGuard.why", { _skipReason: hit._skipReason }) : "";
       console.warn(
-        ` ⚠ 「${hit.title}」(${hit.id}) — female_edition "${hit.feature}"와 중복: ${hit.detail}${why} → 원본 모듈을 비활성화하세요.`
+        feFormat("FE.Diagnostics.ConflictGuard.warn4", { value1: hit.title, value2: hit.id, value3: hit.feature, value4: hit.detail, why: why })
       );
     }
     for (const hit of yields) {
-      console.warn(` ↪ 「${hit.title}」(${hit.id}) — ${hit.detail}`);
+      console.warn(feFormat("FE.Diagnostics.ConflictGuard.warn5", { value1: hit.title, value2: hit.id, value3: hit.detail }));
     }
     if (FE_CG_FCS_RESULT?.active) {
       if (FE_CG_FCS_RESULT.success) {
         const keys = [...new Set(FE_CG_FCS_RESULT.removed.map((entry) => entry.key))];
         if (keys.length) {
           console.warn(
-            ` 🔧 「Force Client Settings」 — female_edition 범위만 런타임 무력화: ${keys.length}개 설정`,
+            feFormat("FE.Diagnostics.ConflictGuard.warn6", { value1: keys.length }),
             keys
           );
         }
       } else {
         console.error(
-          ` ⚠ 「Force Client Settings」 — female_edition 범위 무력화 실패: ${FE_CG_FCS_RESULT.reason}`
+          feFormat("FE.Diagnostics.ConflictGuard.error3", { value1: FE_CG_FCS_RESULT.reason })
         );
       }
     }
@@ -823,35 +824,35 @@ Hooks.once("ready", () => {
     if (warnConflicts.length) {
       const list = warnConflicts.map((h) => `「${h.title}」`).join(", ");
       ui.notifications?.warn(
-        `female_edition: 중복 충돌 모듈 ${warnConflicts.length}개 감지 — ${list}. ` +
-          `female_edition이 동일 기능을 내장하므로 해당 원본 모듈을 비활성화하세요. (콘솔 F12 확인)`,
+        feFormat("FE.ConflictGuard.Text", { length: warnConflicts.length, list: list }) +
+          feLocalize("FE.ConflictGuard.Text2"),
         { permanent: true }
       );
     }
     for (const { hit, result } of neutralized) {
       ui.notifications?.warn(
-        `female_edition: 버려진 중복 모듈 「${hit.title}」 감지 — 라이브 무력화함` +
-          `(훅 ${result.hookCount}개 제거). female_edition 내장 기능이 대체합니다.`
+        feFormat("FE.ConflictGuard.Text3", { title: hit.title }) +
+          feFormat("FE.ConflictGuard.Text4", { hookCount: result.hookCount })
       );
     }
     for (const hit of yields) {
-      ui.notifications?.warn(`female_edition: 「${hit.title}」 감지 — ${hit.detail}`);
+      ui.notifications?.warn(feFormat("FE.ConflictGuard.Text5", { title: hit.title, detail: hit.detail }));
     }
     if (FE_CG_FCS_RESULT?.active && FE_CG_FCS_RESULT.removed?.length) {
       const count = new Set(FE_CG_FCS_RESULT.removed.map((entry) => entry.key)).size;
       ui.notifications?.warn(
-        `female_edition: 유지보수가 중단된 「Force Client Settings」의 ` +
-          `female_edition 설정 강제 ${count}개를 이 세션에서 무력화했습니다.`
+        feLocalize("FE.ConflictGuard.Text6") +
+          feFormat("FE.ConflictGuard.Text7", { count: count })
       );
     } else if (FE_CG_FCS_RESULT?.active && !FE_CG_FCS_RESULT.success) {
       ui.notifications?.error(
-        `female_edition: Force Client Settings의 자체 설정 강제를 무력화하지 못했습니다. ` +
-          `해당 모듈에서 female_edition 설정 잠금을 해제하세요. (콘솔 F12 확인)`,
+        feLocalize("FE.ConflictGuard.Text8") +
+          feLocalize("FE.ConflictGuard.Text9"),
         { permanent: true }
       );
     }
   } catch (err) {
-    console.error("[female_edition] conflict-guard failed", err);
+    console.error(feLocalize("FE.Diagnostics.ConflictGuard.error4"), err);
   }
 });
 

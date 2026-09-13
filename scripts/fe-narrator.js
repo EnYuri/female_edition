@@ -1,4 +1,6 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
+import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
 /**
  * fe-narrator.js — Narrator overlay + styled narrator chat
  *
@@ -127,22 +129,16 @@ function _fnMsgStyle(name) {
   return CONST.CHAT_MESSAGE_STYLES ? { style: v } : { type: v };
 }
 
+// Markup lives in templates/fe-narrator-overlay.hbs; preloaded at `init`.
+const [FE_NARRATOR_OVERLAY_TEMPLATE] = feRegisterTemplates("fe-narrator-overlay.hbs");
+
 // ── Overlay DOM ──────────────────────────────────────────────────────────────
 function _fnBuildOverlay() {
   if (_fn.el) return;
   const el = document.createElement("div");
   el.id = "fe-narrator";
   el.className = "fe-narrator";
-  el.innerHTML = `
-    <div class="fe-narrator-bg"></div>
-    <div class="fe-narrator-frame">
-      <div class="fe-narrator-box"><div class="fe-narrator-content"></div></div>
-      <div class="fe-narrator-buttons" style="opacity:0;visibility:hidden;">
-        <button type="button" class="fe-nt-pause"></button>
-        <button type="button" class="fe-nt-close"></button>
-        <button type="button" class="fe-nt-copy"></button>
-      </div>
-    </div>`;
+  el.innerHTML = feRenderTemplate(FE_NARRATOR_OVERLAY_TEMPLATE);
   document.body.appendChild(el);
 
   _fn.el       = el;
@@ -155,10 +151,6 @@ function _fnBuildOverlay() {
   _fn.btnClose = el.querySelector(".fe-nt-close");
   _fn.btnCopy  = el.querySelector(".fe-nt-copy");
 
-  _fn.btnClose.innerHTML = `<i class="fas fa-times-circle"></i> ${game.i18n?.localize?.("Close") || "닫기"}`;
-  _fn.btnCopy.innerHTML  = `<i class="fas fa-clipboard"></i> 복사`;
-  _fnUpdatePauseButton(false);
-
   _fn.btnPause.addEventListener("click", () => {
     const n = _fnGetState().narration;
     const paused = !n.paused;
@@ -167,21 +159,22 @@ function _fnBuildOverlay() {
   });
   _fn.btnClose.addEventListener("click", () => _fnNarrationClose());
   _fn.btnCopy.addEventListener("click", () => {
-    try { navigator.clipboard.writeText(_fn.content.innerText); ui.notifications?.info("클립보드에 복사했습니다."); } catch {}
+    try { navigator.clipboard.writeText(_fn.content.innerText); ui.notifications?.info(feLocalize("FE.Narrator._fnBuildOverlay")); } catch {}
   });
 
-  // Only the narrator (GM-level) gets pause/close.
-  if (!_fn.isNarrator) {
-    _fn.btnPause.style.display = "none";
-    _fn.btnClose.style.display = "none";
-  }
+  // Only the narrator (GM-level) gets pause/close — a class, so the buttons keep
+  // whatever display the stylesheet gives them for everyone else.
+  el.classList.toggle("fe-nt-observer", !_fn.isNarrator);
 }
 
+// The button's markup comes from the template; only the icon glyph and the label
+// change, so swap those two instead of rebuilding innerHTML.
 function _fnUpdatePauseButton(paused) {
   if (!_fn.btnPause) return;
-  _fn.btnPause.innerHTML = paused
-    ? `<i class="fas fa-play-circle"></i> 재생`
-    : `<i class="fas fa-pause-circle"></i> 일시정지`;
+  const icon = _fn.btnPause.querySelector("i");
+  if (icon) icon.className = paused ? "fas fa-play-circle" : "fas fa-pause-circle";
+  const label = _fn.btnPause.querySelector(".fe-nt-label");
+  if (label) label.textContent = feLocalize(paused ? "FE.Common.Play" : "FE.Common.Pause");
 }
 
 // ── Duration model (ported from narrator-tools) ─────────────────────────────
@@ -229,14 +222,15 @@ function _fnController(state) {
       _fnAnimate(_fn.bg, [{ height: _fn.bg.style.height || "0px" }, { height: "0px" }], 400);
       _fnAnimate(_fn.buttons, [{ opacity: 1 }, { opacity: 0 }], 280);
     }
-    _fn.content.style.opacity = "0";
+    // Visibility is a class (fe-narrator.css); only the measured band height,
+    // which no stylesheet can know, stays inline — and the WAAPI keyframes above
+    // read it straight back off `style.height`.
+    _fn.el.classList.remove("fe-nt-open");
     _fn.bg.style.height = "0px";
-    _fn.buttons.style.opacity = "0";
-    _fn.buttons.style.visibility = "hidden";
     _fn.visible = false;
     return;
   }
-  if (!n.message) { _fn.content.style.opacity = "0"; return; }
+  if (!n.message) { _fn.el.classList.add("fe-nt-empty"); return; }
 
   // New narration id → open immediately (no artificial gap). The text fades in
   // via the CSS opacity transition (content starts at opacity 0 when nothing was
@@ -248,8 +242,8 @@ function _fnController(state) {
     _fn.content.innerHTML = n.message;
     _fn.content.style.top = "0px";
     const h = Math.min(_fn.content.offsetHeight || 0, 310);
-    _fn.btnCopy.style.display = _fnAllowCopy ? "" : "none";
-    _fn.buttons.style.visibility = "visible";
+    _fn.el.classList.remove("fe-nt-empty");
+    _fn.el.classList.toggle("fe-nt-no-copy", !_fnAllowCopy);
     _fn.buttons.style.top = `calc(50% + ${60 + h / 2}px)`;
     // Fade in via WAAPI only when coming from a hidden state; a back-to-back
     // replacement swaps content instantly (no flash to 0).
@@ -258,9 +252,8 @@ function _fnController(state) {
       _fnAnimate(_fn.bg, [{ height: "0px" }, { height: `${h * 3}px` }], 450);
       _fnAnimate(_fn.buttons, [{ opacity: 0 }, { opacity: 1 }], 450);
     }
-    _fn.content.style.opacity = "1";
+    _fn.el.classList.add("fe-nt-open");
     _fn.bg.style.height = `${h * 3}px`;
-    _fn.buttons.style.opacity = "1";
     _fn.visible = true;
     const paused = !!n.paused;
     _fnUpdatePauseButton(paused);
@@ -330,8 +323,7 @@ function _fnNarrationClose() {
 function _fnForceClose() {
   _fnStopScroll();
   _fnClearCloseTimer();
-  if (_fn.content) _fn.content.style.opacity = "0";
-  if (_fn.buttons) { _fn.buttons.style.opacity = "0"; _fn.buttons.style.visibility = "hidden"; }
+  _fn.el?.classList.remove("fe-nt-open");
   if (_fn.bg) _fn.bg.style.height = "0px";
 }
 
@@ -369,7 +361,7 @@ function _fnCreateMessage(type, message, options = {}) {
     content: rendered,
     flags: { [_FN_MODULE]: { [_FN_NARRATOR_FLAG]: true, [_FN_TYPE_FLAG]: type, raw: plain, markdown: true } },
     ..._fnMsgStyle("OTHER"),
-    speaker: { scene: game.user.viewedScene, actor: null, token: null, alias: "내레이터" },
+    speaker: { scene: game.user.viewedScene, actor: null, token: null, alias: feLocalize("FE.Common.Narrator") },
     whisper: type === "notification" ? game.users.filter((u) => u.isGM).map((u) => u.id) : [],
     ...options,
   };
@@ -448,7 +440,7 @@ Hooks.on("chatMessage", (_log, message, chatData) => {
       const box = document.getElementById("chat-message");
       if (match[1]) {
         _fn.character = match[1];
-        if (box) box.placeholder = `말하기: ${_fn.character}`;
+        if (box) box.placeholder = feFormat("FE.Narrator.placeholder", { character: _fn.character });
       } else {
         _fn.character = "";
         if (box) box.placeholder = "";
@@ -458,11 +450,11 @@ Hooks.on("chatMessage", (_log, message, chatData) => {
     const body = (match[1] ?? "").trim();
     if (!body) {
       // Bare command (no text) — swallow and hint, do not error.
-      ui.notifications?.info(`사용법: ${_usage[c]}`);
+      ui.notifications?.info(feFormat("FE.Narrator.Text", { value1: _usage[c] }));
       return false;
     }
     if (c === "narration" && !game.user.hasPermission?.("SETTINGS_MODIFY")) {
-      ui.notifications?.error("이 작업에는 설정 수정 권한이 필요합니다.");
+      ui.notifications?.error(feLocalize("FE.Narrator.Text2"));
     } else {
       _fnCreateMessage(c, body);
     }

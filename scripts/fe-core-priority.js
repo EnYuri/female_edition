@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import {
   MODULE_ID,
   S,
@@ -163,7 +164,7 @@ async function feSetCoreOverrides(partial = {}) {
       return true;
     });
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to update core-setting overrides`, err);
+    console.warn(feFormat("FE.Diagnostics.CorePriority.feSetCoreOverrides", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -223,7 +224,7 @@ async function feSeedCoreOverridesFromLocal({ force = false } = {}) {
     if (!Object.keys(partial).length) return false;
     return await feSetCoreOverrides(partial);
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to seed core-setting overrides`, err);
+    console.warn(feFormat("FE.Diagnostics.CorePriority.feSeedCoreOverridesFromLocal", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -241,11 +242,11 @@ function feRequestCoreReload(keys) {
         return name ? game.i18n.localize(name) : key;
       })
       .join(", ");
-    ui.notifications?.info(`GM이 강제한 환경 설정이 적용되었습니다(새로고침 필요): ${names}`);
+    ui.notifications?.info(feFormat("FE.CorePriority.feRequestCoreReload", { names: names }));
     foundry.applications.settings.SettingsConfig.reloadConfirm({ world: false })
-      .catch((err) => console.warn(`[${MODULE_ID}] core-priority reload prompt failed`, err));
+      .catch((err) => console.warn(feFormat("FE.Diagnostics.CorePriority.feRequestCoreReload", { MODULE_ID: MODULE_ID }), err));
   } catch (err) {
-    console.warn(`[${MODULE_ID}] core-priority reload prompt failed`, err);
+    console.warn(feFormat("FE.Diagnostics.CorePriority.feRequestCoreReload", { MODULE_ID: MODULE_ID }), err);
   }
 }
 
@@ -284,7 +285,7 @@ async function feSyncLocalCoreSettings({ keys = null } = {}) {
           // bad key must not abort the rest of the batch.
           await game.settings.set(CORE_NS, key, target);
         } catch (err) {
-          console.warn(`[${MODULE_ID}] could not force core setting "${key}"`, err);
+          console.warn(feFormat("FE.Diagnostics.CorePriority.feSyncLocalCoreSettings", { MODULE_ID: MODULE_ID, key: key }), err);
           delete newBackupEntries[key];
           continue;
         }
@@ -316,7 +317,7 @@ async function feSyncLocalCoreSettings({ keys = null } = {}) {
     feRequestCoreReload(reloadKeys);
     return changed;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to sync local core settings`, err);
+    console.warn(feFormat("FE.Diagnostics.CorePriority.feSyncLocalCoreSettings2", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -362,7 +363,7 @@ async function feRestoreLocalCoreSettings() {
     feRequestCoreReload(reloadKeys);
     return true;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to restore local core settings`, err);
+    console.warn(feFormat("FE.Diagnostics.CorePriority.feRestoreLocalCoreSettings", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }

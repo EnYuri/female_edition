@@ -1,3 +1,4 @@
+import { feLocalize, feFormat, feLocalizeHTML, feFormatHTML } from "./fe-i18n.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
 // Chat archive + HTML/PDF export (split)
 // Kept in its own module so export-only logic can be isolated.
@@ -155,35 +156,35 @@ async function feShowArchiveRangeDialog(totalCount = 0) {
     const content = `
 <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;">
   <p style="margin:0;font-size:0.95em;">
-    총 메시지 수: <strong>${totalCount.toLocaleString()}개</strong>
+    ${feLocalizeHTML("FE.ChatArchive.content.Text1")} <strong>${feFormatHTML("FE.Common.Count", { count: totalCount.toLocaleString() })}</strong>
   </p>
   <div style="display:flex;flex-direction:column;gap:8px;">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="radio" name="fe-range-mode" value="all" checked style="margin:0;">
-      전체 저장
+      ${feLocalizeHTML("FE.ChatArchive.content.Text3")}
     </label>
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="radio" name="fe-range-mode" value="range" style="margin:0;">
-      범위 지정:
+      ${feLocalizeHTML("FE.ChatArchive.content.Text4")}
       <input type="number" id="fe-range-from" value="1" min="1" max="${totalCount || 99999}"
-        style="width:80px;margin:0 4px;text-align:right;"> 번째
+        style="width:80px;margin:0 4px;text-align:right;"> ${feLocalizeHTML("FE.Common.OrdinalSuffix")}
       ~
       <input type="number" id="fe-range-to" value="${totalCount || 99999}" min="1" max="${totalCount || 99999}"
-        style="width:80px;margin:0 4px;text-align:right;"> 번째
+        style="width:80px;margin:0 4px;text-align:right;"> ${feLocalizeHTML("FE.Common.OrdinalSuffix")}
     </label>
   </div>
   <p style="margin:0;font-size:0.82em;color:var(--color-text-secondary,#888);">
-    메시지는 오래된 순서로 번호가 매겨집니다. (1 = 가장 오래된 메시지)
+    ${feLocalizeHTML("FE.ChatArchive.content.Text7")}
   </p>
 </div>`;
 
     const DialogV2 = foundry?.applications?.api?.DialogV2;
     if (typeof DialogV2?.prompt === "function") {
       return await DialogV2.prompt({
-        window: { title: "채팅 아카이브 — 범위 선택" },
+        window: { title: feLocalize("FE.ChatArchive.window.title") },
         content,
         ok: {
-          label: "저장 시작",
+          label: feLocalize("FE.ChatArchive.ok.label"),
           callback: (event, button, dialog) => readRange(button?.form ?? dialog?.element),
         },
         rejectClose: false,
@@ -219,12 +220,12 @@ async function feShowArchiveRangeDialog(totalCount = 0) {
         resolve(value);
       };
       const dialog = new LegacyDialog({
-        title: "채팅 아카이브 — 범위 선택",
+        title: feLocalize("FE.ChatArchive.window.title"),
         content,
         buttons: {
           save: {
             icon: '<i class="fas fa-save"></i>',
-            label: "저장 시작",
+            label: feLocalize("FE.ChatArchive.ok.label"),
             callback: (html) => finish(readRange(html)),
           },
         },
@@ -288,8 +289,8 @@ function feGetArchiveRenderProfile(messageCount = 0) {
 function _feCreateExportAnchor() {
   const a = document.createElement("a");
   a.className = "control-icon fe-export-pdf";
-  a.dataset.tooltip = "채팅 로그 내보내기(PDF/HTML)";
-  a.ariaLabel = "채팅 로그 내보내기(PDF/HTML)";
+  a.dataset.tooltip = feLocalize("FE.ChatArchive.tooltip");
+  a.ariaLabel = feLocalize("FE.ChatArchive.tooltip");
   a.innerHTML = '<i class="fa-solid fa-file-pdf"></i>';
   a.addEventListener("click", async (ev) => {
     ev.preventDefault();
@@ -380,9 +381,9 @@ function feEnsureExportContainer() {
       <div id="fe-chat-export-title">Chat Log</div>
       <div id="fe-chat-export-meta"></div>
       <div class="fe-chat-export-actions">
-        <a class="fe-chat-export-action fe-chat-export-download" aria-label="Download HTML" data-tooltip="HTML 저장">HTML</a>
-        <a class="fe-chat-export-action fe-chat-export-print" aria-label="Print" data-tooltip="인쇄 / PDF">🖨</a>
-        <a class="fe-chat-export-action fe-chat-export-close" aria-label="Close" data-tooltip="닫기">✕</a>
+        <a class="fe-chat-export-action fe-chat-export-download" aria-label="${feLocalizeHTML("FE.Common.DownloadHtml")}" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text1")}">HTML</a>
+        <a class="fe-chat-export-action fe-chat-export-print" aria-label="${feLocalizeHTML("FE.Common.Print")}" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text2")}">🖨</a>
+        <a class="fe-chat-export-action fe-chat-export-close" aria-label="${feLocalizeHTML("FE.Common.Close")}" data-tooltip="${feLocalizeHTML("FE.Common.Close")}">✕</a>
       </div>
     </div>
     <ol id="fe-chat-export-log" class="chat-log"></ol>
@@ -582,7 +583,7 @@ function feEnsurePrintCSSOverrides() {
  */
 async function feExportChatLogToPDF() {
   if (feArchiveLaunchInProgress && !feArchiveLaunchIsAbandoned()) {
-    ui.notifications?.warn("female_edition | 채팅 아카이브를 이미 만들고 있습니다.", { console: false });
+    ui.notifications?.warn(feLocalize("FE.ChatArchive.feExportChatLogToPDF"), { console: false });
     return;
   }
 
@@ -617,11 +618,11 @@ async function feExportChatLogToPDF() {
 function feArchiveLaunchIsAbandoned() {
   try {
     if (feArchiveLaunchWindow && feArchiveWindowClosed(feArchiveLaunchWindow)) {
-      console.warn("female_edition | archive launch lock released: its window was closed");
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchiveLaunchIsAbandoned"));
       return true;
     }
     if (feArchiveLaunchStartedAt && Date.now() - feArchiveLaunchStartedAt > FE_ARCHIVE_LAUNCH_STALE_MS) {
-      console.warn("female_edition | archive launch lock released: stale");
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchiveLaunchIsAbandoned2"));
       return true;
     }
   } catch {
@@ -637,11 +638,11 @@ async function feExportChatLogToPDFUnlocked() {
   let preRangeSpec = null;
   try {
     const liveMessageMap = feBuildLiveChatMessageElementMap();
-    ui.notifications?.info("female_edition | 메시지 수집 중…", { permanent: false, console: false });
+    ui.notifications?.info(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked"), { permanent: false, console: false });
     preCollectedMessages = await feCollectVisibleChatMessages(game.user, { liveMessageMap });
 
     if (!preCollectedMessages.length) {
-      ui.notifications?.warn("female_edition | 아카이브할 메시지가 없습니다.");
+      ui.notifications?.warn(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked2"));
       return;
     }
 
@@ -649,7 +650,7 @@ async function feExportChatLogToPDFUnlocked() {
     preRangeSpec = await feShowArchiveRangeDialog(preCollectedMessages.length);
     if (preRangeSpec == null) return; // cancelled
   } catch (err) {
-    console.warn("female_edition | pre-collection failed, falling through", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feExportChatLogToPDFUnlocked"), err);
     preCollectedMessages = null;
     preRangeSpec = null;
   }
@@ -661,7 +662,7 @@ async function feExportChatLogToPDFUnlocked() {
   // open it in any normal browser and use that browser's PDF-save feature.
   if (feIsElectron()) {
     const done = await feExportChatLogToDesktopHTML({ preCollectedMessages, preRangeSpec });
-    if (!done) ui.notifications?.error("female_edition | 데스크톱 앱에서 HTML 아카이브 저장에 실패했습니다. 콘솔을 확인해 주세요.", { console: false });
+    if (!done) ui.notifications?.error(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked3"), { console: false });
     return;
   }
 
@@ -684,7 +685,7 @@ async function feExportChatLogToPDFUnlocked() {
 
       return;
     } catch (err) {
-      console.warn("female_edition | archive window export failed, falling back to inline export", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feExportChatLogToPDFUnlocked2"), err);
       try {
         win.close();
       } catch {}
@@ -695,14 +696,14 @@ async function feExportChatLogToPDFUnlocked() {
   // late. Never allow the desktop client to fall through to window.print().
   if (feIsElectron()) {
     const done = await feExportChatLogToDesktopHTML({ preCollectedMessages, preRangeSpec });
-    if (!done) ui.notifications?.error("female_edition | 데스크톱 앱에서 HTML 아카이브 저장에 실패했습니다. 콘솔을 확인해 주세요.", { console: false });
+    if (!done) ui.notifications?.error(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked3"), { console: false });
     return;
   }
 
   // Browser fallback: in-document export + print. Reuse the already-collected messages
   // and range selection: popup blockers are common in the desktop client, and
   // collecting again here used to discard the user's selected range.
-  ui.notifications?.info("female_edition | 새 창을 열 수 없어 현재 Foundry 창에서 아카이브와 인쇄를 진행합니다.", { console: false });
+  ui.notifications?.info(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked4"), { console: false });
   await feExportChatLogToPDFInline({ preCollectedMessages, preRangeSpec });
 }
 
@@ -794,7 +795,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     }
     const messages = feApplyMessageRange(allMessages, rangeSpec);
     if (!messages.length) {
-      ui.notifications?.warn("female_edition | 선택한 범위에 아카이브할 메시지가 없습니다.");
+      ui.notifications?.warn(feLocalize("FE.ChatArchive.feExportChatLogToPDFInline"));
       cleanup();
       return;
     }
@@ -803,7 +804,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     // Header/meta
     const sceneName = canvas?.scene?.name ?? "";
     titleEl.textContent = feBuildArchiveTitleText();
-    metaEl.textContent = `${messages.length} messages${sceneName ? ` • ${sceneName}` : ""}`;
+    metaEl.textContent = feFormat("FE.ChatArchive.MessageCount", { count: messages.length }) + (sceneName ? ` • ${sceneName}` : "");
 
     // Prefer cloning from the already-rendered live chat log DOM when possible.
 
@@ -837,9 +838,9 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     } catch {}
 
     // Wait for images (portraits, item icons) to load so they actually print
-    metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
+    metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? feLocalize("FE.ChatArchive.Status.LoadingVisibleImages") : feLocalize("FE.ChatArchive.Status.LoadingImages");
     const inlineImgTimeout = await feWaitForImages(logEl, FE_EXPORT_INLINE_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
-    if (inlineImgTimeout > 0) console.warn(`female_edition | inline export: ${inlineImgTimeout} image(s) failed or timed out`);
+    if (inlineImgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feExportChatLogToPDFInline", { inlineImgTimeout: inlineImgTimeout }));
 
     // IMPORTANT: Force a paginatable layout.
     // If any part of the export UI remains a fixed/scroll container, Chromium printing will
@@ -874,15 +875,15 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     // so ui-font.css and its @font-face rules are already loaded. Injecting the archive's
     // embedded-font block would drop an UNLAYERED `html, body { font-family: … !important }`
     // (plus :root --font-* overrides) onto the live UI — see feBuildEmbeddedCookieRunFontCSS.
-    metaEl.textContent = "Loading fonts…";
+    metaEl.textContent = feLocalize("FE.ChatArchive.Status.LoadingFonts");
     await feWaitForFonts(document, FE_EXPORT_WAIT_FONTS_TIMEOUT);
 
-    metaEl.textContent = "Opening print dialog…";
+    metaEl.textContent = feLocalize("FE.ChatArchive.Status.OpeningPrintDialog");
 
     try {
       restorePageBreaks = fePrepareImagesForPageBreaks(document, logEl);
     } catch (err) {
-      console.warn("female_edition | inline page-break image preparation failed", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feExportChatLogToPDFInline2"), err);
     }
 
     window.addEventListener("afterprint", cleanup, { once: true });
@@ -894,7 +895,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     setTimeout(cleanup, 0);
   } catch (err) {
     console.error(err);
-    ui.notifications?.error("Chat log PDF export failed. Check the console for details.");
+    ui.notifications?.error(feLocalize("FE.ChatArchive.Status.ExportFailed"));
     // Restore the live document even if we failed mid-export.
     try { cleanup(); } catch {}
   }
@@ -920,7 +921,7 @@ function feOpenChatArchiveWindow() {
       // The caller has a same-window render/print fallback. This is especially
       // expected in Foundry's Electron client, where window.open is commonly
       // disabled, so do not instruct users to change popup-blocker settings.
-      console.info("female_edition | chat archive popup unavailable; using in-document fallback");
+      console.info(feLocalize("FE.Diagnostics.ChatArchive.feOpenChatArchiveWindow"));
       return null;
     }
 
@@ -968,7 +969,7 @@ async function feExportChatLogToDesktopHTML({ preCollectedMessages = null, preRa
   }
 
   try {
-    ui.notifications?.info("female_edition | HTML 아카이브 생성 중…", { console: false });
+    ui.notifications?.info(feLocalize("FE.ChatArchive.feExportChatLogToDesktopHTML"), { console: false });
 
     await feRenderChatArchiveWindow(win, {
       autoPrint: false,
@@ -982,10 +983,10 @@ async function feExportChatLogToDesktopHTML({ preCollectedMessages = null, preRa
     });
 
     const saved = await feDownloadArchiveHTML(win, titleText);
-    if (saved) ui.notifications?.info("female_edition | HTML 아카이브를 저장했습니다. Chrome 또는 Edge로 열어 인쇄 → PDF로 저장하세요.", { console: false });
+    if (saved) ui.notifications?.info(feLocalize("FE.ChatArchive.feExportChatLogToDesktopHTML2"), { console: false });
     return saved;
   } catch (err) {
-    console.warn("female_edition | desktop HTML archive export failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feExportChatLogToDesktopHTML"), err);
     return false;
   } finally {
     // Let the browser receive the download click before tearing down its frame.
@@ -1045,7 +1046,7 @@ function feCollectHeadStylesHTML() {
     // interpolates it straight into the popup's <head> — a throw here yields a
     // completely unstyled archive window. Keep returning "" (better than no archive
     // at all); only the silence is fixed.
-    console.warn("female_edition | archive window style collection failed — rendering without CSS.", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feCollectHeadStylesHTML"), err);
     return "";
   }
 }
@@ -1161,7 +1162,7 @@ function feApplyModuleStylesheetSettingsToDocument(doc) {
       /* no-op */
     }
   } catch (err) {
-    console.warn("female_edition | failed to apply module stylesheet settings to archive document", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feApplyModuleStylesheetSettingsToDocument"), err);
   }
 }
 
@@ -1322,7 +1323,7 @@ function feRefreshPortraitsForLog(logEl, renderProfile = null, { nodes = null } 
   // errors or per-message records for a multi-thousand-message log would add
   // memory precisely where the archive is already under pressure.
   if (failed > 0) {
-    console.warn(`female_edition | archive portrait refresh skipped ${failed} message(s); first=${firstFailedId}`);
+    console.warn(feFormat("FE.Diagnostics.ChatArchive.feRefreshPortraitsForLog", { failed: failed, firstFailedId: firstFailedId }));
   }
 }
 
@@ -1358,9 +1359,9 @@ function feRepairMissingArchivePortraitsForPrint(logEl, renderProfile = null) {
     }
   }
 
-  if (repaired > 0) console.info(`female_edition | print repaired ${repaired} missing portrait(s)`);
+  if (repaired > 0) console.info(feFormat("FE.Diagnostics.ChatArchive.feRepairMissingArchivePortraitsForPrint", { repaired: repaired }));
   if (failed > 0) {
-    console.warn(`female_edition | print portrait repair skipped ${failed} message(s); first=${firstFailedId}`);
+    console.warn(feFormat("FE.Diagnostics.ChatArchive.feRepairMissingArchivePortraitsForPrint2", { failed: failed, firstFailedId: firstFailedId }));
   }
 }
 
@@ -1540,7 +1541,7 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
     }
   };
 
-  report("메시지 수집 중…");
+  report(feLocalize("FE.ChatArchive.feCollectVisibleChatMessages"));
 
   let all = Array.from(game.messages?.contents ?? []);
   // Set only when `all` holds raw DB rows; the lazy `msg` getter needs it to materialize.
@@ -1549,16 +1550,16 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
   // Some worlds/clients may only have the most recent chat page hydrated in memory,
   // so always probe the backend and keep whichever source is longer.
   try {
-    report("메시지 DB 확인 중…");
+    report(feLocalize("FE.ChatArchive.feCollectVisibleChatMessages2"));
     const { rows: dbAll, docClass } = await feFetchAllChatMessagesFromDatabase();
     if (dbAll.length > all.length) {
       all = dbAll;
       rowDocClass = docClass;
     } else if (dbAll.length === 0 && all.length > 0) {
-      console.warn("female_edition | archive: DB query returned 0 messages — falling back to in-memory messages. Some older messages may be missing.");
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feCollectVisibleChatMessages"));
     }
   } catch (err) {
-    console.warn("female_edition | archive: DB query failed — falling back to in-memory messages. Some older messages may be missing.", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feCollectVisibleChatMessages2"), err);
   }
 
   const collectProfile = feGetArchiveRenderProfile(all.length);
@@ -1577,14 +1578,14 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
           ? FE_ARCHIVE_HARVEST_TIMEOUT_LARGE
           : FE_ARCHIVE_HARVEST_TIMEOUT_DEFAULT;
       const maxIterations = collectProfile.huge ? 4 : collectProfile.large ? 6 : 10;
-      report(`이전 채팅 보강 중… ${Math.min(liveMap.size, all.length)}/${all.length}`);
+      report(feFormat("FE.ChatArchive.feCollectVisibleChatMessages3", { value1: Math.min(liveMap.size, all.length), length: all.length }));
       harvested = await feHarvestFullChatHistory({
         batchSize: collectProfile.large ? 80 : 100,
         maxIterations,
         timeBudgetMs,
         progress: ({ collected = 0, total = all.length, timedOut = false } = {}) => {
-          const suffix = timedOut ? " (시간 제한 도달)" : "";
-          report(`이전 채팅 보강 중… ${Math.min(collected, total)}/${total}${suffix}`);
+          const suffix = timedOut ? feLocalize("FE.ChatArchive.progress") : "";
+          report(feFormat("FE.ChatArchive.progress2", { value1: Math.min(collected, total), total: total, suffix: suffix }));
         },
       });
       if (harvested?.cloneMap?.size) {
@@ -1601,7 +1602,7 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
     }
   }
 
-  report("메시지 정렬 중…");
+  report(feLocalize("FE.ChatArchive.feCollectVisibleChatMessages4"));
 
   // Applied here — inside collection — rather than alongside feApplyMessageRange, so the
   // count handed to the range dialog is the already-filtered count. Filtering later would
@@ -1656,11 +1657,11 @@ async function feCollectVisibleChatMessages(user = game.user, { liveMessageMap =
       liveEl: id ? (liveMap.get(id) || null) : null,
     })).filter((it) => it.liveEl)
       .filter((it) => !(excludeWhispers && feArchiveIsWhisperMessage(null, it.liveEl)));
-    report(`메시지 ${out.length}개 준비 완료`);
+    report(feFormat("FE.ChatArchive.feCollectVisibleChatMessages5", { length: out.length }));
     return out;
   }
 
-  report(`메시지 ${items.length}개 준비 완료`);
+  report(feFormat("FE.ChatArchive.feCollectVisibleChatMessages5", { length: items.length }));
   return items;
 }
 
@@ -1888,7 +1889,7 @@ async function feInlineDnd5eIcons(rootEl, targetDoc) {
       })
     );
   } catch (err) {
-    console.warn("female_edition | dnd5e-icon inlining failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feInlineDnd5eIcons"), err);
   }
 }
 
@@ -2072,7 +2073,7 @@ async function feRenderMessagesIntoLog({
       renderedCount += 1;
       if (metaEl && (renderedCount === 1 || renderedCount % FE_EXPORT_STATUS_EVERY === 0 || renderedCount === messages.length)) {
         try {
-          metaEl.textContent = `Rendering… ${renderedCount}/${messages.length}`;
+          metaEl.textContent = feFormat("FE.ChatArchive.Status.Rendering", { rendered: renderedCount, total: messages.length });
         } catch {}
       }
 
@@ -2676,18 +2677,18 @@ async function feRenderChatArchiveWindow(win, {
       <div class="fe-chat-export-toolbar">
         <div>
           <div id="fe-chat-export-title">${feEscapeHTML(titleText)}</div>
-          <div id="fe-chat-export-meta">메시지 수집 중…</div>
+          <div id="fe-chat-export-meta">${feLocalizeHTML("FE.ChatArchive.feCollectVisibleChatMessages")}</div>
         </div>
         <div class="fe-chat-export-actions">
-          <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="HTML 저장">HTML</a>
+          <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text1")}">HTML</a>
           ${externalBtnHTML}
-          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="인쇄 / PDF">인쇄</a>
-          <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="닫기">닫기</a>
+          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="${feLocalizeHTML("FE.ChatArchive.innerHTML.Text2")}">${feLocalizeHTML("FE.ChatArchive.feRenderChatArchiveWindow.Text4")}</a>
+          <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="${feLocalizeHTML("FE.Common.Close")}">${feLocalizeHTML("FE.Common.Close")}</a>
         </div>
       </div>
       <div id="fe-chat-export-sidebar" class="sidebar chat-sidebar">
         <section id="fe-chat-export-chat" class="sidebar-tab tab active" data-tab="chat">
-          <div id="fe-chat-export-status" class="fe-chat-export-status">메시지 수집 중…</div>
+          <div id="fe-chat-export-status" class="fe-chat-export-status">${feLocalizeHTML("FE.ChatArchive.feCollectVisibleChatMessages")}</div>
           <ol id="fe-chat-export-log" class="chat-log"></ol>
         </section>
       </div>
@@ -2785,7 +2786,7 @@ async function feRenderChatArchiveWindow(win, {
       try {
         await feRunArchiveDocumentOperation(win.document, () => feArchivePrint(win));
       } catch (err) {
-        console.warn("female_edition | print failed", err);
+        console.warn(feLocalize("FE.Diagnostics.ChatArchive.feRenderChatArchiveWindow"), err);
       } finally {
         try { btnPrint.removeAttribute("aria-disabled"); } catch {}
       }
@@ -2826,7 +2827,7 @@ async function feRenderChatArchiveWindow(win, {
   let allMessages;
   if (Array.isArray(preCollectedMessages) && preCollectedMessages.length > 0) {
     allMessages = preCollectedMessages;
-    setStatus(`메시지 ${allMessages.length}개 준비 완료`);
+    setStatus(feFormat("FE.ChatArchive.feCollectVisibleChatMessages5", { length: allMessages.length }));
   } else {
     allMessages = await feCollectVisibleChatMessages(game.user, {
       liveMessageMap,
@@ -2839,8 +2840,8 @@ async function feRenderChatArchiveWindow(win, {
   // Show the range selection dialog now that we know the real message count.
   // Skip if a range was already selected before the popup opened.
   if (!allMessages.length) {
-    setStatus("수집된 메시지가 없습니다.");
-    ui.notifications?.warn("female_edition | 아카이브할 메시지가 없습니다.");
+    setStatus(feLocalize("FE.ChatArchive.feRenderChatArchiveWindow"));
+    ui.notifications?.warn(feLocalize("FE.ChatArchive.feExportChatLogToPDFUnlocked2"));
     return;
   }
 
@@ -2871,7 +2872,7 @@ async function feRenderChatArchiveWindow(win, {
   // is the archive's own header and is serialized into the saved file, where an
   // internal performance mode is noise — the reader wants what this log IS, not how
   // it was produced.
-  const metaParts = [`${messages.length} messages`];
+  const metaParts = [feFormat("FE.ChatArchive.MessageCount", { count: messages.length })];
   if (sceneName) metaParts.push(sceneName);
   const metaText = metaParts.join(" • ");
   setStatus(metaText);
@@ -2900,7 +2901,7 @@ async function feRenderChatArchiveWindow(win, {
   // by throwing) so the caller's `finally` clears feArchiveLaunchInProgress and the
   // next archive request is accepted immediately.
   if (feArchiveWindowClosed(win)) {
-    console.debug("female_edition | archive window closed during render; aborting");
+    console.debug(feLocalize("FE.Diagnostics.ChatArchive.feRenderChatArchiveWindow2"));
     return;
   }
 
@@ -2919,7 +2920,7 @@ async function feRenderChatArchiveWindow(win, {
   })();
 
   if (effectiveOptimize) {
-    if (metaEl) metaEl.textContent = "Applying texture stripping…";
+    if (metaEl) metaEl.textContent = feLocalize("FE.ChatArchive.Status.StrippingTextures");
     await feRunArchiveChunkedPass(win, postPassNodes, (batch) => feStripChatTexturesInWindow(win, logEl, { nodes: batch }));
   }
 
@@ -2928,11 +2929,11 @@ async function feRenderChatArchiveWindow(win, {
     try {
       feApplyChatMergeInWindow(win, renderProfile, { skipPortraits: true });
     } catch (err) {
-      console.warn("female_edition | archive merge failed", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feRenderChatArchiveWindow3"), err);
     }
   }
   if (renderProfile.deferPortraits) {
-    if (metaEl) metaEl.textContent = "Applying portraits…";
+    if (metaEl) metaEl.textContent = feLocalize("FE.ChatArchive.Status.ApplyingPortraits");
     await feRunArchiveChunkedPass(win, postPassNodes, (batch) => feRefreshPortraitsForLog(logEl, renderProfile, { nodes: batch }));
   }
 
@@ -2944,7 +2945,7 @@ async function feRenderChatArchiveWindow(win, {
   // Must run BEFORE the snapshot/print steps: it turns empty <dnd5e-icon> custom
   // elements into real inline <svg>. Awaited (a handful of same-origin fetches,
   // cached by src) so the icons exist for both the popup paint and the serializer.
-  if (metaEl) metaEl.textContent = "Inlining icons…";
+  if (metaEl) metaEl.textContent = feLocalize("FE.ChatArchive.Status.InliningIcons");
   await feInlineDnd5eIcons(logEl, win.document);
 
   try {
@@ -2956,11 +2957,11 @@ async function feRenderChatArchiveWindow(win, {
   // that path independently fetches and embeds assets where configured, so
   // waiting here only wastes time and raises its peak decoded-image memory.
   if (waitForAssets) {
-    if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? "Loading visible images…" : "Loading images…";
+    if (metaEl) metaEl.textContent = renderProfile.initialImageWaitMax < FE_EXPORT_WAIT_IMAGES_MAX ? feLocalize("FE.ChatArchive.Status.LoadingVisibleImages") : feLocalize("FE.ChatArchive.Status.LoadingImages");
     const imgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: renderProfile.initialImageWaitMax });
-    if (imgTimeout > 0) console.warn(`female_edition | archive: ${imgTimeout} image(s) failed or timed out`);
+    if (imgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feRenderChatArchiveWindow4", { imgTimeout: imgTimeout }));
 
-    if (metaEl) metaEl.textContent = "Loading fonts…";
+    if (metaEl) metaEl.textContent = feLocalize("FE.ChatArchive.Status.LoadingFonts");
     // Inject the self-contained data: URL faces into the popup BEFORE waiting, so the
     // print/PDF path never depends on the popup resolving Foundry's @import-based
     // module stylesheets. The popup is an about:blank document whose <style>@import
@@ -3057,7 +3058,7 @@ function fePrepareImagesForPageBreaks(doc, logEl) {
       img.style.setProperty("page-break-inside", "avoid", "important");
     }
   } catch (err) {
-    console.warn("female_edition | fePrepareImagesForPageBreaks error", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.fePrepareImagesForPageBreaks"), err);
   }
 
   return () => {
@@ -3192,7 +3193,7 @@ async function feArchivePrint(win) {
     restoreBg = feFreezeMessageBackgroundsForPrint(win, logEl);
     win.addEventListener("afterprint", restoreBg, { once: true });
   } catch (err) {
-    console.warn("female_edition | print background freeze failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint"), err);
   }
 
   // Memory guard: if images are supposed to be hidden, also blank their src so Chromium won't decode them.
@@ -3275,7 +3276,7 @@ async function feArchivePrint(win) {
         win,
       });
     } catch (err) {
-      console.warn("female_edition | print portrait upgrade failed", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint2"), err);
     }
   }
 
@@ -3287,7 +3288,7 @@ async function feArchivePrint(win) {
   if (shouldDownscale && logEl) {
     try {
       const mildDownscale = mode === "downscaleLite";
-      setMeta(mildDownscale ? "Loading images… (품질 우선)" : "Loading images…");
+      setMeta(mildDownscale ? feLocalize("FE.ChatArchive.feArchivePrint") : feLocalize("FE.ChatArchive.Status.LoadingImages"));
       // Originals are about to be replaced by downscaled blobs — skip the
       // sync-decode storm (async lets Chromium decode off-thread).
       restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
@@ -3303,7 +3304,7 @@ async function feArchivePrint(win) {
       // which the straggler-blank pass then neutralizes.
       const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
       const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount) });
-      if (printImgTimeout > 0) console.warn(`female_edition | print: ${printImgTimeout} image(s) failed or timed out`);
+      if (printImgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feArchivePrint3", { printImgTimeout: printImgTimeout }));
       // Large/huge logs: shrink resolution caps so the pixels Chromium must
       // rasterize into the PDF (and the decoded bitmaps it holds during
       // win.print()) stay within memory. Print-time OOM scales with total
@@ -3338,7 +3339,7 @@ async function feArchivePrint(win) {
         useBlobURL: true,
       });
     } catch (err) {
-      console.warn("female_edition | print downscale failed", err);
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint4"), err);
     }
   }
 
@@ -3366,7 +3367,7 @@ async function feArchivePrint(win) {
   }
 
   try {
-    setMeta("Loading fonts…");
+    setMeta(feLocalize("FE.ChatArchive.Status.LoadingFonts"));
     // The embedded data: URL faces are injected at RENDER time (feEnsureArchiveEmbeddedFonts,
     // in feRenderChatArchiveWindow) — NOT here. Reasons they must not be injected at print
     // time: the !important font overrides trigger a full text re-layout, so injecting right
@@ -3425,7 +3426,7 @@ async function feArchivePrint(win) {
   try {
     restorePageBreaks = fePrepareImagesForPageBreaks(doc, logEl);
   } catch (err) {
-    console.warn("female_edition | print page-break image preparation failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint5"), err);
   }
 
   try {
@@ -3551,7 +3552,7 @@ function feApplyChatMergeInWindow(win, renderProfile = null, { skipPortraits = f
     feApplyRenderedStateToLog(logEl, feArchiveMergeOptions());
     if (!skipPortraits) feRefreshPortraitsForLog(logEl, renderProfile);
   } catch (err) {
-    console.warn("female_edition | feApplyChatMergeInWindow failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feApplyChatMergeInWindow"), err);
   }
 }
 
@@ -3596,7 +3597,7 @@ async function feEnsureArchiveEmbeddedFonts(win) {
     styleEl.textContent = fontCss;
     doc.head.appendChild(styleEl);
   } catch (err) {
-    console.warn("female_edition | failed to embed fonts in archive window", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feEnsureArchiveEmbeddedFonts"), err);
   }
 }
 
@@ -3940,7 +3941,7 @@ function feScheduleInjectExportButtons(delay = 0) {
     if (feInjectExportButtonsTimer) clearTimeout(feInjectExportButtonsTimer);
     feInjectExportButtonsTimer = setTimeout(() => {
       feInjectExportButtonsTimer = null;
-      try { feInjectExportButtonsAll(); } catch (err) { console.warn("[female_edition] fe-chat-archive: inject failed", err); }
+      try { feInjectExportButtonsAll(); } catch (err) { console.warn(feLocalize("FE.Diagnostics.ChatArchive.feScheduleInjectExportButtons"), err); }
     }, Math.max(0, Number(delay) || 0));
   } catch {}
 }
@@ -3949,7 +3950,7 @@ Hooks.once("ready", () => {
   try {
     feScheduleInjectExportButtons(0);
   } catch (err) {
-    console.warn("[female_edition] fe-chat-archive: initial inject failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.warn"), err);
   }
 });
 
@@ -3960,7 +3961,7 @@ Hooks.on("renderChatInput", () => {
   try {
     feScheduleInjectExportButtons(0);
   } catch (err) {
-    console.warn("[female_edition] fe-chat-archive: chat input reinject failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.warn2"), err);
   }
 });
 
@@ -3970,6 +3971,6 @@ Hooks.on(`${MODULE_ID}.chatUiUpdated`, (payload) => {
     if (reason !== "ready" && reason !== "renderChatLog" && reason !== "export-settings") return;
     feScheduleInjectExportButtons(0);
   } catch (err) {
-    console.warn("[female_edition] fe-chat-archive: reinject failed", err);
+    console.warn(feLocalize("FE.Diagnostics.ChatArchive.warn3"), err);
   }
 });

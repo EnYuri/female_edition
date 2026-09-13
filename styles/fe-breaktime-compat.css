@@ -1,0 +1,92 @@
+/* ================================================================
+ * fe-breaktime-compat.css
+ * female_edition — Break Time (module id: breaktime) 호환
+ *
+ * module.json 에서 { "src": ..., "layer": "layouts" } 로 등록한다.
+ * ================================================================ */
+
+
+/* ── 레이아웃 (테마 무관) ─────────────────────────────────────── */
+
+#breaktime-app {
+  max-height: 80vh !important;
+}
+
+#breaktime-app .window-content {
+  min-height: 0 !important;
+}
+
+#breaktime-app .breaktime-container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+#breaktime-app .breaktime-player {
+  align-items: center !important;
+  display: flex !important;
+  gap: 4px !important;
+  height: auto !important;
+  min-height: 50px !important;
+}
+
+#breaktime-app .breaktime-player .breaktime-avatar {
+  flex: 0 0 58px !important;
+  height: 50px !important;
+  width: 58px !important;
+}
+
+#breaktime-app .breaktime-details {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  padding-right: 28px !important;
+  width: auto !important;
+}
+
+#breaktime-app .breaktime-name {
+  max-height: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#breaktime-app .breaktime-character {
+  max-height: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#breaktime-app footer.sheet-footer {
+  flex: 0 0 auto !important;
+}
+
+
+/* ── 레트로 색 ────────────────────────────────────────────────── */
+
+body.fe-retro-theme #breaktime-app .window-content {
+  background: #000 !important;
+  background-image: none !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme #breaktime-app .breaktime-container {
+  border-top-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme #breaktime-app .breaktime-player {
+  border-bottom-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme #breaktime-app .breaktime-player .breaktime-avatar {
+  border-left-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme #breaktime-app .breaktime-button {
+  border-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme #breaktime-app .breaktime-marker {
+  text-shadow: none !important;
+}

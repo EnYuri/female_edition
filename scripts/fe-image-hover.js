@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
 /**
  * fe-image-hover.js — Token image hover overlay
@@ -80,8 +81,8 @@ function _ihRegisterSettings() {
   feRegisterSetting("ihEnabled", () => { _ihLoadSettings(); _ihHud()?.close(); });
 
   game.keybindings.register(_IH_MODULE, "ihKeybind", {
-    name: "Image Hover: 아트 표시 토글 키",
-    hint: "토큰 호버 중 이 키를 누르면 마우스가 토큰을 벗어날 때까지 아트가 표시됩니다. 다시 누르면 취소. 기본값: X",
+    name: feLocalize("FE.ImageHover.name"),
+    hint: feLocalize("FE.ImageHover.hint"),
     editable: [{ key: "KeyX" }],
     onDown: () => {
       if (!_ihActive()) return false;

@@ -1,0 +1,23 @@
+{{!--
+  female_edition: narrator cinematic overlay (#fe-narrator).
+  Built once by fe-narrator.js (_fnBuildOverlay) and appended to <body>.
+  Initial hidden state comes from fe-narrator.css (.fe-narrator-content{opacity:0},
+  .fe-narrator-buttons{visibility:hidden}) — never from inline attributes here.
+  The pause button ships in its "playing" state; _fnUpdatePauseButton swaps only the
+  icon class and the label text.
+--}}
+<div class="fe-narrator-bg"></div>
+<div class="fe-narrator-frame">
+  <div class="fe-narrator-box"><div class="fe-narrator-content"></div></div>
+  <div class="fe-narrator-buttons">
+    <button type="button" class="fe-nt-pause">
+      <i class="fas fa-pause-circle"></i> <span class="fe-nt-label">{{localize "FE.Common.Pause"}}</span>
+    </button>
+    <button type="button" class="fe-nt-close">
+      <i class="fas fa-times-circle"></i> <span class="fe-nt-label">{{localize "FE.Common.Close"}}</span>
+    </button>
+    <button type="button" class="fe-nt-copy">
+      <i class="fas fa-clipboard"></i> <span class="fe-nt-label">{{localize "FE.Common.Copy"}}</span>
+    </button>
+  </div>
+</div>

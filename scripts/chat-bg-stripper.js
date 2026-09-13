@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: FVTT v13+
 // Chat message/card texture stripper — settings + CSS-class driver only.
@@ -178,7 +179,7 @@ function feInstallChatContextMenuSurfaceSync() {
     }
     proto.__feChatContextSurfaceSyncInstalled = true;
   } catch (err) {
-    console.warn(`${MODULE_ID} | failed to install chat context-menu surface sync`, err);
+    console.warn(feFormat("FE.Diagnostics.ChatBgStripper.feInstallChatContextMenuSurfaceSync", { MODULE_ID: MODULE_ID }), err);
   }
 }
 

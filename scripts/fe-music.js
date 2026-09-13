@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Music feature — entry point (in module.json).
 //
@@ -78,11 +79,11 @@ async function ensureSharedPlaylist({ notify = true } = {}) {
   if (!pl) {
     pl = await Playlist.create({
       name,
-      description: "플레이어 공용 업로드 음악",
+      description: feLocalize("FE.Music.description"),
       ownership: { default: OWNER },
       flags: { [MODULE_ID]: { [SHARED_FLAG]: true } },
     });
-    if (notify) ui.notifications.info("Emanim Music: 공용 플레이리스트 생성 완료");
+    if (notify) ui.notifications.info(feLocalize("FE.Music.ensureSharedPlaylist"));
     return pl;
   }
 
@@ -100,8 +101,8 @@ async function ensureMusicUploadDirectory({ notify = false } = {}) {
     await ensureDirectory("data", dir);
     return true;
   } catch (err) {
-    console.warn("[female_edition] music upload directory init failed", err);
-    if (notify) ui.notifications.warn(`음악 업로드 폴더를 만들 수 없습니다: ${dir}`);
+    console.warn(feLocalize("FE.Diagnostics.Music.ensureMusicUploadDirectory"), err);
+    if (notify) ui.notifications.warn(feFormat("FE.Music.ensureMusicUploadDirectory", { dir: dir }));
     return false;
   }
 }
@@ -222,7 +223,7 @@ function registerSocket() {
       if (msg.type === MUSIC_MSG.UP_INIT_ACK && msg.toUserId === game.user.id) {
         markInitAck(msg.uploadId, { reused: !!msg.reused });
         if (msg.reused) {
-          ui.notifications.info(`이미 동일한 파일이 있어 재사용했습니다: ${msg.trackName ?? ""}`);
+          ui.notifications.info(feFormat("FE.Music.registerSocket", { value1: msg.trackName ?? "" }));
           notifyClientRefresh();
         }
         return;
@@ -233,14 +234,14 @@ function registerSocket() {
       }
       if (msg.type === MUSIC_MSG.UP_ACK && msg.toUserId === game.user.id) {
         markUploadAck(msg.uploadId, { trackName: msg.trackName, playlistId: msg.playlistId, reused: !!msg.reused });
-        ui.notifications.info(`업로드 완료: ${msg.trackName ?? ""}`);
+        ui.notifications.info(feFormat("FE.Music.registerSocket2", { value1: msg.trackName ?? "" }));
         clearLocalUpload(msg.uploadId);
         notifyClientRefresh();
         return;
       }
       if (msg.type === MUSIC_MSG.UP_ERR && msg.toUserId === game.user.id) {
         markUploadError(msg.uploadId, msg.reason);
-        ui.notifications.error(`업로드 실패: ${msg.reason ?? "unknown"}`);
+        ui.notifications.error(feFormat("FE.Music.registerSocket3", { value1: msg.reason ?? "unknown" }));
         clearLocalUpload(msg.uploadId);
         return;
       }
@@ -268,7 +269,7 @@ function registerSocket() {
         await ensureDirectory("data", musicUploadDir());
         ok = true;
       } catch (e) {
-        reason = e?.message || "폴더 생성 실패";
+        reason = e?.message || feLocalize("FE.Music.registerSocket4");
       }
       game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.ENSURE_DIR_ACK, authorityId: game.user.id, toUserId: fromUserId, reqId, ok, reason });
       return;
@@ -282,13 +283,13 @@ function registerSocket() {
 
       const err = (reason) => game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: fromUserId, uploadId, reason });
 
-      if (!allowedAudio(fileName)) return void err("지원하지 않는 오디오 확장자");
+      if (!allowedAudio(fileName)) return void err(feLocalize("FE.Music.registerSocket5"));
 
       const size = Number(fileSize);
-      if (!Number.isFinite(size) || size <= 0) return void err("파일 크기 정보가 올바르지 않음");
+      if (!Number.isFinite(size) || size <= 0) return void err(feLocalize("FE.Music.registerSocket6"));
 
       const maxMB = musicSetting(S.MUSIC_MAX_MB);
-      if (size > maxMB * 1024 * 1024) return void err(`파일이 너무 큼 (최대 ${maxMB}MB)`);
+      if (size > maxMB * 1024 * 1024) return void err(feFormat("FE.Music.registerSocket7", { maxMB: maxMB }));
 
       // A client has no way to cancel a GM-side session: closing the window or
       // reloading mid-transfer just abandons it, and it then survives for the full
@@ -301,10 +302,10 @@ function registerSocket() {
       const prevUploadId = uploadsByUser.get(fromUserId);
       if (prevUploadId && prevUploadId !== uploadId) cleanupUpload(prevUploadId);
 
-      if (uploads.size >= MAX_CONCURRENT_UPLOADS) return void err("서버가 바쁨(동시 업로드 제한). 잠시 후 다시 시도");
+      if (uploads.size >= MAX_CONCURRENT_UPLOADS) return void err(feLocalize("FE.Music.registerSocket8"));
 
       const pl = pickSharedPlaylist();
-      if (!pl) return void err("공용 플레이리스트 없음(GM 자동 초기화 실패)");
+      if (!pl) return void err(feLocalize("FE.Music.registerSocket9"));
 
       const dir = musicUploadDir();
       const cleanName = sanitizeFileName(fileName);
@@ -379,7 +380,7 @@ function registerSocket() {
       const rec = uploads.get(uploadId);
 
       if (!rec) {
-        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: sender.id, uploadId, reason: "업로드 세션 없음(다시 업로드 시작)" });
+        game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: sender.id, uploadId, reason: feLocalize("FE.Music.reason") });
         return;
       }
       if (sender.id !== rec.fromUserId) return;
@@ -389,7 +390,7 @@ function registerSocket() {
         rec.retryCount++;
         if (rec.retryCount > MAX_RETRY) {
           cleanupUpload(uploadId);
-          game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, reason: `전송 누락 반복(누락 ${missing.length}개). 파일 다시 선택` });
+          game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, reason: feFormat("FE.Music.reason2", { length: missing.length }) });
           return;
         }
         game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_REQ_MISSING, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, attempt: rec.retryCount, missing });
@@ -400,7 +401,7 @@ function registerSocket() {
         const { trackName, playlistId } = await gmHandleUploadFinish(rec);
         game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ACK, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, trackName, playlistId, reused: false });
       } catch (e) {
-        const reason = e?.message === "NO_PLAYLIST" ? "공용 플레이리스트 없음" : "서버 업로드 실패";
+        const reason = e?.message === "NO_PLAYLIST" ? feLocalize("FE.Music.reason3") : feLocalize("FE.Music.reason4");
         game.socket.emit(MUSIC_SOCKET, { type: MUSIC_MSG.UP_ERR, authorityId: game.user.id, toUserId: rec.fromUserId, uploadId, reason });
       } finally {
         cleanupUpload(uploadId);
@@ -423,12 +424,12 @@ function registerLiveRefresh() {
 function registerDeleteGuards() {
   Hooks.on("preDeletePlaylist", (doc) => {
     if (!isSharedPlaylist(doc) || game.user.isGM) return;
-    ui.notifications.warn("공용 음악 플레이리스트는 GM만 삭제할 수 있습니다.");
+    ui.notifications.warn(feLocalize("FE.Music.registerDeleteGuards"));
     return false;
   });
   Hooks.on("preDeletePlaylistSound", (doc) => {
     if (!isSharedPlaylist(doc?.parent) || game.user.isGM) return;
-    ui.notifications.warn("공용 음악 트랙은 GM만 삭제할 수 있습니다.");
+    ui.notifications.warn(feLocalize("FE.Music.registerDeleteGuards2"));
     return false;
   });
 }
@@ -495,7 +496,7 @@ function registerPlaylistSeekControls() {
       slider.disabled = true;
       slider.max = "1";
       slider.value = "0";
-      slider.setAttribute("aria-valuetext", "재생 시간 불러오는 중");
+      slider.setAttribute("aria-valuetext", feLocalize("FE.Music.updateSeekSlider"));
       return;
     }
 
@@ -570,7 +571,7 @@ function registerPlaylistSeekControls() {
     if (typeof original !== "function") {
       // Degrade, don't break: sliders still seek and still refresh on every hook
       // below — they just stop advancing on their own.
-      console.warn("female_edition | PlaylistDirectory#updateTimestamps is missing — playlist seek sliders will not auto-advance");
+      console.warn(feLocalize("FE.Diagnostics.Music.registerPlaylistSeekControls"));
       return;
     }
     if (original.feSeekPatched) return;
@@ -583,7 +584,7 @@ function registerPlaylistSeekControls() {
       // same prefix; core arms no timer on a popout (`!this.isPopout`), so a popout
       // has never had a tick of its own.
       try { refreshPlayingSeekSliders(); }
-      catch (error) { console.error("female_edition | playlist seek slider refresh failed", error); }
+      catch (error) { console.error(feLocalize("FE.Diagnostics.Music.registerPlaylistSeekControls2"), error); }
       return result;
     };
     patched.feSeekPatched = true;
@@ -610,21 +611,21 @@ function registerPlaylistSeekControls() {
     seek.min = "0";
     seek.max = "1";
     seek.step = "0.1";
-    seek.setAttribute("aria-label", `${sound.name} 재생 위치`);
+    seek.setAttribute("aria-label", feFormat("FE.Music.enhancePlayback", { name: sound.name }));
 
     const volume = document.createElement("div");
     volume.className = "fe-music-volume-control";
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "inline-control sound-control icon fe-music-volume-toggle";
-    toggle.setAttribute("aria-label", `${sound.name} 볼륨 조절`);
+    toggle.setAttribute("aria-label", feFormat("FE.Music.enhancePlayback2", { name: sound.name }));
     toggle.setAttribute("aria-expanded", "false");
     toggle.innerHTML = '<i class="fa-solid fa-volume-low" inert></i>';
     const popover = document.createElement("div");
     popover.className = "fe-music-volume-popover";
     popover.hidden = true;
     popover.setAttribute("role", "group");
-    popover.setAttribute("aria-label", `${sound.name} 볼륨`);
+    popover.setAttribute("aria-label", feFormat("FE.Music.enhancePlayback3", { name: sound.name }));
     const maxVolumeIcon = document.createElement("i");
     maxVolumeIcon.className = "fa-solid fa-volume-high fe-music-volume-max";
     maxVolumeIcon.setAttribute("aria-hidden", "true");
@@ -677,7 +678,7 @@ function registerPlaylistSeekControls() {
         offset: Math.clamp(target, 0, Math.max(0, duration - 0.05))
       });
     } catch (error) {
-      console.error("female_edition | local playlist seek sync failed", error);
+      console.error(feLocalize("FE.Diagnostics.Music.registerPlaylistSeekControls3"), error);
       sound.sync?.();
     } finally {
       // Keep the map to in-flight seeks only; without this it kept one entry per
@@ -754,8 +755,8 @@ function registerPlaylistSeekControls() {
       // offset on every client. A paused Sound keeps the new resume position.
       await sound.update({ pausedTime: sound.playing ? target : Math.max(0.01, target) });
     } catch (error) {
-      console.error("female_edition | playlist seek failed", error);
-      ui.notifications?.error?.("재생 위치를 변경하지 못했습니다.");
+      console.error(feLocalize("FE.Diagnostics.Music.registerPlaylistSeekControls4"), error);
+      ui.notifications?.error?.(feLocalize("FE.Music.registerPlaylistSeekControls"));
     } finally {
       slider.dataset.seeking = "false";
       updateSeekSlider(slider);
@@ -789,7 +790,7 @@ function registerSidebarButton() {
     controls.push({
       action: "fe-music-open",
       icon: "fa-solid fa-music",
-      label: "Emanim Music",
+      label: feLocalize("FE.Music.Open"),
       onClick: () => openApp(),
       visible: true
     });
@@ -819,8 +820,8 @@ function registerSidebarButton() {
     const btn = document.createElement("a");
     btn.className = "header-control fe-music-open";
     btn.dataset.action = "fe-music-open";
-    btn.setAttribute("title", "Emanim Music");
-    btn.setAttribute("aria-label", "Emanim Music");
+    btn.setAttribute("title", feLocalize("FE.Music.Open"));
+    btn.setAttribute("aria-label", feLocalize("FE.Music.Open"));
     btn.innerHTML = '<i class="fa-solid fa-music"></i>';
 
     btn.addEventListener("click", (ev) => {

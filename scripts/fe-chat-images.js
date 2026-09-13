@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 
 // Chat Images integration (ported from chat-images, adapted for female_edition)
@@ -181,7 +182,7 @@ function ciAddPendingTile(item, root = document) {
 
   const remove = doc.createElement("i");
   remove.className = "ci-remove-image-icon fa-regular fa-circle-xmark";
-  remove.title = "제거";
+  remove.title = feLocalize("FE.Common.Remove");
   remove.addEventListener("click", () => ciRemovePendingById(item.id, root));
 
   const img = doc.createElement("img");
@@ -312,7 +313,7 @@ function ciOpenImageInBrowser(src) {
     browserWin = window.open("about:blank", "_blank", ciBuildPopupFeatures());
     if (!browserWin) {
       if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
-      ui?.notifications?.warn?.("팝업이 차단되어 새 창을 열 수 없습니다.");
+      ui?.notifications?.warn?.(feLocalize("FE.ChatImages.ciOpenImageInBrowser"));
       return;
     }
     browserWin.opener = null;
@@ -323,7 +324,7 @@ function ciOpenImageInBrowser(src) {
   } catch {
     try { browserWin?.close?.(); } catch { /* no-op */ }
     if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
-    ui?.notifications?.warn?.("새 창을 열 수 없습니다.");
+    ui?.notifications?.warn?.(feLocalize("FE.ChatImages.ciOpenImageInBrowser2"));
   }
 }
 
@@ -347,7 +348,7 @@ function ciGetImagePopoutSubclass() {
       buttons.push({ // last in the array = immediately left of close
         icon: "fa-solid fa-up-right-from-square",
         action: "feOpenInBrowser",
-        label: "새 창으로 보기",
+        label: feLocalize("FE.ChatImages.label"),
       });
       return buttons;
     }
@@ -464,7 +465,7 @@ async function ciResolvePendingSource(item) {
     try {
       return await ciUploadImageDirect(item.file, ciUploadLocation());
     } catch (error) {
-      console.warn("female_edition | direct chat-image upload failed; trying GM proxy", error);
+      console.warn(feLocalize("FE.Diagnostics.ChatImages.ciResolvePendingSource"), error);
     }
   }
 
@@ -472,8 +473,8 @@ async function ciResolvePendingSource(item) {
     try {
       return await ciUploadImageViaAuthority(item.file);
     } catch (error) {
-      console.warn("female_edition | proxied chat-image upload failed; embedding in message", error);
-      ui?.notifications?.warn?.(`서버 이미지 업로드에 실패하여 메시지에 직접 포함합니다: ${item.name || "image"}`);
+      console.warn(feLocalize("FE.Diagnostics.ChatImages.ciResolvePendingSource2"), error);
+      ui?.notifications?.warn?.(feFormat("FE.ChatImages.ciResolvePendingSource", { value1: item.name || "image" }));
     }
   }
 
@@ -482,7 +483,7 @@ async function ciResolvePendingSource(item) {
   if ((item.file.size ?? 0) > ciMaxUploadBytes()) {
     const mb = (item.file.size / 1024 / 1024).toFixed(1);
     ui?.notifications?.error?.(
-      `이미지 "${item.name || "image"}" (${mb} MB)가 너무 큽니다. 최대 ${ciMaxUploadMB()} MB까지 허용됩니다.`,
+      feFormat("FE.ChatImages.ciResolvePendingSource2", { value1: item.name || "image", mb: mb, value3: ciMaxUploadMB() }),
       { permanent: false }
     );
     return "";
@@ -543,7 +544,7 @@ function ciEnsureUploadArea(root = document) {
 
     const send = doc.createElement("a");
     send.className = "ci-send-all";
-    send.title = "이미지 전송";
+    send.title = feLocalize("FE.ChatImages.title");
     send.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
     send.addEventListener("click", async (ev) => {
       ev.preventDefault();
@@ -554,7 +555,7 @@ function ciEnsureUploadArea(root = document) {
 
     const clear = doc.createElement("a");
     clear.className = "ci-clear-all";
-    clear.title = "모두 제거";
+    clear.title = feLocalize("FE.ChatImages.title2");
     clear.innerHTML = '<i class="fa-solid fa-trash"></i>';
     clear.addEventListener("click", (ev) => {
       ev.preventDefault();
@@ -615,7 +616,7 @@ function ciEnsureUploadButton(root = document) {
   if (!btn) {
     btn = doc.createElement("a");
     btn.id = "ci-upload-image";
-    btn.title = "이미지 업로드";
+    btn.title = feLocalize("FE.ChatImages.title3");
     btn.setAttribute("role", "button");
     btn.innerHTML = '<i class="fas fa-images"></i>';
     const target = controls.querySelector?.(".control-buttons") || controls;
@@ -696,7 +697,7 @@ async function ciSendPending(root = document) {
       resolved.push({ ...item, src });
     }
     if (!resolved.length) {
-      ui?.notifications?.warn?.("전송할 수 있는 이미지가 없습니다. 업로드에 실패했거나 파일이 너무 클 수 있습니다.");
+      ui?.notifications?.warn?.(feLocalize("FE.ChatImages.ciSendPending"));
       return false;
     }
 
@@ -712,8 +713,8 @@ async function ciSendPending(root = document) {
     ciClearPending(root);
     return true;
   } catch (err) {
-    console.error("female_edition | chat-images send failed", err);
-    ui?.notifications?.error?.("채팅 이미지 전송에 실패했습니다.");
+    console.error(feLocalize("FE.Diagnostics.ChatImages.ciSendPending"), err);
+    ui?.notifications?.error?.(feLocalize("FE.ChatImages.ciSendPending2"));
     return false;
   } finally {
     CI_STATE.busy = false;

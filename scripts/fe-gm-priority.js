@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { MODULE_ID, S, FE_DEFAULTS, FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY, FE_GM_PRIORITY_EXCLUDED_KEYS, FE_CORE_PRIORITY_OVERRIDES_KEY, FE_CORE_PRIORITY_BACKUP_KEY } from "./fe-constants.js";
 import { feHasOwn, feValuesEqual } from "./fe-util.js";
 
@@ -126,7 +127,7 @@ async function feSetGmPriorityOverrides(partial = {}) {
       return true;
     });
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to update GM-priority overrides`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feSetGmPriorityOverrides", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -188,7 +189,7 @@ async function feSeedGmPriorityOverridesFromLocal({ force = false } = {}) {
     if (!Object.keys(partial).length) return false;
     return await feSetGmPriorityOverrides(partial);
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to seed GM-priority overrides`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feSeedGmPriorityOverridesFromLocal", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -250,7 +251,7 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
     }
     return changed;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to sync local GM-priority settings`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feSyncLocalGmPrioritySettings", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -292,7 +293,7 @@ async function feRestoreLocalGmPrioritySettings() {
     }
     return true;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to restore local GM-priority settings`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feRestoreLocalGmPrioritySettings", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -389,7 +390,7 @@ async function feCaptureWorldSettings() {
     await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
     return true;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to capture per-world settings`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feCaptureWorldSettings", { MODULE_ID: MODULE_ID }), err);
     return false;
   }
 }
@@ -455,7 +456,7 @@ async function feHydrateWorldSettings() {
     await game.settings.set(MODULE_ID, FE_WORLD_SETTINGS_KEY, all);
     return changed;
   } catch (err) {
-    console.warn(`[${MODULE_ID}] failed to hydrate per-world settings`, err);
+    console.warn(feFormat("FE.Diagnostics.GmPriority.feHydrateWorldSettings", { MODULE_ID: MODULE_ID }), err);
     return false;
   } finally {
     feHydratingWorldSettings = false;

@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 // Archive output helpers: visibility filtering, reversible DOM normalization,
 // source restoration, font preparation, and image/font readiness waits.
 // Self-contained; no Foundry module imports.
@@ -664,7 +665,7 @@ const feArchiveDocumentOperations = new WeakSet();
 export async function feRunArchiveDocumentOperation(doc, task) {
   if (!doc || typeof task !== "function") return false;
   if (feArchiveDocumentOperations.has(doc)) {
-    ui.notifications?.warn("female_edition | 이 아카이브에서 다른 인쇄/저장 작업이 진행 중입니다.", { console: false });
+    ui.notifications?.warn(feLocalize("FE.ArchiveOutput.feRunArchiveDocumentOperation"), { console: false });
     return false;
   }
   feArchiveDocumentOperations.add(doc);

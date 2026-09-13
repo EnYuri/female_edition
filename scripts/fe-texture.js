@@ -1,3 +1,4 @@
+import { feLocalize } from "./fe-i18n.js";
 import { FE_TEX_RE } from "./fe-constants.js";
 import {
   feGetMessageFromElementOrCollection, feGetRoundMarkerFlagValue, feLooksLikeRoundMarkerFlavor,
@@ -255,7 +256,7 @@ function feStripChatTexturesInWindow(win, rootEl, { nodes = null } = {}) {
 
     feApplyBackgroundPlan(plan);
   } catch (err) {
-    console.warn("female_edition | archive texture strip failed", err);
+    console.warn(feLocalize("FE.Diagnostics.Texture.feStripChatTexturesInWindow"), err);
   }
 }
 

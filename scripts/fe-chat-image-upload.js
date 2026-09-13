@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // Chat-image file upload transport.
 //
 // FILES_UPLOAD controls direct FilePicker writes, not whether the module's chat
@@ -205,13 +206,13 @@ export async function ciEnsureUploadDirectory(path) {
 
     try { await Picker.createDirectory("data", current, {}); } catch { /* verify below */ }
     const verified = await Picker.browse("data", current);
-    if (verified?.target === ".") throw new Error(`업로드 폴더를 만들 수 없습니다: ${current}`);
+    if (verified?.target === ".") throw new Error(feFormat("FE.ChatImageUpload.ciEnsureUploadDirectory", { current: current }));
   }
   return target;
 }
 
 export async function ciUploadImageDirect(file, uploadDirectory) {
-  if (!ciResolveImageExtension(file?.name, file?.type)) throw new Error("지원하지 않는 이미지 형식입니다.");
+  if (!ciResolveImageExtension(file?.name, file?.type)) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect"));
   const Picker = ciGetFilePicker();
   if (!Picker) throw new Error("FilePicker API unavailable");
 
@@ -227,7 +228,7 @@ export async function ciUploadImageDirect(file, uploadDirectory) {
       : null);
   if (!upload) throw new Error("FilePicker upload API unavailable");
   const result = await upload("data", target, safeFile, {}, { notify: false });
-  if (!result?.path) throw new Error("업로드 결과 경로가 없습니다.");
+  if (!result?.path) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect2"));
   return String(result.path);
 }
 
@@ -282,7 +283,7 @@ function ciMarkDone(uploadId, path) {
 function ciMarkError(uploadId, reason) {
   const record = localUploads.get(uploadId);
   if (!record) return;
-  const error = new Error(String(reason || "대리 업로드 실패"));
+  const error = new Error(String(reason || feLocalize("FE.ChatImageUpload.error")));
   if (record.initTimer) clearTimeout(record.initTimer);
   if (record.doneTimer) clearTimeout(record.doneTimer);
   record.initTimer = null;
@@ -315,12 +316,12 @@ async function ciEmitChunks(record, indices = null) {
 }
 
 export async function ciUploadImageViaAuthority(file) {
-  if (!ciHasUploadAuthorityOnline()) throw new Error("온라인 GM이 없습니다.");
+  if (!ciHasUploadAuthorityOnline()) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageViaAuthority"));
   const size = Number(file?.size);
-  if (!Number.isFinite(size) || size <= 0) throw new Error("파일 크기가 올바르지 않습니다.");
-  if (size > ciMaxUploadBytes()) throw new Error(`대리 업로드는 최대 ${ciMaxUploadMB()} MB까지 가능합니다.`);
+  if (!Number.isFinite(size) || size <= 0) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageViaAuthority2"));
+  if (size > ciMaxUploadBytes()) throw new Error(feFormat("FE.ChatImageUpload.ciUploadImageViaAuthority3", { value1: ciMaxUploadMB() }));
   const ext = ciResolveImageExtension(file?.name, file?.type);
-  if (!ext) throw new Error("지원하지 않는 이미지 형식입니다.");
+  if (!ext) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect"));
 
   const uploadId = `${game.user.id}-${Date.now()}-${ciRandomId()}`;
   const totalChunks = Math.ceil(size / CI_CHUNK_SIZE);
@@ -360,7 +361,7 @@ export async function ciUploadImageViaAuthority(file) {
       fromUserId: game.user.id,
     });
     const path = await done;
-    if (!path) throw new Error("대리 업로드 결과 경로가 없습니다.");
+    if (!path) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageViaAuthority4"));
     return path;
   } finally {
     ciClearLocalUpload(uploadId);
@@ -399,13 +400,13 @@ function ciAuthorityError(toUserId, uploadId, reason) {
     authorityId: game.user.id,
     toUserId,
     uploadId,
-    reason: String(reason || "대리 업로드 실패"),
+    reason: String(reason || feLocalize("FE.ChatImageUpload.error")),
   });
 }
 
 async function ciFinishAuthorityUpload(record, getUploadDirectory) {
   const blob = new Blob(record.chunks, { type: record.fileType || "application/octet-stream" });
-  if (blob.size !== record.fileSize) throw new Error("수신한 이미지 크기가 원본과 일치하지 않습니다.");
+  if (blob.size !== record.fileSize) throw new Error(feLocalize("FE.ChatImageUpload.ciFinishAuthorityUpload"));
 
   const file = new File([blob], ciBuildUploadFileName(record.fileName, record.fileType), {
     type: record.fileType || "",
@@ -419,7 +420,7 @@ async function ciFinishAuthorityUpload(record, getUploadDirectory) {
       : null);
   if (!upload) throw new Error("FilePicker upload API unavailable");
   const result = await upload("data", target, file, {}, { notify: false });
-  if (!result?.path) throw new Error("업로드 결과 경로가 없습니다.");
+  if (!result?.path) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect2"));
   return String(result.path);
 }
 
@@ -440,7 +441,7 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
         const record = localUploads.get(message.uploadId);
         if (!record) return;
         if (record.retries >= CI_MAX_RETRY) {
-          ciMarkError(message.uploadId, "이미지 청크 재전송 한도를 초과했습니다.");
+          ciMarkError(message.uploadId, feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket"));
           return;
         }
         record.retries++;
@@ -452,7 +453,7 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
             fromUserId: game.user.id,
           });
         } catch (error) {
-          ciMarkError(message.uploadId, error?.message || "이미지 청크 재전송에 실패했습니다.");
+          ciMarkError(message.uploadId, error?.message || feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket2"));
         }
       }
       return;
@@ -465,17 +466,17 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
       const uploadId = String(message.uploadId || "");
       const reject = (reason) => ciAuthorityError(sender.id, uploadId, reason);
       if (!uploadId) return;
-      if (typeof isFeatureEnabled === "function" && !isFeatureEnabled()) return void reject("채팅 이미지 기능이 비활성화되어 있습니다.");
+      if (typeof isFeatureEnabled === "function" && !isFeatureEnabled()) return void reject(feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket3"));
 
       const fileSize = Number(message.fileSize);
-      if (!Number.isFinite(fileSize) || fileSize <= 0) return void reject("파일 크기가 올바르지 않습니다.");
-      if (fileSize > ciMaxUploadBytes()) return void reject(`파일이 너무 큽니다. 최대 ${ciMaxUploadMB()} MB`);
+      if (!Number.isFinite(fileSize) || fileSize <= 0) return void reject(feLocalize("FE.ChatImageUpload.ciUploadImageViaAuthority2"));
+      if (fileSize > ciMaxUploadBytes()) return void reject(feFormat("FE.ChatImageUpload.ciRegisterImageUploadSocket4", { value1: ciMaxUploadMB() }));
       const extension = ciResolveImageExtension(message.fileName, message.fileType);
-      if (!extension) return void reject("지원하지 않는 이미지 형식입니다.");
+      if (!extension) return void reject(feLocalize("FE.ChatImageUpload.ciUploadImageDirect"));
 
       const previous = authorityUploadByUser.get(sender.id);
       if (previous && previous !== uploadId) ciClearAuthorityUpload(previous);
-      if (authorityUploads.size >= CI_MAX_CONCURRENT_UPLOADS) return void reject("서버가 다른 이미지 업로드를 처리 중입니다. 잠시 후 다시 시도하세요.");
+      if (authorityUploads.size >= CI_MAX_CONCURRENT_UPLOADS) return void reject(feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket5"));
       ciClearAuthorityUpload(uploadId);
 
       const chunkSize = ciCoerceChunkSize(message.chunkSize);
@@ -529,7 +530,7 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
       record.retryCount++;
       if (record.retryCount > CI_MAX_RETRY) {
         ciClearAuthorityUpload(uploadId);
-        ciAuthorityError(sender.id, uploadId, "이미지 청크 재전송 한도를 초과했습니다.");
+        ciAuthorityError(sender.id, uploadId, feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket"));
         return;
       }
       ciRefreshAuthorityTtl(record);
@@ -553,7 +554,7 @@ export function ciRegisterImageUploadSocket({ getUploadDirectory, isFeatureEnabl
         path,
       });
     } catch (error) {
-      ciAuthorityError(sender.id, uploadId, error?.message || "서버 이미지 업로드에 실패했습니다.");
+      ciAuthorityError(sender.id, uploadId, error?.message || feLocalize("FE.ChatImageUpload.ciRegisterImageUploadSocket6"));
     } finally {
       ciClearAuthorityUpload(uploadId);
     }

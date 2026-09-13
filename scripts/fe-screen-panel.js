@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Screen Panel — entry / orchestrator (registered in module.json).
 //
@@ -240,7 +241,7 @@ async function feMigratePanelFaceSizes(actor) {
     }
     if (changed) await actor.update({ "system.faces": faces });
   } catch (err) {
-    console.warn(`${MODULE_ID} | screen panel per-face size migration failed`, err);
+    console.warn(feFormat("FE.Diagnostics.ScreenPanel.feMigratePanelFaceSizes", { MODULE_ID: MODULE_ID }), err);
   } finally {
     _panelFaceSizeMigrations.delete(actor);
   }
@@ -1037,7 +1038,7 @@ function feRebuildPanelOverlays(tile) {
       }
     }
     if (tile._fePanelOverlays.length) canvas.primary.sortDirty = true;
-  } catch (err) { console.warn(`${MODULE_ID} | screen panel overlay rebuild failed`, err); }
+  } catch (err) { console.warn(feFormat("FE.Diagnostics.ScreenPanel.feRebuildPanelOverlays", { MODULE_ID: MODULE_ID }), err); }
 }
 
 /**
@@ -1436,7 +1437,7 @@ async function feSyncPanelTokenization(panelActor) {
       try {
         if (want) await feConvertPanelTileToToken(scene, doc, panelActor);
         else await feConvertPanelTokenToTile(scene, doc, panelActor);
-      } catch (err) { console.warn(`${MODULE_ID} | screen panel tokenize conversion failed`, err); }
+      } catch (err) { console.warn(feFormat("FE.Diagnostics.ScreenPanel.feSyncPanelTokenization", { MODULE_ID: MODULE_ID }), err); }
     }
   }
 }
@@ -1510,7 +1511,7 @@ async function feRemoveAllPanelPlacements(actorId) {
     const placements = fePanelPlacementsIn(scene, actorId);
     if (!placements.length) continue;
     try { removed += await feDeletePanelPlacements(scene, placements); }
-    catch (err) { console.warn(`${MODULE_ID} | screen panel placement cleanup failed`, err); }
+    catch (err) { console.warn(feFormat("FE.Diagnostics.ScreenPanel.feRemoveAllPanelPlacements", { MODULE_ID: MODULE_ID }), err); }
   }
   return removed;
 }
@@ -1543,7 +1544,7 @@ async function feCleanupOrphanPanelPlacementsIn(scene) {
   }).catch(() => false);
   if (!ok) return 0;
   try {
-    console.warn(`${MODULE_ID} | removing ${orphans.length} orphan panel placement(s) from "${scene.name}"`,
+    console.warn(feFormat("FE.Diagnostics.ScreenPanel.feCleanupOrphanPanelPlacementsIn", { MODULE_ID: MODULE_ID, value2: orphans.length, value3: scene.name }),
       orphans.map(p => ({
         id: p.doc.id,
         type: p.isToken ? "Token" : "Tile",
@@ -1555,7 +1556,7 @@ async function feCleanupOrphanPanelPlacementsIn(scene) {
     if (count) ui.notifications?.info(game.i18n.format("FESP.Cleanup.Orphans", { count, scene: scene.name }));
     return count;
   } catch (err) {
-    console.warn(`${MODULE_ID} | screen panel orphan cleanup failed`, err);
+    console.warn(feFormat("FE.Diagnostics.ScreenPanel.feCleanupOrphanPanelPlacementsIn2", { MODULE_ID: MODULE_ID }), err);
     return 0;
   }
 }
@@ -1672,7 +1673,7 @@ function onPanelSocket(data, senderId) {
   if (game.user !== game.users.activeGM) return; // only the primary GM applies
   const requester = feResolveSocketSender(senderId, data.requesterId, "screen-panel");
   if (!requester) return;
-  applyPanelOp(data.type, data, requester).catch(err => console.error(`${MODULE_ID} | screen panel op failed`, err));
+  applyPanelOp(data.type, data, requester).catch(err => console.error(feFormat("FE.Diagnostics.ScreenPanel.onPanelSocket", { MODULE_ID: MODULE_ID }), err));
 }
 
 /**
@@ -1755,7 +1756,7 @@ function feInstallDottedTypeAliases() {
       });
     } catch (err) {
       // A nonstandard system-owned CONFIG shape must never block panel setup.
-      console.warn(`${MODULE_ID} | could not install the dotted-type alias for CONFIG.Actor.${name}`, err);
+      console.warn(feFormat("FE.Diagnostics.ScreenPanel.feInstallDottedTypeAliases", { MODULE_ID: MODULE_ID, name: name }), err);
     }
   }
 }
@@ -1863,7 +1864,7 @@ Hooks.on("deleteActor", (actor) => {
   if (game.user !== game.users.activeGM) return;
   feRemoveAllPanelPlacements(actor.id).then((count) => {
     if (count) ui.notifications?.info(game.i18n.format("FESP.Cleanup.ActorDeleted", { name: actor.name, count }));
-  }).catch(err => console.warn(`${MODULE_ID} | screen panel placement cleanup failed`, err));
+  }).catch(err => console.warn(feFormat("FE.Diagnostics.ScreenPanel.feRemoveAllPanelPlacements", { MODULE_ID: MODULE_ID }), err));
 });
 // A panel is drawn as a Tile OR a Token, so the same overlay/index/visibility work runs
 // off BOTH draw cycles — otherwise a tokenized panel shows no overlay labels and is
@@ -2019,7 +2020,7 @@ async function feSyncLinkedFaceImages(panelActor) {
     }
     if (needsUpdate) await panelActor.update({ "system.faces": faces }, { render: false });
   } catch (err) {
-    console.warn(`${MODULE_ID} | linked screen panel image sync failed`, err);
+    console.warn(feFormat("FE.Diagnostics.ScreenPanel.feSyncLinkedFaceImages", { MODULE_ID: MODULE_ID }), err);
   }
 }
 
@@ -2293,7 +2294,7 @@ Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
   // own stage entries, which are excluded for panels (a panel is a display board, not a
   // character). v14 core labels the entry with the un-localized key, v13 and some modules
   // use `name` already localized, so match both. Fall back to the top when not found.
-  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? "편집";
+  const editLabel = game.i18n?.localize?.("SIDEBAR.Edit") ?? feLocalize("FE.Common.Edit");
   const isEdit = (o) => [o?.label, o?.name].some(v => v === "SIDEBAR.Edit" || v === editLabel);
   const editIdx = options.findIndex(isEdit);
   options.splice(editIdx >= 0 ? editIdx + 1 : 0, 0, ...items);

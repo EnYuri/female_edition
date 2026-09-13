@@ -364,15 +364,28 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
    formula-input / .input-group 의 직계 자식 버튼은 자유 버튼이 아니라 껍데기의
    구성 부품이며(코어가 transparent 로 명시), 불투명하게 칠하면 껍데기의 테두리를
    덮어 잘라 먹는다. 그 표면은 fe-retro-forms.css § F2 가 소유한다. 가드 없이는
-   아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인. */
+   아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인.
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
+   두 번째 가드가 Tidy5e 의 `transparent-button` 계열이다. Tidy 는 "값을 누르는
+   곳"(포트레이트 레벨, AC, 능력치 수정치/내성굴림, 우선권)을 크롬 버튼이 아니라
+   투명 버튼으로 만들고, 그 뒤의 방패·육각형 모양은 Tidy 가 별도 엘리먼트로 그린다.
+   Tidy 의 선언은 `.tidy5e-sheet.application:where(.classic) .transparent-button
+   { background: none }` — !important 가 없고 layer(modules) 다. 아래 규칙은
+   !important + layer(layouts) 라 레이어 역전으로 무조건 이겨서, 그 모양들 위에
+   불투명 검정을 덮어씌웠다 (v14.367 / Tidy 13.7.0 에서 59개 전부 rgb(0,0,0) 실측).
+
+   fe-dnd5e-compat.css 에 같은 취지의 예외 블록이 이미 있으나 (0,5,2)/(0,6,3) 이라
+   아래 규칙의 (0,9,4) 에 진다 — 같은 layouts 레이어라 명시도로 갈린다. 명시도
+   경쟁을 키우는 대신 여기서 가드로 빼는 이유는, 이 선택자가 이미
+   `:not(.double-cross-3rd)` 등 시스템 전용 가드를 갖고 있어 선례가 있기 때문이다. */
+
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
   background: #000 !important;
   color: var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
   background: var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }

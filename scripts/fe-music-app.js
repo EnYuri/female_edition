@@ -1,3 +1,4 @@
+import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 // female_edition: Music feature — client UI (ApplicationV2) + upload logic.
 //
 // ApplicationV2 (HandlebarsApplicationMixin) per the project convention. The window
@@ -180,7 +181,7 @@ export async function resendMissingChunks({ uploadId, missing, attempt }) {
   if (!rec) return;
 
   if (rec.retries >= LOCAL_MAX_RETRY) {
-    ui.notifications.error("재전송 한도 초과. 파일 다시 선택하세요.");
+    ui.notifications.error(feLocalize("FE.MusicApp.resendMissingChunks"));
     clearLocalUpload(uploadId);
     return;
   }
@@ -189,7 +190,7 @@ export async function resendMissingChunks({ uploadId, missing, attempt }) {
   const miss = Array.isArray(missing) ? missing : [];
   if (!miss.length) return;
 
-  ui.notifications.info(`누락 청크 재전송 중... (${miss.length}개, 시도 ${attempt ?? rec.retries})`);
+  ui.notifications.info(feFormat("FE.MusicApp.resendMissingChunks2", { length: miss.length, value2: attempt ?? rec.retries }));
 
   for (const i of miss) {
     const idx = Number(i);
@@ -252,7 +253,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
     id: "fe-music-app",
     classes: ["female-edition", "fe-music-app"],
     tag: "div",
-    window: { title: "음악 (Emanim Music)", icon: "fa-solid fa-music", resizable: true },
+    window: { title: "FE.MusicApp.window.title", icon: "fa-solid fa-music", resizable: true },
     position: { width: 560, height: "auto" },
     actions: {
       refresh:   FeMusicApp.#onRefresh,
@@ -291,7 +292,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       ...context,
       hasPlaylist: !!pl,
-      playlistName: pl?.name ?? "(아직 없음)",
+      playlistName: pl?.name ?? feLocalize("FE.MusicApp.playlistName"),
       uploadDir: musicUploadDir(),
       direct,
       sounds,
@@ -373,8 +374,8 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const sound = pl?.sounds?.get(target.dataset.soundId);
     if (!pl || !sound) return;
     const ok = await foundry.applications.api.DialogV2.confirm({
-      window: { title: "트랙 삭제" },
-      content: `<p>"${sound.name}" 트랙을 플레이리스트에서 제거할까요?<br>(디스크의 파일은 지워지지 않습니다.)</p>`,
+      window: { title: feLocalize("FE.MusicApp.window.title2") },
+      content: `<p>"${sound.name}${feLocalizeHTML("FE.MusicApp.content.Text1")}<br>${feLocalizeHTML("FE.MusicApp.content.Text2")}</p>`,
     }).catch(() => false);
     if (!ok) return;
     await sound.delete();
@@ -393,11 +394,11 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   async _processFiles(files) {
     if (this._uploading) {
-      ui.notifications.warn("이미 업로드가 진행 중입니다.");
+      ui.notifications.warn(feLocalize("FE.MusicApp.Text"));
       return;
     }
     if (!this.playlist) {
-      ui.notifications.error("공용 플레이리스트가 아직 없습니다. (GM이 월드에 들어오면 자동 생성)");
+      ui.notifications.error(feLocalize("FE.MusicApp.Text2"));
       return;
     }
 
@@ -421,12 +422,12 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         setStatus(
           total > 1
-            ? `업로드 중 (${fi + 1}/${total}): ${file.name}`
-            : `업로드 중: ${file.name}`
+            ? feFormat("FE.MusicApp.Text3", { value1: fi + 1, total: total, name: file.name })
+            : feFormat("FE.MusicApp.Text4", { name: file.name })
         );
 
         if (file.size > maxMB * 1024 * 1024) {
-          ui.notifications.error(`파일이 너무 큽니다. (최대 ${maxMB}MB): ${file.name}`);
+          ui.notifications.error(feFormat("FE.MusicApp.Text5", { maxMB: maxMB, name: file.name }));
           failed++;
           continue;
         }
@@ -436,7 +437,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
           ? _AH.hasAudioExtension(file.name)
           : ["mp3", "ogg", "wav", "flac", "m4a", "webm"].includes(extOf(file.name));
         if (!audioOk) {
-          ui.notifications.error(`지원하지 않는 오디오 확장자: ${file.name}`);
+          ui.notifications.error(feFormat("FE.MusicApp.Text6", { name: file.name }));
           failed++;
           continue;
         }
@@ -446,8 +447,8 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
           if (r === "reused") reused++; else success++;
         } catch (e) {
           if (e?.message !== "HANDLED") {
-            console.error("female_edition | music upload failed", e);
-            ui.notifications.error(`업로드 실패: ${file.name}${e?.message ? ` (${e.message})` : ""}`);
+            console.error(feLocalize("FE.Diagnostics.MusicApp.error"), e);
+            ui.notifications.error(feFormat("FE.MusicApp.Text7", { name: file.name, value2: e?.message ? ` (${e.message})` : "" }));
           }
           failed++;
         }
@@ -459,7 +460,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     if (total > 1 || reused) {
-      ui.notifications.info(`업로드 결과: 추가 ${success}개, 중복재사용 ${reused}개, 실패 ${failed}개`);
+      ui.notifications.info(feFormat("FE.MusicApp.Text8", { success: success, reused: reused, failed: failed }));
     }
   }
 
@@ -488,7 +489,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
   // Proxy path: GM-relayed chunked upload (for clients without FILES_UPLOAD).
   async _proxyUpload(file) {
     if (!isAnyGMOnline()) {
-      ui.notifications.error(`GM이 온라인이어야 업로드(프록시)가 됩니다: ${file.name}`);
+      ui.notifications.error(feFormat("FE.MusicApp.Text9", { name: file.name }));
       throw new Error("HANDLED");
     }
 
@@ -525,7 +526,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
       initInfo = await initPromise;
     } catch (e) {
       if (e?.message === "INIT_ACK_TIMEOUT") {
-        ui.notifications.error(`서버 응답 지연(UP_INIT_ACK): ${file.name}`);
+        ui.notifications.error(feFormat("FE.MusicApp.Text10", { name: file.name }));
       }
       clearLocalUpload(uploadId);
       throw new Error("HANDLED");
@@ -566,7 +567,7 @@ export class FeMusicApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return res?.reused ? "reused" : "added";
     } catch (e) {
       if (e?.message === "FINISH_ACK_TIMEOUT") {
-        ui.notifications.error(`서버 응답 지연(UP_ACK/UP_ERR): ${file.name}`);
+        ui.notifications.error(feFormat("FE.MusicApp.Text11", { name: file.name }));
         clearLocalUpload(uploadId);
       }
       throw new Error("HANDLED");

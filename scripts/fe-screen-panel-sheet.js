@@ -1,3 +1,4 @@
+import { feLocalize, feFormat } from "./fe-i18n.js";
 // female_edition: Screen Panel — Actor sheet (ApplicationV2 / Handlebars).
 //
 // Edits the shared panel definition: the ordered list of faces (name + image +
@@ -216,8 +217,8 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     if (ScreenPanelSheet.#droppedHeaderControls.has(label)) return;
     ScreenPanelSheet.#droppedHeaderControls.add(label);
     console.debug(
-      `${MODULE_ID} | screen panel sheet: dropped a foreign header control 「${label}」 ` +
-      `(a panel is a display board, not a character)`
+      feFormat("FE.Diagnostics.ScreenPanelSheet.debug", { MODULE_ID: MODULE_ID, label: label }) +
+      feLocalize("FE.Diagnostics.ScreenPanelSheet.debug2")
     );
   }
 
@@ -1490,7 +1491,7 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     // Delegated to the entry module to avoid a circular import.
     const fn = globalThis.feScreenPanelPlaceOnScene;
     if (typeof fn === "function") await fn(this.document);
-    else ui.notifications?.warn("Screen Panel: placement API not ready.");
+    else ui.notifications?.warn(feLocalize("FESP.Errors.PlacementNotReady"));
   }
 
   static async #onAddOverlay(event, target) {

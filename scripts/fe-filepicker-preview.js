@@ -1,3 +1,4 @@
+import { feLocalize, feLocalizeHTML } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-filepicker-preview.js
 // Adds a preview sidebar to the right of core's FilePicker.
@@ -116,7 +117,7 @@ function _ensureSidebar(el, app) {
     `<div class="fe-fp-preview-body" data-fe-preview-body></div>` +
     `<div class="fe-fp-preview-drop" data-fe-drop-hint>` +
       `<i class="fa-solid fa-arrow-down-to-bracket" inert></i>` +
-      `<span>이미지를 창에 드롭하거나 붙여넣기<br>업로드 후 자동 선택</span>` +
+      `<span>${feLocalizeHTML("FE.FilepickerPreview.DropOrPaste")}<br>${feLocalizeHTML("FE.FilepickerPreview.SelectAfterUpload")}</span>` +
     `</div>`;
   content.appendChild(aside);
 
@@ -280,7 +281,7 @@ async function _selectUploadedImage(app, path) {
 async function _uploadExternalImages(files, aside, app, { clipboardFallback = false, urls = [] } = {}) {
   if ((!files.length && !clipboardFallback && !urls.length) || app._feFpExternalUploadBusy) return;
   if (!ciCanUploadDirect()) {
-    ui.notifications?.warn("파일 픽커 이미지 업로드에는 Foundry 파일 업로드 권한이 필요합니다.");
+    ui.notifications?.warn(feLocalize("FE.FilepickerPreview._uploadExternalImages"));
     return;
   }
 
@@ -291,16 +292,16 @@ async function _uploadExternalImages(files, aside, app, { clipboardFallback = fa
     if (!uploadFiles.length && clipboardFallback) uploadFiles = await _readClipboardApiImages(app);
     if (!uploadFiles.length && urls.length) uploadFiles = await _downloadImageUrls(urls, app);
     if (!uploadFiles.length) {
-      throw new Error("업로드 가능한 이미지 데이터를 읽지 못했습니다. 클립보드 형식이나 원본 사이트의 다운로드 제한일 수 있습니다.");
+      throw new Error(feLocalize("FE.FilepickerPreview._uploadExternalImages2"));
     }
 
     _previewLocal(aside, uploadFiles[0]);
     let selectedPath = "";
     const directory = _uploadDirectory();
     for (const file of uploadFiles) selectedPath = await ciUploadImageDirect(file, directory);
-    if (!selectedPath) throw new Error("업로드 결과 경로가 없습니다.");
+    if (!selectedPath) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect2"));
     await _selectUploadedImage(app, selectedPath);
-    ui.notifications?.info?.("이미지를 업로드하고 파일 픽커에서 선택했습니다.");
+    ui.notifications?.info?.(feLocalize("FE.FilepickerPreview._uploadExternalImages3"));
   } catch (err) {
     ui.notifications?.error(err, { console: true });
   } finally {
@@ -378,7 +379,7 @@ function _renderMedia(cat, url, name) {
     case "audio":
       return `<div class="fe-fp-audio-wrap"><i class="fa-solid fa-music" inert></i><audio src="${esc(url)}" controls preload="metadata" data-fe-media></audio></div>`;
     case "font":
-      return `<div class="fe-fp-font" data-fe-font>가나다라 AaBbCc 0123<br><span class="fe-fp-font-sm">다람쥐 헌 쳇바퀴 The quick brown fox</span></div>`;
+      return `<div class="fe-fp-font" data-fe-font>${feLocalizeHTML("FE.FontPreview.Sample")}<br><span class="fe-fp-font-sm">${feLocalizeHTML("FE.FontPreview.Pangram")}</span></div>`;
     default:
       return `<div class="fe-fp-fileicon"><i class="${_catIcon(cat)}" inert></i></div>`;
   }
@@ -409,7 +410,7 @@ function _writePreview(aside, { url, name, cat, sizeText = "", dateText = "", is
     `<div class="fe-fp-stage" data-fe-stage>${_renderMedia(cat, url, name)}</div>` +
     `<div class="fe-fp-meta">` +
       `<div class="fe-fp-name" title="${safeName}">${safeName}</div>` +
-      `<div class="fe-fp-sub" data-fe-sub>${[isLocal ? "업로드할 파일" : "", sizeText, dateText].filter(Boolean).join(" · ")}</div>` +
+      `<div class="fe-fp-sub" data-fe-sub>${[isLocal ? feLocalize("FE.FilepickerPreview.innerHTML2") : "", sizeText, dateText].filter(Boolean).join(" · ")}</div>` +
       `<div class="fe-fp-dim" data-fe-dim></div>` +
     `</div>`;
 

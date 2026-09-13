@@ -1,3 +1,4 @@
+import { feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-typing-indicator.js
 // "다른 사람이 입력하고 있습니다" typing indicator for Foundry VTT v13 + v14.
@@ -290,7 +291,7 @@ Hooks.once("init", () => {
   try { game.socket.on(SOCKET_CHANNEL, feHandleSocket); } catch { /* no-op */ }
 
   if (feCgmpActive()) {
-    console.log(`${MODULE_ID} | CGMP typing notifier enabled — deferring typing indicator to CGMP`);
+    console.log(feFormat("FE.Diagnostics.TypingIndicator.log", { MODULE_ID: MODULE_ID }));
   }
 });
 

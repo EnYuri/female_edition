@@ -1,3 +1,4 @@
+import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 // female_edition: package update notifier.
 // Self-contained entry-point script. Uses Foundry's server-side package APIs so
 // remote GitHub manifests are never fetched directly by the browser (CORS).
@@ -52,11 +53,11 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
         const seen = String(message.flags.female_edition.updateNotice?.latest || "").trim()
           || String(feUpdReadCache().latestVersion || "").trim();
         feUpdSetDismissedVersion(seen);
-        ui.notifications?.info("흐에... 그룬 업데이트 알림은 나중에 보내는챱");
+        ui.notifications?.info(feLocalize("FE.UpdateCheck.Text"));
         try { await message.delete(); } catch { /* no-op */ }
       });
     } catch (err) {
-      console.warn("female_edition | update-notice button wiring failed", err);
+      console.warn(feLocalize("FE.Diagnostics.UpdateCheck.warn"), err);
     }
   });
 }
@@ -176,7 +177,7 @@ async function feUpdNotify(latestVersion, localVersion) {
   FE_UPD_NOTIFIED_THIS_LOAD.add(loadKey);
 
   ui.notifications?.warn(
-    `흐에흐에!!! 암컷모듈(Female_edition, aka. Female-cupwhi)을 업데이트 할 수 있는!!: 지금은 ${local}이지만 최신은 ${latest}인. 확인하시는챱`,
+    feFormat("FE.UpdateCheck.feUpdNotify", { local: local, latest: latest }),
     { permanent: true, console: false },
   );
 
@@ -189,16 +190,16 @@ function feUpdBuildNoticeContent(latest, local) {
 <div class="fe-update-notice" style="border:2px solid var(--color-warm-2,#c9a13b);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,0.28);">
   <div style="display:flex;align-items:center;gap:8px;font-weight:bold;font-size:1.05em;margin-bottom:6px;">
     <i class="fas fa-arrow-up-right-dots"></i>
-    <span>흐물! 암컷모듈 업데이트가 있는 거에요!</span>
+    <span>${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text1")}</span>
   </div>
   <div style="line-height:1.5;">
-    흐에흐에!!! <b>Female_edition</b> (aka. Female-cupwhi) 을 업데이트 할 수 있는거에요!!<br>
-    그룬데 현재버전은 <b>${esc(local)}</b> 이구 채신은 <b>${esc(latest)}</b> 인 거에요...<br>
-    글애서 <b>FVTT 셋업 → 부가 모듈</b> 탭에서 업데이트를 확인하시는거에요챱
+    ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text2")} <b>Female_edition</b> ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text3")}<br>
+    ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text4")} <b>${esc(local)}</b> ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text5")} <b>${esc(latest)}</b> ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text6")}<br>
+    ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text7")} <b>${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text8")}</b> ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text9")}
   </div>
   <div style="margin-top:10px;text-align:right;">
     <button type="button" data-fe-upd-dismiss style="cursor:pointer;">
-      <i class="fas fa-check"></i> 흐에알겠는
+      <i class="fas fa-check"></i> ${feLocalizeHTML("FE.UpdateCheck.feUpdBuildNoticeContent.Text10")}
     </button>
   </div>
 </div>`.trim();
@@ -218,7 +219,7 @@ async function feUpdPostChatNotice(latest, local, loadKey) {
     // Record only after a successful post, so a failed create can retry next load.
     feUpdWriteCache({ ...feUpdReadCache(), chatNotifiedFor: loadKey });
   } catch (err) {
-    console.warn("female_edition | update-notice chat post failed", err);
+    console.warn(feLocalize("FE.Diagnostics.UpdateCheck.feUpdPostChatNotice"), err);
   }
 }
 
@@ -318,14 +319,14 @@ async function feUpdCheckRemote() {
     const checked = await feUpdCheckViaGitHubRelease();
     if (checked?.latestVersion) return { ...checked, source: "github-release" };
   } catch (err) {
-    console.warn("female_edition | GitHub release update check failed; trying Foundry compatibility paths", err);
+    console.warn(feLocalize("FE.Diagnostics.UpdateCheck.feUpdCheckRemote"), err);
   }
 
   try {
     const checked = await feUpdCheckViaFoundryApi();
     if (checked?.latestVersion) return { ...checked, source: "foundry" };
   } catch (err) {
-    console.warn("female_edition | Foundry package update check failed; falling back to remote manifest API", err);
+    console.warn(feLocalize("FE.Diagnostics.UpdateCheck.feUpdCheckRemote2"), err);
   }
 
   const checked = await feUpdCheckViaRemoteManifest();
@@ -370,6 +371,6 @@ async function feUpdCheckForUpdate() {
     if (checked?.isUpgrade || feUpdIsNewer(latestVersion, localVersion)) await feUpdNotify(latestVersion, localVersion);
   } catch (err) {
     feUpdWriteCache({ ...feUpdReadCache(), failedAt: now });
-    console.warn("female_edition | update check failed", err);
+    console.warn(feLocalize("FE.Diagnostics.UpdateCheck.feUpdCheckForUpdate"), err);
   }
 }
