@@ -27,6 +27,15 @@ import { feResolveSocketSender } from "./fe-socket-auth.js";
 // fe-portrait-hq.js). They are display-only, non-editable images, so the safe src-swap HQ
 // path applies.
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
+import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
+
+// All markup lives in templates/; preloaded at `init` (fe-template.js).
+const [CT_TPL_ROOT, CT_TPL_MENU, CT_TPL_DIALOG, CT_TPL_REMOVE] = feRegisterTemplates(
+  "fe-combat-tracker.hbs",
+  "fe-combat-tracker-menu.hbs",
+  "fe-combat-tracker-dialog.hbs",
+  "fe-combat-tracker-remove.hbs"
+);
 
 const CTD_ID = "combat-tracker-dock"; // original Carousel Combat Tracker — we yield to it
 const TRACKER_DOM_ID = "fe-combat-tracker";
@@ -43,16 +52,31 @@ let _ctCollapsed = false;
 // _ctEnterStart remembers WHEN each combatant's animation began; a re-render hands the
 // node a negative `animation-delay` so it resumes exactly where it was.
 //
-// It is deliberately split in two, because `.fe-ct-combatants` is `overflow-y: hidden`
-// (it must be — the strip's scrollbar is flipped to the top): a portrait animated with a
-// vertical travel INSIDE the strip would simply be clipped and never seen. So the
-// "위에서 내려온다" travel is played by the whole bar (`.fe-ct-inner`, which nothing
-// clips), while individual portraits fade/scale in place with a stagger.
-const CT_ENTER_MS = 420;
-const CT_ENTER_STAGGER_MS = 55;
-const CT_BAR_ENTER_MS = 520;
+// Reverse the exit sequence: the bar fades in first, then portraits slide down
+// left-to-right from behind the strip's upper edge. Keep scaleY(-1) in their
+// transforms to undo the strip's scrollbar flip.
+// Portrait travel durations must match the keyframes in styles/fe-combat-tracker.css.
+// The stagger is the interval BETWEEN two neighbours; CT_*_STAGGER_TOTAL_MS caps how long
+// the whole cascade may take, so a 20-combatant encounter still reads as sequential
+// instead of taking a second and a half to finish arriving.
+// All entrance/exit durations and stagger intervals run at approximately 0.66x.
+const CT_ENTER_MS = 455;
+const CT_ENTER_STAGGER_MS = 83;
+const CT_ENTER_STAGGER_TOTAL_MS = 500;
+const CT_BAR_ENTER_MS = 333;
 const _ctEnterStart = new Map(); // combatantId -> performance.now() timestamp
+let _ctInitialEnterUntil = 0;
+let _ctInitialEnterOrder = "";
 let _ctBarEnterStart = 0;        // 0 = tracker is not on screen; set when it appears
+
+// Exit animation: portraits slide up right-to-left, then the bar fades out.
+// Unlike the entrance this needs no per-combatant stamp map: the strip is not re-rendered
+// while it is leaving (feCtBeginExit owns the DOM until its timer clears it).
+const CT_EXIT_MS = 455;
+const CT_EXIT_STAGGER_MS = 83;
+const CT_EXIT_STAGGER_TOTAL_MS = 500;
+const CT_BAR_EXIT_MS = 333;
+let _ctExitTimer = 0;            // 0 = not leaving
 
 // ── settings access ─────────────────────────────────────────────────────────
 
@@ -210,14 +234,6 @@ function feCtHasUnrolledCombatants(combat) {
   return !!combat?.turns?.some((c) => feCtCanRollInitiative(c));
 }
 
-function feCtEsc(s) {
-  const fn = foundry.utils?.escapeHTML;
-  if (typeof fn === "function") return fn(String(s ?? ""));
-  return String(s ?? "").replace(/[&<>"']/g, (ch) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])
-  );
-}
-
 
 // ── DOM build ───────────────────────────────────────────────────────────────
 
@@ -236,132 +252,86 @@ function feCtEnsureRoot() {
   return root;
 }
 
-function feCtPortraitHTML(c, active, canEndTurn, enterDelay = null) {
+// One combatant's template context. Everything that used to be concatenated into an
+// HTML string is now plain data; templates/fe-combat-tracker.hbs owns the markup.
+function feCtPortraitData(c, active, canEndTurn, enterDelay = null) {
   const img = feCtPortraitImage(c);
-  const name = feCtEsc(c.name);
   const init = c.initiative;
-  const cls = ["fe-ct-portrait"];
-  if (active) cls.push("is-active");
-  if (enterDelay != null) cls.push("is-entering");
-  if (c.isDefeated) cls.push("is-defeated");
-  if (c.hidden) cls.push("is-hidden");
 
   // Disposition color tints the frame border — but the active highlight (accent)
   // must win, so only apply it to non-active portraits. In the retro/pixel theme
   // the frame outline must follow the accent-tone (--fe-ac-*) override, so the
   // hard-coded disposition tint is suppressed there (CSS class wins).
-  let frameStyle = "";
   const retro = document.body.classList.contains("fe-retro-theme");
-  if (!active && !retro && feCtSetting(S.COMBAT_TRACKER_SHOW_DISPOSITION)) {
-    const dc = feCtDispositionColor(c);
-    if (dc) frameStyle = ` style="border-color:${dc}"`;
-  }
+  const disposition =
+    !active && !retro && feCtSetting(S.COMBAT_TRACKER_SHOW_DISPOSITION)
+      ? feCtDispositionColor(c) || null
+      : null;
 
-  const initBadge =
-    feCtSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE) && init != null && init !== ""
-      ? `<span class="fe-ct-init">${Math.round(Number(init))}</span>`
-      : "";
-  let hpBar = "";
-  if (feCtSetting(S.COMBAT_TRACKER_SHOW_HP)) {
-    const hp = feCtResolveHp(c.actor);
-    if (hp) {
-      hpBar =
-        `<div class="fe-ct-hp"><div class="fe-ct-hp-fill" ` +
-        `style="width:${hp.pct}%;background:${hp.color}"></div></div>`;
-    }
-  }
-  // Hover ">>" end-turn marker. Rendered only for the active combatant, and only for a user
-  // allowed to end that combatant's turn (GM: all, player: owned). It is a large glowing
-  // glyph centred on the portrait with no background fill; the container is
-  // pointer-events:none so selection/panning/double-click outside the glyph still work —
-  // the glyph itself is the click target. Both an fa icon and a plain ">>" are emitted so
-  // the retro theme can swap to the pixel font via CSS.
-  const endTurnBtn = canEndTurn
-    ? `<div class="fe-ct-endturn">` +
-        `<i class="fas fa-angles-right fe-ct-endturn-icon" data-ct-endturn="1" ` +
-          `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.EndTurn"))}"></i>` +
-        `<span class="fe-ct-endturn-px" data-ct-endturn="1" ` +
-          `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.EndTurn"))}">&gt;&gt;</span>` +
-      `</div>`
-    : "";
+  const showInit =
+    feCtSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE) && init != null && init !== "";
 
-  // Roll-initiative affordance: a d20 centred on the portrait, drawn only when this
-  // combatant has NO initiative yet and the viewer owns it. Suppressed while the
-  // end-turn ">>" is showing so the two never overlap on one portrait.
-  const rollInitBtn =
-    !canEndTurn && feCtCanRollInitiative(c)
-      ? `<div class="fe-ct-rollinit">` +
-          // `far` (regular) = the outline d20 — the same icon Carousel Combat Tracker
-          // uses (`scripts/systems.js` default `rollIcon: "far fa-dice-d20"`). Foundry
-          // bundles Font Awesome PRO webfonts (fa-regular-400.woff2 is present), so the
-          // regular weight really renders instead of falling back to solid.
-          `<i class="far fa-dice-d20" data-ct-rollinit="1" ` +
-            `data-tooltip="${feCtEsc(feLocalize("FECT.Ctx.RollInit"))}"></i>` +
-        `</div>`
-      : "";
-
-  const enterStyle = enterDelay != null ? ` style="animation-delay:${Math.round(enterDelay)}ms"` : "";
-  return (
-    `<div class="${cls.join(" ")}" data-combatant-id="${c.id}" data-tooltip="${name}"${enterStyle}>` +
-    `<div class="fe-ct-frame"${frameStyle}>` +
-      `<img src="${feCtEsc(img)}" data-fe-src="${feCtEsc(img)}" alt="">` +
-    `</div>` +
-    // name caption straddles the frame's bottom outline (sibling of the frame so
-    // the frame's overflow:hidden — which clips the image — doesn't clip it)
-    `<div class="fe-ct-name">${name}</div>` +
-    `${initBadge}` +
-    `${hpBar}` +
-    `${endTurnBtn}` +
-    `${rollInitBtn}` +
-    `</div>`
-  );
+  return {
+    id: c.id,
+    name: c.name,
+    img,
+    active,
+    defeated: !!c.isDefeated,
+    hidden: !!c.hidden,
+    entering: enterDelay != null,
+    delay: enterDelay != null ? Math.round(enterDelay) : 0,
+    disposition,
+    // A separate flag, not a truthiness test on the number: initiative 0 is legal
+    // and must still show its badge.
+    showInitiative: showInit,
+    initiative: showInit ? Math.round(Number(init)) : null,
+    hp: feCtSetting(S.COMBAT_TRACKER_SHOW_HP) ? feCtResolveHp(c.actor) || null : null,
+    // ">>" end-turn and the roll-initiative d20 both sit dead-centre on the frame, so
+    // only one of them is ever drawn (see docs/combat-tracker.md).
+    canEndTurn,
+    canRollInit: !canEndTurn && feCtCanRollInitiative(c),
+  };
 }
 
-function feCtBtnHTML(action, icon, label) {
-  return (
-    `<button class="fe-ct-btn" data-ct-action="${action}" ` +
-    `data-tooltip="${feCtEsc(label)}"><i class="fas ${icon}"></i></button>`
-  );
+function feCtBtn(action, icon, label) {
+  return { action, icon, label };
 }
 
-function feCtCollapseBtnHTML() {
+function feCtCollapseBtn() {
   // Collapse/minimize is a personal UI toggle, so it is offered to GMs and players alike.
-  const label = _ctCollapsed
-    ? feLocalize("FECT.Expand")
-    : feLocalize("FECT.Collapse");
-  return feCtBtnHTML("toggle-collapse", _ctCollapsed ? "fa-window-maximize" : "fa-window-minimize", label);
+  return feCtBtn(
+    "toggle-collapse",
+    _ctCollapsed ? "fa-window-maximize" : "fa-window-minimize",
+    feLocalize(_ctCollapsed ? "FECT.Expand" : "FECT.Collapse")
+  );
 }
 
-function feCtControlsHTML(combat) {
+// The GM control bar, in render order. A `roundLabel` entry renders as the round
+// counter instead of a button.
+function feCtControlButtons(combat) {
   const round = combat.round ?? 0;
   const paused = combat.active === false;
   const started = Number(round) > 0;
-  const startButton = started
-    ? ""
-    : feCtBtnHTML("start-combat", "fa-circle-play", feLocalize("FECT.StartCombat"));
-  // Shown only while somebody still needs a roll — same self-explanatory pattern as
-  // 전투 개시 (which disappears once the encounter has started).
-  const rollAllButton = feCtHasUnrolledCombatants(combat)
-    ? feCtBtnHTML("roll-all", "fa-dice-d20", feLocalize("FECT.RollAll"))
-    : "";
-  return (
-    rollAllButton +
-    startButton +
-    feCtBtnHTML("end-combat", "fa-flag-checkered", feLocalize("FECT.EndCombat")) +
-    feCtBtnHTML(
+  return [
+    // Shown only while somebody still needs a roll — same self-explanatory pattern as
+    // 전투 개시 (which disappears once the encounter has started).
+    feCtHasUnrolledCombatants(combat)
+      ? feCtBtn("roll-all", "fa-dice-d20", feLocalize("FECT.RollAll"))
+      : null,
+    started ? null : feCtBtn("start-combat", "fa-circle-play", feLocalize("FECT.StartCombat")),
+    feCtBtn("end-combat", "fa-flag-checkered", feLocalize("FECT.EndCombat")),
+    feCtBtn(
       "toggle-active",
       paused ? "fa-play" : "fa-pause",
-      paused
-        ? feLocalize("FECT.Resume")
-        : feLocalize("FECT.Deactivate")
-    ) +
-    feCtBtnHTML("prev-round", "fa-angles-left", feLocalize("FECT.PrevRound")) +
-    feCtBtnHTML("prev-turn", "fa-angle-left", feLocalize("FECT.PrevTurn")) +
-    `<span class="fe-ct-round">R${round}</span>` +
-    feCtBtnHTML("next-turn", "fa-angle-right", feLocalize("FECT.NextTurn")) +
-    feCtBtnHTML("next-round", "fa-angles-right", feLocalize("FECT.NextRound")) +
-    feCtCollapseBtnHTML()
-  );
+      feLocalize(paused ? "FECT.Resume" : "FECT.Deactivate")
+    ),
+    feCtBtn("prev-round", "fa-angles-left", feLocalize("FECT.PrevRound")),
+    feCtBtn("prev-turn", "fa-angle-left", feLocalize("FECT.PrevTurn")),
+    { roundLabel: `R${round}` },
+    feCtBtn("next-turn", "fa-angle-right", feLocalize("FECT.NextTurn")),
+    feCtBtn("next-round", "fa-angles-right", feLocalize("FECT.NextRound")),
+    feCtCollapseBtn(),
+  ].filter(Boolean);
 }
 
 // ── render ──────────────────────────────────────────────────────────────────
@@ -394,8 +364,88 @@ function feCtScheduleRender() {
  */
 function feCtTeardown() {
   if (_ctRaf) { cancelAnimationFrame(_ctRaf); _ctRaf = 0; }
+  feCtCancelExit();
   feCtCloseContextMenu();
   document.getElementById(TRACKER_DOM_ID)?.remove();
+}
+
+// Interval between two neighbours' animations, squeezed so `count` of them finish
+// within `total`. Never stretched beyond `base` — a two-combatant encounter keeps the
+// comfortable spacing rather than snapping to the cap.
+function feCtStagger(count, base, total) {
+  if (count <= 1) return 0;
+  return Math.min(base, total / (count - 1));
+}
+
+function feCtPrefersReducedMotion() {
+  try { return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true; }
+  catch { return false; }
+}
+
+function feCtClearTracker(root) {
+  root.classList.remove("fe-ct-active");
+  root.innerHTML = "";
+}
+
+function feCtCancelExit() {
+  if (!_ctExitTimer) return;
+  clearTimeout(_ctExitTimer);
+  _ctExitTimer = 0;
+}
+
+/**
+ * Play the tracker off the screen, then clear it.
+ *
+ * Portraits leave right-to-left (the reverse of the entrance stagger); the bar's own
+ * upward slide starts only after the last one has finished, so the two never overlap.
+ * `forwards` fill keeps everything hidden between the animation ending and the timer
+ * clearing the DOM.
+ *
+ * The entrance stamps are dropped HERE rather than when the DOM is finally cleared: an
+ * encounter started mid-exit must animate in fresh, and it would otherwise inherit the
+ * old bar timestamp and skip its entrance entirely.
+ */
+function feCtBeginExit(root) {
+  if (_ctExitTimer) return; // already leaving
+
+  _ctBarEnterStart = 0;
+  _ctInitialEnterUntil = 0;
+  _ctInitialEnterOrder = "";
+  _ctEnterStart.clear();
+
+  const inner = root.querySelector(".fe-ct-inner");
+  // Nothing on screen, or the user asked for reduced motion — leave immediately.
+  if (!inner || feCtPrefersReducedMotion()) {
+    feCtClearTracker(root);
+    return;
+  }
+
+  // While collapsed, `.fe-ct-combatants-wrap` is display:none — staggering portraits
+  // nobody can see would only delay the bar's exit by the full stagger. Skip straight
+  // to the slide-up.
+  const portraits = root.classList.contains("fe-ct-collapsed")
+    ? []
+    : [...inner.querySelectorAll(".fe-ct-combatants > .fe-ct-portrait")];
+  const last = portraits.length - 1;
+  const stagger = feCtStagger(portraits.length, CT_EXIT_STAGGER_MS, CT_EXIT_STAGGER_TOTAL_MS);
+  portraits.forEach((el, i) => {
+    el.classList.remove("is-entering");
+    // Reverse order: the rightmost portrait leaves first.
+    el.style.setProperty("--fe-ct-exit-delay", `${Math.round((last - i) * stagger)}ms`);
+    el.classList.add("is-leaving");
+  });
+
+  const portraitsDone = portraits.length ? Math.round(last * stagger) + CT_EXIT_MS : 0;
+  inner.classList.remove("is-entering");
+  inner.style.setProperty("--fe-ct-bar-exit-delay", `${portraitsDone}ms`);
+  inner.classList.add("is-leaving");
+
+  _ctExitTimer = setTimeout(() => {
+    _ctExitTimer = 0;
+    // An encounter may have started while the tracker was leaving.
+    if (feCtGetCombat()?.turns?.length) feCtRender();
+    else feCtClearTracker(root);
+  }, portraitsDone + CT_BAR_EXIT_MS);
 }
 
 function feCtRender() {
@@ -406,13 +456,12 @@ function feCtRender() {
 
   const combat = feCtGetCombat();
   if (!combat || !combat.turns?.length) {
-    root.classList.remove("fe-ct-active");
-    root.innerHTML = "";
-    // Tracker left the screen — the next encounter drops in fresh.
-    _ctBarEnterStart = 0;
-    _ctEnterStart.clear();
+    feCtBeginExit(root);
     return;
   }
+  // A new encounter started while the previous one was still animating out; the
+  // innerHTML below replaces those nodes, so the pending clear must not fire.
+  feCtCancelExit();
 
   const isGM = !!game.user?.isGM;
   const size = Number(feCtSetting(S.COMBAT_TRACKER_PORTRAIT_SIZE)) || 90;
@@ -436,45 +485,65 @@ function feCtRender() {
   // in), and every render passes the REMAINING delay: positive = not started yet,
   // negative = resume mid-flight, past the window = no class at all.
   const nowMs = performance.now();
-  if (!_ctBarEnterStart) _ctBarEnterStart = nowMs;
+  if (!_ctBarEnterStart) {
+    _ctBarEnterStart = nowMs;
+    _ctInitialEnterUntil = nowMs + CT_BAR_ENTER_MS + CT_ENTER_STAGGER_TOTAL_MS + CT_ENTER_MS;
+  }
+  // Creating an encounter delivers multiple combatant hooks; initiative can also
+  // reorder turns before the entrance finishes. Rebuild that cascade from the live
+  // left-to-right order only when its membership/order changes. Ordinary renders
+  // keep the timestamps, so animation progress survives actor/token updates.
+  const enterOrder = JSON.stringify(combatants.map((c) => c.id));
+  if (nowMs < _ctInitialEnterUntil && enterOrder !== _ctInitialEnterOrder) {
+    _ctInitialEnterOrder = enterOrder;
+    const cascadeStart = Math.max(nowMs, _ctBarEnterStart + CT_BAR_ENTER_MS);
+    const stagger = feCtStagger(combatants.length, CT_ENTER_STAGGER_MS, CT_ENTER_STAGGER_TOTAL_MS);
+    combatants.forEach((c, i) => _ctEnterStart.set(c.id, cascadeStart + i * stagger));
+    _ctInitialEnterUntil = cascadeStart + Math.max(0, combatants.length - 1) * stagger + CT_ENTER_MS;
+  }
   const barDelay = _ctBarEnterStart - nowMs;
   const barEntering = barDelay > -CT_BAR_ENTER_MS;
+  // The stagger has to be known BEFORE the first stamp is handed out, so count the
+  // newcomers up front rather than incrementing as we go — otherwise a whole encounter
+  // arriving at once would size its interval from a count of 1.
+  const enterStagger = feCtStagger(
+    combatants.reduce((n, c) => n + (_ctEnterStart.has(c.id) ? 0 : 1), 0),
+    CT_ENTER_STAGGER_MS,
+    CT_ENTER_STAGGER_TOTAL_MS
+  );
   let newcomers = 0;
-  const portraits = combatants
-    .map((c) => {
-      const isActive = c.id === activeId;
-      // ">>" only on the active combatant, and only for a user allowed to end that turn
-      const canEndTurn = isActive && feCtCanEndTurnForCombatant(combat, c);
-      let start = _ctEnterStart.get(c.id);
-      if (start === undefined) {
-        start = nowMs + newcomers * CT_ENTER_STAGGER_MS;
-        newcomers += 1;
-        _ctEnterStart.set(c.id, start);
-      }
-      const delay = start - nowMs;
-      return feCtPortraitHTML(c, isActive, canEndTurn, delay > -CT_ENTER_MS ? delay : null);
-    })
-    .join("");
+  const portraits = combatants.map((c) => {
+    const isActive = c.id === activeId;
+    // ">>" only on the active combatant, and only for a user allowed to end that turn
+    const canEndTurn = isActive && feCtCanEndTurnForCombatant(combat, c);
+    let start = _ctEnterStart.get(c.id);
+    if (start === undefined) {
+      // The reverse of the exit's final bar fade comes before portrait travel.
+      start = Math.max(nowMs, _ctBarEnterStart + CT_BAR_ENTER_MS) + newcomers * enterStagger;
+      newcomers += 1;
+      _ctEnterStart.set(c.id, start);
+    }
+    const delay = start - nowMs;
+    // The window has to cover the stagger too: the LAST newcomer's delay is
+    // (n-1)*stagger, and a re-render before it starts must still emit its class.
+    return feCtPortraitData(c, isActive, canEndTurn, delay > -CT_ENTER_MS ? delay : null);
+  });
   // Drop stamps for combatants that are gone, so a re-added one animates in again.
   const liveIds = new Set(combatants.map((c) => c.id));
   for (const id of [..._ctEnterStart.keys()]) if (!liveIds.has(id)) _ctEnterStart.delete(id);
 
-  // The control panel is GM-only; the collapse button alone is also shown to players.
-  const center = isGM
-    ? `<div class="fe-ct-controlbar">${feCtControlsHTML(combat)}</div>`
-    : `<div class="fe-ct-controlbar fe-ct-controlbar-player">${feCtCollapseBtnHTML()}</div>`;
-
-  // .fe-ct-combatants scrolls (overflow-x), so the retro pixel-border decoration
-  // (an inset:-10px pseudo-element) would be clipped/scroll with it — wrap it in
-  // a non-scrolling positioned wrapper that carries the border instead.
-  const innerAttrs = barEntering
-    ? ` class="fe-ct-inner is-entering" style="animation-delay:${Math.round(barDelay)}ms"`
-    : ` class="fe-ct-inner"`;
-  root.innerHTML =
-    `<div${innerAttrs}>` +
-    `<div class="fe-ct-combatants-wrap"><div class="fe-ct-combatants">${portraits}</div></div>` +
-    `${center}` +
-    `</div>`;
+  root.innerHTML = feRenderTemplate(CT_TPL_ROOT, {
+    isGM,
+    barEntering,
+    barDelay: Math.round(barDelay),
+    combatants: portraits,
+    // The control panel is GM-only; the collapse button alone is also shown to players.
+    buttons: isGM ? feCtControlButtons(combat) : [feCtCollapseBtn()],
+    labels: {
+      endTurn: feLocalize("FECT.Ctx.EndTurn"),
+      rollInit: feLocalize("FECT.Ctx.RollInit"),
+    },
+  });
   root.classList.add("fe-ct-active");
   root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   root.classList.toggle("fe-ct-paused", combat.active === false);
@@ -733,15 +802,7 @@ function feCtOpenContextMenu(id, x, y) {
   menu.id = CTX_MENU_ID;
   menu.className = "fe-ct-context-menu";
   if (document.body.classList.contains("fe-retro-theme")) menu.classList.add("fe-retro-theme");
-  menu.innerHTML = items
-    .map(
-      (it) =>
-        `<button type="button" class="fe-ct-ctx-item${it.disabled ? " is-disabled" : ""}` +
-        `${it.danger ? " is-danger" : ""}" ` +
-        `data-ct-ctx="${it.action}" ${it.disabled ? "disabled" : ""}>` +
-        `<i class="fas ${it.icon}"></i><span>${feCtEsc(it.label)}</span></button>`
-    )
-    .join("");
+  menu.innerHTML = feRenderTemplate(CT_TPL_MENU, { items });
   document.body.appendChild(menu);
 
   // clamp to viewport
@@ -888,11 +949,12 @@ async function feCtOpenHpDialog(c) {
   const cur = Number(foundry.utils.getProperty(actor, path)) || 0;
 
   const DialogV2 = foundry.applications.api.DialogV2;
-  const content =
-    `<div class="fe-ct-hp-dialog" style="padding:6px 2px;display:flex;align-items:center;gap:8px;">` +
-    `<label style="font-weight:bold;">HP</label>` +
-    `<input type="number" name="hp" value="${cur}" step="1" autofocus ` +
-    `style="flex:1;min-width:90px;"></div>`;
+  const content = feRenderTemplate(CT_TPL_DIALOG, {
+    label: "HP",
+    field: "hp",
+    value: cur,
+    step: 1,
+  });
   let result;
   try {
     result = await DialogV2.prompt({
@@ -921,12 +983,13 @@ async function feCtOpenInitiativeDialog(combat, c) {
   const curStr = Number.isFinite(cur) ? String(cur) : "";
 
   const DialogV2 = foundry.applications.api.DialogV2;
-  const content =
-    `<div class="fe-ct-init-dialog" style="padding:6px 2px;display:flex;align-items:center;gap:8px;">` +
-    `<label style="font-weight:bold;">${feCtEsc(feLocalize("FECT.Ctx.Initiative"))}</label>` +
-    `<input type="number" name="init" value="${feCtEsc(curStr)}" step="any" autofocus ` +
-    `placeholder="${feCtEsc(feLocalize("FECT.Ctx.InitEmpty"))}" ` +
-    `style="flex:1;min-width:90px;"></div>`;
+  const content = feRenderTemplate(CT_TPL_DIALOG, {
+    label: feLocalize("FECT.Ctx.Initiative"),
+    field: "init",
+    value: curStr,
+    step: "any",
+    placeholder: feLocalize("FECT.Ctx.InitEmpty"),
+  });
   let result;
   try {
     result = await DialogV2.prompt({
@@ -996,9 +1059,10 @@ async function feCtRemoveCombatant(c) {
   try {
     ok = await DialogV2.confirm({
       window: { title: feLocalize("FECT.Ctx.Remove") },
-      content: `<p>${feCtEsc(
-        feLocalize("FECT.Ctx.RemoveConfirm")
-      )}</p><p><strong>${feCtEsc(c.name ?? "")}</strong></p>`,
+      content: feRenderTemplate(CT_TPL_REMOVE, {
+        message: feLocalize("FECT.Ctx.RemoveConfirm"),
+        name: c.name ?? "",
+      }),
       rejectClose: false,
       modal: true,
     });

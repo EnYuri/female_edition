@@ -1,0 +1,10 @@
+{{!--
+  female_edition: 배틀 트래커 numeric prompt (DialogV2 content).
+  Shared by the HP and initiative dialogs — they differ only in label/value/placeholder.
+  Layout lives in styles/fe-combat-tracker.css (.fe-ct-value-dialog).
+--}}
+<div class="fe-ct-value-dialog">
+  <label for="fe-ct-value-input">{{label}}</label>
+  <input id="fe-ct-value-input" type="number" name="{{field}}" value="{{value}}" step="{{step}}"
+    placeholder="{{placeholder}}" autofocus>
+</div>

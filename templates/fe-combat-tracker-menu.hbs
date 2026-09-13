@@ -1,0 +1,11 @@
+{{!--
+  female_edition: 배틀 트래커 right-click menu (#fe-ct-context-menu).
+  Built by fe-combat-tracker.js (feCtOpenContextMenu); its viewport-clamped
+  left/top is the only thing still set inline, because it is measured.
+--}}
+{{#each items}}
+<button type="button" class="fe-ct-ctx-item{{#if disabled}} is-disabled{{/if}}{{#if danger}} is-danger{{/if}}"
+  data-ct-ctx="{{action}}"{{#if disabled}} disabled{{/if}}>
+  <i class="fas {{icon}}"></i><span>{{label}}</span>
+</button>
+{{/each}}

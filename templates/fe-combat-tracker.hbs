@@ -1,0 +1,62 @@
+{{!--
+  female_edition: 배틀 트래커 (#fe-combat-tracker) inner markup.
+  Rebuilt wholesale by fe-combat-tracker.js (feCtRender) on every render.
+
+  Style values that depend on live data (entrance delay, disposition tint, HP bar)
+  are passed as CSS custom properties only — the declarations that consume them live
+  in styles/fe-combat-tracker.css, never here.
+--}}
+<div class="fe-ct-inner{{#if barEntering}} is-entering{{/if}}"
+  {{~#if barEntering}} style="--fe-ct-enter-delay:{{barDelay}}ms"{{/if}}>
+  <div class="fe-ct-combatants-wrap">
+    {{!-- .fe-ct-combatants scrolls (overflow-x), so the retro pixel-border decoration
+          (an inset:-10px pseudo-element) would be clipped/scroll with it — the
+          non-scrolling wrapper above carries that border instead. --}}
+    <div class="fe-ct-combatants">
+      {{#each combatants}}
+      <div class="fe-ct-portrait{{#if active}} is-active{{/if}}{{#if entering}} is-entering{{/if}}{{#if defeated}} is-defeated{{/if}}{{#if hidden}} is-hidden{{/if}}{{#if disposition}} has-disposition{{/if}}"
+        data-combatant-id="{{id}}" data-tooltip="{{name}}"
+        style="{{#if entering}}--fe-ct-enter-delay:{{delay}}ms;{{/if}}{{#if disposition}}--fe-ct-disposition:{{disposition}};{{/if}}">
+        <div class="fe-ct-frame"><img src="{{img}}" data-fe-src="{{img}}" alt=""></div>
+        {{!-- The name caption straddles the frame's bottom outline, so it is a SIBLING
+              of the frame: the frame's overflow:hidden (which clips the image) would
+              otherwise clip it too. --}}
+        <div class="fe-ct-name">{{name}}</div>
+        {{#if showInitiative}}<span class="fe-ct-init">{{initiative}}</span>{{/if}}
+        {{#if hp}}
+        <div class="fe-ct-hp">
+          <div class="fe-ct-hp-fill" style="--fe-ct-hp-pct:{{hp.pct}}%;--fe-ct-hp-color:{{hp.color}}"></div>
+        </div>
+        {{/if}}
+        {{#if canEndTurn}}
+        {{!-- Hover ">>" end-turn marker: a large glowing glyph centred on the portrait
+              with no background fill. The container is pointer-events:none so selection,
+              panning and double-click outside the glyph still work — the glyph itself is
+              the click target. Both an fa icon and a plain ">>" are emitted so the retro
+              theme can swap to the pixel font via CSS. --}}
+        <div class="fe-ct-endturn">
+          <i class="fas fa-angles-right fe-ct-endturn-icon" data-ct-endturn="1" data-tooltip="{{@root.labels.endTurn}}"></i>
+          <span class="fe-ct-endturn-px" data-ct-endturn="1" data-tooltip="{{@root.labels.endTurn}}">&gt;&gt;</span>
+        </div>
+        {{/if}}
+        {{#if canRollInit}}
+        {{!-- `far` (regular) = the outline d20, the same icon Carousel Combat Tracker
+              defaults to. Foundry bundles the Font Awesome PRO webfonts
+              (fa-regular-400.woff2 is present), so the regular weight really renders. --}}
+        <div class="fe-ct-rollinit">
+          <i class="far fa-dice-d20" data-ct-rollinit="1" data-tooltip="{{@root.labels.rollInit}}"></i>
+        </div>
+        {{/if}}
+      </div>
+      {{/each}}
+    </div>
+  </div>
+  {{!-- The control panel is GM-only; the collapse button alone is also shown to players. --}}
+  <div class="fe-ct-controlbar{{#unless isGM}} fe-ct-controlbar-player{{/unless}}">
+    {{#each buttons}}
+    {{#if roundLabel}}<span class="fe-ct-round">{{roundLabel}}</span>
+    {{else}}<button class="fe-ct-btn" data-ct-action="{{action}}" data-tooltip="{{label}}"><i class="fas {{icon}}"></i></button>
+    {{/if}}
+    {{/each}}
+  </div>
+</div>

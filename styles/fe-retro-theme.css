@@ -130,6 +130,18 @@ body.fe-retro-theme.fe-accent-text-override #pause {
   ) !important;
 }
 
+/* 배틀 트래커 등장/퇴장 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
+   트래커의 등장/퇴장은 "전투가 시작/종료됐다"를 알리는 상태 전환이라 즉시
+   나타났다 사라지면 전투 종료를 놓친다. #pause 기어와 같은 예외 패턴.
+   개별 값은 fe-combat-tracker.css 가 요소마다 --fe-ct-anim-dur / --fe-ct-anim-delay
+   로 실어 보내므로 여기서는 그 두 변수를 그대로 되살리기만 한다 — 지속시간을
+   여기에 하드코딩하면 두 파일이 조용히 어긋난다. */
+body.fe-retro-theme #fe-combat-tracker
+  :is(.fe-ct-inner, .fe-ct-portrait):is(.is-entering, .is-leaving) {
+  animation-duration: var(--fe-ct-anim-dur, 320ms) !important;
+  animation-delay:    var(--fe-ct-anim-delay, 0ms) !important;
+}
+
 /* 로딩 스피너류 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
    "상태를 알리는" 무한 회전 스피너까지 1ms로 돌면 정지/뭉개짐처럼 보인다.
    일시정지 기어와 동일한 예외 패턴으로 정상 회전 주기를 복원한다.
