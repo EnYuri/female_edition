@@ -14,6 +14,7 @@ import {
   feApplyRenderedStateToMessageElement,
   feApplyRenderedStateToLog,
   feSetChatCardFontClass,
+  feSetChatCardIconCropClass,
   feSetChatFontChoiceClass,
   feSetUiFontClass,
   feSetUserColorBgBaseClass,
@@ -2715,6 +2716,7 @@ async function feRenderChatArchiveWindow(win, {
   feApplyStyleVarsFromSettings(win.document);
   // Apply chat-card font toggle class in the archive window too.
   feSetChatCardFontClass(win.document);
+  feSetChatCardIconCropClass(win.document);
   // Apply chat font choice + optional user-color background class.
   feSetChatFontChoiceClass(win.document);
   feSetUiFontClass(win.document);

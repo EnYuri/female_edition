@@ -81,6 +81,7 @@ function feRegisterSettingsMenu({
         [S.UI_ENABLE_FONTS]:   feRead(S.UI_ENABLE_FONTS),
         [S.UI_HIDE_PORTRAITS]: feRead(S.UI_HIDE_PORTRAITS),
         [S.UI_STRIP_TEXTURES]: feRead(S.UI_STRIP_TEXTURES),
+        [S.CHAT_CARD_ICON_CROP]: feRead(S.CHAT_CARD_ICON_CROP),
         [S.SC_COLLAPSE_ENABLED]: feRead(S.SC_COLLAPSE_ENABLED),
         [S.CORE_UI_TOKEN_PREVIEW]: feRead(S.CORE_UI_TOKEN_PREVIEW),
         [S.CORE_UI_FILEPICKER_ENHANCEMENTS]: feRead(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
@@ -590,7 +591,7 @@ function feRegisterSettingsMenu({
           bool(S.TYPING_ENABLED),
           // World-scoped (GM-only) typing visibility — non-GMs lack write permission
           ...(game.user?.isGM ? [bool(S.TYPING_SHOW_TO_PLAYERS)] : []),
-          bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES),
+          bool(S.UI_ENABLE_FONTS), bool(S.UI_HIDE_PORTRAITS), bool(S.UI_STRIP_TEXTURES), bool(S.CHAT_CARD_ICON_CROP),
           bool(S.SC_COLLAPSE_ENABLED),
           bool(S.CORE_UI_TOKEN_PREVIEW), bool(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
           ...(game.user?.isGM ? [str(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION)] : []),

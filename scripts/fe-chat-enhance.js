@@ -48,7 +48,7 @@ import {
 import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapProseMirrorHTML } from "./fe-markdown.js";
 
 import {
-  feSetBodyMergeClasses, feSetChatCardFontClass, feSetChatFontChoiceClass,
+  feSetBodyMergeClasses, feSetChatCardIconCropClass, feSetChatCardFontClass, feSetChatFontChoiceClass,
   feSetUiFontClass, feSetNeodgmModeClass, feSetUserFontMode, feSetRetroThemeClass,
   feApplyDoubleCrossLegacyPixiTheme, feInstallDoubleCrossLegacyPixiTheme,
   feSetUserColorBgClass, feSetUserColorBgBaseClass, feSetPaperOverlayClass, feSetChatGroupOutlineClass,
@@ -156,6 +156,7 @@ async function feMigrateLegacySettings() {
 function feApplyVisualSettingsToDocument(doc = document) {
   try { feApplyStyleVarsFromSettings(doc); } catch { /* no-op */ }
   try { feSetBodyMergeClasses(); } catch { /* no-op */ }
+  try { feSetChatCardIconCropClass(doc); } catch { /* no-op */ }
   try { feSetChatCardFontClass(doc); } catch { /* no-op */ }
   try { feSetChatFontChoiceClass(doc); } catch { /* no-op */ }
   try { feSetUiFontClass(doc); } catch { /* no-op */ }
@@ -281,6 +282,8 @@ Hooks.once("init", () => {
   feRegisterSetting(S.STYLE_HEADER_CONTENT_GAP, () => feApplyStyleVarsFromSettings(document));
 
   feRegisterSetting(S.MERGE_INNER_GAP, () => feApplyStyleVarsFromSettings(document));
+
+  feRegisterSetting(S.CHAT_CARD_ICON_CROP, () => feSetChatCardIconCropClass(document));
 
   feRegisterSetting(S.CHAT_FONT_CHOICE, () => {
       feSetChatCardFontClass(document);
@@ -1096,6 +1099,7 @@ export {
   feScheduleRenderedStateRefreshForMessageId,
   feSetChatFontChoiceClass,
   feSetChatCardFontClass,
+  feSetChatCardIconCropClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,
   feSetUserFontMode,

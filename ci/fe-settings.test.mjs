@@ -29,7 +29,7 @@ test("settings entry and its transitive imports exist and have no circular depen
 });
 
 test("every setting key and menu reset value has a central registration definition", () => {
-  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 166);
+  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 167);
   assert.deepEqual(Object.keys(FE_DEFAULTS).sort(), Object.keys(FE_SETTING_DEFINITIONS).sort());
   for (const key of [...Object.values(S), ...Object.values(CP), ...FE_RELOAD_REQUIRED_KEYS]) {
     assert.ok(FE_SETTING_DEFINITIONS[key], key);
@@ -38,6 +38,10 @@ test("every setting key and menu reset value has a central registration definiti
     assert.ok(FE_SETTING_DEFINITIONS[key], key);
     assert.deepEqual(value, FE_DEFAULTS[key], key);
   }
+  assert.equal(FE_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
+  assert.equal(FE_MENU_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
+  assert.equal(FE_SETTING_DEFINITIONS[S.CHAT_CARD_ICON_CROP].scope, "client");
+  assert.ok(!constants.FE_GM_PRIORITY_EXCLUDED_KEYS.has(S.CHAT_CARD_ICON_CROP));
   for (const key of ["feGmPriorityOverrides", "feGmPriorityBackup", "feWorldSettings", "narratorState", "ceMusicAutoInitDone"]) {
     assert.equal(Object.hasOwn(FE_MENU_DEFAULTS, key), false, key);
   }

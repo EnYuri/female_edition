@@ -619,3 +619,32 @@ body.fe-strip-chat-textures
   .dice-tooltip {
   background-image: none !important;
 }
+
+/* PHB quest/advice callouts own their parchment image independently of the
+ * chat message or sheet. Non-retro texture stripping removes only that image;
+ * transparent paper uses the surrounding surface and its inherited ink.
+ * Retro owns its separate accent surface in fe-dnd5e-compat.css.
+ */
+body.fe-strip-chat-textures:not(.fe-retro-theme) :is(.fvtt.quest, .fvtt.advice) {
+  background-image: none !important;
+  color: inherit !important;
+}
+
+/* Crop only item-card image icons, never actor portraits or description art.
+ * Use the system's icon-size token where available; cards without dnd5e2
+ * still get a stable square. No src/srcset writes or image data mutations.
+ */
+body .chat-card img.gold-icon {
+  width: var(--gold-icon-size, 32px) !important;
+  height: var(--gold-icon-size, 32px) !important;
+  inline-size: var(--gold-icon-size, 32px) !important;
+  block-size: var(--gold-icon-size, 32px) !important;
+  flex: 0 0 var(--gold-icon-size, 32px) !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+body.fe-chatcard-icon-crop .chat-card img.gold-icon {
+  object-fit: cover !important;
+  object-position: center top !important;
+}

@@ -1,6 +1,7 @@
 import { feLocalize } from "./fe-i18n.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
 import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId } from "./fe-constants.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
 
 // accent hex -> { h: 0-360, s: 0-1 }. Achromatic input (s~0) pins h to 0.
@@ -68,6 +69,19 @@ function feSetBodyMergeClasses() {
   document.body.classList.toggle("fe-merge-follow-hide", enabled && style === "hide");
   document.body.classList.toggle("fe-merge-follow-name", enabled && style === "name");
   document.body.classList.toggle("fe-merge-follow-portrait", enabled && style === "portrait");
+}
+
+function feSetChatCardIconCropClass(doc = document) {
+  const body = doc?.body;
+  if (!body) return;
+  const enabled = !!(feSetting(S.CHAT_CARD_ICON_CROP) ?? FE_DEFAULTS[S.CHAT_CARD_ICON_CROP]);
+  if (body.classList.contains("fe-chatcard-icon-crop") === enabled) return;
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+  try {
+    body.classList.toggle("fe-chatcard-icon-crop", enabled);
+  } finally {
+    restoreStickyScroll();
+  }
 }
 
 function feSetChatCardFontClass(doc = document) {
@@ -745,6 +759,7 @@ function feApplyCanvasTextFont(doc = document) {
 export {
   feSetBodyMergeClasses,
   feSetChatCardFontClass,
+  feSetChatCardIconCropClass,
   feSetChatFontChoiceClass,
   feSetUiFontClass,
   feSetNeodgmModeClass,

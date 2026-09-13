@@ -32,6 +32,8 @@ body.fe-retro-theme
 /* ── Foundry 컨텍스트 메뉴 ─────────────────────────────────── */
 body.fe-retro-theme
   :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu) {
+  --text-color: var(--fe-ac-90) !important;
+  --hover-text-color: #000000 !important;
   background: #000000 !important;
   border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
   outline: 1px solid #000000 !important;
@@ -40,7 +42,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li) {
+  :is(.context-item, li:not(.context-group)) {
   color: var(--fe-ac-90) !important;
   background: transparent !important;
   border: none !important;
@@ -48,7 +50,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li):hover {
+  :is(.context-item, li:not(.context-group)):is(:hover, :focus-visible) {
   background: var(--fe-dx3rd-accent, #ffffff) !important;
   color: #000000 !important;
   outline: 1px solid #ffffff !important;
@@ -57,11 +59,49 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu)
-  :is(.context-item, li):hover * {
-  color: inherit !important;
+  :is(.context-item, li:not(.context-group)):is(:hover, :focus-visible) * {
+  color: #000000 !important;
 }
 
 /* ── Foundry 캔버스 제어 ───────────────────────────────────── */
+/* Tidy's floating menu has its own ink rules on entries and icons. Match
+ * that scope explicitly; inherited menu colors cannot override those rules. */
+body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context) {
+  --t5e-primary-font-color: var(--fe-ac-90) !important;
+  --t5e-secondary-font-color: var(--fe-ac-70) !important;
+  --t5e-faint-color: var(--fe-ac-22) !important;
+  background: var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-45) !important;
+}
+
+body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
+  :is(a, li.context-item) {
+  background: transparent !important;
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
+  :is(a, li.context-item) :is(i, dnd5e-icon, svg) {
+  color: var(--fe-ac-80) !important;
+  --icon-fill: var(--fe-ac-80) !important;
+  --icon-stroke: var(--fe-ac-80) !important;
+}
+
+body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
+  :is(a, li.context-item):is(:hover, :focus-visible) {
+  --t5e-primary-font-color: #000000 !important;
+  background: var(--fe-ac-80) !important;
+  color: #000000 !important;
+  outline-color: var(--fe-ac-45) !important;
+}
+
+body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
+  :is(a, li.context-item):is(:hover, :focus-visible) * {
+  color: #000000 !important;
+  --icon-fill: #000000 !important;
+  --icon-stroke: #000000 !important;
+}
+
 body.fe-retro-theme #navigation { background: transparent !important; }
 
 /* ── Foundry 창 프레임 ─────────────────────────────────────── */
@@ -366,26 +406,26 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
    덮어 잘라 먹는다. 그 표면은 fe-retro-forms.css § F2 가 소유한다. 가드 없이는
    아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인.
 
-   두 번째 가드가 Tidy5e 의 `transparent-button` 계열이다. Tidy 는 "값을 누르는
-   곳"(포트레이트 레벨, AC, 능력치 수정치/내성굴림, 우선권)을 크롬 버튼이 아니라
-   투명 버튼으로 만들고, 그 뒤의 방패·육각형 모양은 Tidy 가 별도 엘리먼트로 그린다.
-   Tidy 의 선언은 `.tidy5e-sheet.application:where(.classic) .transparent-button
-   { background: none }` — !important 가 없고 layer(modules) 다. 아래 규칙은
-   !important + layer(layouts) 라 레이어 역전으로 무조건 이겨서, 그 모양들 위에
-   불투명 검정을 덮어씌웠다 (v14.367 / Tidy 13.7.0 에서 59개 전부 rgb(0,0,0) 실측).
+   The Tidy5e guards (.transparent-button / .transparent-inline /
+   .transparent-inline-icon / .inline-transparent-button / .item-list-button /
+   .inline-icon-button) exist for the same reason. Tidy uses those classes for
+   clickable VALUES, not chrome buttons, and draws the shape behind them as a
+   separate element; its own `background: none` carries no !important and sits in
+   layer(modules), so this rule's !important in layer(layouts) always wins and
+   paints opaque black over that artwork.
 
-   fe-dnd5e-compat.css 에 같은 취지의 예외 블록이 이미 있으나 (0,5,2)/(0,6,3) 이라
-   아래 규칙의 (0,9,4) 에 진다 — 같은 layouts 레이어라 명시도로 갈린다. 명시도
-   경쟁을 키우는 대신 여기서 가드로 빼는 이유는, 이 선택자가 이미
-   `:not(.double-cross-3rd)` 등 시스템 전용 가드를 갖고 있어 선례가 있기 때문이다. */
+   fe-dnd5e-compat.css has exception blocks with the same intent, but at (0,5,2)
+   and (0,6,3) they lose to this rule's specificity within the same layer.
+   Guarding here instead of escalating specificity follows the precedent already
+   set by the :not(.double-cross-3rd) system guards above. */
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
   background: #000 !important;
   color: var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
   background: var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -511,6 +551,20 @@ body.fe-retro-theme #prosemirror-dropdown li:hover > :is(span, i) { color: inher
 body.fe-retro-theme #prosemirror-dropdown li.divider { border-bottom-color: var(--fe-ac-22) !important; }
 
 body.fe-retro-theme :is(.prosemirror, prose-mirror) { --menu-padding: 4px !important; }
+
+/* Tabbed document/effect configuration editors can be borderless, while
+ * schema fieldsets retain the browser's default groove. Keep a single flat
+ * accent frame around each field, including inactive tabs when activated. */
+body.fe-retro-theme .application .tab.scrollable
+  :is(prose-mirror, code-mirror, textarea, fieldset) {
+  border: 1px solid var(--fe-ac-33) !important;
+  border-radius: 0 !important;
+}
+
+body.fe-retro-theme .application .tab.scrollable
+  :is(prose-mirror, code-mirror):focus-within {
+  border-color: var(--fe-ac-45) !important;
+}
 
 body.fe-retro-theme :is(.prosemirror, prose-mirror) menu {
   background: #000 !important;
@@ -842,4 +896,56 @@ body.fe-retro-theme .package-list .package .tags > .tag.badge.neutral {
    (foundry2.css:14604~). 그것도 같이 막는다. */
 body.fe-retro-theme .package-list .package:is(:hover, .active, .loading) .tags > .tag {
   background: transparent !important;
+}
+
+/* Sheet scrollbars use the retro accent instead of core/Tidy's warm red.
+ * Set the painted color on scroll elements as well as the package tokens:
+ * nested sheet regions can define their own scrollbar-color.
+ */
+body.fe-retro-theme,
+body.fe-retro-theme :is(.application, .window-app) {
+  --color-scrollbar: var(--fe-dx3rd-accent, #ffffff) !important;
+  --t5e-scrollbar-thumb-color: var(--fe-dx3rd-accent, #ffffff) !important;
+  --dnd5e-color-scrollbar: var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+/* Native scrollbar-color/width take precedence over Chromium's pseudo-
+ * elements. Release both in Chromium so the thumb can have square corners.
+ * Flat, integer-pixel rectangles need no rounded-edge smoothing or blur.
+ */
+body.fe-retro-theme :is(.application, .window-app),
+body.fe-retro-theme :is(.application, .window-app) * {
+  scrollbar-color: var(--fe-dx3rd-accent, #ffffff) transparent !important;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  body.fe-retro-theme :is(.application, .window-app),
+  body.fe-retro-theme :is(.application, .window-app) * {
+    scrollbar-color: auto !important;
+    scrollbar-width: auto !important;
+  }
+
+  body.fe-retro-theme :is(.application, .window-app)::-webkit-scrollbar,
+  body.fe-retro-theme :is(.application, .window-app) *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  body.fe-retro-theme :is(.application, .window-app)::-webkit-scrollbar-thumb,
+  body.fe-retro-theme :is(.application, .window-app) *::-webkit-scrollbar-thumb {
+    background: var(--fe-dx3rd-accent, #ffffff) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.fe-retro-theme :is(.application, .window-app)::-webkit-scrollbar-track,
+  body.fe-retro-theme :is(.application, .window-app) *::-webkit-scrollbar-track,
+  body.fe-retro-theme :is(.application, .window-app)::-webkit-scrollbar-corner,
+  body.fe-retro-theme :is(.application, .window-app) *::-webkit-scrollbar-corner {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
 }

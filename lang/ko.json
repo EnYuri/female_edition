@@ -1204,5 +1204,7 @@
 	"FE.FontPreview.ModuleFolder": "모듈 font 폴더",
 	"FE.FontPreview.SystemFonts": "설치된 시스템 폰트",
 	"FE.FontPreview.Sample": "가나다라 AaBbCc 0123",
-	"FE.FontPreview.Pangram": "다람쥐 헌 쳇바퀴 The quick brown fox"
+	"FE.FontPreview.Pangram": "다람쥐 헌 쳇바퀴 The quick brown fox",
+	"FE.SettingsData.ceChatCardIconCrop.name": "아이템 카드 이미지 자르기",
+	"FE.SettingsData.ceChatCardIconCrop.hint": "채팅 아이템 카드의 이미지 아이콘을 정해진 크기에 맞춰 자릅니다. 세로로 긴 이미지는 위쪽을 유지하고 아래쪽을 자릅니다. 끄면 전체 이미지가 아이콘 영역 안에 보이도록 맞춥니다."
 }

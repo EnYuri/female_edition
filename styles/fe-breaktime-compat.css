@@ -1,12 +1,17 @@
 /* ================================================================
  * fe-breaktime-compat.css
- * female_edition — Break Time (module id: breaktime) 호환
+ * female_edition — Break Time (module id: breaktime) compatibility
  *
- * module.json 에서 { "src": ..., "layer": "layouts" } 로 등록한다.
+ * Registered in module.json with "layer": "layouts" so its !important
+ * declarations outrank the module's own sheet.
  * ================================================================ */
 
 
-/* ── 레이아웃 (테마 무관) ─────────────────────────────────────── */
+/* ── Layout (applies with or without the retro theme) ──────────────
+ * The module fixes each player row at height: 50px and lays the avatar and
+ * details out as inline-blocks, which our taller font overflows, and nothing
+ * in its markup scrolls once the list grows past the window.
+ * ------------------------------------------------------------------ */
 
 #breaktime-app {
   max-height: 80vh !important;
@@ -63,7 +68,10 @@
 }
 
 
-/* ── 레트로 색 ────────────────────────────────────────────────── */
+/* ── Retro colours ─────────────────────────────────────────────────
+ * breaktime.css hardcodes light borders (#c9c7b8, #C0C0C0). State colours
+ * (away red / back green) are semantic and deliberately left alone.
+ * ------------------------------------------------------------------ */
 
 body.fe-retro-theme #breaktime-app .window-content {
   background: #000 !important;

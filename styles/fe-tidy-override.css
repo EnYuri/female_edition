@@ -192,35 +192,17 @@ span.flex-row.align-items-center.extra-small-gap {
 }
 
 /* -------------------------------------------------------------------------
- * Tidy5e Classic: 펼친 항목 / 정보 카드의 액션 버튼 줄바꿈
+ * Tidy5e Classic: inline action buttons in the expanded item summary.
+ *
+ * Not caused by the retro theme. Tidy's classic.css resets `button` to
+ * `display: block`, and these are dnd5e system buttons (.button), which never
+ * match dnd5e's own styling because the Tidy sheet root carries no .dnd5e2.
+ * Info cards keep Tidy's native column layout: their content must flex and
+ * scroll within the height used by Tidy's placement calculations.
  * ------------------------------------------------------------------------- */
 .tidy5e-sheet.application:where(.classic) .item-summary > button {
   display: inline-flex !important;
   margin: 0 4px 4px 0 !important;
   vertical-align: middle !important;
-  width: auto !important;
-}
-
-.tidy-info-card {
-  height: auto !important;
-  max-height: var(--card-height, 28.75rem) !important;
-}
-
-.tidy-info-card .info-card-body {
-  align-content: flex-start !important;
-  align-items: center !important;
-  flex-flow: row wrap !important;
-  gap: 4px !important;
-  padding-inline: 8px !important;
-}
-
-.tidy-info-card .info-card-body > :not(button) {
-  flex: 0 0 calc(100% + 16px) !important;
-  margin-inline: -8px !important;
-  width: calc(100% + 16px) !important;
-}
-
-.tidy-info-card .info-card-body > button {
-  flex: 0 0 auto !important;
   width: auto !important;
 }
