@@ -525,6 +525,11 @@ body:not(.fe-retro-theme) .fe-stage-dock--inset .fe-stage-textbox::after {
 
 .fe-stage-remove-menu {
   position: fixed;
+  /* position:fixed with auto insets parks the element at its static position, which
+     for a body child is below the whole page — measuring it there can pick up a
+     different wrap. JS overwrites both the moment it has the measured rect. */
+  left: 0;
+  top: 0;
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -561,6 +566,12 @@ body:not(.fe-retro-theme) .fe-stage-dock--inset .fe-stage-textbox::after {
 .fe-stage-remove-item:disabled {
   cursor: default;
   opacity: 0.45;
+}
+
+/* _fetOpenRemoveMenu appends the menu to measure it, then positions it. Hidden for
+   that one frame so it never flashes at 0,0. Was an inline style.visibility write. */
+.fe-stage-remove-menu.fe-stage-menu-measuring {
+  visibility: hidden;
 }
 
 /* ── Emote picker popup ───────────────────────────────────────── */

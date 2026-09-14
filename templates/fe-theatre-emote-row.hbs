@@ -1,0 +1,25 @@
+{{!--
+  무대 배우 설정 다이얼로그의 감정 표현 한 줄.
+
+  두 곳에서 쓴다.
+   1) fe-theatre-config.hbs 가 기존 감정마다 partial 로 포함
+   2) "감정 추가" 버튼이 빈 데이터로 단독 렌더 (_fetOpenActorConfig 의 render 핸들러)
+  그래서 이 파일은 반드시 최상위 요소가 .fe-config-emote-row 하나여야 한다 —
+  추가 핸들러가 firstElementChild 만 떼어서 붙인다.
+
+  key / label / img / src 는 사용자가 친 자유 문자열이다. 반드시 {{ }} 로 둘 것.
+  {{{ }}} 로 바꾸면 감정 이름에 따옴표를 넣는 것만으로 속성을 탈출할 수 있다.
+--}}
+<div class="fe-config-emote-row">
+	<input type="text" name="emoteKey" placeholder="{{localize 'FE.Theatre.buildEmoteRow.Text1'}}" value="{{key}}">
+	<input type="text" name="emoteLabel" placeholder="{{localize 'FE.Theatre.buildEmoteRow.Text2'}}" value="{{label}}">
+	<div class="form-fields">
+		<input type="text" name="emoteImg" placeholder="{{localize 'FE.Theatre.buildEmoteRow.Text3'}}" value="{{img}}">
+		<button type="button" class="fe-pick" data-target="emoteImg" title="{{localize 'FE.Common.PickFile'}}"><i class="fas fa-file-import"></i></button>
+	</div>
+	<div class="form-fields">
+		<input type="text" name="emoteSrc" placeholder="{{localize 'FE.Theatre.buildEmoteRow.Text5'}}" value="{{src}}">
+		<button type="button" class="fe-pick" data-target="emoteSrc" title="{{localize 'FE.Common.PickFile'}}"><i class="fas fa-file-import"></i></button>
+	</div>
+	<button type="button" class="fe-remove-emote" title="{{localize 'FE.Common.Remove'}}"><i class="fas fa-trash"></i></button>
+</div>

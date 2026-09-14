@@ -188,6 +188,40 @@ body.fe-retro-theme :is(.window-app, .application)
   color: var(--fe-ac-90) !important;
 }
 
+/* 헤더 컨트롤 hover 비주얼 통일 — 전역 button:hover(§ 강조색 면 + 검정 글씨)가
+   창 헤더까지 내려오면 두 가지가 깨진다.
+   (1) 바로 위 hover 규칙이 (0,4,1) 로 글씨를 --fe-ac-90(밝은 색)으로 못박으므로
+       강조색이 밝은 계열일 때 흰 바탕에 흰 글씨가 된다 — DX3rd 시트 헤더의
+       "액터 타입"/"프로토타입 토큰" 처럼 라벨이 있는 header-control 에서 실제로
+       글자가 사라졌다. DX3rd 시트는 아래 .window-app/.application 규칙의
+       :not(.dx3rd-emanim) 시스템 가드에 걸려 어두운 hover 면(--fe-ac-12)을
+       받지 못하고 전역 규칙으로 떨어지기 때문에 이 조합이 성립한다.
+   (2) 헤더 컨트롤은 면 없는 아이콘/텍스트 버튼이라 강조색 면을 깔면 시트 본문
+       버튼의 hover(어두운 면 + 강조색 테두리)와 표현이 어긋난다.
+   → 시스템과 무관하게 레트로 평균값인 "어두운 면 + 강조색 테두리 + 밝은 글씨"로
+   통일한다. 명시도 (0,5,2) 이므로 전역 규칙은 이기고, 자체 헤더 팔레트를 가진
+   fe-dnd5e-compat.css 의 (0,9,x) 규칙들에는 진다(의도한 우선순위). */
+body.fe-retro-theme :is(.window-app, .application) .window-header
+  :is(.header-control, .close, .minimize, .header-button):not([disabled]) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+body.fe-retro-theme :is(.window-app, .application) .window-header
+  :is(.header-control, .close, .minimize, .header-button):not([disabled]):is(:hover, :focus-visible) {
+  background-color: var(--fe-ac-12) !important;
+  border-color: var(--fe-ac-70) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* 아이콘·라벨은 버튼 색을 그대로 따른다. 헤더 버튼 내부의 span 은 § 본문 텍스트
+   규칙(--fe-ac-57)에 잡혀 hover 시에도 어두운 채로 남는다. */
+body.fe-retro-theme :is(.window-app, .application) .window-header
+  :is(.header-control, .close, .minimize, .header-button):not([disabled]) :is(i, span, svg) {
+  color: inherit !important;
+}
+
+
 /* 모듈이 주입한 헤더 버튼은 코어 최소화 상태에서 숨긴다. */
 body.fe-retro-theme .application.minimized .window-header
   :is(.fedr-sheet-btn, .fet-stage-btn, .header-control:not([data-action="close"])) {

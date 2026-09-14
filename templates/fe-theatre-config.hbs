@@ -1,0 +1,24 @@
+{{!--
+  무대 배우 설정 다이얼로그 본문 (DialogV2.wait 의 content).
+  stageName / stageBaseSrc 는 사용자 입력이므로 {{ }} 유지.
+--}}
+<div class="fe-stage-config-form">
+	<div class="form-group">
+		<label>{{localize 'FE.Theatre.content.Text1'}}</label>
+		<input type="text" name="stageName" value="{{stageName}}">
+	</div>
+	<div class="form-group">
+		<label>{{localize 'FE.Theatre.content.Text2'}}</label>
+		<div class="form-fields">
+			<input type="text" name="stageBaseSrc" value="{{stageBaseSrc}}">
+			<button type="button" class="fe-pick" data-target="stageBaseSrc" title="{{localize 'FE.Common.PickFile'}}"><i class="fas fa-file-import"></i></button>
+		</div>
+	</div>
+	<div class="form-group-stacked">
+		<label>{{localize 'FE.Theatre.content.Text4'}} <small>{{localize 'FE.Theatre.content.Text5'}}</small></label>
+		<div class="fe-config-emotes-list">
+			{{#each emotes}}{{> "modules/female_edition/templates/fe-theatre-emote-row.hbs"}}{{/each}}
+		</div>
+		<button type="button" class="fe-add-emote"><i class="fas fa-plus"></i> {{localize 'FE.Theatre.content.Text6'}}</button>
+	</div>
+</div>

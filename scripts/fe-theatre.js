@@ -1,5 +1,6 @@
-import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting, FE_DEFAULTS } from "./fe-settings-data.js";
+import { feRegisterTemplates, feRenderTemplate, feRenderTemplateFragment } from "./fe-template.js";
 /**
  * fe-theatre.js — Portrait stage & speech bubble system
  *
@@ -23,6 +24,29 @@ const _FET_FLAG_KEY    = "stage";         // actor flag namespace under female_e
 const _FET_USER_STATE_FLAG = "stageUserState";
 const _FET_NONE        = "__none__";      // sentinel: theatre nav visible but no overrides applied
 const _FET_RECALL_NON_ACTOR_ID = "__fe-stage-recall-non-actor__";
+
+const [FET_TPL_CONFIG, FET_TPL_EMOTE_ROW] = feRegisterTemplates(
+  "fe-theatre-config.hbs",
+  "fe-theatre-emote-row.hbs",
+);
+
+/**
+ * The five icon-only buttons this file builds (nav emote / nav remove, bubble
+ * recall / bubble close, portrait emote) were five copies of the same six lines
+ * ending in an `innerHTML` string. `onClick` receives the raw event so each site
+ * keeps its own preventDefault/stopPropagation choice — they are not the same.
+ */
+function _fetIconBtn(className, title, faIcon, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = className;
+  btn.title = title;
+  const i = document.createElement("i");
+  i.className = `fas ${faIcon}`;
+  btn.appendChild(i);
+  btn.addEventListener("click", onClick);
+  return btn;
+}
 
 // ── Runtime state ──────────────────────────────────────────────────────────
 
@@ -364,27 +388,21 @@ function _fetInjectUI() {
   });
 
   // Emote button (visible only when an actor is selected)
-  const emoteBtn = document.createElement("button");
-  emoteBtn.type = "button";
-  emoteBtn.className = "fe-stage-nav-emote hidden";
-  emoteBtn.title = feLocalize("FE.Theatre.SelectEmote");
-  emoteBtn.innerHTML = '<i class="fas fa-theater-masks"></i>';
-  emoteBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (_fet.speakingAs) _fetOpenEmoteMenu(_fet.speakingAs, emoteBtn);
-  });
+  const emoteBtn = _fetIconBtn(
+    "fe-stage-nav-emote hidden", feLocalize("FE.Theatre.SelectEmote"), "fa-theater-masks",
+    (e) => {
+      e.stopPropagation();
+      if (_fet.speakingAs) _fetOpenEmoteMenu(_fet.speakingAs, emoteBtn);
+    });
 
   // Remove-from-stage button (visible only when an actor is selected)
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "fe-stage-nav-remove-cur hidden";
-  removeBtn.title = feLocalize("FE.Common.RemoveFromStage");
-  removeBtn.innerHTML = '<i class="fas fa-door-open"></i>';
-  removeBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    _fetOpenRemoveMenu(removeBtn);
-  });
+  const removeBtn = _fetIconBtn(
+    "fe-stage-nav-remove-cur hidden", feLocalize("FE.Common.RemoveFromStage"), "fa-door-open",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      _fetOpenRemoveMenu(removeBtn);
+    });
 
   nav.append(select, emoteBtn, removeBtn);
   _fetNavEl    = nav;
@@ -432,28 +450,22 @@ function _fetCreateInsertEl(theatreId, name, src) {
   const toolsEl = document.createElement("div");
   toolsEl.className = "fe-stage-textbox-tools";
 
-  const prevBtn = document.createElement("button");
-  prevBtn.type = "button";
-  prevBtn.className = "fe-stage-textbox-btn fe-stage-textbox-prev";
-  prevBtn.title = feLocalize("FE.Theatre.RecallSpeech");
-  prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
-  prevBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    _fetRecallPrev(theatreId);
-  });
+  const prevBtn = _fetIconBtn(
+    "fe-stage-textbox-btn fe-stage-textbox-prev", feLocalize("FE.Theatre.RecallSpeech"), "fa-chevron-left",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      _fetRecallPrev(theatreId);
+    });
 
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "fe-stage-textbox-btn fe-stage-textbox-close";
-  closeBtn.title = feLocalize("FE.Theatre.CloseSpeech");
-  closeBtn.innerHTML = '<i class="fas fa-times"></i>';
-  closeBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const ins = _fetGetDisplayInsert(theatreId);
-    if (ins) _fetDismissInsert(ins);
-  });
+  const closeBtn = _fetIconBtn(
+    "fe-stage-textbox-btn fe-stage-textbox-close", feLocalize("FE.Theatre.CloseSpeech"), "fa-times",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const ins = _fetGetDisplayInsert(theatreId);
+      if (ins) _fetDismissInsert(ins);
+    });
 
   toolsEl.append(prevBtn, closeBtn);
   textboxEl.append(nameEl, toolsEl, contentEl);
@@ -477,15 +489,12 @@ function _fetCreateInsertEl(theatreId, name, src) {
   imgEl.alt = name;
   imgEl.draggable = false;
 
-  const emoteBtn = document.createElement("button");
-  emoteBtn.type = "button";
-  emoteBtn.className = "fe-stage-emote-btn";
-  emoteBtn.title = feLocalize("FE.Theatre.SelectEmote");
-  emoteBtn.innerHTML = '<i class="fas fa-theater-masks"></i>';
-  emoteBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (_fet.inserts.has(theatreId)) _fetOpenEmoteMenu(theatreId, emoteBtn);
-  });
+  const emoteBtn = _fetIconBtn(
+    "fe-stage-emote-btn", feLocalize("FE.Theatre.SelectEmote"), "fa-theater-masks",
+    (e) => {
+      e.stopPropagation();
+      if (_fet.inserts.has(theatreId)) _fetOpenEmoteMenu(theatreId, emoteBtn);
+    });
 
   const labelEl = document.createElement("div");
   labelEl.className = "fe-stage-label";
@@ -861,7 +870,10 @@ function _fetOpenRemoveMenu(anchor) {
     count <= 0,
   ));
 
-  menu.style.visibility = "hidden";
+  // Measure off-cascade: the menu must be in the document to have a size, but must
+  // not flash at its unpositioned origin. Class, not an inline write — see the
+  // matching .fe-stage-remove-menu.fe-stage-menu-measuring rule.
+  menu.classList.add("fe-stage-menu-measuring");
   document.body.appendChild(menu);
 
   const rect = anchor.getBoundingClientRect();
@@ -879,7 +891,7 @@ function _fetOpenRemoveMenu(anchor) {
     : maxTop;
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
-  menu.style.visibility = "";
+  menu.classList.remove("fe-stage-menu-measuring");
 
   setTimeout(() => {
     document.addEventListener("click", () => menu.remove(), { once: true });
@@ -1475,43 +1487,17 @@ async function _fetOpenActorConfig(actorId) {
   // Reload fresh flags each open
   const flags = actor.getFlag(_FET_MODULE, _FET_FLAG_KEY) ?? {};
 
-  const buildEmoteRow = (key = "", emote = {}) => `
-    <div class="fe-config-emote-row">
-      <input type="text" name="emoteKey"   placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text1")}" value="${_fetEsc(key)}">
-      <input type="text" name="emoteLabel" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text2")}"   value="${_fetEsc(emote.label ?? "")}">
-      <div class="form-fields">
-        <input type="text" name="emoteImg" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text3")}" value="${_fetEsc(emote.img ?? "")}">
-        <button type="button" class="fe-pick" data-target="emoteImg" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
-      </div>
-      <div class="form-fields">
-        <input type="text" name="emoteSrc" placeholder="${feLocalizeHTML("FE.Theatre.buildEmoteRow.Text5")}" value="${_fetEsc(emote.src ?? "")}">
-        <button type="button" class="fe-pick" data-target="emoteSrc" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
-      </div>
-      <button type="button" class="fe-remove-emote" title="${feLocalizeHTML("FE.Common.Remove")}"><i class="fas fa-trash"></i></button>
-    </div>`;
-
-  const existingRows = Object.entries(flags.emotes ?? {})
-    .map(([k, v]) => buildEmoteRow(k, v)).join("");
-
-  const content = `
-    <div class="fe-stage-config-form">
-      <div class="form-group">
-        <label>${feLocalizeHTML("FE.Theatre.content.Text1")}</label>
-        <input type="text" name="stageName" value="${_fetEsc(flags.name ?? actor.name)}">
-      </div>
-      <div class="form-group">
-        <label>${feLocalizeHTML("FE.Theatre.content.Text2")}</label>
-        <div class="form-fields">
-          <input type="text" name="stageBaseSrc" value="${_fetEsc(flags.baseSrc ?? actor.img ?? "")}">
-          <button type="button" class="fe-pick" data-target="stageBaseSrc" title="${feLocalizeHTML("FE.Common.PickFile")}"><i class="fas fa-file-import"></i></button>
-        </div>
-      </div>
-      <div class="form-group-stacked">
-        <label>${feLocalizeHTML("FE.Theatre.content.Text4")} <small>${feLocalizeHTML("FE.Theatre.content.Text5")}</small></label>
-        <div class="fe-config-emotes-list">${existingRows}</div>
-        <button type="button" class="fe-add-emote"><i class="fas fa-plus"></i> ${feLocalizeHTML("FE.Theatre.content.Text6")}</button>
-      </div>
-    </div>`;
+  const content = feRenderTemplate(FET_TPL_CONFIG, {
+    stageName:    flags.name ?? actor.name,
+    stageBaseSrc: flags.baseSrc ?? actor.img ?? "",
+    // The row partial reads key/label/img/src, so flatten the flag map into a list.
+    emotes: Object.entries(flags.emotes ?? {}).map(([key, emote]) => ({
+      key,
+      label: emote?.label ?? "",
+      img:   emote?.img ?? "",
+      src:   emote?.src ?? "",
+    })),
+  });
 
   // ApplicationV2 DialogV2 (v1 Dialog is deprecated and slated for removal in a
   // future v14). Buttons are an array; callback is (event, button, dialog) and
@@ -1578,9 +1564,9 @@ async function _fetOpenActorConfig(actorId) {
         if (!e.target.closest(".fe-add-emote")) return;
         const list = root.querySelector(".fe-config-emotes-list");
         if (!list) return;
-        const tmp = document.createElement("div");
-        tmp.innerHTML = buildEmoteRow();
-        if (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
+        list.append(feRenderTemplateFragment(FET_TPL_EMOTE_ROW, {
+          key: "", label: "", img: "", src: "",
+        }));
       });
     },
   });
@@ -1613,15 +1599,6 @@ async function _fetSaveActorConfig(actorId, root) {
   ]) {
     if (insert) _fetApplyInsertStageData(insert, actorId, name, baseSrc, emotes);
   }
-}
-
-/** HTML-escape helper for template strings */
-function _fetEsc(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 // ── Actor Directory context menu ───────────────────────────────────────────
@@ -1842,7 +1819,12 @@ function _fetInjectSheetButtons(app, el) {
     // Label wrapped in a span so systems that force icon-only round header
     // buttons (dnd5e: .window-header .header-button → 18px grid) can hide the
     // text via CSS instead of letting it wrap and stack the buttons vertically.
-    btn.innerHTML = `<i class="fas ${icon}"></i><span class="fet-stage-btn-label"> ${title}</span>`;
+    const iconEl = document.createElement("i");
+    iconEl.className = `fas ${icon}`;
+    const labelEl = document.createElement("span");
+    labelEl.className = "fet-stage-btn-label";
+    labelEl.textContent = ` ${title}`;
+    btn.append(iconEl, labelEl);
     btn.addEventListener("click", (e) => { e.preventDefault(); onClick(); });
     return btn;
   };
