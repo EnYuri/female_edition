@@ -470,7 +470,9 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 }
 
 /* 컨테이너 공통: fixed, pointer-events 차단 (카드만 auto)
-   위치·flex-direction은 JS(_getOrCreateContainer)가 생성 시 inline style로 설정
+   위치(left/top/right)만 JS(_getOrCreateContainer)가 인라인으로 설정한다 — 사이드바
+   폭·nav 하단·드래그 좌표라 실측이 필요하다. 방향/줄바꿈/정렬은 전부 여기 있다.
+   (예전엔 JS 가 매 렌더마다 여기와 똑같은 값을 인라인으로 다시 썼다.)
    z-index: 70 — 기본 UI 패널(~30) 위, 윈도우(100+) 아래 */
 #fe-dx3rd-rui-container,
 #fe-dx3rd-rui-container-own {
@@ -479,19 +481,37 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   left: 8px;        /* JS inline style로 덮어씀 (PC는 left:auto + right로 우상단 배치) */
   z-index: 70;
   display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 0;           /* 카드 margin(10px)이 간격 담당 */
   pointer-events: none;
 }
 
-/* enemy 타입: 좌상단, 세로 정렬 (JS inline이 우선, 여기선 fallback) */
-#fe-dx3rd-rui-container {
-  flex-direction: column;
+/* 카드가 없거나 전역 표시가 꺼져 있을 때 (JS 가 style.display 를 쓰지 않는다) */
+#fe-dx3rd-rui-container.fedr-hidden,
+#fe-dx3rd-rui-container-own.fedr-hidden {
+  display: none;
 }
 
-/* PC 타입: 우상단(사이드바 왼쪽), 가로 정렬 (JS inline이 우선, 여기선 fallback) */
+/* enemy 타입: 좌상단, 세로 정렬. --fedr-wrap-h = 카드 N개분 높이(JS 실측) →
+   그만큼 차면 다음 열로 넘어간다. 열은 왼쪽부터 채운다(align-content). */
+#fe-dx3rd-rui-container {
+  flex-direction: column;
+  max-height: var(--fedr-wrap-h, none);
+}
+
+/* PC 타입: 우상단(사이드바 왼쪽), 가로 정렬. --fedr-wrap-w = 카드 N개분 폭.
+   justify-content: flex-end — 마지막 부분 행도 우측 정렬 */
 #fe-dx3rd-rui-container-own {
   flex-direction: row;
   align-items: flex-start;
+  justify-content: flex-end;
+  max-width: var(--fedr-wrap-w, none);
+}
+
+/* 컨테이너를 끄는 동안 커서를 문서 전체에 고정 — 카드 밖으로 나가도 유지된다 */
+body.fedr-dragging {
+  cursor: grabbing;
 }
 
 /* 개별 액터 카드: name-row(절대 위치) + card-body(포트레이트+패널)
@@ -659,7 +679,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   box-sizing: border-box;
 }
 
-/* 채움 — JS가 inline width 설정 */
+/* 채움 — 길이는 JS 가 카드에 실어 주는 퍼센트 커스텀 프로퍼티에서 온다 */
 .fedr-fill {
   position: absolute;
   top: 0;
@@ -667,6 +687,17 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   height: 100%;
   width: 0%;
   background: var(--fe-dx3rd-accent, #ffffff);
+}
+.fedr-hp .fedr-fill {
+  width: var(--fedr-hp-pct, 0%);
+}
+.fedr-enc .fedr-fill {
+  width: var(--fedr-enc-pct, 0%);
+}
+
+/* 침식률이 없는 시스템(dnd5e 등) — 카드에 .fedr-no-enc 가 붙으면 그룹째 숨김 */
+.fedr-actor-card.fedr-no-enc .fedr-enc-group {
+  display: none;
 }
 
 /* 수치 행 — 레이블 키(HP 등) 좌측, 수치 우측 */
@@ -696,6 +727,11 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 
 .fedr-ctx-menu {
   position: fixed;
+  /* 좌상단이 기본값 — JS 는 붙인 뒤 실측해서 뷰포트 안으로 클램프한 좌표만 덮어쓴다.
+     inset 이 auto 면 fixed 요소가 static 위치(문서 맨 끝)에 잠깐 놓여 측정 전에
+     스크롤이 생길 수 있다. 예전엔 JS 가 이 두 줄을 인라인으로 먼저 썼다. */
+  left: 0;
+  top: 0;
   z-index: 9999;
   background: rgba(20, 21, 26, 0.97);
   border: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.16));
@@ -752,6 +788,39 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   justify-content: center;
   position: relative;
   overflow: hidden;
+}
+
+/* 액센트 색 선택 다이얼로그 (templates/fe-dx3rd-accent-dialog.hbs).
+   예전엔 이 규칙들이 전부 content 문자열의 인라인 style 이었다.
+   미리보기 스와치는 챗 컨트롤 버튼과 같은 --fe-accent-swatch 를 읽는다. */
+.fe-accent-dialog {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+}
+
+.fe-accent-dialog .fe-accent-dialog-preview {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  background: var(--fe-accent-swatch, var(--fe-dx3rd-accent, #ffffff));
+  border: 1px solid rgb(255 255 255 / 0.35);
+  outline: 1px solid #000;
+}
+
+.fe-accent-dialog input[type="color"] {
+  width: 52px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.fe-accent-dialog input[type="text"] {
+  flex: 1;
+  min-width: 90px;
+  font-family: monospace;
+  text-transform: lowercase;
 }
 
 .fe-dx3rd-accent-btn::before {

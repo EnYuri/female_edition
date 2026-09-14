@@ -1,0 +1,7 @@
+{{!--
+  female_edition: 캐릭터 스테이터스 카드 우클릭 메뉴 (.fedr-ctx-menu).
+  뷰포트 클램프한 left/top 만 JS 가 인라인으로 넣는다 — 실측값이라 CSS 로 옮길 수 없다.
+--}}
+{{#each items}}
+<div class="fedr-ctx-item" data-fedr-ctx="{{@index}}"><i class="fas {{icon}}"></i>{{label}}</div>
+{{/each}}

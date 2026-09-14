@@ -1,0 +1,11 @@
+{{!--
+  female_edition: 레트로 액센트 색 선택 다이얼로그 (DialogV2 content).
+  미리보기 스와치는 --fe-accent-swatch 로 칠한다 — 챗 컨트롤의 스와치 버튼과 같은
+  방식이라, JS 가 두 곳에서 서로 다른 프로퍼티를 쓰지 않는다.
+  레이아웃은 styles/fe-dx3rd-compat.css (.fe-accent-dialog).
+--}}
+<div class="fe-accent-dialog">
+  <span class="fe-accent-dialog-preview" style="--fe-accent-swatch:{{current}}"></span>
+  <input type="color" name="accent" value="{{current}}">
+  <input type="text" name="accentHex" value="{{current}}" maxlength="7" spellcheck="false" autocomplete="off">
+</div>

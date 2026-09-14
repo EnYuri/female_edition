@@ -1,0 +1,10 @@
+{{!--
+  female_edition: FilePicker 오른쪽 미리보기 사이드바 뼈대 (aside.fe-fp-preview).
+  fe-filepicker-preview.js (_ensureSidebar) 가 창마다 한 번 붙인다.
+  본문(.fe-fp-preview-body)은 파일을 고를 때마다 별도 템플릿으로 다시 그린다.
+--}}
+<div class="fe-fp-preview-body" data-fe-preview-body></div>
+<div class="fe-fp-preview-drop" data-fe-drop-hint>
+  <i class="fa-solid fa-arrow-down-to-bracket" inert></i>
+  <span>{{localize "FE.FilepickerPreview.DropOrPaste"}}<br>{{localize "FE.FilepickerPreview.SelectAfterUpload"}}</span>
+</div>

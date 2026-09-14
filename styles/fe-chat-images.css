@@ -1,34 +1,179 @@
-@charset "UTF-8";#chat-form{position:relative}#ci-spinner{z-index:1;border:5px solid #b2c3ff;border-top:5px solid #5d49ff;border-radius:50%;width:50px;height:50px;animation:spin 2s linear infinite;position:absolute;left:42%;top:45%}#ci-chat-upload-area:has(.ci-upload-area-image)~#ci-spinner{top:70%}@keyframes spin{0%{transform:rotate(0)}to{transform:rotate(360deg)}}.ci-message-image:not(:only-child):not(:last-child){margin-bottom:.5rem}.ci-message-image img{cursor:pointer}.ci-message-image img:hover{box-shadow:0 2px 12px #0000004d}#chat-controls .ci-control-buttons-gm{flex:0 0 72px}#chat-controls .ci-control-buttons-p{flex:0 0 24px}#ci-upload-image-hidden-input{opacity:0;width:0;height:0;pointer-events:none}#ci-chat-upload-area{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;padding:4px;margin:4px 7px 0 5px;background:rgba(0,0,0,.2);border:1px solid var(--color-border-light-primary);border-radius:4px;max-width:100%}#ci-chat-upload-area.hidden{display:none}.ci-upload-area-image{position:relative;display:flex;justify-content:center;align-items:center;width:80px;height:80px;flex:0 0 auto;overflow:hidden;border-radius:3px;border:1px solid var(--color-border-light-primary)}.ci-image-preview{width:100%;height:100%;object-fit:cover}.ci-remove-image-icon{position:absolute;top:2px;right:2px;font-size:16px;line-height:1;cursor:pointer;color:var(--color-text-light-header);background:rgba(0,0,0,.55);border-radius:50%;padding:2px}.ci-remove-image-icon:hover{text-shadow:0 0 6px var(--color-shadow-primary)}
+@charset "UTF-8";
 
-/* female_edition additions for chat-images integration */
-#ci-chat-upload-area .ci-upload-area-images { display: inline-flex; gap: 6px; align-items: center; }
+/* ===========================================================================
+   fe-chat-images.css — 채팅 이미지 업로드/붙여넣기/드래그드롭 UI
+   layer(modules) (module.json 에 layer 키 없음)
+
+   1행이 통째로 minify 되어 있던 것을 펼쳤다. 규칙 순서는 원본 그대로 —
+   같은 선택자가 파일 안에서 두 번 나오는 곳이 있어서(§2 .ci-message-image img,
+   §3 #ci-chat-upload-area) 순서를 바꾸면 캐스케이드가 달라진다.
+   =========================================================================== */
+
+/* --- 1. 업로드 스피너 ---------------------------------------------------- */
+
+#chat-form {
+  position: relative;
+}
+
+#ci-spinner {
+  z-index: 1;
+  border: 5px solid #b2c3ff;
+  border-top: 5px solid #5d49ff;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 2s linear infinite;
+  position: absolute;
+  left: 42%;
+  top: 45%;
+}
+
+/* 업로드 대기 타일이 떠 있으면 스피너를 그 아래로 밀어낸다. */
+#ci-chat-upload-area:has(.ci-upload-area-image) ~ #ci-spinner {
+  top: 70%;
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* --- 2. 채팅 본문에 렌더된 이미지 ---------------------------------------- */
+
+.ci-message-image:not(:only-child):not(:last-child) {
+  margin-bottom: .5rem;
+}
+
+.ci-message-image img {
+  cursor: pointer;
+}
+
+.ci-message-image img:hover {
+  box-shadow: 0 2px 12px #0000004d; /* = rgba(0,0,0,.302) — 값 그대로 보존 */
+}
+
+/* --- 3. 채팅 컨트롤 바 / 업로드 영역 ------------------------------------- */
+
+#chat-controls .ci-control-buttons-gm {
+  flex: 0 0 72px;
+}
+
+#chat-controls .ci-control-buttons-p {
+  flex: 0 0 24px;
+}
+
+/* 실제 <input type="file"> — 보이지 않지만 DOM 에는 있어야 한다. */
+#ci-upload-image-hidden-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+#ci-chat-upload-area {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px;
+  margin: 4px 7px 0 5px;
+  background: rgba(0, 0, 0, .2);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 4px;
+  max-width: 100%;
+}
+
+#ci-chat-upload-area.hidden {
+  display: none;
+}
+
+/* --- 4. 업로드 대기 타일 -------------------------------------------------- */
+
+.ci-upload-area-image {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  height: 80px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 3px;
+  border: 1px solid var(--color-border-light-primary);
+}
+
+.ci-image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ci-remove-image-icon {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-light-header);
+  background: rgba(0, 0, 0, .55);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.ci-remove-image-icon:hover {
+  text-shadow: 0 0 6px var(--color-shadow-primary);
+}
+
+/* --- 5. female_edition 통합 추가분 --------------------------------------- */
+
+#ci-chat-upload-area .ci-upload-area-images {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .ci-message {
   display: flex;
   flex-direction: column;
   gap: .5rem;
 }
+
 .ci-message-image img {
   display: block;
   max-width: 100%;
   height: auto;
   object-fit: contain;
 }
+
 .ci-notes {
   margin-top: .5rem;
 }
+
+/* 아카이브(내보내기) 창에서도 같은 크기 규칙을 적용한다. */
 #fe-chat-export-container .ci-message-image img {
   max-width: 100%;
   height: auto;
   object-fit: contain;
 }
 
-#ci-chat-upload-area { pointer-events: auto; position: relative; z-index: 4; }
+#ci-chat-upload-area {
+  pointer-events: auto;
+  position: relative;
+  z-index: 4;
+}
+
 #ci-chat-upload-area .ci-upload-area-actions {
   display: inline-flex;
   gap: 6px;
   align-items: center;
   margin-left: auto;
 }
+
+/* 전송 / 전체삭제 아이콘 버튼 (fe-chat-images.js 의 ciIconEl 이 <i> 를 넣는다) */
 #ci-chat-upload-area .ci-send-all,
 #ci-chat-upload-area .ci-clear-all {
   display: inline-flex;
@@ -38,18 +183,30 @@
   height: 28px;
   min-width: 28px;
   border-radius: 6px;
-  border: 1px solid var(--color-border-light-2, rgba(0,0,0,.2));
+  border: 1px solid var(--color-border-light-2, rgba(0, 0, 0, .2));
   cursor: pointer;
   text-decoration: none;
   pointer-events: auto;
 }
+
 #ci-chat-upload-area .ci-send-all:hover,
 #ci-chat-upload-area .ci-clear-all:hover {
-  background: rgba(0,0,0,.06);
+  background: rgba(0, 0, 0, .06);
 }
-#ci-chat-upload-area .ci-upload-area-images { flex: 1 1 auto; min-width: 0; }
-#ci-chat-upload-area .ci-image-preview { cursor: pointer; }
 
+#ci-chat-upload-area .ci-upload-area-images {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#ci-chat-upload-area .ci-image-preview {
+  cursor: pointer;
+}
+
+/* --- 6. 업로드 버튼 -------------------------------------------------------
+   #chat-controls 안의 코어/타 모듈 버튼 스타일과 싸워야 해서 !important 다.
+   같은 layer(modules) 경쟁자를 이기기 위한 것이지, layouts 레이어를
+   이기지는 못한다 (CLAUDE.md 의 레이어 규칙 참고). ----------------------- */
 
 #ci-upload-image {
   display: inline-flex !important;
@@ -69,6 +226,7 @@
   opacity: 1 !important;
   cursor: pointer !important;
 }
+
 #ci-upload-image > i {
   display: inline-flex !important;
   align-items: center !important;
@@ -82,10 +240,24 @@
   color: currentColor !important;
   opacity: 1 !important;
 }
+
 #ci-upload-image:hover,
 #ci-upload-image:focus {
   background: var(--control-hover-bg-color, rgba(45, 58, 84, 0.98)) !important;
   border-color: var(--control-hover-border-color, rgba(255, 255, 255, 0.62)) !important;
   color: var(--control-hover-icon-color, #ffffff) !important;
   outline: none !important;
+}
+
+/* --- 7. 클릭 확대/축소 커서 -----------------------------------------------
+   예전엔 JS 가 img.style.cursor 로 직접 썼다.
+   .fe-ci-zoom-in  : 채팅 본문의 클릭 가능한 이미지 (ciBindRenderedImages)
+   .fe-ci-zoom-out : 확대 팝아웃 안의 이미지 (클릭하면 닫힘) -------------- */
+
+.message-content img.fe-ci-zoom-in {
+  cursor: zoom-in;
+}
+
+.fe-ci-zoom-out {
+  cursor: zoom-out;
 }

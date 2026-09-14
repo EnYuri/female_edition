@@ -3,6 +3,10 @@
 /* ----- Dropdown menu ----- */
 .fe-sp-menu {
   position: fixed;
+  /* 좌상단이 기본값 — JS 는 붙인 뒤 실측해서 뷰포트 안으로 클램프한 좌표만 덮어쓴다.
+     inset 이 auto 면 fixed 요소가 static 위치에 잠깐 놓여 측정값이 흔들린다. */
+  left: 0;
+  top: 0;
   z-index: 100;
   display: none;
   min-width: 184px;
@@ -83,6 +87,12 @@
 }
 
 /* ----- Hover tooltip ----- */
+/* 크기를 재는 한 프레임 동안만 — .active 로 켜 두되 보이지는 않게 한다
+   (JS 가 style.visibility 를 쓰지 않는다). */
+.fe-sp-menu.fe-sp-measuring {
+  visibility: hidden;
+}
+
 .fe-sp-tooltip {
   position: fixed;
   z-index: 99;

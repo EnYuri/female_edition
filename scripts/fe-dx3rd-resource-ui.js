@@ -1,4 +1,4 @@
-import { feLocalize, feLocalizeHTML, feFormat } from "./fe-i18n.js";
+import { feLocalize, feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-dx3rd-resource-ui.js
 // Pixel-theme character status panels. An actor gets a card only while it carries
@@ -17,6 +17,14 @@ import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
+import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
+
+// Markup lives in templates/; preloaded at `init` (fe-template.js).
+const [RUI_TPL_CARD, RUI_TPL_MENU, RUI_TPL_ACCENT] = feRegisterTemplates(
+  "fe-dx3rd-resource-card.hbs",
+  "fe-dx3rd-resource-menu.hbs",
+  "fe-dx3rd-accent-dialog.hbs"
+);
 
 const CONTAINER_ID     = "fe-dx3rd-rui-container";
 const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
@@ -183,7 +191,7 @@ function _makeDraggable(container, posKey) {
         container.style.top    = `${rect.top}px`;
         container.style.bottom = "";
         container.style.right  = "";
-        document.body.style.cursor = "grabbing";
+        document.body.classList.add("fedr-dragging");
       }
       mv.preventDefault();
       mv.stopPropagation();
@@ -194,7 +202,7 @@ function _makeDraggable(container, posKey) {
     const onUp = up => {
       document.removeEventListener("mousemove", onMove, true);
       document.removeEventListener("mouseup",   onUp,   true);
-      document.body.style.cursor = "";
+      document.body.classList.remove("fedr-dragging");
       if (dragging) {
         up.stopPropagation();
         const r = container.getBoundingClientRect();
@@ -255,18 +263,16 @@ function _showCardContextMenu(actor, e) {
 
   const menu = document.createElement("div");
   menu.className = "fedr-ctx-menu";
-
-  for (const { label, icon, action } of items) {
-    const item = document.createElement("div");
-    item.className = "fedr-ctx-item";
-    item.innerHTML = `<i class="fas ${icon}"></i>${label}`;
-    item.addEventListener("click", () => { menu.remove(); action(); });
-    menu.appendChild(item);
-  }
+  menu.innerHTML = feRenderTemplate(RUI_TPL_MENU, { items });
+  // One delegated listener instead of one per row; the template stamps the index.
+  menu.addEventListener("click", (ev) => {
+    const row = ev.target.closest("[data-fedr-ctx]");
+    if (!row) return;
+    menu.remove();
+    items[Number(row.dataset.fedrCtx)]?.action?.();
+  });
 
   // Clamp to the viewport: insert first, then measure the real size.
-  menu.style.left = "0";
-  menu.style.top  = "0";
   document.body.appendChild(menu);
   const mw = menu.offsetWidth, mh = menu.offsetHeight;
   menu.style.left = `${Math.min(e.clientX, window.innerWidth  - mw - 4)}px`;
@@ -277,40 +283,21 @@ function _showCardContextMenu(actor, e) {
 
 // ─── DOM ───────────────────────────────────────────────────────────────────
 
+// The three size custom properties are written from four different places; keep them
+// in one helper so a card built here and a card refreshed on rebuild cannot drift.
+function _applyCardMetrics(card, pw, panelW, ch) {
+  card.style.setProperty("--fedr-pw", `${pw}px`);
+  card.style.setProperty("--fedr-panel-w", `${panelW}px`);
+  card.style.setProperty("--fedr-ph", `${ch}px`);
+}
+
 function _buildCard(actor, pw, panelW, ch) {
   const card = document.createElement("div");
   card.className = "fedr-actor-card";
   card.dataset.actorId = actor.id;
   card.dataset.actorUuid = _actorKey(actor);
-  card.style.setProperty("--fedr-pw", `${pw}px`);
-  card.style.setProperty("--fedr-panel-w", `${panelW}px`);
-  card.style.setProperty("--fedr-ph", `${ch}px`);
-
-  card.innerHTML =
-    `<div class="fedr-name-row"><span class="fedr-name"></span></div>` +
-    `<div class="fedr-card-body">` +
-      `<div class="fedr-portrait-wrap">` +
-        `<img class="fedr-portrait" draggable="false">` +
-      `</div>` +
-      `<div class="fedr-panel">` +
-        `<div class="fedr-bars">` +
-          `<div class="fedr-bar-group">` +
-            `<div class="fedr-bar fedr-hp"><div class="fedr-fill"></div></div>` +
-            `<div class="fedr-label-row">` +
-              `<span class="fedr-label-key">HP</span>` +
-              `<span class="fedr-label fedr-hp-lbl"></span>` +
-            `</div>` +
-          `</div>` +
-          `<div class="fedr-bar-group">` +
-            `<div class="fedr-bar fedr-enc"><div class="fedr-fill"></div></div>` +
-            `<div class="fedr-label-row">` +
-              `<span class="fedr-label-key">${feLocalizeHTML("FE.Dx3rdResourceUi.Encroachment")}</span>` +
-              `<span class="fedr-label fedr-enc-lbl"></span>` +
-            `</div>` +
-          `</div>` +
-        `</div>` +
-      `</div>` +
-    `</div>`;
+  _applyCardMetrics(card, pw, panelW, ch);
+  card.innerHTML = feRenderTemplate(RUI_TPL_CARD);
   feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
 
   card.addEventListener("contextmenu", e => {
@@ -333,26 +320,25 @@ function _updateCard(card, actor) {
   card.querySelector(".fedr-name").textContent = actor.name ?? "";
   const masked = _isMasked(actor);
 
+  // Bar fills arrive as percentages on custom properties; `width` itself is declared
+  // once in fe-dx3rd-compat.css.
   const hp = _hp(actor);
   if (hp) {
     const pct = Math.max(0, Math.min(1, (hp.max - hp.value) / hp.max));
-    card.querySelector(".fedr-hp .fedr-fill").style.width = `${pct * 100}%`;
+    card.style.setProperty("--fedr-hp-pct", `${pct * 100}%`);
     card.querySelector(".fedr-hp-lbl").textContent = masked ? "??" : `${hp.value}/${hp.max}`;
   }
 
-  // Encroachment bar: present only on systems that have it (DX3rd).
-  // On dnd5e and any system without an encroachment attribute, hide the whole
-  // bar-group so the card shows the HP bar only.
-  const encGroup = card.querySelector(".fedr-enc")?.closest(".fedr-bar-group");
+  // Encroachment bar: present only on systems that have it (DX3rd). On dnd5e and any
+  // system without an encroachment attribute the card carries .fedr-no-enc and CSS hides
+  // the whole bar-group, so the card shows the HP bar only.
   const enc = _enc(actor);
   if (enc) {
     const pct = Math.max(0, Math.min(1, enc.value / enc.cap));
-    card.querySelector(".fedr-enc .fedr-fill").style.width = `${pct * 100}%`;
+    card.style.setProperty("--fedr-enc-pct", `${pct * 100}%`);
     card.querySelector(".fedr-enc-lbl").textContent = masked ? "??" : `${enc.value}/${enc.cap}`;
-    if (encGroup) encGroup.style.display = "";
-  } else if (encGroup) {
-    encGroup.style.display = "none";
   }
+  card.classList.toggle("fedr-no-enc", !enc);
 }
 
 // ─── container management ──────────────────────────────────────────────────
@@ -390,24 +376,15 @@ function _getOrCreateContainer(id, posKey) {
     document.body.appendChild(el);
   }
 
-  el.style.flexDirection = id === CONTAINER_OWN_ID ? "row" : "column";
-  el.style.alignItems    = id === CONTAINER_OWN_ID ? "flex-start" : "";
-
-  // Wrapping: cap the main-axis size at N card footprints so the rest spills to the next
-  // row/column. One footprint is the card body (pw + panelW, or ch tall) plus 2x10px margin.
-  el.style.flexWrap = "wrap";
-  const footW = _portraitW() + _panelW() + 20;
-  const footH = _cardH() + 20;
+  // Flex direction / wrap / alignment are static per container and already declared in
+  // fe-dx3rd-compat.css — the JS used to re-write them with the exact same values on
+  // every render. The only thing it can know that CSS cannot is the wrap limit, which
+  // depends on the measured card footprint (card body + 2x10px margin); that goes out as
+  // a custom property. +4px so rounding does not wrap the Nth card one slot early.
   if (id === CONTAINER_OWN_ID) {
-    el.style.maxWidth       = `${PC_CARDS_PER_ROW * footW + 4}px`;  // +4: 반올림으로 5번째가 일찍 줄바뀜 방지
-    el.style.maxHeight      = "";
-    el.style.justifyContent = "flex-end";    // 부분 행도 우측 정렬
-    el.style.alignContent   = "flex-start";
+    el.style.setProperty("--fedr-wrap-w", `${PC_CARDS_PER_ROW * (_portraitW() + _panelW() + 20) + 4}px`);
   } else {
-    el.style.maxHeight      = `${ENEMY_CARDS_PER_COL * footH + 4}px`;
-    el.style.maxWidth       = "";
-    el.style.justifyContent = "";
-    el.style.alignContent   = "flex-start";  // 열들을 왼쪽부터 채움
+    el.style.setProperty("--fedr-wrap-h", `${ENEMY_CARDS_PER_COL * (_cardH() + 20) + 4}px`);
   }
 
   if (isNew) {
@@ -432,7 +409,7 @@ function _getOrCreateContainer(id, posKey) {
 // the visibility toggle and card add/remove.
 function _applyContainerDisplay(cnt) {
   const hasCards = cnt.querySelectorAll(".fedr-actor-card").length > 0;
-  cnt.style.display = (hasCards && _isGlobalOn()) ? "" : "none";
+  cnt.classList.toggle("fedr-hidden", !(hasCards && _isGlobalOn()));
 }
 
 function _syncContainerCards(cnt, actors, pw, panelW, ch) {
@@ -446,9 +423,7 @@ function _syncContainerCards(cnt, actors, pw, panelW, ch) {
       card = _buildCard(actor, pw, panelW, ch);
       cnt.appendChild(card);
     } else {
-      card.style.setProperty("--fedr-pw", `${pw}px`);
-      card.style.setProperty("--fedr-panel-w", `${panelW}px`);
-      card.style.setProperty("--fedr-ph", `${ch}px`);
+      _applyCardMetrics(card, pw, panelW, ch);
       feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
     }
     _updateCard(card, actor);
@@ -515,9 +490,7 @@ function _addActorCard(actor) {
     card = _buildCard(actor, pw, panelW, ch);
     cnt.appendChild(card);
   } else {
-    card.style.setProperty("--fedr-pw", `${pw}px`);
-    card.style.setProperty("--fedr-panel-w", `${panelW}px`);
-    card.style.setProperty("--fedr-ph", `${ch}px`);
+    _applyCardMetrics(card, pw, panelW, ch);
     feApplyHQPortrait(card.querySelector(".fedr-portrait"), actor.img ?? "", pw, ch);
   }
   _updateCard(card, actor);
@@ -602,14 +575,7 @@ async function _openAccentDialog(label) {
   if (!DialogV2) return;
   const cur = _normalizeHex(_getAccent()) ?? "#ffffff";
 
-  const content =
-    `<div class="fe-accent-dialog" style="display:flex;align-items:center;gap:10px;padding:6px 2px;">` +
-      `<span class="fe-accent-dialog-preview" style="width:28px;height:28px;flex:0 0 28px;` +
-        `border:1px solid rgba(255,255,255,0.35);outline:1px solid #000;background:${cur};"></span>` +
-      `<input type="color" name="accent" value="${cur}" style="width:52px;height:28px;padding:0;cursor:pointer;">` +
-      `<input type="text" name="accentHex" value="${cur}" maxlength="7" spellcheck="false" autocomplete="off" ` +
-        `style="flex:1;min-width:90px;font-family:monospace;text-transform:lowercase;">` +
-    `</div>`;
+  const content = feRenderTemplate(RUI_TPL_ACCENT, { current: cur });
 
   let picked;
   try {
@@ -623,7 +589,7 @@ async function _openAccentDialog(label) {
         const color = root.querySelector('input[name="accent"]');
         const text  = root.querySelector('input[name="accentHex"]');
         const swab  = root.querySelector(".fe-accent-dialog-preview");
-        const paint = (hex) => { if (swab) swab.style.background = hex; };
+        const paint = (hex) => swab?.style.setProperty("--fe-accent-swatch", hex);
         color?.addEventListener("input", () => {
           if (text) text.value = color.value;
           paint(color.value);
@@ -758,18 +724,39 @@ Hooks.on("createActor", (actor, _options, userId) => {
 
 // Canvas token right-click: inject buttons into the Token HUD. There is no core
 // getTokenEntries hook, so renderTokenHUD is the entry point.
+// The one place an <i> is built for this feature. `inert` keeps the glyph out of the hit
+// test so the click always lands on the button itself.
+function _iconEl(faClasses) {
+  const i = document.createElement("i");
+  i.className = faClasses;
+  i.toggleAttribute("inert", true);
+  return i;
+}
+
 function _hudIconBtn(label, faIcon, onClick) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "control-icon fedr-hud-btn";
   btn.dataset.tooltip = "";
   btn.setAttribute("aria-label", label);
-  btn.innerHTML = `<i class="fa-solid ${faIcon}" inert></i>`;
+  btn.append(_iconEl(`fa-solid ${faIcon}`));
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     onClick();
   });
+  return btn;
+}
+
+// Actor-sheet header button. Both entries (pin, mask) were byte-identical apart from
+// title/icon/handler.
+function _sheetHeaderBtn(title, faIcon, onClick) {
+  const btn = document.createElement("a");
+  btn.className = "header-button fedr-sheet-btn";
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+  btn.append(_iconEl(`fas ${faIcon}`));
+  btn.addEventListener("click", (e) => { e.preventDefault(); onClick(); });
   return btn;
 }
 
@@ -863,19 +850,16 @@ function _injectSheetStatusBtn(app, el) {
   const pinned = _isActorPinned(actor);
   const masked = _isMasked(actor);
 
-  const btn = document.createElement("a");
-  btn.className = "header-button fedr-sheet-btn";
-  btn.title = pinned ? feLocalize("FECT.Ctx.Hide") : feLocalize("FE.Dx3rdResourceUi.title");
-  btn.setAttribute("aria-label", btn.title);
-  btn.innerHTML = `<i class="fas ${pinned ? "fa-eye" : "fa-eye-slash"}" inert></i>`;
-  btn.addEventListener("click", e => { e.preventDefault(); _toggleActorPin(actor); });
-
-  const maskBtn = document.createElement("a");
-  maskBtn.className = "header-button fedr-sheet-btn";
-  maskBtn.title = masked ? feLocalize("FE.Dx3rdResourceUi.label3") : feLocalize("FE.Dx3rdResourceUi.label4");
-  maskBtn.setAttribute("aria-label", maskBtn.title);
-  maskBtn.innerHTML = `<i class="fas fa-question-circle" inert></i>`;
-  maskBtn.addEventListener("click", e => { e.preventDefault(); _toggleActorMask(actor); });
+  const btn = _sheetHeaderBtn(
+    pinned ? feLocalize("FECT.Ctx.Hide") : feLocalize("FE.Dx3rdResourceUi.title"),
+    pinned ? "fa-eye" : "fa-eye-slash",
+    () => _toggleActorPin(actor)
+  );
+  const maskBtn = _sheetHeaderBtn(
+    masked ? feLocalize("FE.Dx3rdResourceUi.label3") : feLocalize("FE.Dx3rdResourceUi.label4"),
+    "fa-question-circle",
+    () => _toggleActorMask(actor)
+  );
 
   if (headerBtns) {
     // Append (not prepend) so our button sorts AFTER any core/system buttons

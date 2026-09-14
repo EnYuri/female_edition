@@ -1,4 +1,4 @@
-import { feLocalize, feLocalizeHTML } from "./fe-i18n.js";
+import { feLocalize } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-filepicker-preview.js
 // Adds a preview sidebar to the right of core's FilePicker.
@@ -20,6 +20,14 @@ import {
   ciResolveImageExtension,
   ciUploadImageDirect,
 } from "./fe-chat-image-upload.js";
+
+import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
+
+// Markup lives in templates/; preloaded at `init` (fe-template.js).
+const [FP_TPL_ASIDE, FP_TPL_BODY] = feRegisterTemplates(
+  "fe-filepicker-preview.hbs",
+  "fe-filepicker-preview-body.hbs"
+);
 
 const PREVIEW_WIDTH = 288; // sidebar width in px — must match CSS grid-template-columns
 const EXTERNAL_UPLOAD_SETTING = S.CORE_UI_FILEPICKER_UPLOAD_LOCATION;
@@ -113,12 +121,7 @@ function _ensureSidebar(el, app) {
   el.classList.add("fe-fp-has-preview");
   aside = document.createElement("aside");
   aside.className = "fe-fp-preview fe-fp-empty";
-  aside.innerHTML =
-    `<div class="fe-fp-preview-body" data-fe-preview-body></div>` +
-    `<div class="fe-fp-preview-drop" data-fe-drop-hint>` +
-      `<i class="fa-solid fa-arrow-down-to-bracket" inert></i>` +
-      `<span>${feLocalizeHTML("FE.FilepickerPreview.DropOrPaste")}<br>${feLocalizeHTML("FE.FilepickerPreview.SelectAfterUpload")}</span>` +
-    `</div>`;
+  aside.innerHTML = feRenderTemplate(FP_TPL_ASIDE);
   content.appendChild(aside);
 
   _bindExternalImages(aside, el, app);
@@ -364,27 +367,6 @@ function _revoke(aside) {
   if (aside._feObjUrl) { try { URL.revokeObjectURL(aside._feObjUrl); } catch (_) {} aside._feObjUrl = null; }
 }
 
-function _renderMedia(cat, url, name) {
-  // Attribute-escape BOTH the src URL and the alt name. A file whose name contains
-  // a double-quote (allowed on Linux/macOS hosts; a player-uploaded file is a
-  // cross-user vector once the GM previews it) would otherwise break out of the
-  // src="" attribute and inject an onerror handler. foundry.utils.escapeHTML is
-  // safe for quoted attributes (handles & < > " ').
-  const esc = (s) => globalThis.foundry?.utils?.escapeHTML?.(String(s ?? "")) ?? String(s ?? "");
-  switch (cat) {
-    case "image":
-      return `<img class="fe-fp-media" src="${esc(url)}" alt="${esc(name)}" data-fe-media>`;
-    case "video":
-      return `<video class="fe-fp-media" src="${esc(url)}" controls preload="metadata" data-fe-media></video>`;
-    case "audio":
-      return `<div class="fe-fp-audio-wrap"><i class="fa-solid fa-music" inert></i><audio src="${esc(url)}" controls preload="metadata" data-fe-media></audio></div>`;
-    case "font":
-      return `<div class="fe-fp-font" data-fe-font>${feLocalizeHTML("FE.FontPreview.Sample")}<br><span class="fe-fp-font-sm">${feLocalizeHTML("FE.FontPreview.Pangram")}</span></div>`;
-    default:
-      return `<div class="fe-fp-fileicon"><i class="${_catIcon(cat)}" inert></i></div>`;
-  }
-}
-
 function _clearPreview(aside) {
   if (!aside || aside.classList.contains("fe-fp-empty")) {
     // Already empty — still revoke, so no object URL leaks.
@@ -405,14 +387,19 @@ function _writePreview(aside, { url, name, cat, sizeText = "", dateText = "", is
   aside.classList.remove("fe-fp-empty");
   aside.dataset.fePreviewKey = isLocal ? `local:${name}` : url;
 
-  const safeName = globalThis.foundry?.utils?.escapeHTML?.(name) ?? name;
-  body.innerHTML =
-    `<div class="fe-fp-stage" data-fe-stage>${_renderMedia(cat, url, name)}</div>` +
-    `<div class="fe-fp-meta">` +
-      `<div class="fe-fp-name" title="${safeName}">${safeName}</div>` +
-      `<div class="fe-fp-sub" data-fe-sub>${[isLocal ? feLocalize("FE.FilepickerPreview.innerHTML2") : "", sizeText, dateText].filter(Boolean).join(" · ")}</div>` +
-      `<div class="fe-fp-dim" data-fe-dim></div>` +
-    `</div>`;
+  // Escaping of `url` and `name` is the TEMPLATE's job now (see its header comment) —
+  // a file name may legitimately contain a double quote.
+  body.innerHTML = feRenderTemplate(FP_TPL_BODY, {
+    url,
+    name,
+    isImage: cat === "image",
+    isVideo: cat === "video",
+    isAudio: cat === "audio",
+    isFont: cat === "font",
+    icon: _catIcon(cat),
+    sub: [isLocal ? feLocalize("FE.FilepickerPreview.innerHTML2") : "", sizeText, dateText]
+      .filter(Boolean).join(" · "),
+  });
 
   // Fill in extra metadata asynchronously: image resolution, media duration, font load.
   const dim = body.querySelector("[data-fe-dim]");
@@ -441,7 +428,8 @@ async function _applyFontSample(elFont, url, name) {
     const face = new FontFace(fam, `url("${url}")`);
     await face.load();
     document.fonts.add(face);
-    elFont.style.fontFamily = `"${fam}", sans-serif`;
+    // The generated family name is data; `font-family` itself is declared in CSS.
+    elFont.style.setProperty("--fe-fp-font-family", `"${fam}"`);
   } catch (_) {}
 }
 

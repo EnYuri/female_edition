@@ -9,7 +9,7 @@
 // arbitrary screen coordinates (the canvas tile has no DOM element of its own).
 
 import { MODULE_ID } from "./fe-constants.js";
-import { FE_PANEL_TILE_FLAG, feEscapeHtml } from "./fe-screen-panel-data.js";
+import { FE_PANEL_TILE_FLAG } from "./fe-screen-panel-data.js";
 
 const MENU_ID = "fe-sp-menu";
 const TOOLTIP_ID = "fe-sp-tooltip";
@@ -76,7 +76,13 @@ function menuItem({ icon, label, danger = false, disabled = false, active = fals
   item.type = "button";
   item.className = ["fe-sp-menu-item", extraClass, danger ? "danger" : "", active ? "active" : ""]
     .filter(Boolean).join(" ");
-  item.innerHTML = `<i class="${icon}"></i><span>${feEscapeHtml(label)}</span>`;
+  // Built as nodes, not an HTML string: `label` is a localized name that may contain
+  // any character, and `textContent` escapes it without a helper.
+  const glyph = document.createElement("i");
+  glyph.className = icon;
+  const text = document.createElement("span");
+  text.textContent = label;
+  item.append(glyph, text);
   item.disabled = disabled || !onClick;
   if (onClick) item.addEventListener("click", async () => { closePanelMenu(); await onClick(); });
   return item;
@@ -286,17 +292,15 @@ function feOpenPanelMenu({ tile, actor, clientX, clientY }) {
     el.appendChild(note);
   }
 
-  // Position: clamp into viewport after we know its size.
-  el.style.visibility = "hidden";
-  el.style.left = "0px";
-  el.style.top = "0px";
-  el.classList.add("active");
+  // Position: show it at the stylesheet's 0,0 origin but invisible, measure, then clamp
+  // into the viewport. Only the final coordinates are written inline — they are measured.
+  el.classList.add("active", "fe-sp-measuring");
   const rect = el.getBoundingClientRect();
   const x = Math.min(clientX, window.innerWidth - rect.width - 8);
   const y = Math.min(clientY, window.innerHeight - rect.height - 8);
   el.style.left = `${Math.max(4, x)}px`;
   el.style.top = `${Math.max(4, y)}px`;
-  el.style.visibility = "";
+  el.classList.remove("fe-sp-measuring");
 }
 
 // --------------------------------

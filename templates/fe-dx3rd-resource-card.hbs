@@ -1,0 +1,32 @@
+{{!--
+  female_edition: 픽셀 캐릭터 스테이터스 카드 (.fedr-actor-card).
+  fe-dx3rd-resource-ui.js (_buildCard) 가 액터마다 한 번 만들고, 이후에는
+  _updateCard 가 텍스트와 CSS 커스텀 프로퍼티만 갱신한다 — 재생성하지 않는다.
+  이름/수치는 비워 두고 JS 가 textContent 로 채운다(마스킹 "??" 포함).
+--}}
+<div class="fedr-name-row"><span class="fedr-name"></span></div>
+<div class="fedr-card-body">
+  <div class="fedr-portrait-wrap">
+    <img class="fedr-portrait" draggable="false">
+  </div>
+  <div class="fedr-panel">
+    <div class="fedr-bars">
+      <div class="fedr-bar-group">
+        <div class="fedr-bar fedr-hp"><div class="fedr-fill"></div></div>
+        <div class="fedr-label-row">
+          <span class="fedr-label-key">HP</span>
+          <span class="fedr-label fedr-hp-lbl"></span>
+        </div>
+      </div>
+      {{!-- 침식률: DX3rd 에만 있다. dnd5e 등에서는 카드에 .fedr-no-enc 가 붙어
+            CSS 가 이 그룹을 숨긴다(JS 가 display 를 쓰지 않는다). --}}
+      <div class="fedr-bar-group fedr-enc-group">
+        <div class="fedr-bar fedr-enc"><div class="fedr-fill"></div></div>
+        <div class="fedr-label-row">
+          <span class="fedr-label-key">{{localize "FE.Dx3rdResourceUi.Encroachment"}}</span>
+          <span class="fedr-label fedr-enc-lbl"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

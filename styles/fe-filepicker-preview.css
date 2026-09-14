@@ -116,7 +116,12 @@
   padding: 16px;
 }
 
+/* 폰트 미리보기 — 실제 패밀리 이름은 파일마다 다르므로 JS 가
+   --fe-fp-font-family 로 실어 보낸다(선언 자체는 여기 있다).
+   var() 안에 sans-serif 폴백을 둔 이유: 값이 비어 있으면 `font-family: , sans-serif`
+   가 되어 선언 전체가 무효가 되고 상속값으로 떨어진다. */
 .fe-fp-font {
+  font-family: var(--fe-fp-font-family, sans-serif), sans-serif;
   font-size: 1.4rem;
   line-height: 1.5;
   text-align: center;

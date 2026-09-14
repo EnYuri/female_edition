@@ -359,7 +359,7 @@ function ciGetImagePopoutSubclass() {
         const img = this.element?.querySelector?.(".window-content img") ?? this.element?.querySelector?.("img");
         if (img && img.dataset.feClickClose !== "1") {
           img.dataset.feClickClose = "1";
-          img.style.cursor = "zoom-out";
+          img.classList.add("fe-ci-zoom-out");
           img.addEventListener("click", (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
@@ -413,13 +413,21 @@ function ciOpenImagePopout(src) {
 // and card art alike. Header portraits live outside .message-content and are image-hover's
 // job. Images inside interactive card elements (a/button/[data-action]) are left alone,
 // since those already have their own click behaviour.
+// One <i> builder for the three icon-only controls this file creates. `doc` matters:
+// the chat input can live in a popout, and these nodes must belong to that document.
+function ciIconEl(doc, className) {
+  const i = doc.createElement("i");
+  i.className = className;
+  return i;
+}
+
 function ciBindRenderedImages(root) {
   if (!root?.querySelectorAll) return;
   for (const img of root.querySelectorAll(".message-content img")) {
     if (img.dataset.feCiBound === "1") continue;
     if (img.closest("a, button, [data-action]")) continue;
     img.dataset.feCiBound = "1";
-    img.style.cursor = "zoom-in";
+    img.classList.add("fe-ci-zoom-in");
     img.addEventListener("click", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -545,7 +553,7 @@ function ciEnsureUploadArea(root = document) {
     const send = doc.createElement("a");
     send.className = "ci-send-all";
     send.title = feLocalize("FE.ChatImages.title");
-    send.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
+    send.append(ciIconEl(doc, "fa-solid fa-paper-plane"));
     send.addEventListener("click", async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -556,7 +564,7 @@ function ciEnsureUploadArea(root = document) {
     const clear = doc.createElement("a");
     clear.className = "ci-clear-all";
     clear.title = feLocalize("FE.ChatImages.title2");
-    clear.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    clear.append(ciIconEl(doc, "fa-solid fa-trash"));
     clear.addEventListener("click", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -618,7 +626,7 @@ function ciEnsureUploadButton(root = document) {
     btn.id = "ci-upload-image";
     btn.title = feLocalize("FE.ChatImages.title3");
     btn.setAttribute("role", "button");
-    btn.innerHTML = '<i class="fas fa-images"></i>';
+    btn.append(ciIconEl(doc, "fas fa-images"));
     const target = controls.querySelector?.(".control-buttons") || controls;
     target.appendChild(btn);
   }
