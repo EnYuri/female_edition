@@ -1,16 +1,14 @@
 import { feFormat } from "./fe-i18n.js";
+// feNextTick is the 0 ms yield that keeps heavy canvas loops off the UI thread.
+// fe-archive-output.js owns the shared low-level utils for this family; it imports
+// only fe-i18n.js and fe-util.js and never imports this file, so there is no cycle.
+import { feNextTick } from "./fe-archive-output.js";
 // Image processing for fe-chat-archive.js
 // Canvas downscale, background color freeze, blob → data-URL conversion.
-// Only depends on the shared localization helper.
 
 // ===========================================================================
 // Internal utilities
 // ===========================================================================
-
-// 0 ms yield so heavy canvas loops don't freeze the UI thread.
-function feNextTick() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
 
 const clampByte = (v) => Math.max(0, Math.min(255, v));
 const clampAlpha = (v) => Math.max(0, Math.min(1, v));

@@ -1,6 +1,11 @@
 // Archive clone helpers: duplicate-image optimization and computed-style
-// mirroring. Self-contained so the archive entry module does not need to own
-// the large property tables or DOM traversal implementation.
+// mirroring. Holds the large property tables and DOM traversal implementation
+// so the archive entry module does not have to.
+//
+// feIsElement comes from fe-archive-output.js, which owns the shared low-level
+// utils for this family. That module imports only fe-i18n.js and fe-util.js and
+// nothing in the family imports this file back, so the edge introduces no cycle.
+import { feIsElement } from "./fe-archive-output.js";
 
 const FE_ARCHIVE_DUPLICATE_IMAGE_KEEP = 1;
 
@@ -280,10 +285,6 @@ function feStripHeaderLayoutInlineStyles(cloneEl) {
 }
 const FE_ARCHIVE_TREE_MAX_PORTRAIT = 112;
 const FE_ARCHIVE_TREE_MAX_COMPLEX = 260;
-
-function feIsElement(node) {
-  return !!node && node.nodeType === 1;
-}
 
 function feGetArchiveTreeMirrorBudget(liveEl) {
   try {
