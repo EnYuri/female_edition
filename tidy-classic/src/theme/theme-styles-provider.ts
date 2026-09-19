@@ -1,0 +1,298 @@
+import { isNil } from 'src/utils/data';
+import type {
+  ThemeSettingsV3,
+  ThemeSettingsConfigurationOptions,
+  ThemeQuadroneStyleDeclaration,
+  ThemeQuadroneStyleRule,
+} from './theme-quadrone.types';
+import { formatResourcePathForCss } from 'src/utils/path';
+
+export class ThemeStylesProvider {
+  static create(
+    settings: ThemeSettingsV3,
+    options: ThemeSettingsConfigurationOptions
+  ): ThemeQuadroneStyleDeclaration[] {
+    let { doc, idOverride } = options;
+    let selectorPrefix = this.getSelectorPrefix(doc, idOverride);
+
+    let result: ThemeQuadroneStyleDeclaration[] = [
+      ...this.getAccentColorDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      ...this.getActorHeaderBackgroundDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      ...this.getHeaderColorDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      ...this.getItemSidebarBackgroundDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      ...this.getRarityColorsDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      ...this.getSpellPreparationMethodDeclarations(
+        selectorPrefix,
+        settings,
+        doc,
+        idOverride
+      ),
+      // etc.
+    ];
+
+    return result;
+  }
+
+  static getAccentColorDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    if (isNil(settings.accentColor, '')) {
+      return [];
+    }
+
+    const identifierRule = this.getDeclarationKeyRule(
+      'accentColor',
+      doc,
+      idOverride
+    );
+    return [
+      {
+        identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        selector: selectorPrefix,
+        ruleset: [
+          identifierRule,
+          {
+            property: '--t5e-theme-color-default',
+            value: settings.accentColor,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getActorHeaderBackgroundDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    if (
+      !settings.useHeaderBackground ||
+      isNil(settings.actorHeaderBackground, '')
+    ) {
+      return [];
+    }
+
+    const identifierRule = this.getDeclarationKeyRule(
+      'actorHeaderBackground',
+      doc,
+      idOverride
+    );
+
+    const urlValue = getUrlValue(settings.actorHeaderBackground);
+
+    return [
+      {
+        identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        selector: selectorPrefix,
+        ruleset: [
+          identifierRule,
+          {
+            property: '--t5e-sheet-header-bg',
+            value: urlValue,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getItemSidebarBackgroundDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    if (isNil(settings.itemSidebarBackground, '')) {
+      return [];
+    }
+
+    const identifierRule = this.getDeclarationKeyRule(
+      'itemSidebarBackground',
+      doc,
+      idOverride
+    );
+
+    const urlValue = getUrlValue(settings.itemSidebarBackground);
+
+    return [
+      {
+        identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        selector: selectorPrefix,
+        ruleset: [
+          identifierRule,
+          {
+            property: '--t5e-sidebar-bg',
+            value: urlValue,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getHeaderColorDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    if (isNil(settings.headerColor, '')) {
+      return [];
+    }
+
+    const identifierRule = this.getDeclarationKeyRule(
+      'headerColor',
+      doc,
+      idOverride
+    );
+    return [
+      {
+        identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        selector: selectorPrefix,
+        ruleset: [
+          identifierRule,
+          {
+            property: '--t5e-theme-header-color',
+            value: settings.headerColor,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getRarityColorsDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    const rarityColors = Object.entries(settings.rarityColors ?? {}).filter(
+      ([_, value]) => !isNil(value?.trim(), '')
+    );
+
+    return rarityColors.map(([key, value]) => {
+      const identifierRule = this.getDeclarationKeyRule(
+        `rarityColors-${key}`,
+        doc,
+        idOverride
+      );
+
+      return {
+        identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        selector: selectorPrefix,
+        ruleset: [
+          identifierRule,
+          {
+            property: `--t5e-color-rarity-${key.toLowerCase()}`,
+            value: value,
+          },
+        ],
+      };
+    });
+  }
+
+  static getSpellPreparationMethodDeclarations(
+    selectorPrefix: string,
+    settings: ThemeSettingsV3,
+    doc: any | undefined,
+    idOverride?: string
+  ): ThemeQuadroneStyleDeclaration[] {
+    const spellPrepMethods = Object.entries(
+      settings.spellPreparationMethodColors ?? {}
+    ).filter(([_, value]) => !isNil(value?.trim(), ''));
+
+    return spellPrepMethods.flatMap(([key, value]) => {
+      const identifierRule = this.getDeclarationKeyRule(
+        `spellPreparationMethodColors-${key}`,
+        doc,
+        idOverride
+      );
+
+      return [
+        {
+          identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+          selector: selectorPrefix,
+          ruleset: [
+            identifierRule,
+            {
+              property: `--t5e-color-spellcasting-${key.toLowerCase()}`,
+              value: value,
+            },
+          ],
+        },
+        // {
+        //   identifier: `${identifierRule.property}: "${identifierRule.value}"`,
+        //   selector: `${selectorPrefix} .tidy-table-header-row.spell-method`,
+        //   ruleset: [identifierRule, { property: cssVariable, value: value }],
+        // },
+      ];
+    });
+  }
+
+  static getDeclarationKeyRule(
+    settingName: string,
+    doc?: any,
+    idOverride?: string
+  ): ThemeQuadroneStyleRule {
+    return {
+      property: doc
+        ? this.sheetSettingIdentifierKey(doc, idOverride)
+        : this.worldSettingIdentifierKey,
+      value: this.themeSettingIdentifierValue(settingName),
+    };
+  }
+
+  private static getSelectorPrefix(doc: any, idOverride?: string) {
+    return idOverride
+      ? `#${idOverride}`
+      : doc
+      ? `#${doc.sheet.id}`
+      : '.tidy5e-sheet.application.quadrone';
+  }
+
+  static readonly worldSettingIdentifierKey = '--tidy5e-sheet-world-setting';
+
+  static sheetSettingIdentifierKey(doc: any, idOverride?: string) {
+    const id = idOverride ?? doc.uuid;
+    return `--tidy5e-sheet-sheet-setting-${id.replaceAll('.', '-')}`;
+  }
+
+  static themeSettingIdentifierValue(settingName: string) {
+    return `tidy5e-sheet-theme-setting-${settingName}`;
+  }
+}
+
+/** Creates a URL(...) CSS style value and accounts for content pulled from the web. */
+function getUrlValue(path: string) {
+  const formattedPath = formatResourcePathForCss(path);
+
+  const urlValue = `url("${formattedPath}")`;
+  return urlValue;
+}

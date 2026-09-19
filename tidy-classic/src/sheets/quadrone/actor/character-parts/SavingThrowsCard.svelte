@@ -1,0 +1,152 @@
+<script lang="ts">
+  import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { getSheetContext } from 'src/sheets/sheet-context.svelte';
+  import type {
+    ActorAbilityContextEntry,
+    CharacterSheetQuadroneContext,
+    NpcSheetQuadroneContext,
+    VehicleSheetQuadroneContext,
+  } from 'src/types/types';
+  import FiligreeCard from 'src/components/filigree-card/FiligreeCard.svelte';
+  import ProficiencyCycle from '../parts/ProficiencyCycle.svelte';
+  import { CONSTANTS } from 'src/constants';
+  import { getModifierData } from 'src/utils/formatting';
+
+  let context =
+    $derived(
+      getSheetContext<
+        | CharacterSheetQuadroneContext
+        | NpcSheetQuadroneContext
+        | VehicleSheetQuadroneContext
+      >(),
+    );
+
+  const localize = FoundryAdapter.localize;
+
+  let leftAbilities = $derived(
+    context.abilities.slice(0, Math.floor(context.abilities.length / 2)),
+  );
+  let rightAbilities = $derived(
+    context.abilities.slice(Math.floor(context.abilities.length / 2)),
+  );
+</script>
+
+<FiligreeCard class="saving-throws card">
+  <div class="card-header use-ability-header flexrow">
+    <i class="fa-solid fa-shield-heart color-icon-diminished"></i>
+    <h3 class="font-label-medium">
+      {localize('DND5E.ClassSaves')}
+    </h3>
+    <span
+      class="modifier-label color-text-lightest font-default-medium flexshrink"
+    >
+      {localize('DND5E.Modifier')}
+    </span>
+  </div>
+
+  <ul class="saving-throws-ability-column unlist use-ability-list">
+    {#each leftAbilities as ability, index}
+      <li style="order: {2 * index + 1}">
+        {@render savingThrowRow(ability)}
+      </li>
+    {/each}
+    {#each rightAbilities as ability, index}
+      <li style="order: {2 * index + 2}">
+        {@render savingThrowRow(ability)}
+      </li>
+    {/each}
+    <!-- </ul> -->
+    <!-- Concentration here -->
+    {#if 'spellcasting' in context && context.spellcasting?.length > 0 && context.saves.concentration}
+      {@const conc = context.saves.concentration}
+      {@const tooltip = localize('DND5E.AbilityConfigure', {
+        ability: context.saves.concentration.label,
+      })}
+      <!-- <ul class="saving-throws-special-column unlist use-ability-list"> -->
+      <li style="order: 50">
+        {#if context.isConcentrating}
+          <i class="active-concentration-icon fas fa-arrow-rotate-left fa-spin fa-spin-reverse" aria-label="Concentration" style="font-size: var(--icon-size);"></i>
+        {:else}
+          <i class="fas fa-head-side-brain color-text-gold"></i>
+        {/if}
+        <button
+          type="button"
+          class="button button-borderless use-ability-roll-button"
+          data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ABILITY_SAVE_ROLLER}
+          onclick={(ev) =>
+            context.actor.rollConcentration({ event: ev, legacy: false })}
+          data-has-roll-modes
+        >
+          {conc.label + (context.isConcentrating ? ` (${localize('EFFECT.DND5E.StatusConcentrating')})` : '')}
+        </button>
+        <span class="modifier">
+          <span class="font-label-medium color-text-lightest">
+            {conc.sign}
+          </span>
+          <span class="font-data-medium">
+            {conc.mod}
+          </span>
+        </span>
+        {#if context.unlocked}
+          <button
+            type="button"
+            class="button button-borderless button-icon-only"
+            data-tooltip={tooltip}
+            onclick={(ev) =>
+              FoundryAdapter.openConcentrationConfig(context.actor)}
+          >
+            <i class="fa-solid fa-cog"></i>
+          </button>
+        {/if}
+      </li>
+    {/if}
+  </ul>
+</FiligreeCard>
+
+{#snippet savingThrowRow(ability: ActorAbilityContextEntry)}
+  {@const modifier = getModifierData(ability.save.value)}
+  {@const tooltip = localize('DND5E.AbilityConfigure', {
+    ability: ability.label,
+  })}
+  <ProficiencyCycle
+    actor={context.actor}
+    aria-label={localize(ability.hover)}
+    data-tooltip=""
+    disabled={!context.unlocked}
+    path="system.abilities.{ability.key}.proficient"
+    type="ability"
+    value={context.unlocked
+      ? (ability.source?.proficient ?? 0)
+      : ability.proficient}
+  />
+  <button
+    type="button"
+    class="button button-borderless use-ability-roll-button"
+    onclick={(event) =>
+      context.actor.rollSavingThrow({ ability: ability.key, event })}
+    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ABILITY_SAVE_ROLLER}
+    data-has-roll-modes
+    disabled={!context.owner}
+  >
+    {ability.label}
+  </button>
+  <span class="modifier">
+    <span class="font-label-medium color-text-lightest">
+      {modifier.sign}
+    </span>
+    <span class="font-data-medium">
+      {modifier.value}
+    </span>
+  </span>
+  {#if context.unlocked}
+    <button
+      type="button"
+      class="button button-borderless button-icon-only"
+      data-tooltip={tooltip}
+      onclick={(ev) =>
+        FoundryAdapter.renderAbilityConfig(context.actor, ability.key)}
+    >
+      <i class="fa-solid fa-cog"></i>
+    </button>
+  {/if}
+{/snippet}

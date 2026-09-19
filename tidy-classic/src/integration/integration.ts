@@ -1,0 +1,84 @@
+import { PopoutModuleIntegration } from './modules/PopoutModuleIntegration';
+import type {
+  ModuleIntegrationBase,
+  SystemIntegrationBase,
+  ThirdPartyIntegrationBase,
+} from './integration-classes';
+import { error } from 'src/utils/logging';
+import { CustomCharacterSheetsModuleIntegration } from './modules/CustomCharacterSheetsModuleIntegration';
+import type { Tidy5eSheetsApi } from 'src/api/Tidy5eSheetsApi';
+import { DrakkenheimCoreModuleIntegration } from './modules/Drakkenheim/DrakkenheimCore';
+import { TidyCustomSectionsInDefaultItemSheetIntegration } from './system/TidyCustomSectionsInDefaultItemSheetIntegration';
+import { ColorisThirdPartyIntegration } from './third-party/Coloris.svelte';
+import { SebastianCrowesGuideToDrakkenheimModuleIntegration } from './modules/Drakkenheim/SebastianCrowesGuideToDrakkenheim';
+import { MonstersOfDrakkenheimModuleIntegration } from './modules/Drakkenheim/MonstersOfDrakkenheim';
+
+export function setupIntegrations(api: Tidy5eSheetsApi) {
+  setupSystemIntegrations(api);
+  setupModuleIntegrations(api);
+  setupThirdPartyIntegrations(api);
+}
+
+/* System Integrations */
+
+const systemIntegrations: SystemIntegrationBase[] = [
+  new TidyCustomSectionsInDefaultItemSheetIntegration(),
+  // Add other system integrations here
+];
+
+function setupSystemIntegrations(api: Tidy5eSheetsApi) {
+  systemIntegrations.forEach((systemIntegration) => {
+    try {
+      systemIntegration.init(api);
+    } catch (e) {
+      error(`System integration failed`, false, e);
+    }
+  });
+}
+
+/* Module Integrations */
+
+// Upstream's Tasha's Cauldron and MCDM Class Bundle integrations are deliberately absent.
+// Both exist only to register a QUADRONE item sheet (under the shared
+// `TIDY5E.Tidy5eItemSheetQuadrone` label) plus Quadrone-layout tabs for those modules' own
+// item types — and tidy5e-sheet 14, which this fork expects to stay installed for Quadrone,
+// still ships both. Keeping ours would put a second, identically-labelled entry in the sheet
+// picker for the same item type, which is the exact duplication this fork avoids elsewhere.
+const moduleIntegrations: ModuleIntegrationBase[] = [
+  new PopoutModuleIntegration(),
+  new CustomCharacterSheetsModuleIntegration(),
+  new DrakkenheimCoreModuleIntegration(),
+  new SebastianCrowesGuideToDrakkenheimModuleIntegration(),
+  new MonstersOfDrakkenheimModuleIntegration(),
+  // Add other module integrations here
+];
+
+function setupModuleIntegrations(api: Tidy5eSheetsApi) {
+  moduleIntegrations.forEach((m) => {
+    try {
+      if (game.modules.get(m.moduleId)?.active) {
+        m.init(api);
+      }
+    } catch (e) {
+      error(`Module integration failed for ${m.moduleId}`, false, e);
+    }
+  });
+}
+
+const thirdPartyIntegrations: ThirdPartyIntegrationBase[] = [
+  new ColorisThirdPartyIntegration(),
+];
+
+function setupThirdPartyIntegrations(api: Tidy5eSheetsApi) {
+  thirdPartyIntegrations.forEach((m) => {
+    try {
+      m.init(api);
+    } catch (e) {
+      error(
+        `Module integration failed for third party script ${m.name}`,
+        false,
+        e
+      );
+    }
+  });
+}

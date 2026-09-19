@@ -5,6 +5,8 @@
 .gitattributes    export-ignore
 .gitignore        export-ignore
 ci                export-ignore
+# One-off maintenance scripts run by hand from a dev checkout — never shipped.
+tools             export-ignore
 CLAUDE.md         export-ignore
 AGENTS.md        export-ignore
 .codex       export-ignore

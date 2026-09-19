@@ -23,6 +23,11 @@ on:
       - "lang/**"
       - "font/**"
       - "assets/**"
+      # Vendored Tidy 5e Classic: module.json loads tidy-classic/dist + public + styles,
+      # so a rebuild of the fork must publish a release even when nothing else changed.
+      - "tidy-classic/dist/**"
+      - "tidy-classic/public/**"
+      - "tidy-classic/styles/**"
 
 permissions:
   contents: write

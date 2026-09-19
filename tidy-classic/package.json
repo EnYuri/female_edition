@@ -1,0 +1,26 @@
+{
+  "name": "female-edition-tidy-classic",
+  "private": true,
+  "version": "12.5.5",
+  "type": "module",
+  "description": "Classic-layout fork of Tidy 5e Sheets 12.5.5, carried forward by female_edition after upstream went Quadrone-only in 14.x.",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@melloware/coloris": "^0.24.0",
+    "chroma-js": "^3.1.2",
+    "clsx": "^2.1.1",
+    "esm-env": "^1.2.2",
+    "svelte": "5.55.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "less": "^4.9.1",
+    "svelte-check": "^4.1.5",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.5"
+  }
+}

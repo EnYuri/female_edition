@@ -1,0 +1,284 @@
+<script lang="ts">
+  import type {
+    ThemeColorSettingConfigEntry,
+    ThemeSettingsContext,
+    ThemeSettingsQuadroneApplication,
+  } from './ThemeSettingsQuadroneApplication.svelte';
+  import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import ThemeSettingColorFormGroupQuadrone from './ThemeSettingColorFormGroupQuadrone.svelte';
+  import { ThemeQuadrone } from 'src/theme/theme-quadrone.svelte';
+  import { CONSTANTS } from 'src/constants';
+  import { isNil } from 'src/utils/data';
+  import { getSingleFileFromDropEvent } from 'src/utils/file';
+  import { ThemeQuadroneImportService } from 'src/theme/theme-import-service';
+  import ImportButton from './parts/ImportButton.svelte';
+  import ImagePickerButton from './parts/ImagePickerButton.svelte';
+  import { TidyHooks } from 'src/api';
+
+  interface Props {
+    app: ThemeSettingsQuadroneApplication;
+    settings: ThemeSettingsContext;
+    placeholders: ThemeSettingsContext | undefined;
+  }
+
+  let { app, settings: context, placeholders }: Props = $props();
+
+  const localize = FoundryAdapter.localize;
+
+  let idPrefix = `theme-settings-${foundry.utils.randomID()}`;
+
+  let portraitShapes = ThemeQuadrone.getActorPortraitShapes();
+
+  let portraitShapeDefaultValue =
+    placeholders?.value?.portraitShape ?? ThemeQuadrone.DEFAULT_PORTRAIT_SHAPE;
+
+  let portraitShapeDefaultLabel = localize(
+    'TIDY5E.UseSpecificDefaultValue.Label',
+    {
+      value: localize(
+        `TIDY5E.ThemeSettings.PortraitShape.option.${portraitShapeDefaultValue}`,
+      ),
+    },
+  );
+
+  let methodColorPlaceholders = createColorPlaceholderMap(
+    placeholders?.value.spellPreparationMethodColors,
+  );
+
+  let rarityColorPlaceholders = createColorPlaceholderMap(
+    placeholders?.value.rarityColors,
+  );
+
+  function createColorPlaceholderMap(colors?: ThemeColorSettingConfigEntry[]) {
+    return (
+      colors?.reduce<Record<string, string>>((prev, curr) => {
+        if (!isNil(curr.value, '')) {
+          prev[curr.key] = curr.value;
+        }
+        return prev;
+      }, {}) ?? {}
+    );
+  }
+
+  $effect(() => {
+    // Live Preview is only sanely feasible for sheet-specific theming.
+    if (!app.document) {
+      return;
+    }
+
+    const liveSettings = ThemeQuadrone.getSheetThemeSettings({
+      doc: app.document,
+      settingsOverride: app.mapContextToSettings(context),
+    });
+
+    TidyHooks.tidy5eSheetsThemeSettingsChanged(app.document, liveSettings);
+  });
+
+  async function onDrop(
+    ev: DragEvent & {
+      currentTarget: EventTarget & HTMLElement;
+    },
+  ) {
+    let file = getSingleFileFromDropEvent(ev);
+
+    await processImportFile(file);
+  }
+
+  async function processImportFile(file: File | null | undefined) {
+    if (file) {
+      const imported = await ThemeQuadroneImportService.import(file);
+      if (imported) {
+        context.value = app._getSettings(imported).value;
+      }
+    }
+  }
+</script>
+
+<div class="dialog-content-container flexcol" ondrop={onDrop} role="region">
+  <div class="flexrow flexgap-1">
+    <h2>
+      {localize('TIDY5E.ThemeSettings.SheetMenu.name')}
+    </h2>
+    <ImportButton onfilechanged={(file) => processImportFile(file)} />
+    <button
+      type="button"
+      class="button flexshrink"
+      onclick={() =>
+        ThemeQuadroneImportService.export(app.mapContextToSettings(context))}
+    >
+      <i class="fa-solid fa-file-export"></i>
+      {localize('TIDY5E.ThemeSettings.Sheet.export')}
+    </button>
+  </div>
+
+  <fieldset>
+    <legend>
+      {localize('TIDY5E.ThemeSettings.SheetTheme.title')}
+      <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline>
+    </legend>
+
+    <ThemeSettingColorFormGroupQuadrone
+      key="accent-color"
+      bind:value={context.value.accentColor}
+      label={localize('TIDY5E.ThemeSettings.AccentColor.title')}
+      placeholder={placeholders?.value.accentColor}
+    />
+    <p class="hint">
+      {localize('TIDY5E.ThemeSettings.SheetTheme.hint')}
+    </p>
+
+    {#if !app.document?.documentName || app.document?.documentName === CONSTANTS.DOCUMENT_NAME_ACTOR}
+      <div class="form-group">
+        <label for="{idPrefix}-actor-portrait-shape">
+          {localize('TIDY5E.ThemeSettings.PortraitShape.title', {
+            type: localize(CONSTANTS.DOCUMENT_NAME_ACTOR),
+          })}
+        </label>
+        <div class="form-fields">
+          <select
+            id="{idPrefix}-actor-portrait-shape"
+            bind:value={context.value.portraitShape}
+          >
+            <option value={undefined}>{portraitShapeDefaultLabel}</option>
+            {#each portraitShapes as shape}
+              <option value={shape}
+                >{localize(
+                  `TIDY5E.ThemeSettings.PortraitShape.option.${shape}`,
+                )}</option
+              >
+            {/each}
+          </select>
+        </div>
+      </div>
+    {/if}
+
+    {#if !app.document || app.actorHeaderBackgroundSupportedActorTypes.has(app.document.type)}
+      <div class="form-group">
+        <label for="{idPrefix}-use-header-background">
+          {localize('TIDY5E.ThemeSettings.UseHeaderBackground.title')}
+        </label>
+        <div class="form-fields">
+          <input
+            id="{idPrefix}-use-header-background"
+            type="checkbox"
+            bind:checked={context.value.useHeaderBackground}
+          />
+        </div>
+        <p class="hint">
+          {localize('TIDY5E.ThemeSettings.UseHeaderBackground.hint')}
+        </p>
+      </div>
+
+      {#if context.value.useHeaderBackground}
+        <div class="form-group">
+          <label for="{idPrefix}-actor-header-background">
+            {localize('TIDY5E.ThemeSettings.ActorHeaderBackground.title')}
+          </label>
+          <div class="form-fields">
+            <input
+              id="{idPrefix}-actor-header-background"
+              type="text"
+              bind:value={context.value.actorHeaderBackground}
+              placeholder={placeholders?.value.actorHeaderBackground}
+            />
+            <ImagePickerButton
+              current={context.value.actorHeaderBackground}
+              onimagepicked={(image) =>
+                (context.value.actorHeaderBackground = image)}
+            />
+          </div>
+        </div>
+        
+        <ThemeSettingColorFormGroupQuadrone
+          key="header-color"
+          bind:value={context.value.headerColor}
+          label={localize('TIDY5E.ThemeSettings.HeaderColor.title')}
+          placeholder={placeholders?.value.headerColor}
+        />
+        <p class="hint">
+          {localize('TIDY5E.ThemeSettings.HeaderColor.hint')}
+        </p>
+      {/if}
+    {/if}
+
+    <!-- TODO: Add item sidebar background setting -->
+    <!-- {#if settings.value.truesight}
+      <div class="form-group">
+        <label for="{idPrefix}-item-sidebar-background">
+          {localize('TIDY5E.ThemeSettings.ItemSidebarBackground.title')}
+        </label>
+        <div class="form-fields">
+          <input
+            id="{idPrefix}-item-sidebar-background"
+            type="text"
+            bind:value={context.value.itemSidebarBackground}
+            placeholder={placeholders?.value.itemSidebarBackground}
+          />
+          <ImagePickerButton
+            current={context.value.itemSidebarBackground}
+            onimagepicked={(image) =>
+              (context.value.itemSidebarBackground = image)}
+          />
+        </div>
+      </div>
+    {/if} -->
+  </fieldset>
+  <fieldset>
+    <legend>
+      {localize('TIDY5E.ThemeSettings.RarityColors.title')}
+      <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline>
+    </legend>
+
+    {#each context.value.rarityColors as color}
+      <ThemeSettingColorFormGroupQuadrone
+        key={color.key}
+        bind:value={color.value}
+        label={color.label.titleCase()}
+        placeholder={rarityColorPlaceholders[color.key]}
+      />
+    {/each}
+  </fieldset>
+
+  <fieldset>
+    <legend>
+      {localize('TIDY5E.ThemeSettings.SpellcastingMethodColors.title')}
+      <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline>
+    </legend>
+
+    {#each context.value.spellPreparationMethodColors as color}
+      <ThemeSettingColorFormGroupQuadrone
+        key={color.key}
+        bind:value={color.value}
+        label={color.label}
+        placeholder={methodColorPlaceholders[color.key]}
+      />
+    {/each}
+  </fieldset>
+</div>
+
+<div class="button-bar">
+  <button
+    type="button"
+    class="button button-secondary button-large use-default-btn"
+    onclick={() => app.useDefault()}
+  >
+    <i class="fas fa-rotate-left"></i>
+    {localize('TIDY5E.UseDefault')}
+  </button>
+  <button
+    type="button"
+    class="button button-secondary button-large apply-changes-btn"
+    data-testid="section-config-apply-changes"
+    onclick={() => app.close()}
+  >
+    {localize('Cancel')}
+  </button>
+  <button
+    type="button"
+    class="button button-primary button-large button-save save-changes-btn"
+    onclick={() => app.save()}
+  >
+    <i class="fas fa-save"></i>
+    {localize('TIDY5E.SaveChanges')}
+  </button>
+</div>

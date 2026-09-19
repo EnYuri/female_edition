@@ -1,0 +1,118 @@
+<script lang="ts">
+  import { CONSTANTS } from 'src/constants';
+  import { settings } from 'src/settings/settings.svelte';
+  import { getCharacterSheetQuadroneContext } from 'src/sheets/sheet-context.svelte';
+  import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+
+  // TODO: Use the same hooks and sheet parts that supports the Hidden Death Saves module.
+
+  let totalsaves = 6;
+  
+  const localize = FoundryAdapter.localize;
+
+  let context = $derived(getCharacterSheetQuadroneContext());
+
+  let halfSaves = $derived(Math.floor(totalsaves / 2));
+
+  let successes = $derived(context.system.attributes.death.success);
+  let failures = $derived(context.system.attributes.death.failure);
+
+  async function incrementDeathSave(path: string, value: number) {
+    const adjustment = Math.min(value + 1, 3);
+    return await setDeathSave(path, adjustment);
+  }
+
+  async function decrementDeathSave(path: string, value: number) {
+    const adjustment = Math.max(value - 1, 0);
+    return await setDeathSave(path, adjustment);
+  }
+
+  async function setDeathSave(path: string, value: number) {
+    return await context.actor.update({
+      [path]: value,
+    });
+  }
+</script>
+
+<div class="death-saves-overlay">
+  <div
+    class="failures flexcol"
+    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.DEATH_SAVE_FAILURES}
+  >
+    {#each Array(halfSaves) as _, i}
+      {@const filled = failures >= i + 1}
+      {@const path = 'system.attributes.death.failure'}
+      <button
+        type="button"
+        aria-label={localize('DND5E.DeathSaveFailureLabel')}
+        data-tooltip=""
+        class={[
+          'button button-borderless button-icon-only',
+          { checked: filled },
+        ]}
+        onclick={() =>
+          filled
+            ? decrementDeathSave(path, failures)
+            : incrementDeathSave(path, failures)}
+      >
+        <i class="fas fa-skull"></i>
+      </button>
+    {/each}
+  </div>
+  <button
+    aria-label={localize('DND5E.DeathSaveRoll')}
+    data-tooltip=""
+    type="button"
+    onclick={(event) =>
+      context.actor.rollDeathSave(
+        {
+          event: event,
+          legacy: false,
+        },
+        {
+          options: {
+            default: {
+              rollMode: settings.value.defaultDeathSaveRoll,
+            },
+          },
+        },
+      )}
+    oncontextmenu={(ev) => {
+      ev.preventDefault();
+      (async () => {
+        await context.actor.update({
+          'system.attributes.death.success': 0,
+          'system.attributes.death.failure': 0,
+        });
+      })();
+    }}
+    class="death-save-roll-button button button-borderless button-icon-only"
+    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.DEATH_SAVE_ROLLER}
+  >
+    <i class="fas fa-dice-d20"></i>
+  </button>
+  <div
+    class="successes flexcol"
+    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.DEATH_SAVE_SUCCESSES}
+  >
+    {#each Array(halfSaves) as _, i}
+      {@const filled = successes >= i + 1}
+      {@const path = 'system.attributes.death.success'}
+      <button
+        type="button"
+        aria-label={localize('DND5E.DeathSaveSuccessLabel')}
+        data-tooltip=""
+        class={[
+          'button button-borderless button-icon-only',
+          { checked: filled },
+        ]}
+        onclick={(ev) =>
+          filled
+            ? decrementDeathSave(path, successes)
+            : incrementDeathSave(path, successes)}
+      >
+        <i class="fas fa-heart"></i>
+      </button>
+    {/each}
+  </div>
+</div>
