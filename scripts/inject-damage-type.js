@@ -15,6 +15,11 @@ const _DMG_ENTRIES = [
   { key: "female_fire",        idx: 8, icon: "systems/dnd5e/icons/svg/sorcerer.svg"           },
 ];
 
+// Only `damageTypes` exists on dnd5e 6.0 — the three dr/di/dv tables were folded into it
+// (traits now read `damageTypes` through `CONFIG.DND5E.traits.<dr|di|dv>.configKey`), and
+// upstream Tidy 12.5.5 already had zero references to them on 5.2. They are kept for the
+// older dnd5e releases this module still supports; both loops below skip a missing table,
+// so an absent one costs nothing.
 const _DMG_TABLES = [
   "damageTypes",
   "damageResistanceTypes",

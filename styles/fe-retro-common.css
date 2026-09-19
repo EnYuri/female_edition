@@ -775,7 +775,9 @@ body.fe-retro-theme
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) {
-  --fe-dice-outline: #ffffff;
+  /* 유저색이 없는 메시지의 기본 윤곽선. 리터럴 #ffffff 였는데, 강조색에 색조를
+     넣으면 여기만 흰색으로 남아 튀었다(강조색을 녹색으로 돌려 실측). */
+  --fe-dice-outline: var(--fe-ac-90, #ffffff);
 }
 
 body.fe-retro-theme
@@ -824,14 +826,22 @@ body.fe-retro-theme
   color: var(--fe-ac-90, #e6e6e6) !important;
 }
 
-/* core 의 성공/실패 색(#18520b / #aa0200)도 검정 패널 위에서는 판독 불가 —
- * 의미는 유지한 채 밝은 톤으로 올리고, 색을 뒤트는 sepia/hue-rotate 필터는
- * 끈다(그 필터는 우리 윤곽선 text-shadow 까지 함께 물들인다). */
+/* core 의 성공/실패 색(#18520b / #aa0200)은 검정 패널 위에서 판독 불가다.
+ * 예전에는 의미를 살리려고 밝은 초록/빨강(#4ade80 / #ff6b6b)으로 올렸지만,
+ * 레트로는 의미를 **색으로 나르지 않는다** → 명도 축으로 옮긴다:
+ *   성공/최대 = --fe-ac-96 (불투명 L=96%, 팔레트의 최상단)
+ *   실패/최소 = --fe-ac-t22 (L=82% · 채도 24% · α .82, 눈에 띄게 바랜 톤)
+ *   폭발/펌블 = 어두운 알(--fe-ac-12) + 밝은 후광으로 "반전"시켜 구분.
+ *              후광 밝기만 다르다(폭발 --fe-ac-96 / 펌블 --fe-ac-45).
+ * 강조색에 채도가 있으면 그 색조는 따라간다 — 모노톤은 "회색 고정"이 아니라
+ * "의미색(초록/빨강)을 쓰지 않는다"는 뜻이다.
+ * 색을 뒤트는 sepia/hue-rotate 필터는 끈다(그 필터는 우리 윤곽선 text-shadow
+ * 까지 함께 물들인다). */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.success, li.max, li.success > span, li.max > span) {
-  color: #4ade80 !important;
+  color: var(--fe-ac-96, #ffffff) !important;
   filter: none !important;
 }
 
@@ -839,7 +849,7 @@ body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.failure, li.min, li.failure > span, li.min > span) {
-  color: #ff6b6b !important;
+  color: var(--fe-ac-t22, #d1d1d1) !important;
   filter: none !important;
 }
 
@@ -847,22 +857,24 @@ body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.exploded, li.exploded > span) {
-  color: #00aa22 !important;
-  text-shadow: 0 0 6px #99ffbb, 0 0 3px #99ffbb, 1px 0 0 #99ffbb,
-    -1px 0 0 #99ffbb, 0 1px 0 #99ffbb, 0 -1px 0 #99ffbb,
-    1px 1px 0 #99ffbb, -1px 1px 0 #99ffbb, 1px -1px 0 #99ffbb,
-    -1px -1px 0 #99ffbb !important;
+  color: var(--fe-ac-12, #1f1f1f) !important;
+  text-shadow: 0 0 6px var(--fe-ac-96), 0 0 3px var(--fe-ac-96),
+    1px 0 0 var(--fe-ac-96), -1px 0 0 var(--fe-ac-96),
+    0 1px 0 var(--fe-ac-96), 0 -1px 0 var(--fe-ac-96),
+    1px 1px 0 var(--fe-ac-96), -1px 1px 0 var(--fe-ac-96),
+    1px -1px 0 var(--fe-ac-96), -1px -1px 0 var(--fe-ac-96) !important;
 }
 
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.fumble, li.fumble > span) {
-  color: #cc2020 !important;
-  text-shadow: 0 0 6px #ff9999, 0 0 3px #ff9999, 1px 0 0 #ff9999,
-    -1px 0 0 #ff9999, 0 1px 0 #ff9999, 0 -1px 0 #ff9999,
-    1px 1px 0 #ff9999, -1px 1px 0 #ff9999, 1px -1px 0 #ff9999,
-    -1px -1px 0 #ff9999 !important;
+  color: var(--fe-ac-12, #1f1f1f) !important;
+  text-shadow: 0 0 6px var(--fe-ac-45), 0 0 3px var(--fe-ac-45),
+    1px 0 0 var(--fe-ac-45), -1px 0 0 var(--fe-ac-45),
+    0 1px 0 var(--fe-ac-45), 0 -1px 0 var(--fe-ac-45),
+    1px 1px 0 var(--fe-ac-45), -1px 1px 0 var(--fe-ac-45),
+    1px -1px 0 var(--fe-ac-45), -1px -1px 0 var(--fe-ac-45) !important;
 }
 
 body.fe-retro-theme
@@ -878,6 +890,96 @@ body.fe-retro-theme
   :is(.chat-message, .message) a.inline-roll:hover {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
+}
+
+/* ── 롤테이블 결과 행 (.table-results) ───────────────────────
+ * 코어의 결과 행(li.flexrow)은 검은 판 위에 아이콘과 문장만 떠 있어 행 경계가
+ * 없고, 왼쪽 결과 아이콘(img)도 테두리가 없다 — monks .item-image(아래 §)와
+ * 같은 사정이다. 행과 아이콘 각각에 옅은 하드 라인을 둘러 결을 맞춘다. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) .table-results > li {
+  border: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.chat-message, .message) .table-results > li > img {
+  border: 1px solid var(--fe-ac-33) !important;
+}
+
+/* ── monks-tokenbar 카드 (세이브 요청 / 대조 굴림) ───────────
+ * 이 모듈은 카드 안쪽 구분선을 양피지 리터럴로 직접 박는다(tokenbar.css):
+ *   .card-header            → 2px groove #ffffff
+ *   .items-list .items-header → 2px groove #eeede0
+ *   .items-list .item       → 1px solid #c9c7b8
+ *   .card-footer span       → 2px groove #ffffff (오른쪽 구분선)
+ * 변수 경유가 전혀 없어서 팔레트 리맵으로는 닿지 않고, 강조색에 색조를 넣으면
+ * 이 세 줄만 양피지색으로 남는다(강조색을 녹색으로 돌려 실측). 선택자를 직접
+ * 잡는 수밖에 없다 — 대신 dnd5e 와 무관한 모듈이므로 여기(공통)에 둔다.
+ * groove → solid: 레트로는 모든 경계를 하드 라인 하나로 그린다(§7·§16과 동일). */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .monks-tokenbar :is(.card-header, .items-list .items-header, .items-list .item,
+                      .card-footer span) {
+  border-color: var(--fe-ac-33) !important;
+  border-style: solid !important;
+}
+
+/* 같은 사정의 두 번째 묶음 — 성공/실패 색.
+ * tokenbar.css 는 내성 성공을 #468847(초록), 실패를 #b94a48(빨강) 리터럴로 칠한다:
+ *   .dice-total a.result-passed.selected / .dice-result.success .total / .dice-text.passed
+ *   .dice-total a.result-failed.selected / .dice-result.fail .total    / .dice-text.failed
+ *   .item-roll .adv-btn.advantage / .disadvantage  (이점/불이익 +- 버튼)
+ *   .dice-roll a.add-xp                            (초록 면 + 흰 글자)
+ * 레트로는 의미를 색으로 나르지 않는다 → 명도축으로 옮긴다:
+ *   성공/이점 = 밝은 쪽(--fe-ac-90), 실패/불이익 = 흐린 쪽(--fe-ac-57).
+ * 이 잉크는 dnd5e 전역 스윕(.fe-accent-text-override)이 닿지 않는다 — 스윕은
+ * fe-retro-system-dnd5e 게이트가 걸려 있고 [class*="fa-"] 를 제외하는데, 여기서
+ * 초록으로 남는 건 그 제외 대상인 아이콘과 그 부모다. 그래서 따로 잡는다. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .monks-tokenbar :is(
+    li.item .dice-roll .dice-total a.result-passed.selected,
+    li.item .dice-roll .dice-total a.result-passed.selected i,
+    li.item .dice-roll .dice-total .dice-result.success .total,
+    li.item .dice-roll .dice-total .dice-text.passed,
+    li.item .item-roll .adv-btn.advantage,
+    li.item .item-roll .adv-btn.advantage i) {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .monks-tokenbar :is(
+    li.item .dice-roll .dice-total a.result-failed.selected,
+    li.item .dice-roll .dice-total a.result-failed.selected i,
+    li.item .dice-roll .dice-total .dice-result.fail .total,
+    li.item .dice-roll .dice-total .dice-text.failed,
+    li.item .item-roll .adv-btn.disadvantage,
+    li.item .item-roll .adv-btn.disadvantage i) {
+  color: var(--fe-ac-57) !important;
+}
+
+/* XP 지급 버튼만 면을 칠하던 곳이다. 초록 면 → 어두운 면 + 밝은 윤곽선(§7 어법). */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .monks-tokenbar li.item .dice-roll a.add-xp {
+  background-color: var(--fe-ac-22) !important;
+  border: 1px solid var(--fe-ac-45) !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* 행(.item-name.flexrow) 왼쪽의 토큰 아이콘. 배경 이미지를 깐 빈 div 이고
+   tokenbar.css:604 가 `border: none` 을 명시한다(실측 0px none) — 검은 판 위에
+   아트만 떠 있어 경계가 없다. midi 의 타겟/세이브 썸네일은 --dnd5e-color-gold
+   경유라 이미 --fe-ac-80 테두리를 받으므로, 같은 밝기의 하드 라인 하나를 둘러
+   결을 맞춘다. 코어가 `*{box-sizing:border-box}` 를 걸어 두어 30px 고정 폭
+   (flex: 0 0 30px)은 그대로고 아트만 2px 안쪽으로 들어온다. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .monks-tokenbar .item .item-image {
+  border: 1px solid var(--fe-ac-80) !important;
 }
 
 /* ── 공통 최상위 강조 텍스트 ────────────────────────────────── */

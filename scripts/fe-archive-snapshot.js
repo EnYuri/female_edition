@@ -1121,57 +1121,51 @@ async function feBuildEmbeddedCookieRunFontCSS() {
 
   // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
   const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
+  // OTF only. Each face also exists as a .ttf in a dev checkout, but the twins are
+  // export-ignore'd (see .gitattributes) so they are absent from any distributed
+  // install, and their cmap coverage is identical anyway — the old second candidate
+  // could only ever cost one wasted fetch.
   const weights = [
-    // Prefer OTF first (smaller than TTF in this module)
-    { weight: 400, name: "Regular", files: ["CookieRun%20Regular.otf", "CookieRun%20Regular.ttf"] },
-    { weight: 700, name: "Bold", files: ["CookieRun%20Bold.otf", "CookieRun%20Bold.ttf"] },
-    { weight: 900, name: "Black", files: ["CookieRun%20Black.otf", "CookieRun%20Black.ttf"] },
+    { weight: 400, file: "CookieRun%20Regular.otf" },
+    { weight: 700, file: "CookieRun%20Bold.otf" },
+    { weight: 900, file: "CookieRun%20Black.otf" },
   ];
 
   const faces = [];
   for (const w of weights) {
-    let dataUrl = null;
-    let fmt = null;
-
-    for (const f of w.files) {
-      const url = fontUrl(f);
-      const attempt = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_COOKIE });
-      if (!attempt) continue;
-      dataUrl = attempt;
-      fmt = f.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
-      break;
-    }
-
+    const dataUrl = await fetchFont(fontUrl(w.file), {
+      perFileCap: MAX_PER_FILE_BYTES_COOKIE,
+    });
     if (!dataUrl) continue;
 
     faces.push(
-      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("${fmt}");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
+      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("opentype");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
     );
   }
 
   // Optional: embed Hakgyoansim Geurimilgi.
   // If present, we embed it so saved file:// HTML keeps the same look.
   //
-  // OTF FIRST — the same typeface ships as a 730KB .otf and a 6.3MB .ttf. Preferring
-  // the OTF cuts ~5.6MB of binary (≈7.5MB of base64) out of every saved archive and
-  // brings the face under the GENERIC url() embedder's per-file cap too, so it now
-  // gets embedded even when this opt-in setting is off. The TTF is kept only as a
-  // belt-and-braces second candidate (it costs one extra HEAD when the OTF is
-  // missing); it is otherwise redundant now and is a deletion candidate.
+  // OTF ONLY, and the format matters here more than anywhere else. The typeface also
+  // exists as a 6.3MB .ttf with byte-identical coverage (verified glyph-for-glyph:
+  // 12640 glyphs, 11172/11172 Hangul syllables — the gap is CFF vs glyf encoding, not
+  // content), and that .ttf is export-ignore'd out of the distributed zip. Even in a
+  // dev checkout it is useless to this function: the embedder caps each file to keep
+  // base64 expansion from OOMing Chromium/Electron, the TTF blows straight past that
+  // cap, and a saved archive that picked it up failed to load the face at all
+  // (document.fonts → "FE Geurimilgi: error"). The 730KB OTF sits under the cap, so it
+  // also rides the GENERIC url() embedder and lands even when this opt-in is off.
+  // Do not reintroduce a TTF candidate.
   let geurimilgiEmbedded = false;
   try {
-    const geurCandidates = [
-      { url: fontUrl("HakgyoansimGeurimilgi-R.otf"), fmt: "opentype" },
-      { url: fontUrl("HakgyoansimGeurimilgi-R.ttf"), fmt: "truetype" },
-    ];
-    for (const { url, fmt } of geurCandidates) {
-      const geurimilgiData = await fetchFont(url, { perFileCap: MAX_PER_FILE_BYTES_GEUR });
-      if (!geurimilgiData) continue;
+    const geurimilgiData = await fetchFont(fontUrl("HakgyoansimGeurimilgi-R.otf"), {
+      perFileCap: MAX_PER_FILE_BYTES_GEUR,
+    });
+    if (geurimilgiData) {
       faces.push(
-        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("${fmt}");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
+        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("opentype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
       );
       geurimilgiEmbedded = true;
-      break;
     }
   } catch {}
 

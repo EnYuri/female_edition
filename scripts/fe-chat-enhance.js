@@ -46,6 +46,11 @@ import {
 } from "./fe-core-priority.js";
 
 import { feApplyMarkdownOnPreCreate, feMarkdownToHTML, feEscapeHTML, feUnwrapProseMirrorHTML } from "./fe-markdown.js";
+import {
+  feHasRestorableMidiDamageTypes,
+  feRestoreMidiDamageTypeIcons,
+  feRestoreMidiItemDescription,
+} from "./fe-midi-damage-types.js";
 
 import {
   feSetBodyMergeClasses, feSetChatCardIconCropClass, feSetChatCardFontClass, feSetChatFontChoiceClass,
@@ -132,6 +137,7 @@ async function feMigrateLegacySettings() {
   await feNormalizeChoiceSetting(S.MERGE_FOLLOW_HEADER_STYLE, ["hide", "name", "portrait"], FE_DEFAULTS[S.MERGE_FOLLOW_HEADER_STYLE]);
   await feNormalizeChoiceSetting(S.MERGE_SPEAKER_BASIS, ["token", "actor", "author"], FE_DEFAULTS[S.MERGE_SPEAKER_BASIS]);
   await feNormalizeChoiceSetting(S.USER_COLOR_BG_BASE, ["white", "black", "none", "custom"], FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
+  await feNormalizeChoiceSetting(S.SYSTEM_MSG_BG_BASE, ["white", "black", "custom"], FE_DEFAULTS[S.SYSTEM_MSG_BG_BASE]);
   await feNormalizeChoiceSetting(S.EXPORT_PRINT_IMAGE_MODE, Object.keys(FE_EXPORT_PRINT_IMAGE_MODE_CHOICES), FE_DEFAULTS[S.EXPORT_PRINT_IMAGE_MODE]);
   await feNormalizeChoiceSetting(S.EXPORT_DESKTOP_EXTERNAL_MODE, ["off", "button", "auto"], FE_DEFAULTS[S.EXPORT_DESKTOP_EXTERNAL_MODE]);
 }
@@ -225,6 +231,8 @@ Hooks.once("init", () => {
   feRegisterSetting(S.MERGE_ONLY_TEXT, () => feApplyChatMergeToAllLogs());
 
   feRegisterSetting(S.MERGE_INCLUDE_ROLL_MESSAGES, () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }));
+
+  feRegisterSetting(S.MERGE_INCLUDE_CHAT_CARDS, () => feScheduleRenderedStateRefreshForAllLogs({ delay: 0 }));
 
   feRegisterSetting(S.MERGE_DIVIDER, () => feApplyChatMergeToAllLogs());
 
@@ -359,9 +367,29 @@ Hooks.once("init", () => {
       feApplyUserColorBgToAllLogs(document);
     });
 
-  feRegisterSetting(S.SYSTEM_MSG_BG_ENABLED, () => feSetSystemMsgColorClass(document));
+  // The alpha lives on each tinted element as an inline var, so changing it must
+  // re-stamp the elements rather than just re-emitting body vars.
+  feRegisterSetting(S.SYSTEM_MSG_ALPHA, () => {
+      feApplyUserColorBgToAllLogs(document);
+    });
 
-  feRegisterSetting(S.SYSTEM_MSG_BG_COLOR, () => feApplyStyleVarsFromSettings(document));
+  // All three also re-publish fe-sysmsg-bg-light/dark, which feSetUserColorBgBaseClass
+  // owns: system messages carry a base of their own, so which way THEY lean is a
+  // separate question from the chat-card base.
+  feRegisterSetting(S.SYSTEM_MSG_BG_ENABLED, () => {
+      feSetSystemMsgColorClass(document);
+      feSetUserColorBgBaseClass(document);
+    });
+
+  feRegisterSetting(S.SYSTEM_MSG_BG_BASE, () => {
+      feApplyStyleVarsFromSettings(document);
+      feSetUserColorBgBaseClass(document);
+    });
+
+  feRegisterSetting(S.SYSTEM_MSG_BG_COLOR, () => {
+      feApplyStyleVarsFromSettings(document);
+      feSetUserColorBgBaseClass(document);
+    });
 
   feRegisterSetting(S.FORCE_NORMAL_MSG_COLOR, () => {
       feSetForceNormalMsgColorClass(document);
@@ -543,6 +571,10 @@ Hooks.once("ready", async () => {
   feScheduleFullMergePass({ delay: 150 });
   setTimeout(() => feScheduleFullMergePass({ delay: 0 }), 600);
   feFireChatUiUpdated({ reason: "ready", root: document, log: null, document });
+  // CSS changes repaint existing messages automatically; compatibility DOM
+  // grafts do not. Touch only the messages currently loaded in chat (never the
+  // full world collection), once, while preserving the reader's scroll anchor.
+  setTimeout(() => void feRefreshLoadedMidiDamageTypes(), 0);
 
   // Keep the bottom-pin when the chat becomes visible again after being hidden, for
   // readers who were following. The inactive sidebar tab is display:none (measurements
@@ -874,6 +906,27 @@ function feScheduleRenderedMessageRefresh(messageOrId, { delay = 16, allowNarrat
   }
 }
 
+async function feRefreshLoadedMidiDamageTypes(rootDocument = document) {
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+  try {
+    for (const log of feGetChatLogsInDocument(rootDocument)) {
+      for (const element of log.querySelectorAll(":scope > .chat-message, :scope > li.message")) {
+        const message = feGetMessageFromElementOrCollection(element);
+        if (feHasRestorableMidiDamageTypes(message)) {
+          feRestoreMidiDamageTypeIcons(message, element);
+        }
+        if (message?.flags?.["midi-qol"]) {
+          await feRestoreMidiItemDescription(message, element);
+        }
+      }
+    }
+  } catch {
+    /* no-op */
+  } finally {
+    restoreStickyScroll();
+  }
+}
+
 // -------------------------------------
 // Chat message hooks
 // -------------------------------------
@@ -881,6 +934,31 @@ function feScheduleRenderedMessageRefresh(messageOrId, { delay = 16, allowNarrat
 Hooks.on("renderChatMessageHTML", (message, html) => {
   const el = feExtractHTMLElement(html);
   if (!el) return;
+  const restoreDamageTypes = feHasRestorableMidiDamageTypes(message);
+  const restoreItemDescription = !!message?.flags?.["midi-qol"];
+  if (restoreDamageTypes || restoreItemDescription) {
+    try {
+      if (restoreDamageTypes) feRestoreMidiDamageTypeIcons(message, el);
+      // ChatMessageMidi resumes after awaiting the core renderer and replaces
+      // parts of the card after this hook. One gated next-task retry is enough
+      // and avoids installing an observer for every rendered message.
+      setTimeout(async () => {
+        const restoreStickyScroll = el.isConnected
+          ? feSnapshotAndRestoreStickyScroll()
+          : () => {};
+        try {
+          if (restoreDamageTypes) feRestoreMidiDamageTypeIcons(message, el);
+          if (restoreItemDescription) await feRestoreMidiItemDescription(message, el);
+        } catch {
+          /* no-op */
+        } finally {
+          restoreStickyScroll();
+        }
+      }, 0);
+    } catch {
+      /* no-op */
+    }
+  }
   try {
     feSnapshotOrRestoreInlineRolls(message, el);
   } catch {
@@ -1006,7 +1084,20 @@ Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
           // the system; overriding it would break actor-id tracking and portraits.
           const msgRolls = Array.isArray(data?.rolls) ? data.rolls
             : (Array.isArray(message?.rolls) ? message.rolls : []);
-          if (!(msgRolls.length > 0 && speaker?.actor)) {
+
+          // Skip midi-qol's own cards. midi colors a message's border from the SPEAKER,
+          // not the author (`colorChatMessageHandler`: `if (actor) user =
+          // playerForActor(actor)`, chatMessageHandling.ts), and `playerForActor` ends at
+          // `preferredActiveGM()` when it cannot resolve a player. Nulling the speaker here
+          // therefore drops midi straight to `game.users.get(message.author.id)` — the GM —
+          // so EVERY midi card the GM triggers for a player-owned actor came out in the GM's
+          // color, which reads as "midi 의 테두리 색 설정이 GM 색으로 고정됐다". These are
+          // activity/damage/save cards generated by a module, not GM roleplay speech, so the
+          // same rationale as the roll guard above applies: leave their speaker alone.
+          // The activity card itself carries no rolls, so the roll guard does NOT cover it.
+          const isMidiCard = !!(data?.flags?.["midi-qol"] ?? message?.flags?.["midi-qol"]);
+
+          if (!isMidiCard && !(msgRolls.length > 0 && speaker?.actor)) {
             let actor = null;
             if (speaker?.actor) {
               actor = game.actors?.get(speaker.actor) ?? null;

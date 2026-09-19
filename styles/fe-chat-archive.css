@@ -1261,8 +1261,30 @@ body.fe-print-chatlog.fe-print-chatlog .chat-message .dice-roll .dice-total::aft
  * see feMarkHeaderlessArchiveCards in fe-chat-archive.js for why midi's own
  * `.midi-qol-dmg-app-msg` / `.midi-qol-player-dmg-msg` rules miss the GM variant.
  * The class is stamped per message, so this covers the archive window, the saved
- * HTML and both print paths at once. */
-#fe-chat-export-container .chat-message.fe-archive-headerless-card > .message-header,
-body.fe-print-chatlog .chat-message.fe-archive-headerless-card > .message-header {
+ * HTML and both print paths at once.
+ *
+ * The `li` in each selector is load-bearing, not decoration: the live
+ * fe-chat-portrait.css grid rule
+ *   `:is(li.chat-message, #chat-notifications .message).fe-has-chat-portrait > .message-header { display: grid !important }`
+ * is inlined into the export AFTER this sheet and sits at the same (1,2,1)
+ * specificity, so without it source order decides and the header comes back.
+ * `li.chat-message` pushes this rule to (1,2,2) / (1,3,3) — it wins regardless
+ * of where the portrait sheet lands. */
+#fe-chat-export-container li.chat-message.fe-archive-headerless-card > .message-header,
+body.fe-print-chatlog #fe-chat-export-container li.chat-message.fe-archive-headerless-card > .message-header {
   display: none !important;
+}
+
+/* Browser PDF backends do not consistently embed Font Awesome. These glyphs
+ * are ordinary text inserted by feNormalizeArchiveMidiDamageButtonIcons, so
+ * apply/reverse controls remain visible even when icon fonts are omitted. */
+#fe-chat-export-log .fe-archive-midi-damage-glyph {
+  display: inline-grid !important;
+  place-content: center !important;
+  width: 1em !important;
+  height: 1em !important;
+  font-family: sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
 }

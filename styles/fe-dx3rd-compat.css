@@ -428,7 +428,8 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content,
-      .card-header.description, .details.card-content, .collapsible-content.card-content) {
+      .card-header.description, .details.card-content, .collapsible-content.card-content,
+      .card-description, .card-flavor, .icon-row, .card-summary, .wrapper) {
   background: transparent !important;
 }
 
@@ -1648,6 +1649,16 @@ body.fe-retro-theme {
 
   /* 강조색 H·S + 원본 명도(L) — 텍스트 색상 변수에 알파 0.82 적용 (가시성 완화) */
   --fe-ac-90: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.82);
+  /* 계열의 최상단 — 불투명 L=96%. --fe-ac-90(L90/α.82) 한 단계 위가 필요한
+     "가장 강한 상태"(성공 눈금 등) 전용이고, 본문 텍스트에는 쓰지 않는다.
+     ⚠️ L=100% 로 두지 말 것: HSL 은 L=100% 에서 채도가 의미를 잃어 H·S 와 무관하게
+        무조건 #ffffff 가 된다 — 강조색 계열이 아니라 "변수로 감싼 흰색"이 되고,
+        색조를 넣은 순간 여기만 흰색으로 튄다. 96% 는 불투명이라 --fe-ac-90 보다
+        확실히 밝으면서 채도가 살아 있는 상단 끝점이다.
+     --fe-dx3rd-accent(원본 강조색)를 쓰지 않는 이유는 §20 머리말 그대로다:
+        원본은 자기 명도를 갖고 있어서 어두운 강조색을 고르면 검은 패널 위에서
+        읽히지 않는다. */
+  --fe-ac-96: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%);
   /* --fe-ac-90 alpha 변형 — 구 rgb(from accent / X) 패턴 대체용. 명도 90% 고정으로 채도 오염 방지 */
   --fe-ac-90-50: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.50);
   --fe-ac-90-40: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.40);
@@ -1664,6 +1675,8 @@ body.fe-retro-theme {
   --fe-ac-33: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 33%);
   --fe-ac-22: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 22%);
   --fe-ac-12: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 12%);
+  /* 채팅 카드 내부면용 — 12는 "조금 짙다", 06은 카드와 구분이 안 되는 실측 중간값. */
+  --fe-ac-08: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%)  8%);
   --fe-ac-06: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%)  6%);
   /* 대비용 그림자: 검정 베이스 판독성은 유지하되 색조 오버라이드 hue를 아주 낮은 명도로 반영. */
   --fe-retro-shadow-strong: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.55) 4% / 0.96);

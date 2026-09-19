@@ -252,7 +252,14 @@ body.fe-fonts-enabled
   font-size: var(--fe-chat-card-font-size, inherit) !important;
   line-height: var(--fe-chat-card-line-height, 1.35) !important;
   font-weight: var(--fe-chat-card-font-weight, 400) !important;
-  color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
+  /* Full-strength ink, NOT a hardcoded dark one. This used to be
+   * `--color-text-dark-primary` outright, which predates the painted-base work and was
+   * the reason a dnd5e 6.0 card description rendered #191813 body text inside a box
+   * §1j had just painted dark. §1i sets `--color-text-primary` on the message per base
+   * lean, so reading it here keeps the original intent (override dnd5e's faint
+   * description ink) while following the base. With no base painted the variable is
+   * still the theme's own value, which is what should win there. */
+  color: var(--color-text-primary, rgb(20 20 20 / 0.92)) !important;
   text-shadow: none !important;
 }
 
@@ -279,7 +286,10 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
     section.card-header.description,
     .card-header.description,
     section.card-header.description.collapsible,
-    .card-header.description.collapsible
+    .card-header.description.collapsible,
+    /* dnd5e 6.0 (.message.compact) */
+    section.card-description,
+    .card-description
   ) {
   background-color: var(--fe-chat-desc-bg, transparent) !important;
 }
@@ -289,9 +299,11 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.card-header.description,
-    .card-header.description
+    .card-header.description,
+    section.card-description,
+    .card-description
   )
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(p, li) {
   margin: 0 0 0.55em 0;
 }
@@ -301,9 +313,11 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.card-header.description,
-    .card-header.description
+    .card-header.description,
+    section.card-description,
+    .card-description
   )
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(p, li):last-child {
   margin-bottom: 0;
 }
@@ -313,9 +327,11 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(
     section.card-header.description,
-    .card-header.description
+    .card-header.description,
+    section.card-description,
+    .card-description
   )
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(strong, b) {
   font-weight: var(--fe-chat-card-strong-weight, 700);
   color: inherit;
@@ -381,7 +397,7 @@ body.fe-userbg-base-white #chat-notifications .message.fe-has-user-color:not(.na
 }
 
 body.fe-userbg-base-black #chat-notifications .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
-  --fe-user-bg-base-rgb: 0 0 0;
+  --fe-user-bg-base-rgb: var(--fe-userbg-black-rgb, 48 40 49);
 }
 
 body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom) #chat-notifications .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {

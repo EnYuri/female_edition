@@ -155,7 +155,10 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   .chat-message
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content,
-      .card-header.description, .details.card-content, .collapsible-content.card-content) {
+      .card-header.description, .details.card-content, .collapsible-content.card-content,
+      /* dnd5e 6.0 (.message.compact) card parts — the description left .card-header,
+         and the buttons/pills rows became .icon-row. */
+      .card-description, .card-flavor, .icon-row, .card-summary, .wrapper) {
   background: transparent !important;
 }
 
@@ -290,23 +293,21 @@ body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet) input.resource-value {
  *
  * dnd5e 의 결과 숫자 박스(.dice-total)는 두 종류다:
  *   · 일반 굴림        → 배경 rgba(0,0,0,0.05) (거의 투명) → 레트로 검정 카드 위
- *                        에서는 사실상 검정 배경.        → 밝은 글씨여야 보인다.
- *   · 크리티컬/펌블 강조 → 배경 연녹(rgb 204,215,197)/연적 등 밝은 파스텔.
- *                                                        → 어두운 글씨여야 보인다.
- * 레트로에서 기본 글씨가 밝은 회색이라 크리티컬 박스에선 "유백색 위 밝은 글씨"로
- * 묻히고, 무턱대고 어둡게 하면 일반 박스가 "검정 위 검정"으로 사라진다.
- *   → 기본은 밝은 글씨(일반 박스 대비), .critical/.fumble 만 어두운 글씨로 덮는다.
+ *                        에서는 사실상 검정 배경.
+ *   · 크리티컬/펌블 강조 → 원래는 연녹(rgb 204,215,197)/연적 파스텔.
+ * 예전에는 후자만 어두운 글씨(#14130f)로 덮어야 했다. 이제는 모노톤 블록이
+ * --dnd5e-color-success-background/-failure-background 를 --fe-ac-22/-06 으로
+ * 다시 가리키므로 **두 박스 모두 어두운 면**이다 → 어두운 글씨를 그대로 두면
+ * "검정 위 검정"이 된다. 그래서 분기를 없애고 한 가지 밝은 잉크로 통일한다.
+ * 크리티컬/펌블의 구분은 면의 명도(22 vs 06)와 테두리가 진다.
  * transition:none — 레트로의 `* { transition: all 1ms }` 가 색/배경 전환을 시작값에
  *   고착시켜 변경이 페인트되지 않는 문제를 회피(채팅 색조 틴트와 동일 원인). */
 body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
-  :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total) {
-  color: #e6e6e6 !important;
-  transition: none !important;
-}
-body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
-  :is(.dice-total.critical, .dice-total.fumble,
+  :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total,
+      .dice-total.critical, .dice-total.fumble,
       .dice-roll .dice-total.critical, .dice-roll .dice-total.fumble) {
-  color: #14130f !important;
+  color: var(--fe-ac-90, #e6e6e6) !important;
+  transition: none !important;
 }
 
 
@@ -326,6 +327,60 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
   word-break: keep-all !important;
   overflow-wrap: normal !important;
 }
+
+/* Keep attack and damage totals on the same visual centerline. midi-qol places
+ * its damage-type icon inline after the number, so the combined `10 + icon`
+ * group is centered and the number itself shifts left relative to an adjacent
+ * attack total. Take the icon out of line flow and park it immediately before
+ * dnd5e's 32px expand-caret compartment. */
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .dice-total
+  > dnd5e-icon.midi-damage-type-icon {
+  position: absolute !important;
+  inset-block-start: 50% !important;
+  inset-inline-end: 38px !important;
+  margin: 0 !important;
+  vertical-align: initial !important;
+  transform: translateY(-50%) !important;
+}
+
+/* midi's damage-roll template carries an empty `.midi-dice-tooltip` placeholder
+ * which its own nested rule gives 0.125rem (2px here) of top padding. Attack
+ * rolls have no equivalent node, so side-by-side damage cards become 2px taller
+ * and flex centering shifts their formula/total column up by 1px. Hide only a
+ * placeholder whose tooltip-part contains no rendered element; the real dice
+ * tooltip lives in the separate `.dice-tooltip-collapser` that follows it. */
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .dice-result
+  > .midi-dice-tooltip:not(:has(> .tooltip-part > *)) {
+  display: none !important;
+}
+
+/* midi templates disagree on direct-child order:
+ *   attack: formula → tooltip → total
+ *   damage: formula → total → placeholder → tooltip
+ * `.dice-result` is a space-around flex column, so equal-height columns still
+ * put the totals on different Y coordinates. Normalize visual order without
+ * moving DOM or changing the expanded tooltip contents. */
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
+  > .dice-result
+  > .dice-formula {
+  order: 0 !important;
+}
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
+  > .dice-result
+  > :is(.dice-tooltip-collapser, .midi-dice-tooltip) {
+  order: 1 !important;
+}
+:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
+  > .dice-result
+  > .dice-total {
+  order: 2 !important;
+}
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.dice-result .dice-formula, .dice-roll .dice-formula, .dice-formula) {
   word-break: keep-all !important;
@@ -356,6 +411,32 @@ body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
       .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link):not(.key):not(:where(#context-menu, .context-menu, .tidy5e-sheet.context) *) {
   color: var(--fe-ac-90, #e6e6e6) !important;
   transition: none !important;
+}
+
+
+/* ----------------------------------------------------------------
+ * 인라인 롤 d20 아이콘 — 레트로에서 액센트색으로
+ *
+ * dnd5e 는 인라인 롤의 FA 글리프를 지우고(::before content:unset) 코어의
+ * 검정 d20 SVG 를 배경으로 깐다(dnd5e.css:1863, /icons/svg/d20-black.svg).
+ * 다크 테마만 --dnd5e-roll-icon-filter:invert(1) 로 뒤집는데, 레트로는
+ * 표면을 검정으로 칠하면서도 fe-chat-bg-light(흰 베이스) 브랜치가 살아
+ * 있으면 필터가 none 이라 검정-위-검정으로 아이콘이 사라진다.
+ *   filter 로는 임의의 강조색을 못 만든다(sepia/hue-rotate 는 정해진 색만
+ *   나오고, 채도 0 강조색엔 오히려 색을 입힌다) → 같은 SVG 를 mask 로 씌워
+ *   background-color 를 강조색 파생 톤(--fe-ac-90)으로 칠한다. 강조색이
+ *   무채색이면 밝은 회색, 채색이면 그 hue 를 따라간다.
+ *   filter:none 필수 — fe-chat-bg-dark 브랜치나 dnd5e 다크 테마의 invert(1)
+ *   이 남아 있으면 마스크된 강조색까지 반전시킨다.
+ *   선택자는 dnd5e 자신의 스코프(:is(.dnd5e, .dnd5e2, .dnd5e2-journal))를
+ *   그대로 따라가 채팅·시트·저널 어디든 동일하게 칠한다. */
+body.fe-retro-theme
+  :is(.dnd5e, .dnd5e2, .dnd5e2-journal)
+  :is(a.inline-roll, .roll-link) > i.fa-dice-d20 {
+  background: var(--fe-ac-90, #e6e6e6) !important;
+  -webkit-mask: url("/icons/svg/d20-black.svg") center / contain no-repeat !important;
+  mask: url("/icons/svg/d20-black.svg") center / contain no-repeat !important;
+  filter: none !important;
 }
 
 
@@ -902,6 +983,19 @@ body.fe-retro-theme .tidy5e-sheet.application {
   --t5e-alwaysprepared-accent-color: var(--fe-tidy-state-line);
   --t5e-magic-accent-color: var(--fe-tidy-state-line);
   --t5e-attuned-color: var(--fe-tidy-state-line);
+  /* The sheet's own accent (#ff6400 upstream): spell pips, the focus-visible
+     four-way outline, entity-link hover and the settings-dialog border all
+     resolve through these, so one remap moves the whole accent family. */
+  --t5e-primary-accent-color: var(--fe-tidy-state-line-strong);
+  --t5e-settings-dialog-border-color: var(--fe-tidy-state-line-strong);
+  /* Item/spell icon backplates — parchment #ece9df in tidy's light theme would
+     stay a light tile on the black sheet; the glyph and hover inks flip with
+     it. --t5e-icon-shadow-color is deliberately not remapped: retro's global
+     box-shadow reset already removes the inset shadow it feeds. */
+  --t5e-icon-background: var(--fe-tidy-mono-surface-2);
+  --t5e-icon-font-color: var(--fe-tidy-mono-muted);
+  --t5e-icon-hover-color: var(--fe-ac-90);
+  --t5e-icon-outline-color: var(--fe-tidy-mono-line);
   color: var(--fe-tidy-mono-text) !important;
 }
 
@@ -2021,7 +2115,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone.actor,
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   :where(.window-content)
@@ -2069,7 +2163,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone.actor,
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   :where(.window-content)
@@ -2104,7 +2198,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone.actor,
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2127,7 +2221,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone.actor,
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2139,7 +2233,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone.actor,
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2541,11 +2635,23 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
   :is([data-tab="journal"], .tab.journal, .tab.biography, [data-tab="biography"])
-  :is(hr, .golden-fade, tidy-gold-header-underline, .horizontal-line-separator, .separator, .faint, .light) {
+  :is(hr, .golden-fade, tidy-gold-header-underline, fe-tidy-classic-gold-underline, .horizontal-line-separator, .separator, .faint, .light) {
   background: var(--fe-dnd5e-mono-line) !important;
   background-image: none !important;
   border-color: var(--fe-dnd5e-mono-line) !important;
   box-shadow: none !important;
+  /* The underline elements paint SVG strokes from --line-color, which
+     background/border cannot reach. */
+  --line-color: var(--fe-dnd5e-mono-line) !important;
+}
+
+/* fe-tidy-classic-gold-underline is the fork's renamed copy of
+   tidy-gold-header-underline (docs/compat.md — renamed so both bundles can
+   define their custom element). The fork also plants it inside <legend>
+   separators of its settings dialogs, outside the journal/biography scope
+   above. */
+body.fe-retro-theme .tidy5e-sheet.application fe-tidy-classic-gold-underline {
+  --line-color: var(--fe-dnd5e-mono-line, rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.26)) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
@@ -3853,27 +3959,186 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
   writing-mode: horizontal-tb !important;
 }
 
+/* ----------------------------------------------------------------
+ * 채팅 카드 공통 레트로 팔레트 (midi 전용 아님 — MUST keep the wide scope)
+ *
+ * 바로 아래 블록은 `.chat-card.midi-chat-card` 에만 걸려 있어서, midi 를 거치지
+ * 않은 **네이티브 dnd5e 카드**는 시스템 팔레트 상수를 그대로 쓰고 있었다.
+ * 라이브 실측(강조색을 임시로 녹색 hue 로 돌려서 "강조색을 따르지 않는 것"만
+ * 골라낸 결과):
+ *   · img.gold-icon / dnd5e-icon.gold-icon → 테두리 #9f9275, 배경 rgb(13,11,11)
+ *     (--dnd5e-color-gold / --dnd5e-gold-icon-background)
+ *   · li.pill.transparent / section.tooltip-part / section.deltas → 흰 0.32 괘선
+ *     (chat-bg-stripper.css §1j 의 --dnd5e-color-blue-gray-3 다크 리맵. 다크 테마
+ *      기준으로는 맞지만 강조색을 따르지 않는다)
+ *   · .midi-qol-hits-display → #ddd, .midi-qol-ac → rgb(255 255 255 / 0.1)
+ *     (midi 가 리터럴로 박아둔 값)
+ * 텍스트는 전부 이미 --fe-ac-* 였다 — 남은 건 전부 "면·선·아이콘"이다.
+ *
+ * 상수를 채팅 스코프 안에서 다시 가리키는 방식을 쓴다(외부 선택자 열거 금지):
+ * 한 줄로 그 상수를 읽는 모든 규칙과, 그 상수를 경유하는 alias 까지 따라온다.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) {
+  --dnd5e-color-gold: var(--fe-ac-80) !important;
+  --dnd5e-gold-icon-background: transparent !important;
+  /* 알약/툴팁/델타 괘선. --dnd5e-border-dark/-dotted/-separator-heavy,
+     --control-border-color, --pill-border(-dotted) 가 전부 이걸 경유한다. */
+  --dnd5e-color-blue-gray-3: var(--fe-ac-33) !important;
+  --dnd5e-color-card: var(--fe-ac-08) !important;
+  --dnd5e-color-parchment: var(--fe-ac-08) !important;
+  --dnd5e-background-card: var(--fe-ac-08) !important;
+  --dnd5e-background-parchment: var(--fe-ac-08) !important;
+  /* `color-scheme` is inherited — pinning it dark here feeds every native
+   * control's dropdown glyph/popup and any scrollbar inside the card, which
+   * author colours cannot reach. Retro surfaces are always dark. */
+  color-scheme: dark !important;
+}
+
+/* Native form controls inside messages (observed: midi-qol's damage
+ * multiplier `<select>` in `.midi-qol-damage-card`, which is its own wrapper —
+ * NOT `.chat-card.midi-chat-card` — so the card rules below cannot reach it).
+ * The `--input-*` vars must be re-pointed ON the control: `body.theme-dark`
+ * declares them on the element itself, and an element's own declaration always
+ * beats an inherited one. Core's select/input rule then paints the retro
+ * palette like any themed field — ac-08 면 + ac-33 선 + ac-90 잉크. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) :is(input, select, textarea) {
+  --input-background-color: var(--fe-ac-08) !important;
+  --input-border-color: var(--fe-ac-33) !important;
+  --input-text-color: var(--fe-ac-90) !important;
+  --input-placeholder-color: var(--fe-ac-57) !important;
+  --input-focus-outline-color: var(--fe-ac-45) !important;
+}
+
+/* midi 가 자기 CSS 에 리터럴로 박아 둔 두 곳 — 변수 경유가 없어 위 블록이 닿지
+   못한다. 선택자를 직접 잡는 예외이고, 그래서 여기 두 줄로 끝난다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .midi-qol-hits-display {
+  border-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .midi-qol-ac {
+  background: var(--fe-ac-08) !important;
+}
+
+/* ----------------------------------------------------------------
+ * 성공 / 실패 — 모노톤 (색상 제거)
+ *
+ * 레트로는 색으로 의미를 나르지 않는다. 초록/빨강을 명도 대비로 옮긴다:
+ *   성공 = 채워진 밝은 면 + 밝은 윤곽선  ("켜짐")
+ *   실패 = 비어 있는 어두운 면 + 흐린 윤곽선 ("꺼짐")
+ * 두 값 모두 --fe-ac-* 이므로 강조색에 채도가 있으면 그 색조는 따라간다 —
+ * "모노톤"은 의미색(초록/빨강)을 쓰지 않는다는 뜻이지 회색 고정이 아니다.
+ *
+ * midi 는 `.midi-results .target.success` 에 테두리색을 rgba(0,108,0,0.4) 로
+ * 직접 박아 두어 변수 리맵이 닿지 않는다 → 그 두 줄만 따로 잡는다.
+ *
+ * 잉크는 건드리지 않는다: `.fe-accent-text-override` 전역 스윕이 같은 layouts
+ * 레이어에서 더 높은 특이도로 --fe-ac-90 을 박고 있어서, 여기에 color 를 써도
+ * 죽은 선언이 된다(실측). 성공/실패 구분은 면과 테두리가 전부 진다 —
+ * 어차피 --fe-ac-22 / --fe-ac-06 둘 다 밝은 잉크가 잘 읽히는 어두운 면이다.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) {
+  --dnd5e-color-success: var(--fe-ac-90) !important;
+  --dnd5e-color-failure: var(--fe-ac-57) !important;
+  --dnd5e-color-success-background: var(--fe-ac-22) !important;
+  --dnd5e-color-failure-background: var(--fe-ac-06) !important;
+  --dnd5e-color-success-critical: var(--fe-ac-90) !important;
+  --dnd5e-color-failure-critical: var(--fe-ac-57) !important;
+
+  /* 6.0 의 `.compact` 카드는 위 --dnd5e-color-* 가 아니라 이 두 별칭을 읽는다
+     (`ul.action-list .status.success/.failure`). 다크 테마에서는 이 별칭이
+     코어의 --color-level-* 로 흘러가므로 그 둘도 함께 잡아야 한다 — 그러지
+     않으면 성공 표식만 초록으로 남는다. --color-level-* 는 채팅 안에서만
+     리맵한다(바깥의 알림/경고는 의미색이 필요하다). */
+  --dnd5e-chat-status-success: var(--fe-ac-90) !important;
+  --dnd5e-chat-status-failure: var(--fe-ac-57) !important;
+  --color-level-success: var(--fe-ac-90) !important;
+  --color-level-success-border: var(--fe-ac-45) !important;
+  --color-level-error: var(--fe-ac-57) !important;
+  --color-level-error-border: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .midi-results .target.success {
+  border-color: var(--fe-ac-45) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .midi-results .target.failure {
+  border-color: var(--fe-ac-22) !important;
+}
+
+/* 타겟 알약(`ul.unlist.targets.pills > target-pill`) — 6.0 이 명중/빗나감 면을
+   변수가 아니라 리터럴로 칠하는 유일한 자리다(dnd5e.css:1258 #1a6b22 초록,
+   :1267 #591010 빨강). 테두리와 ::before 체크/엑스 표식은 --color-level-* 를
+   읽으므로 위 블록에서 이미 모노톤이 됐고(실측: 테두리 rgb(179,179,179)),
+   면만 초록으로 남아 있었다 — 실측 rgb(26,107,34).
+   명중 = 채워진 면, 빗나감 = 비어 있는 면. 성공/실패 어법과 같다.
+
+   --pill-colored-text-color 는 dnd5e 의 푸른 흰색(--dnd5e-color-blue-white,
+   실측 rgb(207,210,218))이라 팔레트 밖이다. 점선 테두리도 레트로 어법(모든
+   경계는 하드 라인 하나)과 어긋나므로 같이 solid 로 눕힌다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .pills {
+  --pill-colored-text-color: var(--fe-ac-90) !important;
+  --pill-transparent-color: var(--fe-ac-80) !important;
+  --pill-border-dotted: 1px solid var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .pills target-pill.pill[data-hit] {
+  background-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message) .pills target-pill.pill[data-miss] {
+  background-color: var(--fe-ac-06) !important;
+}
+
+
 /* Midi chat cards contain div-based controls/results and can omit the
  * dnd5e2 class. Set their palette directly rather than relying on that class.
- * Success/failure backgrounds keep their semantic hues.
+ * 성공/실패 배경은 위 모노톤 블록이 담당한다 — 여기서 다시 칠하지 말 것.
  */
 body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card {
-  --fe-midi-card-background: var(--fe-ac-12);
-  --dnd5e-color-card: var(--fe-ac-12) !important;
-  --dnd5e-color-parchment: var(--fe-ac-12) !important;
+  --fe-midi-card-background: var(--fe-ac-08);
+  --dnd5e-color-card: var(--fe-ac-08) !important;
+  --dnd5e-color-parchment: var(--fe-ac-08) !important;
   --dnd5e-color-gold: var(--fe-ac-80) !important;
-  --dnd5e-color-light-gray: var(--fe-ac-12) !important;
+  --dnd5e-color-light-gray: var(--fe-ac-08) !important;
   --dnd5e-gold-icon-background: transparent !important;
-  --dnd5e-color-success-background: color-mix(in srgb, var(--fe-ac-12) 85%, var(--dnd5e-color-success, #006c00)) !important;
-  --dnd5e-color-failure-background: color-mix(in srgb, var(--fe-ac-12) 85%, var(--dnd5e-color-failure, #6e0000)) !important;
-  --dnd5e-background-card: var(--fe-ac-12) !important;
-  --dnd5e-background-parchment: var(--fe-ac-12) !important;
+  --dnd5e-background-card: var(--fe-ac-08) !important;
+  --dnd5e-background-parchment: var(--fe-ac-08) !important;
   --color-text-primary: var(--fe-ac-90) !important;
   --color-text-secondary: var(--fe-ac-70) !important;
   --color-text-tertiary: var(--fe-ac-57) !important;
   --icon-fill: var(--fe-ac-80) !important;
   --icon-stroke: var(--fe-ac-80) !important;
-  background: var(--fe-ac-12) !important;
+  background: var(--fe-ac-08) !important;
   color: var(--fe-ac-90) !important;
 }
 
@@ -3891,7 +4156,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card button {
-  background: var(--fe-ac-12) !important;
+  background: var(--fe-ac-08) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
@@ -3922,7 +4187,10 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card.midi-chat-card :is(.card-header, .card-header.description) {
-  background: var(--fe-ac-22) !important;
+  /* 면을 채우지 않는다 — 카드 자체가 이미 --fe-ac-08 판이고, 그 위에 --fe-ac-22
+     띠를 하나 더 얹으면 검은 카드 안에 회색 블록만 떠 보인다(설명 박스와 같은
+     증상). 구분은 아래 강조색 괘선 하나로 충분하다. */
+  background: transparent !important;
   border-color: var(--fe-ac-45) !important;
 }
 
@@ -3959,7 +4227,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(.fvtt.quest, .fvtt.advice)
 /* Description headers share the palette in sheets and native/Midi chat cards. */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
-  .card-header.description.collapsible {
+  :is(.card-header.description.collapsible, .card-description) {
   background: var(--fe-ac-22) !important;
   color: var(--fe-ac-90) !important;
   border-color: var(--fe-ac-33) !important;
@@ -3967,9 +4235,49 @@ body.fe-retro-theme
   --icon-stroke: var(--fe-ac-80) !important;
 }
 
+/* …in chat the fill is FAINT, not transparent (사용자 지시로 옛 결정 수정).
+ * dnd5e 는 이 섹션을 원래부터 다른 배경(--dnd5e-chat-description-background)으로
+ * 칠한다 — "본문과 다른 구역" 이라는 정보다. --fe-ac-22 채움은 검은 카드
+ * 한가운데 진회색 판때기로 보여 폐기했지만, 팔레트 최하단 --fe-ac-06 은 검정
+ * 위에 색조만 살짝 얹는 수준이라 어법(검은 면 + 강조선)을 깨지 않는다.
+ *   괘선은 solid → 굵은 점선(3px dotted)으로. dnd5e 원래 스타일(dashed)의
+ *   계보를 잇는 사용자 지시다.
+ *   margin-inline:0 — dnd5e 는 -8px 로 이 섹션의 위아래 선을 카드 패딩 밖까지
+ *   밀어내 양옆 세로선을 넘어가게 그린다(dnd5e.css:14884).
+ *   :not(.collapsed) — dnd5e 는 접힌 섹션의 괘선을 지우는데(:14890),
+ *   !important 스타일이 살아 있으면 내용 없는 빈 점선만 남는다.
+ *   이 처리는 6.0 compact 의 .card-description 에만 준다 — 레거시/midi 의
+ *   .card-header.description.collapsible 은 "설명 본문" 이 아니라 접이식
+ *   헤더 블록이라 점선+면이 묻어 나와 시끄러웠다(아래 규칙이 종전 모습 유지).
+ *
+ * 이 블록은 위 규칙보다 뒤에 있고 선택자 특이도도 더 높으므로(:is() 안의
+ * .chat-message 가 추가된다) 같은 layouts 레이어 안에서 확실히 이긴다. */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .card-description:not(.collapsed) {
+  background: var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-45) !important;
+  border-block-style: dotted !important;
+  border-block-width: 3px !important;
+  margin-inline: 0 !important;
+}
+
+/* 레거시/midi 카드의 접이식 헤더 블록 — 종전 어법(투명 면 + 얇은 실선 괘선). */
+body.fe-retro-theme
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .card-header.description.collapsible:not(.collapsed) {
+  background: transparent !important;
+  border-color: var(--fe-ac-45) !important;
+  border-block-style: solid !important;
+}
+
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
-  .card-header.description.collapsible :is(span, label, h3, h4) {
+  :is(.card-header.description.collapsible, .card-description) :is(span, label, h3, h4) {
   color: var(--fe-ac-90) !important;
 }
 
@@ -3979,9 +4287,23 @@ body.fe-retro-theme
   color: var(--fe-ac-80) !important;
 }
 
-/* Quadrone semantic colors: use the retro palette in light, dark and basic modes. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor,
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor :where(.theme-light, .theme-dark, .theme-basic) {
+/* Quadrone semantic colors: use the retro palette in light, dark and basic modes.
+ *
+ * ⚠️ tidy5e-sheet 14.x 는 **Classic 레이아웃을 완전히 삭제**했다(main.css 에 `classic`
+ *    문자열 0회, module.json 은 dnd5e 6.0.x / Foundry v14 를 요구). 즉 14 이상에서는
+ *    모든 시트가 Quadrone 이다. 이 파일에 남아 있는 `.tidy5e-sheet.application.classic …`
+ *    규칙은 **tidy 13.x 이하를 쓰는 월드를 위한 하위 호환**이므로 지우지 말 것 —
+ *    14 에서는 그냥 매칭되지 않고 조용히 비활성화될 뿐이다.
+ *
+ * 시트 종류 클래스는 `.quadrone` 뒤에 붙는다(main.css 실측):
+ *   .actor(780) .encounter(221) .group(176) .character(175) .item(108)
+ *   .vehicle(61) .npc(53) .tooltip(46)
+ * character/npc/vehicle 은 .actor 도 함께 달고 나오므로 .actor 로 덮이지만,
+ * item/group/encounter/tooltip 은 아니었다 — 아이템 시트와 툴팁이 레트로 팔레트를
+ * 전혀 못 받던 구멍이다. `:is()` 는 인자 중 최대 특이도를 취하므로 `.actor` 단독일
+ * 때와 특이도가 동일하다(클래스 1개) → 기존 캐스케이드 싸움은 그대로다. */
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) :where(.theme-light, .theme-dark, .theme-basic) {
   --t5e-color-gold: var(--fe-ac-80) !important;
   --t5e-color-palette-gold-35: var(--fe-ac-33) !important;
   --t5e-color-palette-gold-45: var(--fe-ac-45) !important;
@@ -4116,42 +4438,42 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor :where(.theme-light
   --fe-dnd5e-mono-hover: var(--fe-ac-12);
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor .tidy-table-header-row {
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .tidy-table-header-row {
   --t5e-table-header-background-left: var(--fe-ac-22) !important;
   --t5e-table-header-background-right: var(--fe-ac-12) !important;
   --t5e-table-header-border-color: var(--fe-ac-33) !important;
 }
 
 /* Do not desaturate the accent together with the badge artwork. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor :is(.ability-bonus-container, .initiative-score-container, .shield) {
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) :is(.ability-bonus-container, .initiative-score-container, .shield) {
   filter: none !important;
   --icon-fill: var(--fe-ac-80) !important;
   --icon-stroke: var(--fe-ac-80) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   :is(svg, dnd5e-icon, tidy-icon):not(:where(#context-menu, .context-menu) *) {
   color: var(--fe-ac-80) !important;
   --icon-fill: var(--fe-ac-80) !important;
   --icon-stroke: var(--fe-ac-80) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   svg:not([fill="none"]):not(:where(#context-menu, .context-menu) *),
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   svg [fill]:not([fill="none"]):not(:where(#context-menu, .context-menu) *) {
   fill: var(--fe-ac-80) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   svg[stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *),
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   svg [stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *) {
   stroke: var(--fe-ac-80) !important;
 }
 
 /* External SVG icon files cannot inherit fill from their containing document. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
+body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
   img[src*=".svg"]:not([data-edit], .portrait, .actor-portrait, .item-image, .token-image) {
   filter: brightness(0) invert(0.8) sepia(1)
     saturate(calc(var(--fe-dx3rd-accent-s, 0%) / 1% * 0.06))
@@ -4159,7 +4481,7 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone.actor
 }
 
 /* Restore field boundaries erased by the shared borderless control cleanup. */
-body.fe-retro-theme form.tidy5e-sheet.application.quadrone.actor .window-content
+body.fe-retro-theme form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .window-content
   :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
       select, textarea, .input-group, search, prose-mirror, code-mirror, fieldset):not(:where(.input-group, search) input) {
   border: 1px solid var(--fe-ac-33) !important;
@@ -4167,8 +4489,217 @@ body.fe-retro-theme form.tidy5e-sheet.application.quadrone.actor .window-content
   background-color: var(--fe-ac-06) !important;
 }
 
-body.fe-retro-theme form.tidy5e-sheet.application.quadrone.actor .window-content
+body.fe-retro-theme form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .window-content
   :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
       select, textarea, .input-group, search, prose-mirror, code-mirror):not(:where(.input-group, search) input):is(:hover, :focus-within) {
   border-color: var(--fe-ac-45) !important;
+}
+
+
+/* ================================================================
+ * dnd5e 6.0 — 새 채팅 카드 구조 (`.message.compact`)
+ * ================================================================
+ * 6.0 은 채팅 메시지 마크업을 통째로 갈아엎었다. 두 구조가 **공존**한다:
+ *
+ *   · 레거시(≤5.x, 그리고 DB 에 남아 있는 옛 메시지)
+ *       li.chat-message.dnd5e2
+ *         └ .chat-card.activation-card
+ *             └ section.card-header.description.collapsible
+ *                 ├ header.summary  (img.gold-icon + .name-stacked + i.fa-chevron-down)
+ *                 └ section.details.collapsible-content.card-content > .wrapper
+ *             ├ .card-buttons > button   (텍스트 버튼)
+ *             └ ul.card-footer.pills > li.pill
+ *
+ *   · 6.0 신구조 — `li` 에 `.compact` 가 붙는다(메시지 시스템 데이터 모델의
+ *     `_onRender` 가 추가; dnd5e.mjs `element.classList.add("compact")`).
+ *       li.chat-message.dnd5e2.compact
+ *         └ .chat-card
+ *             ├ section.card-header[.no-description][.collapsed]
+ *             │    ├ .item-icon > img.gold-icon
+ *             │    ├ .activity-icon > dnd5e-icon        (선택)
+ *             │    ├ .name-stacked > .title/.subtitle
+ *             │    └ .chevron > i.fa-chevron-down
+ *             ├ section.card-flavor                      (신규)
+ *             ├ section.card-description.collapsible > .collapsible-content > .wrapper
+ *             ├ p.supplement > strong                    (신규 strong)
+ *             ├ section.icon-row > i + ul.pills > li.pill   (구 .card-footer)
+ *             ├ recorded-targets                          (신규 커스텀 엘리먼트, light DOM)
+ *             └ section.icon-row > ul > li > button.icon    (구 .card-buttons)
+ *
+ * ⚠️ `header.summary` 래퍼와 `.card-content` 는 신구조에 **없다**. 대신
+ *    `.card-header` 자체가 아이콘/이름/셰브런을 직접 담고, 설명은 형제
+ *    `.card-description` 으로 빠졌다. 레거시 선택자는 옛 메시지를 위해
+ *    그대로 두고, 신구조 선택자를 **나란히** 추가하는 방식으로만 대응한다.
+ *
+ * ⚠️ 6.0 은 `li.message.compact` **자체**에 배경/금색 테두리/radius/padding:8px 를
+ *    칠한다(dnd5e.css `.chat-log .message.compact`). 5.x 는 ::before 양피지만
+ *    깔았으므로 이건 새로 생긴 표면이다. 텍스처 제거/유저 컬러 배경은
+ *    chat-bg-stripper.css 의 `!important`(modules 레이어) 가 dnd5e 의 일반
+ *    선언(system 레이어)을 이기므로 그대로 먹지만, 금색 테두리는 별도로 처리한다.
+ * ================================================================ */
+
+/* 카드 변수 자체를 레트로 팔레트로 갈아끼운다. dnd5e 는 이 두 변수를
+   `:where(body)` 수준에서 선언하므로 우리 쪽 `.dnd5e2`(= li) 선언이 더 가깝다. */
+body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
+  --dnd5e-chat-background: transparent !important;
+  --dnd5e-chat-description-background: var(--fe-ac-06) !important;
+}
+
+/* 신구조 카드 파트의 텍스트 색. 기존 레거시 목록(위쪽 `.chat-card :is(p, i, …)`)
+   과 같은 톤을 쓰되, 6.0 에서 새로 생긴 요소만 모았다. `a`/`button`/인라인 롤은
+   고유 색을 지켜야 하므로 여기서도 제외한다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card
+  :is(.card-flavor, .card-description, .card-description .wrapper,
+      .supplement, .supplement > strong,
+      .icon-row > i, .icon-row .pill, .icon-row .pill .label,
+      .card-summary, .name-stacked, .name-stacked .title,
+      .name-stacked .subtitle):not(:where(#context-menu) *) {
+  color: var(--fe-ac-90) !important;
+}
+
+/* 보조 톤은 한 단계 낮춘다 — 플레이버/보충설명/부제는 본문보다 약해야
+   원래 위계가 유지된다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card
+  :is(.card-flavor, .supplement, .name-stacked .subtitle):not(:where(#context-menu) *) {
+  color: var(--fe-ac-70) !important;
+}
+
+/* `.icon-row > i` 는 dnd5e 가 `--dnd5e-color-gold` 로 직접 칠한다(변수 리맵으로는
+   닿지 않는 직접 선언). 행 구분 아이콘이므로 강조색으로 돌린다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card .icon-row > i {
+  color: var(--fe-ac-80) !important;
+}
+
+/* 아이콘 버튼(구 `.card-buttons > button` 의 후신). */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card .icon-row button.icon {
+  background: var(--fe-ac-06) !important;
+  border: 1px solid var(--fe-ac-33) !important;
+  color: var(--fe-ac-90) !important;
+  --icon-fill: var(--fe-ac-90) !important;
+  --icon-stroke: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card .icon-row button.icon:is(:hover, :focus-visible) {
+  background: var(--fe-ac-22) !important;
+  border-color: var(--fe-ac-45) !important;
+}
+
+/* 알약(pill) — 구 `.card-footer.pills` 와 같은 처리. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  .chat-card .icon-row .pill {
+  background: var(--fe-ac-06) !important;
+  border-color: var(--fe-ac-33) !important;
+}
+
+/* 6.0 이 li 에 직접 거는 금색 테두리. 레트로는 카드 테두리를 강조색으로
+   통일하므로 메시지 테두리도 같은 팔레트로 맞춘다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, .chat-popout)
+  :is(.message, .chat-message).compact {
+  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b /
+                    var(--fe-dx3rd-card-border-alpha, 1)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, .chat-popout)
+  :is(.message, .chat-message).compact.fe-has-user-color {
+  border-color: rgb(var(--fe-user-color-rgb, 255 255 255) /
+                    var(--fe-dx3rd-card-border-alpha, 1)) !important;
+}
+
+/* ----------------------------------------------------------------
+ * 채팅 카드 벡터 그래픽 — 픽셀/거친 렌더링
+ *
+ * 레트로는 픽셀 테마인데 카드 안의 벡터(dnd5e-icon, 인라인 <svg>, .svg 이미지)만
+ * 매끈하게 안티앨리어싱돼서 혼자 "현대적"으로 튄다. 그 둘만 거칠게 만든다.
+ *
+ * 두 속성을 나눠 쓰는 이유:
+ *   - shape-rendering: crispEdges → SVG 도형의 안티앨리어싱을 끈다. SVG 상속
+ *     속성이라 dnd5e-icon 의 closed shadow root 안 <svg> 까지 닿는다(상속은
+ *     shadow 경계를 넘는다). 이 요소는 :host{display:contents} 라 박스를 만들지
+ *     않으므로 filter 같은 박스 기반 효과는 쓸 수 없다 — 상속이 유일한 경로다.
+ *   - image-rendering: pixelated → 래스터화된 이미지를 최근접 이웃으로 확대.
+ *     <img src="*.svg"> 와 <svg><image> 에만 건다.
+ *
+ * 포트레이트/토큰 아트/아이템 아트(webp·png·jpg)는 명시적으로 제외한다(사용자
+ * 지시). image-rendering 을 메시지나 카드 루트에 걸지 않는 것도 같은 이유 —
+ * 상속 속성이라 루트에 걸면 포트레이트까지 자글자글해진다.
+ *
+ * Font Awesome 은 SVG 가 아니라 글리프라 위 두 속성이 닿지 않는다 — 대신
+ * fe-retro-theme.css §2 가 이미 body 전체에 -webkit-font-smoothing: none 을
+ * 걸어 두어 아이콘 글리프도 함께 거칠게 나온다(실측: body 계산값 none).
+ * 그래서 여기서 폰트 쪽을 다시 손댈 필요가 없다 — 추가하면 죽은 선언이 된다.
+ * ---------------------------------------------------------------- */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(dnd5e-icon, svg, .chat-card svg, img[src$=".svg" i]) {
+  image-rendering: pixelated !important;
+  shape-rendering: crispEdges !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  svg :is(path, rect, circle, ellipse, line, polyline, polygon, use, g) {
+  shape-rendering: crispEdges !important;
+}
+
+/* 사진류는 원래대로. 위 규칙이 svg 하위 <image> 로 상속되는 경우와,
+   .svg 로 끝나지 않는 모든 이미지가 여기에 해당한다. */
+body.fe-retro-theme.fe-retro-system-dnd5e
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+      #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(img:not([src$=".svg" i]), img.fe-chat-portrait, video) {
+  image-rendering: auto !important;
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  아이템 시트 배경 텍스처 제거 (ceDnd5eItemSheetFlat)                */
+/* ------------------------------------------------------------------ */
+/* dnd5e 는 모든 애플리케이션을 `background: var(--dnd5e-application-background)`
+   로 칠하는데, 그 값은 양피지/데님 이미지 레이어와 배경'색'이 한 단축 속성에
+   섞여 있다. 그래서 변수를 통째로 갈아끼우지 않고 이미지 레이어만 끈다 —
+   색은 테마가 정한 값이 그대로 남으므로 밝은/어두운 테마를 우리가 추측할
+   필요가 없다. `!important` 인 이유는 dnd5e 가 이 변수를 `@scope` 안에서
+   선언하기 때문: 스코프 근접성은 명시도보다 먼저 비교되므로 일반 선언으로는
+   이길 수 없고, `!important` 는 레이어 순서를 뒤집어 layouts(우리) 가
+   system(dnd5e) 을 이긴다. */
+body.fe-dnd5e-item-flat .dnd5e2.sheet.item {
+  background-image: none !important;
+}
+
+/* 머리말 위에 150px 높이로 깔리는 배너 그림. */
+body.fe-dnd5e-item-flat .dnd5e2.sheet.item:not(.minimized)::before {
+  content: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/*  희귀도 단일 드롭다운 (ceDnd5eItemRaritySelect)                     */
+/* ------------------------------------------------------------------ */
+/* multi-select 위젯 자리에 들어가는 우리 <select>. 원래 위젯이 li 폭을 채우던
+   자리이므로 폭만 맞춰 주고 나머지는 dnd5e 의 폼 스타일에 맡긴다. */
+.dnd5e2.sheet.item li.item-rarity > select.fe-item-rarity-select {
+  width: 100%;
 }

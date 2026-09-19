@@ -426,6 +426,12 @@ function feSetForceNormalMsgColorClass(doc = document) {
   } catch {}
 }
 
+/* Rec. 709 luma on raw sRGB bytes. Precise enough to pick between two inks, which is
+ * all the caller does with it. */
+function feRgbReadsLight(r, g, b) {
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55;
+}
+
 function feSetUserColorBgBaseClass(doc = document) {
   try {
     const mode = String(feSetting(S.USER_COLOR_BG_BASE) ?? FE_DEFAULTS[S.USER_COLOR_BG_BASE]);
@@ -434,19 +440,104 @@ function feSetUserColorBgBaseClass(doc = document) {
     body.classList.toggle("fe-userbg-base-white", mode === "white");
     body.classList.toggle("fe-userbg-base-black", mode === "black");
     body.classList.toggle("fe-userbg-base-custom", mode === "custom");
+
+    // `null` = we are not painting a base, so nothing is published and whatever pairing
+    // the active Foundry/system theme chose is left intact.
+    let baseIsLight = null;
+    if (mode === "white") baseIsLight = true;
+    else if (mode === "black") baseIsLight = false;
+
     if (mode === "custom") {
       // Feed the custom base color to CSS as "r g b" (inherited down to messages).
       const hex = String(feSetting(S.USER_COLOR_BG_CUSTOM) ?? FE_DEFAULTS[S.USER_COLOR_BG_CUSTOM]).trim();
       const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-      const rgb = m ? `${parseInt(m[1], 16)} ${parseInt(m[2], 16)} ${parseInt(m[3], 16)}` : "27 27 27";
-      body.style.setProperty("--fe-user-bg-base-rgb", rgb);
+      const [r, g, b] = m
+        ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)]
+        : [27, 27, 27];
+      body.style.setProperty("--fe-user-bg-base-rgb", `${r} ${g} ${b}`);
+      baseIsLight = feRgbReadsLight(r, g, b);
     } else {
       body.style.removeProperty("--fe-user-bg-base-rgb");
     }
     if (mode === "none") {
       body.classList.remove("fe-userbg-base-white", "fe-userbg-base-black", "fe-userbg-base-custom");
     }
+
+    /* Which way the painted chat surface leans. dnd5e 6.0 takes its chat text colour from
+     * the THEMED `--color-text-*` aliases (`@scope (.theme-dark)` resolves
+     * `--color-text-primary` to near-white), which pairs with dnd5e's OWN chat background —
+     * not with the opaque base this module paints under every message. A white base in a
+     * dark-theme world therefore renders the speaker name, the header and the chat
+     * context menu white-on-white. `styles/chat-bg-stripper.css` keys the ink off these
+     * classes; see the note there.
+     *
+     * The per-message user-colour tint rides on top of this base, so a body-level class is
+     * an approximation — but the tint is alpha-blended (capped at 0.8) over an opaque base,
+     * so the base is what decides legibility. */
+    body.classList.toggle("fe-chat-bg-light", baseIsLight === true);
+    body.classList.toggle("fe-chat-bg-dark", baseIsLight === false);
+
+    /* …and the SAME question again for speakerless/GM system messages, because they do
+     * not share that base. `--fe-system-msg-bg` paints them with a colour of their own, so
+     * a white system base inside a 진회색-based log (or the reverse) left dnd5e's card
+     * interior re-pointed the wrong way — measured: `li.fe-system-msg` painted #ffffff
+     * while it still carried `--color-text-primary: #fff` and
+     * `--dnd5e-background-card: #252830` from the body-level dark branch.
+     *
+     * Published UNCONDITIONALLY (mirroring `baseIsLight` when the system base is off) so
+     * the ink blocks in chat-bg-stripper.css can key system messages off this pair alone,
+     * with no third "which feature is on" arm in every selector. */
+    let systemIsLight = baseIsLight;
+    if (feSetting(S.SYSTEM_MSG_BG_ENABLED)) {
+      const hex = String(feResolveSystemMsgBg(doc)).replace(/^#/, "");
+      const full = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
+      systemIsLight = /^[0-9a-f]{6}$/i.test(full)
+        ? feRgbReadsLight(parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16))
+        : true;
+    }
+    body.classList.toggle("fe-sysmsg-bg-light", systemIsLight === true);
+    body.classList.toggle("fe-sysmsg-bg-dark", systemIsLight === false);
   } catch {}
+}
+
+/* The dark ("진회색") base tone, as a #rrggbb string.
+ *
+ * Single source of truth is `--fe-userbg-black-rgb` in `styles/chat-bg-stripper.css`
+ * (raw "r g b" bytes, so CSS can alpha-compose it with `rgb(... / a)`). Read it back
+ * instead of keeping a second literal here: this value also has to feed
+ * `feContrastText`, and a drifting copy would flip the system message's ink without
+ * flipping its background. The fallback matches the stylesheet and only applies if the
+ * sheet has not parsed yet. */
+function feDarkBaseHex(doc = document) {
+  let bytes = [48, 40, 49];
+  try {
+    const raw = getComputedStyle(doc.documentElement)
+      .getPropertyValue("--fe-userbg-black-rgb")
+      .trim();
+    const m = raw.match(/^(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})$/);
+    if (m) {
+      const parsed = [Number(m[1]), Number(m[2]), Number(m[3])];
+      if (parsed.every((n) => n >= 0 && n <= 255)) bytes = parsed;
+    }
+  } catch {}
+  return `#${bytes.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/* The colour the speakerless/GM system-message base is actually painted with.
+ *
+ * Picked from the same three tones as the chat-card base (흰색 / 진회색 / 사용자 지정)
+ * rather than typed in as a raw colour; SYSTEM_MSG_BG_COLOR survives as the
+ * "사용자 지정" value only. Two callers need this, and they must not disagree:
+ * `feApplyStyleVarsFromSettings` publishes it (plus its contrast ink), and
+ * `feSetUserColorBgBaseClass` decides which way THESE messages lean for the dnd5e
+ * re-pointing blocks. */
+function feResolveSystemMsgBg(doc = document) {
+  const mode = String(feSetting(S.SYSTEM_MSG_BG_BASE) ?? FE_DEFAULTS[S.SYSTEM_MSG_BG_BASE]);
+  if (mode === "black") return feDarkBaseHex(doc);
+  if (mode === "custom") {
+    return String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? FE_DEFAULTS[S.SYSTEM_MSG_BG_COLOR]).trim() || "#ffffff";
+  }
+  return "#ffffff";
 }
 
 function feApplyStyleVarsFromSettings(doc = document) {
@@ -465,7 +556,7 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     // User-color tint strength (clamped to the registered range).
     const ucAlpha = num(feSetting(S.USER_COLOR_ALPHA), FE_DEFAULTS[S.USER_COLOR_ALPHA]);
-    root.style.setProperty("--fe-user-color-alpha", String(Math.min(0.6, Math.max(0.05, ucAlpha))));
+    root.style.setProperty("--fe-user-color-alpha", String(Math.min(0.8, Math.max(0.05, ucAlpha))));
 
     root.style.setProperty("--fe-chat-title-size", px(feSetting(S.STYLE_ACTOR_NAME_SIZE), FE_DEFAULTS[S.STYLE_ACTOR_NAME_SIZE]));
     root.style.setProperty("--fe-chat-subtitle-size", px(feSetting(S.STYLE_PLAYER_NAME_SIZE), FE_DEFAULTS[S.STYLE_PLAYER_NAME_SIZE]));
@@ -484,7 +575,7 @@ function feApplyStyleVarsFromSettings(doc = document) {
 
     root.style.setProperty("--fe-paper-alpha", String(num(feSetting(S.STYLE_BG_SATURATION), FE_DEFAULTS[S.STYLE_BG_SATURATION])));
 
-    const systemBg = String(feSetting(S.SYSTEM_MSG_BG_COLOR) ?? FE_DEFAULTS[S.SYSTEM_MSG_BG_COLOR]).trim() || "#ffffff";
+    const systemBg = feResolveSystemMsgBg(doc);
     root.style.setProperty("--fe-system-msg-bg", systemBg);
     root.style.setProperty("--fe-system-msg-text", feContrastText(systemBg));
 

@@ -14,3 +14,7 @@ consolidated in [`font/LICENSES.txt`](font/LICENSES.txt).
 - **CookieRun** (© Devsisters Corp.) – used under the official CookieRun Font License.
 - **학교안심 그림일기체** (© 서울특별시교육청) – free font, redistributed under its free-use terms.
 - **Neo둥근모** / **Neo둥근모 Pro** (© Eunbin Jeong / Dalgona.) – SIL Open Font License 1.1.
+
+## Licenses
+
+The bundled Tidy 5e Sheets Classic layout is a maintained fork of the MIT-licensed Tidy 5e Sheets v12.5.5, originally created by **kgar**. The upstream project is available at [kgar/foundry-vtt-tidy-5e-sheets](https://github.com/kgar/foundry-vtt-tidy-5e-sheets).

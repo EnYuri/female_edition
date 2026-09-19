@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.10.4",
+  "version": "2.10.5",
   "authors": [
     {
       "name": "nayuri",
@@ -9,6 +9,9 @@
     }
   ],
   "relationships": {},
+  "scripts": [
+    "scripts/fe-legacy-hook-bridge.js"
+  ],
   "esmodules": [
     "scripts/chat-bg-stripper.js",
     "scripts/fe-chat-enhance.js",
@@ -19,6 +22,7 @@
     "scripts/fe-chat-images.js",
     "scripts/inject-conditions.js",
     "scripts/inject-damage-type.js",
+    "scripts/fe-dnd5e-item-sheet.js",
     "scripts/fe-dx3rd-resource-ui.js",
     "scripts/fe-image-hover.js",
     "scripts/fe-theatre.js",
@@ -42,7 +46,8 @@
     "scripts/fe-animated-tile.js",
     "scripts/fe-user-font.js",
     "scripts/fe-update-check.js",
-    "scripts/fe-music.js"
+    "scripts/fe-music.js",
+    "tidy-classic/dist/tidy-classic.js"
   ],
   "styles": [
     { "src": "styles/ui-font.css", "layer": "layouts" },
@@ -77,7 +82,9 @@
     "styles/fe-token-preview.css",
     "styles/fe-scene-config.css",
     "styles/fe-combat-tracker.css",
-    "styles/fe-music.css"
+    "styles/fe-music.css",
+    "tidy-classic/styles/tidy5e-classic-global.css",
+    "tidy-classic/dist/tidy-classic.css"
   ],
   "socket": true,
   "documentTypes": {
@@ -91,6 +98,16 @@
       "name": "Korean",
       "path": "lang/ko.json",
       "flags": {}
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "tidy-classic/public/lang/en.json"
+    },
+    {
+      "lang": "ko",
+      "name": "Korean",
+      "path": "tidy-classic/public/lang/ko.json"
     }
   ],
   "compatibility": {

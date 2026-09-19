@@ -9,7 +9,14 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["node_modules/**"],
+    ignores: [
+      "node_modules/**",
+      // Vendored Tidy 5e Classic fork. It is a Svelte/TypeScript subproject with its own
+      // toolchain (`npm run check` there), and `tidy-classic/dist/` is committed build
+      // output — a 120k-line bundle that this config would flag thousands of times for
+      // Foundry globals it has no reason to know about.
+      "tidy-classic/**",
+    ],
   },
   js.configs.recommended,
   {

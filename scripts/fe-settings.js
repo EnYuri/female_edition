@@ -87,6 +87,8 @@ function feRegisterSettingsMenu({
         [S.CORE_UI_FILEPICKER_ENHANCEMENTS]: feRead(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
         [S.CORE_UI_FILEPICKER_UPLOAD_LOCATION]: feRead(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION),
         [S.CORE_UI_SCENE_CONFIG_TABS]: feRead(S.CORE_UI_SCENE_CONFIG_TABS),
+        [S.DND5E_ITEM_RARITY_SELECT]: feRead(S.DND5E_ITEM_RARITY_SELECT),
+        [S.DND5E_ITEM_SHEET_FLAT]: feRead(S.DND5E_ITEM_SHEET_FLAT),
         [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
         [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
         [S.TOKEN_SYNC_PLACED_NAME]: feRead(S.TOKEN_SYNC_PLACED_NAME),
@@ -95,6 +97,7 @@ function feRegisterSettingsMenu({
         [S.MERGE_ENABLED]:               feRead(S.MERGE_ENABLED),
         [S.MERGE_ONLY_TEXT]:             feRead(S.MERGE_ONLY_TEXT),
         [S.MERGE_INCLUDE_ROLL_MESSAGES]: feRead(S.MERGE_INCLUDE_ROLL_MESSAGES),
+        [S.MERGE_INCLUDE_CHAT_CARDS]:    feRead(S.MERGE_INCLUDE_CHAT_CARDS),
         [S.MERGE_DIVIDER]:               feRead(S.MERGE_DIVIDER),
         [S.MERGE_GROUP_SPACING]:         feRead(S.MERGE_GROUP_SPACING),
         [S.MERGE_MODE]:                  feRead(S.MERGE_MODE),
@@ -135,7 +138,9 @@ function feRegisterSettingsMenu({
         [S.USER_COLOR_BG_CUSTOM]: feRead(S.USER_COLOR_BG_CUSTOM),
         [S.USER_COLOR_ALPHA]:   feRead(S.USER_COLOR_ALPHA),
         [S.SYSTEM_MSG_COLOR]:   feRead(S.SYSTEM_MSG_COLOR),
+        [S.SYSTEM_MSG_ALPHA]:   feRead(S.SYSTEM_MSG_ALPHA),
         [S.SYSTEM_MSG_BG_ENABLED]: feRead(S.SYSTEM_MSG_BG_ENABLED),
+        [S.SYSTEM_MSG_BG_BASE]: feRead(S.SYSTEM_MSG_BG_BASE),
         [S.SYSTEM_MSG_BG_COLOR]: feRead(S.SYSTEM_MSG_BG_COLOR),
         [S.FORCE_NORMAL_MSG_COLOR]: feRead(S.FORCE_NORMAL_MSG_COLOR),
         [S.CHAT_GROUP_OUTLINE]: feRead(S.CHAT_GROUP_OUTLINE),
@@ -596,6 +601,9 @@ function feRegisterSettingsMenu({
           bool(S.CORE_UI_TOKEN_PREVIEW), bool(S.CORE_UI_FILEPICKER_ENHANCEMENTS),
           ...(game.user?.isGM ? [str(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION)] : []),
           bool(S.CORE_UI_SCENE_CONFIG_TABS),
+          ...(feIsDnd5eSystem() ? [
+            bool(S.DND5E_ITEM_RARITY_SELECT), bool(S.DND5E_ITEM_SHEET_FLAT),
+          ] : []),
           bool(S.TOKEN_CONFIG_TWO_COLUMN),
           ...(game.user?.isGM ? [
             bool(S.TOKEN_SYNC_NAME),
@@ -604,6 +612,7 @@ function feRegisterSettingsMenu({
 
           // Merge
           bool(S.MERGE_ENABLED), bool(S.MERGE_ONLY_TEXT), bool(S.MERGE_INCLUDE_ROLL_MESSAGES),
+          bool(S.MERGE_INCLUDE_CHAT_CARDS),
           bool(S.MERGE_DIVIDER), num(S.MERGE_GROUP_SPACING),
           str(S.MERGE_MODE), str(S.MERGE_FOLLOW_HEADER_STYLE), str(S.MERGE_SPEAKER_BASIS),
 
@@ -643,7 +652,9 @@ function feRegisterSettingsMenu({
           // User-color background
           bool(S.USE_USER_COLOR_BG), str(S.USER_COLOR_BG_BASE),
           str(S.USER_COLOR_BG_CUSTOM), num(S.USER_COLOR_ALPHA), bool(S.SYSTEM_MSG_COLOR),
-          bool(S.SYSTEM_MSG_BG_ENABLED), str(S.SYSTEM_MSG_BG_COLOR),
+          num(S.SYSTEM_MSG_ALPHA),
+          bool(S.SYSTEM_MSG_BG_ENABLED), str(S.SYSTEM_MSG_BG_BASE),
+          str(S.SYSTEM_MSG_BG_COLOR),
           bool(S.FORCE_NORMAL_MSG_COLOR),
           bool(S.CHAT_GROUP_OUTLINE), bool(S.MSG_BORDER_USER_COLOR),
 

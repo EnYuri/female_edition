@@ -526,6 +526,9 @@ function cpApplyChatCardIconSizing(messageEl) {
       })();
 
       // Prefer the standard dnd5e icon location.
+      // dnd5e 6.0 wraps it one level deeper: .card-header > .item-icon > img.gold-icon
+      // (with an optional sibling .activity-icon that may hold a <dnd5e-icon>, not an
+      // <img> — querySelector therefore still lands on the item icon first).
       const icon =
         card.querySelector("header.card-header img") ||
         card.querySelector(".card-header img") ||
@@ -549,6 +552,16 @@ function cpApplyChatCardIconSizing(messageEl) {
       // Prefer "smooth" if supported.
       icon.style.setProperty("image-rendering", "smooth", "important");
       icon.classList.add("fe-chat-card-icon");
+
+      // dnd5e 6.0 sizes the header icon through a `--size` custom property on the
+      // .item-icon / .activity-icon WRAPPER, not on the <img>. Resizing only the img
+      // leaves it overflowing a 24px box, so push the same size onto the wrapper.
+      const iconWrap = icon.closest?.(".item-icon, .activity-icon");
+      if (cpIsElement(iconWrap)) {
+        iconWrap.style.setProperty("--size", `${size}px`, "important");
+        iconWrap.style.setProperty("--gold-icon-size", `${size}px`, "important");
+        iconWrap.style.setProperty("flex", `0 0 ${size}px`, "important");
+      }
     }
 
     // Some automation modules embed large portrait-like images directly inside message
@@ -663,7 +676,18 @@ function cpApplyImgStyling(img, { size, shape, borderMode, borderWidth, borderCo
       shape === "circle" ? "circle(50% at 50% 50%)" : "none", "important");
   }
 
-  img.style.setProperty("display",          "block",  "important");
+  // `display` is deliberately NOT written inline. An inline `!important` declaration
+  // outranks every stylesheet rule there is, so writing `display: block !important`
+  // here made the portrait impossible to hide from CSS — which broke the rule the
+  // whole feature is built on ("always inject the portrait; let CSS reveal/hide it",
+  // see CLAUDE.md § Chat Merge). Two merge paths were silently defeated by it: the
+  // follow-hide flavor branch (`.message-header:has(> .flavor-text) > *:not(.flavor-text)`)
+  // and the whole `fe-merge-follow-name` mode, so a merged roll/card follow message
+  // kept a full-size portrait next to its flavor line. The default lives in
+  // `fe-chat-portrait.css` as a NORMAL declaration instead; core's own `img { display:
+  // block }` already agrees, so nothing changes visually. `removeProperty` clears the
+  // value on elements stamped by an older session before the style signature short-circuits.
+  img.style.removeProperty("display");
   img.style.setProperty("image-rendering",  "auto",   "important");
   img.style.setProperty("image-rendering",  "smooth", "important");
 

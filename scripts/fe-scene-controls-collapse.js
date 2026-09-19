@@ -9,9 +9,14 @@ import { feRegisterSetting } from "./fe-settings-data.js";
 //
 // With the setting enabled (body.fe-collapse-scene-controls), each menu is
 // collapsed to a single cell showing only its currently-active button — a
-// dropdown. Clicking that cell EXPANDS the menu (adds .fe-sc-open); picking an
-// item lets core handle the selection and then re-collapses. Clicking outside,
-// or Escape, collapses everything.
+// dropdown. Clicking that cell EXPANDS the menu (adds .fe-sc-open). While open
+// the menu STAYS open: picking an item lets core handle the selection and the
+// column remains expanded, so several tools can be used without re-opening it.
+// Clicking the collapse cell (the currently-active button, i.e. the same cell
+// that expanded it) is the ONLY thing that folds a menu back. Not an outside
+// click, not Escape, and not opening the other menu — the two dropdowns are
+// independent and can be open at once. Explicit user decision; do not re-add
+// any of those auto-collapse paths.
 //
 // All visual collapsing lives in styles/fe-scene-controls-collapse.css; this
 // script only drives the body class and the open/close state class.
@@ -44,9 +49,23 @@ function isCollapseEnabled() {
 // Open / close state
 // --------------------------------
 
-function closeAllMenus(except = null) {
+// Resolve the button a collapsed menu would display. MUST mirror the CSS in
+// styles/fe-scene-controls-collapse.css — pressed button (for tools, the
+// pressed NON-toggle tool), with the first cell as the nothing-pressed
+// fallback. This is the button that both expands the menu and folds it back.
+function collapsedCellButton(menu) {
+  if (!menu) return null;
+  const pressed = menu.id === "scene-controls-tools"
+    ? menu.querySelector(':scope > li > button[aria-pressed="true"]:not(.toggle)')
+    : menu.querySelector(':scope > li > button[aria-pressed="true"]');
+  return pressed ?? menu.querySelector(":scope > li:first-child > button");
+}
+
+// Only used when the feature itself is switched off — no click path collapses
+// a menu except its own collapse cell.
+function closeAllMenus() {
   for (const menu of document.querySelectorAll(MENU_SELECTOR)) {
-    if (menu !== except) menu.classList.remove(OPEN_CLASS);
+    menu.classList.remove(OPEN_CLASS);
   }
 }
 
@@ -68,12 +87,10 @@ function applyCollapseSetting(enabled) {
 function onDocumentClickCapture(event) {
   if (!isCollapseEnabled()) return;
 
+  // Clicks outside the control menus are left alone — an open dropdown stays
+  // open until its own collapse cell is clicked.
   const menu = event.target?.closest?.(MENU_SELECTOR);
-  if (!menu) {
-    // Click anywhere outside the control menus → collapse all open dropdowns.
-    closeAllMenus();
-    return;
-  }
+  if (!menu) return;
 
   const button = event.target?.closest?.("button.control");
   if (!button) return;
@@ -83,17 +100,23 @@ function onDocumentClickCapture(event) {
     // is a core no-op. Intercept and expand this menu instead.
     event.preventDefault();
     event.stopImmediatePropagation();
-    closeAllMenus(menu);
     menu.classList.add(OPEN_CLASS);
-  } else {
-    // Open: let core process the selection, then collapse on the next tick.
-    // The visible cell follows aria-pressed, so it auto-updates to the new pick.
-    setTimeout(() => menu.classList.remove(OPEN_CLASS), 0);
+    return;
   }
-}
 
-function onDocumentKeydown(event) {
-  if (event.key === "Escape" && isCollapseEnabled()) closeAllMenus();
+  // Open. Clicking the collapse cell — the very button the menu shows when
+  // collapsed — is the explicit "fold it back" gesture. Re-selecting an
+  // already-active control is a core no-op, so intercepting costs nothing.
+  if (button === collapsedCellButton(menu)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    menu.classList.remove(OPEN_CLASS);
+    return;
+  }
+
+  // Any other button: let core process it and leave the menu open, so the user
+  // can keep picking. Only the collapse cell above closes it. The visible cell
+  // still follows aria-pressed once it does collapse.
 }
 
 // --------------------------------
@@ -103,9 +126,8 @@ function onDocumentKeydown(event) {
 Hooks.once("init", () => {
   feRegisterSetting(S.SC_COLLAPSE_ENABLED, value => applyCollapseSetting(value));
 
-  // Capture-phase listeners are attached once and persist across re-renders.
+  // Capture-phase listener is attached once and persists across re-renders.
   document.addEventListener("click", onDocumentClickCapture, true);
-  document.addEventListener("keydown", onDocumentKeydown, true);
 });
 
 Hooks.once("ready", () => {

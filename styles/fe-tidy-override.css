@@ -28,6 +28,20 @@
   --t5e-font-family-body: var(--fe-font-secondary) !important;
   --t5e-primary-font-family: var(--fe-font-primary) !important;
   --t5e-secondary-font-family: var(--fe-font-secondary) !important;
+
+  /* tidy5e-sheet 14 (Quadrone 전용) 이름. 13.x 의 `--t5e-font-family-body` 는
+     14 에 존재하지 않고, 본문 계열이 default / forms / longform 셋으로 쪼개졌다
+     (main.css 실측: family-default 4회, family-forms 3회, family-longform 사용).
+     위 13.x 이름들은 하위 호환으로 남겨 둔다 — 없는 변수를 선언하는 건 무해하다. */
+  --t5e-font-family-default: var(--fe-font-secondary) !important;
+  --t5e-font-family-forms: var(--fe-font-secondary) !important;
+  --t5e-font-family-longform: var(--fe-font-secondary) !important;
+  /* 직접 쓰이는 서체 이름 변수(각 3·6회). 주의: tidy 14 의 합성 변수
+     (`--t5e-font-title-medium: 400 var(--font-size-28) "Modesto Condensed", …`)는
+     서체 이름을 값 안에 **직접** 박아 두므로 이 둘을 바꿔도 닿지 않는다. 그쪽은
+     아래 요소 단위 font-family 규칙들이 덮는다. */
+  --t5e-font-modesto-condensed: var(--fe-font-primary) !important;
+  --t5e-font-roboto-condensed: var(--fe-font-secondary) !important;
 }
 
 /* Large headings / labels (actor name, ability labels, tab titles) */

@@ -294,11 +294,29 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "FE.SettingsData.ceSystemMsgAlpha.name"}}</label>
+      <div class="form-fields">
+        <input type="number" name="ceSystemMsgAlpha" data-dtype="Number" value="{{values.ceSystemMsgAlpha}}" step="{{ranges.ceSystemMsgAlpha.step}}" min="{{ranges.ceSystemMsgAlpha.min}}" max="{{ranges.ceSystemMsgAlpha.max}}" />
+      </div>
+      <p class="notes">{{localize "FE.SettingsData.ceSystemMsgAlpha.hint"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsData.ceSystemMsgBgEnabled.name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceSystemMsgBgEnabled" data-dtype="Boolean" {{checked values.ceSystemMsgBgEnabled}} />
       </div>
       <p class="notes">{{localize "FE.SettingsMenu.ceSystemMsgBgEnabled.Text"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsData.ceSystemMsgBgBase.name"}}</label>
+      <div class="form-fields">
+        <select name="ceSystemMsgBgBase" data-dtype="String">
+          {{selectOptions choices.systemMsgBgBase selected=values.ceSystemMsgBgBase localize=true}}
+        </select>
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceSystemMsgBgBase.Text2"}}</p>
     </div>
 
     <div class="form-group">
@@ -417,6 +435,14 @@
         <input type="checkbox" name="ceMergeIncludeRollMessages" data-dtype="Boolean" {{checked values.ceMergeIncludeRollMessages}} />
       </div>
       <p class="notes">{{localize "FE.SettingsMenu.ceMergeIncludeRollMessages.Text"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsData.ceMergeIncludeChatCards.name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceMergeIncludeChatCards" data-dtype="Boolean" {{checked values.ceMergeIncludeChatCards}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceMergeIncludeChatCards.Text"}}</p>
     </div>
 
     <div class="form-group">
@@ -631,6 +657,29 @@
       </div>
     </div>
   </section>
+
+  {{#if isDnd5e}}
+  <section class="fe-settings__section" data-fe-settings-tab="system">
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Dnd5eItemSheet.Title"}}</h3>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceDnd5eItemRaritySelect.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceDnd5eItemRaritySelect" data-dtype="Boolean" {{checked values.ceDnd5eItemRaritySelect}} />
+      </div>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceDnd5eItemRaritySelect.Hint"}}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceDnd5eItemSheetFlat.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceDnd5eItemSheetFlat" data-dtype="Boolean" {{checked values.ceDnd5eItemSheetFlat}} />
+      </div>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceDnd5eItemSheetFlat.Hint"}}}</p>
+    </div>
+
+  </section>
+  {{/if}}
 
   {{#if isDnd5e}}{{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="system">

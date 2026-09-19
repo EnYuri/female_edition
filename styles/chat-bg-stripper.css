@@ -7,6 +7,17 @@
  */
 
 :root {
+  /* The "진회색" (dark) option of the opaque lower background, as raw sRGB bytes.
+   * NOT pure black: it is Foundry's own dark-theme RAISED-surface colour
+   * (`--color-cool-4`, #302831 in the default colour theme) — the tone core uses for a
+   * data box sitting on top of the #0b0a13 sidebar, which is exactly what a chat card is.
+   * Hardcoded rather than `var(--color-cool-4)` on purpose: core re-defines that variable
+   * per COLOUR theme (the fantasy theme drops it to #0c0609, i.e. back to near-black), and
+   * this dropdown option has to mean the same thing in every theme and in an exported
+   * archive. Every sheet that paints the base reads THIS variable — do not re-inline the
+   * literal (chat-bg-stripper, fe-chat-v13-compat and fe-crlngn-compat all paint it). */
+  --fe-userbg-black-rgb: 48 40 49;
+
   /* Adjust to taste. Higher alpha -> more desaturation (lighter). */
   --fe-paper-rgb: 245 239 229;
   --fe-paper-alpha: 0.42;
@@ -105,7 +116,14 @@ body:not(.fe-chatcard-custom-font) {
   font-weight: var(--fe-chat-card-font-weight) !important;
   /* Default: inherit the UI font stack (CookieRun). */
   /* Prefer Foundry variable when available; fallback to near-black. */
-  color: var(--color-text-dark-primary, rgb(20 20 20 / 0.92)) !important;
+  /* Full-strength ink, NOT a hardcoded dark one. This used to be
+   * `--color-text-dark-primary` outright, which predates the painted-base work and was
+   * the reason a dnd5e 6.0 card description rendered #191813 body text inside a box
+   * §1j had just painted dark. §1i sets `--color-text-primary` on the message per base
+   * lean, so reading it here keeps the original intent (override dnd5e's faint
+   * description ink) while following the base. With no base painted the variable is
+   * still the theme's own value, which is what should win there. */
+  color: var(--color-text-primary, rgb(20 20 20 / 0.92)) !important;
   text-shadow: none !important;
 }
 
@@ -137,7 +155,11 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
     section.card-header.description,
     section.card-header.description.collapsible,
     .card-header.description,
-    .card-header.description.collapsible
+    .card-header.description.collapsible,
+    /* dnd5e 6.0 (.message.compact): the description left .card-header and became
+       its own sibling <section class="card-description collapsible">. */
+    section.card-description,
+    .card-description
   ) {
   background-color: var(--fe-chat-desc-bg) !important;
 }
@@ -185,7 +207,7 @@ body.fe-userbg-base-white
 body.fe-userbg-base-black
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
-  --fe-user-bg-base-rgb: 0 0 0;
+  --fe-user-bg-base-rgb: var(--fe-userbg-black-rgb, 48 40 49);
 }
 
 body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
@@ -215,7 +237,7 @@ body.fe-userbg-base-white {
 }
 
 body.fe-userbg-base-black {
-  --fe-dice-tooltip-bg-rgb: 0 0 0;
+  --fe-dice-tooltip-bg-rgb: var(--fe-userbg-black-rgb, 48 40 49);
 }
 
 body.fe-userbg-base-custom {
@@ -328,6 +350,342 @@ body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
     0 3px 6px rgb(0 0 0 / 0.45) !important;
 }
 
+/* --------------------------------
+ * 1i) Themed text aliases vs. our painted base
+ * --------------------------------
+ * dnd5e 6.0 stopped hard-coding its chat ink. It now reads the THEMED aliases —
+ *   `.message:not(.compact) .message-header { color: var(--color-text-secondary) }`
+ *   `.message:not(.compact) .message-header .title { color: var(--color-text-primary) }`
+ *   `#context-menu.dnd5e2 { color: var(--color-text-primary) }`
+ *   `#context-menu.dnd5e2 .context-item i { color: var(--color-text-secondary) }`
+ * — and resolves them inside `@scope (.theme-dark) to (.themed)` to
+ * `--dnd5e-color-blue-white` / `--color-text-light-6`, i.e. near-white.
+ *
+ * That pairing is correct for dnd5e's OWN chat background. It is not correct for ours:
+ * §1f paints an opaque base under every message, so a white base in a dark-theme world
+ * renders the speaker name, the header and the message body white-on-white. The chat
+ * context menu goes with it — ours inherits the message's colour by design (§ above),
+ * and the fixed popout variant is handed the same value inline by chat-bg-stripper.js.
+ *
+ * So re-point the aliases at the THEME-INDEPENDENT constants (`--color-text-dark-*` /
+ * `--color-text-light-*`, which core defines once and never re-themes) according to which
+ * way our base leans. `fe-style.js` publishes that as `body.fe-chat-bg-light` /
+ * `fe-chat-bg-dark`, and publishes NEITHER when the opaque base is off — in that case
+ * dnd5e's own pairing is intact and must be left alone.
+ *
+ * Redefining the variables beats enumerating selectors: every dnd5e rule that reads them,
+ * including ones added by a later version, follows automatically. These are normal
+ * declarations, and `modules` is a later layer than `system`, so they win without
+ * `!important` — do NOT add it, or the layer order reverses and dnd5e takes it back.
+ *
+ * SPEAKERLESS/GM SYSTEM MESSAGES ARE A SECOND, INDEPENDENT BASE, and every ink block from
+ * here down needs both arms because of it. `--fe-system-msg-bg` (§ further down) paints
+ * `li.fe-system-msg` with a colour of its own, so the body-level lean can be flat wrong for
+ * exactly those messages — measured with a 진회색 chat-card base and a white system base:
+ * `li.fe-system-msg` painted `#ffffff` while still carrying `--color-text-primary: #fff`
+ * and `--dnd5e-background-card: #252830` from the dark branch. `fe-style.js` therefore
+ * publishes a SECOND pair, `body.fe-sysmsg-bg-light` / `fe-sysmsg-bg-dark`, and every
+ * block below reads as `…:not(.fe-system-msg)` on the chat-card pair plus a
+ * `…​.fe-system-msg` arm on the system pair. The second pair is published unconditionally
+ * (mirroring the chat-card lean whenever the system base is off), which is what keeps that
+ * to two arms instead of a third "is the feature on" arm in every selector.
+ */
+body.fe-chat-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-sysmsg-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg,
+body.fe-chat-bg-light #context-menu.fe-chat-context-menu {
+  --color-text-primary: var(--color-text-dark-primary, #191813);
+  --color-text-secondary: var(--color-text-dark-5, #666);
+  --color-text-emphatic: var(--color-text-dark-primary, #191813);
+  --color-text-title: var(--color-text-dark-primary, #191813);
+}
+
+body.fe-chat-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-sysmsg-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg,
+body.fe-chat-bg-dark #context-menu.fe-chat-context-menu {
+  --color-text-primary: var(--color-text-light-0, #fff);
+  --color-text-secondary: var(--color-text-light-6, #999);
+  --color-text-emphatic: var(--color-text-light-0, #fff);
+  --color-text-title: var(--color-text-light-0, #fff);
+}
+
+/* --------------------------------
+ * 1j) Themed CARD-INTERIOR aliases vs. our painted base
+ * --------------------------------
+ * §1i above re-points the four `--color-text-*` aliases, which fixes the speaker header
+ * and the message body. It does NOT fix the inside of a dnd5e chat card: 6.0 themes the
+ * card's own boxes, borders, headings, pills, icons and dice ink through a SECOND family
+ * of variables — including a chat-only `--dnd5e-chat-*` set — resolved in the same
+ * `@scope (.theme-dark|.theme-light) to (.themed)` blocks (dnd5e.css:134 / :444).
+ *
+ * Measured live in a `theme-dark` world with our default white base (`fe-chat-bg-light`):
+ * the header read correctly while the card interior stayed dark-theme — a blue-gray
+ * `.card-description` panel and roll-breakdown box, blue-gray separators, a gold activity
+ * icon on white, `--dnd5e-chat-damage-filter: none` leaving the damage icons black on
+ * blue-gray, and `--dnd5e-roll-icon-filter: invert(1)` painting every inline-roll d20
+ * white-on-white. The card was half-converted.
+ *
+ * HOW THE LIST WAS DERIVED — it is the UNION of two scans, and both are needed:
+ *   (a) every variable read by the two chat regions of dnd5e.css (`:is(.chat-popout,
+ *       #chat-log, .chat-log) .message` at :12583-13230 for the legacy DOM and
+ *       `.message.compact` at :14673-15560 for 6.0's);
+ *   (b) every variable read by any dnd5e rule that actually matches an element inside a
+ *       live `li.chat-message` (walked over `document.styleSheets`).
+ * (a) alone misses the GLOBAL `:is(.dnd5e, .dnd5e2, .dnd5e2-journal)` rules, which style
+ * chat cards too because the `li` itself carries `.dnd5e2` — that is where the inline-roll
+ * d20 (`--dnd5e-roll-icon-filter`, dnd5e.css:1871), the `h3` heading colour and the pill
+ * borders live, none of which are inside the chat line ranges. (b) alone misses whatever
+ * card types the sampled world happens not to contain. Intersect the union with the
+ * variables the two scopes define DIFFERENTLY — `--color-text-tertiary`,
+ * `--color-level-*`, `--dnd5e-shadow-*` and friends are read in chat but are identical in
+ * both themes, so they are not theme variables at all and are deliberately absent, as are
+ * the `--color-text-*` aliases §1i already owns.
+ *
+ * Each is mapped VERBATIM to dnd5e's own value for the matching theme — this block says
+ * "resolve the card the way dnd5e would if it had detected OUR background", nothing more.
+ * Every value is theme-independent at its source (the `--dnd5e-color-*` constants at
+ * dnd5e.css:40-60 and core's `--color-*` block are outside both scopes; the only
+ * redefinitions are under `.dnd5e-flag-high-contrast`, an opt-in that is not chat).
+ *
+ * `--dnd5e-chat-background` is in the intersection and is deliberately NOT here: it is
+ * dnd5e's background for the message itself, which §1f already paints over with an
+ * `!important` opaque base. Redefining it would be dead weight.
+ *
+ * `--dnd5e-background-card` is safe to set here even though `#context-menu.dnd5e2` reads
+ * it (dnd5e.css:772): a context menu rendered inside a message matches the `@scope` rule
+ * on ITSELF, and an own declaration beats an inherited one regardless of layer.
+ *
+ * Normal declarations, same as §1i — `modules` is a later layer than `system`, so they
+ * already win. Adding `!important` would reverse the layer order and hand it back.
+ */
+body.fe-chat-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-sysmsg-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg {
+  /* Ink, icons and icon filters */
+  --activity-icon-color: var(--color-text-dark-primary, #191813);
+  --dnd5e-heading-3-color: var(--color-text-dark-primary, #191813);
+  --dnd5e-chat-color-die: var(--color-text-light-6, #999);
+  --dnd5e-chat-damage-filter: invert(1);
+  --dnd5e-roll-icon-filter: none;
+  --pill-colored-text-color: var(--color-text-light-0, #fff);
+  --pill-transparent-color: #4e4e4e;
+  /* Inner surfaces */
+  /* The PALETTE CONSTANT behind it, re-pointed too. dnd5e treats `--dnd5e-color-card` as
+   * theme-independent and themes through the `--dnd5e-background-*` aliases instead — but
+   * third-party cards read the constant directly (midi-qol 14: `.dnd5e2 .midi-buttons
+   * button` and `.midi-qol-tooltip .midi-qol-tooltiptext` both do), which leaves them a
+   * #f8f4f1 surface in ANY dark chat, stock dnd5e dark theme included. Re-pointing the
+   * constant fixes every such reader at once instead of enumerating their selectors, which
+   * is the whole reason this section redefines variables rather than rules. dnd5e does the
+   * same thing itself in its high-contrast block (dnd5e.css:15594). */
+  --dnd5e-color-card: #f8f4f1;
+  --dnd5e-background-card: var(--dnd5e-color-card, #f8f4f1);
+  --dnd5e-background-parchment: var(--dnd5e-color-parchment);
+  --dnd5e-background-alt-1: var(--dnd5e-color-light-gray);
+  --dnd5e-background-alt-2: var(--dnd5e-color-iron-gray);
+  --dnd5e-background-5: rgb(0 0 0 / 0.05);
+  --dnd5e-gold-icon-background: var(--dnd5e-color-light-gray);
+  --dnd5e-chat-description-background: transparent;
+  /* Ours, not dnd5e's: the 약간의 회색 box §the description rule further up paints with
+   * `background-color: … !important`, which overrides the dnd5e variable right above it.
+   * It sat in `:root` as a fixed #f0f0f0, so on a dark base it rendered the description
+   * section light-grey while the ink stayed light — measured #f0f0f0 on #f0f0f0, i.e.
+   * invisible. The dark value is a translucent HIGHLIGHT rather than a literal colour so
+   * it composites correctly over any dark base (진회색 or a custom one). */
+  --fe-chat-desc-bg: #f0f0f0;
+  --dnd5e-chat-button-background: rgb(0 0 0 / 0.05);
+  --control-active-background-color: rgb(0 0 0 / 0.2);
+  /* Borders */
+  /* The line PALETTE CONSTANT, same story as --dnd5e-color-card above. dnd5e reads
+   * `--dnd5e-color-blue-gray-3` raw for two chat lines it never routes through a
+   * `--dnd5e-border-*` alias — `.card-description` gets `border-block: 1px dashed …` and
+   * `.deltas` gets `border-block-start: 1px dashed …` — so those two can only be
+   * reached here. Measured on a 진회색 base: a #434857 dashed rule on a ~#3a3340 box, i.e. no
+   * visible line at all. Re-pointing the constant also lifts every alias in the dark
+   * block below that resolves through it (border-dark / -dotted / -separator-heavy,
+   * --control-border-color, --pill-border[-dotted]) — they wash out for exactly the same
+   * reason, because dnd5e picked that tone against ITS card, not ours.
+   * The light value is dnd5e's own, so the light base is unchanged. */
+  --dnd5e-color-blue-gray-3: #434857;
+  --dnd5e-border-gold: 1px solid var(--dnd5e-color-gold, #9f9275);
+  --dnd5e-border-dark: 1px solid #999;
+  --dnd5e-border-dotted: 1px dotted #bbb;
+  --dnd5e-border-separator-heavy: 1px solid #ddd;
+  --dnd5e-border-heading-3: 1px solid var(--color-text-dark-primary, #191813);
+  --dnd5e-chat-button-border: var(--color-border-light-2, #bbb);
+  --dnd5e-chat-breakdown-border: 1px solid var(--dnd5e-color-gold, #9f9275);
+  --control-border-color: #999;
+  --pill-border: 1px solid #666;
+  --pill-border-dotted: 1px dotted #666;
+}
+
+body.fe-chat-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-sysmsg-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg {
+  /* Ink, icons and icon filters */
+  --activity-icon-color: var(--dnd5e-color-gold, #9f9275);
+  --dnd5e-heading-3-color: var(--color-text-light-6, #999);
+  --dnd5e-chat-color-die: var(--color-text-dark-5, #666);
+  --dnd5e-chat-damage-filter: none;
+  --dnd5e-roll-icon-filter: invert(1);
+  --pill-colored-text-color: var(--dnd5e-color-blue-white);
+  --pill-transparent-color: var(--color-text-primary);
+  /* Inner surfaces */
+  --dnd5e-color-card: var(--dnd5e-color-blue-gray-2);
+  --dnd5e-background-card: var(--dnd5e-color-blue-gray-2);
+  --dnd5e-background-parchment: var(--dnd5e-color-blue-gray-2);
+  --dnd5e-background-alt-1: var(--dnd5e-color-dark-gray);
+  --dnd5e-background-alt-2: var(--dnd5e-color-blue-gray-2);
+  --dnd5e-background-5: var(--dnd5e-highlight-10);
+  --dnd5e-gold-icon-background: var(--dnd5e-color-dark-gray);
+  --dnd5e-chat-description-background: rgb(255 255 255 / 0.03);
+  --fe-chat-desc-bg: rgb(255 255 255 / 0.06);
+  --dnd5e-chat-button-background: var(--dnd5e-color-blue-gray-1);
+  --control-active-background-color: rgb(0 0 0 / 0.45);
+  /* Borders */
+  --dnd5e-color-blue-gray-3: rgb(255 255 255 / 0.32);
+  --dnd5e-border-gold: 1px solid var(--dnd5e-color-blue-gray-1);
+  --dnd5e-border-dark: 1px solid var(--dnd5e-color-blue-gray-3);
+  --dnd5e-border-dotted: 1px dotted var(--dnd5e-color-blue-gray-3);
+  --dnd5e-border-separator-heavy: 1px solid var(--dnd5e-color-blue-gray-3);
+  --dnd5e-border-heading-3: 1px solid var(--color-text-light-6, #999);
+  --dnd5e-chat-button-border: var(--dnd5e-color-blue-gray-4);
+  --dnd5e-chat-breakdown-border: 1px solid var(--dnd5e-color-blue-gray-4);
+  --control-border-color: var(--dnd5e-color-blue-gray-3);
+  --pill-border: 1px solid var(--dnd5e-color-blue-gray-3);
+  --pill-border-dotted: 1px solid var(--dnd5e-color-blue-gray-3);
+}
+
+/* dnd5e draws the description box's top/bottom rules at 1px dashed, sized against ITS
+ * card. On our painted base they read as barely-there even after §1j lifts the colour,
+ * so thicken them. Theme-independent on purpose — a 2px dash is the intended weight on a
+ * light base too, and splitting it per branch would be two values to keep in sync for no
+ * reason. `.deltas` keeps 1px: it is an inline damage/healing strip, not a box edge.
+ * Normal declaration — `modules` is a later layer than `system`, so it already wins. */
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(section.card-description, .card-description, section.card-header.description, .card-header.description) {
+  border-block-width: var(--fe-chat-desc-line-width, 2px);
+}
+
+/* midi-qol's per-target save rows paint dnd5e's `--dnd5e-color-success-background`
+ * (#c7d0c0) / `--dnd5e-color-failure-background` (#ffdddd) and set NO ink of their own.
+ * Those two are genuine constants — dnd5e never themes them, and pairs them with ink it
+ * pins explicitly (`.dice-result .dice-total.success` gets `--dnd5e-color-success-critical`),
+ * so its own usage is safe in either theme. midi's is not: the row inherits whatever the
+ * card is using, which on a dark base is our light `--fe-system-msg-text` — measured
+ * #f0f0f0 on #ccd7c5.
+ *
+ * So pin the ink rather than repaint the background: the pastel carries the pass/fail
+ * MEANING, and darkening it would only move the contrast problem onto dnd5e's green/red.
+ * No branch and no `!important` — the backgrounds are theme-independent, and the value
+ * being fought is an INHERITED one, which any directly-matching declaration outranks. */
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .midi-results .target:is(.success, .failure) {
+  color: var(--color-text-dark-primary, #191813);
+}
+
+/* …but not into the tooltip that hangs off that row: it paints itself with
+ * `--dnd5e-color-card`, which the block above re-points per base, so it needs the CARD
+ * ink, not the pastel's. Measured without this: #191813 on #252830, dark-on-dark. */
+:is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .midi-results .target:is(.success, .failure) .midi-qol-tooltiptext {
+  color: var(--color-text-primary);
+}
+
+/* Native form controls inside messages — midi-qol's damage-multiplier
+ * `<select>` in `.midi-qol-damage-card` is the observed case. Core's select
+ * rule reads `--input-*`, but `body.theme-dark` declares those vars ON the
+ * control element itself — an element's own declaration always beats an
+ * inherited one, so re-pointing them on `.chat-message` does nothing and the
+ * field stays cool-4 dark no matter what we painted the message. The vars
+ * must be re-pointed on the CONTROL, which is also why this is a selector
+ * rule and not part of the message variable blocks above. Core's own
+ * select/input rule then paints it, exactly like any themed field.
+ * `color-scheme` is inherited; setting it here feeds the UA dropdown glyph
+ * and option popup, which author colours cannot reach. No `!important`:
+ * these selectors already outrank `body.theme-dark input/select`. */
+body.fe-chat-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  :is(input, select, textarea),
+body.fe-sysmsg-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  :is(input, select, textarea) {
+  color-scheme: light;
+  --input-background-color: rgba(0, 0, 0, 0.1);
+  --input-border-color: var(--color-dark-6);
+  --input-text-color: var(--color-dark-2);
+  --input-placeholder-color: var(--color-dark-4);
+  --input-focus-outline-color: var(--color-warm-2);
+}
+
+body.fe-chat-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  :is(input, select, textarea),
+body.fe-sysmsg-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  :is(input, select, textarea) {
+  /* Counterpart of the light arm: already the root values under theme-dark,
+   * but pinned so a theme-LIGHT world with a dark message base does not get
+   * light controls on its dark cards. */
+  color-scheme: dark;
+  --input-background-color: var(--color-cool-4);
+  --input-border-color: transparent;
+  --input-text-color: var(--color-light-3);
+  --input-placeholder-color: var(--color-light-5);
+  --input-focus-outline-color: var(--color-cool-3);
+}
+
+/* The roll-breakdown box is a `popover`, so the browser's UA stylesheet gives it
+ * `color: CanvasText` — an AUTHOR-less declaration that no CSSOM walk over
+ * `document.styleSheets` can see, and that resolves from `color-scheme`, not from the
+ * element's parent. In a dark-theme world it is white, which dnd5e never has to think
+ * about because its own box is dark there. Ours is not: once the block above repaints the
+ * box with `--dnd5e-background-parchment`, the inherited white turned every breakdown box
+ * (and every `.dice-tooltip` nested inside one) into white-on-parchment. `color: inherit`
+ * on the popover restored the correct value, which is how the UA origin was identified.
+ * An author declaration of any specificity beats the UA one, so no `!important`. */
+body.fe-chat-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  :is(.roll-breakdown, .inline-roll.expanded > .dice-tooltip),
+body.fe-sysmsg-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  :is(.roll-breakdown, .inline-roll.expanded > .dice-tooltip) {
+  color: var(--color-text-dark-primary, #191813);
+}
+
+body.fe-chat-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  :is(.roll-breakdown, .inline-roll.expanded > .dice-tooltip),
+body.fe-sysmsg-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  :is(.roll-breakdown, .inline-roll.expanded > .dice-tooltip) {
+  color: var(--color-text-light-0, #fff);
+}
+
 /* Optional opaque base for speakerless system messages. */
 body.fe-system-msg-bg
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -406,8 +764,8 @@ body.fe-system-msg-color #chat-notifications
   .chat-message
   .message-content
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
-  :is(section.card-header.description, .card-header.description)
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.card-header.description, .card-header.description, section.card-description, .card-description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(p, li) {
   margin: 0 0 0.55em 0;
 }
@@ -415,8 +773,8 @@ body.fe-system-msg-color #chat-notifications
   .chat-message
   .message-content
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
-  :is(section.card-header.description, .card-header.description)
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.card-header.description, .card-header.description, section.card-description, .card-description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(p, li):last-child {
   margin-bottom: 0;
 }
@@ -426,8 +784,8 @@ body.fe-system-msg-color #chat-notifications
   .chat-message
   .message-content
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card)
-  :is(section.card-header.description, .card-header.description)
-  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content)
+  :is(section.card-header.description, .card-header.description, section.card-description, .card-description)
+  :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(strong, b) {
   font-weight: var(--fe-chat-card-strong-weight);
   color: inherit;
@@ -647,4 +1005,29 @@ body .chat-card img.gold-icon {
 body.fe-chatcard-icon-crop .chat-card img.gold-icon {
   object-fit: cover !important;
   object-position: center top !important;
+}
+
+
+/* --------------------------------
+ * 2e) dnd5e 6.0 `.message.compact` 표면
+ * --------------------------------
+ * dnd5e 6.0 은 채팅 메시지 `li` **자체**에 배경 + 금색 테두리 + radius + padding 을
+ * 칠한다(`.chat-log .message.compact { background: var(--dnd5e-chat-background);
+ * border: var(--dnd5e-border-gold); … }`). 5.x 는 ::before 양피지만 깔았으므로
+ * 텍스처 제거 대상이 하나 늘어난 셈이다.
+ *
+ * 배경(background-image / background-color)은 위 2c/2d 규칙이 이미 덮는다 —
+ * 우리 쪽은 `modules` 레이어의 `!important`, dnd5e 는 `system` 레이어의 일반
+ * 선언이라 레이어 순서만으로 이긴다. 남는 건 테두리뿐이므로 여기서만 처리한다.
+ *
+ * 병합(fe-merge-*)은 테두리 폭을 자기 `!important` 로 따로 조절하는데, 이 규칙은
+ * `border-color` 만 건드리므로 병합 기하와 충돌하지 않는다.
+ *
+ * 레트로 테마는 같은 테두리를 강조색으로 되살린다(fe-dnd5e-compat.css, layouts
+ * 레이어 → `!important` 역전으로 이쪽을 이긴다). 즉 "텍스처 제거 ON + 레트로 OFF"
+ * 에서만 테두리가 사라진다. */
+body.fe-strip-chat-textures
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
+  :is(.message, .chat-message).compact:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
+  border-color: transparent !important;
 }

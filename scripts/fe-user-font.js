@@ -26,6 +26,12 @@ const FONT_DIR = `modules/${MODULE_ID}/font`;
 // font/ files that back the module's own @font-face declarations — they are
 // already available under their "FE *" family names, so we hide them from the
 // user-font picker to avoid duplicate/confusing entries.
+//
+// The .ttf twins are still listed even though nothing loads them any more: they are
+// export-ignore'd out of the zip (so the entries are simply inert for users), but a
+// dev checkout HAS both files on disk, and dropping them here would surface a second,
+// identical "FEU CookieRun Regular" next to every built-in face. This is a suppression
+// list, not a fallback chain — the fallbacks were removed, these entries stay.
 const FE_BUILTIN_FONT_FILES = new Set([
   "cookierun regular.otf", "cookierun regular.ttf",
   "cookierun bold.otf", "cookierun bold.ttf",

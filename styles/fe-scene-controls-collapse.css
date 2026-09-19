@@ -4,7 +4,10 @@
    Open class:   .fe-sc-open on #scene-controls-layers / #scene-controls-tools
 
    Collapsed (default): each control menu shows ONLY its active cell.
-   Open: the full column is shown; selecting an item re-collapses it.
+   Open: the full column is shown and STAYS open while items are picked; it
+   folds back ONLY on the collapse cell (the active button, marked with an
+   up-caret) — not on a pick, an outside click, Escape, or the other menu
+   opening.
 
    The active cell is selected via aria-pressed, which Foundry keeps in sync
    synchronously on activate, so the visible cell always tracks the selection.
@@ -55,4 +58,33 @@ body.fe-collapse-scene-controls :is(#scene-controls-layers, #scene-controls-tool
 body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open,
 body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open {
   z-index: calc(var(--z-index-app, 30) + 5);
+}
+
+/* Open: mark the collapse cell — the button that folds the menu back. It is the
+   same cell the menu shows when collapsed, so these selectors mirror the
+   collapsed rules above (pressed button; for tools the pressed NON-toggle tool;
+   first-child fallback when nothing is pressed). The caret points up to read as
+   "fold", the collapsed one points down to read as "expand". Keep the two in
+   sync with collapsedCellButton() in fe-scene-controls-collapse.js. */
+body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open > li:has(> button[aria-pressed="true"]) > button,
+body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open > li:has(> button[aria-pressed="true"]:not(.toggle)) > button,
+body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open:not(:has(> li > button[aria-pressed="true"])) > li:first-child > button,
+body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open:not(:has(> li > button[aria-pressed="true"]:not(.toggle))) > li:first-child > button {
+  position: relative;
+}
+body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open > li:has(> button[aria-pressed="true"]) > button::after,
+body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open > li:has(> button[aria-pressed="true"]:not(.toggle)) > button::after,
+body.fe-collapse-scene-controls #scene-controls-layers.fe-sc-open:not(:has(> li > button[aria-pressed="true"])) > li:first-child > button::after,
+body.fe-collapse-scene-controls #scene-controls-tools.fe-sc-open:not(:has(> li > button[aria-pressed="true"]:not(.toggle))) > li:first-child > button::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-bottom: 4px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
 }

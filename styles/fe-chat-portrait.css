@@ -25,7 +25,12 @@
   border: none !important;
 }
 
+/* `display` is a NORMAL declaration on purpose — it used to be written inline with
+   `!important` by cpApplyImgStyling, which no stylesheet can override, so the merge
+   follow rules could never hide a follow message's portrait. Keep it unimportant so
+   `display: none !important` from fe-chat-enhance.css still wins. */
 :is(li.chat-message, #chat-notifications .message).fe-has-chat-portrait > .message-header > img.fe-chat-portrait {
+  display: block;
   grid-area: portrait;
   align-self: stretch !important;
   justify-self: start !important;
@@ -50,6 +55,34 @@ body.fe-chat-card-icon-sizing
   max-height: var(--fe-chat-card-icon-size, 36px) !important;
   flex: 0 0 var(--fe-chat-card-icon-size, 36px) !important;
   object-fit: cover !important;
+}
+
+/* midi-qol AC modifier icons stored as <img class="midi-qol-ac-icon"> (older
+ * messages baked the reaction/cover icon as a plain img; newer renders use
+ * <dnd5e-icon> instead). Live sizes the dnd5e-icon via --icon-size:14px — a
+ * variable a plain <img> ignores — and the stored SVGs are intrinsically 512px,
+ * so without an explicit size the icon floods the whole card. 14px matches
+ * live (.midi-qol-ac-icon --icon-size / .midi-qol-ac-icon-img width). Not gated
+ * on fe-chat-card-icon-sizing: this is a live-parity fix, not user sizing. */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(li.chat-message, .message)
+  .message-content
+  img.midi-qol-ac-icon {
+  width: 14px !important;
+  height: 14px !important;
+  object-fit: contain !important;
+}
+
+/* midi-qol damage receipts title themselves inside #midi-qol-dmg-header. Their
+ * outer Foundry sender header only repeats the actor/GM portrait, name and time.
+ * :has() makes this apply immediately to already-rendered live history without
+ * a JS classification pass; archive output retains its explicit marker rule. */
+:is(#chat-log, .chat-log, ol.chat-log, #chat-notifications)
+  :is(li.chat-message, .message):has(
+    > .message-content :is(.midi-qol-damage-card, .midi-qol-player-damage-card)
+  )
+  > .message-header {
+  display: none !important;
 }
 
 :is(li.chat-message, #chat-notifications .message).fe-has-chat-portrait > .message-header .message-sender {

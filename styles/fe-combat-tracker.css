@@ -421,7 +421,10 @@
 }
 
 .fe-ct-portrait.is-active .fe-ct-name {
-  top: calc(var(--fe-ct-h, var(--fe-ct-size)) - 3px);
+  /* The whole active portrait, including this caption, stays at 110%. Pull the
+     enlarged caption slightly inward so its bottom edge remains inside the
+     strip's existing clipping boundary without making the strip any taller. */
+  top: calc(var(--fe-ct-h, var(--fe-ct-size)) - 6px);
   z-index: 8;
 }
 

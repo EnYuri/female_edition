@@ -25,17 +25,20 @@
  * 1) @font-face 등록 (항상 로드)
  * =================================================== */
 
-/* OTF 우선, TTF 폴백 — CookieRun과 동일한 구성.
- * 두 파일은 같은 서체이고 OTF가 730KB, TTF가 6.3MB로 8.6배 차이가 난다. 이 크기 차이는
- * 아카이브 내보내기에서 결정적이다: HTML 스냅샷의 폰트 임베드는 base64 팽창으로 인한
- * Chromium/Electron OOM을 막으려고 파일당 상한(1.2MB)을 두는데, TTF는 그 상한을 넘어
- * 항상 제외되고 저장된 파일에서 face 로드가 실패했다(document.fonts → "FE Geurimilgi: error").
- * OTF는 상한 아래라 자동으로 임베드된다. 순서를 뒤집지 말 것. */
+/* OTF 단독 — CookieRun과 동일한 구성.
+ * 이전에는 TTF 폴백을 두 번째 src로 놓았으나, .gitattributes가 TTF 쪽을
+ * export-ignore 하면서 배포본에는 존재하지 않는 파일을 가리키는 죽은 항목이 됐다.
+ * 두 파일은 같은 서체이며 cmap 커버리지가 완전히 동일하다(한글 11172/11172,
+ * 글리프 12640개 일치). 크기 차이는 CFF vs glyf 인코딩 차이일 뿐이다.
+ * 그래도 OTF여야 하는 이유는 따로 있다: 아카이브 내보내기의 폰트 임베드는
+ * base64 팬창으로 인한 Chromium/Electron OOM을 막으려고 파일당 상한(1.2MB)을 두는데,
+ * 6.3MB TTF는 그 상한을 넘어 항상 제외되고 저장된 파일에서 face 로드가 실패했다
+ * (document.fonts → "FE Geurimilgi: error"). 730KB OTF는 상한 아래라 자동으로 임베드된다.
+ * TTF를 되살리지 말 것. */
 @font-face {
   font-family: "FE Geurimilgi";
   src:
-    url("../font/HakgyoansimGeurimilgi-R.otf") format("opentype"),
-    url("../font/HakgyoansimGeurimilgi-R.ttf") format("truetype");
+    url("../font/HakgyoansimGeurimilgi-R.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -45,8 +48,7 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("../font/CookieRun%20Regular.otf") format("opentype"),
-    url("../font/CookieRun%20Regular.ttf") format("truetype");
+    url("../font/CookieRun%20Regular.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -56,8 +58,7 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("../font/CookieRun%20Bold.otf") format("opentype"),
-    url("../font/CookieRun%20Bold.ttf") format("truetype");
+    url("../font/CookieRun%20Bold.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -67,8 +68,7 @@
 @font-face {
   font-family: "FE CookieRun";
   src:
-    url("../font/CookieRun%20Black.otf") format("opentype"),
-    url("../font/CookieRun%20Black.ttf") format("truetype");
+    url("../font/CookieRun%20Black.otf") format("opentype");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -562,6 +562,22 @@ body.fe-fonts-enabled #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info
   font-family: inherit !important;
 }
 
+/* monks-tokenbar 의 h3/탐색 행은 tokenbar.css 가 font-family 를 리터럴로
+   박는다("Modesto Condensed", "Palatino Linotype", serif — :642 의
+   .sheet .items-header h3, :754 의 .card-header h3, :1360 의
+   #assignexperience .sheet-navigation). 요소에 직접 선언된 font-family 는
+   상속을 이기므로 컨테이너의 카드 폰트가 내려가지 못한다. 위 dx3rd 폼 컨트롤과
+   같은 사정 — inherit 로 물려받으면 카드 폰트 OFF(시스템)/ON(세컨더리) 두
+   모드를 모두 올바르게 따라간다. #assignexperience 는 다이얼로그라 채팅
+   표면 밖 — 상속원은 .application 의 UI 폰트다. */
+body.fe-fonts-enabled #sidebar #chat .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
+body.fe-fonts-enabled #chat-notifications .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
+body.fe-fonts-enabled .chat-popout #chat .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
+body.fe-fonts-enabled #fe-chat-export-log .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
+body.fe-fonts-enabled #assignexperience .sheet-navigation {
+  font-family: inherit !important;
+}
+
 body.fe-fonts-enabled.fe-chatcard-custom-font #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-fonts-enabled.fe-chatcard-custom-font #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-fonts-enabled.fe-chatcard-custom-font .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
@@ -590,9 +606,13 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-log :is(.chat-card
 body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .chat-message
-  :is(.chat-card.item-card, .chat-card.activation-card)
-  > .card-header.description
-  > .details.collapsible-content.card-content
+  :is(.chat-card.item-card, .chat-card.activation-card, .chat-card)
+  :is(
+    .card-header.description > .details.collapsible-content.card-content,
+    /* dnd5e 6.0 (.message.compact): <section class="card-description collapsible">
+       > <div class="collapsible-content"> > <div class="wrapper">. */
+    .card-description > .collapsible-content
+  )
   :is([style*="font-family"], font[face]) {
   font-family: var(--fe-font-secondary) !important;
 }
@@ -603,9 +623,13 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
 body.fe-fonts-enabled.fe-chatcard-custom-font
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .chat-message
-  :is(.chat-card.item-card, .chat-card.activation-card)
-  > .card-header.description
-  > .summary
+  :is(.chat-card.item-card, .chat-card.activation-card, .chat-card)
+  :is(
+    .card-header.description > .summary,
+    /* dnd5e 6.0: the <header class="summary"> wrapper is gone — .card-header
+       itself now holds .item-icon / .activity-icon / .name-stacked / .chevron. */
+    .card-header
+  )
   .name-stacked
   :is(.title, .subtitle) {
   font-family: var(--fe-font-primary) !important;
@@ -634,6 +658,19 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
   display: inline-flex !important;
   align-items: center !important;
   gap: var(--fe-chat-meta-gap) !important;
+}
+
+/* Merge follow messages hide the speaker strip (name + portrait + timestamp) — that is
+   what "merged" means, and fe-chat-enhance.css says so with `display: none !important`.
+   But this sheet is `layer(layouts)` and that one is `layer(modules)`, and for
+   `!important` the layer order REVERSES (see CLAUDE.md § CSS Cascade Layers), so the
+   `display: inline-flex !important` above beat it no matter how specific the merge
+   selector was — a merged follow message kept showing "34분 전" beside its flavor line.
+   The exception has to live in THIS sheet for the same reason. All three follow-header
+   modes (hide / name / portrait) hide the metadata, so no mode needs it back. */
+body.fe-fonts-enabled.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-metadata {
+  display: none !important;
 }
 
 body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)

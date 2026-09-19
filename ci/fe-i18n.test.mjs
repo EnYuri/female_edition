@@ -6,11 +6,19 @@ import { FE_SETTING_DEFINITIONS, CHOICES, FE_DEFAULTS } from "../scripts/fe-sett
 
 const root = new URL("../", import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL("module.json", root), "utf8"));
-const translations = Object.assign({}, ...manifest.languages.filter(entry => entry.lang === "ko")
+
+// female_edition's OWN translations only. The manifest also registers the Korean and
+// English strings of the vendored Tidy 5e Classic fork (tidy-classic/public/lang/), which
+// are third-party `TIDY5E.*` keys redistributed as-is — they are not ours to consolidate,
+// rename or lint, and they must stay registered so the fork keeps its strings even if
+// tidy5e-sheet 14 is uninstalled.
+const feLanguageEntries = manifest.languages.filter(
+  entry => entry.lang === "ko" && !entry.path.startsWith("tidy-classic/"));
+const translations = Object.assign({}, ...feLanguageEntries
   .map(entry => JSON.parse(readFileSync(new URL(entry.path, root), "utf8"))));
 
 test("a single korean language file holds every translation without duplicate keys", () => {
-  const entries = manifest.languages.filter(entry => entry.lang === "ko");
+  const entries = feLanguageEntries;
   assert.equal(entries.length, 1);
   assert.equal(entries[0].path, "lang/ko.json");
   const source = readFileSync(new URL(entries[0].path, root), "utf8");

@@ -205,6 +205,20 @@ function feShouldMergeRollMessages() {
   }
 }
 
+// Chat cards (dnd5e/midi/monks/dx3rd) were unconditionally unmergeable until this
+// setting existed; it defaults ON — merging them is the verified shipped behaviour.
+// It is visually safe because a card carries its own header (item name + icon) inside
+// the message content, so hiding the follow message's speaker header loses no
+// information — but dnd5e 6.0 paints `li.message.compact` itself (border + radius +
+// padding), so `chat-bg-stripper.css` has to flatten the seams inside a merged group.
+function feShouldMergeChatCards() {
+  try {
+    return !!feSetting(S.MERGE_INCLUDE_CHAT_CARDS);
+  } catch {
+    return false;
+  }
+}
+
 function feComputeMergeRuntimeBehavior({
   isNarrator = false,
   isRoundMarker = false,
@@ -213,10 +227,17 @@ function feComputeMergeRuntimeBehavior({
   hasRolls = false,
 } = {}) {
   const includeRollMessages = feShouldMergeRollMessages();
+  const includeChatCards = feShouldMergeChatCards();
   const hasRollMessage = !!(hasDice || hasRolls);
-  const mergeableText = !hasChatCard && (includeRollMessages || !hasRollMessage);
-  const noMerge = !!isNarrator || !!isRoundMarker || !!hasChatCard || (!includeRollMessages && hasRollMessage);
-  return { includeRollMessages, hasRollMessage, mergeableText, noMerge };
+  // A chat card is governed by the CARD setting alone, even when it carries rolls.
+  // Almost every dnd5e/midi card does (an attack card holds its d20, a damage card its
+  // dice), so letting the roll setting veto them would have made the card switch inert
+  // in exactly the system it was added for. The roll setting keeps its original meaning:
+  // BARE roll-result messages, the ones with no card around them.
+  const mergeableText = hasChatCard ? includeChatCards : (includeRollMessages || !hasRollMessage);
+  const noMerge = !!isNarrator || !!isRoundMarker
+    || (hasChatCard ? !includeChatCards : (!includeRollMessages && hasRollMessage));
+  return { includeRollMessages, includeChatCards, hasRollMessage, mergeableText, noMerge };
 }
 
 // -------------------------------------
@@ -353,6 +374,12 @@ function feIsNarratorToolsMessage(message, messageEl) {
     if (messageEl?.classList?.contains?.("narrator-chat") || messageEl?.classList?.contains?.("fe-narrator-chat")) return true;
     const state = feGetStoredRenderState(message);
     if (typeof state?.isNarrator === "boolean") return state.isNarrator;
+    // Our own narrator (/narrate, /describe, /note) — the canonical flag
+    // fe-narrator.js stamps. Needed for messages created before the versioned
+    // renderState flag existed (imported/old-world logs): without it they were
+    // misclassified as ordinary system messages and picked up the GM-color tint.
+    if (message?.getFlag?.(MODULE_ID, "isNarrator") || message?.flags?.[MODULE_ID]?.isNarrator) return true;
+    if (message?.getFlag?.(MODULE_ID, "narratorType") || message?.flags?.[MODULE_ID]?.narratorType) return true;
     if (message?.getFlag?.("narrator-tools", "type")) return true;
     if (message?.flags?.["narrator-tools"]) return true;
     return false;
@@ -489,8 +516,12 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     el0.classList.toggle("fe-narrator-chat", isNarratorTools);
     el0.classList.toggle("fe-round-marker-chat", isRoundMarker);
     if (isNarratorTools || isRoundMarker) {
-      el0.classList.remove("fe-system-msg", "fe-has-user-color");
+      // fe-system-gm-tint must go too: a pass that ran BEFORE narrator detection
+      // could work (no element class yet, no stored state on imported logs)
+      // stamps it, and the early return below is the only place it can come off.
+      el0.classList.remove("fe-system-msg", "fe-has-user-color", "fe-system-gm-tint");
       el0.style.removeProperty("--fe-user-color-rgb");
+      el0.style.removeProperty("--fe-user-color-alpha");
       return;
     }
 
@@ -500,6 +531,10 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
     const isSystemMessage = charColor == null;
     el0.classList.toggle("fe-system-msg", isSystemMessage);
     el0.classList.remove("fe-system-gm-tint");
+    // The GM tint carries its own alpha var (ceSystemMsgAlpha); any message that
+    // is not on the gm-tint path must drop it so the body-level user alpha
+    // (--fe-user-color-alpha from ceUserColorAlpha) governs again.
+    el0.style.removeProperty("--fe-user-color-alpha");
 
     // System messages can optionally reuse the active GM's user-color tint.
     // They intentionally remain independent of the ordinary player tint/base
@@ -510,6 +545,9 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
         el0.classList.remove("fe-has-user-color");
         el0.classList.add("fe-system-gm-tint");
         el0.style.setProperty("--fe-user-color-rgb", `${parsed.r} ${parsed.g} ${parsed.b}`);
+        const sysAlpha = Number(feSetting(S.SYSTEM_MSG_ALPHA));
+        el0.style.setProperty("--fe-user-color-alpha",
+          String(Number.isFinite(sysAlpha) ? Math.min(0.8, Math.max(0.05, sysAlpha)) : 0.22));
         return;
       }
     }
@@ -681,6 +719,8 @@ function feStampRenderedStateAttributes(message, messageEl) {
       isNarrator: isNarratorTools,
       isRoundMarker,
       noMerge: mergeRuntime.noMerge,
+      // feMergeKey normalizes a roll's style/alias, so it needs to know this is a roll.
+      hasRollMessage: mergeRuntime.hasRollMessage,
     };
 
     const mergeKey = feMergeKey(mergeInfo);
@@ -763,6 +803,9 @@ function feMessageMergeInfo(msg, el) {
     isNarrator: isNarratorTools,
     isRoundMarker,
     noMerge: mergeRuntime.noMerge,
+    // Callers rebuild the key with feMergeKey(info, basis) whenever it is not stamped, and
+    // the roll normalization there keys off this flag.
+    hasRollMessage: mergeRuntime.hasRollMessage,
   };
 }
 
@@ -771,13 +814,71 @@ function feMessageMergeInfo(msg, el) {
 // (lives here to avoid circular: merge.js imports these, render-state.js does not import from merge.js)
 // -------------------------------------
 
+/** The display name of the user who authored a message, or "" if it cannot be resolved. */
+function feAuthorDisplayName(authorId) {
+  try {
+    if (!authorId) return "";
+    return String(game?.users?.get?.(authorId)?.name ?? "");
+  } catch {
+    return "";
+  }
+}
+
+// Foundry stamps a ROLL differently from a typed line even when the same user sends both,
+// and the merge key encodes both differences, so `ceMergeIncludeRollMessages` used to lift
+// the `noMerge` veto and change nothing visible: a roll could still only ever pair with
+// another roll. Measured on a live log — the same GM's `/r` and their next OOC line:
+//
+//   roll : author || |나유리|  || || 0 || || 0     style OTHER(0), alias "나유리"
+//   OOC  : author || ||        || || 0 || || 1     style OOC(1),   alias null
+//
+// `feCanMergePair` compares the keys as whole strings, so BOTH components have to agree;
+// normalizing one of them alone is inert (verified by rebuilding the key each way).
+//
+// Both differences are Foundry's stamping, not a real distinction:
+//   * `speaker.alias` — `ChatMessage.getSpeaker()` with no actor falls back to the user's
+//     own name, while a typed OOC line leaves `alias` null. Same speaker, two spellings.
+//     Compared against the AUTHOR's name rather than blanked outright, so a deliberate
+//     custom alias on an actor-less roll still keeps its own group.
+//   * `style` — `OTHER` is not a channel the way IC/OOC/EMOTE are; it is "this is a roll".
+//     It is mapped to the channel the roll BELONGS to (IC when the speaker carries an
+//     actor, OOC otherwise) rather than dropped from the key, because dropping it would
+//     also let an EMOTE merge into its actor's IC lines, which is a different feature.
+//
+// Both are gated on the setting AND on the message actually carrying rolls, so with the
+// setting off the key is byte-identical to what it has always been.
+function feNormalizeRollMergeComponents(info) {
+  const style = info?.style ?? "";
+  const speakerKey = info?.speakerKey ?? "";
+  if (!info?.hasRollMessage) return { style, speakerKey };
+  try {
+    if (!feShouldMergeRollMessages()) return { style, speakerKey };
+  } catch {
+    return { style, speakerKey };
+  }
+
+  const parts = String(speakerKey).split("|");
+  const actorId = parts[2] ?? "";
+  const alias = parts[3] ?? "";
+
+  const authorName = feAuthorDisplayName(info?.authorId);
+  const normalizedParts = parts.slice();
+  if (!actorId && alias && authorName && alias === authorName) normalizedParts[3] = "";
+
+  const STYLES = globalThis.CONST?.CHAT_MESSAGE_STYLES ?? {};
+  const normalizedStyle = actorId ? (STYLES.IC ?? 2) : (STYLES.OOC ?? 1);
+
+  return { style: normalizedStyle, speakerKey: normalizedParts.join("|") };
+}
+
 function feMergeKey(info, basisOverride) {
   if (info?.precomputedKey) return String(info.precomputedKey);
+  const normalized = feNormalizeRollMergeComponents(info);
   const author = info?.authorId ?? "";
   const whisper = info?.whisperKey ?? "";
   const blind = info?.blind ? "1" : "0";
   const rollMode = info?.rollMode ?? "";
-  const style = info?.style ?? "";
+  const style = normalized.style ?? "";
 
   const basis = basisOverride != null
     ? String(basisOverride)
@@ -787,14 +888,17 @@ function feMergeKey(info, basisOverride) {
   if (basis === "author") {
     speakerComponent = "";
   } else if (basis === "actor") {
-    const raw = info?.speakerKey ?? "";
+    const raw = normalized.speakerKey ?? "";
     const parts = raw.split("|");
     const actorId = parts[2] ?? "";
     const alias   = parts[3] ?? "";
     const special = parts.slice(4).join("|");
     speakerComponent = [actorId, alias, special].join("|");
   } else {
-    speakerComponent = info?.speakerKey ?? "";
+    // The "speaker" basis keeps scene + token in the key on purpose — it means "the exact
+    // same token spoke". A roll and a typed line differ there too, so the normalization
+    // above cannot make them meet, and that is the stricter basis doing its job.
+    speakerComponent = normalized.speakerKey ?? "";
   }
 
   return [author, speakerComponent, whisper, blind, rollMode, style].join("||");
@@ -818,6 +922,7 @@ export {
   feMessageHasChatCardContent,
   feMessageHasDiceCardContent,
   feShouldMergeRollMessages,
+  feShouldMergeChatCards,
   feComputeMergeRuntimeBehavior,
   feComputeMessageRenderState,
   feMessageRenderStateOverrides,

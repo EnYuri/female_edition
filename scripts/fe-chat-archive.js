@@ -41,6 +41,10 @@ import {
   feChatPortraitApplyVars,
 } from "./fe-chat-portrait.js";
 import { cpMaybeApplyHQResample } from "./fe-chat-portrait-image.js";
+import {
+  feRestoreMidiDamageTypeIcons,
+  feRestoreMidiItemDescription,
+} from "./fe-midi-damage-types.js";
 
 // Image processing: canvas downscale, background freeze.
 import {
@@ -1789,6 +1793,169 @@ function feMarkHeaderlessArchiveCards(node) {
   } catch {}
 }
 
+// dnd5e 6.0 emits <recorded-targets> as an EMPTY container — every child is
+// built by RecordedTargetsElement#connectedCallback in the live document
+// (buildTargetContainer + buildTargetsList). In the archive document there is
+// no dnd5e JS, so the element never upgrades and system-rendered/fallback
+// messages lose the entire targets row; live clones survive via the already-
+// built DOM — the same split as the dnd5e-icon case below. Rebuild a static
+// equivalent from msg.system.targets — each descriptor already carries
+// {ac, actor, img, name, token} (TargetsField.getDescriptors) — mirroring the
+// live markup: section.icon-row > ul.targets.pills > li > target-pill > label +
+// datalist>option.
+function fePopulateArchiveRecordedTargets(node, msg, targetDoc) {
+  try {
+    if (!feIsElement(node)) return;
+    const doc = targetDoc || node.ownerDocument || document;
+    const descriptors = Array.isArray(msg?.system?.targets) ? msg.system.targets : [];
+    for (const el of node.querySelectorAll?.("recorded-targets") ?? []) {
+      // A live clone already carries the built list — never replace real content.
+      if (el.querySelector("ul.targets") || el.querySelector("target-pill")) continue;
+      const row = doc.createElement("section");
+      row.className = "icon-row";
+      // Live prepends targetSourceControl — an icon button toggling the
+      // targeted/selected source mode. Inert here, but kept for visual parity:
+      // it is part of the row's chrome on every live card.
+      const sourceControl = doc.createElement("button");
+      sourceControl.type = "button";
+      sourceControl.classList.add("icon", "target-source-toggle");
+      sourceControl.toggleAttribute("data-tooltip", true);
+      const list = doc.createElement("ul");
+      list.classList.add("targets", "unlist", "pills");
+      // If this element is ever adopted into the LIVE document (the in-document
+      // export path), RecordedTargetsElement#connectedCallback would wipe our
+      // children — unless `targetList`/`targetSourceControl` are already set and
+      // rebuilds are suspended. Point them at our own nodes so the upgrade
+      // becomes a no-op. Inert in the popup/iframe, where nothing upgrades.
+      // _refreshTargetMode(): the default "targeted" mode + disabled when the
+      // message recorded no targets.
+      sourceControl.dataset.mode = "targeted";
+      sourceControl.disabled = !descriptors.length;
+      try {
+        el.targetList = list;
+        el.targetSourceControl = sourceControl;
+        el.setAttribute("suspended", "");
+      } catch {}
+      if (!descriptors.length) {
+        const li = doc.createElement("li");
+        li.classList.add("none", "pill", "target", "transparent");
+        try {
+          li.textContent = String(game.i18n?.localize?.("DND5E.Tokens.NoTargets") ?? "") || "No Targets";
+        } catch {
+          li.textContent = "No Targets";
+        }
+        list.appendChild(li);
+      } else {
+        // Group per actor like live's token.getGroupingKey → "3× Goblin".
+        const groups = new Map();
+        for (const d of descriptors) {
+          const key = String(d?.actor ?? d?.token ?? d?.name ?? "");
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(d);
+        }
+        for (const members of groups.values()) {
+          const first = members[0] ?? {};
+          const name = String(first.name ?? "");
+          const li = doc.createElement("li");
+          const pill = doc.createElement("target-pill");
+          const label = doc.createElement("label");
+          if (members.length > 1) {
+            try {
+              label.textContent = game.i18n.format("DND5E.CHATMESSAGE.Targets.Count", { name, number: members.length });
+            } catch {
+              label.textContent = `${members.length}× ${name}`;
+            }
+          } else {
+            label.textContent = name;
+          }
+          const dl = doc.createElement("datalist");
+          for (const m of members) {
+            const opt = doc.createElement("option");
+            if (m?.token) opt.value = String(m.token);
+            opt.toggleAttribute("data-checked", true);
+            opt.append(String(m?.name ?? ""));
+            dl.appendChild(opt);
+          }
+          pill.append(label, dl);
+          li.appendChild(pill);
+          list.appendChild(li);
+        }
+      }
+      row.append(sourceControl, list);
+      el.replaceChildren(row);
+    }
+  } catch {}
+}
+
+// dnd5e 6.0's interactive trays — <damage-application> (damage-card.hbs) and
+// <effect-application> (usage-card.hbs) — are emitted EMPTY too: the whole
+// apply-damage / apply-effect UI is built by the element's JS in the live
+// document. A rebuilt message therefore carries an element with no children,
+// which feExpandCollapsedArchiveSections would happily un-collapse into an
+// empty box — while a live clone of the same card shows the full control
+// surface. The controls are dead UI in an export either way, but an EMPTY one
+// is pure noise, so strip only the empty ones (clones keep their real content).
+function feStripEmptyArchiveTrays(node) {
+  try {
+    if (!feIsElement(node)) return;
+    for (const el of node.querySelectorAll?.("damage-application, effect-application") ?? []) {
+      try {
+        if (!el.querySelector("*")) el.remove();
+      } catch {}
+    }
+  } catch {}
+}
+
+// midi-qol's renderChatMessage hook edits the DOM per VIEWER ROLE, in JS — it
+// removes one of the two name spans every save/hit row carries
+// (.midi-qol-gmTokenName vs .midi-qol-playerTokenName) and, for GMs, hides
+// .midi-qol-target-npc-Player (hideAll → inline display:none). Live clones copy
+// the already-edited DOM and are fine; system-rendered and fallback messages
+// carry the raw template with BOTH name spans, so the target's name rendered
+// twice. Re-run the same unconditional edits here: remove the span the current
+// user would not see live, and apply the GM-only hide. The remaining player-
+// side items (hits-display when autoCheckHit is "gmOnly", confirm buttons,
+// author checks) depend on midi config / per-message authorship and are left
+// alone. Safe on clones: the wrong-role span is already gone there, and hiding
+// an already-hidden element is a no-op — the function is idempotent.
+function feApplyMidiQolViewerRole(node) {
+  try {
+    if (!feIsElement(node)) return;
+    const isGM = !!game?.user?.isGM;
+    for (const el of node.querySelectorAll?.(isGM ? ".midi-qol-playerTokenName" : ".midi-qol-gmTokenName") ?? []) {
+      try { el.remove(); } catch {}
+    }
+    if (isGM) {
+      for (const el of node.querySelectorAll?.(".midi-qol-target-npc-Player") ?? []) {
+        try { el.style.display = "none"; } catch {}
+      }
+    }
+  } catch {}
+}
+
+// Font Awesome webfonts are not reliably embedded by every browser's PDF
+// backend. Keep these two damage-receipt controls legible in saved HTML/PDF by
+// replacing only their icon-font nodes with ordinary Unicode text.
+function feNormalizeArchiveMidiDamageButtonIcons(node) {
+  try {
+    if (!feIsElement(node)) return;
+    const replacements = [
+      [".midi-qol-dmg-btn-apply > i", "\u2713"],
+      [".midi-qol-dmg-btn-reverse > i", "\u21BA"],
+    ];
+    const doc = node.ownerDocument || document;
+    for (const [selector, glyph] of replacements) {
+      for (const icon of node.querySelectorAll?.(selector) ?? []) {
+        const span = doc.createElement("span");
+        span.className = "fe-archive-midi-damage-glyph";
+        span.setAttribute("aria-hidden", "true");
+        span.textContent = glyph;
+        icon.replaceWith(span);
+      }
+    }
+  } catch {}
+}
+
 // ---------------------------------------------------------------------------
 // dnd5e-icon inlining
 //
@@ -1927,8 +2094,14 @@ function feFinalizeArchiveSpecialMessageState(node, msg, liveEl = null) {
     }
 
     if (isNarrator || isRoundMarker) {
-      node.classList.remove('fe-has-user-color');
+      // Mirror feApplyUserColorBgToMessageElement's early return: narrator and
+      // round-marker messages never carry user-color machinery. A live clone can
+      // still bring a stale fe-system-gm-tint/fe-system-msg stamped before its
+      // narrator class existed (imported logs, no stored render state), so all
+      // three classes — and the tint var — come off here.
+      node.classList.remove('fe-has-user-color', 'fe-system-msg', 'fe-system-gm-tint');
       node.style?.removeProperty?.('--fe-user-color-rgb');
+      node.style?.removeProperty?.('--fe-user-color-alpha');
     }
 
     if (!isRoundMarker) {
@@ -2206,7 +2379,43 @@ async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null, render
 
   if (feIsElement(node)) {
     try {
+      feRestoreMidiDamageTypeIcons(msg, node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      await feRestoreMidiItemDescription(msg, node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
       feMarkHeaderlessArchiveCards(node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      fePopulateArchiveRecordedTargets(node, msg, targetDoc || document);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      feStripEmptyArchiveTrays(node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      feApplyMidiQolViewerRole(node);
+    } catch {}
+  }
+
+  if (feIsElement(node)) {
+    try {
+      feNormalizeArchiveMidiDamageButtonIcons(node);
     } catch {}
   }
 
@@ -2505,6 +2714,15 @@ async function feRenderChatArchiveWindow(win, {
       #fe-chat-export-log dnd5e-icon {
         display: contents;
       }
+      #fe-chat-export-log .dice-total > dnd5e-icon.midi-damage-type-icon {
+        display: inline-block;
+        position: absolute !important;
+        inset-block-start: 50% !important;
+        inset-inline-end: 38px !important;
+        margin: 0 !important;
+        vertical-align: initial !important;
+        transform: translateY(-50%) !important;
+      }
       #fe-chat-export-log svg.fe-dnd5e-icon-svg {
         fill: var(--icon-fill, #000);
         width: var(--icon-width, var(--icon-size, 1em));
@@ -2599,16 +2817,16 @@ async function feRenderChatArchiveWindow(win, {
       #fe-chat-export-log {
         background: #000000 !important;
         background-image: none !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
       }
       .fe-chat-export-status {
         background: #000000 !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
         border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
       }
       .fe-chat-export-action {
         background: #000000 !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
         border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
       }
       /* This inline pixel fallback must own hover too. Its base background is
@@ -2618,11 +2836,23 @@ async function feRenderChatArchiveWindow(win, {
       .fe-chat-export-action:hover {
         background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
       }
-      #fe-chat-export-log .chat-message {
+      /* Special-background messages are EXCLUDED from the flat black: user-color
+       * tints, narrator bars, round markers, and the system-msg background all
+       * carry their own layered-important surfaces (chat-bg-stripper.css /
+       * fe-chat-archive.css), which an unlayered-important fallback would beat —
+       * erasing them on rebuilt messages while live clones kept them through the
+       * mirror. With no compat sheets at all these render transparent over the
+       * page's black, which stays readable because the text color below still
+       * applies. Same exclusion set chat-bg-stripper itself uses. */
+      #fe-chat-export-log .chat-message:not(
+        .fe-has-user-color, .narrator-chat, .fe-narrator-chat,
+        .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"],
+        :has(.round-marker), .fe-system-msg
+      ) {
         background: #000000 !important;
         background-color: #000000 !important;
         background-image: none !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
         /* Fallback only: an OOC message carries the author's border color as
          * an inline style. Making this important erased that core distinction
          * on rebuilt/older messages while live-cloned messages kept it through
@@ -2638,7 +2868,7 @@ async function feRenderChatArchiveWindow(win, {
       #fe-chat-export-log .chat-message .message-content {
         background: transparent !important;
         background-image: none !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
       }
       #fe-chat-export-log .chat-message .message-header *,
       #fe-chat-export-log .chat-message .message-sender,
@@ -2649,7 +2879,7 @@ async function feRenderChatArchiveWindow(win, {
       #fe-chat-export-log .chat-message .message-flavor,
       #fe-chat-export-log .chat-message .flavor-text,
       #fe-chat-export-log .chat-message .message-metadata {
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
       }
       #fe-chat-export-log .chat-message :is(
         .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
@@ -2658,7 +2888,7 @@ async function feRenderChatArchiveWindow(win, {
         background: #000000 !important;
         background-color: #000000 !important;
         background-image: none !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
         /* Preserve semantic/system inline card borders when present. */
         border-color: rgba(255,255,255,0.7);
       }
@@ -2670,7 +2900,28 @@ async function feRenderChatArchiveWindow(win, {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
-        color: rgba(230,230,230,0.82) !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+      }
+      /* dnd5e retro cards are NOT literal black — compat paints their interior
+       * surface --fe-ac-08 and the description inset --fe-ac-06, scoped to
+       * fe-retro-system-dnd5e. Reading the tokens keeps rebuilt messages
+       * identical to live-cloned ones (which carry the same resolved colors
+       * through the style mirror); when the compat sheets failed to load — the
+       * state this fallback exists for — the tokens are undefined and var()
+       * falls back to the flat black above. dx3rd cards stay literal black,
+       * matching fe-dx3rd-compat.css §10. Higher specificity than the generic
+       * rules so these win under the dnd5e scope only. */
+      body.fe-retro-system-dnd5e #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card
+      ) {
+        background: var(--fe-ac-08, #000000) !important;
+        background-color: var(--fe-ac-08, #000000) !important;
+        background-image: none !important;
+      }
+      body.fe-retro-system-dnd5e #fe-chat-export-log .chat-message .card-description {
+        background: var(--fe-ac-06, transparent) !important;
+        background-color: var(--fe-ac-06, transparent) !important;
+        background-image: none !important;
       }
     </style>` : ""}
   </head>

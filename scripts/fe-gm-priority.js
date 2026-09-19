@@ -17,6 +17,20 @@ const FE_INFRASTRUCTURE_KEYS = new Set([
   FE_CORE_PRIORITY_BACKUP_KEY,
 ]);
 
+// The vendored Tidy 5e Classic fork (tidy-classic/) registers ITS settings in our
+// namespace, because tidy5e-sheet 14 still owns `tidy5e-sheet` and two modules cannot
+// register the same `namespace.key`. They are therefore `female_edition` settings as far
+// as Foundry is concerned, and both sweeps below take EVERY registered client-scope key —
+// so without this guard the GM would force every player's sheet layout, tab order, pinned
+// attributes and colour theme, and the per-world store would start shadowing them too.
+// They are a third-party module's preferences, not female_edition features, and they have
+// their own settings window; they stay personal.
+const FE_TIDY_CLASSIC_KEY_PREFIX = "tidyClassic-";
+
+function feIsTidyClassicSettingKey(key) {
+  return String(key ?? "").startsWith(FE_TIDY_CLASSIC_KEY_PREFIX);
+}
+
 let feSyncingLocalGmPrioritySettings = false;
 let feHydratingWorldSettings = false;
 
@@ -39,6 +53,7 @@ function feIsGmPriorityEnabled() {
 function feIsGmPrioritySettingKey(key) {
   try {
     if (!key || FE_INFRASTRUCTURE_KEYS.has(key)) return false;
+    if (feIsTidyClassicSettingKey(key)) return false;
     if (FE_GM_PRIORITY_EXCLUDED_KEYS.has(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
@@ -326,6 +341,7 @@ function feGetWorldId() {
 function feIsPerWorldSettingKey(key) {
   try {
     if (!key || FE_INFRASTRUCTURE_KEYS.has(key)) return false;
+    if (feIsTidyClassicSettingKey(key)) return false;
     const cfg = feGetRegisteredSettingConfig(key);
     if (!cfg) return false;
     return String(cfg.scope ?? "") === "client";

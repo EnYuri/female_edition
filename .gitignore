@@ -14,6 +14,13 @@ node_modules/
 *.md
 !README.md
 
+# ...and except licences/attribution for the third-party code vendored under
+# tidy-classic/ (Tidy 5e Sheets and the RPG-Awesome icon font). We redistribute
+# those files, so their licence text has to ship with them.
+!tidy-classic/**/LICENSE.md
+!tidy-classic/LICENSE.md
+!tidy-classic/NOTICE.md
+
 # OS cruft
 .DS_Store
 Thumbs.db

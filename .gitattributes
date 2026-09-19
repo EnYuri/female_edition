@@ -14,3 +14,43 @@ package.json      export-ignore
 package-lock.json export-ignore
 eslint.config.mjs export-ignore
 node_modules      export-ignore
+# --- tidy-classic (vendored Tidy 5e Classic) -------------------------------
+# module.json loads ONLY the build output, so the Svelte/TS sources and the
+# build tooling must not ship. What DOES ship: dist/*.js + dist/*.css,
+# public/ (templates, lang, fonts, rpg-awesome), styles/, and the licence text.
+# Note `package.json` / `package-lock.json` above are basename patterns and
+# already cover tidy-classic's copies; these are the paths they do not reach.
+tidy-classic/src              export-ignore
+tidy-classic/vite.config.ts   export-ignore
+tidy-classic/svelte.config.js export-ignore
+tidy-classic/tsconfig.json    export-ignore
+tidy-classic/node_modules     export-ignore
+# Source maps are dev-only and are the single largest artefact in the tree
+# (tidy-classic.js.map alone is ~6 MB, larger than the bundle it maps).
+tidy-classic/dist/*.map       export-ignore
+# Upstream Tidy ships 17 locales; module.json declares only en + ko, so Foundry
+# never loads the other 15. They stay in the repo (they are the upstream source,
+# and adding a locale means declaring one of them) but must not ship.
+# gitattributes has no `!` negation — the LAST matching line wins, so the two
+# keepers unset the attribute the wildcard set. A locale upstream adds later is
+# excluded by default, which is correct: an undeclared one is dead weight.
+tidy-classic/public/lang/*.json  export-ignore
+tidy-classic/public/lang/en.json -export-ignore
+tidy-classic/public/lang/ko.json -export-ignore
+
+# --- font/: the .ttf twins are dead weight, do not ship them ---------------
+# Each typeface is present as both .otf and .ttf, and the .otf is NOT a subset:
+# parsed cmap coverage is identical in every pair (11172/11172 Hangul syllables;
+# Hakgyoansim matches glyph-for-glyph at 12640). The size gap is purely CFF vs
+# glyf outline encoding — Hakgyoansim is 0.70 MB as .otf against 6.01 MB as .ttf.
+# All three consumers already put the .otf first and the .ttf only in a fallback
+# slot that a Chromium-only host never reaches: `ui-font.css` @font-face src
+# lists, `feBuildEmbeddedCookieRunFontCSS` (breaks on the first fetch that
+# succeeds), and `fe-user-font.js`, whose FE_BUILTIN_FONT_FILES hides all eight
+# builtins from the user-font picker so neither twin is selectable by name.
+# Listed one by one rather than as `font/*.ttf` so a future ttf-only face is not
+# silently dropped from the zip. Quoted because the names contain spaces.
+"font/CookieRun Black.ttf"          export-ignore
+"font/CookieRun Bold.ttf"           export-ignore
+"font/CookieRun Regular.ttf"        export-ignore
+font/HakgyoansimGeurimilgi-R.ttf    export-ignore
