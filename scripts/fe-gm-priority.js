@@ -73,11 +73,69 @@ function feGetGmPriorityOverrides() {
   }
 }
 
-function feGetGmPriorityBackup() {
+// The backup store must be namespaced PER WORLD, exactly like FE_WORLD_SETTINGS_KEY —
+// it is a client-scope store (localStorage, shared across every world on this
+// browser/origin) recording each forced key's pre-force value. A player who plays
+// several worlds on the same browser has this module force-enabled independently
+// per world, and "the client's own pre-force value" for e.g. ceDx3rdPixelAccent can
+// legitimately differ between them. The old flat `{key: value}` shape recorded
+// whichever world happened to be active the FIRST time any world ever forced that
+// key, then bled that single value into every OTHER world's per-world snapshot
+// forever after via feSnapshotPerWorldSettings — a world could show a value the
+// player never chose in it. Fixed by nesting the store `{ [worldId]: {key: value} }`
+// like feWorldSettings, with a one-time best-effort migration of legacy flat data
+// into the CURRENTLY active world's slice (as good a guess as the old code's
+// implicit "whatever world was active" behavior, and self-heals once each world's
+// keys are next synced/restored).
+function feIsLegacyFlatGmPriorityBackup(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  return Object.values(raw).some((v) => v === null || typeof v !== "object" || Array.isArray(v));
+}
+
+let _feGmPriorityBackupMigrated = false;
+async function feMigrateGmPriorityBackupToPerWorld() {
+  if (_feGmPriorityBackupMigrated) return;
+  _feGmPriorityBackupMigrated = true;
+  try {
+    const worldId = feGetWorldId();
+    if (!worldId) return;
+    await feWithStoreLock(async () => {
+      const fresh = game.settings.get(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY);
+      if (!feIsLegacyFlatGmPriorityBackup(fresh)) return;
+      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, { [worldId]: fresh });
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+// Whole-store read, normalized to the nested per-world shape. Does not migrate
+// (read-only); callers that write must re-derive from this so a pending legacy
+// migration is never clobbered by a stale flat write.
+function feGetGmPriorityBackupStoreRaw() {
   try {
     const data = game.settings.get(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY);
     if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+    if (feIsLegacyFlatGmPriorityBackup(data)) {
+      const worldId = feGetWorldId();
+      return worldId ? { [worldId]: data } : {};
+    }
     return data;
+  } catch {
+    return {};
+  }
+}
+
+function feGetGmPriorityBackup() {
+  try {
+    const worldId = feGetWorldId();
+    if (!worldId) return {};
+    if (feIsLegacyFlatGmPriorityBackup(game.settings.get(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY))) {
+      void feMigrateGmPriorityBackupToPerWorld();
+    }
+    const all = feGetGmPriorityBackupStoreRaw();
+    const slice = all[worldId];
+    return (slice && typeof slice === "object" && !Array.isArray(slice)) ? slice : {};
   } catch {
     return {};
   }
@@ -154,11 +212,16 @@ async function feSetGmPriorityOverrides(partial = {}) {
 async function feClearGmPriorityBackupKey(key) {
   try {
     return await feWithStoreLock(async () => {
-      const backup = feGetGmPriorityBackup();
-      if (!feHasOwn(backup, key)) return false;
-      const next = foundry.utils.deepClone(backup);
-      delete next[key];
-      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, next);
+      const worldId = feGetWorldId();
+      if (!worldId) return false;
+      const all = feGetGmPriorityBackupStoreRaw();
+      const slice = (all[worldId] && typeof all[worldId] === "object") ? all[worldId] : {};
+      if (!feHasOwn(slice, key)) return false;
+      const nextAll = foundry.utils.deepClone(all);
+      const nextSlice = foundry.utils.deepClone(slice);
+      delete nextSlice[key];
+      nextAll[worldId] = nextSlice;
+      await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, nextAll);
       return true;
     });
   } catch {
@@ -251,14 +314,22 @@ async function feSyncLocalGmPrioritySettings({ keys = null } = {}) {
       try {
         // Locked read-modify-MERGE: re-read the live backup inside the lock and
         // add only keys not already present, so a concurrent feClearGmPriorityBackupKey
-        // (from a mirror) is never clobbered by a stale whole-object write.
+        // (from a mirror) is never clobbered by a stale whole-object write. Merges into
+        // THIS WORLD's slice only — the other worlds' slices in the same store must be
+        // left untouched, or restoring here would blow away their own backups.
         await feWithStoreLock(async () => {
-          const cur = foundry.utils.deepClone(feGetGmPriorityBackup());
+          const worldId = feGetWorldId();
+          if (!worldId) return;
+          const all = foundry.utils.deepClone(feGetGmPriorityBackupStoreRaw());
+          const cur = (all[worldId] && typeof all[worldId] === "object") ? foundry.utils.deepClone(all[worldId]) : {};
           let merged = false;
           for (const [k, v] of Object.entries(newBackupEntries)) {
             if (!feHasOwn(cur, k)) { cur[k] = v; merged = true; }
           }
-          if (merged) await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, cur);
+          if (merged) {
+            all[worldId] = cur;
+            await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, all);
+          }
         });
       } catch {
         /* backup is best-effort; a failure only weakens restore, not safety */
@@ -302,7 +373,17 @@ async function feRestoreLocalGmPrioritySettings() {
     }
 
     try {
-      await feWithStoreLock(() => game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, {}));
+      // Clear only THIS world's slice — other worlds on the same browser keep
+      // their own backups untouched.
+      await feWithStoreLock(async () => {
+        const worldId = feGetWorldId();
+        if (!worldId) return;
+        const all = foundry.utils.deepClone(feGetGmPriorityBackupStoreRaw());
+        if (feHasOwn(all, worldId)) {
+          delete all[worldId];
+          await game.settings.set(MODULE_ID, FE_GM_PRIORITY_BACKUP_KEY, all);
+        }
+      });
     } catch {
       /* no-op */
     }
