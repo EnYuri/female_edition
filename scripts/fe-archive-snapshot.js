@@ -1,4 +1,4 @@
-import { feLocalize, feFormat } from "./fe-i18n.js";
+import { feLocalize } from "./fe-i18n.js";
 // Archive HTML-snapshot production for fe-chat-archive.js.
 //
 // Sub-module of fe-chat-archive.js. Owns the "self-contained HTML file" concern:
@@ -12,43 +12,48 @@ import { feLocalize, feFormat } from "./fe-i18n.js";
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
 import {
-  feBlobToDataURL,
   feFreezeMessageBackgroundsForPrint,
   feDownscaleImagesForPrint,
-  feCompressImageBlobForEmbed,
 } from "./fe-archive-image.js";
 import {
-  feRestoreOriginalPortraitSources,
-  feRestorePrintBlobSources,
-  fePatchInlineFontFamiliesForExport,
   feInjectExportFontReadyBootstrap,
   feNormalizeArchiveShellLayout,
   feNormalizeArchiveMessageLayout,
   feIsElement,
-  feNextTick,
   feEscapeAttr,
   feGetFoundryBaseHref,
   feRunArchiveDocumentOperation,
   feBuildArchiveTitleText,
 } from "./fe-archive-output.js";
-import {
-  cpBuildExportPortrait,
-  cpClearExportPortraitCache,
-} from "./fe-chat-portrait-image.js";
+
 import {
   feRewriteSnapshotCSSURLs,
   feParseCssImports,
   feAssembleInlinedStyleBlock,
 } from "./fe-archive-css.js";
+import {
+  feUpgradePortraitsForExport,
+  feEmbedImagesInNode,
+  fePrepareBodyForHTMLSnapshot,
+  feSerializeBodyToParts,
+} from "./fe-archive-assets.js";
+import {
+  FE_EXPORT_EMBED_CONCURRENCY,
+  feFetchAsDataURLCapped,
+  feFetchWithTimeout,
+  feSnapshotAssetIsSameOrigin,
+  feSnapshotFetchCredentials,
+  feSnapshotIsAllowedFontCdn,
+} from "./fe-archive-fetch.js";
+import {
+  feBuildEmbeddedCookieRunFontCSS,
+} from "./fe-archive-fonts.js";
+
 
 // ===========================================================================
 // Constants (export-snapshot only)
 // ===========================================================================
 
-// Matches a browser's own per-host connection limit — more in-flight fetches would just
-// queue in the network stack while holding decoded blobs alive in JS.
-const FE_EXPORT_EMBED_CONCURRENCY = 6;
-const FE_EXPORT_RESOURCE_FETCH_TIMEOUT = 12000;
 const FE_EXPORT_STYLESHEET_FETCH_TIMEOUT = 8000;
 const FE_EXPORT_STYLESHEET_MAX_BYTES = 2_000_000;
 const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
@@ -87,7 +92,6 @@ const FE_EXPORT_ASSET_IMAGE_EXT_RE = /\.(?:svg|png|webp|jpe?g|gif|avif)(?:[?#]|$
 // rung of); and only families `document.fonts` reports as actually loaded (see
 // feCollectLoadedFontFamilies) — the modes are mutually exclusive, so otherwise a
 // CookieRun export would still carry ~4.3MB of unused Mona.
-const FE_EXPORT_FONT_CDN_HOSTS = new Set(["cdn.jsdelivr.net"]);
 const FE_EXPORT_ASSET_WOFF2_RE = /\.woff2(?:[?#]|$)/i;
 const FE_EXPORT_FONT_FACE_RE = /@font-face\s*\{([^}]*)\}/gi;
 const FE_EXPORT_FONT_FAMILY_DECL_RE = /(?:^|[;{])\s*font-family\s*:\s*([^;}]+)/i;
@@ -102,30 +106,11 @@ const FE_EXPORT_HTML_STYLE_URL_RE = /url\(\s*(&quot;|&#0?39;|["'])?([^"')]+?)\1?
 // entity-escapes any inner `"`, so `[^"]*` cannot run past the attribute's end.
 const FE_EXPORT_HTML_STYLE_ATTR_RE = /style="([^"]*)"/gi;
 
-// Memoized embedded-font CSS (built once per session).
-let feEmbeddedFontCssPromise = null;
-let feEmbeddedFontCssValue = null;
 
 // ===========================================================================
 // Resource fetch + filename helpers
 // ===========================================================================
 
-async function feFetchWithTimeout(url, options = {}, timeoutMs = FE_EXPORT_RESOURCE_FETCH_TIMEOUT, consume = null) {
-  const controller = new AbortController();
-  const upstream = options?.signal;
-  const abortFromUpstream = () => controller.abort(upstream?.reason);
-  if (upstream?.aborted) abortFromUpstream();
-  else upstream?.addEventListener?.("abort", abortFromUpstream, { once: true });
-
-  const timer = setTimeout(() => controller.abort(new DOMException("Export resource request timed out", "TimeoutError")), timeoutMs);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    return typeof consume === "function" ? await consume(response, controller) : response;
-  } finally {
-    clearTimeout(timer);
-    upstream?.removeEventListener?.("abort", abortFromUpstream);
-  }
-}
 
 function feSanitizeExportFilename(name, fallback = "chat-log") {
   return (
@@ -135,6 +120,30 @@ function feSanitizeExportFilename(name, fallback = "chat-log") {
       .slice(0, 80) || fallback
   );
 }
+
+/**
+ * Serialize an element's attributes back into an HTML attribute string.
+ *
+ * Returns `""` or a string with a LEADING SPACE (` lang="ko" class="…"`), so it can
+ * be interpolated straight into `<html%s>` / `<body%s>`.
+ *
+ * Used for the saved file's `<html>` and `<body>` open tags — the snapshot must
+ * preserve `lang`, `class` and every `data-*` the live document carried, because
+ * the inlined stylesheets resolve their variables against exactly those.
+ */
+function feSerializeElementAttributes(el) {
+  try {
+    const attrs = Array.from(el?.attributes ?? []).map((a) => {
+      const n = String(a?.name ?? "");
+      const v = feEscapeAttr(String(a?.value ?? ""));
+      return n ? `${n}="${v}"` : "";
+    }).filter(Boolean);
+    return attrs.length ? " " + attrs.join(" ") : "";
+  } catch {
+    return "";
+  }
+}
+
 
 // ===========================================================================
 // HTML Snapshot Export  (blob build, download, external browser)
@@ -345,69 +354,6 @@ async function feInlineSnapshotStylesheets(headClone, doc, setMeta = () => {}) {
   }
 }
 
-/**
- * Replace same-origin `url()` references inside the already-inlined <style> blocks
- * with data: URLs, so the saved standalone HTML renders offline.
- *
- * WHY (the bug it fixes):
- * feInlineSnapshotStylesheets brings the CSS *text* into the file, but
- * feRewriteSnapshotCSSURLs only ABSOLUTIZES the `url()`s inside it — it never
- * embeds them. Opened as file://, every one of those absolute Foundry-origin URLs
- * 404s (and even with Foundry running, a file:// document's origin is "null", so
- * @font-face fetches are blocked by CORS). Measured consequences on a real export:
- *   - core fontawesome/webfonts/*.woff2  → every icon renders as tofu (□ / ✗)
- *   - core Signika, dnd5e modesto-condensed → text silently falls to a system face
- *   - dnd5e's 97 url() assets (icons/svg/d20-black.svg, ui/lozenge.svg,
- *     ui/notable-*-corner.svg, ui/texture-gray1.webp, the badge webps) → dice icons
- *     vanish and the decorated boxes around them lose their art
- * This pass closes that gap. Anything it cannot embed (cross-origin, over cap,
- * fetch failed, 404 — Foundry v14 references a fa-v4compatibility.woff2 that is
- * not shipped) is LEFT AS THE ABSOLUTE URL, i.e. exactly today's behaviour, so a
- * failure here can only ever be a no-op.
- *
- * Runs only for the HTML snapshot. The print/PDF popup is a live document with
- * network access and needs none of this.
- */
-function feSnapshotAssetIsSameOrigin(abs) {
-  try {
-    const u = new URL(abs);
-    return u.origin === window.location.origin && (u.protocol === "http:" || u.protocol === "https:");
-  } catch {
-    return false;
-  }
-}
-
-/** An https URL on the webfont host allowlist. See FE_EXPORT_FONT_CDN_HOSTS. */
-function feSnapshotIsAllowedFontCdn(abs) {
-  try {
-    const u = new URL(abs);
-    return u.protocol === "https:" && FE_EXPORT_FONT_CDN_HOSTS.has(u.hostname);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * `credentials` for one asset/stylesheet fetch.
- *
- * MUST be "omit" cross-origin. A response carrying `Access-Control-Allow-Origin: *`
- * — which is what every CDN here sends — is REJECTED by the browser outright when
- * the request was made with credentials; the wildcard and credentialed mode are
- * mutually exclusive per the CORS spec. Sending "include" everywhere would make
- * every cross-origin font fail with a CORS error rather than embed.
- *
- * Same-origin keeps "include": Foundry gates its own routes on the session cookie.
- * The URL may still be relative here (feBuildEmbeddedCookieRunFontCSS passes
- * `/modules/…`), so resolve against the document before deciding — a bare
- * `new URL(url)` would throw on those and wrongly downgrade them to "omit".
- */
-function feSnapshotFetchCredentials(url) {
-  try {
-    return new URL(url, window.location.href).origin === window.location.origin ? "include" : "omit";
-  } catch {
-    return "include";
-  }
-}
 
 /**
  * The font families the archive document actually resolved, lowercased.
@@ -696,18 +642,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   const doc = win.document;
   const snapshotRoot = feIsElement(bodyRoot) ? bodyRoot : doc.body;
   const scopedBody = snapshotRoot !== doc.body;
-  const bodyAttrs = (() => {
-    try {
-      const attrs = Array.from(doc.body?.attributes ?? []).map((a) => {
-        const n = String(a?.name ?? "");
-        const v = feEscapeAttr(String(a?.value ?? ""));
-        return n ? `${n}="${v}"` : "";
-      }).filter(Boolean);
-      return attrs.length ? " " + attrs.join(" ") : "";
-    } catch {
-      return "";
-    }
-  })();
+  const bodyAttrs = feSerializeElementAttributes(doc.body);
   const serializeSnapshotRoot = () => {
     const parts = feSerializeBodyToParts(snapshotRoot);
     return scopedBody ? [`<body${bodyAttrs}>`, ...parts, "</body>"] : parts;
@@ -980,18 +915,7 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   // HTML wrapper (preserve attributes like lang/class)
   // ---
   const htmlEl = doc.documentElement;
-  const htmlAttrs = (() => {
-    try {
-      const attrs = Array.from(htmlEl?.attributes ?? []).map((a) => {
-        const n = String(a?.name ?? "");
-        const v = feEscapeAttr(String(a?.value ?? ""));
-        return n ? `${n}="${v}"` : "";
-      }).filter(Boolean);
-      return attrs.length ? " " + attrs.join(" ") : "";
-    } catch {
-      return "";
-    }
-  })();
+  const htmlAttrs = feSerializeElementAttributes(htmlEl);
 
   return new Blob(
     ["<!doctype html>\n", `<html${htmlAttrs}>`, "\n", headClone.outerHTML, "\n", ...bodyParts, "\n</html>"],
@@ -1048,1082 +972,6 @@ async function feDownloadArchiveHTMLUnlocked(win, titleText = "Chat Log", { body
   }
 }
 
-// ===========================================================================
-// Font Embedding  (data-URL encode fonts for self-contained HTML export)
-// ===========================================================================
-
-async function feBuildEmbeddedCookieRunFontCSS() {
-  if (typeof feEmbeddedFontCssValue === "string") return feEmbeddedFontCssValue;
-  if (feEmbeddedFontCssPromise) return feEmbeddedFontCssPromise;
-
-  feEmbeddedFontCssPromise = (async () => {
-  // Tries to fetch the CookieRun font files from the module and embed them as data: URLs.
-  // On any uncaught error, record an empty string so subsequent calls skip retrying.
-  try {
-  // If files are not present, returns an empty string.
-  //
-  // IMPORTANT: Base64 embedding multi-megabyte fonts can easily crash Chromium/Electron
-  // (OOM / STATUS_BREAKPOINT) due to base64 expansion + JS string memory overhead.
-  // To keep exports reliable, we only embed when the server reports a small Content-Length.
-  // CookieRun OTF files shipped with this module are ~0.9–1.0MB each.
-  // Hakgyoansim Geurimilgi (TTF) is larger (~6MB).
-  // We keep separate per-file caps to avoid accidentally embedding oversized TTF variants
-  // of CookieRun while still allowing Geurimilgi to be included when the user explicitly
-  // enables "embed custom fonts".
-  const MAX_TOTAL_BYTES = 11_000_000; // binary before base64 expansion
-  const MAX_PER_FILE_BYTES_COOKIE = 1_200_000;
-  const MAX_PER_FILE_BYTES_GEUR = 7_000_000;
-  let totalBytes = 0;
-
-  const headSize = async (url) => {
-    try {
-      const res = await feFetchWithTimeout(url, { method: "HEAD", credentials: "include" });
-      if (!res.ok) return null;
-      const len = res.headers.get("content-length");
-      const n = Number(len);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const fetchFont = async (url, { perFileCap }) => {
-    // Try to get a size estimate first.
-    const size = await headSize(url);
-
-    // Enforce caps using either the reported size, or a conservative streaming cap.
-    const remaining = Math.max(0, MAX_TOTAL_BYTES - totalBytes);
-    const cap = Math.max(0, Math.min(perFileCap, remaining));
-    if (!cap) return null;
-
-    if (size && (size > perFileCap || size > remaining)) return null;
-
-    // Prefer the capped streaming fetch so exports still work on servers that:
-    // - do not support HEAD
-    // - omit Content-Length
-    const got = await feFetchAsDataURLCapped(url, cap);
-    if (!got?.dataUrl) return null;
-
-    const bytes = size || got.bytes || 0;
-    if (bytes && totalBytes + bytes > MAX_TOTAL_BYTES) return null;
-    totalBytes += bytes;
-    return got.dataUrl;
-  };
-
-  // MUST route through feGetFoundryBaseHref() so the server's routePrefix applies.
-  // Root-absolute `/modules/…` 404s on any world behind a route prefix or proxy
-  // subpath (invisible to a localhost GM), and a bare relative path resolves against
-  // the archive popup's about:blank. Either way every face silently drops out.
-  const fontUrl = (file) => {
-    const rel = `modules/${MODULE_ID}/font/${file}`;
-    try { return new URL(rel, feGetFoundryBaseHref()).href; } catch { return `/${rel}`; }
-  };
-
-  // Match ui-font.css unicode coverage (KR + basic Latin + Latin-1)
-  const unicodeRange = "U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F";
-  // OTF only. Each face also exists as a .ttf in a dev checkout, but the twins are
-  // export-ignore'd (see .gitattributes) so they are absent from any distributed
-  // install, and their cmap coverage is identical anyway — the old second candidate
-  // could only ever cost one wasted fetch.
-  const weights = [
-    { weight: 400, file: "CookieRun%20Regular.otf" },
-    { weight: 700, file: "CookieRun%20Bold.otf" },
-    { weight: 900, file: "CookieRun%20Black.otf" },
-  ];
-
-  const faces = [];
-  for (const w of weights) {
-    const dataUrl = await fetchFont(fontUrl(w.file), {
-      perFileCap: MAX_PER_FILE_BYTES_COOKIE,
-    });
-    if (!dataUrl) continue;
-
-    faces.push(
-      `@font-face{font-family:"FE CookieRun Embedded";src:url(${dataUrl}) format("opentype");font-weight:${w.weight};font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
-    );
-  }
-
-  // Optional: embed Hakgyoansim Geurimilgi.
-  // If present, we embed it so saved file:// HTML keeps the same look.
-  //
-  // OTF ONLY, and the format matters here more than anywhere else. The typeface also
-  // exists as a 6.3MB .ttf with byte-identical coverage (verified glyph-for-glyph:
-  // 12640 glyphs, 11172/11172 Hangul syllables — the gap is CFF vs glyf encoding, not
-  // content), and that .ttf is export-ignore'd out of the distributed zip. Even in a
-  // dev checkout it is useless to this function: the embedder caps each file to keep
-  // base64 expansion from OOMing Chromium/Electron, the TTF blows straight past that
-  // cap, and a saved archive that picked it up failed to load the face at all
-  // (document.fonts → "FE Geurimilgi: error"). The 730KB OTF sits under the cap, so it
-  // also rides the GENERIC url() embedder and lands even when this opt-in is off.
-  // Do not reintroduce a TTF candidate.
-  let geurimilgiEmbedded = false;
-  try {
-    const geurimilgiData = await fetchFont(fontUrl("HakgyoansimGeurimilgi-R.otf"), {
-      perFileCap: MAX_PER_FILE_BYTES_GEUR,
-    });
-    if (geurimilgiData) {
-      faces.push(
-        `@font-face{font-family:"FE Geurimilgi Embedded";src:url(${geurimilgiData}) format("opentype");font-weight:400;font-style:normal;unicode-range:${unicodeRange};font-display:block;}`
-      );
-      geurimilgiEmbedded = true;
-    }
-  } catch {}
-
-  // The normal UI imports the official NeoDGM Pro webfont. Re-assert the same
-  // import in standalone file:// archive HTML, whose copied module stylesheet
-  // cannot resolve its original relative location. The CDN font response permits
-  // cross-origin use, so the saved HTML remains lightweight while online.
-  const neodgmRule = `
-@import url("https://cdn.jsdelivr.net/gh/neodgm/neodgm-pro-webfont@1.020/neodgm_pro/style.css");
-/* NeoDGM Pro webfont: route every font var to the imported face. */
-body.fe-fonts-enabled.fe-neodgm-mode,
-body.fe-neodgm-mode {
-  --fe-font-primary: "NeoDunggeunmo Pro", monospace;
-  --fe-font-geurimilgi: "NeoDunggeunmo Pro", monospace;
-  --fe-font-secondary: "NeoDunggeunmo Pro", monospace;
-  --fe-chat-font-family: "NeoDunggeunmo Pro", monospace;
-  font-kerning: normal;
-  font-variant-ligatures: common-ligatures;
-  font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
-}
-body.fe-fonts-enabled.fe-neodgm-mode * {
-  font-kerning: normal !important;
-  font-variant-ligatures: common-ligatures !important;
-  font-feature-settings: "kern" 1, "liga" 1, "clig" 1 !important;
-}`;
-
-  // Even if optional local faces fail to load, preserve the NeoDGM Pro webfont
-  // rule so the selected pixel-font mode does not silently fall back.
-  if (!faces.length) {
-    // Loud on purpose: an empty face list is not an error to the caller, so this state
-    // is otherwise indistinguishable from a healthy export. Everything that can cause
-    // it (route prefix, 404, size cap, fetch timeout) is invisible from outside, hence
-    // naming the URL actually tried.
-    console.warn(
-      feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildEmbeddedCookieRunFontCSS") +
-      feFormat("FE.Diagnostics.ArchiveSnapshot.feBuildEmbeddedCookieRunFontCSS2", { value1: fontUrl("CookieRun%20Regular.otf") })
-    );
-    // Do not cache the fallback-only result: local font requests may have failed
-    // transiently, and a later export should get another chance to embed them.
-    return neodgmRule;
-  }
-
-  // Geurimilgi routing for the mixed "쿠키런 + 그림일기" preset (small text / cards /
-  // tooltips = Geurimilgi). If the face was embedded, the export MUST route the
-  // geurimilgi var to it — otherwise that half of the mixed preset silently falls back
-  // to a system font and only CookieRun shows ("하나만 적용" bug). If it could NOT be
-  // embedded (over cap / fetch failed), keep the readable system stack.
-  const geurimilgiSystemStack =
-    `"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, -apple-system, sans-serif, var(--fe-symbol-fallback)`;
-  const geurimilgiStack = geurimilgiEmbedded
-    ? `"FE Geurimilgi Embedded", "FE Geurimilgi", ${geurimilgiSystemStack}`
-    : geurimilgiSystemStack;
-
-  const css = `
-/* female_edition: embedded CookieRun fonts (offline HTML export) */
-${neodgmRule}
-${faces.join("\n")}
-
-/* Prefer the embedded faces when opening the saved HTML as file://
- * (remote font files are often blocked by CORS because the origin becomes "null").
- */
-:root {
-  --fe-symbol-fallback:
-    "Segoe UI Symbol",
-    "Segoe UI Emoji",
-    "Apple Color Emoji",
-    "Noto Color Emoji";
-
-  --fe-font-primary:
-    "FE CookieRun Embedded",
-    "FE CookieRun",
-    "Signika",
-    system-ui,
-    -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
-    sans-serif,
-    var(--fe-symbol-fallback);
-
-  /* Geurimilgi: prefer the embedded face when it was embedded (the mixed
-   * CookieRun+Geurimilgi preset needs BOTH faces); else fall back to a readable
-   * system UI stack. Built in JS above as geurimilgiStack. */
-  --fe-font-geurimilgi: ${geurimilgiStack};
-
-  /* Secondary stack (small text / chat-card descriptions). Mirrors ui-font.css's
-   * :root default — follows the geurimilgi stack (embedded face when available). */
-  --fe-font-secondary: var(--fe-font-geurimilgi);
-
-  --fe-chat-card-system-font-family:
-    "Signika",
-    system-ui,
-    -apple-system,
-    "Noto Sans KR",
-    "Segoe UI",
-    sans-serif,
-    var(--fe-symbol-fallback);
-
-  --font-primary: var(--fe-font-primary);
-  --font-sans: var(--fe-font-primary);
-  --font-serif: var(--fe-font-primary);
-  --font-h1: var(--fe-font-primary);
-  --font-h2: var(--fe-font-primary);
-  --font-body: var(--fe-font-primary);
-
-  /* dnd5e v5.2.x font vars (best-effort) */
-  --dnd5e-font-roboto: var(--fe-font-primary);
-  --dnd5e-font-roboto-slab: var(--fe-font-primary);
-  --dnd5e-font-roboto-condensed: var(--fe-font-primary);
-  --dnd5e-font-signika: var(--fe-font-primary);
-  --dnd5e-font-modesto: var(--fe-font-primary);
-
-  /* Chat font choice (default: CookieRun). Controlled via body class. */
-  --fe-chat-font-family: var(--fe-font-primary);
-}
-
-body.fe-chat-font-cookie { --fe-chat-font-family: var(--fe-font-primary); }
-body.fe-chat-font-cookie-all {
-  --fe-font-geurimilgi: var(--fe-font-primary);
-  --fe-font-secondary: var(--fe-font-primary);
-  --fe-chat-font-family: var(--fe-font-primary);
-}
-body.fe-chat-font-geurimilgi {
-  --fe-font-primary: var(--fe-font-geurimilgi);
-  --fe-font-secondary: var(--fe-font-geurimilgi);
-  --fe-chat-font-family: var(--fe-font-geurimilgi);
-}
-body.fe-ui-font-geurimilgi {
-  --fe-ui-font-family: var(--fe-font-geurimilgi);
-  --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
-}
-
-/* Ensure the archive itself uses the embedded stack even when external CSS is partially blocked. */
-html, body {
-  font-family: var(--fe-ui-font-family, var(--fe-font-primary)) !important;
-}
-
-#fe-chat-export-container,
-
-
-#fe-chat-export-container #fe-chat-export-sidebar,
-#fe-chat-export-container #fe-chat-export-chat,
-#fe-chat-export-container #fe-chat-export-log,
-#fe-chat-export-container :is(#chat-log, #fe-chat-export-log) > li.chat-message {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-}
-#fe-chat-export-container .chat-message,
-#fe-chat-export-container .chat-message * {
-  font-family: var(--fe-chat-font-family) !important;
-}
-/* Inside cards and boxes - follows the toggle, exactly like the live ui-font.css. */
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) * {
-  font-family: var(--fe-chat-card-system-font-family) !important;
-}
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) * {
-  font-family: var(--fe-font-secondary) !important;
-}
-
-/* Re-assert Font Awesome over the '.chat-message *' chat-font rule above.
- *
- * NEVER PUT A RAW BACKTICK IN THIS BLOCK, not even in prose. This whole CSS body is
- * one template literal, so a backtick ENDS it rather than quoting anything -- and the
- * result stays syntactically valid JS (member access + subtraction + multiplication),
- * so the syntax check passes and only a ReferenceError at call time reveals it. That
- * happened in 2.6.3 and, swallowed by this function's own catch, silently shipped two
- * versions of font-less exports. Use apostrophes; "npm run lint" is the guard.
- *
- * MUST stay a VERSION-AGNOSTIC STACK: v13 ships FA6, v14 ships FA7, and the families
- * are named per major version. This <style> is unlayered, so its !important outranks
- * FA's own "font-family: var(--_fa-family)" -- naming only one version's families
- * turns every icon into tofu on the other. Fallback is per-glyph, so one stack covers
- * solid/regular/brands/duotone.
- */
-#fe-chat-export-container :is(.fa-solid, .fa-regular, .fa-light, .fa-thin, .fa-duotone, .fa-brands, [class^="fa-"], [class*=" fa-"]) {
-  font-family:
-    "Font Awesome 7 Pro", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 7 Duotone",
-    "Font Awesome 6 Pro", "Font Awesome 6 Free", "Font Awesome 6 Brands", "Font Awesome 6 Duotone",
-    "Font Awesome 5 Pro", "Font Awesome 5 Free", "Font Awesome 5 Brands", "Font Awesome 5 Duotone",
-    "FontAwesome" !important;
-}
-`;
-
-    feEmbeddedFontCssValue = css;
-    return css;
-  } catch {
-    // A transient timeout/network failure must not poison every later export in
-    // this Foundry session. Successful CSS is cached; failures remain retryable.
-    return "";
-  }
-  })();
-
-  try {
-    return await feEmbeddedFontCssPromise;
-  } finally {
-    feEmbeddedFontCssPromise = null;
-  }
-}
-
-async function feFetchAsDataURLCapped(url, maxBytes) {
-  // Stream the response and abort if it exceeds maxBytes.
-  // This avoids OOM when servers omit Content-Length.
-  const cap = Math.max(0, Number(maxBytes) || 0);
-  if (!cap) return null;
-
-  const controller = new AbortController();
-  const timeoutTimer = setTimeout(() => controller.abort(), FE_EXPORT_RESOURCE_FETCH_TIMEOUT);
-  try {
-    const res = await fetch(url, { credentials: feSnapshotFetchCredentials(url), signal: controller.signal });
-    if (!res.ok) return null;
-
-    // Carry the response's own MIME into the Blob we assemble from the stream.
-    // `new Blob(chunks)` with no type yields `data:application/octet-stream`, which a
-    // font `src` survives (the `format()` hint drives the decode) but an IMAGE does
-    // NOT — `background-image: url(data:application/octet-stream;…)` renders nothing.
-    // The blob() fallback below already carries the type; this makes the streamed
-    // path match it.
-    const contentType = (() => {
-      try {
-        return String(res.headers.get("content-type") || "").split(";")[0].trim();
-      } catch {
-        return "";
-      }
-    })();
-
-    // Respect content-length if present.
-    try {
-      const len = Number(res.headers.get("content-length") || 0);
-      if (Number.isFinite(len) && len > 0 && len > cap) {
-        try {
-          controller.abort();
-        } catch {}
-        return null;
-      }
-    } catch {}
-
-    // If streams aren't available, fall back to blob() (still capped).
-    if (!res.body || typeof res.body.getReader !== "function") {
-      const blob = await res.blob();
-      if (blob.size > cap) return null;
-      return { dataUrl: await feBlobToDataURL(blob), bytes: blob.size };
-    }
-
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      received += value.byteLength || value.length || 0;
-      if (received > cap) {
-        try {
-          controller.abort();
-        } catch {}
-        return null;
-      }
-      chunks.push(value);
-    }
-
-    const blob = contentType ? new Blob(chunks, { type: contentType }) : new Blob(chunks);
-    if (blob.size > cap) return null;
-    return { dataUrl: await feBlobToDataURL(blob), bytes: blob.size };
-  } catch {
-    try {
-      controller.abort();
-    } catch {}
-    return null;
-  } finally {
-    clearTimeout(timeoutTimer);
-  }
-}
-
-// ===========================================================================
-// Asset Embedding & HTML Preparation  (image embed, portrait restore,
-//                                      font-family patch, font-ready bootstrap)
-// ===========================================================================
-
-async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
-  const setMeta = typeof meta === "function" ? meta : () => {};
-
-  // Track per-img mutations so the caller can restore the live DOM after serialization.
-  // Allocated up-front and captured by the restore closure so a partial-failure path
-  // (any throw mid-loop) still hands the caller a valid restore.
-  const changed = [];
-  const recordBeforeMutate = (img) => {
-    try {
-      changed.push({
-        img,
-        src: img.getAttribute("src"),
-        srcset: img.getAttribute("srcset"),
-        loading: img.getAttribute("loading"),
-      });
-    } catch {}
-  };
-  let dedupRestore = null;
-
-  const restore = () => {
-    try { dedupRestore?.(); } catch {}
-    for (let k = changed.length - 1; k >= 0; k -= 1) {
-      const it = changed[k];
-      try {
-        if (it.src == null) it.img.removeAttribute("src");
-        else it.img.setAttribute("src", it.src);
-        if (it.srcset == null) it.img.removeAttribute("srcset");
-        else it.img.setAttribute("srcset", it.srcset);
-        if (it.loading == null) it.img.removeAttribute("loading");
-        else it.img.setAttribute("loading", it.loading);
-      } catch {}
-    }
-  };
-
-  let imgs;
-  try {
-    imgs = Array.from(root?.querySelectorAll?.("img") ?? []);
-  } catch {
-    return restore;
-  }
-  if (!imgs.length) return restore;
-
-  // Hard safety limits:
-  // Single-file HTML + embedded images can easily crash Chromium/Electron (STATUS_BREAKPOINT / OOM)
-  // due to base64 expansion + JS string memory overhead.
-  //
-  // These are LAST-RESORT ceilings, not a tuning knob for file size — the pre-embed
-  // downscale pass is what actually keeps the payload small. Hitting one of them is a
-  // silent failure that leaves an absolute Foundry-origin src in the saved HTML, i.e.
-  // an image only the exporting user can load. So they are set well above what a
-  // downscaled log needs; the console warning at the end of the pass reports any image
-  // that still fell through.
-  // COUNT cap, and the one that actually bit. Measured on the 2026-08-12 export
-  // (1900 messages): 2096 <img> elements, of which ~1980 kept a Foundry-origin src.
-  // With the old 600 the pass stopped after the first 600 elements no matter how
-  // much byte budget was left — a log this size could never finish embedding.
-  // 8000 covers ~4x this log; it is a runaway guard, not a tuning knob.
-  const MAX_IMAGES = 8000;
-  // Binary bytes before base64/string expansion. Caller may pass a smaller cap
-  // (shared budget) — e.g. after pre-embed downscaling already spent part of it.
-  // Explicit user decision (2026-08-12): file size does not matter, offline
-  // completeness does. Measured demand for the 1900-message log above is ~50MB
-  // post-downscale (24.5MB actually embedded before the budget ran dry, plus 42
-  // distinct source files totalling 71.7MB on disk that downscale to ~25MB), so
-  // 250MB carries 4-5x that log. The saved HTML is assembled as an ARRAY of
-  // per-message strings passed to new Blob() (feSerializeBodyToParts), never one
-  // giant string, so V8's ~512MB max string length is not a ceiling here.
-  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 250_000_000;
-  // Over this, the image is compressed (never dropped). Raised 4MB → 16MB so that
-  // full-resolution art escaping the downscale pass is embedded as-is instead of
-  // being re-encoded; at 4MB the largest character portraits in the world above
-  // (up to ~9MB) were all taking the compressor path.
-  const MAX_PER_IMAGE = 16_000_000;
-  // Absolute stop for the compress-past-the-budget path below.
-  const HARD_TOTAL_CEILING = Math.round(MAX_TOTAL_BYTES * 1.5);
-
-  const cache = new Map();
-
-  // Resolve each img to the URL it would be embedded from — LAZILY, at most once per img.
-  // A big log can hold thousands of <img> while the commit loop stops at MAX_IMAGES, so
-  // resolving them all up front would spend unbounded synchronous time parsing URLs that are
-  // never used, before the first yield. Resolution stays just ahead of the prefetch window.
-  //
-  // Reading an img's src before its own turn is safe: an img is mutated only when the commit
-  // loop reaches it, which is always at or after the point we resolve it.
-  //
-  // planCache[i]: `undefined` = unresolved, `null` = not embeddable (already a data: URL,
-  // unparseable, or cross-origin), else { img, abs }.
-  const planCache = new Array(imgs.length);
-  const entryAt = (i) => {
-    let entry = planCache[i];
-    if (entry !== undefined) return entry;
-
-    entry = null;
-    try {
-      const img = imgs[i];
-      const src = img.getAttribute("src") || img.src;
-      if (src && !src.startsWith("data:")) {
-        const abs = new URL(src, window.location.href).href;
-        // Only embed same-origin resources (avoid CORS failures).
-        if (new URL(abs).origin === window.location.origin) entry = { img, abs };
-      }
-    } catch {
-      entry = null;
-    }
-
-    planCache[i] = entry;
-    return entry;
-  };
-
-  // Fetches run ahead of the commit loop (network overlap), but the DECISIONS below stay
-  // strictly in document order. That ordering is load-bearing, not incidental:
-  //   - the byte budget is spent in a deterministic prefix, so the same log exports the
-  //     same way every time — with completion-order accounting, which images make the cut
-  //     would vary run to run;
-  //   - `cache` (first occurrence embeds, later ones reuse) stays well-defined.
-  const fetches = new Map(); // abs -> Promise<{ dataUrl, size } | null>
-  let inflight = 0;
-  let prefetchIdx = 0;
-
-  const startFetch = (abs) => {
-    const existing = fetches.get(abs);
-    if (existing) return existing;
-
-    inflight += 1;
-    const p = (async () => {
-      try {
-        const fetched = await feFetchWithTimeout(
-          abs,
-          { credentials: "include" },
-          FE_EXPORT_RESOURCE_FETCH_TIMEOUT,
-          async (res) => res.ok ? res.blob() : null
-        );
-        const blob = fetched;
-        if (!blob) return null;
-        // Per-image limit. Order-independent, so it belongs here rather than at commit.
-        // Over the cap is NOT a drop: dropping leaves an absolute Foundry-origin src that
-        // only this machine can load. Compress it down instead and embed the result
-        // unconditionally — `compressed: true` tells the commit loop not to re-apply any
-        // cap to what came back.
-        if (blob.size > MAX_PER_IMAGE) {
-          const shrunk = await feCompressImageBlobForEmbed(window, blob, {
-            targetBytes: MAX_PER_IMAGE,
-            maxSide: 1400,
-          });
-          if (!shrunk) {
-            console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode"), abs, blob.size);
-            return null;
-          }
-          return { dataUrl: shrunk.dataUrl, size: shrunk.size, compressed: true };
-        }
-        // `blob` is kept so the commit loop can compress this image if it no longer
-        // fits the remaining total budget. Cleared right after that decision so the
-        // memoized entry doesn't pin bytes for the rest of the run.
-        return { dataUrl: await feBlobToDataURL(blob), size: blob.size, blob };
-      } catch (err) {
-        console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode2"), abs, err);
-        return null;
-      } finally {
-        inflight -= 1;
-      }
-    })();
-
-    fetches.set(abs, p);
-    return p;
-  };
-
-  // Keep the window topped up with distinct URLs the commit loop is about to need.
-  const pumpPrefetch = () => {
-    while (prefetchIdx < imgs.length && inflight < FE_EXPORT_EMBED_CONCURRENCY) {
-      const entry = entryAt(prefetchIdx);
-      prefetchIdx += 1;
-      if (entry && !fetches.has(entry.abs)) startFetch(entry.abs);
-    }
-  };
-
-  try {
-    let embeddedCount = 0;
-    let embeddedBytes = 0;
-
-    for (let i = 0; i < imgs.length; i += 1) {
-      pumpPrefetch();
-
-      const entry = entryAt(i);
-      if (!entry) continue;
-
-      // Stop when reaching limits.
-      //
-      // NOT at MAX_TOTAL_BYTES: past the budget, images go through the compressor
-      // below instead of being abandoned on a server-only URL. HARD_TOTAL_CEILING is
-      // where that stops too — otherwise 600 compressed images could still add up
-      // far past any sane file size.
-      if (embeddedCount >= MAX_IMAGES || embeddedBytes >= HARD_TOTAL_CEILING) {
-        setMeta(
-          feFormat("FE.ChatArchive.Status.ImageLimitReached", { embeddedCount: embeddedCount, value2: (
-            embeddedBytes /
-            1024 /
-            1024
-          ).toFixed(1) })
-        );
-        break;
-      }
-
-      const { img, abs } = entry;
-
-      if (cache.has(abs)) {
-        // Every duplicate — including one collapsed by feOptimizeArchiveNodeImages
-        // (`data-fe-archive-shared-image`) — gets the cached data: URL. Leaving a
-        // shared duplicate on its absolute Foundry-origin src used to be the
-        // size optimization, but it makes that image load ONLY for a viewer who can
-        // reach this server. `feDeduplicateInlineDataUrlsInNode` below already
-        // removes the repeat cost: identical data: srcs collapse to one copy plus a
-        // marker attribute, restored at view time by the bootstrap script.
-        try {
-          recordBeforeMutate(img);
-          img.setAttribute("src", cache.get(abs));
-          img.removeAttribute("srcset");
-          img.removeAttribute("loading");
-        } catch {}
-        continue;
-      }
-
-      setMeta(feFormat("FE.ChatArchive.Status.EmbeddingImageProgress", { embeddedCount: embeddedCount, MAX_IMAGES: MAX_IMAGES, value3: i + 1, value4: imgs.length }));
-
-      let result = await startFetch(abs);
-      if (!result) continue;
-
-      // Total limit. A too-large image is compressed into what's left rather than skipped —
-      // same reasoning as the per-image cap: a skipped image keeps a server-only URL. Once
-      // it has been through the compressor it is embedded regardless of the remaining
-      // budget (bounded overshoot: a compressed image is ≲1MB).
-      if (!result.compressed && embeddedBytes + result.size > MAX_TOTAL_BYTES) {
-        const remaining = Math.max(0, MAX_TOTAL_BYTES - embeddedBytes);
-        const shrunk = result.blob
-          ? await feCompressImageBlobForEmbed(window, result.blob, {
-              targetBytes: Math.max(150_000, remaining),
-              maxSide: 1200,
-            })
-          : null;
-        if (shrunk && shrunk.size < result.size) {
-          result = { dataUrl: shrunk.dataUrl, size: shrunk.size, compressed: true };
-        } else {
-          // Compression failed, or re-encoding an already-optimized file made it bigger.
-          // Embed the original rather than abandon it: it is under MAX_PER_IMAGE, and the
-          // run still stops at HARD_TOTAL_CEILING.
-          result = { dataUrl: result.dataUrl, size: result.size, compressed: true };
-        }
-        // Re-memoize so later duplicates reuse this decision (and drop the blob).
-        fetches.set(abs, Promise.resolve(result));
-      }
-
-      // Budget decision is made — drop the retained blob so it can be collected.
-      try { if (result.blob) result.blob = null; } catch {}
-
-      cache.set(abs, result.dataUrl);
-
-      try {
-        recordBeforeMutate(img);
-        img.setAttribute("src", result.dataUrl);
-        img.removeAttribute("srcset");
-        img.removeAttribute("loading");
-      } catch {}
-
-      embeddedCount++;
-      embeddedBytes += result.size;
-
-      // Yield periodically so Chromium doesn't freeze.
-      if (i % 10 === 0) await feNextTick();
-    }
-
-    // Diagnostic: anything still pointing at a network URL will render only for a
-    // reader whose browser can reach this Foundry server — i.e. a broken image for
-    // everyone the file is shared with. Report it instead of failing silently.
-    try {
-      const leftovers = [];
-      for (const img of root.querySelectorAll?.("img[src]") ?? []) {
-        const s = img.getAttribute("src") || "";
-        if (!s || s.startsWith("data:")) continue;
-        leftovers.push(s);
-      }
-      if (leftovers.length) {
-        console.warn(
-          feFormat("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode3", { value1: leftovers.length }) +
-          feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode4"),
-          leftovers.slice(0, 10)
-        );
-        setMeta(feFormat("FE.ChatArchive.Status.ImagesNotEmbedded", { value1: leftovers.length }));
-      }
-    } catch {}
-
-    // Final pass: deduplicate identical inline data: URLs across the serialized HTML.
-    // Each repeated <img src="data:..."> is reduced to a marker; a small bootstrap
-    // script restores src at view time. Avoids N× base64 bloat for repeated avatars/portraits.
-    dedupRestore = feDeduplicateInlineDataUrlsInNode(root, setMeta);
-  } catch (err) {
-    // The caller still gets `restore` with whatever's been recorded so far,
-    // so the live archive window can recover from partial mutation.
-    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feEmbedImagesInNode5"), err);
-  }
-
-  return restore;
-}
-
-function feDeduplicateInlineDataUrlsInNode(root, setMeta = () => {}) {
-  const refsAdded = [];
-  const srcRemoved = [];
-  let scriptEl = null;
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    const doc = root.ownerDocument || document;
-    const groups = new Map();
-    let n = 0;
-    let dedupCount = 0;
-    let savedBytes = 0;
-    for (const img of root.querySelectorAll('img[src^="data:"]')) {
-      const url = img.getAttribute("src");
-      // Skip tiny inline images — bootstrap overhead outweighs the saving.
-      if (!url || url.length < 256) continue;
-      let entry = groups.get(url);
-      if (!entry) {
-        entry = { id: `fei${++n}` };
-        groups.set(url, entry);
-        img.setAttribute("data-fe-img-ref", entry.id);
-        refsAdded.push(img);
-        continue;
-      }
-      img.setAttribute("data-fe-img-ref", entry.id);
-      refsAdded.push(img);
-      const removedSrc = img.getAttribute("src");
-      img.removeAttribute("src");
-      srcRemoved.push({ img, src: removedSrc });
-      dedupCount += 1;
-      savedBytes += url.length;
-    }
-    if (dedupCount > 0) {
-      scriptEl = doc.createElement("script");
-      scriptEl.id = "fe-archive-img-dedup";
-      // The script auto-executes the moment it gets inserted into a connected
-      // document. In the in-place embed flow this would re-fill `src` on the
-      // duplicates we just stripped, undoing the dedup. The skip flag turns
-      // that one execution into a no-op; we strip the flag right after so the
-      // copy that ends up in saved HTML still runs when the file is later opened.
-      scriptEl.setAttribute("data-fe-skip-bootstrap", "1");
-      scriptEl.textContent = '(function(){var cs=document.currentScript;if(cs&&cs.hasAttribute("data-fe-skip-bootstrap"))return;try{var m={};document.querySelectorAll(\'img[data-fe-img-ref][src^="data:"]\').forEach(function(el){var k=el.getAttribute("data-fe-img-ref");if(k&&!m[k])m[k]=el.getAttribute("src");});document.querySelectorAll("img[data-fe-img-ref]:not([src])").forEach(function(el){var s=m[el.getAttribute("data-fe-img-ref")];if(s)el.setAttribute("src",s);});}catch(_e){}})();';
-      root.appendChild(scriptEl);
-      scriptEl.removeAttribute("data-fe-skip-bootstrap");
-      try { setMeta(feFormat("FE.ChatArchive.Status.DeduplicatedImages", { dedupCount: dedupCount, value2: (savedBytes / 1024 / 1024).toFixed(1) })); } catch {}
-    }
-  } catch (err) {
-    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feDeduplicateInlineDataUrlsInNode"), err);
-  }
-  return () => {
-    try { scriptEl?.remove(); } catch {}
-    for (const it of srcRemoved) {
-      try {
-        if (it.src != null) it.img.setAttribute("src", it.src);
-      } catch {}
-    }
-    for (const img of refsAdded) {
-      try { img.removeAttribute("data-fe-img-ref"); } catch {}
-    }
-  };
-}
-
-// Splits the body's outerHTML into [shell-before-log-open, ...messages, shell-after-log-open]
-// so the caller can pass an array of small strings to `new Blob()` instead of allocating
-// one giant outerHTML and then re-copying it into the Blob. Avoids the V8 peak-memory hit
-// for large logs (~50MB single string → many small strings).
-function feSerializeBodyToParts(body) {
-  try {
-    const log = body?.querySelector?.("#fe-chat-export-log, ol.chat-log");
-    if (!log?.children?.length) return [body?.outerHTML || ""];
-
-    // Detach messages, snapshot the now-empty shell, re-attach. This narrows the
-    // body.outerHTML allocation to "everything except the messages", which is small.
-    const messages = Array.from(log.children);
-    for (const m of messages) m.remove();
-    let shellHTML;
-    let emptyLogHTML;
-    try {
-      emptyLogHTML = log.outerHTML;
-      shellHTML = body.outerHTML;
-    } finally {
-      // Always re-insert in original order, even if a serialization step throws.
-      log.append(...messages);
-    }
-
-    const logIdx = shellHTML.indexOf(emptyLogHTML);
-    if (logIdx < 0) return [body.outerHTML];
-    // The empty log serializes as `<ol ...></ol>`. Split right after the open tag so
-    // messages get spliced in between open and close.
-    const closeTag = "</ol>";
-    const splitAt = logIdx + emptyLogHTML.length - closeTag.length;
-
-    const parts = [];
-    parts.push(shellHTML.slice(0, splitAt));
-    for (const m of messages) {
-      try { parts.push(m.outerHTML); } catch {}
-    }
-    parts.push(shellHTML.slice(splitAt));
-    return parts;
-  } catch {
-    try { return [body?.outerHTML || ""]; } catch { return [""]; }
-  }
-}
-
-// Multiplier over the CSS portrait box, and the absolute pixel ceiling, for the
-// export-resolution portrait bitmaps. 4x of the default 64px box = 256px.
-//
-// The number is a print-DPI budget, not a taste setting: Chrome rasterizes
-// `window.print()` well above CSS pixels, and a reader may zoom or open the file on a
-// HiDPI screen. Anything at 1x (which is what the live `src` data URL is on a dpr-1
-// machine) is visibly blocky in all three cases — that is exactly the "터무니없이 낮은
-// 해상도" report. A 256px pre-cropped PNG costs ~60-100 KB and dedups across every
-// message from the same actor, so the whole log usually adds well under 1 MB.
-// The 4x multiplier IS the print budget: 300 DPI over CSS's 96 DPI reference is
-// 3.125 device px per CSS px, so 4x covers 300 DPI with headroom at every portrait
-// size. The ceiling only exists to bound the file, and MUST NOT be set below what the
-// multiplier needs at the largest usable portrait size — at 512 it silently clipped
-// every box above 128px (a 160px portrait needs ~500px at 300 DPI and got 512, a 200px
-// one needs ~625 and still got 512), i.e. the exact ceiling this whole pass removes,
-// reappearing for anyone who enlarged their portraits. 768 covers up to a 192px box.
-const FE_EXPORT_PORTRAIT_SCALE = 4;
-const FE_EXPORT_PORTRAIT_MAX_PX = 768;
-// Total wall-clock the portrait pass may spend on NEW work. Sized against the 5 s
-// per-source probe ceiling at concurrency 4: a batch of dead paths costs one round of
-// timeouts, not one per source. Keep it well under the point where a user assumes the
-// export has hung — everything past it degrades to "keep the original src", not to a
-// failure.
-const FE_EXPORT_PORTRAIT_BUDGET_MS = 10000;
-// Absolute ceiling for the same pass, so "extend on progress" can never turn into an
-// unbounded wait when slow-but-alive and dead sources interleave. Generous on purpose:
-// everything past it degrades to a lower-resolution portrait, which is exactly the
-// defect this pass exists to fix — it is a hang guard, not a speed target.
-const FE_EXPORT_PORTRAIT_HARD_BUDGET_MS = 90000;
-
-/**
- * Re-resample every portrait from its ORIGINAL file at export resolution and swap the
- * result in, returning an undo.
- *
- * Runs BEFORE fePrepareBodyForHTMLSnapshot so its `keepSelfContainedSrc` branch sees
- * an already-self-contained data: URL and leaves it alone; anything this could not
- * upgrade still falls through to the normal restore + embed path.
- */
-export async function feUpgradePortraitsForExport(
-  root,
-  { meta = () => {}, useBlobURL = false, win = null } = {}
-) {
-  const changed = [];
-  const winURL = (win && win.URL) || URL;
-  const createdBlobURLs = new Set();
-  // dataUrl -> Promise<blobUrl>. Every message from the same speaker must end up
-  // sharing ONE blob: URL, which is the entire point of this on the print path.
-  const blobURLByData = new Map();
-  const toBlobURL = (dataUrl) => {
-    let p = blobURLByData.get(dataUrl);
-    if (p) return p;
-    p = (async () => {
-      const blob = await (await fetch(dataUrl)).blob();
-      const url = winURL.createObjectURL(blob);
-      createdBlobURLs.add(url);
-      return url;
-    })().catch(() => null);
-    blobURLByData.set(dataUrl, p);
-    return p;
-  };
-  try {
-    if (!root?.querySelectorAll) return () => {};
-    const imgs = Array.from(root.querySelectorAll("img[data-fe-portrait-orig-src]"));
-    if (!imgs.length) return () => {};
-
-    const size = Math.max(16, Number(feSetting("chatPortraitSize") ?? 64) || 64);
-    const shape = String(feSetting("chatPortraitShape") ?? "circle");
-    const fit = shape === "none" ? "contain" : "cover";
-    const targetPx = Math.min(FE_EXPORT_PORTRAIT_MAX_PX, Math.round(size * FE_EXPORT_PORTRAIT_SCALE));
-
-    // Budget for NEW work, measured as time WITHOUT PROGRESS rather than total elapsed.
-    // MUST stay: cpWaitForImage puts a ceiling on each source, and a source that 404s or
-    // hangs burns all of it. Past the deadline the pass keeps running but only serves
-    // sources already resolved in the memo (free), so repeated speakers still upgrade;
-    // everything else keeps its original src and falls through to the normal embed path.
-    //
-    // The deadline is pushed forward on every source that answers (`runOne`), because a
-    // FIXED total is the wrong shape here: a log with many distinct speakers on a remote
-    // Foundry host spends its whole budget on healthy-but-slow fetches and then silently
-    // degrades the entire tail — and the tail is where the one-off NPCs live, which is
-    // the second half of the "NPC만 저해상도" report. What the budget must actually bound
-    // is a batch of DEAD paths, and those make no progress by definition. The hard
-    // ceiling below still bounds the pathological case where the two interleave.
-    let deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
-    const hardDeadline = performance.now() + FE_EXPORT_PORTRAIT_HARD_BUDGET_MS;
-
-    // CONCURRENT, bounded. This loop used to be serial, with a comment claiming
-    // parallelism could not help because the work is main-thread canvas work. That
-    // reasoning was WRONG and it made printing take far too long: per the measurements
-    // in CLAUDE.md the ladder is ~0.4 ms and the encode ~2.4 ms, but this pass first has
-    // to FETCH AND FULLY DECODE the original file — several MB and 10+ megapixels for a
-    // typical portrait — and that part is off-main-thread and overlaps almost perfectly.
-    // Serially it is the entire cost of the pass, multiplied by the number of distinct
-    // speakers, and on a remote Foundry host it is network latency multiplied by the
-    // same. The cap keeps peak memory to a few decoded sources at once.
-    const CONCURRENCY = 4;
-    let cursor = 0;
-    let done = 0;
-    const runOne = async (img) => {
-      const orig = img.dataset?.fePortraitOrigSrc || img.getAttribute?.("data-fe-portrait-orig-src") || "";
-      if (!orig) return;
-      let info = null;
-      try {
-        info = await cpBuildExportPortrait(orig, {
-          targetPx,
-          fit,
-          anchorTop: true,
-          cachedOnly: performance.now() > Math.min(deadline, hardDeadline),
-        });
-      } catch {}
-      if (!info) return;
-      // Any answer at all means this source is alive — see the deadline comment.
-      deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
-
-      const dataUrl = info.dataUrl;
-      if (!dataUrl) {
-        // The ORIGINAL file is already the best available answer (a source at/below the
-        // export target, or a vector). Pin it and mark it: doing nothing here is not
-        // neutral — it hands the portrait to the two passes that each impose their own
-        // ceiling BELOW the source's own resolution (the avatar downscaler's
-        // `cssBox × avatarDpr` ≈ 96px on the print path, and `keepSelfContainedSrc`
-        // keeping the 64px live screen bitmap on the saved-HTML path). That asymmetry —
-        // large portrait art upgraded to 256px, small/default art capped at 64-96px —
-        // is the reported "PC는 선명한데 NPC 포트레이트만 저해상도".
-        if (!info.keepOriginal) return;
-        const prevSrc = img.getAttribute("src");
-        const prevSrcset = img.getAttribute("srcset");
-        const prevLoading = img.getAttribute("loading");
-        changed.push({ img, prevSrc, prevSrcset, prevLoading });
-        img.setAttribute("src", orig);
-        img.removeAttribute("srcset");
-        // The print path waits on image LOAD before rasterizing; a portrait we just
-        // pointed at a file must be able to finish on its own (feDownscaleImagesForPrint
-        // and feWaitForImages both skip `loading="lazy"` elements).
-        img.setAttribute("loading", "eager");
-        img.dataset.feExportPortrait = "1";
-        // Same value the snapshot revert would write anyway — set so the print path's
-        // blob revert treats this element like every other upgraded portrait.
-        if (useBlobURL) {
-          try { img.dataset.fePrintOrigSrc = orig; } catch {}
-        }
-        return;
-      }
-
-      // PRINT uses blob: URLs, the saved-HTML path uses the data: URL directly.
-      //
-      // The bitmap is identical either way — what differs is what sits in the DOM. A
-      // base64 data: URL is ~20 KB of attribute text, and a busy log repeats the same
-      // speaker across hundreds of messages, so the print document ends up carrying
-      // megabytes of duplicated string that Chromium has to copy when it builds the
-      // preview. One blob: URL per distinct speaker is a short, shared handle instead.
-      // `feDownscaleImagesForPrint` already made exactly this choice for the same
-      // reason ("~33% memory plus V8 string overhead"); portraits skip that pass now,
-      // so they have to make it themselves. The saved HTML cannot use blob: at all —
-      // the handle dies with the session — hence the flag rather than a blanket switch.
-      let finalUrl = dataUrl;
-      if (useBlobURL) {
-        const blobUrl = await toBlobURL(dataUrl);
-        if (blobUrl) finalUrl = blobUrl;
-      }
-
-      const prevSrc = img.getAttribute("src");
-      const prevSrcset = img.getAttribute("srcset");
-      if (prevSrc === finalUrl && !prevSrcset) {
-        // Already carrying exactly this bitmap — but it still has to be MARKED, or the
-        // downscale pass re-targets it at `cssBox × avatarDpr` and the HQ resampler is
-        // free to put the 64px screen bitmap back. Recorded in `changed` so undo clears
-        // the marker; rewriting the identical src on undo is a no-op.
-        if (img.dataset.feExportPortrait !== "1") {
-          changed.push({ img, prevSrc, prevSrcset });
-          img.dataset.feExportPortrait = "1";
-        }
-        return;
-      }
-      changed.push({ img, prevSrc, prevSrcset });
-      // Same contract as the downscale pass: an HTML snapshot taken while these blob:
-      // URLs are live reverts through data-fe-print-orig-src, since a blob: handle in
-      // saved HTML would be dead on arrival.
-      //
-      // Stash the ORIGINAL FILE PATH, never `prevSrc`. MEASURED 2026-08-05: prevSrc
-      // here is the live HQ resample, i.e. a ~10.8 KB base64 data: URL, and copying it
-      // per element put 29.34 MB of dead string into the print document — the single
-      // largest attribute in it, ahead of style (6.51 MB) and src (0.37 MB). Nothing
-      // ever paints it. The path is what a snapshot actually wants (it is the same
-      // value feRestoreOriginalPortraitSources would write) and costs ~20 bytes.
-      if (useBlobURL && orig) {
-        try { img.dataset.fePrintOrigSrc = orig; } catch {}
-      }
-      img.setAttribute("src", finalUrl);
-      img.removeAttribute("srcset");
-      // Tells feDownscaleImagesForPrint to leave this one alone. Without it the
-      // downscale pass re-targets every avatar at `cssBox × avatarDpr` (64 × 1.5 =
-      // 96px) and throws the extra resolution straight back away — which is the
-      // ceiling that made both the PDF and the saved HTML look low-resolution.
-      img.dataset.feExportPortrait = "1";
-    };
-
-    // Progress has to be reported from inside the pass: the memoized sources return
-    // instantly and the cold ones do not, so a single message posted up front sits
-    // there looking hung for exactly as long as the work actually takes.
-    const workers = Array.from({ length: Math.min(CONCURRENCY, imgs.length) }, async () => {
-      for (;;) {
-        const i = cursor++;
-        if (i >= imgs.length) return;
-        try {
-          await runOne(imgs[i]);
-        } catch {}
-        done += 1;
-        if (done === imgs.length || done % CONCURRENCY === 0) {
-          meta(feFormat("FE.ChatArchive.Status.PreparingPortraits", { done: done, value2: imgs.length }));
-        }
-      }
-    });
-    await Promise.all(workers);
-  } catch (err) {
-    console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feUpgradePortraitsForExport"), err);
-  }
-  return () => {
-    for (const it of changed) {
-      try {
-        if (it.prevSrc == null) it.img.removeAttribute("src");
-        else it.img.setAttribute("src", it.prevSrc);
-        if (it.prevSrcset == null) it.img.removeAttribute("srcset");
-        else it.img.setAttribute("srcset", it.prevSrcset);
-        // Only the keep-the-original branch records `loading`; the upgrade branch leaves
-        // it untouched, so `undefined` here means "was never changed".
-        if (it.prevLoading !== undefined) {
-          if (it.prevLoading == null) it.img.removeAttribute("loading");
-          else it.img.setAttribute("loading", it.prevLoading);
-        }
-        delete it.img.dataset.feExportPortrait;
-        delete it.img.dataset.fePrintOrigSrc;
-      } catch {}
-    }
-    // Blob handles outlive the elements that referenced them until revoked — the
-    // bitmaps would stay pinned in memory for the rest of the session otherwise.
-    for (const url of createdBlobURLs) {
-      try { winURL.revokeObjectURL(url); } catch {}
-    }
-    createdBlobURLs.clear();
-    blobURLByData.clear();
-    try { cpClearExportPortraitCache(); } catch {}
-  };
-}
-
-function fePrepareBodyForHTMLSnapshot(root, { embedFonts = false, keepSelfContainedSrc = false } = {}) {
-  const restores = [];
-  try {
-    restores.push(feRestoreOriginalPortraitSources(root, { keepSelfContainedSrc }));
-  } catch {}
-  try {
-    // Revert any blob: URLs left over from in-flight print downscale so they
-    // don't end up in the saved HTML (where they'd be invalid once the popup
-    // closes or `afterprint` revokes them).
-    restores.push(feRestorePrintBlobSources(root));
-  } catch {}
-  if (embedFonts) {
-    try {
-      restores.push(fePatchInlineFontFamiliesForExport(root));
-    } catch {}
-  }
-  return () => {
-    for (let i = restores.length - 1; i >= 0; i--) {
-      try {
-        restores[i]?.();
-      } catch {}
-    }
-  };
-}
-
-
 // ---------------------------------------------------------------------------
 // Inline Export — download from current (non-popup) document
 // ---------------------------------------------------------------------------
@@ -2143,6 +991,7 @@ async function feDownloadExportHTMLFromCurrentDocument() {
     return false;
   }
 }
+
 
 export {
   feDownloadArchiveHTML,

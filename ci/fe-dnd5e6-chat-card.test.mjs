@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import {
   feRestoreMidiDamageTypeIcons,
   feRestoreMidiItemDescription,
@@ -22,6 +22,21 @@ import {
  */
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+
+// The archive is one FEATURE split across several files (entry + fe-archive-*.js +
+// the popup shell template). These tripwires pin archive BEHAVIOUR, not which file
+// currently hosts it, so they read the whole family — otherwise every refactor that
+// moves a function between archive modules breaks them for no real reason.
+const readArchiveFamily = () => {
+  const dir = new URL("../scripts/", import.meta.url);
+  const parts = readdirSync(dir)
+    .filter((f) => f === "fe-chat-archive.js" || /^fe-archive-.*\.js$/.test(f))
+    .sort()
+    .map((f) => readFileSync(new URL(f, dir), "utf8"));
+  const shell = new URL("../templates/fe-archive-shell.hbs", import.meta.url);
+  if (existsSync(shell)) parts.push(readFileSync(shell, "utf8"));
+  return parts.join("\n");
+};
 
 const DND5E_COMPAT = read("styles/fe-dnd5e-compat.css");
 const BG_STRIPPER = read("styles/chat-bg-stripper.css");
@@ -519,7 +534,7 @@ test("midi-qol's persisted <img> AC icons are pinned to live's 14px", () => {
 });
 
 test("midi-qol damage receipts keep their outer archive header hidden", () => {
-  const archiveJs = read("scripts/fe-chat-archive.js");
+  const archiveJs = readArchiveFamily();
   const archiveCss = read("styles/fe-chat-archive.css");
 
   assert.match(
@@ -659,7 +674,7 @@ test("live midi damage receipts hide their redundant outer header without a JS p
 
 test("midi damage-type icons do not push damage totals off center", () => {
   const compatCss = read("styles/fe-dnd5e-compat.css");
-  const archiveJs = read("scripts/fe-chat-archive.js");
+  const archiveJs = readArchiveFamily();
   const liveBlock = compatCss.match(
     /\.dice-total\s*>\s*dnd5e-icon\.midi-damage-type-icon\s*\{[^}]*\}/,
   );
@@ -764,7 +779,7 @@ test("empty dnd5e 6 midi activity descriptions fall back to the parent item", as
 });
 
 test("archive damage receipt actions do not depend on Font Awesome embedding", () => {
-  const archiveJs = read("scripts/fe-chat-archive.js");
+  const archiveJs = readArchiveFamily();
   const archiveCss = read("styles/fe-chat-archive.css");
   assert.match(archiveJs, /function feNormalizeArchiveMidiDamageButtonIcons\(/);
   assert.match(archiveJs, /\["\.midi-qol-dmg-btn-apply > i", "\\u2713"\]/);

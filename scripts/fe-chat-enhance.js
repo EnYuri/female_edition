@@ -160,15 +160,51 @@ async function feMigrateLegacySettings() {
 // applied — no retro theme, no accent variables, no merge classes. Calling this
 // from `setup` decouples the look of the UI from whether the canvas ever loads.
 function feApplyVisualSettingsToDocument(doc = document) {
-  try { feApplyStyleVarsFromSettings(doc); } catch { /* no-op */ }
+  feApplyStyleClassesToDocument(doc);
+
+  // --- NOT document-scoped: live-client side effects, deliberately excluded from
+  // feApplyStyleClassesToDocument so the archive can reuse that list. ---
+  // feSetBodyMergeClasses ignores `doc` entirely and writes `document.body`; the
+  // archive has feSyncArchiveMergeBodyClasses for its own document instead.
   try { feSetBodyMergeClasses(); } catch { /* no-op */ }
+  // feApplyCanvasTextFont mutates CONFIG.canvasTextStyle / CONFIG.defaultFontFamily
+  // and redraws canvas text — global PIXI state, meaningless in an export document
+  // and undesirable as a side effect of one.
+  try { feApplyCanvasTextFont(doc); } catch { /* no-op */ }
+}
+
+/**
+ * Apply every genuinely DOCUMENT-SCOPED style toggle to `doc`.
+ *
+ * **The single source of this list.** It used to be inlined a second time inside
+ * `feRenderChatArchiveWindow` against the popup's document, and the two copies
+ * drifted: the archive's copy was missing `feSetHideMsgBorderUserColorClass` and
+ * `feSetForceNormalMsgColorClass`. Both of those toggles' CSS rules name
+ * `#fe-chat-export-log` explicitly — i.e. they were written to cover the archive —
+ * so the rules sat dead in every archive window and every saved HTML file.
+ * Do not re-inline it; add new toggles here and both callers get them.
+ *
+ * Every call is individually try/caught: one failing toggle must not abandon the
+ * rest, because this runs at `setup` where a half-applied UI is the failure mode
+ * the whole function exists to prevent.
+ */
+function feApplyStyleClassesToDocument(doc = document) {
+  try { feApplyStyleVarsFromSettings(doc); } catch { /* no-op */ }
   try { feSetChatCardIconCropClass(doc); } catch { /* no-op */ }
   try { feSetChatCardFontClass(doc); } catch { /* no-op */ }
   try { feSetChatFontChoiceClass(doc); } catch { /* no-op */ }
   try { feSetUiFontClass(doc); } catch { /* no-op */ }
   try { feSetNeodgmModeClass(doc); } catch { /* no-op */ }
+  // MUST stay next to feSetNeodgmModeClass — user-font mode is the sixth font mode
+  // and was once the ONE missing from the archive's copy of this list, so an
+  // archive/PDF exported while "유저 로컬 폰트" was active always rendered in the
+  // default system stack ("PDF/HTML로 인쇄하면 기본 고딕으로 나온다"). The CSS
+  // variable alone was already arriving: feSetUserFontMode writes
+  // --fe-user-font-family onto documentElement.style and feSyncArchiveDocumentChrome
+  // copies <html>'s whole style attribute. What it does NOT copy is <body>'s class
+  // (explicitly skipped there), and the var is only consumed by
+  // `body.fe-user-font-mode` rules — so the value was present and unreachable.
   try { feSetUserFontMode(doc); } catch { /* no-op */ }
-  try { feApplyCanvasTextFont(doc); } catch { /* no-op */ }
   try { feSetRetroThemeClass(doc); } catch { /* no-op */ }
   try { feSetUserColorBgClass(doc); } catch { /* no-op */ }
   try { feSetPaperOverlayClass(doc); } catch { /* no-op */ }
@@ -1205,6 +1241,9 @@ export {
   feSetAccentTextOverrideClass,
   feSetSystemMsgColorClass,
   feSetForceNormalMsgColorClass,
+  // The single source of the document-scoped toggle list — the archive reuses it
+  // instead of keeping its own copy. See the function's own comment.
+  feApplyStyleClassesToDocument,
 
   feApplyChatMerge,
   feCaptureMessageRenderFlagsOnPreCreate,

@@ -4,6 +4,32 @@ import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 // source restoration, font preparation, and image/font readiness waits.
 // Uses the shared sticky-scroll guard when suspending screen containment.
 
+/**
+ * True while the EXPORT pass owns this image's source.
+ *
+ * `feUpgradePortraitsForExport` (fe-archive-assets.js) replaces a portrait with a
+ * print/zoom-resolution bitmap and marks it `data-fe-export-portrait="1"`; the marker
+ * is cleared by that pass's own undo. Until then **no other pass may write the
+ * element's src**, because every one of them would put a screen-sized (or
+ * full-resolution) bitmap back and undo the upgrade.
+ *
+ * Three passes have to honour that, and they used to spell the check three different
+ * ways (`!dataset.feExportPortrait`, `dataset.feExportPortrait`, `!== "1"`) in three
+ * files. Equivalent only because "1" is the sole value ever written — i.e. one
+ * careless change away from drifting. This is the single spelling; import it.
+ *
+ * The fourth honourer, `cpMayWriteScreenPortraitSource` in fe-chat-portrait-image.js,
+ * is deliberately NOT this function: that module has zero imports on purpose (see
+ * CLAUDE.md). `ci/fe-archive-portrait-ownership.test.mjs` pins the two in agreement.
+ */
+export function feIsExportOwnedImage(img) {
+  try {
+    return img?.dataset?.feExportPortrait === "1";
+  } catch {
+    return false;
+  }
+}
+
 // `keepSelfContainedSrc`: the HTML-snapshot path passes true. A portrait whose
 // src is ALREADY a data: URL (the HQ resample result — see fe-chat-portrait-image.js)
 // needs no file to embed from: it is self-contained, and it is exactly the size the
@@ -33,7 +59,7 @@ export function feRestoreOriginalPortraitSources(root, { keepSelfContainedSrc = 
       // 2774 <img> pointing at full-resolution originals (akari.png 3328x3677 in a
       // 64px box, x481; largest 3745x5539), 33 distinct sources totalling 69.7
       // MEGAPIXELS, all eager. Chromium's preview never became ready.
-      if (img.dataset?.feExportPortrait) continue;
+      if (feIsExportOwnedImage(img)) continue;
       const prevSrc = img.getAttribute('src');
       const prevSrcset = img.getAttribute('srcset');
       const prevLoading = img.getAttribute('loading');
@@ -176,6 +202,17 @@ export async function feWaitForFonts(doc, timeoutMs = 12000) {
   } catch {}
 }
 
+// Whisper detection for the archive's "exclude whispers" preference.
+//
+// This is deliberately NOT folded into feCanUserSeeChatMessage: that predicate answers
+// "is this user allowed to see it", while this answers "does the user want it in the
+// output". A GM passes the visibility check for every whisper in the world, so without
+// this filter a GM-saved log carries every private conversation into a file that is
+// usually made in order to be shared.
+//
+// `liveEl` is a fallback for the harvest-only path, where a rendered <li> may be all we
+// have (no ChatMessage document). Both core and feFallbackRenderChatMessage put the
+// `whisper` class on whispered messages.
 export function feArchiveIsWhisperMessage(msg, liveEl = null) {
   try {
     const whisper = msg?.whisper;

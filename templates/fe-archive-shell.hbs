@@ -1,0 +1,469 @@
+{{!--
+  Archive popup shell.
+
+  Rendered by feBuildArchiveDocument (fe-archive-document.js) and written into the
+  popup with document.write. It was a ~450-line template literal inside
+  feRenderChatArchiveWindow; the CSS below could not contain a backtick without
+  terminating that string, which broke the export once.
+
+  The <style> block stays INLINE and UNLAYERED on purpose. Foundry injects module
+  CSS as @import inside layer(modules), and for !important the layer order reverses
+  — so these unlayered !important rules are the WEAKEST important declarations in
+  the document, which is exactly what makes them a safe fallback rather than an
+  override. Moving them into styles/fe-chat-archive.css would silently PROMOTE
+  them over every layered sheet they are meant to lose to.
+
+  Context: baseHref, titleText, headStyles (raw), bodyClass, archiveBg,
+  pixelTheme, labels.{collecting,downloadTooltip,printTooltip,print,close}
+--}}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <base href="{{baseHref}}">
+    <title>{{titleText}}</title>
+    {{{headStyles}}}
+    <style>
+      /* Archive window hard overrides: make the document paginatable (no fixed viewport). */
+      html, body {
+        /* Keep on-screen and PDF colors as close as possible */
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        position: static !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        width: auto !important;
+        background: {{archiveBg}} !important;
+      }
+
+      /* Keep the export container in normal flow. */
+      #fe-chat-export-container {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        overflow: visible !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 12mm !important;
+        margin: 0 !important;
+      }
+
+      /* Archive layout width
+       * - Old behavior: hard-locked to Foundry sidebar width (~360px)
+       * - New behavior: use a natural page width (better readability in HTML/PDF)
+       */
+      #fe-chat-export-container .fe-chat-export-toolbar,
+      #fe-chat-export-container #fe-chat-export-sidebar {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      /* Minimal Foundry sidebar/chat structure so existing system/module CSS applies. */
+      #fe-chat-export-container #fe-chat-export-sidebar {
+        position: static !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: 0 0 auto !important;
+        background: {{archiveBg}} !important;
+        border: 0 !important;
+      }
+      #fe-chat-export-container #fe-chat-export-chat {
+        position: static !important;
+        background: {{archiveBg}} !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+      #fe-chat-export-container #fe-chat-export-log {
+        position: static !important;
+        background: {{archiveBg}} !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+
+      /* Screen-only text rendering helpers.
+       * Some Windows/Chrome setups look jagged when custom fonts are loaded from file://.
+       * A tiny text-shadow is a common workaround (kept out of print).
+       */
+      @media screen {
+        #fe-chat-export-container {
+          -webkit-font-smoothing: auto;
+          -moz-osx-font-smoothing: auto;
+          text-rendering: optimizeLegibility;
+        }
+
+        #fe-chat-export-container :is(.chat-message, .chat-message *) {
+          text-shadow: rgba(0,0,0,0.01) 0 0 1px !important;
+        }
+      }
+
+      /* Toolbar: compact, web-page-like controls. */
+      #fe-chat-export-container .fe-chat-export-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 10px 0;
+      }
+
+      #fe-chat-export-title { font-size: 18px; font-weight: 700; }
+      #fe-chat-export-meta { font-size: 12px; opacity: 0.85; }
+
+      .fe-chat-export-actions {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .fe-chat-export-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 28px;
+        padding: 0 8px;
+        border: 1px solid rgba(0,0,0,0.25);
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1;
+        color: #000;
+        text-decoration: none;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .fe-chat-export-action:hover {
+        background: rgba(0,0,0,0.06);
+      }
+
+      .fe-chat-export-action[aria-disabled="true"] {
+        opacity: 0.55;
+        pointer-events: none;
+      }
+
+      #fe-chat-export-status {
+        margin: 0 0 10px 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(0,0,0,0.18);
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: rgba(0,0,0,0.82);
+        background: rgba(0,0,0,0.03);
+      }
+
+      #fe-chat-export-status[hidden] {
+        display: none !important;
+      }
+
+      /* Expand all collapsed collapsible sections in the archive (dnd5e chat cards). */
+      #fe-chat-export-log .collapsible.collapsed .collapsible-content {
+        grid-template-rows: 1fr !important;
+      }
+      #fe-chat-export-log .chat-card .description.collapsed .details {
+        grid-template-rows: 1fr !important;
+        opacity: 1 !important;
+      }
+      #fe-chat-export-log .collapsible.collapsed > .fa-chevron-down,
+      #fe-chat-export-log .collapsible.collapsed > * > .fa-chevron-down,
+      #fe-chat-export-log .collapsible.collapsed .fa-caret-down {
+        transform: none !important;
+      }
+
+      /* …and the roll breakdowns, which collapse the OTHER way round: core and
+       * dnd5e keep .dice-tooltip / .dice-tooltip-collapser at
+       * grid-template-rows:0fr until .dice-roll gains .expanded.
+       * feExpandCollapsedArchiveSections adds that class; this is the CSS
+       * backstop for nodes that never went through it.
+       * NO BACKTICKS IN THIS BLOCK — it lives inside a JS template literal, so a
+       * backtick terminates the string (this already broke the export once). */
+      #fe-chat-export-log .dice-roll .dice-tooltip,
+      #fe-chat-export-log .dice-result .dice-tooltip-collapser {
+        grid-template-rows: 1fr !important;
+      }
+      #fe-chat-export-log .dice-roll .dice-tooltip > .wrapper,
+      #fe-chat-export-log .dice-result .dice-tooltip-collapser > .wrapper,
+      #fe-chat-export-log .dice-result .dice-tooltip {
+        overflow: visible !important;
+      }
+
+      /* dx3rd item cards: a THIRD collapse mechanism (collapsed sits on the
+       * content element, with no .collapsible wrapper anywhere in the system).
+       * feExpandCollapsedArchiveSections MUST drop the class because dx3rd's
+       * display:none !important lives in layer(system), which outranks both our
+       * layer(modules) archive sheet and this unlayered inline sheet for
+       * !important declarations. Once the class is gone, this rule supplies the
+       * stable expanded geometry and also covers system CSS that was not inlined. */
+      #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info) .collapsible-content,
+      #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info) .collapsible-content.collapsed {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      #fe-chat-export-log .dx3rd-item-info :is(.effect-list, .weapon-list, .item-description) {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      /* dnd5e SVG icons grafted in by feInlineDnd5eIcons. Reproduces
+       * IconElement.CSS from dnd5e.mjs, whose :host / svg rules live in a closed
+       * shadow root that does not survive an export. The host keeps
+       * display:contents so surrounding flex/grid layout is unchanged. */
+      #fe-chat-export-log dnd5e-icon {
+        display: contents;
+      }
+      #fe-chat-export-log .dice-total > dnd5e-icon.midi-damage-type-icon {
+        display: inline-block;
+        position: absolute !important;
+        inset-block-start: 50% !important;
+        inset-inline-end: 38px !important;
+        margin: 0 !important;
+        vertical-align: initial !important;
+        transform: translateY(-50%) !important;
+      }
+      #fe-chat-export-log svg.fe-dnd5e-icon-svg {
+        fill: var(--icon-fill, #000);
+        width: var(--icon-width, var(--icon-size, 1em));
+        height: var(--icon-height, var(--icon-size, 1em));
+      }
+
+      @media print {
+        html, body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        /* Speed: normalize blend modes — Chromium must composite each blend layer
+         * when generating PDFs, which is the largest single source of slowness.
+         * Normalizing to "normal" eliminates the compositor pass entirely.
+         * background-blend-mode must also be reset: user-color tints use screen blend. */
+        #fe-chat-export-log *,
+        #fe-chat-export-log *::before,
+        #fe-chat-export-log *::after {
+          mix-blend-mode: normal !important;
+          background-blend-mode: normal !important;
+          isolation: auto !important;
+          filter: none !important;
+          -webkit-filter: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+
+        /* Speed: disable transitions/animations so the PDF captures static state. */
+        #fe-chat-export-log *,
+        #fe-chat-export-log *::before,
+        #fe-chat-export-log *::after {
+          transition: none !important;
+          animation: none !important;
+        }
+
+        /* Completeness: content wrappers inside collapsible sections must not clip. */
+        #fe-chat-export-log .collapsible-content > .wrapper {
+          overflow: visible !important;
+        }
+
+        /* Hide the toolbar when printing (save as PDF). */
+        #fe-chat-export-container .fe-chat-export-toolbar { display: none !important; }
+
+        /* Keep message headers together and attached to content. */
+        #fe-chat-export-log .chat-message :is(.message-header, .message-sender) {
+          break-inside: avoid;
+          page-break-inside: avoid;
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        #fe-chat-export-log .chat-message:last-child {
+          break-after: auto !important;
+          page-break-after: auto !important;
+          margin-bottom: 0 !important;
+        }
+
+        /* Bordered boxes must not be split across a page boundary — see the identical
+         * block in styles/fe-chat-archive.css for the full rationale. Keep the two
+         * selector lists in sync. */
+        #fe-chat-export-log :is(
+          .dice-roll, .dice-total, .dice-formula, .dice-result, .dice-tooltip,
+          .card-header, .card-footer, .card-buttons button, .pill, .tag,
+          [class*="midi-qol-"]
+        ) {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* PDF stability: hide-images option */
+        body.fe-print-hide-avatars #fe-chat-export-log :is(
+          .message-header img,
+          .message-sender .avatar,
+          .message-sender > img,
+          img.chat-portrait-image-size-name-dnd5e,
+          img[class*="chat-portrait-image-size"]
+        ) {
+          display: none !important;
+        }
+        body.fe-print-hide-all #fe-chat-export-log img { display: none !important; }
+
+        @page { margin: 10mm; }
+      }
+    </style>
+    {{#if pixelTheme}}<style data-fe-pixel-archive="1">
+      /* Pixel theme: inline fallback — guaranteed present regardless of <link> load order */
+      html, body,
+      #fe-chat-export-container,
+      #fe-chat-export-sidebar,
+      #fe-chat-export-chat,
+      #fe-chat-export-log {
+        background: #000000 !important;
+        background-image: none !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+      }
+      .fe-chat-export-status {
+        background: #000000 !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+        border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
+      }
+      .fe-chat-export-action {
+        background: #000000 !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+        border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
+      }
+      /* This inline pixel fallback must own hover too. Its base background is
+       * !important, so the normal (non-important) hover rule above cannot change
+       * it when the popup's copied @import stylesheet is late or unavailable.
+       * The buttons still click in that state, but appear completely inert. */
+      .fe-chat-export-action:hover {
+        background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
+      }
+      /* Special-background messages are EXCLUDED from the flat black: user-color
+       * tints, narrator bars, round markers, and the system-msg background all
+       * carry their own layered-important surfaces (chat-bg-stripper.css /
+       * fe-chat-archive.css), which an unlayered-important fallback would beat —
+       * erasing them on rebuilt messages while live clones kept them through the
+       * mirror. With no compat sheets at all these render transparent over the
+       * page's black, which stays readable because the text color below still
+       * applies. Same exclusion set chat-bg-stripper itself uses. */
+      #fe-chat-export-log .chat-message:not(
+        .fe-has-user-color, .narrator-chat, .fe-narrator-chat,
+        .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"],
+        :has(.round-marker), .fe-system-msg
+      ) {
+        background: #000000 !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+        /* Fallback only: an OOC message carries the author's border color as
+         * an inline style. Making this important erased that core distinction
+         * on rebuilt/older messages while live-cloned messages kept it through
+         * their mirrored inline-important style. */
+        border-color: rgba(255,255,255,0.7);
+      }
+      #fe-chat-export-log .chat-message::before,
+      #fe-chat-export-log .chat-message::after {
+        background: transparent none !important;
+        background-image: none !important;
+      }
+      #fe-chat-export-log .chat-message .message-header,
+      #fe-chat-export-log .chat-message .message-content {
+        background: transparent !important;
+        background-image: none !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+      }
+      #fe-chat-export-log .chat-message .message-header *,
+      #fe-chat-export-log .chat-message .message-sender,
+      #fe-chat-export-log .chat-message .message-sender *,
+      #fe-chat-export-log .chat-message .name-stacked,
+      #fe-chat-export-log .chat-message .name-stacked .title,
+      #fe-chat-export-log .chat-message .name-stacked .subtitle,
+      #fe-chat-export-log .chat-message .message-flavor,
+      #fe-chat-export-log .chat-message .flavor-text,
+      #fe-chat-export-log .chat-message .message-metadata {
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+      }
+      #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+        .dx3rd-item-chat, .dx3rd-item-info
+      ) {
+        background: #000000 !important;
+        background-color: #000000 !important;
+        background-image: none !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+        /* Preserve semantic/system inline card borders when present. */
+        border-color: rgba(255,255,255,0.7);
+      }
+      #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
+        .dx3rd-item-chat, .dx3rd-item-info
+      ) :is(header, section, footer, .card-header, .card-content, .collapsible-content,
+            .details, .wrapper) {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        color: var(--fe-ac-90, rgba(230,230,230,0.82)) !important;
+      }
+      /* dnd5e retro cards are NOT literal black — compat paints their interior
+       * surface --fe-ac-08 and the description inset --fe-ac-06, scoped to
+       * fe-retro-system-dnd5e. Reading the tokens keeps rebuilt messages
+       * identical to live-cloned ones (which carry the same resolved colors
+       * through the style mirror); when the compat sheets failed to load — the
+       * state this fallback exists for — the tokens are undefined and var()
+       * falls back to the flat black above. dx3rd cards stay literal black,
+       * matching fe-dx3rd-compat.css §10. Higher specificity than the generic
+       * rules so these win under the dnd5e scope only. */
+      body.fe-retro-system-dnd5e #fe-chat-export-log .chat-message :is(
+        .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card
+      ) {
+        background: var(--fe-ac-08, #000000) !important;
+        background-color: var(--fe-ac-08, #000000) !important;
+        background-image: none !important;
+      }
+      body.fe-retro-system-dnd5e #fe-chat-export-log .chat-message .card-description {
+        background: var(--fe-ac-06, transparent) !important;
+        background-color: var(--fe-ac-06, transparent) !important;
+        background-image: none !important;
+      }
+    </style>{{/if}}
+  </head>
+  <body class="{{bodyClass}}">
+    <div id="fe-chat-export-container">
+      <div class="fe-chat-export-toolbar">
+        <div>
+          <div id="fe-chat-export-title">{{titleText}}</div>
+          <div id="fe-chat-export-meta">{{labels.collecting}}</div>
+        </div>
+        <div class="fe-chat-export-actions">
+          <a class="fe-chat-export-action fe-chat-export-download" id="fe-archive-download" data-tooltip="{{labels.downloadTooltip}}">HTML</a>
+          <a class="fe-chat-export-action fe-chat-export-print" id="fe-archive-print" data-tooltip="{{labels.printTooltip}}">{{labels.print}}</a>
+          <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="{{labels.close}}">{{labels.close}}</a>
+        </div>
+      </div>
+      <div id="fe-chat-export-sidebar" class="sidebar chat-sidebar">
+        <section id="fe-chat-export-chat" class="sidebar-tab tab active" data-tab="chat">
+          <div id="fe-chat-export-status" class="fe-chat-export-status">{{labels.collecting}}</div>
+          <ol id="fe-chat-export-log" class="chat-log"></ol>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

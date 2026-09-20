@@ -578,7 +578,7 @@ function cpShouldUseHQResample(img, shape) {
     //
     // MUST be checked BEFORE `fe-print-chatlog`: the archive window's body class is built
     // as `… fe-print-chatlog fe-chat-archive fe-chat-archive-window …`
-    // (`fe-chat-archive.js`, feBuildArchiveDocument), so it carries BOTH. Testing print
+    // (`fe-archive-document.js`, feBuildArchiveDocument), so it carries BOTH. Testing print
     // first made this branch unreachable and silently disabled HQ resampling in every
     // archive window — the reported "아카이브에서 포트레이트 안티에일리어싱이 안 된다".
     if (body?.classList?.contains("fe-chat-archive")) return true;

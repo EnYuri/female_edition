@@ -2,7 +2,7 @@ import { feFormat } from "./fe-i18n.js";
 // feNextTick is the 0 ms yield that keeps heavy canvas loops off the UI thread.
 // fe-archive-output.js owns the shared low-level utils for this family; it imports
 // only fe-i18n.js and fe-util.js and never imports this file, so there is no cycle.
-import { feNextTick } from "./fe-archive-output.js";
+import { feNextTick, feIsExportOwnedImage } from "./fe-archive-output.js";
 // Image processing for fe-chat-archive.js
 // Canvas downscale, background color freeze, blob → data-URL conversion.
 
@@ -458,9 +458,7 @@ export async function feDownscaleImagesForPrint(
   // — 64 × 1.5 = 96px for a default portrait — so without the skip it would resample
   // that work straight back down and reinstate the exact low-resolution ceiling the
   // upgrade exists to lift.
-  imgs = imgs.filter((img) => {
-    try { return !img.dataset?.feExportPortrait; } catch { return true; }
-  });
+  imgs = imgs.filter((img) => !feIsExportOwnedImage(img));
   if (!imgs.length) return () => {};
 
   if (waitForPendingMs > 0) {
