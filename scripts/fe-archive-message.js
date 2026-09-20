@@ -292,6 +292,33 @@ export function feArchiveMessageContentLooksEmpty(node) {
 //      property rather than trying to out-specify it.
 // Only `display` is cleared, never the whole style attribute: dx3rdSlideToggle
 // also parks `height`/`overflow`/`transition` there mid-animation.
+//
+// A THIRD hiding source, found on a live-collapsed dnd5e item card: the
+// computed-style mirror (feMirrorLiveMessageStyles, which runs BEFORE this)
+// bakes the collapsed computed state inline with `!important` —
+// `opacity: 0; grid: 0px / 255px`. Inline !important outranks the doubled
+// ALWAYS-EXPANDED rules in fe-chat-archive.css, so class/display clearing alone
+// still printed the section collapsed (description silently lost). Every
+// property a collapser uses to hide or size-away its content is cleared here:
+// the archive stylesheet then owns the expanded state outright.
+const FE_COLLAPSIBLE_HIDE_PROPS = [
+  "opacity", "visibility",
+  "grid", "grid-template", "grid-template-rows", "grid-template-columns",
+  "grid-template-areas", "grid-area",
+  "height", "max-height", "overflow", "transition",
+];
+
+function feClearCollapsibleHideStyles(el) {
+  try {
+    const s = el?.style;
+    if (!s) return;
+    if (s.getPropertyValue?.("display") === "none") s.removeProperty("display");
+    for (const p of FE_COLLAPSIBLE_HIDE_PROPS) {
+      try { s.removeProperty(p); } catch {}
+    }
+  } catch {}
+}
+
 export function feExpandCollapsedArchiveSections(node) {
   try {
     if (!feIsElement(node)) return;
@@ -301,13 +328,15 @@ export function feExpandCollapsedArchiveSections(node) {
     for (const el of node.querySelectorAll?.(".dice-roll") ?? []) {
       try { el.classList.add("expanded"); } catch {}
     }
-    for (const el of node.querySelectorAll?.(".collapsible-content") ?? []) {
+    // `.dice-tooltip` / `.dice-tooltip-collapser` collapse by the same
+    // 0fr-grid mechanism and take the same mirrored-inline hit, so they are
+    // cleared alongside `.collapsible-content`.
+    for (const el of node.querySelectorAll?.(
+      ".collapsible-content, .dice-tooltip, .dice-tooltip-collapser"
+    ) ?? []) {
       try {
         el.classList.remove("collapsed");
-        if (el.style?.display === "none") el.style.removeProperty("display");
-        el.style?.removeProperty?.("height");
-        el.style?.removeProperty?.("overflow");
-        el.style?.removeProperty?.("transition");
+        feClearCollapsibleHideStyles(el);
       } catch {}
     }
     for (const el of node.querySelectorAll?.(
@@ -320,6 +349,73 @@ export function feExpandCollapsedArchiveSections(node) {
       } catch {}
     }
   } catch {}
+}
+
+// Item-description collapsibles (dnd5e/midi card `.card-header.description`)
+// are expanded only on the FIRST occurrence of each ITEM in the export and
+// collapsed on every repeat — the one thing the "always expanded" rule above
+// intentionally overrides. Identity is the item UUID (`data-item-uuid` on midi
+// cards); where only a raw `data-item-id` exists it is keyed with the owning
+// actor's UUID so two characters holding the same-named item still count as
+// distinct items. Cards with neither attribute keep the always-expanded
+// baseline: a description we cannot dedupe must never be hidden.
+//
+// Token-scoped uuids — `Scene.X.Token.Y.Actor.Z.Item.W`, which midi stamps on
+// cards rolled through a token — are normalized down to the `Actor.*`
+// document portion first. Two scene tokens of the same actor roll the same
+// item; treating them as distinct items would re-expand the description once
+// per token, not once per item.
+function feArchiveItemKey(holder) {
+  try {
+    const uuid = String(holder?.dataset?.itemUuid || "");
+    if (uuid) {
+      const i = uuid.lastIndexOf("Actor.");
+      return i > 0 ? uuid.slice(i) : uuid;
+    }
+    const itemId = String(holder?.dataset?.itemId || "");
+    if (!itemId) return "";
+    let actor = String(holder?.dataset?.actorUuid || holder?.dataset?.actorId || "");
+    const i = actor.lastIndexOf("Actor.");
+    if (i > 0) actor = actor.slice(i);
+    return `${actor}::${itemId}`;
+  } catch {
+    return "";
+  }
+}
+
+// `seenItems` is a Set shared across the whole export and this runs in the
+// ordered commit loop of feRenderMessagesIntoLog — never inside the parallel
+// renderOne pass — so "first" means first in document order, not first to
+// finish rendering.
+export function feCollapseRepeatedItemDescriptions(node, seenItems) {
+  try {
+    if (!feIsElement(node)) return 0;
+    let collapsed = 0;
+    for (const el of node.querySelectorAll?.(
+      ".collapsible.description .collapsible-content, .card-header.description .collapsible-content"
+    ) ?? []) {
+      try {
+        const key = feArchiveItemKey(el.closest?.("[data-item-uuid], [data-item-id]"));
+        if (!key || !seenItems) continue;
+        if (seenItems.has(key)) {
+          el.classList.add("fe-archive-repeat-collapsed");
+          // Inline !important: a mirrored expanded state would beat any
+          // stylesheet hide, and the saved HTML has no toggle JS anyway.
+          el.style?.setProperty?.("display", "none", "important");
+          collapsed += 1;
+          continue;
+        }
+        seenItems.add(key);
+        // First occurrence is guaranteed open even if this section arrived
+        // after the generic pass (e.g. a description restored from item data).
+        feClearCollapsibleHideStyles(el);
+        el.closest?.(".collapsible.collapsed")?.classList?.remove?.("collapsed");
+      } catch {}
+    }
+    return collapsed;
+  } catch {
+    return 0;
+  }
 }
 
 // midi-qol's damage-application cards are self-titled ("HP 업데이트 됨" and a
@@ -745,6 +841,9 @@ export async function feRenderMessagesIntoLog({
   const concurrency = Math.max(1, Number(renderProfile?.renderConcurrency) || FE_EXPORT_RENDER_CONCURRENCY);
   const deferPortraits = !!renderProfile?.deferPortraits;
   const imageRegistry = renderProfile?.collapseDuplicateImages ? new Map() : null;
+  // Shared across the whole export so "first occurrence" of an item UUID is a
+  // document-order decision — consumed only in the ordered commit loop below.
+  const itemDescriptionRegistry = new Set();
   let renderedCount = 0;
   let frag = targetDoc.createDocumentFragment();
   let fragCount = 0;
@@ -812,6 +911,7 @@ export async function feRenderMessagesIntoLog({
       const itemId = String(item?.id ?? item?.msg?.id ?? item?.msg?._id ?? "");
       if (feIsElement(node)) {
         feOptimizeArchiveNodeImages(node, { targetDoc, renderProfile, imageRegistry });
+        feCollapseRepeatedItemDescriptions(node, itemDescriptionRegistry);
         frag.appendChild(node);
         fragCount += 1;
       }
