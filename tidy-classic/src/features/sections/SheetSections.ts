@@ -303,7 +303,7 @@ export class SheetSections {
 
     // Iterate over every spell item, adding spells to the spellbook by section
     items.forEach((spell: Item5e) => {
-      let method = spell.system.method as keyof CONFIG['DND5E']['spellcasting'];
+      let method: string = spell.system.method;
 
       if (!(method in CONFIG.DND5E.spellcasting)) {
         method = 'innate'; // TODO: Constant

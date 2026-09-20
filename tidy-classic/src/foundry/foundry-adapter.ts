@@ -1519,8 +1519,8 @@ export const FoundryAdapter = {
       traits.languages.push({ label, value: value });
     }
     traits.languages.sort((a: LanguageTraitContext, b: LanguageTraitContext) =>
-      (a.label ?? a.value ?? '').localeCompare(
-        b.label ?? b.value ?? '',
+      String(a.label ?? a.value ?? '').localeCompare(
+        String(b.label ?? b.value ?? ''),
         game.i18n.lang
       )
     );
@@ -1697,12 +1697,9 @@ export const FoundryAdapter = {
         }
 
         const sheetClassDetails =
-          // @ts-expect-error - todo: make this somehow work with TS
           CONFIG[documentName]?.sheetClasses[subType]?.[className];
 
-        const documentClass =
-          // @ts-expect-error - todo: make this somehow work with TS
-          CONFIG[documentName]?.documentClass;
+        const documentClass = CONFIG[documentName]?.documentClass;
 
         const isDefault = className === setting[documentName]?.[subType];
 

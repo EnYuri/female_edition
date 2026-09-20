@@ -766,7 +766,7 @@ export class Tidy5eCharacterSheetQuadrone extends Tidy5eActorSheetQuadroneBase<C
   }
 
   _prepareItems(context: CharacterSheetQuadroneContext) {
-    const eligibleItems = Array.from(this.actor.items).filter(
+    const eligibleItems = Array.from<Item5e>(this.actor.items).filter(
       (item: Item5e) => {
         // Suppress riders for disabled enchantments
         return item.dependentOrigin?.active !== false;

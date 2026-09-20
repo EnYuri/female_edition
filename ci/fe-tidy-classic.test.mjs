@@ -57,6 +57,47 @@ test("committed build output exists — Foundry loads it with no build step", ()
   }
 });
 
+test("upstream and vendored licences ship with the fork", () => {
+  for (const p of [
+    "tidy-classic/LICENSE.txt",
+    "tidy-classic/NOTICE.md",
+    "tidy-classic/public/rpg-awesome/LICENSE.md",
+  ]) {
+    assert.ok(existsSync(new URL(p, root)), `${p} is not committed`);
+  }
+});
+
+test("upstream ambient and type-only declarations stay restored", () => {
+  for (const p of [
+    "tidy-classic/src/events/custom-event-types.d.ts",
+    "tidy-classic/src/foundry/dnd5e.dataModels.fields.types.d.ts",
+    "tidy-classic/src/foundry/foundry-and-system.d.ts",
+    "tidy-classic/src/foundry/foundry.data.fields.types.d.ts",
+    "tidy-classic/src/vite-env.d.ts",
+  ]) {
+    assert.ok(existsSync(new URL(p, root)), `${p} is not committed`);
+  }
+
+  assert.match(
+    read("tidy-classic/src/foundry/foundry-and-system.d.ts"),
+    /declare global \{[\s\S]*var game: any;/,
+    "the Foundry globals declaration was replaced",
+  );
+  assert.match(
+    read("tidy-classic/src/foundry/foundry.data.fields.types.d.ts"),
+    /declare module 'foundry\.data\.fields'/,
+  );
+
+  const tsconfig = JSON.parse(read("tidy-classic/tsconfig.json"));
+  assert.equal(tsconfig.compilerOptions.target, "ES2024");
+  assert.ok(tsconfig.compilerOptions.lib.includes("ESNext"));
+
+  const stubs = walk(new URL("tidy-classic/src/", root)).filter(
+    (path) => path.endsWith(".ts") && readFileSync(path, "utf8").includes("Type-only stub"),
+  );
+  assert.equal(stubs.length, 0, `type stubs returned: ${stubs.join(", ")}`);
+});
+
 test("the global stylesheet is registered BEFORE the built one", () => {
   // The global sheet had every rule the build re-emits removed from it. That is only safe
   // while the build's identical copy lands later in the cascade; flip the order and the

@@ -117,6 +117,9 @@
                     placeholder="{{localize "FESP.Sheet.DescPh"}}"
                     {{#unless ../fe.editable}}disabled{{/unless}}>{{face.description}}</textarea>
           <input type="hidden" name="system.faces.{{face.index}}.linkedActorUuid" value="{{face.linkedActorUuid}}">
+          {{!-- The visible active-face control lives in the Attributes tab. Every face
+                still needs this hidden value here so ArrayField auto-submit is complete. --}}
+          <input type="hidden" name="system.faces.{{face.index}}.linkMode" value="{{face.linkMode}}">
           {{!-- Per-face Token settings. data-dtype="JSON" round-trips the object through the
                 faces-array auto-submit (FormDataExtended JSON.parses it) — without this the
                 face's token settings reset on every unrelated edit. --}}
@@ -144,46 +147,6 @@
             <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.max" value="{{fa.max}}">
             <input type="hidden" name="system.faces.{{face.index}}.attributes.{{fa.index}}.attr" value="{{fa.attr}}">
           {{/each}}
-
-          {{!-- Per-face linked actor + link mode --}}
-          <div class="fe-sp-face-actor-section">
-            <div class="fe-sp-face-actor-row">
-              <span class="fe-sp-face-actor-drop{{#if face.linkedActorName}} linked{{/if}}"
-                    data-face-index="{{face.index}}"
-                    {{#if face.linkedActorName}}data-action="feClearFaceLinkedActor"{{/if}}
-                    title="{{#if face.linkedActorName}}{{face.linkedActorName}} ({{localize "FESP.Sheet.FaceActorClear"}}){{else}}{{localize "FESP.Sheet.FaceActorDropHint"}}{{/if}}">
-                {{#if face.linkedActorName}}<img src="{{face.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-user-plus"></i>{{/if}}
-              </span>
-              {{#if face.linkedActorName}}
-                <div class="fe-sp-face-actor-info">
-                  <span class="fe-sp-face-actor-name">{{face.linkedActorName}}</span>
-                  <select class="fe-sp-face-link-mode" data-face-index="{{face.index}}"
-                          name="system.faces.{{face.index}}.linkMode" {{#unless ../fe.editable}}disabled{{/unless}}>
-                    <option value="copy" {{#if (eq face.linkMode "copy")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeCopy"}}</option>
-                    <option value="linked" {{#if (eq face.linkMode "linked")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeLinked"}}</option>
-                  </select>
-                  <span class="fe-sp-face-actor-clear-hint notes">{{localize "FESP.Sheet.FaceActorClear"}}</span>
-                </div>
-              {{else}}
-                {{!-- Keep every face ArrayField element complete during AppV2
-                      auto-submit even while no linked Actor is resolved. --}}
-                <input type="hidden" name="system.faces.{{face.index}}.linkMode" value="{{face.linkMode}}">
-                <span class="fe-sp-face-actor-drophint">{{localize "FESP.Sheet.FaceActorDropHintBig"}}</span>
-              {{/if}}
-            </div>
-            {{#if face.attrs.length}}
-              <ul class="fe-sp-face-attrs">
-                {{#each face.attrs as |at|}}
-                  <li>
-                    <span class="fe-sp-reference-attr-name">{{at.name}}</span>
-                    <span class="fe-sp-reference-attr-value">{{at.value}}</span>
-                    <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="{{at.path}}"
-                          title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">{{at.path}}</code>
-                  </li>
-                {{/each}}
-              </ul>
-            {{/if}}
-          </div>
 
           {{#if face.img}}
           <div class="fe-sp-overlay-section">
@@ -232,12 +195,18 @@
               {{#each face.overlays as |ov|}}
                 <li class="fe-sp-overlay-row{{#if ov.attrWarn}} fe-sp-overlay-warn{{/if}}">
                   <span class="fe-sp-overlay-num">{{ov.num}}</span>
-                  <span class="fe-sp-overlay-link{{#if ov.linkedActorName}} linked{{/if}}"
-                        {{#if ../../fe.editable}}data-action="{{#if ov.linkedActorName}}feClearOverlayLinkedActor{{/if}}"{{/if}}
+                  <div class="fe-sp-actor-uuid-field fe-sp-overlay-link{{#if ov.linkedActorName}} linked{{/if}}"
                         data-face-index="{{face.index}}" data-overlay-index="{{ov.index}}"
-                        title="{{#if ov.linkedActorName}}{{ov.linkedActorName}} ({{localize "FESP.Sheet.OverlayLinkClear"}}){{else}}{{localize "FESP.Sheet.OverlayLinkHint"}}{{/if}}">
+                        data-current-uuid="{{ov.linkedActorUuid}}">
                     {{#if ov.linkedActorName}}<img src="{{ov.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-link-slash"></i>{{/if}}
-                  </span>
+                    <input type="text" class="fe-sp-actor-uuid-input" value="{{ov.linkedActorUuid}}"
+                           placeholder="{{localize "FESP.Sheet.OverlayLinkHint"}}"
+                           aria-label="{{localize "FESP.Sheet.ActorUuidLabel"}}"
+                           autocomplete="off" spellcheck="false" {{#unless ../../fe.editable}}disabled{{/unless}}>
+                    {{#if ov.linkedActorName}}
+                      <span class="fe-sp-actor-uuid-name" title="{{ov.linkedActorName}}">{{ov.linkedActorName}}</span>
+                    {{/if}}
+                  </div>
                   {{!-- The attribute path lives in the 설정 dialog (feEditOverlay) next to the
                         other styling fields, with the datalist picker built there. It stays a
                         hidden input HERE because the faces-array auto-submit resets any field
@@ -247,7 +216,7 @@
                     <i class="fa-solid fa-triangle-exclamation fe-sp-overlay-warn-icon"
                        title="{{ov.attrWarnReason}}"></i>
                   {{/if}}
-                  <input type="text" name="system.faces.{{face.index}}.overlays.{{ov.index}}.text"
+                  <input type="text" class="fe-sp-overlay-text" name="system.faces.{{face.index}}.overlays.{{ov.index}}.text"
                          value="{{ov.text}}" placeholder="{{localize "FESP.Sheet.OverlayTextPh"}}"
                          {{#unless ../../fe.editable}}disabled{{/unless}}>
                   <input type="hidden" name="system.faces.{{face.index}}.overlays.{{ov.index}}.x" value="{{ov.x}}">

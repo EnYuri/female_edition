@@ -34,8 +34,8 @@
 
 {#snippet speedSenseSummary(
   speed: ActorSpeedSenseEntryContext,
-  clsx: ClassValue,
-  hide: ClassValue,
+  clsx: ClassValue | undefined = undefined,
+  hide: ClassValue | undefined = undefined,
 )}
   <span class={[clsx, hide]}>
     <span class="color-text-gold font-label-medium">{speed.label}</span>

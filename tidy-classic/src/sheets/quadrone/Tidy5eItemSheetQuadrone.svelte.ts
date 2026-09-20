@@ -614,7 +614,6 @@ export class Tidy5eItemSheetQuadrone extends TidyExtensibleDocumentSheetMixin<
       const name =
         this.document.type === 'feat' ? 'feature' : this.document.type;
       const itemTypes =
-        // @ts-expect-error
         CONFIG.DND5E[`${name}Types`][this.document.system.type.value];
       if (itemTypes) {
         context.itemType = itemTypes.label;
@@ -775,8 +774,7 @@ export class Tidy5eItemSheetQuadrone extends TidyExtensibleDocumentSheetMixin<
             },
             {}
           )
-        : // @ts-expect-error
-          CONFIG.DND5E[`${this.item.type}Ids`];
+        : CONFIG.DND5E[`${this.item.type}Ids`];
 
     if (baseIds === undefined) {
       return {};
@@ -1081,7 +1079,6 @@ export class Tidy5eItemSheetQuadrone extends TidyExtensibleDocumentSheetMixin<
     }
     advancements = advancements.filter((a) => {
       const validItemTypes =
-        // @ts-expect-error
         CONFIG.DND5E.advancementTypes[a.constructor.typeName]?.validItemTypes ??
         a.metadata.validItemTypes;
       return (

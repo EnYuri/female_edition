@@ -543,7 +543,7 @@ export class TidyHooks {
   static tidy5eSheetsRenderActorSheet(
     app: any,
     element: HTMLElement,
-    data: CharacterSheetContext | NpcSheetContext | VehicleSheetContext,
+    data: ActorSheetContextV1,
     forced: boolean
   ) {
     Hooks.callAll('tidy5e-sheet.renderActorSheet', app, element, data, forced);

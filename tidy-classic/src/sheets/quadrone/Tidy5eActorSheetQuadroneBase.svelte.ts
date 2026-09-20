@@ -766,8 +766,8 @@ export function Tidy5eActorSheetQuadroneBase<
 
       Object.values(traits).forEach((t) => {
         t.sort((a, b) =>
-          (a.label ?? a.value ?? '').localeCompare(
-            b.label ?? b.value ?? '',
+          String(a.label ?? a.value ?? '').localeCompare(
+            String(b.label ?? b.value ?? ''),
             game.i18n.lang
           )
         );

@@ -1,14 +1,24 @@
-/**
- * Type-only stub for `src/types/theme.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { CurrentSettings } from 'src/settings/settings.svelte';
 
-export type ThemeColorSetting = any;
-export type Tidy5eThemeDataV1 = any;
+export type Tidy5eTheme = {
+  id: string;
+  name: string;
+  description: string;
+  variables: Record<string, string>;
+  /**
+   * Determines whether this theme is considered a dark-oriented theme or a light-oriented theme.
+   */
+  type: 'dark' | 'light';
+};
+
+export type ThemeColorSetting = {
+  name: string;
+  hint: string;
+  key: keyof CurrentSettings;
+  cssVariable: string;
+};
+
+export type Tidy5eThemeDataV1 = {
+  version: 1;
+  variables: Record<string, string>;
+};

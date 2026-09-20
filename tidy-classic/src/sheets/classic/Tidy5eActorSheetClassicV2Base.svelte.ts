@@ -370,7 +370,7 @@ export function Tidy5eActorSheetClassicV2Base<
       const speed = (key: string) => getMovementSpeed(movement, key);
 
       // Prepare an array of available movement speeds
-      let speeds = [
+      let speeds: [number | undefined, string][] = [
         [
           speed('burrow'),
           `${game.i18n.localize('DND5E.MOVEMENT.Type.Burrow')} ${speed(
@@ -402,7 +402,9 @@ export function Tidy5eActorSheetClassicV2Base<
       }
 
       // Filter and sort speeds on their values
-      speeds = speeds.filter((s) => s[0]).sort((a, b) => b[0] - a[0]);
+      speeds = speeds
+        .filter((s) => s[0])
+        .sort((a, b) => (b[0] ?? 0) - (a[0] ?? 0));
       const units = movement.units ?? dnd5e.utils.defaultUnits('length');
 
       // Case 1: Largest as primary
@@ -591,10 +593,12 @@ export function Tidy5eActorSheetClassicV2Base<
               const total = dnd5e.utils.simplifyBonus(value, rollData);
               if (!total) return null;
 
-              const damageType =
-                CONFIG.DND5E.damageTypes[
-                  key as keyof typeof CONFIG.DND5E.damageTypes
-                ] ?? {};
+              const damageType = (
+                CONFIG.DND5E.damageTypes as Record<
+                  string,
+                  { label: string; isPhysical?: boolean }
+                >
+              )[key];
 
               const mod: DamageModificationContextEntry = {
                 label: `${damageType?.label ?? key} ${dnd5e.utils.formatNumber(
@@ -604,11 +608,7 @@ export function Tidy5eActorSheetClassicV2Base<
                 consequence: total > 0 ? 'detriment' : 'benefit',
               };
               const icons: string[] = (mod.icons = []);
-              if (
-                dm.bypasses.size &&
-                'isPhysical' in damageType &&
-                damageType?.isPhysical
-              )
+              if (dm.bypasses.size && damageType?.isPhysical)
                 icons.push(...dm.bypasses);
               return mod;
             })

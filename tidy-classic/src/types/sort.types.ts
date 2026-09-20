@@ -1,14 +1,16 @@
-/**
- * Type-only stub for `src/types/sort.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { Item5e } from './item.types';
 
-export type SortMethodOption = any;
-export type SortMethodScheme = any;
+/** The content needed to manage interactions with a sort method. */
+export type SortMethodOption = {
+  key: string;
+  icon: string;
+  label: string;
+  tooltip: string;
+  onClick: (doc: any, currentTabId: string) => Promise<any>;
+};
+
+export type ItemSortComparator = (a: Item5e, b: Item5e) => number;
+
+export type SortMethodScheme = SortMethodOption & {
+  comparator: ItemSortComparator;
+};

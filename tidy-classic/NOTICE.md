@@ -5,7 +5,8 @@ This directory contains a maintained fork of **Tidy 5e Sheets v12.5.5** by
 <https://github.com/kgar/foundry-vtt-tidy-5e-sheets>.
 
 The original project is MIT licensed and copyright its authors (kgar, sednec,
-p4535992, and contributors). This fork is distributed under the same terms.
+p4535992, and contributors). See `LICENSE.txt`. This fork is distributed under
+the same terms.
 
 Only the Classic sheets are registered by this fork; the current upstream Tidy
 module continues to provide its newer layouts.

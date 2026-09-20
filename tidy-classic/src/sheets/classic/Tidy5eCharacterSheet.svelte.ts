@@ -994,7 +994,7 @@ export class Tidy5eCharacterSheet
       species,
       spells,
       subclasses,
-    } = Array.from(this.actor.items).reduce(
+    } = Array.from<Item5e>(this.actor.items).reduce(
       (
         obj: CharacterItemPartitions & { favorites: CharacterItemPartitions },
         item: Item5e

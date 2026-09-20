@@ -54309,7 +54309,8 @@ var root_20$7 = /* @__PURE__ */ from_html(`<div class="list-entry"><div class="l
 var root_17$d = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 function ActorTraitClasses($$anchor, $$props) {
   push($$props, true);
-  const classContent = ($$anchor2, cls = noop) => {
+  const classContent = ($$anchor2, $$arg0) => {
+    let cls = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg0?.(), void 0));
     var div = root_1$28();
     var div_1 = child(div);
     var div_2 = child(div_1);
@@ -54332,7 +54333,7 @@ function ActorTraitClasses($$anchor, $$props) {
             html(
               span_2,
               () => localize("DND5E.LevelNumber", {
-                level: `</span><span class="font-data-medium color-text-default">${cls().levels}`
+                level: `</span><span class="font-data-medium color-text-default">${get(cls).levels}`
               }),
               true
             );
@@ -54351,15 +54352,15 @@ function ActorTraitClasses($$anchor, $$props) {
             append($$anchor4, i);
           };
           if_block(node_2, ($$render) => {
-            if (cls().isOriginalClass) $$render(consequent_1);
+            if (get(cls).isOriginalClass) $$render(consequent_1);
           });
         }
         template_effect(
           ($0) => {
             set_attribute(span, "aria-label", $0);
-            set_attribute(img, "src", cls().img);
-            set_attribute(img, "alt", cls().name);
-            set_text(text2, cls().name);
+            set_attribute(img, "src", get(cls).img);
+            set_attribute(img, "alt", get(cls).name);
+            set_text(text2, get(cls).name);
           },
           [
             () => localize("DND5E.DescriptionView", { description: localize("TYPES.Item.class") })
@@ -54368,7 +54369,7 @@ function ActorTraitClasses($$anchor, $$props) {
         append($$anchor3, fragment);
       };
       if_block(node, ($$render) => {
-        if (cls()) $$render(consequent_2);
+        if (get(cls)) $$render(consequent_2);
       });
     }
     reset(a);
@@ -54389,12 +54390,12 @@ function ActorTraitClasses($$anchor, $$props) {
             () => localize("Tidy5E.ContextMenu")
           ]
         );
-        delegated("click", button, () => cls().item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_EDIT }));
+        delegated("click", button, () => get(cls).item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_EDIT }));
         delegated("click", button_1, (ev) => EventHelper.triggerContextMenu(ev, "[data-item-id]"));
         append($$anchor3, div_3);
       };
       if_block(node_3, ($$render) => {
-        if (get(context).unlocked && cls()) $$render(consequent_3);
+        if (get(context).unlocked && get(cls)) $$render(consequent_3);
       });
     }
     var node_4 = sibling(node_3, 2);
@@ -54404,11 +54405,11 @@ function ActorTraitClasses($$anchor, $$props) {
         var button_2 = child(div_4);
         reset(div_4);
         template_effect(($0) => set_attribute(button_2, "aria-label", $0), [() => localize("DND5E.LevelActionIncrease")]);
-        delegated("click", button_2, () => FoundryAdapter.changeLevel(get(context).actor, cls().item, 1));
+        delegated("click", button_2, () => FoundryAdapter.changeLevel(get(context).actor, get(cls).item, 1));
         append($$anchor3, div_4);
       };
       if_block(node_4, ($$render) => {
-        if (!get(context).unlocked && get(context).editable && cls() && !get(hitLevelCap)) $$render(consequent_4);
+        if (!get(context).unlocked && get(context).editable && get(cls) && !get(hitLevelCap)) $$render(consequent_4);
       });
     }
     reset(div_2);
@@ -54419,10 +54420,10 @@ function ActorTraitClasses($$anchor, $$props) {
         var node_6 = child(div_5);
         LevelUpDropdown(node_6, {
           get availableLevels() {
-            return cls().availableLevels;
+            return get(cls).availableLevels;
           },
           get item() {
-            return cls().item;
+            return get(cls).item;
           },
           class: "level-selector flex0"
         });
@@ -54441,11 +54442,11 @@ function ActorTraitClasses($$anchor, $$props) {
             () => localize("DND5E.LevelActionIncrease")
           ]
         );
-        delegated("click", button_3, () => FoundryAdapter.changeLevel(get(context).actor, cls().item, 1));
+        delegated("click", button_3, () => FoundryAdapter.changeLevel(get(context).actor, get(cls).item, 1));
         append($$anchor3, div_5);
       };
       if_block(node_5, ($$render) => {
-        if (get(context).unlocked && cls()) $$render(consequent_5);
+        if (get(context).unlocked && get(cls)) $$render(consequent_5);
       });
     }
     reset(div_1);
@@ -54453,24 +54454,26 @@ function ActorTraitClasses($$anchor, $$props) {
     template_effect(($0) => set_attribute(a, "aria-label", $0), [
       () => localize("DND5E.DescriptionView", { description: localize("TYPES.Item.class") })
     ]);
-    delegated("click", a, () => cls()?.item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_PLAY }));
-    delegated("mousedown", a, (event2) => FoundryAdapter.editOnMiddleClick(event2, cls()?.item));
-    delegated("keydown", a, (e) => (e.key === "Enter" || e.key === " ") && cls()?.item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_PLAY }));
+    delegated("click", a, () => get(cls)?.item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_PLAY }));
+    delegated("mousedown", a, (event2) => FoundryAdapter.editOnMiddleClick(event2, get(cls)?.item));
+    delegated("keydown", a, (e) => (e.key === "Enter" || e.key === " ") && get(cls)?.item.sheet.render({ force: true, mode: CONSTANTS.SHEET_MODE_PLAY }));
     append($$anchor2, div);
   };
-  const subclassRow = ($$anchor2, cls = noop, orphaned = noop) => {
+  const subclassRow = ($$anchor2, $$arg0, $$arg1) => {
+    let cls = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg0?.(), void 0));
+    let orphaned = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg1?.(), false));
     var fragment_2 = comment();
     var node_7 = first_child(fragment_2);
     {
       var consequent_6 = ($$anchor3) => {
-        subclassListEntry($$anchor3, () => cls().subclass, orphaned);
+        subclassListEntry($$anchor3, () => get(cls).subclass, () => get(orphaned));
       };
       var consequent_7 = ($$anchor3) => {
         needsSubclassListEntry($$anchor3, () => get(firstClass).item);
       };
       if_block(node_7, ($$render) => {
-        if (cls()?.subclass) $$render(consequent_6);
-        else if (cls()?.needsSubclass) $$render(consequent_7, 1);
+        if (get(cls)?.subclass) $$render(consequent_6);
+        else if (get(cls)?.needsSubclass) $$render(consequent_7, 1);
       });
     }
     append($$anchor2, fragment_2);
@@ -61528,7 +61531,8 @@ function VehicleCrewAndPassengersTab($$anchor, $$props) {
   const noCrew = /* @__PURE__ */ user_derived(() => !get(context).crew.assigned.members.length && !get(context).crew.unassigned.members.length);
   var div = root$3h();
   {
-    const CrewPassengerTable = ($$anchor2, section = noop, showCount = noop, noMembersView = noop) => {
+    const CrewPassengerTable = ($$anchor2, section = noop, showCount = noop, $$arg2) => {
+      let noMembersView = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg2?.(), void 0));
       var fragment = comment();
       var node = first_child(fragment);
       {
@@ -61681,7 +61685,7 @@ function VehicleCrewAndPassengersTab($$anchor, $$props) {
                 ($$anchor5) => {
                   var fragment_8 = comment();
                   var node_7 = first_child(fragment_8);
-                  snippet(node_7, () => noMembersView() ?? noop, section);
+                  snippet(node_7, () => get(noMembersView) ?? noop, section);
                   append($$anchor5, fragment_8);
                 }
               );
@@ -61709,7 +61713,7 @@ function VehicleCrewAndPassengersTab($$anchor, $$props) {
           }
         };
         if_block(node, ($$render) => {
-          if (section().members.length || noMembersView()) $$render(consequent_2);
+          if (section().members.length || get(noMembersView)) $$render(consequent_2);
         });
       }
       append($$anchor2, fragment);
@@ -64787,7 +64791,9 @@ function EncounterMemberNameColumn($$anchor, $$props) {
   pop();
 }
 delegate(["click", "keydown"]);
-const creatureTypeEntry = ($$anchor, entry = noop, clsx$12 = noop, hide = noop) => {
+const creatureTypeEntry = ($$anchor, entry = noop, $$arg1, $$arg2) => {
+  let clsx$12 = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg1?.(), void 0));
+  let hide = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg2?.(), void 0));
   var span = root_1$1y();
   var span_1 = child(span);
   var text2 = child(span_1, true);
@@ -64797,7 +64803,7 @@ const creatureTypeEntry = ($$anchor, entry = noop, clsx$12 = noop, hide = noop) 
   reset(span_2);
   reset(span);
   template_effect(() => {
-    set_class(span, 1, clsx([clsx$12(), hide()]));
+    set_class(span, 1, clsx([get(clsx$12), get(hide)]));
     set_text(text2, entry().label);
     set_text(text_1, entry().quantity);
   });
@@ -65086,7 +65092,9 @@ function EncounterSheet$1($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
-const speedSenseSummary$1 = ($$anchor, speed = noop, clsx$12 = noop, hide = noop) => {
+const speedSenseSummary$1 = ($$anchor, speed = noop, $$arg1, $$arg2) => {
+  let clsx$12 = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg1?.(), void 0));
+  let hide = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg2?.(), void 0));
   var fragment = root_1$1x();
   var span = first_child(fragment);
   var span_1 = child(span);
@@ -65114,11 +65122,11 @@ const speedSenseSummary$1 = ($$anchor, speed = noop, clsx$12 = noop, hide = noop
   reset(span);
   var div = sibling(span, 2);
   template_effect(() => {
-    set_class(span, 1, clsx([clsx$12(), hide()]));
+    set_class(span, 1, clsx([get(clsx$12), get(hide)]));
     set_text(text2, speed().label);
     set_text(text_1, speed().value);
     set_text(text_2, speed().units);
-    set_class(div, 1, clsx([hide(), "divider-dot"]));
+    set_class(div, 1, clsx([get(hide), "divider-dot"]));
   });
   append($$anchor, fragment);
 };
@@ -72855,7 +72863,7 @@ function Tidy5eActorSheetQuadroneBase(sheetType) {
         });
       }
       Object.values(traits).forEach((t) => {
-        t.sort((a, b) => (a.label ?? a.value ?? "").localeCompare(b.label ?? b.value ?? "", game.i18n.lang));
+        t.sort((a, b) => String(a.label ?? a.value ?? "").localeCompare(String(b.label ?? b.value ?? ""), game.i18n.lang));
       });
       return traits;
     }
@@ -73551,7 +73559,9 @@ function Tidy5eActorSheetQuadroneBase(sheetType) {
   }
   return Tidy5eActorSheetQuadroneBase2;
 }
-const speedSenseSummary = ($$anchor, speed = noop, clsx$12 = noop, hide = noop) => {
+const speedSenseSummary = ($$anchor, speed = noop, $$arg1, $$arg2) => {
+  let clsx$12 = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg1?.(), void 0));
+  let hide = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg2?.(), void 0));
   var span = root_1$1e();
   var span_1 = child(span);
   var text2 = child(span_1, true);
@@ -73577,7 +73587,7 @@ const speedSenseSummary = ($$anchor, speed = noop, clsx$12 = noop, hide = noop) 
   }
   reset(span);
   template_effect(() => {
-    set_class(span, 1, clsx([clsx$12(), hide()]));
+    set_class(span, 1, clsx([get(clsx$12), get(hide)]));
     set_text(text2, speed().label);
     set_text(text_1, speed().value);
     set_text(text_2, speed().units);
@@ -104747,8 +104757,8 @@ const FoundryAdapter = {
       traits.languages.push({ label, value });
     }
     traits.languages.sort(
-      (a, b) => (a.label ?? a.value ?? "").localeCompare(
-        b.label ?? b.value ?? "",
+      (a, b) => String(a.label ?? a.value ?? "").localeCompare(
+        String(b.label ?? b.value ?? ""),
         game.i18n.lang
       )
     );
@@ -104881,14 +104891,8 @@ const FoundryAdapter = {
         if (!className) {
           continue;
         }
-        const sheetClassDetails = (
-          // @ts-expect-error - todo: make this somehow work with TS
-          CONFIG[documentName]?.sheetClasses[subType]?.[className]
-        );
-        const documentClass = (
-          // @ts-expect-error - todo: make this somehow work with TS
-          CONFIG[documentName]?.documentClass
-        );
+        const sheetClassDetails = CONFIG[documentName]?.sheetClasses[subType]?.[className];
+        const documentClass = CONFIG[documentName]?.documentClass;
         const isDefault = className === setting[documentName]?.[subType];
         result.push({
           documentClass,
@@ -108590,7 +108594,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
           `${game.i18n.localize("DND5E.MOVEMENT.Type.Walk")} ${speed("walk")}`
         ]);
       }
-      speeds = speeds.filter((s) => s[0]).sort((a, b) => b[0] - a[0]);
+      speeds = speeds.filter((s) => s[0]).sort((a, b) => (b[0] ?? 0) - (a[0] ?? 0));
       const units = movement.units ?? dnd5e.utils.defaultUnits("length");
       if (largestPrimary) {
         let primary = speeds.shift();
@@ -108713,13 +108717,13 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
           const mods = Object.entries(dm.amount).map(([key2, value]) => {
             const total = dnd5e.utils.simplifyBonus(value, rollData);
             if (!total) return null;
-            const damageType = CONFIG.DND5E.damageTypes[key2] ?? {};
+            const damageType = CONFIG.DND5E.damageTypes[key2];
             const mod = {
               label: `${damageType?.label ?? key2} ${dnd5e.utils.formatNumber(total, { signDisplay: "always" })}`,
               consequence: total > 0 ? "detriment" : "benefit"
             };
             const icons = mod.icons = [];
-            if (dm.bypasses.size && "isPhysical" in damageType && damageType?.isPhysical) icons.push(...dm.bypasses);
+            if (dm.bypasses.size && damageType?.isPhysical) icons.push(...dm.bypasses);
             return mod;
           }).filter((f) => f);
           context.traits.traits.dm = mods;
@@ -110530,10 +110534,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
     context.customContent = await ItemSheetRuntime.getContent(context);
     if (["feat", "loot", "consumable"].includes(this.document.type)) {
       const name = this.document.type === "feat" ? "feature" : this.document.type;
-      const itemTypes = (
-        // @ts-expect-error
-        CONFIG.DND5E[`${name}Types`][this.document.system.type.value]
-      );
+      const itemTypes = CONFIG.DND5E[`${name}Types`][this.document.system.type.value];
       if (itemTypes) {
         context.itemType = itemTypes.label;
         context.itemSubtypes = itemTypes.subtypes;
@@ -110619,10 +110620,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
         return acc;
       },
       {}
-    ) : (
-      // @ts-expect-error
-      CONFIG.DND5E[`${this.item.type}Ids`]
-    );
+    ) : CONFIG.DND5E[`${this.item.type}Ids`];
     if (baseIds === void 0) {
       return {};
     }
@@ -110809,10 +110807,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
       return false;
     }
     advancements = advancements.filter((a) => {
-      const validItemTypes = (
-        // @ts-expect-error
-        CONFIG.DND5E.advancementTypes[a.constructor.typeName]?.validItemTypes ?? a.metadata.validItemTypes
-      );
+      const validItemTypes = CONFIG.DND5E.advancementTypes[a.constructor.typeName]?.validItemTypes ?? a.metadata.validItemTypes;
       return !this.item.advancement.byId[a.id] && validItemTypes.has(this.item.type) && a.constructor.availableForItem(this.item);
     });
     if (showDialog) {

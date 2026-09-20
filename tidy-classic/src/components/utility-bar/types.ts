@@ -1,13 +1,24 @@
-/**
- * Type-only stub for `src/components/utility-bar/types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { TidySectionBase } from "src/types/types";
 
-export type UtilityToolbarCommandExecuteEvent = any;
+export interface UtilityToolbarCommandParams<TContext> {
+  id: string;
+  title?: string;
+  text?: string;
+  iconClass?: string;
+  context?: any;
+  execute?: (detail: UtilityToolbarCommandExecuteEvent<TContext>) => void;
+  disabled?: boolean;
+  visible?: boolean;
+}
+
+export interface UtilityToolbarCommandExecuteEvent<TContext = any> {
+  event: Event;
+  context: TContext;
+  sections: TidySectionBase[];
+}
+
+export interface UtilityItemFilterParams {
+  filterName: string;
+  setName: string;
+  text: string;
+}

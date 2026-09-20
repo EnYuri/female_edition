@@ -1,16 +1,28 @@
-/**
- * Type-only stub for `src/features/exhaustion/exhaustion.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+export type OpenExhaustionConfig = {
+  /**
+   * Opens exhaustion to be set to any permissible value in the actor exhaustion schema.
+   */
+  type: 'open';
+};
 
-export type ExhaustionConfig = any;
-export type IconWithSeverity = any;
-export type OpenExhaustionConfig = any;
-export type SpecificExhaustionConfig = any;
+export type SpecificExhaustionConfig = {
+  /**
+   * Limits exhaustion to a specific number of levels.
+   */
+  type: 'specific';
+  /**
+   * The number of levels of exhaustion, excluding level 0.
+   */
+  levels: number;
+  /**
+   * An array of hints to use for tooltips when interacting with the exhaustion tracker.
+   */
+  hints: string[];
+};
+
+export type ExhaustionConfig = OpenExhaustionConfig | SpecificExhaustionConfig;
+
+export type IconWithSeverity = {
+  iconCssClass: string;
+  severity: number;
+};

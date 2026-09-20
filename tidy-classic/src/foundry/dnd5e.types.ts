@@ -1,20 +1,152 @@
-/**
- * Type-only stub for `src/foundry/dnd5e.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+/* Actors */
 
+export type RollConfigField = {
+  ability: string;
+  roll: {
+    min: number;
+    max: number;
+    mode: number;
+  };
+};
+
+export type ActorAttributeEncumbrance = {
+  value: number;
+  thresholds: {
+    encumbered: number;
+    heavilyEncumbered: number;
+    maximum: number;
+  };
+  max: number;
+  mod: number;
+  stops: {
+    encumbered: number;
+    heavilyEncumbered: number;
+  };
+  pct: number;
+  encumbered: boolean;
+};
+
+export type ActorProficiency = {
+  deterministic: boolean;
+  multiplier: number;
+  rounding: string;
+  _baseProficiency: number;
+  dice: string;
+  flag: number;
+  hasProficiency: boolean;
+  term: string;
+};
+
+export type ToolData = {
+  value: number;
+  ability: string;
+  bonuses: {
+    check: string;
+  };
+  effectValue: number;
+  bonus: number;
+  mod: number;
+  prof: ActorProficiency;
+  total: number;
+};
+
+export type SkillData = {
+  bonus: number;
+  bonuses: {
+    check: string;
+    passive: string;
+  };
+  effectValue: number;
+  mod: number;
+  passive: number;
+  prof: ActorProficiency;
+  proficient: number;
+  total: number; // mod + bonuses
+  value: number;
+} & RollConfigField;
+
+export type CharacterFavoriteType =
+  | 'activity'
+  | 'effect'
+  | 'item'
+  | 'skill'
+  | 'slots'
+  | 'tool';
+
+export type CharacterFavorite = {
+  type: CharacterFavoriteType;
+  sort: number;
+  id: string;
+};
+
+export type FacilityOccupants = {
+  value: string[];
+  max: number;
+};
+
+export type UnsortedCharacterFavorite = {
+  type: 'item' | 'effect' | 'activity';
+  id: string;
+};
+
+export type RollConfig = {
+  formula?: string;
+  data?: object;
+  chatMessage?: boolean;
+  messageData?: object;
+};
+
+export type Roll = {
+  formula: string;
+  data: object;
+};
+
+/**
+ * Configuration options for a rest.
+ */
+export type RestConfiguration = {
+  type?: string;
+  dialog: boolean;
+  chat: boolean;
+  duration?: number;
+  newDay: boolean;
+  advanceTime?: boolean;
+  autoHD?: boolean;
+  autoHDThreshold?: number;
+};
+
+// TODO
 export type Activity5e = any;
-export type ActorAttributeEncumbrance = any;
-export type CharacterFavorite = any;
-export type CharacterFavoriteType = any;
-export type FacilityOccupants = any;
-export type SkillData = any;
-export type ToolData = any;
-export type UnsortedCharacterFavorite = any;
+
+export type ActivityFavoriteData = {
+  img: string;
+  title: string;
+  subtitle: string[];
+  range: ActivityRange;
+  uses: ActivityUses & { name: string };
+  modifier?: string;
+  save?: ActivitySave;
+};
+
+export type ActivityRange = {
+  value: string | null;
+  units: string | null;
+  special: string | null;
+  override: boolean;
+  long: number | null;
+  reach: number | null;
+  scalar: boolean;
+};
+
+export type ActivityUses = {
+  value: number | null;
+  max: number | null;
+  name: string | null;
+  spent: number | null;
+  recovery: unknown;
+};
+
+export type ActivitySave = {
+  dc: number;
+  ability: string;
+};

@@ -6,6 +6,7 @@ const DATA_JS = readFileSync(new URL("../scripts/fe-screen-panel-data.js", impor
 const PANEL_JS = readFileSync(new URL("../scripts/fe-screen-panel.js", import.meta.url), "utf8");
 const SHEET_JS = readFileSync(new URL("../scripts/fe-screen-panel-sheet.js", import.meta.url), "utf8");
 const SHEET_HBS = readFileSync(new URL("../templates/screen-panel-sheet.hbs", import.meta.url), "utf8");
+const ATTRS_HBS = readFileSync(new URL("../templates/screen-panel-sheet-attributes.hbs", import.meta.url), "utf8");
 
 test("screen panel dimensions are stored on every face, not edited at panel level", () => {
   assert.match(DATA_JS, /img: new f\.FilePathField[\s\S]*?width: new f\.NumberField[\s\S]*?height: new f\.NumberField/);
@@ -45,7 +46,7 @@ test("explicit face dimensions do not require a loaded texture", () => {
 });
 
 test("linked artwork changes seed natural face dimensions", () => {
-  assert.match(SHEET_HBS, /class="fe-sp-face-link-mode" data-face-index="\{\{face\.index\}\}"/);
+  assert.match(ATTRS_HBS, /class="fe-sp-face-link-mode" data-face-index="\{\{fe\.activeFace\.index\}\}"/);
   assert.match(SHEET_JS, /#setFaceLinkMode\(faceIndex, linkMode\)[\s\S]*?feSeedFaceSizeFromImage\(face, natural\)/);
   assert.match(SHEET_JS, /#updateFaceLinkedActor\(faceIndex, uuid\)[\s\S]*?feSeedFaceSizeFromImage\(face, natural\)/);
   assert.match(PANEL_JS, /async function feSyncLinkedFaceImages\(panelActor\)[\s\S]*?face\.width = item\.natural\.w;[\s\S]*?face\.height = item\.natural\.h;/);

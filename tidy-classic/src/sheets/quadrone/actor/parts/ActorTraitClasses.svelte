@@ -154,7 +154,7 @@
   {/each}
 {/if}
 
-{#snippet classContent(cls: ActorClassEntryContext)}
+{#snippet classContent(cls: ActorClassEntryContext | undefined = undefined)}
   <div class="list-content">
     <div class="class-item">
       <div class="flexrow">
@@ -282,7 +282,10 @@
   </div>
 {/snippet}
 
-{#snippet subclassRow(cls: ActorClassEntryContext, orphaned: boolean)}
+{#snippet subclassRow(
+  cls: ActorClassEntryContext | undefined = undefined,
+  orphaned = false,
+)}
   {#if cls?.subclass}
     {@render subclassListEntry(cls.subclass, orphaned)}
   {:else if cls?.needsSubclass}

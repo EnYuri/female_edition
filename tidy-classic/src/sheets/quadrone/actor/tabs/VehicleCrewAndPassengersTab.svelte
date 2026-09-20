@@ -209,7 +209,8 @@
   {#snippet CrewPassengerTable(
     section: CrewSection | PassengerSection,
     showCount: boolean,
-    noMembersView: Snippet<[CrewSection | PassengerSection]>,
+    noMembersView: Snippet<[CrewSection | PassengerSection]> | undefined =
+      undefined,
   )}
     {#if section.members.length || noMembersView}
       {@const columns = new ColumnsLoadout(

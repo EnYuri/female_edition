@@ -1,20 +1,48 @@
-/**
- * Type-only stub for `src/runtime/item/item.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { Item5e } from 'src/types/item.types';
+import type { SortMethodScheme } from 'src/types/sort.types';
 
-export type ConfiguredItemFilter = any;
-export type DocumentFilters = any;
-export type DocumentTypesToFilterTabs = any;
-export type DocumentTypesToSortMethodTabs = any;
-export type FilterCategoriesToFilters = any;
-export type FilterTabsToCategories = any;
-export type ItemFilter = any;
-export type RegisteredEquipmentTypeGroup = any;
+// Filtering
+export type ItemFilter = {
+  name: string;
+  predicate: (item: Item5e) => boolean;
+  text: string;
+  /** Used for scenarios where space is limited and an abbreviation is available. */
+  abbreviation?: string;
+  pinnedFilterClass?: string;
+  /** Classic Sheets only: denotes that an abbreviation should be used, regardless of available space. */
+  useLegacyAbbreviation?: boolean;
+};
+
+type Category = string;
+type TabId = string;
+type DocumentType = string;
+export type FilterCategoriesToFilters = Record<
+  Category,
+  ItemFilter[] | ((document: any) => ItemFilter[])
+>;
+
+export type FilterTabsToCategories = Record<TabId, FilterCategoriesToFilters>;
+export type DocumentTypesToFilterTabs = Record<
+  DocumentType,
+  FilterTabsToCategories
+>;
+
+// TODO: Find a better name for this
+export type ConfiguredItemFilter = ItemFilter & {
+  value: boolean | null;
+};
+export type DocumentFilterCategories = Record<Category, ConfiguredItemFilter[]>;
+export type DocumentFilters = Record<TabId, DocumentFilterCategories>;
+
+export type RegisteredEquipmentTypeGroup = {
+  label: string;
+  types: Record<string, string>;
+};
+
+// Sorting
+export type SortTabsToSortSchemes = Record<TabId, SortMethodScheme[]>;
+
+export type DocumentTypesToSortMethodTabs = Record<
+  DocumentType,
+  SortTabsToSortSchemes
+>;

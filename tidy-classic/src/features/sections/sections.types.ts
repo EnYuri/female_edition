@@ -1,15 +1,16 @@
-/**
- * Type-only stub for `src/features/sections/sections.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+export type SectionConfig = {
+  key: string;
+  order: number;
+  show?: boolean;
+};
 
-export type DocumentSectionAssignments = any;
-export type SectionConfig = any;
-export type SheetTabSectionConfigs = any;
+/** Section configuration for a given actor, arranged by tab IDs. */
+export type SheetTabSectionConfigs = {
+  /** A mapping from tab IDs to arrays of section keys, where the arrays represent the order of the sections. */
+  [tabId: string]: {
+    [sectionKey: string]: SectionConfig;
+  };
+};
+
+/** A record of document UUIDs to Section Keys/Names */
+export type DocumentSectionAssignments = Record<string, string | null>;

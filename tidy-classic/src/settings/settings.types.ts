@@ -1,16 +1,40 @@
-/**
- * Type-only stub for `src/settings/settings.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+export interface GlobalCustomSectionSheetFilters {
+  [sheetType: string]: string[];
+}
 
-export type GlobalCustomSectionsetting = any;
-export type HeaderControlConfiguration = any;
-export type SheetTabConfiguration = any;
-export type TabConfiguration = any;
+export interface GlobalCustomSectionsetting {
+  /** The section name. Localizable keys are also supported. */
+  section: string;
+
+  /** Determines whether the section should be visible even when there are no items  */
+  showWhenEmpty: boolean;
+
+  /**
+   * Limits this section to the indicated sheet types' indicated tab IDs
+   * when utilizing default custom sections.
+   * If this object empty, then apply this section to all sheet types and all tabs.
+   */
+  showWhenEmptyFilters: GlobalCustomSectionSheetFilters;
+}
+
+export type SheetTabConfiguration = {
+  selected: string[];
+  visibilityLevels: Record<string, number | null>;
+};
+
+export type TabConfiguration = {
+  [documentName: string]: {
+    [documentType: string]: SheetTabConfiguration;
+  };
+};
+
+export type SheetHeaderControlConfiguration = {
+  header: string[];
+  menu: string[];
+};
+
+export type HeaderControlConfiguration = {
+  [documentName: string]: {
+    [documentType: string]: SheetHeaderControlConfiguration;
+  };
+};

@@ -1,14 +1,39 @@
-/**
- * Type-only stub for `src/applications/settings/user-settings/UserSettings.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { CurrentSettings } from 'src/settings/settings.svelte';
 
-export type UserSettingsContext = any;
-export type UserSettingsFunctions = any;
+export type UserSettingsContext = {
+  settings: {
+    actionListIncludeConsumables: CurrentSettings['actionListIncludeConsumables'];
+    actionListIncludeMinuteLongSpellsAsActions: CurrentSettings['actionListIncludeMinuteLongSpellsAsActions'];
+    actionListIncludeSpellsWithActiveEffects: CurrentSettings['actionListIncludeSpellsWithActiveEffects'];
+    actionListLimitActionsToCantrips: CurrentSettings['actionListLimitActionsToCantrips'];
+    alwaysShowNpcSkills: CurrentSettings['alwaysShowNpcSkills'];
+    animateInspiration: CurrentSettings['animateInspiration'];
+    hideIfZero: CurrentSettings['hideIfZero'];
+    inlineActivitiesPosition: CurrentSettings['inlineActivitiesPosition'];
+    moveCharacterTraitsToRightOfSkills: CurrentSettings['moveCharacterTraitsToRightOfSkills'];
+    moveNpcTraitsToRightOfSkills: CurrentSettings['moveNpcTraitsToRightOfSkills'];
+    showClassList: CurrentSettings['showClassList'];
+    showEquippedAmmoOnly: CurrentSettings['showEquippedAmmoOnly'];
+    showExhaustionOnHover: CurrentSettings['showExhaustionOnHover'];
+    showInspirationOnHover: CurrentSettings['showInspirationOnHover'];
+    showSpellbookTabNpc: CurrentSettings['showSpellbookTabNpc'];
+    toggleEmptyCharacterSkills: CurrentSettings['toggleEmptyCharacterSkills'];
+    useClassicControlsForCharacter: CurrentSettings['useClassicControlsForCharacter'];
+    useClassicControlsForNpc: CurrentSettings['useClassicControlsForNpc'];
+    useClassicControlsForVehicle: CurrentSettings['useClassicControlsForVehicle'];
+    useContextMenu: CurrentSettings['useContextMenu'];
+    useHpBar: CurrentSettings['useHpBar'];
+    useHpBarNpc: CurrentSettings['useHpBarNpc'];
+    useHpBarVehicle: CurrentSettings['useHpBarVehicle'];
+    useHpOverlay: CurrentSettings['useHpOverlay'];
+    useHpOverlayNpc: CurrentSettings['useHpOverlayNpc'];
+    useHpOverlayVehicle: CurrentSettings['useHpOverlayVehicle'];
+    useSpellClassFilterIcons: CurrentSettings['useSpellClassFilterIcons'];
+  };
+};
+
+export type UserSettingsFunctions = {
+  save(settings: UserSettingsContext): Promise<unknown>;
+  apply(settings: UserSettingsContext): Promise<unknown>;
+  validate(context: UserSettingsContext): boolean;
+};

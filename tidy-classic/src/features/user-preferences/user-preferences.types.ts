@@ -1,17 +1,33 @@
-/**
- * Type-only stub for `src/features/user-preferences/user-preferences.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+import type { CONSTANTS } from 'src/constants';
 
-export type ExpandCollapseBehavior = any;
-export type UserPreferences = any;
-export type UserSheetPreference = any;
-export type UserSheetPreferences = any;
-export type UserSheetTypeTabPreferences = any;
+export type UserSheetTypeTabPreferences = {
+  sort?: string;
+  sidebarExpanded?: boolean;
+  showSheetPins?: boolean;
+};
+
+export type UserSheetPreference = {
+  tabs?: {
+    [tabId: string]: UserSheetTypeTabPreferences;
+  };
+  width?: number | 'auto';
+  height?: number | 'auto';
+  [CONSTANTS.SPELL_SLOT_TRACKER_MODE_PREFERENCE]?:
+    | typeof CONSTANTS.SPELL_SLOT_TRACKER_MODE_PIPS
+    | typeof CONSTANTS.SPELL_SLOT_TRACKER_MODE_VALUE_MAX;
+};
+
+export type UserSheetPreferences = {
+  [sheetType: string]: UserSheetPreference;
+};
+
+export type ExpandCollapseBehavior = 'top-level' | 'all';
+
+export type UserPreferences = {
+  expandCollapseBehavior: ExpandCollapseBehavior;
+  [CONSTANTS.SPELL_CAST_ACTIVITY_GROUPING_PREFERENCE]?:
+    | typeof CONSTANTS.SPELL_CAST_ACTIVITY_GROUPING_ADDITIONAL
+    | typeof CONSTANTS.SPELL_CAST_ACTIVITY_GROUPING_PER_ITEM;
+  [CONSTANTS.SHOW_LEGENDARIES_ON_NPC_STATBLOCK_PREFERENCE]?: boolean;
+  [CONSTANTS.INCLUDE_SPELLBOOK_IN_NPC_STATBLOCK_PREFERENCE]?: boolean;
+};

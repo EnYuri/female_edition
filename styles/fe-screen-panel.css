@@ -441,52 +441,90 @@
   padding-top: 6px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
+.fe-screen-panel-sheet .fe-sp-attrs-tab .fe-sp-face-actor-section {
+  margin: 8px 0 10px;
+  padding: 0 0 10px;
+  border-top: 0;
+  border-bottom: 1px solid var(--fe-sp-line);
+}
 .fe-screen-panel-sheet .fe-sp-face-actor-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   margin-bottom: 4px;
 }
-.fe-screen-panel-sheet .fe-sp-face-actor-drop {
-  width: 86px;
-  height: 86px;
-  flex: 0 0 auto;
+.fe-screen-panel-sheet .fe-sp-actor-uuid-field {
+  min-width: 0;
+  min-height: 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 2px dashed rgba(0, 0, 0, 0.35);
-  border-radius: 6px;
+  gap: 6px;
+  padding: 3px 7px;
+  border: 1px dashed var(--fe-sp-line-strong);
+  border-radius: 4px;
   background: rgba(0, 0, 0, 0.04);
   overflow: hidden;
   transition:
     border-color 0.12s,
     background 0.12s;
 }
-.fe-screen-panel-sheet .fe-sp-face-actor-drop img {
-  width: 100%;
-  height: 100%;
+.fe-screen-panel-sheet .fe-sp-actor-uuid-field img {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 2px;
   object-fit: cover;
 }
-.fe-screen-panel-sheet .fe-sp-face-actor-drop i {
+.fe-screen-panel-sheet .fe-sp-actor-uuid-field > i {
+  width: 22px;
+  flex: 0 0 22px;
+  text-align: center;
   opacity: 0.4;
-  font-size: 28px;
+  font-size: 13px;
 }
-.fe-screen-panel-sheet .fe-sp-face-actor-drophint {
+.fe-screen-panel-sheet .fe-sp-actor-uuid-input {
   flex: 1 1 auto;
   min-width: 0;
+  width: auto;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: monospace;
+  font-size: 11px;
+}
+.fe-screen-panel-sheet .fe-sp-actor-uuid-name {
+  flex: 0 1 34%;
+  min-width: 0;
+  max-width: 34%;
+  margin-left: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-dark-secondary, #555);
-  line-height: 1.4;
+}
+.fe-screen-panel-sheet .fe-sp-actor-uuid-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.fe-screen-panel-sheet .fe-sp-actor-uuid-field:focus-within {
+  border-style: solid;
+  outline: 1px solid var(--color-warm-1, currentColor);
+  outline-offset: 1px;
 }
 .fe-screen-panel-sheet .fe-sp-face-actor-info {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  align-items: center;
   gap: 4px;
-  flex: 1 1 auto;
   min-width: 0;
 }
 .fe-screen-panel-sheet .fe-sp-face-actor-clear-hint {
+  grid-column: 1 / -1;
   font-size: 11px;
   margin: 0;
   opacity: 0.7;
@@ -507,7 +545,26 @@
 /* ----- Per-face copied attributes (Attributes tab) ----- */
 .fe-screen-panel-sheet .fe-sp-face-attr-actions {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 6px;
+  white-space: nowrap;
+}
+.fe-screen-panel-sheet .fe-sp-face-attrs-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.fe-screen-panel-sheet :is(.fe-sp-face-attrs-header, .fe-sp-custom-attrs-header) h3 {
+  font-size: 20px;
+  line-height: 1.25;
+}
+.fe-screen-panel-sheet .fe-sp-face-attrs-header .fe-sp-face-attr-actions {
+  align-self: flex-start;
+}
+.fe-screen-panel-sheet .fe-sp-face-attr-actions .fe-sp-btn {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
 }
 .fe-screen-panel-sheet .fe-sp-attr-other {
   margin: 6px 0;
@@ -529,8 +586,9 @@
 }
 .fe-screen-panel-sheet .fe-sp-face-attrs {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--fe-sp-line);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -554,36 +612,13 @@
 }
 
 /* ----- Per-overlay linked actor (live attribute source) ----- */
-/* A compact drop target inside each overlay row — drag an Actor onto it to
-   link; click it (once linked) to clear. Unlinked = faint dashed placeholder. */
+/* A rectangular Actor UUID field: drag a document onto it or paste its UUID. */
 .fe-screen-panel-sheet .fe-sp-overlay-link {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.03);
-  overflow: hidden;
+  grid-column: 2 / -1;
+  grid-row: 2;
 }
 .fe-screen-panel-sheet :is(.fe-sp-face-actor-drop, .fe-sp-overlay-link).linked {
   border-style: solid;
-  cursor: pointer;
-}
-.fe-screen-panel-sheet
-  :is(.fe-sp-face-actor-drop, .fe-sp-overlay-link).linked:hover {
-  opacity: 0.8;
-}
-.fe-screen-panel-sheet .fe-sp-overlay-link img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.fe-screen-panel-sheet .fe-sp-overlay-link i {
-  opacity: 0.4;
-  font-size: 10px;
 }
 /* ----- Per-face overlay (text/attribute label) editor ----- */
 .fe-screen-panel-sheet .fe-sp-overlay-section {
@@ -1025,12 +1060,26 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 .fe-screen-panel-sheet .fe-sp-overlay-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.4em minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 4px;
+  gap: 5px 4px;
+  padding: 2px 0 10px;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-row + .fe-sp-overlay-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--fe-sp-line);
+}
+.fe-screen-panel-sheet .fe-sp-overlay-text {
+  grid-column: 2;
+  grid-row: 1;
+}
+.fe-screen-panel-sheet .fe-sp-overlay-warn-icon {
+  grid-column: 3;
+  grid-row: 1;
 }
 .fe-screen-panel-sheet .fe-sp-overlay-num {
   width: 1.4em;
@@ -1326,7 +1375,6 @@ body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab.active {
 body.fe-retro-theme
   .fe-screen-panel-sheet
   :is(
-    .fe-sp-face-actor-drophint,
     .fe-sp-attr-path,
     .fe-sp-reference-attr-name
   ) {

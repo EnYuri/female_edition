@@ -8,7 +8,7 @@ import { feLocalize, feFormat } from "./fe-i18n.js";
 //
 // AppV2 so it is forward-clean for v14; it also runs on v13.
 
-import { MODULE_ID } from "./fe-constants.js";
+import { MODULE_ID, feIsDx3rdSystemId } from "./fe-constants.js";
 import { FE_PANEL_COMMON_ATTR_NAMES, FE_PANEL_DEFAULT_SIZE, feCleanFaceTokenData, feEscapeHtml, feNextCustomAttrName, feSortAttrItems } from "./fe-screen-panel-data.js";
 
 // Overlay-preview zoom limits, relative to the contain-fit that zoom 1 means. The ceiling
@@ -109,14 +109,12 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       fePlaceOnScene: ScreenPanelSheet.#onPlaceOnScene,
       feAddOverlay: ScreenPanelSheet.#onAddOverlay,
       feRemoveOverlay: ScreenPanelSheet.#onRemoveOverlay,
-      feClearOverlayLinkedActor: ScreenPanelSheet.#onClearOverlayLinkedActor,
       feEditOverlay: ScreenPanelSheet.#onEditOverlay,
       feAddCustomAttr: ScreenPanelSheet.#onAddCustomAttr,
       feRemoveCustomAttr: ScreenPanelSheet.#onRemoveCustomAttr,
       feAddFaceAttr: ScreenPanelSheet.#onAddFaceAttr,
       feRemoveFaceAttr: ScreenPanelSheet.#onRemoveFaceAttr,
       feRecopyFaceAttrs: ScreenPanelSheet.#onRecopyFaceAttrs,
-      feClearFaceLinkedActor: ScreenPanelSheet.#onClearFaceLinkedActor,
       feCopyAttrPath: ScreenPanelSheet.#onCopyAttrPath,
       feSwitchFace: ScreenPanelSheet.#onSwitchFace,
       feToggleTokenize: ScreenPanelSheet.#onToggleTokenize,
@@ -345,7 +343,15 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
    * convention) — other systems show an empty list for now.
    */
   #extractActorAttributes(actor) {
-    if (!actor || !CONFIG?.DND5E) return [];
+    if (!actor) return [];
+    if (feIsDx3rdSystemId(game.system?.id) && (actor.type === "character" || actor.type === "enemy")) {
+      return this.#extractDx3rdAttributes(actor).map(a => ({
+        name: a.name,
+        path: a.attr,
+        value: a.max ? `${a.value}/${a.max}` : a.value,
+      }));
+    }
+    if (!CONFIG?.DND5E) return [];
     const out = [];
     const hp = actor.system?.attributes?.hp;
     if (hp) out.push({ name: "hp", path: "system.attributes.hp.value", value: `${hp.value ?? ""}/${hp.max ?? ""}` });
@@ -359,14 +365,72 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
+   * DX3rd's actor `attributes` is an ObjectField populated with derived data in
+   * Actor#prepareData. Core's schema walker therefore skips the whole object,
+   * while still descending into the structured `conditions` field and offering
+   * junk such as `conditions.extra-turn`. Curate the actual sheet-facing values
+   * instead: resource bars, primary ability totals, useful combat totals, and
+   * skill totals. Internal point/bonus/extra/applied buckets stay out.
+   */
+  #extractDx3rdAttributes(actor) {
+    const attrs = actor?.system?.attributes;
+    if (!attrs) return [];
+    const out = [];
+    const pushScalar = (name, path, value) => {
+      if (value === undefined || value === null || typeof value === "object") return;
+      out.push({ name, value: String(value), max: "", attr: `system.attributes.${path}` });
+    };
+    const pushBar = (name, path, value) => {
+      if (!value || typeof value !== "object" || value.value === undefined || value.value === null) return;
+      out.push({
+        name,
+        value: String(value.value),
+        max: value.max === undefined || value.max === null ? "" : String(value.max),
+        attr: `system.attributes.${path}.value`,
+      });
+    };
+
+    pushBar("hp", "hp", attrs.hp);
+    pushBar("encroachment", "encroachment", attrs.encroachment);
+    for (const key of ["body", "sense", "mind", "social"]) {
+      pushScalar(key, `${key}.total`, attrs[key]?.total);
+    }
+    for (const [name, path] of [
+      ["init", "init.value"],
+      ["move.battle", "move.battle"],
+      ["move.full", "move.full"],
+      ["attack", "attack.value"],
+      ["attack.melee", "attack.melee"],
+      ["attack.ranged", "attack.ranged"],
+      ["armor", "armor.value"],
+      ["guard", "guard.value"],
+      ["penetrate", "penetrate.value"],
+      ["reduce", "reduce.value"],
+      ["stock", "stock.value"],
+      ["saving", "saving.value"],
+      ["exp", "exp.now"],
+    ]) pushScalar(name, path, foundry.utils.getProperty(attrs, path));
+
+    for (const [key, skill] of Object.entries(attrs.skills ?? {})) {
+      const rawName = String(skill?.name ?? key);
+      const name = game.i18n.has?.(rawName) ? game.i18n.localize(rawName) : rawName;
+      pushScalar(name, `skills.${key}.total`, skill?.total);
+    }
+    return feSortAttrItems(out);
+  }
+
+  /**
    * System-agnostic snapshot of a linked actor's trackable attributes, for the
-   * per-face copied-attribute store. Uses core's `TokenDocument.getTrackedAttributes`
-   * (the same inference the combat-tracker bar dropdown uses) so it works on
-   * dnd5e (schema-based), double-cross-3rd (object-based), and any other system.
+   * per-face copied-attribute store. DX3rd uses the curated branch above because
+   * its derived attributes live under an ObjectField. Other systems use core's
+   * `TokenDocument.getTrackedAttributes` (the combat-tracker bar inference).
    * Returns `[{name, value, max, attr}]`; `attr` is the live source dot-path.
    */
   #extractCopiedAttributes(actor) {
     if (!actor?.system) return [];
+    if (feIsDx3rdSystemId(game.system?.id) && (actor.type === "character" || actor.type === "enemy")) {
+      return this.#extractDx3rdAttributes(actor);
+    }
     const TokenDoc = foundry.documents?.TokenDocument ?? CONFIG?.Token?.documentClass;
     let tracked;
     try { tracked = TokenDoc.getTrackedAttributes(actor.system); } catch { return []; }
@@ -531,7 +595,11 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       name: activeRaw?.name ?? "",
       num: this.#activeFaceIndex + 1,
       hasFace: !!activeRaw,
+      linkedActorUuid: faces[this.#activeFaceIndex]?.linkedActorUuid ?? "",
       linkedActorName: faces[this.#activeFaceIndex]?.linkedActorName ?? "",
+      linkedActorImg: faces[this.#activeFaceIndex]?.linkedActorImg ?? "",
+      linkMode: faces[this.#activeFaceIndex]?.linkMode ?? "copy",
+      attrs: faces[this.#activeFaceIndex]?.attrs ?? [],
       commonAttrs: activeSplit.common,
       otherAttrs: activeSplit.other,
       attrCount: (activeRaw?.attributes ?? []).length,
@@ -1068,13 +1136,12 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       }
     }
 
-    // Per-overlay linked-actor drop zone: accepts a dragged Actor document.
-    this.#wireActorDropZones(root, ".fe-sp-overlay-link", (zone, uuid) =>
+    // Per-overlay linked actor: accepts a dragged Actor document or a pasted UUID.
+    this.#wireActorUuidFields(root, ".fe-sp-overlay-link", (zone, uuid) =>
       this.#updateOverlayLinkedActor(Number(zone.dataset.faceIndex), Number(zone.dataset.overlayIndex), uuid));
 
-    // Per-face linked-actor drop zone: drag an Actor onto the face's actor
-    // area to set that face's linkedActorUuid.
-    this.#wireActorDropZones(root, ".fe-sp-face-actor-drop", (zone, uuid) => {
+    // Per-face linked actor: the same rectangular field accepts drop or paste.
+    this.#wireActorUuidFields(root, ".fe-sp-face-actor-drop", (zone, uuid) => {
       const faceIndex = Number(zone.dataset.faceIndex);
       this.#activeFaceIndex = faceIndex; // so the Attributes tab reflects the just-linked face
       return this.#updateFaceLinkedActor(faceIndex, uuid);
@@ -1131,6 +1198,69 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
         if (data?.type !== "Actor" || !data.uuid) return;
         await onActor(zone, data.uuid);
+      });
+    }
+  }
+
+  /**
+   * Wire a rectangular Actor UUID field for both text entry and document drop.
+   * The visible input intentionally has no `name`: face links have side effects
+   * (copied attributes and possibly linked artwork), and every commit must use
+   * the full-array update paths rather than AppV2's partial auto-submit. The
+   * separately-rendered hidden input keeps each ArrayField element complete.
+   */
+  #wireActorUuidFields(root, selector, onActor) {
+    for (const field of root.querySelectorAll(selector)) {
+      const input = field.querySelector(".fe-sp-actor-uuid-input");
+      if (!input || input.disabled) continue;
+
+      let committing = false;
+      const commit = async (candidate) => {
+        if (committing) return;
+        const requested = String(candidate ?? "").trim();
+        let uuid = requested;
+        if (requested) {
+          let actor = null;
+          try { actor = await fromUuid(requested); } catch { /* invalid UUID */ }
+          if (actor?.documentName !== "Actor") {
+            input.value = field.dataset.currentUuid ?? "";
+            ui.notifications?.warn(game.i18n.localize("FESP.Sheet.ActorUuidInvalid"));
+            return;
+          }
+          uuid = actor.uuid ?? requested;
+        }
+
+        committing = true;
+        input.disabled = true;
+        input.value = uuid;
+        try {
+          await onActor(field, uuid);
+        } finally {
+          committing = false;
+          if (input.isConnected) input.disabled = false;
+        }
+      };
+
+      // Keep this change out of submitOnChange: the hidden field reflects the
+      // persisted UUID, while this full-array path also performs link side effects.
+      input.addEventListener("change", (event) => {
+        event.stopPropagation();
+        void commit(input.value);
+      }, { capture: true });
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        event.stopPropagation();
+        input.blur();
+      }, { capture: true });
+      field.addEventListener("dragover", (event) => event.preventDefault());
+      field.addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        let data;
+        try { data = JSON.parse(event.dataTransfer.getData("text/plain")); } catch { return; }
+        if (data?.type !== "Actor" || !data.uuid) return;
+        void commit(data.uuid);
       });
     }
   }
@@ -1524,12 +1654,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     await this.#updateFaces(faces);
   }
 
-  static async #onClearOverlayLinkedActor(event, target) {
-    const fi = Number(target.dataset.faceIndex);
-    const oi = Number(target.dataset.overlayIndex);
-    await this.#updateOverlayLinkedActor(fi, oi, "");
-  }
-
   /**
    * Everything except the static text lives in this dialog: the attribute path plus
    * the styling fields (font size, color, value bar). The row keeps only what is read
@@ -1728,11 +1852,6 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onRecopyFaceAttrs() {
     await this.#recopyFaceAttrs(this.#activeFaceIndex);
-  }
-
-  static async #onClearFaceLinkedActor(event, target) {
-    const fi = Number(target.dataset.faceIndex);
-    await this.#updateFaceLinkedActor(fi, "");
   }
 
   /** Copy an attribute's dot-path to the clipboard — convenience for filling an overlay's attr field. */

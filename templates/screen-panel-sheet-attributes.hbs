@@ -18,8 +18,9 @@
     </nav>
   {{/if}}
 
-  {{!-- Per-face attributes (copied from the active face's linked actor) --}}
-  <header class="fe-sp-faces-header">
+  {{!-- The active face heading must stay above the linked Actor's potentially long
+        source-attribute list, so the current context and its actions remain visible. --}}
+  <header class="fe-sp-faces-header fe-sp-face-attrs-header">
     <h3>{{localize "FESP.Sheet.FaceAttrs" n=fe.activeFace.num}}{{#if fe.activeFace.name}} — {{fe.activeFace.name}}{{/if}}</h3>
     {{#if fe.editable}}
       <span class="fe-sp-face-attr-actions">
@@ -34,6 +35,42 @@
       </span>
     {{/if}}
   </header>
+
+  {{!-- The linked Actor is the source for this face's copied attributes, so its
+        drop/paste field belongs beside those attributes rather than above the
+        face-art overlay preview. Only the active face gets a visible control;
+        every face's hidden ArrayField values remain in screen-panel-sheet.hbs. --}}
+  {{#if fe.activeFace.hasFace}}
+    <div class="fe-sp-face-actor-section">
+      <div class="fe-sp-face-actor-row">
+        <div class="fe-sp-actor-uuid-field fe-sp-face-actor-drop{{#if fe.activeFace.linkedActorName}} linked{{/if}}"
+             data-face-index="{{fe.activeFace.index}}"
+             data-current-uuid="{{fe.activeFace.linkedActorUuid}}">
+          {{#if fe.activeFace.linkedActorName}}<img src="{{fe.activeFace.linkedActorImg}}" alt="">{{else}}<i class="fa-solid fa-user-plus"></i>{{/if}}
+          <input type="text" class="fe-sp-actor-uuid-input" value="{{fe.activeFace.linkedActorUuid}}"
+                 placeholder="{{localize "FESP.Sheet.FaceActorDropHintBig"}}"
+                 aria-label="{{localize "FESP.Sheet.ActorUuidLabel"}}"
+                 autocomplete="off" spellcheck="false" {{#unless fe.editable}}disabled{{/unless}}>
+          {{#if fe.activeFace.linkedActorName}}
+            <span class="fe-sp-actor-uuid-name" title="{{fe.activeFace.linkedActorName}}">{{fe.activeFace.linkedActorName}}</span>
+          {{/if}}
+        </div>
+        {{#if fe.activeFace.linkedActorName}}
+          <div class="fe-sp-face-actor-info">
+            <span class="fe-sp-face-actor-name">{{fe.activeFace.linkedActorName}}</span>
+            <select class="fe-sp-face-link-mode" data-face-index="{{fe.activeFace.index}}"
+                    {{#unless fe.editable}}disabled{{/unless}}>
+              <option value="copy" {{#if (eq fe.activeFace.linkMode "copy")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeCopy"}}</option>
+              <option value="linked" {{#if (eq fe.activeFace.linkMode "linked")}}selected{{/if}}>{{localize "FESP.Sheet.LinkModeLinked"}}</option>
+            </select>
+            <span class="fe-sp-face-actor-clear-hint notes">{{localize "FESP.Sheet.FaceActorClear"}}</span>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  {{/if}}
+
+  {{!-- Per-face attributes (copied from the active face's linked actor) --}}
   {{#if fe.activeFace.linkedActorName}}
     <p class="notes">{{localize "FESP.Sheet.FaceAttrLinkedNote" actor=fe.activeFace.linkedActorName}}</p>
   {{else}}
@@ -96,9 +133,24 @@
     {{/if}}
   {{/if}}
 
+  {{!-- Keep the linked Actor's source-path reference after the editable snapshot:
+        users first review/change the copied values, then consult paths as needed. --}}
+  {{#if fe.activeFace.attrs.length}}
+    <ul class="fe-sp-face-attrs">
+      {{#each fe.activeFace.attrs as |at|}}
+        <li>
+          <span class="fe-sp-reference-attr-name">{{at.name}}</span>
+          <span class="fe-sp-reference-attr-value">{{at.value}}</span>
+          <code class="fe-sp-attr-path" data-action="feCopyAttrPath" data-path="{{at.path}}"
+                title="{{localize "FESP.Sheet.CustomAttrCopyHint"}}">{{at.path}}</code>
+        </li>
+      {{/each}}
+    </ul>
+  {{/if}}
+
   <hr class="fe-sp-attr-divider">
 
-  <header class="fe-sp-faces-header">
+  <header class="fe-sp-faces-header fe-sp-custom-attrs-header">
     <h3>{{localize "FESP.Sheet.CustomAttrs"}}</h3>
     {{#if fe.editable}}
       <button type="button" class="fe-sp-btn" data-action="feAddCustomAttr">

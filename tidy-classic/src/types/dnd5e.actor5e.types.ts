@@ -1,13 +1,48 @@
-/**
- * Type-only stub for `src/types/dnd5e.actor5e.types`.
- *
- * The original module declared nothing but types, so it produced no runtime code and
- * the bundler never emitted it — which means the published sourcemap has no copy of it
- * and the real declarations are unrecoverable. Importers still name these symbols, and
- * esbuild keeps an import it cannot prove is type-only, so the module has to resolve.
- *
- * Types are erased before execution, so `any` here changes nothing at runtime; it only
- * makes type checking permissive.
- */
+export type Ability = {
+  attack: number;
+  bonuses: AbilityBonus;
+  check: AbilityCheck;
+  checkBonus: number;
+  checkProf: AbilityProficiency;
+  dc: number;
+  max: number;
+  mod: number;
+  proficient: number;
+  save: AbilitySave;
+  saveBonus: number;
+  saveProf: AbilityProficiency;
+  value: number;
+};
 
-export type Ability = any;
+export type AbilityBonus = {
+  check: string;
+  save: string;
+};
+
+export type RollConfig = {
+  min: number | null;
+  max: number | null;
+  mode: number; // AdvantageMode
+};
+
+export type AbilityCheck = {
+  roll: RollConfig;
+};
+
+export type AbilityProficiency = {
+  deterministic: boolean;
+  multiplier: number;
+  rounding: string;
+  _baseProficiency: number;
+  get dice(): string;
+  get flat(): number;
+  get hasProficiency(): boolean;
+  get term(): string;
+};
+
+export type AbilitySave = {
+  roll: RollConfig;
+  toJSON: () => string;
+  toString: () => string;
+  value: number;
+};
