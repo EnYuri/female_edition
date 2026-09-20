@@ -798,6 +798,7 @@ function feMessageMergeInfo(msg, el) {
     blind,
     rollMode,
     style,
+    timestamp: Number(msg?.timestamp) || 0,
     mergeableText: mergeRuntime.mergeableText,
     key: stamped?.key ?? null,
     isNarrator: isNarratorTools,
@@ -904,11 +905,22 @@ function feMergeKey(info, basisOverride) {
   return [author, speakerComponent, whisper, blind, rollMode, style].join("||");
 }
 
+// Merge hides a follow message's header — including its timestamp — so a group
+// fused across a long silence pins the OLDEST message's stamp over fresh
+// content (a card reading "~11 months ago" while its newest line is live). Past
+// a gap no conversation beat would bridge, start a new group instead. The bound
+// is generous on purpose: intra-session pauses still merge; only day-plus
+// dormancy splits. Messages without a timestamp (missing docs) keep merging.
+const FE_MERGE_MAX_TIME_GAP_MS = 60 * 60 * 1000;
+
 function feCanMergePair(a, b, { onlyText = false, allowNarratorMerge = false } = {}) {
   if (!a || !b) return false;
   if ((a.noMerge || b.noMerge) && !(allowNarratorMerge && a.isNarrator && b.isNarrator)) return false;
   if (a.key !== b.key) return false;
   if (onlyText && (!a.mergeableText || !b.mergeableText)) return false;
+  const ta = Number(a.timestamp);
+  const tb = Number(b.timestamp);
+  if (ta > 0 && tb > 0 && Math.abs(tb - ta) > FE_MERGE_MAX_TIME_GAP_MS) return false;
   return true;
 }
 

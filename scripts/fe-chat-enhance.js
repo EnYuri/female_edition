@@ -98,6 +98,37 @@ feSetMergeScheduleCallback((logEl, opts) => feScheduleRenderedLogRefresh(logEl, 
 // Helpers
 // -------------------------------------
 
+// Core timeSince() feeds the (now - timestamp) difference through
+// CalendarData._decomposeTimeYears, which maps ANY negative (future) diff to
+// year=-1 with ~365 leftover days — formatDuration then renders "11개월 3XX일 전"
+// regardless of the real gap. A ChatMessage stamped while the host clock ran
+// ahead (drift later corrected by NTP, a manually-set clock, a skewed remote
+// server) therefore shows an absurd "past" forever on every client.
+// Clamp future inputs to "now" so such cards display as just-posted (TIME.Now).
+//
+// Two surfaces render the stamp: ChatLog.updateTimestamps() (15s refresh — calls
+// foundry.utils.timeSince dynamically, so the wrap covers it) and the
+// {{timeSince}} Handlebars helper, which captured the ORIGINAL function when
+// core's handlebars module evaluated (long before this init hook) — so the helper
+// has to be re-registered with the patched function.
+function feInstallFutureTimestampClamp() {
+  try {
+    const utils = globalThis.foundry?.utils;
+    const original = utils?.timeSince;
+    if (typeof original !== "function" || original.__feFutureClamped) return;
+    const patched = function (timeStamp) {
+      const ms = new Date(timeStamp).getTime();
+      if (Number.isFinite(ms) && ms > Date.now()) return original.call(this, new Date());
+      return original.call(this, timeStamp);
+    };
+    patched.__feFutureClamped = true;
+    utils.timeSince = patched;
+    try { globalThis.Handlebars?.registerHelper?.("timeSince", patched); } catch { /* no-op */ }
+  } catch {
+    /* no-op */
+  }
+}
+
 function feHasRenderedStateWork() {
   try {
     return !!feSetting(S.MERGE_ENABLED) || feUserColorBgFeatureActive();
@@ -235,6 +266,7 @@ Hooks.once("init", () => {
   feRegisterSetting(S.PRUNE_ENABLED);
   feRegisterSetting(S.PRUNE_MAX_MESSAGES);
   feInstallChatLogPrune();
+  feInstallFutureTimestampClamp();
 
   feRegisterSetting(FE_GM_PRIORITY_OVERRIDES_KEY, () => {
       feApplyGmPriorityUiRefresh(document);
@@ -1085,6 +1117,17 @@ Hooks.on("updateChatMessage", (message, change, _options, userId) => {
 Hooks.on("preCreateChatMessage", (message, data, _options, userId) => {
   try {
     if (userId !== game.user.id) return;
+
+    // Never persist a future timestamp: one stamped from a clock that ran ahead
+    // displays as "~11 months ago" forever (see feInstallFutureTimestampClamp).
+    // Nulling lets the server's own _preCreate fill options.modifiedTime instead.
+    try {
+      const ts = Number(data?.timestamp ?? message?.timestamp);
+      if (Number.isFinite(ts) && ts > Date.now()) {
+        message.updateSource({ timestamp: null });
+        if (data && typeof data === "object") data.timestamp = null;
+      }
+    } catch { /* no-op */ }
 
     // Screen panel actors are display boards, not characters — never let them be chat speakers.
     // Main risk: a tokenized panel selected on canvas → getSpeaker() resolves to the panel actor.

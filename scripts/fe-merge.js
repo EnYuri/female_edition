@@ -519,8 +519,8 @@ function fePreApplyMergeHint(message, el) {
       if (!lastKey) continue;
 
       if (feCanMergePair(
-        { key: lastKey, noMerge: lastInfo.noMerge, isNarrator: lastInfo.isNarrator, mergeableText: lastInfo.mergeableText },
-        { key: thisKey, noMerge: thisInfo.noMerge, isNarrator: thisInfo.isNarrator, mergeableText: thisInfo.mergeableText },
+        { key: lastKey, noMerge: lastInfo.noMerge, isNarrator: lastInfo.isNarrator, mergeableText: lastInfo.mergeableText, timestamp: lastInfo.timestamp },
+        { key: thisKey, noMerge: thisInfo.noMerge, isNarrator: thisInfo.isNarrator, mergeableText: thisInfo.mergeableText, timestamp: thisInfo.timestamp },
         { allowNarratorMerge: false }
       )) {
         el.classList.add("fe-merge-follow");
