@@ -1080,8 +1080,71 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 /* The separator and the max digits are drums too, parked on their single cell — the
    reading is one continuous counter rather than a dial with a caption after it.
    They carry no data-dbp-roll, which is what keeps the ticker off them. */
-.fe-dbp-reel.is-glyph {
+.fe-dbp-reel.is-sep {
   width: 0.5em;
+}
+
+/* ── the separator, DRAWN ────────────────────────────────────────────────────
+   The solidus between the value and the max is a rotated bar, not a character:
+   the separator cell in templates/fe-combat-tracker.hbs is EMPTY and this is what
+   fills it, and the bar caption gets the same stroke from the same rule.
+
+   Why it is drawn at all: a typed "/" is a near-perfect 7 at dial size in several
+   of the faces this module is used with (CookieRun, the pixel faces), so "105/300"
+   read as a six-digit number. A substitute character (a middle dot) fixed the
+   misreading but not the cause — the shape was still whatever the cascade's face
+   happened to draw, and the module's faces are replaceable by the user. A stroke we
+   draw ourselves is the same shape in every face, at every size.
+
+   It sits INSIDE the strip span rather than on the reel, so it inherits the drum's
+   ink colour (currentColor — #15130f by default, #000 under retro) and rides above
+   the same seam the digit faces carry. currentColor is also what makes the retro
+   branch need no override of its own.
+
+   The geometry is all in `em` against the dial's own type size, so it tracks the
+   portrait size exactly as the digits do. The height is set per context because the
+   two readings are typed at different sizes relative to their box. */
+.fe-dbp-reel.is-sep .fe-dbp-strip > span,
+.fe-dbp-bar-sep {
+  position: relative;
+}
+
+.fe-dbp-reel.is-sep .fe-dbp-strip > span::after,
+.fe-dbp-bar-sep::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--fe-dbp-sep-w, 0.11em);
+  height: var(--fe-dbp-sep-h, 0.7em);
+  background: currentColor;
+  /* Centre first, THEN lean: rotating about the element's own centre keeps the
+     stroke's midpoint on the cell's centre whatever the lean is, so changing the
+     angle never drags the separator off the row. 18° is the lean of a typical
+     text solidus — steep enough to read as "/" and never as a "1". */
+  transform: translate(-50%, -50%) rotate(18deg);
+}
+
+/* The dial is centred on its DIGITS' ink (--fe-dbp-lh, measured per face), and this
+   stroke is centred in the 1em cell, which is where that metric puts the digits. */
+.fe-dbp-reel.is-sep .fe-dbp-strip > span::after {
+  --fe-dbp-sep-h: 0.7em;
+}
+
+/* The bar caption is a line of text rather than a drum, so the cell has to be an
+   inline box that occupies the separator's share of the line. The box is sunk below
+   the baseline by the same amount a solidus descends. */
+.fe-dbp-bar-sep {
+  display: inline-block;
+  --fe-dbp-sep-w: 0.12em;
+  --fe-dbp-sep-h: 0.82em;
+  width: 0.46em;
+  height: 0.82em;
+  /* Measured against a typed solidus in the same bold face at the same size: a
+     text "/" spans from just under the baseline to just over the cap line, so the
+     box descends 0.04em and the stroke fills it. Centring the box on the line box
+     instead parks the stroke visibly low against the digits beside it. */
+  vertical-align: -0.04em;
 }
 
 /* Hidden HP is the SAME dial, parked on a "?" cell — .fe-dbp-dial.is-unknown
@@ -1265,10 +1328,17 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 
    No scale ramp here — the old one existed only because translating the img
    uncovered the frame's opposite edge. A card translated as a whole uncovers
-   nothing, so the profile is pure translate plus a little rotation, decaying to
-   exactly zero at 100% so nothing jumps when the animation is removed.
+   nothing, so the profile is PURE TRANSLATE, decaying to exactly zero at 100% so
+   nothing jumps when the animation is removed.
 
-   Every intermediate stop reads --fe-dbp-k<n>{x,y,r}, which feDbpApplyShake writes
+   There is deliberately NO rotate(): the card is a framed portrait sitting in a
+   row of them, and tilting it read as the frame coming loose rather than as the
+   thing inside being hit. Displacement along both axes carries the impact on its
+   own. Do not add one back — feDbpShakeProfile emits pairs, not triples, so a
+   rotate() here would resolve against its fallback on every stop and every hit
+   would tilt by the same canned amount.
+
+   Every intermediate stop reads --fe-dbp-k<n>{x,y}, which feDbpApplyShake writes
    onto the card: ONE randomised set per hit, so no two impacts shake the same way.
    The fallbacks are the old fixed profile, so a shake that never got its variables
    (JS disabled the panel, an element the pass did not reach) still plays.
@@ -1284,26 +1354,20 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 }
 
 @keyframes fe-dbp-shake {
-  0%   { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0) rotate(0deg); }
+  0%   { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0); }
   8%   { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k1x, -10%), var(--fe-dbp-k1y, 3%))
-                   rotate(var(--fe-dbp-k1r, -2deg)); }
+                   translate(var(--fe-dbp-k1x, -10%), var(--fe-dbp-k1y, 3%)); }
   22%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k2x, 8.5%), var(--fe-dbp-k2y, -2.5%))
-                   rotate(var(--fe-dbp-k2r, 1.7deg)); }
+                   translate(var(--fe-dbp-k2x, 8.5%), var(--fe-dbp-k2y, -2.5%)); }
   36%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k3x, -7%), var(--fe-dbp-k3y, 2%))
-                   rotate(var(--fe-dbp-k3r, -1.3deg)); }
+                   translate(var(--fe-dbp-k3x, -7%), var(--fe-dbp-k3y, 2%)); }
   50%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k4x, 5.5%), var(--fe-dbp-k4y, -1.5%))
-                   rotate(var(--fe-dbp-k4r, 1deg)); }
+                   translate(var(--fe-dbp-k4x, 5.5%), var(--fe-dbp-k4y, -1.5%)); }
   64%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k5x, -4%), var(--fe-dbp-k5y, 1%))
-                   rotate(var(--fe-dbp-k5r, -0.7deg)); }
+                   translate(var(--fe-dbp-k5x, -4%), var(--fe-dbp-k5y, 1%)); }
   78%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
-                   translate(var(--fe-dbp-k6x, 2.5%), var(--fe-dbp-k6y, 0%))
-                   rotate(var(--fe-dbp-k6r, 0.4deg)); }
-  100% { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0) rotate(0deg); }
+                   translate(var(--fe-dbp-k6x, 2.5%), var(--fe-dbp-k6y, 0%)); }
+  100% { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1467,4 +1531,48 @@ body.fe-retro-theme .fe-dbp-reel::after {
    with the strip, now a single hard pixel line with no falloff behind it. */
 body.fe-retro-theme .fe-dbp-strip > span {
   background-image: linear-gradient(180deg, var(--fe-ac-12, #1a1a1a) 0 1px, transparent 1px);
+}
+
+/* The separator under retro: the SAME stroke, drawn as a STAIR instead of a lean.
+   A rotated bar is the one smoothly-antialiased edge left on a dial whose every
+   other gradient has been replaced by hard bands, and next to a pixel face it reads
+   as a stray vector object.
+
+   Four blocks, each one step right and two steps up from the last, is the shape a
+   pixel font gives a solidus at this size. They are background LAYERS rather than
+   elements: one `::after` already exists and a stair needs no DOM of its own. Each
+   layer is one block (background-size) and the positions are thirds, which is what
+   keeps the arithmetic out of it — see the note on the positions below.
+
+   The rotation is dropped, NOT reduced: a stair that is also rotated re-introduces
+   exactly the antialiasing this exists to remove. The step is the stroke width, so
+   the retro separator has the same visual weight as the straight one.
+
+   This lives here rather than in fe-retro-theme.css for the same reason the rest of
+   the retro dial does: that sheet is layer(layouts), which for NORMAL declarations
+   LOSES to this sheet's layer(modules), so an override there would need !important
+   to do anything at all. */
+body.fe-retro-theme .fe-dbp-reel.is-sep .fe-dbp-strip > span::after,
+body.fe-retro-theme .fe-dbp-bar-sep::after {
+  /* The step is DERIVED from the height the straight stroke would have had, not
+     from its width, so the stair ends up exactly as tall as the leaning bar it
+     replaces and both readings keep the height each already tuned. Four columns of
+     two-step blocks is 8 steps of height — hence the /8. */
+  --fe-dbp-sep-step: calc(var(--fe-dbp-sep-h, 0.7em) / 8);
+  width: calc(var(--fe-dbp-sep-step) * 4);
+  height: var(--fe-dbp-sep-h, 0.7em);
+  transform: translate(-50%, -50%);
+  background-color: transparent;
+  background-image:
+    linear-gradient(currentColor 0 0),
+    linear-gradient(currentColor 0 0),
+    linear-gradient(currentColor 0 0),
+    linear-gradient(currentColor 0 0);
+  background-size: var(--fe-dbp-sep-step) calc(var(--fe-dbp-sep-step) * 2);
+  /* Percentage background-position is a fraction of the FREE space, so with a box
+     of 4 × 8 steps holding 1 × 2 step blocks the thirds land exactly one step apart
+     horizontally and two apart vertically: the blocks tile edge to edge with no gap
+     and no hardcoded offsets to keep in sync with the step. */
+  background-position: 0 100%, 33.333% 66.667%, 66.667% 33.333%, 100% 0;
+  background-repeat: no-repeat;
 }

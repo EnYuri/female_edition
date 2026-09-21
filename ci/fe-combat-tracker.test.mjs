@@ -286,7 +286,7 @@ test("the bar HP style short-circuits the dial", () => {
 test("the bar's roll follows the dial's contract, and locks left to right", () => {
   const HBS = read("templates/fe-combat-tracker.hbs").replace(/\{\{!--[\s\S]*?--\}\}/g, "");
   assert.match(HBS, /data-dbp-bar-roll="1"/);
-  assert.match(HBS, /class="fe-dbp-bar-cur">\{\{dbp\.hp\.cur\}\}<\/span>\{\{dbp\.hp\.rest\}\}/);
+  assert.match(HBS, /class="fe-dbp-bar-cur">\{\{dbp\.hp\.cur\}\}<\/span><span class="fe-dbp-bar-sep"><\/span>\{\{dbp\.hp\.max\}\}/);
 
   const anim = DBP.slice(DBP.indexOf("function feDbpBeginHpAnim("));
   const animBody = anim.slice(0, anim.indexOf("\n}"));
@@ -337,27 +337,71 @@ test("the bar HP style reuses the dial's secrecy policy", () => {
   assert.match(body, /anim\?\.hidden === true/, "a spin that started hidden stays hidden");
 });
 
-// ONE separator, in three places that cannot see each other: the dial's glyph drum
-// (markup), the bar's caption (JS) and the ink metric's glyph set (JS). A solidus
-// reads as a 7 at dial size in several of the faces this module ships with, so the
-// character itself is the fix — and a file left behind would show the old one right
-// next to the new one.
-test("the value/max separator is one character, shared by both readings", () => {
-  const sep = "·";
-  assert.match(DBP, /const DBP_SEP = "·";/, "the separator must be a named constant");
+// The value/max separator is DRAWN, not typed, in three places that cannot see each
+// other: the dial's separator cell (markup), the bar's caption (markup) and the ink
+// metric's glyph set (JS). A typed "/" reads as a 7 at dial size in several of the
+// faces this module ships with, and a substitute character only moved the problem —
+// the shape was still whatever face the cascade landed on. A stroke drawn in CSS is
+// the same in every face, so nothing here may carry a separator CHARACTER.
+test("the value/max separator is drawn by CSS, never typed", () => {
+  // No separator CHARACTER left in either file — a typed glyph would show up right
+  // next to the drawn one. Both the old middle dot and the solidus it replaced.
+  assert.ok(!DBP.includes("·"), "a middle dot survived in fe-combat-tracker-dbp.js");
+  assert.ok(!HBS.includes("·"), "a middle dot survived in fe-combat-tracker.hbs");
+  assert.ok(!/<span>\s*\/\s*<\/span>/.test(HBS), "a typed solidus survived in a dial cell");
+  // The caption fields are plain readings. A template literal here is how a
+  // separator would creep back in front of the max.
+  assert.ok(!/\b(cur|max): `/.test(DBP), "a caption field spliced something in front of its number");
+  assert.ok(!/DBP_SEP/.test(DBP), "the separator constant is gone with the character");
+  // The ink metric must not measure a stand-in: the dial shows no separator glyph,
+  // so one in this set would clamp the whole row against ink that is never drawn.
   assert.ok(
-    DBP.includes("rest: `${DBP_SEP}${Math.round(raw.max)}`"),
-    "the bar caption must read the constant"
+    DBP.includes('const DBP_INK_GLYPHS = "?";'),
+    "the ink metric may only measure glyphs the dial actually shows"
+  );
+  // The dial's separator cell is empty, and CSS is what fills it.
+  assert.ok(
+    HBS.includes('<span class="fe-dbp-reel is-sep"><span class="fe-dbp-strip"><span></span></span></span>'),
+    "the dial's separator drum must be an empty is-sep cell"
   );
   assert.ok(
-    DBP.includes('const DBP_INK_GLYPHS = DBP_SEP + "?";'),
-    "the ink metric must measure the separator the dial actually shows"
+    HBS.includes('<span class="fe-dbp-bar-sep"></span>{{dbp.hp.max}}'),
+    "the bar caption must draw its separator and print the max alone"
   );
-  assert.ok(
-    HBS.includes(`<span class="fe-dbp-reel is-glyph"><span class="fe-dbp-strip"><span>${sep}</span></span></span>`),
-    "the dial's glyph drum must carry the same character"
+  assert.match(DBP, /max: String\(Math\.round\(raw\.max\)\),/, "the caption carries the max alone");
+  // …and the one rule that draws it reaches both readings.
+  const at = CSS.indexOf(".fe-dbp-reel.is-sep .fe-dbp-strip > span::after,");
+  assert.notEqual(at, -1, "the drawn separator rule must serve the dial");
+  const block = CSS.slice(at, CSS.indexOf("}", at));
+  assert.match(block, /\.fe-dbp-bar-sep::after/, "…and the bar caption, from the same rule");
+  assert.match(block, /background: currentColor/, "the stroke must take the drum's own ink");
+  assert.match(block, /rotate\(18deg\)/, "a solidus leans; an upright bar reads as a 1");
+  // Under retro the same stroke becomes a STAIR: a rotated bar is the one smoothly
+  // antialiased edge on a dial whose every other gradient is a hard band. It must
+  // drop the rotation rather than reduce it — a rotated stair antialiases again.
+  const rat = CSS.indexOf("body.fe-retro-theme .fe-dbp-reel.is-sep .fe-dbp-strip > span::after,");
+  assert.notEqual(rat, -1, "retro must pixelate the drawn separator");
+  const retro = CSS.slice(rat, CSS.indexOf("}", rat));
+  assert.match(retro, /body\.fe-retro-theme \.fe-dbp-bar-sep::after/, "…in both readings");
+  assert.match(retro, /transform: translate\(-50%, -50%\);/, "the retro stair may not be rotated");
+  assert.ok(!/rotate\(/.test(retro), "a rotated stair antialiases again");
+  assert.equal(
+    (retro.match(/linear-gradient\(currentColor 0 0\)/g) || []).length, 4,
+    "four blocks, one per step"
   );
-  assert.ok(!/rest: `\//.test(DBP), "no solidus left in a caption");
+});
+
+// The hit shake is PURE DISPLACEMENT. A rotate() made the card read as a frame coming
+// loose from the strip rather than as the portrait inside it being hit, and the two
+// halves have to agree: feDbpShakeProfile emits pairs, so a rotate() left in the
+// keyframes would resolve against its fallback and tilt every hit by the same amount.
+test("the hit shake never rotates the card", () => {
+  const at = CSS.indexOf("@keyframes fe-dbp-shake {");
+  assert.notEqual(at, -1, "the shake keyframes are gone entirely");
+  const kf = CSS.slice(at, CSS.indexOf("\n}", at));
+  assert.ok(!/rotate\(/.test(kf), "a rotate() in the shake keyframes");
+  assert.ok(!/DBP_SHAKE_ROT/.test(DBP), "a rotation peak in the shake profile");
+  assert.ok(!/--fe-dbp-k\$\{i \+ 1\}r/.test(DBP), "a rotation variable still written onto the card");
 });
 
 // The per-actor mask is ONE flag with two doors (the status panel's sheet button and

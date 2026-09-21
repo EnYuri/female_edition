@@ -60,13 +60,19 @@ import {
 // and resume in CSS; only the dial needs a per-frame write, so it gets its own rAF
 // ticker.
 
-// The character between the value and the max, in BOTH readings. It is not "/" on
-// purpose: in several of the faces this module is used with (CookieRun, the pixel
-// faces) a solidus at dial size is a near-perfect 7, and "105/300" reads as a
-// six-digit number with a stray 7 in it. A middle dot cannot be mistaken for a digit
-// in any face. templates/fe-combat-tracker.hbs hardcodes the same character in the
-// dial's glyph drum — ci/fe-combat-tracker.test.mjs holds the two together.
-const DBP_SEP = "·";
+// The separator between the value and the max is a SOLIDUS that is DRAWN, not typed:
+// there is no separator character anywhere in this file or in the template, only an
+// empty cell that styles/fe-combat-tracker.css fills with a rotated bar.
+//
+// A real "/" was tried first and is what the middle dot before it was working around:
+// in several of the faces this module is used with (CookieRun, the pixel faces) a
+// solidus at dial size is a near-perfect 7, so "105/300" read as a six-digit number
+// with a stray 7 in it. Drawing the stroke ourselves keeps the shape a reader expects
+// between a value and a max while making it independent of whichever face the cascade
+// landed on — the one thing the substitute character could not do.
+//
+// The consequence here is that the ink metric must NOT measure a separator any more
+// (see DBP_INK_GLYPHS) and the bar caption emits the max alone.
 const DBP_DIGITS_MIN = 3;              // a 3-reel dial by default
 const DBP_DIGITS_MAX = 5;              // …widened to 5 only for absurd HP pools
 // The floor is what the BAR's lock schedule has to fit inside: five places
@@ -90,7 +96,10 @@ const DBP_HIT_MS = 460;  // must match @keyframes fe-dbp-shake
 const DBP_SHAKE_STOPS = 6;       // must match the intermediate @keyframes stops
 const DBP_SHAKE_X = [7, 13];     // % of card width
 const DBP_SHAKE_Y = [1, 4.5];    // % of card height
-const DBP_SHAKE_ROT = [1.1, 2.8];// degrees
+// There is no rotation peak and there must not be one: the shake is pure
+// displacement. A card is a framed portrait in a row of framed portraits, and
+// tilting it read as the frame coming loose rather than as the thing inside being
+// hit. @keyframes fe-dbp-shake composes no rotate() either — the two have to agree.
 const DBP_SHAKE_JITTER = [0.5, 1];
 // The first stop keeps a high floor: it is the impact itself, and a shake whose
 // hardest kick landed on the third stop read as a wobble that built up rather than
@@ -98,7 +107,7 @@ const DBP_SHAKE_JITTER = [0.5, 1];
 const DBP_SHAKE_JITTER_FIRST = [0.85, 1];
 const DBP_SHAKE_DECAY = 1.3;     // >1 = the tail dies off faster than linearly
 // A bigger hit shakes harder. Damage at or above each threshold moves the card up
-// one tier, and the tier scales all three peaks. Damage only — healing moves the
+// one tier, and the tier scales both peaks. Damage only — healing moves the
 // dial and the floating number and nothing else, so it never reaches this.
 // The gains stay modest on purpose: the card overlaps its neighbours while it
 // swings (that is what its z-index is for), and past roughly 2x the top tier reads
@@ -351,8 +360,8 @@ function feDbpBarSecretRoll(now, digits) {
 // uses — so the bar can never publish a digit the dial would have hidden.
 //
 // The caption is split in two — `cur` (the current value, the only part that moves)
-// and `rest` (the "/max" after it) — so feDbpApplyBarRoll can write one text node per
-// frame instead of rebuilding the whole reading.
+// and `max` (the resting number after the drawn slash) — so feDbpApplyBarRoll can
+// write one text node per frame instead of rebuilding the whole reading.
 //
 // What this returns is always the RESTING state, never the momentary one, and `roll`
 // only says that an animation owns the element. That is the same contract the dial
@@ -374,7 +383,7 @@ function feDbpBarHp(raw, revealed, anim) {
       pct: raw.pct,
       color: raw.color,
       cur: String(Math.round(raw.value)),
-      rest: `${DBP_SEP}${Math.round(raw.max)}`,
+      max: String(Math.round(raw.max)),
     };
   }
   const digits = feDbpDigits(raw.max);
@@ -386,7 +395,7 @@ function feDbpBarHp(raw, revealed, anim) {
     pct: partial ? raw.pct : 0,
     color: raw.color,
     cur: feDbpHiddenCells(raw.value, digits).join(""),
-    rest: `${DBP_SEP}${new Array(digits).fill("?").join("")}`,
+    max: new Array(digits).fill("?").join(""),
   };
 }
 
@@ -501,7 +510,7 @@ function feDbpBeginHpAnim(c, prev, next) {
 }
 
 // The rolling drums of one dial, most significant first. The dial also holds the
-// "/" and the max, which are parked drums — [data-dbp-roll] is what separates the
+// separator cell and the max, which are parked drums — [data-dbp-roll] is what separates the
 // two, so the ticker can never write an offset into a cell that must not move.
 //
 // It returns the STRIPS, not the reels: --fe-dbp-d is written on the element that
@@ -608,11 +617,17 @@ function feDbpApplyBarRoll(root, now) {
 }
 
 // Every character a dial can show. The digits decide where the type is CENTRED;
-// "/" and "?" only have to not be clipped, which is why they are measured
-// separately — the separator and "?" can reach further above and below the digits,
-// and centring on them would push the numbers off-centre to make room.
+// "?" only has to not be clipped, which is why it is measured separately — it can
+// reach further above and below the digits, and centring on it would push the
+// numbers off-centre to make room.
+//
+// The separator is NOT in this set and must not be put back: it is drawn by CSS, not
+// typed, so it has no ink in the user's face to measure. Measuring a stand-in
+// character would clamp the whole row against a glyph the dial never shows — which is
+// exactly what the old "/" did, reaching further above the digits than any of them and
+// pulling the row off-centre through the clamp below.
 const DBP_INK_DIGITS = "0123456789";
-const DBP_INK_GLYPHS = DBP_SEP + "?";
+const DBP_INK_GLYPHS = "?";
 const _dbpLineHeight = new Map(); // font shorthand → line-height in em
 let _dbpInkCtx = null;
 
@@ -663,8 +678,7 @@ function feDbpInkLineHeight(font) {
       }
     }
     // Centre on the digits, then pull back inside the window so the tallest glyph
-    // of the whole set still fits. The clamp is what keeps the separator and the
-    // "?" off the edges.
+    // of the whole set still fits. The clamp is what keeps the "?" off the edges.
     let want = 0.5 + (inkUp - inkDown) / 2;
     want = Math.min(Math.max(want, allUp), 1 - allDown);
     const h = 2 * (want - asc) + asc + desc;
@@ -688,7 +702,7 @@ function feDbpApplyInkMetric(root) {
   root.style.setProperty("--fe-dbp-lh", `${feDbpInkLineHeight(font)}em`);
 }
 
-// One hit's shake, as DBP_SHAKE_STOPS triples of [x%, y%, rotdeg]. The shape is
+// One hit's shake, as DBP_SHAKE_STOPS pairs of [x%, y%]. The shape is
 // still a decaying wobble — that is what reads as an impact rather than as a
 // vibration — but every factor inside it is drawn fresh: the peak of each axis,
 // the per-stop magnitude, and which way the first kick goes. X alternates sign so
@@ -711,7 +725,6 @@ function feDbpShakeProfile(damage) {
   const gain = feDbpShakeGain(Math.abs(Number(damage) || 0));
   const ax = feDbpRand(DBP_SHAKE_X) * gain;
   const ay = feDbpRand(DBP_SHAKE_Y) * gain;
-  const ar = feDbpRand(DBP_SHAKE_ROT) * gain;
   const dir = Math.random() < 0.5 ? -1 : 1;
   const out = [];
   for (let i = 0; i < DBP_SHAKE_STOPS; i++) {
@@ -721,7 +734,6 @@ function feDbpShakeProfile(damage) {
     out.push([
       Number((sign * ax * decay * feDbpRand(jitter)).toFixed(2)),
       Number(((Math.random() < 0.5 ? -1 : 1) * ay * decay * feDbpRand(jitter)).toFixed(2)),
-      Number((sign * ar * decay * feDbpRand(jitter)).toFixed(2)),
     ]);
   }
   return out;
@@ -740,7 +752,6 @@ function feDbpApplyShake(root) {
     for (let i = 0; i < shake.length; i++) {
       el.style.setProperty(`--fe-dbp-k${i + 1}x`, `${shake[i][0]}%`);
       el.style.setProperty(`--fe-dbp-k${i + 1}y`, `${shake[i][1]}%`);
-      el.style.setProperty(`--fe-dbp-k${i + 1}r`, `${shake[i][2]}deg`);
     }
   }
 }

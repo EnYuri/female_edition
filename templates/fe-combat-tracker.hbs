@@ -42,7 +42,7 @@
                     byte-identical HTML and feCtRender skips the rebuild. --}}
               <div class="fe-dbp-bar-row">
                 <span class="fe-dbp-bar-key">HP</span>
-                <span class="fe-dbp-bar-val"><span class="fe-dbp-bar-cur">{{dbp.hp.cur}}</span>{{dbp.hp.rest}}</span>
+                <span class="fe-dbp-bar-val"><span class="fe-dbp-bar-cur">{{dbp.hp.cur}}</span><span class="fe-dbp-bar-sep"></span>{{dbp.hp.max}}</span>
               </div>
             </div>
             {{else if dbp.hp}}
@@ -73,11 +73,13 @@
                 <span class="fe-dbp-reel" data-dbp-roll="1"><span class="fe-dbp-strip"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span></span></span>
                 {{/each}}
                 {{/if}}
-                {{!-- The separator. Kept in sync with DBP_SEP in
-                      scripts/fe-combat-tracker-dbp.js, which is what the bar caption
-                      and the ink metric use — a solidus reads as a 7 at this size in
-                      several of the faces this module ships with. --}}
-                <span class="fe-dbp-reel is-glyph"><span class="fe-dbp-strip"><span>·</span></span></span>
+                {{!-- The separator drum. Its cell is deliberately EMPTY: the solidus is
+                      DRAWN by styles/fe-combat-tracker.css (.fe-dbp-reel.is-sep), never
+                      typed, because a real "/" reads as a 7 at this size in several of
+                      the faces this module ships with. Do not put a character back in
+                      here — fe-combat-tracker-dbp.js's ink metric no longer measures a
+                      separator, so one would be centred against nothing. --}}
+                <span class="fe-dbp-reel is-sep"><span class="fe-dbp-strip"><span></span></span></span>
                 {{#each dbp.hp.maxCells}}
                 <span class="fe-dbp-reel"><span class="fe-dbp-strip"><span>{{this}}</span></span></span>
                 {{/each}}
