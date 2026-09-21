@@ -444,12 +444,15 @@ function feDbpData(c, size, now, insert) {
       if (!anim) reels = feDbpReelSet(raw.value, digits);
       else if (secret) reels = feDbpScrambleSet(now, digits);
       else reels = feDbpSpinReels(anim, now, digits);
-      // The max is a row of parked drums, one per character, and the separator is a
-      // drum of its own — the whole reading is one counter rather than a dial with a
-      // caption after it. `cells` is what sizes the type: value + sep + max.
+      // The max is a row of parked drums, padded with leading zeros to the same
+      // width the value reels use (digits): a counter reads "027/027", never
+      // "027/27" — a short max is just a reading whose leading drums sit on 0.
+      // The separator is a drum of its own — the whole reading is one counter
+      // rather than a dial with a caption after it. `cells` is what sizes the
+      // type: value + sep + max.
       const maxCells = secret
         ? new Array(digits).fill("?")
-        : [...String(Math.round(raw.max))];
+        : [...String(Math.round(raw.max)).padStart(digits, "0")];
       hp = { reels, maxCells, cells: reels.length + 1 + maxCells.length };
     }
   }

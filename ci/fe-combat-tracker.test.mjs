@@ -78,6 +78,20 @@ test("the dial offset is written on the strip, with inheritance off", () => {
   assert.match(DBP, /querySelectorAll\("\[data-dbp-roll\] > \.fe-dbp-strip"\)/);
 });
 
+// Every drum is 1em tall, so a row font that read --fe-dbp-cells shrank the whole
+// dial — and in the insert layout, where the panel is in flow, the whole card.
+// The font stays at the 7-cell baseline and the width fit is a horizontal
+// condense on the dial itself: the counter narrows, it never lowers.
+test("the dial row's height never depends on the reading's digit count", () => {
+  const block = (sel) => CSS.slice(CSS.indexOf(sel), CSS.indexOf("}", CSS.indexOf(sel)));
+  const row = block(".fe-dbp-hp {");
+  assert.ok(!/--fe-dbp-cells/.test(row), "the row's font must not read --fe-dbp-cells");
+  const dial = block(".fe-dbp-dial {");
+  assert.match(dial, /transform:\s*scaleX\(/, "the width fit is a condense, not a shrink");
+  assert.match(dial, /--fe-dbp-cells/, "the condense is sized by the cell count");
+  assert.match(dial, /transform-origin:\s*left/, "condensing pulls toward the left edge");
+});
+
 // Two renders taken at different moments of the same spin must produce identical
 // HTML, or feCtRender's rebuild-skip never fires and the spin stutters again.
 test("per-frame dial state stays out of the template", () => {
@@ -121,6 +135,13 @@ test("the hidden dial's glyphs come from the data", () => {
   assert.deepEqual([...body.matchAll(/cells\[[^\]]+\]\s*=\s*([^;]+);/g)].map((m) => m[1]), ['"0"']);
 });
 
+// A counter reads 027/027, never 027/27 — the max drums pad to the dial's width
+// with leading zeros, so the two sides of the separator are always the same
+// length and the card never narrows just because the pool is small.
+test("the max drums pad to the dial's width", () => {
+  assert.match(DBP, /String\(Math\.round\(raw\.max\)\)\.padStart\(digits, "0"\)/);
+});
+
 // feCtSetting falls back to FE_DEFAULTS on a throw, so a key the family reads but never
 // registers reads its default forever: the checkbox saves, nothing happens, no error.
 test("every tracker setting the family reads is registered by the entry", () => {
@@ -155,11 +176,16 @@ test("the status row is reserved whether or not there are effects", () => {
 });
 
 // The active card's zoom grows downward into the strip's bottom spill; the anchor is
-// the translate that puts it there. The hit shake replaces the whole transform
-// property, so a keyframe that forgets the anchor snaps the card back to a centred
-// zoom for the length of the hit — 460ms of the card jumping, with no error.
+// the translate that puts it there. The sign is the whole trick: the translate is
+// mirrored TWICE (the card's own scaleY(-1), then the strip's), so visual down is a
+// POSITIVE translateY — a negative anchor sends the growth up into the 12px top
+// clip, which is the centred-zoom bug the anchor exists to fix. The hit shake
+// replaces the whole transform property, so a keyframe that forgets the anchor
+// snaps the card back to a centred zoom for the length of the hit — 460ms of the
+// card jumping, with no error.
 test("the active card's zoom is anchored, in the rule and in every shake keyframe", () => {
-  assert.match(CSS, /--fe-ct-zoom-anchor:\s*-4\.545%/);
+  assert.match(CSS, /--fe-ct-zoom-anchor:\s*4\.545%/, "positive — mirrored twice, so down is +");
+  assert.ok(!/--fe-ct-zoom-anchor:\s*-/.test(CSS), "a negative anchor grows the card UP");
   const zoomed = [...CSS.matchAll(/scale\(var\(--fe-ct-zoom[^)]*\)\)(\s*translateY\(var\(--fe-ct-zoom-anchor)?/g)];
   assert.ok(zoomed.length >= 9, `expected every zoom composition, found ${zoomed.length}`);
   for (const m of zoomed) assert.ok(m[1], "a zoom composition without the anchor");

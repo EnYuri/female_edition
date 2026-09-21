@@ -132,12 +132,15 @@
    has room, and the card leans out over the scene instead.
 
    The value is the translate that cancels the upper half of the zoom. Written in
-   the transform list AFTER the scale it is applied BEFORE it, and the flip mirrors
-   it, so a visual downward shift of h*(zoom-1)/2 needs a translateY of
-   -(zoom-1)/(2*zoom) of the card's own height. It is deliberately NOT derived from
-   --fe-ct-zoom with calc() — dividing by a var() number is the one calc() form we
-   cannot count on — so the two are declared next to each other and edited
-   together. */
+   the transform list AFTER the scale it is applied BEFORE it, and between it and
+   the screen there are TWO mirrors — the card's own scaleY(-1) and the strip's —
+   which cancel out. So a visual downward shift of h*(zoom-1)/2 needs a POSITIVE
+   translateY of (zoom-1)/(2*zoom) of the card's own height; the sign is the
+   load-bearing part, and a negative anchor pushes the growth UP into the 12px
+   clip instead — the exact centred-zoom failure it exists to fix. It is
+   deliberately NOT derived from --fe-ct-zoom with calc() — dividing by a var()
+   number is the one calc() form we cannot count on — so the two are declared
+   next to each other and edited together. */
 #fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait {
   --fe-ct-zoom: 1;
   --fe-ct-zoom-anchor: 0%;
@@ -205,8 +208,10 @@
      transform 은 여기서 다시 선언하지 않는다: 위 규칙의 합성 transform 이 이
      --fe-ct-zoom 을 읽으므로, 다시 쓰면 흔들림 키프레임과 두 벌로 갈라진다. */
   --fe-ct-zoom: 1.1;
-  /* -(1.1 - 1) / (2 * 1.1) = -4.545% — keep in step with --fe-ct-zoom above. */
-  --fe-ct-zoom-anchor: -4.545%;
+  /* (1.1 - 1) / (2 * 1.1) = +4.545% — keep in step with --fe-ct-zoom above.
+     POSITIVE on purpose: mirrored twice (the card's own flip, then the strip's),
+     so a negative value would grow the card UP into the top clip. */
+  --fe-ct-zoom-anchor: 4.545%;
   z-index: 2;
 }
 .fe-ct-portrait.is-active .fe-ct-frame {
@@ -836,29 +841,41 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
   text-overflow: ellipsis;
 }
 
-/* The row must fit the portrait width whatever the reading is, and since the
-   value, the "/" and the max are all drums now, the type size is a function of the
-   TOTAL cell count the template passes as --fe-dbp-cells. Each cell is 0.66em wide
-   plus a 1px gap, and 0.72 per cell leaves room for those gaps and the bezel's
-   padding; 7 cells (three digits / three digits) lands on the same size the old
-   digits-only formula gave. */
+/* The row must fit the portrait width whatever the reading is, but its HEIGHT may
+   not depend on the reading: this font used to be a function of --fe-dbp-cells, and
+   since every drum is 1em tall a 4- or 5-digit pool shrank the whole dial row — in
+   the insert layout the panel is in flow, so the card visibly shortened. The font is
+   therefore pinned to the 7-cell size (three digits / three digits) and the WIDTH
+   fit is the dial's own job, done by condensing horizontally — see .fe-dbp-dial's
+   scaleX below. Each cell is 0.66em wide plus a 1px gap, and 0.72 per cell leaves
+   room for those gaps and the bezel's padding. */
 .fe-dbp-hp {
   display: flex;
   align-items: baseline;
   justify-content: flex-start;
   gap: 1px;
-  font-size: calc(var(--fe-ct-size, 90px) * 0.9 / (var(--fe-dbp-cells, 7) * 0.72 + 0.4));
+  font-size: calc(var(--fe-ct-size, 90px) * 0.9 / (7 * 0.72 + 0.4));
   line-height: 1;
   font-weight: bold;
 }
 
 /* The dial is meant to READ as a mechanical counter: a light bezel around a row
    of recessed digit windows, each separated by a hairline, with the cylinder
-   curvature faked by a dark-to-clear-to-dark overlay inside every window. */
+   curvature faked by a dark-to-clear-to-dark overlay inside every window.
+
+   The scaleX is the width fit that used to live in .fe-dbp-hp's font-size: a
+   reading wider than 7 cells condenses toward the left edge instead of shrinking
+   the type, so a bigger pool narrows the drums but never lowers the counter.
+   scaleX — not scale — because the drum height is the furniture. The layout box
+   keeps its natural width (overflow:hidden on .fe-dbp clips the part of the BOX
+   the transform vacates; nothing rendered crosses the padding box), and
+   transform-origin: left keeps the condensed reading where it started. */
 .fe-dbp-dial {
   display: inline-flex;
   gap: 1px;
   padding: 1px;
+  transform-origin: left center;
+  transform: scaleX(min(1, calc((7 * 0.72 + 0.4) / (var(--fe-dbp-cells, 7) * 0.72 + 0.4))));
   /* Dark bezel around light drums — the reverse of the surrounding panel, which
      is what makes it read as a slot/odometer window rather than as more text. */
   background: linear-gradient(180deg, #4a4a4a, #202020 50%, #3d3d3d);
