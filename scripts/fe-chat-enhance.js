@@ -50,6 +50,7 @@ import {
   feHasRestorableMidiDamageTypes,
   feRestoreMidiDamageTypeIcons,
   feRestoreMidiItemDescription,
+  feRestoreMidiItemDescriptionSync,
 } from "./fe-midi-damage-types.js";
 
 import {
@@ -1007,6 +1008,10 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   if (restoreDamageTypes || restoreItemDescription) {
     try {
       if (restoreDamageTypes) feRestoreMidiDamageTypeIcons(message, el);
+      // `el` is not connected yet here (core inserts it after renderHTML returns),
+      // so an item whose description is already enriched can be filled with no
+      // visible reflow. Every re-render of the same card takes this path.
+      if (restoreItemDescription) feRestoreMidiItemDescriptionSync(message, el);
       // ChatMessageMidi resumes after awaiting the core renderer and replaces
       // parts of the card after this hook. One gated next-task retry is enough
       // and avoids installing an observer for every rendered message.

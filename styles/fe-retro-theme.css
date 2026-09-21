@@ -142,6 +142,17 @@ body.fe-retro-theme #fe-combat-tracker
   animation-delay:    var(--fe-ct-anim-delay, 0ms) !important;
 }
 
+/* Same exception for the dynamic battle portrait's hit shake and floating delta:
+   both announce "HP changed", and crushed to 1ms the hit itself becomes invisible.
+   The dial spin is absent here because a JS ticker drives it. Durations are the
+   --fe-ct-anim-* values fe-combat-tracker.css puts on each element — never
+   hardcode them here or the two files drift apart. */
+body.fe-retro-theme #fe-combat-tracker
+  :is(.fe-ct-portrait.is-hit, .fe-dbp-pop) {
+  animation-duration: var(--fe-ct-anim-dur, 460ms) !important;
+  animation-delay:    var(--fe-ct-anim-delay, 0ms) !important;
+}
+
 /* 로딩 스피너류 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
    "상태를 알리는" 무한 회전 스피너까지 1ms로 돌면 정지/뭉개짐처럼 보인다.
    일시정지 기어와 동일한 예외 패턴으로 정상 회전 주기를 복원한다.

@@ -29,7 +29,7 @@ test("settings entry and its transitive imports exist and have no circular depen
 });
 
 test("every setting key and menu reset value has a central registration definition", () => {
-  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 172);
+  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 177);
   assert.deepEqual(Object.keys(FE_DEFAULTS).sort(), Object.keys(FE_SETTING_DEFINITIONS).sort());
   for (const key of [...Object.values(S), ...Object.values(CP), ...FE_RELOAD_REQUIRED_KEYS]) {
     assert.ok(FE_SETTING_DEFINITIONS[key], key);

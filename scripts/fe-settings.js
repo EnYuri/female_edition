@@ -231,6 +231,10 @@ function feRegisterSettingsMenu({
         [S.COMBAT_TRACKER_SHOW_INITIATIVE]: feRead(S.COMBAT_TRACKER_SHOW_INITIATIVE),
         [S.COMBAT_TRACKER_SHOW_DISPOSITION]:feRead(S.COMBAT_TRACKER_SHOW_DISPOSITION),
         [S.COMBAT_TRACKER_SHOW_HP]:         feRead(S.COMBAT_TRACKER_SHOW_HP),
+        [S.COMBAT_TRACKER_DYNAMIC_PORTRAIT]: feRead(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT),
+        [S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT]: feRead(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT),
+        [S.COMBAT_TRACKER_HIDDEN_PARTIAL]: feRead(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
+        [S.COMBAT_TRACKER_DBP_HP_STYLE]: feRead(S.COMBAT_TRACKER_DBP_HP_STYLE),
 
         // Music (player audio upload — world/GM)
         [S.MUSIC_ENABLED]:         feRead(S.MUSIC_ENABLED),
@@ -256,6 +260,7 @@ function feRegisterSettingsMenu({
         // Status UI (dx3rd + dnd5e)
         [S.DX3RD_RUI_ENABLED]:        feRead(S.DX3RD_RUI_ENABLED),
         [S.DX3RD_RUI_VISIBLE]:        feRead(S.DX3RD_RUI_VISIBLE),
+        [S.DX3RD_RUI_YIELD_TO_TRACKER]: feRead(S.DX3RD_RUI_YIELD_TO_TRACKER),
         [S.DX3RD_RUI_PORTRAIT_WIDTH]: feRead(S.DX3RD_RUI_PORTRAIT_WIDTH),
         [S.DX3RD_RUI_PANEL_WIDTH]:    feRead(S.DX3RD_RUI_PANEL_WIDTH),
         [S.DX3RD_RUI_CARD_HEIGHT]:    feRead(S.DX3RD_RUI_CARD_HEIGHT),
@@ -674,6 +679,7 @@ function feRegisterSettingsMenu({
           // else d[key] would be undefined and overwrite existing preferences.
           ...((feIsDx3rdSystem() || feIsDnd5eSystem()) ? [
             bool(S.DX3RD_RUI_ENABLED), bool(S.DX3RD_RUI_VISIBLE),
+            bool(S.DX3RD_RUI_YIELD_TO_TRACKER),
             num(S.DX3RD_RUI_PORTRAIT_WIDTH), num(S.DX3RD_RUI_PANEL_WIDTH),
             num(S.DX3RD_RUI_CARD_HEIGHT),
           ] : []),
@@ -730,7 +736,9 @@ function feRegisterSettingsMenu({
           str(S.COMBAT_TRACKER_ASPECT), str(S.COMBAT_TRACKER_ROUNDNESS),
           str(S.COMBAT_TRACKER_ALIGNMENT), str(S.COMBAT_TRACKER_PORTRAIT_IMAGE),
           bool(S.COMBAT_TRACKER_SHOW_INITIATIVE), bool(S.COMBAT_TRACKER_SHOW_DISPOSITION),
-          bool(S.COMBAT_TRACKER_SHOW_HP),
+          bool(S.COMBAT_TRACKER_SHOW_HP), bool(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT),
+          str(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT), bool(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
+          str(S.COMBAT_TRACKER_DBP_HP_STYLE),
 
           // Music — world/GM (enabled[FE_RELOAD_REQUIRED_KEYS] + name/root/size); non-GMs lack write permission
           ...(game.user?.isGM ? [

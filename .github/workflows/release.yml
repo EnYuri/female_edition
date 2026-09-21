@@ -38,8 +38,9 @@ concurrency:
 
 jobs:
   # Gate: the release job below cannot run unless the unit tests pass, so a
-  # regression can never be published. Tests use Node's built-in runner — no
-  # dependency install needed. ci/ is committed (kept out of the shipped zip
+  # regression can never be published. Tests use Node's built-in runner, but a
+  # few tripwires need devDependencies (handlebars), so npm ci runs first.
+  # ci/ is committed (kept out of the shipped zip
   # via `ci export-ignore` in .gitattributes).
   test:
     runs-on: ubuntu-latest
@@ -51,9 +52,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+
+      - name: Install dev dependencies
+        run: npm ci
 
       - name: Run unit tests
-        run: node --test ci/*.test.mjs
+        run: npm test
 
   release:
     needs: test

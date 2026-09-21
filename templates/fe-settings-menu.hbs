@@ -777,6 +777,14 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceDx3rdRuiYieldToTracker.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceDx3rdRuiYieldToTracker" data-dtype="Boolean" {{checked values.ceDx3rdRuiYieldToTracker}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceDx3rdRuiYieldToTracker.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsMenu.ceDx3rdRuiPortraitWidth.Text"}}</label>
       <div class="form-fields">
         <input type="number" name="ceDx3rdRuiPortraitWidth" data-dtype="Number" value="{{values.ceDx3rdRuiPortraitWidth}}" step="{{ranges.ceDx3rdRuiPortraitWidth.step}}" min="{{ranges.ceDx3rdRuiPortraitWidth.min}}" max="{{ranges.ceDx3rdRuiPortraitWidth.max}}" />
@@ -1260,6 +1268,42 @@
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerShowHp" data-dtype="Boolean" {{checked values.ceCombatTrackerShowHp}} />
       </div>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerDynamicPortrait.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceCombatTrackerDynamicPortrait" data-dtype="Boolean" {{checked values.ceCombatTrackerDynamicPortrait}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerDynamicPortrait.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerDynamicPortraitLayout.Text"}}</label>
+      <div class="form-fields">
+        <select name="ceCombatTrackerDynamicPortraitLayout" data-dtype="String">
+          {{selectOptions choices.combatTrackerDbpLayout selected=values.ceCombatTrackerDynamicPortraitLayout localize=true}}
+        </select>
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerDynamicPortraitLayout.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerDbpHpStyle.Text"}}</label>
+      <div class="form-fields">
+        <select name="ceCombatTrackerDbpHpStyle" data-dtype="String">
+          {{selectOptions choices.combatTrackerDbpHpStyle selected=values.ceCombatTrackerDbpHpStyle localize=true}}
+        </select>
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerDbpHpStyle.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerHiddenPartial.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceCombatTrackerHiddenPartial" data-dtype="Boolean" {{checked values.ceCombatTrackerHiddenPartial}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerHiddenPartial.Text2"}}</p>
     </div>
   </section>
 

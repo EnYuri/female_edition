@@ -55,12 +55,19 @@
   gap: 5px;
 }
 
-/* non-scrolling wrapper around the strip — hosts the retro pixel border so it
-   isn't clipped by the strip's own overflow-x:auto (see render() comment) */
+/* Non-scrolling wrapper around the strip. It hosts the retro pixel border (which
+   the strip's own overflow-x:auto would clip — see render()) and, since the strip
+   now hangs 40px outside its own box at the bottom (below), it is also what PAINTS
+   the tracker panel: background, outline, rounding, shadow. Putting those on the
+   strip would have meant the panel growing with the spill. */
 #fe-combat-tracker .fe-ct-combatants-wrap {
   position: relative;
   display: flex;
   max-width: 100%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 #fe-combat-tracker .fe-ct-combatants {
@@ -69,29 +76,72 @@
   flex-direction: row;
   gap: 6px;
   align-items: flex-start;        /* flipped (see transform) → visually bottom-aligned */
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  /* 세로 패딩은 is-active 의 scale(1.1) 확대분과 프레임 밖으로 걸치는 이름 캡션/HP
-     바가 overflow-y:hidden 에 잘리지 않게 하는 여유분이다. 줄이지 말 것. */
-  padding: 12px 8px;
   /* clear the right sidebar + the top-left scene-controls dropdown when centered,
      plus 72px extra breathing room on each side (640 + 144) so it never touches
      the sidebar panels */
   max-width: min(92vw, calc(100vw - 784px));
+
+  /* THE BOTTOM SPILL. The active card is scale(1.1) and wears a 26px glow, and
+     overflow-y had been cutting both off at the panel's bottom edge. There is no
+     way to simply turn that clipping off: an element that scrolls on one axis
+     cannot be `visible` on the other, and `clip` — the one value that would take
+     overflow-clip-margin — is coerced to `hidden` in exactly this situation
+     (measured in Chrome: overflow-x:auto + overflow-y:clip computes to `hidden`).
+     So instead the CLIP BOX is made taller than the panel, at no cost to the
+     panel, which is painted by the wrapper above:
+
+       padding-top  += spill   the clip box (= the padding box) grows by that much
+       margin-top   -= spill   so the wrapper's height is left exactly as it was
+       translateY(spill)       undoes the shift the asymmetric padding causes in
+                               the flip, which mirrors about the BORDER box centre
+
+     After all three, content sits pixel-identically where it did, the horizontal
+     scrollbar stays on the panel's top edge, the top edge still clips (the
+     entrance animation slides portraits out from behind it, deliberately), and the
+     bottom has `spill` px of room. Keep the three in sync through the variable. */
+  /* 56px, not 40: the active card's zoom now grows downward only (see
+     --fe-ct-zoom-anchor), so the spill has to clear 10% of the tallest card plus
+     the glow's 26px blur instead of 5% plus the blur. */
+  --fe-ct-spill: 56px;
+  padding: calc(12px + var(--fe-ct-spill)) 8px 12px;
+  margin-top: calc(-1 * var(--fe-ct-spill));
   /* scrollbar moved to the TOP (vertical flip) so it doesn't cross the name
      captions that hang at the bottom; children are flipped back upright */
-  transform: scaleY(-1);
+  transform: translateY(var(--fe-ct-spill)) scaleY(-1);
   overflow-x: auto;
   overflow-y: hidden;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   /* paint the strip content (incl. the bottom name captions) ABOVE the wrap's
      pixel-border decoration (::after z-index:0) so the border never covers names */
   position: relative;
   z-index: 1;
 }
+
+/* The strip is flipped (scaleY(-1)) and the active card is zoomed, so the card's
+   transform is composed from --fe-ct-zoom here — the flip has to be undone on
+   every child or the whole card renders upside down. The hit shake animates this
+   same property and therefore has to re-state both parts on every keyframe;
+   reading them from the variable is what keeps the declarations in sync.
+
+   --fe-ct-zoom-anchor is what decides WHICH WAY the zoom grows, and the panel's
+   geometry is the reason it exists. The strip has 12px of room above the cards and
+   --fe-ct-spill px below (the clip box hangs that far past the panel's bottom
+   edge), so a zoom centred on the card pushes its top half straight into a 12px
+   wall: the enlargement — and the whole top arc of the active glow — is cut off at
+   the panel's outline, which is exactly the "trapped inside the box" look. Shifting
+   the card so it grows only DOWNWARD puts all of the growth in the direction that
+   has room, and the card leans out over the scene instead.
+
+   The value is the translate that cancels the upper half of the zoom. Written in
+   the transform list AFTER the scale it is applied BEFORE it, and the flip mirrors
+   it, so a visual downward shift of h*(zoom-1)/2 needs a translateY of
+   -(zoom-1)/(2*zoom) of the card's own height. It is deliberately NOT derived from
+   --fe-ct-zoom with calc() — dividing by a var() number is the one calc() form we
+   cannot count on — so the two are declared next to each other and edited
+   together. */
 #fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait {
-  transform: scaleY(-1);
+  --fe-ct-zoom: 1;
+  --fe-ct-zoom-anchor: 0%;
+  transform: scaleY(-1) scale(var(--fe-ct-zoom)) translateY(var(--fe-ct-zoom-anchor));
 }
 
 /* thin scrollbar for overflow when many combatants */
@@ -115,6 +165,9 @@
 }
 
 .fe-ct-portrait .fe-ct-frame {
+  /* Positioned so the dynamic battle portrait panel and its floating damage
+     numbers anchor to the frame rather than to the portrait column. */
+  position: relative;
   width: var(--fe-ct-size);
   height: var(--fe-ct-h, var(--fe-ct-size));
   border-radius: var(--fe-ct-round, 6px);
@@ -130,7 +183,10 @@
   border-color: var(--fe-ct-disposition);
 }
 
-.fe-ct-portrait .fe-ct-frame img {
+/* NOTE: `> img` on purpose. The dynamic battle portrait panel lives INSIDE the
+   frame and carries its own status-effect icons; a descendant selector here
+   would stretch every one of them to fill the whole frame. */
+.fe-ct-portrait .fe-ct-frame > img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -142,13 +198,15 @@
   image-rendering: smooth !important;
 }
 
-/* must out-specify the flip selector (#…> .fe-ct-portrait) to keep the scale,
-   and must re-include scaleY(-1) so the content stays upright under the flip */
 #fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-active {
-  /* 현재 턴 강조 — 기본 크기보다 10% 크게. 스트립이 overflow-y:hidden 이라
-     확대분(위/아래 각각 약 5%)이 잘리지 않도록 .fe-ct-combatants 의 세로 패딩을
-     함께 키워 두었다(위쪽 = 이니셔티브 배지, 아래쪽 = 이름 캡션). */
-  transform: scaleY(-1) scale(1.1);
+  /* 현재 턴 강조 — 기본 크기보다 10% 크게. 확대분과 글로우가 스트립 밖으로
+     나가는 것은 .fe-ct-combatants 의 --fe-ct-spill(패딩/음수 마진/translate 세 짝)
+     으로 처리한다 — 세로 패딩을 키우면 트래커 박스 자체가 두꺼워진다.
+     transform 은 여기서 다시 선언하지 않는다: 위 규칙의 합성 transform 이 이
+     --fe-ct-zoom 을 읽으므로, 다시 쓰면 흔들림 키프레임과 두 벌로 갈라진다. */
+  --fe-ct-zoom: 1.1;
+  /* -(1.1 - 1) / (2 * 1.1) = -4.545% — keep in step with --fe-ct-zoom above. */
+  --fe-ct-zoom-anchor: -4.545%;
   z-index: 2;
 }
 .fe-ct-portrait.is-active .fe-ct-frame {
@@ -209,7 +267,7 @@
   }
 }
 
-.fe-ct-portrait.is-defeated .fe-ct-frame img {
+.fe-ct-portrait.is-defeated .fe-ct-frame > img {
   filter: grayscale(1) brightness(0.5);
 }
 .fe-ct-portrait.is-hidden {
@@ -468,8 +526,17 @@
 }
 
 /* control bar (GM) — sits at the BOTTOM-LEFT of the tracker, under the strip */
+/* z-index, and it is load-bearing. The strip above hangs 40px past its own box at
+   the bottom (the spill) and the .fe-ct-inner column gap is 5px, so the strip's
+   padding box covers this whole row — and the strip is `pointer-events: auto` and
+   `z-index: 1`. Without a higher stacking position here every click on the control
+   bar lands on the strip instead and the panel is simply dead. (It is a hit-test
+   problem, not a paint one: the covering area is transparent, so nothing looks
+   wrong.) */
 .fe-ct-controlbar {
   pointer-events: auto;
+  position: relative;
+  z-index: 3;
   align-self: flex-start;
   display: flex;
   align-items: center;
@@ -517,7 +584,7 @@
 body.fe-retro-theme #fe-combat-tracker {
   font-family: var(--fe-font-primary, monospace);
 }
-body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants,
+body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap,
 body.fe-retro-theme #fe-combat-tracker .fe-ct-controlbar {
   background: #000;
   /* the pixel-border decoration (::before/::after below) IS the outline now —
@@ -589,30 +656,36 @@ body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-px {
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
 }
 
-/* outermost pixel-border decoration — same 9-slice pattern as window-app in
-   fe-dx3rd-compat.css: ::before supplies the accent fill, ::after lays the
+/* outermost pixel-border decoration — the SAME 9-slice frame every retro window
+   wears (fe-retro-theme.css §16): ::before supplies the accent fill, ::after lays
    pixel-border.png over it with mix-blend-mode:multiply (white px → accent,
    black px → black). Asset path is relative to this file (also in styles/).
    ONLY on the portrait strip — the control bar deliberately has no border
-   decoration (it sits separately at the bottom-left). */
+   decoration (it sits separately at the bottom-left).
+
+   The three tens are one number and must stay equal: the image's slice is 10px, so
+   rendering the border at any other width RESAMPLES the pattern and the slashes
+   come apart — which is what an earlier 8px version did here while every window on
+   screen was drawn at 10. Pixel art only survives at 1:1. inset matches the border
+   width so the frame sits entirely outside the panel, as it does on a window. */
 body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::before {
   content: "";
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   box-sizing: border-box;
   pointer-events: none;
-  border: 8px solid var(--fe-dx3rd-accent, #fff);
+  border: 10px solid var(--fe-dx3rd-accent, #fff);
   background: transparent;
 }
 body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
   content: "";
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   box-sizing: border-box;
   pointer-events: none;
   z-index: 0;
-  border: 8px solid transparent;
-  border-image: url("./assets/pixel-border.png") 10 / 8px / 0 repeat;
+  border: 10px solid transparent;
+  border-image: url("./assets/pixel-border.png") 10 / 10px / 0 repeat;
   image-rendering: pixelated;
   mix-blend-mode: multiply;
 }
@@ -693,4 +766,705 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 .fe-ct-context-menu .fe-ct-ctx-item.is-danger:hover,
 .fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item.is-danger:hover {
   background: rgba(255, 80, 80, 0.18);
+}
+
+/* ═════════════ dynamic battle portrait (MOTHER-style status box) ═════════════
+ *
+ * An overlay covering the bottom 2/5 of the frame. JS emits the markup only for
+ * the vertical aspects (feCtDbpEnabled) and, when it does, the panel replaces the
+ * ordinary name caption. Unlike the caption and the HP bar it lives INSIDE
+ * .fe-ct-frame — here the frame's overflow:hidden clipping to the rounded corners
+ * is exactly what we want.
+ *
+ * The dial is an odometer rolling a 0-9 plus 0 strip per digit. --fe-dbp-d is the
+ * (fractional) offset JS writes every frame, and the strip's 11th cell being
+ * another 0 hides the seam when a reel wraps 9.x → 0. The spin is driven by a JS
+ * ticker rather than a CSS animation, so retro's global 1ms crush cannot touch it
+ * — only the shake and the floating number need the exception in
+ * fe-retro-theme.css.
+ */
+
+/* With a panel, row 1 owns the name — the caption would sit on top of it. */
+.fe-ct-portrait.has-dbp .fe-ct-name {
+  display: none;
+}
+
+.fe-dbp {
+  position: absolute;
+  /* Inset rather than flush with the frame: the panel is a piece of UI sitting ON
+     the artwork, not part of it, so it needs an edge on all four sides and a gap
+     to show that edge against. Flush + no border let the gradient dissolve into
+     the portrait and the two read as one surface. */
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  /* 2/5 of the frame is the CEILING, not a fixed height: a combatant with no
+     status effects has one row fewer and should not pay for it in dead black. */
+  height: auto;
+  max-height: 40%;
+  z-index: 4;
+  box-sizing: border-box;
+  padding: 2px 3px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3),
+    rgba(0, 0, 0, 0.82) 20%,
+    rgba(0, 0, 0, 0.9)
+  );
+  color: #fff;
+  text-align: center;
+  /* Clicks fall through to the portrait (select / pan / double-click all survive) */
+  pointer-events: none;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px #000;
+}
+
+.fe-dbp-name {
+  text-align: left;
+  font-size: calc(var(--fe-ct-size, 90px) * 0.115);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The row must fit the portrait width whatever the reading is, and since the
+   value, the "/" and the max are all drums now, the type size is a function of the
+   TOTAL cell count the template passes as --fe-dbp-cells. Each cell is 0.66em wide
+   plus a 1px gap, and 0.72 per cell leaves room for those gaps and the bezel's
+   padding; 7 cells (three digits / three digits) lands on the same size the old
+   digits-only formula gave. */
+.fe-dbp-hp {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 1px;
+  font-size: calc(var(--fe-ct-size, 90px) * 0.9 / (var(--fe-dbp-cells, 7) * 0.72 + 0.4));
+  line-height: 1;
+  font-weight: bold;
+}
+
+/* The dial is meant to READ as a mechanical counter: a light bezel around a row
+   of recessed digit windows, each separated by a hairline, with the cylinder
+   curvature faked by a dark-to-clear-to-dark overlay inside every window. */
+.fe-dbp-dial {
+  display: inline-flex;
+  gap: 1px;
+  padding: 1px;
+  /* Dark bezel around light drums — the reverse of the surrounding panel, which
+     is what makes it read as a slot/odometer window rather than as more text. */
+  background: linear-gradient(180deg, #4a4a4a, #202020 50%, #3d3d3d);
+  border-radius: 2px;
+  color: #15130f;
+  text-shadow: none;
+}
+
+/* One digit = a 1em-tall window; the strip inside it rolls. */
+.fe-dbp-reel {
+  position: relative;
+  display: inline-block;
+  width: 0.66em;
+  height: 1em;
+  overflow: hidden;
+  /* THE CYLINDER, painted in WINDOW space. A drum's curvature is a property of
+     where the viewer and the light are, not of the drum's surface: whichever digit
+     happens to be passing, the top and bottom of the window are always the parts
+     curving away and the middle is always the part facing the viewer square-on. So
+     these three layers stay PUT while the strip rolls underneath. Only the seam
+     between two digits belongs to the surface and travels — see .fe-dbp-strip > span.
+
+     Putting the curvature on the strip instead (tried, and it is what "돌아가다보면
+     음영이 사라진다" was) makes the dial go flat at every fractional offset: at
+     d = n + 0.5 the specular band is split in half across the window edges and the
+     window shows two dark thirds and no lit middle at all. Only at a whole offset
+     did it ever look like a cylinder.
+
+     The base is a MID grey, not an off-white, and that is what makes the curvature
+     legible at all. A cylinder is read from the tonal DISTANCE between the lit
+     middle and the edges rolling away, and a near-white base leaves the highlight
+     nowhere to go — both ends sit at the top of the range and the drum stays a flat
+     card however the gradients are tuned. Darkening the base opens the range the
+     specular band needs. The digits are near-black, so their contrast survives it
+     with room to spare. */
+  background-color: #aeaa9f;
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0, rgba(0, 0, 0, 0.55) 0.06em,
+                    rgba(0, 0, 0, 0.36) 0.12em, rgba(0, 0, 0, 0.18) 0.2em,
+                    rgba(0, 0, 0, 0) 0.3em),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.72) 0, rgba(0, 0, 0, 0.55) 0.06em,
+                    rgba(0, 0, 0, 0.36) 0.12em, rgba(0, 0, 0, 0.18) 0.2em,
+                    rgba(0, 0, 0, 0) 0.28em),
+    /* The specular band. Its PEAK is deliberately short of white: at 0.97 the
+       middle of every drum is paper-white, and a digit with an enclosed counter —
+       0, and 6/8/9 with it — frames that white and reads as a glowing ring with the
+       drum's own shading showing above and below it rather than as a number on a
+       metal face. 0 is the one the eye lands on because it is also the character a
+       resting dial shows most often (every leading place of a short value). Lowering
+       the peak and widening the falloff keeps the cylinder — the tonal DISTANCE
+       between the lit middle and the edges rolling away is what carries the shape,
+       and that distance is still most of the range — while giving the counters a
+       grey to sit in. The near-black digits lose nothing: their contrast against a
+       0.62 face is still far past legible at dial size. */
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0.18em,
+                    rgba(255, 255, 255, 0.34) 0.34em,
+                    rgba(255, 255, 255, 0.62) 0.5em,
+                    rgba(255, 255, 255, 0.34) 0.66em,
+                    rgba(255, 255, 255, 0) 0.82em);
+  background-repeat: no-repeat;
+  /* Thickness of the recess bands; the ::after layers are laid out against these
+     so that none of them overlaps another. */
+  --fe-dbp-edge: 0.16em;
+  --fe-dbp-top: 0.07em;
+}
+
+/* Per-cell recess, shaped like ㄴ: down the left edge and along the bottom of
+   every digit window, plus a thin shade across the top and a lit lip on the right,
+   so each one reads as its own recessed slot. They are pseudo-elements on the
+   WINDOW (not on the strip) so they stay put while the strip translates underneath,
+   and they are painted with gradients rather than an inset box-shadow because
+   fe-dx3rd-compat.css strips box-shadow globally with !important.
+
+   TWO pseudo-elements, MITRED at the bottom-left corner. Both previous attempts at
+   that corner failed in opposite directions:
+
+   - Letting the two bands overlap composites them as alpha-over, so two 0.44 bands
+     make 0.69 and the corner reads as a second shadow pasted on top. No blend or
+     mask mode fixes it — `add` gives the union, `intersect` the product, and what
+     is needed is `max`.
+   - Giving each band a disjoint rectangle (left band stopping short of the bottom)
+     leaves a GAP: at the corner the left band has ended and the bottom band's own
+     gradient has already faded out, so the ㄴ comes apart at its elbow.
+
+   The fix is the one a picture frame uses: cut both along the mitre line, the
+   diagonal from the outer corner (0,100%) to the inner corner (edge,100%-edge).
+   That line is exactly where distance-to-left equals distance-to-bottom, so with
+   both bands sharing one profile the tone matches across the join — continuous,
+   and painted exactly once. ::before owns the left of it, ::after the rest.
+
+   Three more constraints pull against each other here, each already violated once:
+
+   0. They are deliberately the QUIETER of the two shadings. Both this and the
+      cylinder on .fe-dbp-reel's own background darken the same top and bottom
+      strips of the same cell, and at equal weight the recess wins simply by being
+      painted last — the curvature disappears under it and the drum goes flat. The
+      recess only has to say "this is a slot"; the curvature is what carries the
+      shape, so the recess gives way.
+   1. The bands stay NARROW (--fe-dbp-edge), so the dark stays on the left edge and
+      the bottom and the ㄴ is still a ㄴ. Widening them to even out the tone (86%
+      of the cell was tried) just washes the whole cell.
+   2. Their tone must be EVEN — a plateau holding one density, then a falloff whose
+      alpha drops by equal steps over equal distances. A near-opaque contact line
+      with a faint tail (0.62 → 0.06 was tried) reads as two different shadows.
+   3. They must not be plain two-stop ramps either — that reads as a gradient fill
+      rather than as a shadow.
+
+   The stops are in `em`, not %: the cell is 0.66em wide and 1em tall, so
+   percentages would give the horizontal and vertical bands different physical
+   widths and the mitre would not line up.
+
+   --fe-dbp-top is a SHADE: on a real odometer the drum curves away from the viewer
+   at the top of the window, so that edge is dark. Kept very thin but NOT pale — a
+   thin dense line reads as a hard edge, a thick faint one as a smudge. */
+.fe-dbp-reel::before,
+.fe-dbp-reel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+}
+
+/* Left band, mitred: everything except the triangle below the corner diagonal. */
+.fe-dbp-reel::before {
+  background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.27) 0, rgba(0, 0, 0, 0.27) 0.04em,
+                    rgba(0, 0, 0, 0.2) 0.07em, rgba(0, 0, 0, 0.12) 0.10em,
+                    rgba(0, 0, 0, 0.05) 0.13em, rgba(0, 0, 0, 0) 0.16em);
+  background-size: 100% calc(100% - var(--fe-dbp-top));
+  background-position: left var(--fe-dbp-top);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, var(--fe-dbp-edge) 100%,
+                     var(--fe-dbp-edge) calc(100% - var(--fe-dbp-edge)), 0 100%);
+}
+
+/* Bottom band (mitred the other way) + top shade. The clip removes only the
+   triangle above the corner diagonal, where neither of them paints.
+
+   There is deliberately NO layer on the right edge. A pale lip lived there to sell
+   the recess, but with a band on the left, the bottom and the top, a fourth edge
+   left the cell dark on every side and the dial as a whole went muddy. The right
+   edge is the one place the drum stays clean. */
+.fe-dbp-reel::after {
+  background-image:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.27) 0, rgba(0, 0, 0, 0.27) 0.04em,
+                    rgba(0, 0, 0, 0.2) 0.07em, rgba(0, 0, 0, 0.12) 0.10em,
+                    rgba(0, 0, 0, 0.05) 0.13em, rgba(0, 0, 0, 0) 0.16em),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0.26) 0.04em,
+                    rgba(0, 0, 0, 0) 0.07em);
+  background-size:
+    100% var(--fe-dbp-edge),
+    100% var(--fe-dbp-top);
+  background-position:
+    left bottom,
+    left top;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%,
+                     var(--fe-dbp-edge) calc(100% - var(--fe-dbp-edge)),
+                     0 calc(100% - var(--fe-dbp-edge)));
+}
+
+/* --fe-dbp-d is set on the STRIP, by the ticker, and never on the reel — measured,
+   and it is the single biggest cost in the whole feature. A custom property change
+   invalidates the element's entire subtree so the new value can inherit, and a reel's
+   subtree is 11 digit cells plus two pseudo-elements. Written on the reel, a strip of
+   8 spinning cards cost ~1.2 ms of style recalc per frame; written on the strip,
+   which is the only element that reads it, ~0.2 ms. Same pixels, 6× cheaper.
+
+   `inherits: false` is the other half: without it the value still propagates into the
+   11 cells even when nothing there reads it. The registration is also why the strip
+   can be handed a bare number — an unregistered custom property is a token stream, so
+   `calc()` over it re-parses every frame. If a browser ignores @property the feature
+   still works; it just costs what it used to. */
+@property --fe-dbp-d {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.fe-dbp-strip {
+  display: block;
+  transform: translateY(calc(var(--fe-dbp-d, 0) * -1em));
+  will-change: transform;
+}
+
+/* THE SEAM, and nothing else. This is the only part of the dial that belongs to
+   the drum's SURFACE rather than to the window, so it is the only part that travels:
+   the physical edge where one digit's face meets the next, a near-black hairline
+   with a short shadow falling away from it. Without an edge crossing the window a
+   spinning reel is just sliding text.
+
+   Everything that makes the drum read as a cylinder — the far side curving away at
+   the top and bottom of the window, the specular band down its middle — lives on
+   .fe-dbp-reel instead and does NOT move. Those are fixed by the viewer and the
+   light, not by which digit is passing.
+
+   The hairline is the one value in px rather than em: it is an edge, and has to stay
+   exactly one device pixel at every portrait size. The falloff is em so it scales.
+
+   It is a background layer, NEVER a border: the reel's offset is written in `em`
+   against a cell height of exactly 1em, so a 1px border would desynchronise the
+   strip from --fe-dbp-d and the dial would drift further off with every digit. */
+.fe-dbp-strip > span {
+  display: block;
+  height: 1em;
+  /* NOT 1em. Where the digit sits inside its window is decided by the font's own
+     ascent and descent, so a fixed line-height centres it only for the faces that
+     happen to agree: CookieRun lands at 0.505 of the cell, the stock sans-serif at
+     0.565 with its feet clipped off by the window. feDbpApplyInkMetric measures the
+     user's face and solves for the line-height that centres the ink; the cell box
+     stays exactly 1em either way, so nothing about the drum geometry moves. */
+  line-height: var(--fe-dbp-lh, 1em);
+  text-align: center;
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.88) 0 1px,
+                    rgba(0, 0, 0, 0.36) 1px, rgba(0, 0, 0, 0.22) 0.04em,
+                    rgba(0, 0, 0, 0.1) 0.08em, rgba(0, 0, 0, 0) 0.13em);
+  background-repeat: no-repeat;
+}
+
+/* The separator and the max digits are drums too, parked on their single cell — the
+   reading is one continuous counter rather than a dial with a caption after it.
+   They carry no data-dbp-roll, which is what keeps the ticker off them. */
+.fe-dbp-reel.is-glyph {
+  width: 0.5em;
+}
+
+/* Hidden HP is the SAME dial, parked on a "?" cell — .fe-dbp-dial.is-unknown
+   reuses the bezel, the drums and the recess, so a hidden portrait and a revealed
+   one are identical furniture and only the reading differs. It carries no
+   data-dbp-dial attribute, which is what keeps the ticker from writing offsets
+   into a dial that has nothing to roll. */
+.fe-dbp-dial.is-unknown .fe-dbp-strip {
+  transform: none;
+}
+
+/* ── the HP reading as a BAR ─────────────────────────────────────────────────
+   COMBAT_TRACKER_DBP_HP_STYLE = "bar" swaps the dial for the STATUS PANEL's reading
+   (.fedr-bar / .fedr-label-row in styles/fe-dx3rd-compat.css): a track with a
+   proportional fill, and 「HP  value/max」 under it. The point of the style is that a
+   table which turned the status panel off in favour of the tracker
+   (ceDx3rdRuiYieldToTracker) still gets the reading it had, so the two rows and their
+   order deliberately match that card.
+
+   What does NOT carry over is the panel's pixel sizing. Those are constants (10px
+   track, 12px type) because a status card is a fixed size; a tracker portrait is
+   user-scalable from tiny to huge, so every size here is a fraction of --fe-ct-size.
+   A 10px track under a 200px portrait reads as a hairline. */
+.fe-dbp-hpbar {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fe-dbp-bar {
+  position: relative;
+  width: 100%;
+  /* The floor matters more than the ratio at the small end: below ~3px the border
+     eats the track and the fill has no room left to be visible in. */
+  height: max(3px, calc(var(--fe-ct-size, 90px) * 0.055));
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+/* An element rather than a background-size on the track: the fill's own width is
+   what animates, the track's border and radius stay put, and the retro theme's
+   global 1ms transition-duration lands on it for free (a background-size ramp would
+   need its own exception to be crushed). --fe-dbp-bar-pct comes from the template on
+   the TRACK and inherits down. */
+.fe-dbp-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  /* --fe-dbp-bar-hold is feDbpApplyBarRoll's: while the caption is still scrambling it
+     pins the fill to the PRE-change ratio, and dropping it hands the width back to the
+     resting --fe-dbp-bar-pct the template wrote. Two properties rather than one because
+     the template's value lives in the same element's style attribute — writing the hold
+     into it would destroy the value the hold is supposed to fall back to. */
+  width: var(--fe-dbp-bar-hold, var(--fe-dbp-bar-pct, 0%));
+  background: var(--fe-dbp-bar-color, #2ecc71);
+  transition: width 260ms ease-out;
+}
+
+/* Key left, number right — the status panel's .fedr-label-row exactly. The type is
+   smaller than the name row's: the name is the card's title and this is a readout
+   under it, and the widest reading a masked 5-digit pool can produce
+   ("?????/?????") still has to fit the portrait's width. */
+.fe-dbp-bar-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px;
+  font-size: calc(var(--fe-ct-size, 90px) * 0.1);
+  line-height: 1.1;
+  font-weight: bold;
+}
+
+/* "HP" is furniture and the number is the reading, so only one of them gets the
+   panel's full contrast. */
+.fe-dbp-bar-key {
+  flex: 0 0 auto;
+  opacity: 0.72;
+  letter-spacing: 0.04em;
+}
+
+.fe-dbp-bar-val {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Conditions first, then plain AEs. JS counts the overflow and folds it into a
+   "…", so all this needs to allow is the wrap. */
+/* Two rows is the hard cap — the row count is what decides how much of the band
+   the status list may claim, and JS folds the overflow into a "…" using the same
+   number (DBP_EFF_ROWS). Never let this box grow past it. */
+.fe-dbp-effects {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: flex-start;
+  gap: 1px;
+  /* ONE row is reserved whether or not anything is in it (the template emits the
+     row unconditionally). The row used to appear with the first condition, which
+     made the card grow by an icon height in the middle of combat and re-laid out
+     the whole strip. A card whose height never changes is worth one row of black.
+     The cap stays two rows — that is the number JS folds the overflow against. */
+  min-height: var(--fe-dbp-icon, 12px);
+  max-height: calc(var(--fe-dbp-icon, 12px) * 2 + 1px);
+  overflow: hidden;
+}
+
+.fe-dbp-eff {
+  width: var(--fe-dbp-icon, 12px);
+  height: var(--fe-dbp-icon, 12px);
+  object-fit: contain;
+  border: none;
+  /* Pointer events are back on only so the tooltip fires. A click still bubbles
+     to the portrait (the root handler resolves it with
+     closest("[data-combatant-id]")), so selection behaviour is unchanged. */
+  pointer-events: auto;
+  filter: drop-shadow(0 0 1px #000);
+}
+
+/* A thin ring separates conditions from plain active effects. It is an outline,
+   not a box-shadow: fe-dx3rd-compat.css strips box-shadow globally with
+   !important. */
+.fe-dbp-eff.is-status {
+  outline: 1px solid rgba(255, 120, 120, 0.7);
+  outline-offset: -1px;
+}
+
+.fe-dbp-more {
+  font-size: var(--fe-dbp-icon, 12px);
+  line-height: 1;
+  pointer-events: auto;
+}
+
+/* The floating delta — the same idea as a token's scrolling combat text, but it
+   rises out of the dial instead. */
+.fe-dbp-pop {
+  position: absolute;
+  left: 50%;
+  /* Anchored to the FRAME (the panel clips its overflow), starting on the band's
+     ceiling so the number never travels across the name or the digits. */
+  bottom: 40%;
+  z-index: 6;
+  font-size: calc(var(--fe-ct-size, 90px) * 0.2);
+  font-weight: bold;
+  line-height: 1;
+  white-space: nowrap;
+  color: #ff6a6a;
+  text-shadow: 0 1px 2px #000, 0 0 4px #000;
+  pointer-events: none;
+  --fe-ct-anim-dur: 1400ms; /* must match DBP_POP_MS */
+  --fe-ct-anim-delay: var(--fe-dbp-pop-delay, 0ms);
+  animation: fe-dbp-pop var(--fe-ct-anim-dur) ease-out var(--fe-ct-anim-delay) both;
+}
+
+.fe-dbp-pop.is-heal {
+  color: #7dff9b;
+}
+
+@keyframes fe-dbp-pop {
+  0%   { opacity: 0; transform: translate(-50%, 6px) scale(0.8); }
+  12%  { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  35%  { opacity: 1; transform: translate(-50%, -10px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -30px) scale(1); }
+}
+
+/* The hit shake moves the WHOLE CARD — frame, dial panel and name caption
+   together — rather than the artwork inside the frame. Shaking only the img read
+   as the picture sliding around behind a fixed window; the card being struck is
+   what the hit is supposed to say.
+
+   Because the card already carries a transform (scaleY(-1) for the strip's flip,
+   plus the active card's zoom and the translate that anchors that zoom to the
+   card's top), every keyframe has to RE-STATE it: an animation replaces the whole
+   transform property, it does not append to it. All of it comes from
+   --fe-ct-zoom / --fe-ct-zoom-anchor so this never drifts from the two rules that
+   set them — drop the anchor here and the active card would jump back to a centred
+   zoom for the length of every hit.
+
+   No scale ramp here — the old one existed only because translating the img
+   uncovered the frame's opposite edge. A card translated as a whole uncovers
+   nothing, so the profile is pure translate plus a little rotation, decaying to
+   exactly zero at 100% so nothing jumps when the animation is removed.
+
+   Every intermediate stop reads --fe-dbp-k<n>{x,y,r}, which feDbpApplyShake writes
+   onto the card: ONE randomised set per hit, so no two impacts shake the same way.
+   The fallbacks are the old fixed profile, so a shake that never got its variables
+   (JS disabled the panel, an element the pass did not reach) still plays.
+
+   0% and 100% are deliberately NOT randomised. They are the anchors the card
+   returns to; jittering them would leave it parked off its own layout position. */
+.fe-ct-portrait.is-hit {
+  --fe-ct-anim-dur: 460ms; /* must match DBP_HIT_MS */
+  --fe-ct-anim-delay: var(--fe-dbp-hit-delay, 0ms);
+  animation: fe-dbp-shake var(--fe-ct-anim-dur) linear var(--fe-ct-anim-delay) backwards;
+  /* over the neighbours it swings into, and over the active card's ring */
+  z-index: 3;
+}
+
+@keyframes fe-dbp-shake {
+  0%   { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0) rotate(0deg); }
+  8%   { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k1x, -10%), var(--fe-dbp-k1y, 3%))
+                   rotate(var(--fe-dbp-k1r, -2deg)); }
+  22%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k2x, 8.5%), var(--fe-dbp-k2y, -2.5%))
+                   rotate(var(--fe-dbp-k2r, 1.7deg)); }
+  36%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k3x, -7%), var(--fe-dbp-k3y, 2%))
+                   rotate(var(--fe-dbp-k3r, -1.3deg)); }
+  50%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k4x, 5.5%), var(--fe-dbp-k4y, -1.5%))
+                   rotate(var(--fe-dbp-k4r, 1deg)); }
+  64%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k5x, -4%), var(--fe-dbp-k5y, 1%))
+                   rotate(var(--fe-dbp-k5r, -0.7deg)); }
+  78%  { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%))
+                   translate(var(--fe-dbp-k6x, 2.5%), var(--fe-dbp-k6y, 0%))
+                   rotate(var(--fe-dbp-k6r, 0.4deg)); }
+  100% { transform: scaleY(-1) scale(var(--fe-ct-zoom, 1)) translateY(var(--fe-ct-zoom-anchor, 0%)) translate(0, 0) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fe-ct-portrait.is-hit {
+    animation: none;
+  }
+  .fe-dbp-pop {
+    animation: fe-dbp-pop-static var(--fe-ct-anim-dur) linear var(--fe-ct-anim-delay) both;
+  }
+  @keyframes fe-dbp-pop-static {
+    0%, 70% { opacity: 1; transform: translate(-50%, 0); }
+    100%    { opacity: 0; transform: translate(-50%, 0); }
+  }
+}
+
+/* ── inserted layout (the default): the panel is appended UNDER the frame ──
+ *
+ * Same markup, different place in the DOM (see templates/fe-combat-tracker.hbs).
+ * The panel is in normal flow here, so the portrait column simply grows by its
+ * height and the two boxes are joined into one card: the frame drops its bottom
+ * border and bottom rounding, the panel picks them up.
+ */
+.fe-ct-portrait.is-dbp-insert .fe-ct-frame {
+  border-bottom: none;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fe-ct-portrait.is-dbp-insert .fe-dbp {
+  position: static;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  padding: 3px 4px 4px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  /* The joint against the artwork. It is a DIVIDER, not an outer edge, so it is
+     thinner than the other three — and it deliberately takes the same colour as
+     them (the mirror rules below set `border-color`, which is all four sides), so
+     the panel reads as a compartment of the card rather than as a second card
+     stuck to the bottom. The frame drops its own bottom border, so this is the
+     only line at the joint; giving both a border paints it twice, and at 1px it
+     was too faint to separate a dark panel from dark artwork. */
+  border-radius: 0 0 var(--fe-ct-round, 6px) var(--fe-ct-round, 6px);
+}
+
+/* The joint has to keep following the frame's own border colour, and that colour
+   comes from three different rules (disposition tint, active accent, retro
+   accent). Mirror all three rather than trying to inherit — border-color is not
+   inherited and the portrait does not carry the resolved value. */
+.fe-ct-portrait.is-dbp-insert.has-disposition .fe-dbp {
+  border-color: var(--fe-ct-disposition);
+}
+.fe-ct-portrait.is-dbp-insert.is-active .fe-dbp {
+  border-color: var(--fe-dx3rd-accent, #ffd54a);
+}
+/* Both layouts, hence `.fe-ct-portrait` rather than `.is-dbp-insert`: that keeps
+   the specificity equal to the inserted-layout rule above, and this one is later
+   in the sheet, so it still wins there while also reaching the overlay. */
+body.fe-retro-theme .fe-ct-portrait .fe-dbp {
+  border-color: var(--fe-ac-45, #fff);
+  border-radius: 0;
+}
+
+/* The active ring wraps the WHOLE card, not just the artwork. Its default rule
+   is sized from --fe-ct-h (the frame), which here stops halfway down. */
+.fe-ct-portrait.is-dbp-insert.is-active::after {
+  left: -3px;
+  top: -3px;
+  right: -3px;
+  bottom: -3px;
+  width: auto;
+  height: auto;
+}
+
+/* The damage number rises off the bottom of the ARTWORK, which is where the dial
+   sits in this layout (just below the frame edge). */
+.fe-ct-portrait.is-dbp-insert .fe-dbp-pop {
+  bottom: 4%;
+}
+
+/* ── retro / pixel ── */
+body.fe-retro-theme .fe-dbp {
+  background: #000;
+  /* beat §4's global text-shadow:none !important and keep the hard outline */
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+}
+body.fe-retro-theme :is(.fe-dbp-name, .fe-dbp-hp, .fe-dbp-bar-row, .fe-dbp-more) {
+  color: var(--fe-ac-90, #fff);
+}
+/* The bar goes flat and monochrome for the same reason the dial does: the accent tone
+   ladder is this theme's only palette, so the health gradient's green/orange/red is
+   dropped rather than posterised. The status panel's retro rules
+   (fe-dx3rd-compat.css) make exactly the same trade, which keeps the two readings
+   looking like one feature. Opaque tones only — an alpha fill would let the artwork
+   through the track. */
+body.fe-retro-theme .fe-dbp-bar {
+  background: #000;
+  border: 1px solid var(--fe-ac-45, #b3b3b3);
+}
+body.fe-retro-theme .fe-dbp-bar-fill {
+  background: var(--fe-ac-96, #f2f2f2);
+}
+body.fe-retro-theme .fe-dbp-eff {
+  image-rendering: pixelated;
+}
+
+/* THE DIAL, POSTERISED.
+ *
+ * The default dial fakes a metal cylinder with continuous gradients — a soft
+ * falloff at each edge of the window, a specular band down the middle, a shadow
+ * trailing every seam. None of that belongs in a pixel theme: a smooth ramp is the
+ * one thing the look cannot contain, and at this size it also dithers, so the
+ * drums came out as muddy grey smears next to hard-edged pixel type.
+ *
+ * The rebuild keeps the SHAPE of the lighting and throws away the interpolation.
+ * Every gradient below is written with doubled stop positions, so each colour
+ * holds a band and then changes in one step — the same top-dark / middle-lit /
+ * bottom-dark reading as the default dial, rendered as flat layers the way a
+ * sprite artist would shade a cylinder with four ramp colours. Keep the stops
+ * doubled: a single position anywhere re-introduces a ramp across that band and
+ * the whole effect is gone.
+ *
+ * Bands are in `em`, like the default dial's, because the cell is exactly 1em tall
+ * at every portrait size — percentages would put the steps in different places on
+ * a 3-drum and a 5-drum reading.
+ *
+ * Tones come from the accent ladder (--fe-ac-*), so the counter picks up the
+ * world's accent hue like the rest of the retro UI instead of being the one grey
+ * object on screen. --fe-ac-96 / -45 / -33 are the opaque members of that ladder;
+ * the alpha-carrying ones (-90, -80) would let the artwork show through the drum.
+ */
+body.fe-retro-theme .fe-dbp-dial {
+  /* Flat bezel. The 1px padding and the 1px gaps let it show between the drums as
+     hard rules, which is all the separation the cells need here — the recessed-slot
+     shading below is switched off. */
+  background: var(--fe-ac-12, #1a1a1a);
+  color: #000;
+}
+
+body.fe-retro-theme .fe-dbp-reel {
+  background-color: var(--fe-ac-96, #f2f2f2);
+  background-image: linear-gradient(
+    180deg,
+    var(--fe-ac-33, #545454) 0 0.13em,
+    var(--fe-ac-45, #b3b3b3) 0.13em 0.26em,
+    transparent 0.26em 0.74em,
+    var(--fe-ac-45, #b3b3b3) 0.74em 0.87em,
+    var(--fe-ac-33, #545454) 0.87em 1em
+  );
+}
+
+/* The per-cell recess is what the flat bands replace — left on, its soft ㄴ would
+   be the only smooth shading left on the dial. */
+body.fe-retro-theme .fe-dbp-reel::before,
+body.fe-retro-theme .fe-dbp-reel::after {
+  background-image: none;
+}
+
+/* The seam between two digit faces: still the only part of the dial that travels
+   with the strip, now a single hard pixel line with no falloff behind it. */
+body.fe-retro-theme .fe-dbp-strip > span {
+  background-image: linear-gradient(180deg, var(--fe-ac-12, #1a1a1a) 0 1px, transparent 1px);
 }

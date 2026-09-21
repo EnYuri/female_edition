@@ -484,6 +484,32 @@ function fePreApplyMergeHint(message, el) {
     if (!feSetting(S.MERGE_ENABLED)) return;
     if (!feIsElementNode(el)) return;
 
+    // A RE-RENDER is not an append. Core's #rerenderMessage builds a fresh <li>
+    // for a message that is ALREADY in the log and calls
+    // `existing.replaceWith(replacement)` (sidebar/tabs/chat.mjs), so the
+    // "newest element in the log" probe below would compare this message with
+    // ITSELF: same key, same timestamp, so feCanMergePair always says yes and a
+    // message that is really a group START gets stamped `fe-merge-follow`. The
+    // rAF recompute corrects it one frame later, which is exactly the visible
+    // "header collapses, then reopens" blink — and a midi-qol workflow
+    // re-renders its card ~8 times per roll, so it blinks 8 times.
+    // Mirror the live element's own merge classes instead: that is the state the
+    // recompute will confirm, so nothing changes visually.
+    const thisId = feGetMessageIdFromElement(el) || message?.id || message?._id || null;
+    if (thisId) {
+      for (const log of feGetChatLogs()) {
+        if (!feIsElementNode(log)) continue;
+        for (const item of log.querySelectorAll?.("li.chat-message") ?? []) {
+          if (item === el) continue;
+          if (feGetMessageIdFromElement(item) !== thisId) continue;
+          for (const cls of FE_MERGE_CLASS_LIST) {
+            el.classList.toggle(cls, item.classList.contains(cls));
+          }
+          return;
+        }
+      }
+    }
+
     const thisInfo = feMessageMergeInfo(message, el);
     if (!thisInfo || thisInfo.noMerge) return;
 

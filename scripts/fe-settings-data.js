@@ -79,6 +79,7 @@ const S = {
   CORE_PRIORITY_ENABLED: "ceCorePriorityEnabled",
   DX3RD_RUI_ENABLED: "ceDx3rdRuiEnabled",
   DX3RD_RUI_VISIBLE: "ceDx3rdRuiVisible",
+  DX3RD_RUI_YIELD_TO_TRACKER: "ceDx3rdRuiYieldToTracker",
   DX3RD_RUI_PORTRAIT_WIDTH: "ceDx3rdRuiPortraitWidth",
   DX3RD_RUI_PANEL_WIDTH: "ceDx3rdRuiPanelWidth",
   DX3RD_RUI_CARD_HEIGHT: "ceDx3rdRuiCardHeight",
@@ -109,6 +110,10 @@ const S = {
   COMBAT_TRACKER_SHOW_INITIATIVE: "ceCombatTrackerShowInitiative",
   COMBAT_TRACKER_SHOW_DISPOSITION: "ceCombatTrackerShowDisposition",
   COMBAT_TRACKER_HIDE_DEFEATED: "ceCombatTrackerHideDefeated",
+  COMBAT_TRACKER_DYNAMIC_PORTRAIT: "ceCombatTrackerDynamicPortrait",
+  COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT: "ceCombatTrackerDynamicPortraitLayout",
+  COMBAT_TRACKER_HIDDEN_PARTIAL: "ceCombatTrackerHiddenPartial",
+  COMBAT_TRACKER_DBP_HP_STYLE: "ceCombatTrackerDbpHpStyle",
   TOKEN_GLOW_ENABLED: "ceTokenGlowEnabled",
   TOKEN_GLOW_HOVER: "ceTokenGlowHover",
   TOKEN_GLOW_STRENGTH: "ceTokenGlowStrength",
@@ -268,8 +273,8 @@ const FE_DEFAULTS = {
   "chatPortraitShowRoll": true,
   "chatPortraitShowOther": true,
   "ceCombatTrackerEnabled": true,
-  "ceCombatTrackerPortraitSize": 108,
-  "ceCombatTrackerAspect": "2",
+  "ceCombatTrackerPortraitSize": 120,
+  "ceCombatTrackerAspect": "1.5",
   "ceCombatTrackerRoundness": "0",
   "ceCombatTrackerAlignment": "center",
   "ceCombatTrackerPortraitImage": "actor",
@@ -277,9 +282,14 @@ const FE_DEFAULTS = {
   "ceCombatTrackerShowDisposition": false,
   "ceCombatTrackerHideDefeated": false,
   "ceCombatTrackerShowHp": false,
+  "ceCombatTrackerDynamicPortrait": true,
+  "ceCombatTrackerDynamicPortraitLayout": "insert",
+  "ceCombatTrackerHiddenPartial": false,
+  "ceCombatTrackerDbpHpStyle": "dial",
   "ceConflictGuardMode": "auto",
   "ceDx3rdRuiEnabled": true,
   "ceDx3rdRuiVisible": true,
+  "ceDx3rdRuiYieldToTracker": true,
   "ceDx3rdRuiPortraitWidth": 100,
   "ceDx3rdRuiPanelWidth": 128,
   "ceDx3rdRuiCardHeight": 80,
@@ -473,6 +483,8 @@ const CHOICES = {
   combatTrackerRoundness: { "0": "FECT.Settings.Roundness.Sharp", "8": "FECT.Settings.Roundness.Soft", "16": "FECT.Settings.Roundness.Round" },
   combatTrackerAlignment: { left: "FECT.Settings.Alignment.Left", center: "FECT.Settings.Alignment.Center", right: "FECT.Settings.Alignment.Right" },
   combatTrackerImage:     { actor: "FECT.Settings.Image.Actor", token: "FECT.Settings.Image.Token" },
+  combatTrackerDbpLayout: { insert: "FECT.Settings.DbpLayout.Insert", overlay: "FECT.Settings.DbpLayout.Overlay" },
+  combatTrackerDbpHpStyle: { dial: "FECT.Settings.DbpHpStyle.Dial", bar: "FECT.Settings.DbpHpStyle.Bar" },
 };
 
 // Only user-facing settings participate in the settings-menu reset.
@@ -535,6 +547,7 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "ceCorePriorityEnabled",
   "ceDx3rdRuiEnabled",
   "ceDx3rdRuiVisible",
+  "ceDx3rdRuiYieldToTracker",
   "ceDx3rdRuiPortraitWidth",
   "ceDx3rdRuiPanelWidth",
   "ceDx3rdRuiCardHeight",
@@ -559,6 +572,10 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "ceCombatTrackerShowInitiative",
   "ceCombatTrackerShowDisposition",
   "ceCombatTrackerHideDefeated",
+  "ceCombatTrackerDynamicPortrait",
+  "ceCombatTrackerDynamicPortraitLayout",
+  "ceCombatTrackerHiddenPartial",
+  "ceCombatTrackerDbpHpStyle",
   "ceTokenGlowEnabled",
   "ceTokenGlowHover",
   "ceTokenGlowStrength",
@@ -1367,6 +1384,47 @@ const FE_SETTING_DEFINITIONS = {
     config: false,
     type: Boolean,
   },
+  // 동적 배틀 포트레이트 — MOTHER-style status box over the lower 2/5 of a
+  // vertical portrait. No reload key: feCtRender rebuilds the strip wholesale.
+  "ceCombatTrackerDynamicPortrait": {
+    name: "FECT.Settings.DynamicPortraitName",
+    hint: "FECT.Settings.DynamicPortraitHint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+  },
+  // Where the status box sits: appended under the artwork (default) or laid over
+  // its bottom 2/5.
+  "ceCombatTrackerDynamicPortraitLayout": {
+    name: "FECT.Settings.DbpLayoutName",
+    hint: "FECT.Settings.DbpLayoutHint",
+    scope: "client",
+    config: false,
+    choices: {"insert":"FECT.Settings.DbpLayout.Insert","overlay":"FECT.Settings.DbpLayout.Overlay"},
+    type: String,
+  },
+  // Hidden HP: park every drum on "?", or let the leftmost drum show its real digit.
+  // Client scope like the rest of the tracker's settings — GM priority force-pushes
+  // client keys, so a GM who wants one answer for the whole table has that lever.
+  "ceCombatTrackerHiddenPartial": {
+    name: "FECT.Settings.HiddenPartialName",
+    hint: "FECT.Settings.HiddenPartialHint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+  },
+  // How the dynamic battle portrait reads its HP: the odometer dial (default) or a
+  // status-panel-style bar with a "value/max" caption. The bar exists so the tracker
+  // can stand in for the status UI completely (ceDx3rdRuiYieldToTracker) — a dial is
+  // a different reading of the same number, not the same reading.
+  "ceCombatTrackerDbpHpStyle": {
+    name: "FECT.Settings.DbpHpStyleName",
+    hint: "FECT.Settings.DbpHpStyleHint",
+    scope: "client",
+    config: false,
+    choices: {"dial":"FECT.Settings.DbpHpStyle.Dial","bar":"FECT.Settings.DbpHpStyle.Bar"},
+    type: String,
+  },
   "ceCombatTrackerShowHp": {
     name: "FECT.Settings.ShowHpName",
     hint: "FECT.Settings.ShowHpHint",
@@ -1397,6 +1455,16 @@ const FE_SETTING_DEFINITIONS = {
   "ceDx3rdRuiVisible": {
     name: "FE.SettingsData.ceDx3rdRuiVisible.name",
     hint: "FE.SettingsData.ceDx3rdRuiVisible.hint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+  },
+  // Stand down while the battle tracker is the thing showing HP. Both features answer
+  // the same question, and the tracker answers it for every combatant at once — see
+  // feCtDisplaysHp in fe-combat-tracker-core.js for exactly what counts as "showing".
+  "ceDx3rdRuiYieldToTracker": {
+    name: "FE.SettingsData.ceDx3rdRuiYieldToTracker.name",
+    hint: "FE.SettingsData.ceDx3rdRuiYieldToTracker.hint",
     scope: "client",
     config: false,
     type: Boolean,

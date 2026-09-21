@@ -27,10 +27,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
 
-      # Node's built-in test runner — no dependency install needed.
+      # Node's built-in test runner, but a few tripwires compile a .hbs with
+      # handlebars (a devDependency), so the install is required.
+      - name: Install dev dependencies
+        run: npm ci
+
       - name: Run unit tests
-        run: node --test ci/*.test.mjs
+        run: npm test
 
   lint:
     runs-on: ubuntu-latest

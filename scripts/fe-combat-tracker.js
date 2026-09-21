@@ -21,13 +21,43 @@ import { feRegisterSetting } from "./fe-settings-data.js";
  * Self-contained except for constants. Own DOM (`#fe-combat-tracker` on <body>) +
  * own CSS (styles/fe-combat-tracker.css, unlayered — no system-layer conflict).
  */
-import { MODULE_ID, S, FE_DEFAULTS, feIsDx3rdSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
+import { feHpMasked, feToggleHpMask } from "./fe-hp-mask.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 // Tracker portraits shrink huge sources, which CSS image-rendering cannot do well (see
 // fe-portrait-hq.js). They are display-only, non-editable images, so the safe src-swap HQ
 // path applies.
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
+import {
+  TRACKER_DOM_ID,
+  feCtDbpEnabled,
+  feCtDbpHpStyle,
+  feCtEnabled,
+  feCtGetCombat,
+  feCtOriginalActive,
+  feCtResolveHp,
+  feCtCancelScheduledRender,
+  feCtScheduleRender,
+  feCtSetRenderer,
+  feCtSetting,
+  CTD_ID,
+} from "./fe-combat-tracker-core.js";
+import {
+  feCtDbpInsertLayout,
+  feDbpApplyBarRoll,
+  feDbpApplyInkMetric,
+  feDbpApplyOffsets,
+  feDbpApplyShake,
+  feDbpData,
+  feDbpHasHpBaseline,
+  feDbpHitDelay,
+  feDbpObserveActorHp,
+  feDbpPruneState,
+  feDbpReset,
+  feDbpSeedHpBaseline,
+  feDbpStartTicker,
+} from "./fe-combat-tracker-dbp.js";
 
 // All markup lives in templates/; preloaded at `init` (fe-template.js).
 const [CT_TPL_ROOT, CT_TPL_MENU, CT_TPL_DIALOG, CT_TPL_REMOVE] = feRegisterTemplates(
@@ -37,8 +67,6 @@ const [CT_TPL_ROOT, CT_TPL_MENU, CT_TPL_DIALOG, CT_TPL_REMOVE] = feRegisterTempl
   "fe-combat-tracker-remove.hbs"
 );
 
-const CTD_ID = "combat-tracker-dock"; // original Carousel Combat Tracker — we yield to it
-const TRACKER_DOM_ID = "fe-combat-tracker";
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
 
@@ -80,20 +108,6 @@ let _ctExitTimer = 0;            // 0 = not leaving
 
 // ── settings access ─────────────────────────────────────────────────────────
 
-function feCtSetting(key) {
-  try { return game.settings.get(MODULE_ID, key); }
-  catch { return FE_DEFAULTS[key]; }
-}
-
-function feCtEnabled() {
-  return !!feCtSetting(S.COMBAT_TRACKER_ENABLED);
-}
-
-// Yield: skip install when the original Carousel Combat Tracker is active.
-function feCtOriginalActive() {
-  return !!game.modules?.get?.(CTD_ID)?.active;
-}
-
 // DX3rd replaces Combat#nextTurn with its action-end/action-delay workflow.
 // That workflow must start in the acting player's browser: it opens a local
 // choice dialog, updates their owned Actor, then asks DX3rd's own GM socket
@@ -104,12 +118,6 @@ function feCtUsesLocalPlayerTurnEndWorkflow() {
 }
 
 // ── data helpers ────────────────────────────────────────────────────────────
-
-function feCtGetCombat() {
-  // The `viewed` fallback keeps a deactivated encounter (active:false) on screen so it can
-  // be resumed straight from the tracker instead of the tracker vanishing.
-  return game.combat ?? game.combats?.active ?? game.combats?.viewed ?? null;
-}
 
 // Token disposition → frame color. Uses core's configured disposition colors when
 // available (PIXI ints), falling back to fixed hex.
@@ -151,19 +159,6 @@ function feCtPortraitImage(c) {
 
 // Resolve an HP {value,max,pct,color} bar from an actor. Primary path is the
 // dx3rd/dnd5e shared `system.attributes.hp`; falls back to `system.hp`.
-function feCtResolveHp(actor) {
-  if (!actor) return null;
-  const sys = actor.system ?? {};
-  const cand = sys?.attributes?.hp ?? sys?.hp ?? null;
-  if (!cand) return null;
-  const value = Number(cand.value);
-  const max = Number(cand.max ?? cand.maxHP ?? 0);
-  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return null;
-  const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  const color = pct > 50 ? "#2ecc71" : pct > 25 ? "#e67e22" : "#e74c3c";
-  return { value, max, pct, color };
-}
-
 function feCtCombatHasActor(actor) {
   const combat = feCtGetCombat();
   if (!combat || !actor) return false;
@@ -235,6 +230,7 @@ function feCtHasUnrolledCombatants(combat) {
 }
 
 
+
 // ── DOM build ───────────────────────────────────────────────────────────────
 
 function feCtEnsureRoot() {
@@ -254,7 +250,7 @@ function feCtEnsureRoot() {
 
 // One combatant's template context. Everything that used to be concatenated into an
 // HTML string is now plain data; templates/fe-combat-tracker.hbs owns the markup.
-function feCtPortraitData(c, active, canEndTurn, enterDelay = null) {
+function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = null) {
   const img = feCtPortraitImage(c);
   const init = c.initiative;
 
@@ -271,6 +267,8 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null) {
   const showInit =
     feCtSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE) && init != null && init !== "";
 
+  const hitDelay = dbpOpts ? feDbpHitDelay(c.id, dbpOpts.now) : null;
+
   return {
     id: c.id,
     name: c.name,
@@ -285,12 +283,37 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null) {
     // and must still show its badge.
     showInitiative: showInit,
     initiative: showInit ? Math.round(Number(init)) : null,
-    hp: feCtSetting(S.COMBAT_TRACKER_SHOW_HP) ? feCtResolveHp(c.actor) || null : null,
+    hp: feCtShowHpBar(c.actor) ? feCtResolveHp(c.actor) || null : null,
     // ">>" end-turn and the roll-initiative d20 both sit dead-centre on the frame, so
     // only one of them is ever drawn (see docs/combat-tracker.md).
     canEndTurn,
     canRollInit: !canEndTurn && feCtCanRollInitiative(c),
+    // Dynamic battle portrait. dbpOpts only arrives for the vertical aspects, and
+    // when it does the name caption is hidden in CSS (.has-dbp .fe-ct-name).
+    dbp: dbpOpts ? feDbpData(c, dbpOpts.size, dbpOpts.now, dbpOpts.insert) : null,
+    // The hit shake uses the same stamp scheme as the entrance: the REMAINING time
+    // goes out as a negative delay, so an innerHTML rebuild never rewinds a shake
+    // that is already playing.
+    hit: hitDelay != null,
+    hitDelay: hitDelay != null ? Math.round(hitDelay) : 0,
   };
+}
+
+// The plain HP bar under the portrait. It drew the exact ratio for EVERY combatant,
+// including one whose numbers are hidden — a bar is coarse, but it still answers
+// "how close to dead" for an actor the GM marked secret, and the dial next to it was
+// carefully saying nothing. So the bar now follows the same per-actor mask, and for a
+// masked actor the partial-disclosure setting is what decides: the same value that lets
+// the dial publish its digit count lets the bar publish its ratio, since both are
+// approximations rather than the number.
+function feCtShowHpBar(actor) {
+  if (!feCtSetting(S.COMBAT_TRACKER_SHOW_HP)) return false;
+  // Two bars for one pool. The dynamic battle portrait's bar style already draws the
+  // ratio, with a caption, inside the panel — this one would sit right under it saying
+  // the same thing less precisely, so the panel's own reading wins.
+  if (feCtDbpEnabled() && feCtDbpHpStyle() === "bar") return false;
+  if (!feHpMasked(actor)) return true;
+  return feCtSetting(S.COMBAT_TRACKER_HIDDEN_PARTIAL) === true;
 }
 
 function feCtBtn(action, icon, label) {
@@ -336,15 +359,9 @@ function feCtControlButtons(combat) {
 
 // ── render ──────────────────────────────────────────────────────────────────
 
-let _ctRaf = 0;
-function feCtScheduleRender() {
-  if (_ctRaf) return;
-  _ctRaf = requestAnimationFrame(() => {
-    _ctRaf = 0;
-    feCtRender();
-  });
-}
-
+// The last markup handed to root.innerHTML. feCtRender compares against it and
+// leaves the DOM alone when nothing changed — see there.
+let _ctLastHtml = "";
 /**
  * Remove every trace of the tracker from the screen.
  *
@@ -363,10 +380,14 @@ function feCtScheduleRender() {
  * run here and not just `.remove()` the node.
  */
 function feCtTeardown() {
-  if (_ctRaf) { cancelAnimationFrame(_ctRaf); _ctRaf = 0; }
+  feCtCancelScheduledRender();
   feCtCancelExit();
   feCtCloseContextMenu();
+  // Stop the dynamic battle portrait ticker too — left running after the DOM is
+  // gone it would keep firing a pointless querySelector every frame.
+  feDbpReset();
   document.getElementById(TRACKER_DOM_ID)?.remove();
+  _ctLastHtml = ""; // the root is gone; the next render must rebuild from scratch
 }
 
 // Interval between two neighbours' animations, squeezed so `count` of them finish
@@ -385,6 +406,7 @@ function feCtPrefersReducedMotion() {
 function feCtClearTracker(root) {
   root.classList.remove("fe-ct-active");
   root.innerHTML = "";
+  _ctLastHtml = ""; // the DOM no longer matches the cached markup
 }
 
 function feCtCancelExit() {
@@ -439,6 +461,11 @@ function feCtBeginExit(root) {
   inner.classList.remove("is-entering");
   inner.style.setProperty("--fe-ct-bar-exit-delay", `${portraitsDone}ms`);
   inner.classList.add("is-leaving");
+  // The exit is applied to the DOM directly, so the DOM no longer matches the
+  // cached markup. Without this, a new encounter starting during the exit could
+  // render byte-identical HTML, be skipped as "nothing changed", and leave the
+  // whole tracker wearing is-leaving — i.e. faded out forever.
+  _ctLastHtml = "";
 
   _ctExitTimer = setTimeout(() => {
     _ctExitTimer = 0;
@@ -470,6 +497,13 @@ function feCtRender() {
   root.style.setProperty("--fe-ct-size", `${size}px`);
   root.style.setProperty("--fe-ct-h", `${Math.round(size * aspect)}px`);
   root.style.setProperty("--fe-ct-round", `${round}px`);
+  // The dynamic battle portrait is vertical-aspect only (feCtDbpEnabled).
+  const dbpOn = feCtDbpEnabled();
+  const dbpInsert = dbpOn && feCtDbpInsertLayout();
+  root.classList.toggle("fe-ct-dbp", dbpOn);
+  if (dbpOn) {
+    root.style.setProperty("--fe-dbp-icon", `${Math.max(8, Math.round(size * 0.11))}px`);
+  }
 
   const align = String(feCtSetting(S.COMBAT_TRACKER_ALIGNMENT) || "center");
   root.classList.remove("fe-ct-align-left", "fe-ct-align-center", "fe-ct-align-right");
@@ -526,13 +560,28 @@ function feCtRender() {
     const delay = start - nowMs;
     // The window has to cover the stagger too: the LAST newcomer's delay is
     // (n-1)*stagger, and a re-render before it starts must still emit its class.
-    return feCtPortraitData(c, isActive, canEndTurn, delay > -CT_ENTER_MS ? delay : null);
+    // The baseline for HP-change detection has to be ours (updateActor fires after
+    // the update). Seeding it here means a real hit always has a previous value.
+    if (dbpOn && !feDbpHasHpBaseline(c.id)) {
+      const seed = feCtResolveHp(c.actor);
+      if (seed) feDbpSeedHpBaseline(c.id, seed.value);
+    }
+    return feCtPortraitData(
+      c,
+      isActive,
+      canEndTurn,
+      delay > -CT_ENTER_MS ? delay : null,
+      dbpOn ? { size, now: nowMs, insert: dbpInsert } : null
+    );
   });
   // Drop stamps for combatants that are gone, so a re-added one animates in again.
   const liveIds = new Set(combatants.map((c) => c.id));
   for (const id of [..._ctEnterStart.keys()]) if (!liveIds.has(id)) _ctEnterStart.delete(id);
+  // Same reason for the dynamic portrait's state: a combatant that left must not
+  // keep its old HP baseline, or rejoining would replay a phantom hit against it.
+  feDbpPruneState(liveIds);
 
-  root.innerHTML = feRenderTemplate(CT_TPL_ROOT, {
+  const html = feRenderTemplate(CT_TPL_ROOT, {
     isGM,
     barEntering,
     barDelay: Math.round(barDelay),
@@ -544,18 +593,55 @@ function feCtRender() {
       rollInit: feLocalize("FECT.Ctx.RollInit"),
     },
   });
+
+  /* Rebuild ONLY when the markup actually changed.
+   *
+   * feCtRender runs from every updateActor / updateToken / combat hook, and each
+   * run used to throw the whole strip away and build it again: new <img> elements
+   * (re-decoded, re-HQ-resampled), new text, new compositor layers. Mid-spin that
+   * is a dropped frame, and it is what was left of the "dial stutters" report once
+   * the spin itself had been made continuous — the harness never showed it because
+   * nothing else was updating there.
+   *
+   * The comparison is only meaningful because the dial offsets are NOT in the
+   * markup (feDbpApplyOffsets writes them below); everything else that changes per
+   * frame — entrance delays, the hit delay, floating-number delays — is emitted
+   * only while that animation is actually alive, so a steady tracker renders the
+   * same string every time and the DOM is left completely untouched.
+   */
+  if (html !== _ctLastHtml) {
+    _ctLastHtml = html;
+    root.innerHTML = html;
+    // HQ downscale to the display size (size x size*aspect). These are display-only
+    // images, so the src swap is safe; a cache hit applies synchronously with no
+    // flicker. Only the rebuild can introduce new <img> elements, so this belongs
+    // inside the branch.
+    const hpx = Math.round(size * aspect);
+    root.querySelectorAll(".fe-ct-frame > img").forEach((im) => {
+      const src = im.dataset.feSrc;
+      if (src) feApplyHQPortrait(im, src, size, hpx);
+    });
+  }
   root.classList.add("fe-ct-active");
   root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   root.classList.toggle("fe-ct-paused", combat.active === false);
 
-  // HQ downscale to the display size (size x size*aspect). These are display-only images,
-  // so the src swap is safe; a cache hit applies synchronously with no flicker.
-  const hpx = Math.round(size * aspect);
-  root.querySelectorAll(".fe-ct-frame img").forEach((im) => {
-    const src = im.dataset.feSrc;
-    if (src) feApplyHQPortrait(im, src, size, hpx);
-  });
+  // Every dial's position, written straight into the DOM — a dial this render just
+  // built would otherwise paint one frame at offset 0. The bar style's caption is the
+  // same contract with a different applier: the template emits only the RESTING
+  // reading, so a bar rebuilt mid-animation has to be handed its momentary one here.
+  feDbpApplyInkMetric(root);
+  feDbpApplyOffsets(root, nowMs);
+  feDbpApplyBarRoll(root, nowMs);
+  feDbpApplyShake(root);
+  // Re-attach any running spin to the dials this render just built; waiting for the
+  // next frame would flash the template's value for one frame.
+  feDbpStartTicker();
 }
+
+// core's scheduler is what the dbp module and every hook below go through; this
+// is the one place that closes the loop back to the actual renderer.
+feCtSetRenderer(feCtRender);
 
 // ── interaction ─────────────────────────────────────────────────────────────
 
@@ -773,6 +859,21 @@ function feCtOpenContextMenu(id, x, y) {
     { action: "move-down", icon: "fa-arrow-down", label: feLocalize("FECT.Ctx.MoveDown") },
   );
 
+  // The per-actor "hide the numbers" flag (fe-hp-mask.js) — the same one the status
+  // panel's sheet-header button writes, so this is a second door onto one switch. GM
+  // only, because the whole point of the flag is that the table cannot see through it,
+  // and only where there is an actor to carry it. Deliberately NOT gated on the
+  // tracker's HP settings: the flag also governs the status panel, and a GM who hides
+  // an enemy's numbers means it everywhere.
+  if (isGM && c.actor) {
+    const masked = feHpMasked(c.actor);
+    items.push({
+      action: "toggle-hp-mask",
+      icon: masked ? "fa-hashtag" : "fa-question",
+      label: masked ? feLocalize("FECT.Ctx.RevealHP") : feLocalize("FECT.Ctx.MaskHP"),
+    });
+  }
+
   // Mirrors core's `visible` conditions (combat-tracker.mjs#_getEntryContextOptions):
   // reset only when an initiative is actually set, movement history only when it exists.
   // `clearMovementHistory` is v14-only — v13 combatants have no movement history at all.
@@ -856,6 +957,9 @@ async function feCtHandleContextAction(action, id) {
       }
       case "open-sheet":      c.sheet?.render({ force: true }); break;
       case "adjust-hp":       await feCtOpenHpDialog(c); break;
+      // The flag update fires updateActor, and that hook already reschedules a render
+      // for any actor in the combat — nothing to do here but write it.
+      case "toggle-hp-mask":  await feToggleHpMask(c.actor); break;
       case "set-initiative":  await feCtOpenInitiativeDialog(combat, c); break;
       case "reroll-initiative": await combat.rollInitiative([c.id]); break;
       case "clear-initiative":  await c.update({ initiative: null }); break;
@@ -1075,17 +1179,43 @@ async function feCtRemoveCombatant(c) {
 
 // ── lifecycle ───────────────────────────────────────────────────────────────
 
+// Rerender, and tell the status panel (fe-dx3rd-resource-ui.js) that the answer to
+// "is the tracker showing HP?" may have changed — it stands down while we are
+// (ceDx3rdRuiYieldToTracker, feCtDisplaysHp). A hook rather than an import: the two
+// features are otherwise unrelated, and feRegisterSetting takes exactly one onChange
+// per key, so the tracker cannot simply hand these keys over to the panel.
+const FE_CT_HP_DISPLAY_HOOK = `${MODULE_ID}.combatTrackerHpDisplay`;
+
+function feCtHpDisplayChanged() {
+  feCtScheduleRender();
+  Hooks.callAll(FE_CT_HP_DISPLAY_HOOK);
+}
+
 Hooks.once("init", () => {
-  feRegisterSetting(S.COMBAT_TRACKER_ENABLED, (v) => { if (!v) feCtTeardown(); });
+  feRegisterSetting(S.COMBAT_TRACKER_ENABLED, (v) => {
+    if (!v) feCtTeardown();
+    Hooks.callAll(FE_CT_HP_DISPLAY_HOOK);
+  });
   feRegisterSetting(S.COMBAT_TRACKER_PORTRAIT_SIZE, () => feCtScheduleRender());
-  feRegisterSetting(S.COMBAT_TRACKER_ASPECT, () => feCtScheduleRender());
+  // The aspect is part of feCtDbpEnabled — a square portrait has no status panel,
+  // so switching to one puts the tracker's HP readout away entirely.
+  feRegisterSetting(S.COMBAT_TRACKER_ASPECT, feCtHpDisplayChanged);
   feRegisterSetting(S.COMBAT_TRACKER_ROUNDNESS, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_ALIGNMENT, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_PORTRAIT_IMAGE, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_SHOW_DISPOSITION, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_HIDE_DEFEATED, () => feCtScheduleRender());
-  feRegisterSetting(S.COMBAT_TRACKER_SHOW_HP, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_SHOW_HP, feCtHpDisplayChanged);
+  feRegisterSetting(S.COMBAT_TRACKER_DBP_HP_STYLE, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_HIDDEN_PARTIAL, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT, () => {
+    // HP changes that happened while the panel was off went unobserved, so the
+    // baselines go with it.
+    feDbpReset();
+    feCtHpDisplayChanged();
+  });
 });
 
 Hooks.once("ready", () => {
@@ -1110,8 +1240,22 @@ Hooks.once("ready", () => {
   Hooks.on("updateCombatant", rerender);
   Hooks.on("renderCombatTracker", rerender);
   Hooks.on("canvasReady", rerender);
-  Hooks.on("updateActor", (actor) => { if (feCtCombatHasActor(actor)) feCtScheduleRender(); });
+  Hooks.on("updateActor", (actor) => {
+    feDbpObserveActorHp(actor);
+    if (feCtCombatHasActor(actor)) feCtScheduleRender();
+  });
+  // Updating an unlinked token's actor updates its ActorDelta rather than the
+  // synthetic Actor, so updateActor never fires for it — without this hook those
+  // HP changes are missed entirely.
+  Hooks.on("updateActorDelta", (delta) => {
+    const actor = delta?.parent?.actor ?? delta?.syntheticActor ?? null;
+    if (!actor) return;
+    feDbpObserveActorHp(actor);
+    if (feCtCombatHasActor(actor)) feCtScheduleRender();
+  });
   Hooks.on("updateToken", () => feCtScheduleRender());
+  // Old HP baselines mean nothing once the encounter is gone.
+  Hooks.on("deleteCombat", () => feDbpReset());
 });
 
 export { feCtResolveHp, feCtEnabled, feCtOriginalActive };

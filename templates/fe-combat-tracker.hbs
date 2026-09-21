@@ -14,10 +14,111 @@
           non-scrolling wrapper above carries that border instead. --}}
     <div class="fe-ct-combatants">
       {{#each combatants}}
-      <div class="fe-ct-portrait{{#if active}} is-active{{/if}}{{#if entering}} is-entering{{/if}}{{#if defeated}} is-defeated{{/if}}{{#if hidden}} is-hidden{{/if}}{{#if disposition}} has-disposition{{/if}}"
+      {{!-- The status panel is the same markup in both layouts, only its PLACE
+            differs — inside the frame when it overlays the artwork, after the
+            frame when it is appended below it (the frame clips its overflow, so
+            an appended panel cannot live inside it). Hence one inline partial
+            emitted from two sites rather than two copies of the markup. --}}
+      {{#*inline "feDbpPanel"}}
+          <div class="fe-dbp">
+            <div class="fe-dbp-name">{{name}}</div>
+            {{#if dbp.hp.bar}}
+            {{!-- Bar style (COMBAT_TRACKER_DBP_HP_STYLE = "bar"): the status panel's
+                  own reading, so the tracker can replace that feature outright. The
+                  fill length and colour travel as custom properties; `fill` is false
+                  for a masked actor whose numbers stay shut, and then the track is
+                  drawn EMPTY rather than omitted — a missing bar would be its own
+                  signal, and the caption is already saying "?". --}}
+            <div class="fe-dbp-hpbar"{{#if dbp.hp.roll}} data-dbp-bar-roll="1"{{/if}}>
+              <div class="fe-dbp-bar" style="--fe-dbp-bar-pct:{{dbp.hp.pct}}%;--fe-dbp-bar-color:{{dbp.hp.color}}">
+                {{#if dbp.hp.fill}}<div class="fe-dbp-bar-fill"></div>{{/if}}
+              </div>
+              {{!-- Only `cur` moves, so it is its own text node: feDbpApplyBarRoll
+                    writes that one node per frame while the animation runs. Both values
+                    are the RESTING reading — data-dbp-bar-roll says an animation owns
+                    the element, and the applier (which runs right after every render)
+                    supplies the momentary one. Same contract as the dial: no per-frame
+                    state in the markup, so an unrelated render mid-animation produces
+                    byte-identical HTML and feCtRender skips the rebuild. --}}
+              <div class="fe-dbp-bar-row">
+                <span class="fe-dbp-bar-key">HP</span>
+                <span class="fe-dbp-bar-val"><span class="fe-dbp-bar-cur">{{dbp.hp.cur}}</span>{{dbp.hp.rest}}</span>
+              </div>
+            </div>
+            {{else if dbp.hp}}
+            {{!-- ONE counter: the value drums, a separator drum and the max drums all sit
+                  inside a single bezel, so the whole reading is the same piece of
+                  machinery. --fe-dbp-cells is their total count and is what sizes
+                  the type (styles/fe-combat-tracker.css). --}}
+            <div class="fe-dbp-hp" style="--fe-dbp-cells:{{dbp.hp.cells}}">
+              <span class="fe-dbp-dial{{#if dbp.hp.unknown}} is-unknown{{/if}}"{{#unless dbp.hp.unknown}} data-dbp-dial="1"{{/unless}}>
+                {{#if dbp.hp.unknown}}
+                {{!-- Hidden HP parks every drum on one character — same furniture,
+                      different reading. All "?" by default; with the partial-disclosure
+                      option on, every LEADING ZERO is opened instead
+                      (fe-combat-tracker-dbp.js, feDbpHiddenCells), so the glyph comes
+                      from the data. No data-dbp-dial: there is nothing for the ticker
+                      to roll, and no offsets are written into it. --}}
+                {{#each dbp.hp.glyphs}}
+                <span class="fe-dbp-reel"><span class="fe-dbp-strip"><span>{{this}}</span></span></span>
+                {{/each}}
+                {{else}}
+                {{!-- The rolling drums. --fe-dbp-d (the fractional offset) is NOT
+                      emitted here: feDbpApplyOffsets writes it right after the
+                      rebuild instead, which keeps this markup byte-identical
+                      between renders and lets feCtRender skip the rebuild
+                      entirely. The 11th cell being another 0 hides the seam when a
+                      reel wraps 9.x → 0. --}}
+                {{#each dbp.hp.reels}}
+                <span class="fe-dbp-reel" data-dbp-roll="1"><span class="fe-dbp-strip"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span></span></span>
+                {{/each}}
+                {{/if}}
+                {{!-- The separator. Kept in sync with DBP_SEP in
+                      scripts/fe-combat-tracker-dbp.js, which is what the bar caption
+                      and the ink metric use — a solidus reads as a 7 at this size in
+                      several of the faces this module ships with. --}}
+                <span class="fe-dbp-reel is-glyph"><span class="fe-dbp-strip"><span>·</span></span></span>
+                {{#each dbp.hp.maxCells}}
+                <span class="fe-dbp-reel"><span class="fe-dbp-strip"><span>{{this}}</span></span></span>
+                {{/each}}
+              </span>
+            </div>
+            {{/if}}
+            {{!-- The status row is emitted UNCONDITIONALLY, even with nothing in it.
+                  It used to be gated on `dbp.effects.length`, which meant the very
+                  first condition applied to a combatant INSERTED a row: the card grew
+                  by one icon height mid-combat and the whole strip re-laid out. The
+                  empty row costs one icon height of black (min-height in
+                  styles/fe-combat-tracker.css) and buys a card whose height never
+                  changes. Only the SECOND row still shifts, and two-row cases are
+                  rare enough to leave alone. --}}
+            <div class="fe-dbp-effects">
+              {{#each dbp.effects}}<img class="fe-dbp-eff{{#if status}} is-status{{/if}}" src="{{img}}" alt="" data-tooltip="{{name}}">{{/each}}
+              {{#if dbp.moreTip}}<span class="fe-dbp-more" data-tooltip="{{dbp.moreTip}}">…</span>{{/if}}
+            </div>
+          </div>
+      {{/inline}}
+      <div class="fe-ct-portrait{{#if active}} is-active{{/if}}{{#if entering}} is-entering{{/if}}{{#if defeated}} is-defeated{{/if}}{{#if hidden}} is-hidden{{/if}}{{#if disposition}} has-disposition{{/if}}{{#if dbp}} has-dbp{{#if dbp.insert}} is-dbp-insert{{/if}}{{/if}}{{#if hit}} is-hit{{/if}}"
         data-combatant-id="{{id}}" data-tooltip="{{name}}"
-        style="{{#if entering}}--fe-ct-enter-delay:{{delay}}ms;{{/if}}{{#if disposition}}--fe-ct-disposition:{{disposition}};{{/if}}">
-        <div class="fe-ct-frame"><img src="{{img}}" data-fe-src="{{img}}" alt=""></div>
+        style="{{#if entering}}--fe-ct-enter-delay:{{delay}}ms;{{/if}}{{#if disposition}}--fe-ct-disposition:{{disposition}};{{/if}}{{#if hit}}--fe-dbp-hit-delay:{{hitDelay}}ms;{{/if}}">
+        <div class="fe-ct-frame"><img src="{{img}}" data-fe-src="{{img}}" alt="">
+          {{#if dbp}}
+          {{!-- Overlay layout: the panel goes INSIDE the frame — unlike the name
+                caption and the HP bar, this one WANTS the frame's overflow:hidden
+                to clip it to the rounded corners. --}}
+          {{#unless dbp.insert}}{{> feDbpPanel}}{{/unless}}
+          {{#each dbp.pops}}
+          {{!-- The floating delta always rides on the ARTWORK, in both layouts: the
+                panel clips its own overflow, and in the inserted layout the panel is
+                not even inside the frame. Its progress must survive an innerHTML
+                rebuild, so it travels as remaining time (a negative delay), not as
+                a class. --}}
+          <span class="fe-dbp-pop{{#if heal}} is-heal{{/if}}" style="--fe-dbp-pop-delay:{{delay}}ms">{{text}}</span>
+          {{/each}}
+          {{/if}}
+        </div>
+        {{!-- Inserted layout: appended under the frame, lengthening the card. --}}
+        {{#if dbp.insert}}{{> feDbpPanel}}{{/if}}
         {{!-- The name caption straddles the frame's bottom outline, so it is a SIBLING
               of the frame: the frame's overflow:hidden (which clips the image) would
               otherwise clip it too. --}}

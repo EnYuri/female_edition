@@ -107,18 +107,19 @@ function feMidiItemDetailsAllowed(item) {
 }
 
 /**
- * dnd5e 6 activity cards can carry an empty activity description even when
- * midi's "Show Item Details" is enabled. Restore the parent item's description
- * only into the empty legacy wrapper; populated/suppressed cards are untouched.
+ * Locate the one empty legacy description wrapper this pass may fill, together
+ * with the item whose description belongs in it. Returns null when the card
+ * already has content, is suppressed by midi's own settings, or has no item.
+ * Shared by the sync and async entry points so both agree on eligibility.
  */
-export async function feRestoreMidiItemDescription(message, root) {
+function feFindMidiDescriptionTarget(message, root) {
   try {
-    if (!root?.querySelector) return 0;
+    if (!root?.querySelector) return null;
     const wrapper = root.querySelector(
       ".midi-chat-card .card-header.description.collapsible"
       + " > .details.collapsible-content.card-content > .wrapper",
     );
-    if (!wrapper || wrapper.querySelector("*") || wrapper.textContent?.trim()) return 0;
+    if (!wrapper || wrapper.querySelector("*") || wrapper.textContent?.trim()) return null;
 
     const flags = message?.flags?.["midi-qol"] ?? {};
     const card = wrapper.closest?.(".midi-chat-card");
@@ -126,6 +127,84 @@ export async function feRestoreMidiItemDescription(message, root) {
       ?? flags?.activityUuid?.split?.(".Activity.")?.[0]
       ?? card?.dataset?.itemUuid
       ?? "";
+    if (!itemUuid) return null;
+    return { wrapper, itemUuid };
+  } catch {
+    return null;
+  }
+}
+
+function feFillMidiDescription(wrapper, html) {
+  try {
+    if (!wrapper || typeof html !== "string" || !html.trim()) return 0;
+    wrapper.innerHTML = html;
+    wrapper.dataset.feRestoredItemDescription = "1";
+    return 1;
+  } catch {
+    return 0;
+  }
+}
+
+// enrichHTML is async, so the first restore for an item necessarily lands a tick
+// AFTER the card is on screen — the card grows under the reader. Core rebuilds
+// the whole <li> on every message update (#rerenderMessage → replaceWith), and a
+// midi-qol workflow updates its card ~8 times per roll, so without a cache that
+// growth replayed once per re-render and read as a blinking card. The enriched
+// string depends only on the item, so memoize it and let every later render fill
+// the wrapper SYNCHRONOUSLY, before the element is inserted.
+const FE_MIDI_DESC_CACHE_MAX = 64;
+const feMidiDescriptionCache = new Map();
+
+function feMidiDescriptionCacheGet(uuid) {
+  if (!feMidiDescriptionCache.has(uuid)) return null;
+  // Re-insert to keep the eviction order least-recently-used.
+  const html = feMidiDescriptionCache.get(uuid);
+  feMidiDescriptionCache.delete(uuid);
+  feMidiDescriptionCache.set(uuid, html);
+  return html;
+}
+
+function feMidiDescriptionCacheSet(uuid, html) {
+  feMidiDescriptionCache.delete(uuid);
+  feMidiDescriptionCache.set(uuid, html);
+  while (feMidiDescriptionCache.size > FE_MIDI_DESC_CACHE_MAX) {
+    const oldest = feMidiDescriptionCache.keys().next().value;
+    if (oldest === undefined) break;
+    feMidiDescriptionCache.delete(oldest);
+  }
+}
+
+/**
+ * Synchronous restore for an item whose description was already enriched once in
+ * this session. Safe to call from the render hook, where the element is not yet
+ * connected — filling it there costs no visible reflow at all.
+ */
+export function feRestoreMidiItemDescriptionSync(message, root) {
+  try {
+    const target = feFindMidiDescriptionTarget(message, root);
+    if (!target) return 0;
+    const cached = feMidiDescriptionCacheGet(target.itemUuid);
+    if (cached === null) return 0;
+    return feFillMidiDescription(target.wrapper, cached);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * dnd5e 6 activity cards can carry an empty activity description even when
+ * midi's "Show Item Details" is enabled. Restore the parent item's description
+ * only into the empty legacy wrapper; populated/suppressed cards are untouched.
+ */
+export async function feRestoreMidiItemDescription(message, root) {
+  try {
+    const sync = feRestoreMidiItemDescriptionSync(message, root);
+    if (sync) return sync;
+
+    const target = feFindMidiDescriptionTarget(message, root);
+    if (!target) return 0;
+    const { wrapper, itemUuid } = target;
+
     const item = globalThis.fromUuidSync?.(itemUuid);
     if (!item || !feMidiItemDetailsAllowed(item)) return 0;
     const source = item.system?.description?.value;
@@ -135,14 +214,14 @@ export async function feRestoreMidiItemDescription(message, root) {
       rollData: item.getRollData?.() ?? {},
       secrets: item.isOwner ?? game?.user?.isGM,
     });
+    feMidiDescriptionCacheSet(itemUuid, enriched);
     // A later renderer may have populated or replaced the wrapper while enrichHTML
     // awaited document links. Never overwrite real message content.
     if (!wrapper.isConnected && root.isConnected) return 0;
     if (wrapper.querySelector("*") || wrapper.textContent?.trim()) return 0;
-    wrapper.innerHTML = enriched;
-    wrapper.dataset.feRestoredItemDescription = "1";
-    return 1;
+    return feFillMidiDescription(wrapper, enriched);
   } catch {
     return 0;
   }
 }
+

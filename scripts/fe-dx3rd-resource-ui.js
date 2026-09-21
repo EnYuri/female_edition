@@ -16,7 +16,12 @@ import { feRegisterSetting } from "./fe-settings-data.js";
 import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
+import { feHpMasked, feToggleHpMask } from "./fe-hp-mask.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
+// feCtDisplaysHp only — the tracker family's shared floor, which reads settings and
+// nothing else. Importing the tracker ENTRY here would be a cycle (it fires the hook
+// this module listens on) and would drag the whole strip renderer in with it.
+import { feCtDisplaysHp } from "./fe-combat-tracker-core.js";
 import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
 
 // Markup lives in templates/; preloaded at `init` (fe-template.js).
@@ -34,7 +39,6 @@ const PC_CARDS_PER_ROW    = 5; // horizontal container: new row every 5
 const ENEMY_CARDS_PER_COL = 8; // vertical container: new column every 8
 const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
 const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → RUI에 표시 (토큰 무관)
-const MASK_FLAG        = "maskResourceValues"; // 수치 값을 ??로 숨김
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
 const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 
@@ -46,7 +50,40 @@ function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
-function _ruiEnabled()   { try { return feSetting(S.DX3RD_RUI_ENABLED) === true; } catch { return false; } }
+function _ruiEnabled()   {
+  try {
+    if (feSetting(S.DX3RD_RUI_ENABLED) !== true) return false;
+    return !_yieldsToTracker();
+  } catch { return false; }
+}
+// The battle tracker answers the same question these cards do — "how much HP is left"
+// — and during an encounter it answers it for every combatant at once, so the pinned
+// cards are redundant furniture for exactly as long as the encounter lasts. Default on.
+// feCtDisplaysHp includes the "a combat is on screen" term, so this is a TEMPORARY
+// stand-down: the cards come back by themselves when the combat ends.
+function _yieldsToTracker() {
+  try {
+    if (feSetting(S.DX3RD_RUI_YIELD_TO_TRACKER) === false) return false;
+    return feCtDisplaysHp();
+  } catch { return false; }
+}
+
+// The last answer _yieldsToTracker gave, so the combat hooks below can ignore the ones
+// that change nothing. They fire on every turn and every round — rebuilding all the
+// cards each time would be a full re-sync per turn for a state that flips twice per
+// encounter. null = never asked.
+let _ruiYieldState = null;
+
+function _syncTrackerYield() {
+  if (!_isSupported()) return;
+  const yielding = _yieldsToTracker();
+  if (yielding === _ruiYieldState) return;
+  _ruiYieldState = yielding;
+  feRebuildDx3rdResourceUI();
+  // Already-open sheets do not re-render, so the pin button would linger on a feature
+  // that just stood down — the same cleanup the enable toggle does.
+  if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
+}
 function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
 // Panel visibility, moved from a chat toggle button to a module setting. Defaults to on.
 function _isGlobalOn()   { try { return feSetting(S.DX3RD_RUI_VISIBLE) !== false; } catch { return true; } }
@@ -141,14 +178,14 @@ function _isActorPinned(actor) {
   return !!actor.getFlag(MODULE_ID, SHOW_FLAG);
 }
 
+// The flag is shared with the battle tracker's dynamic portrait — one "hide the
+// numbers" switch per actor, not one per UI. Absent means masked; see fe-hp-mask.js.
 function _isMasked(actor) {
-  return !!actor.getFlag(MODULE_ID, MASK_FLAG);
+  return feHpMasked(actor);
 }
 
 function _toggleActorMask(actor) {
-  if (!actor.isOwner) return;
-  if (_isMasked(actor)) actor.unsetFlag(MODULE_ID, MASK_FLAG);
-  else actor.setFlag(MODULE_ID, MASK_FLAG, true);
+  feToggleHpMask(actor);
 }
 
 // ─── position persistence ──────────────────────────────────────────────────
@@ -712,15 +749,10 @@ function _ruiContextEntry(html, options) {
 Hooks.on("getActorContextOptions",     _ruiContextEntry);
 Hooks.on("getActorContextMenuOptions", _ruiContextEntry);
 
-// New actors start masked. createActor fires on EVERY connected client, so only the
-// creator (who owns it) may write — without that gate, other clients spam
-// "User X lacks permission to update Actor [...]".
-Hooks.on("createActor", (actor, _options, userId) => {
-  if (!_isDx3rd()) return;
-  if (game.user.id !== userId || !actor.isOwner) return;
-  actor.setFlag(MODULE_ID, MASK_FLAG, true)
-    .catch(err => console.warn(feFormat("FE.Diagnostics.Dx3rdResourceUi.warn", { MODULE_ID: MODULE_ID }), err));
-});
+// New actors used to be seeded with the mask flag here (DX3rd only), which is what
+// made "absent" mean "revealed" for everything else. fe-hp-mask.js makes absent mean
+// masked, so there is nothing to write on creation any more — and every system, not
+// just DX3rd, now starts private.
 
 // Canvas token right-click: inject buttons into the Token HUD. There is no core
 // getTokenEntries hook, so renderTokenHUD is the entry point.
@@ -911,10 +943,25 @@ Hooks.on("init", () => {
       if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
     });
   feRegisterSetting(S.DX3RD_RUI_VISIBLE, _refreshVisibility);
+  feRegisterSetting(S.DX3RD_RUI_YIELD_TO_TRACKER, _syncTrackerYield);
   feRegisterSetting(S.DX3RD_RUI_PORTRAIT_WIDTH, feRebuildDx3rdResourceUI);
   feRegisterSetting(S.DX3RD_RUI_PANEL_WIDTH, feRebuildDx3rdResourceUI);
   feRegisterSetting(S.DX3RD_RUI_CARD_HEIGHT, feRebuildDx3rdResourceUI);
 });
+
+// The tracker fires this whenever one of the settings feCtDisplaysHp reads changes.
+// It cannot be a feRegisterSetting onChange on our side: those keys already have one
+// (the tracker's), and a setting gets exactly one.
+Hooks.on(`${MODULE_ID}.combatTrackerHpDisplay`, _syncTrackerYield);
+
+// The other half of feCtDisplaysHp is "a combat is on screen", so the stand-down has to
+// follow the encounter's whole life. These are the same hooks the tracker itself
+// rerenders on, minus the ones that cannot change whether turns exist; _syncTrackerYield
+// throws away the ones that change nothing, which is nearly all of them.
+for (const hook of ["createCombat", "deleteCombat", "updateCombat",
+  "createCombatant", "deleteCombatant"]) {
+  Hooks.on(hook, _syncTrackerYield);
+}
 
 // ─── Foundry hooks ─────────────────────────────────────────────────────────
 
