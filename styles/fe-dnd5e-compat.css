@@ -2,34 +2,46 @@
  * fe-dnd5e-compat.css
  * female_edition — dnd5e readability fixes under dark backgrounds
  *
- * 활성화: 채팅 카드 가독성은 body.fe-retro-theme.fe-retro-system-dnd5e 전용(레트로만 카드 배경을 검정으로
- *         강제). HP 미터 입력칸 투명화도 body.fe-retro-theme 전용.
+ * Enabled by: chat-card readability applies only under
+ *         body.fe-retro-theme.fe-retro-system-dnd5e (only retro forces card
+ *         backgrounds black). The HP-meter input transparency is likewise
+ *         body.fe-retro-theme only.
  *
- * 문제:
- *   dnd5e 채팅 카드(.chat-card / .dnd5e2.chat-card)는 밝은 양피지 배경을
- *   전제로 본문 텍스트에 시스템 잉크색(#191813)과 회색 보조색(#666)을 쓴다.
- *   레트로 테마(또는 검정 유저-컬러 배경)는 카드 배경을 검정으로 강제하므로
- *   그 어두운 잉크가 검정 위에 얹혀 대비 ~0.09 로 사실상 안 보인다
- *   (피쳐/주문 카드의 설명·보조설명·재료 텍스트 등).
+ * Problem:
+ *   dnd5e chat cards (.chat-card / .dnd5e2.chat-card) assume a bright
+ *   parchment background and use the system ink (#191813) plus a grey
+ *   secondary (#666) for body text. The retro theme (or a black user-color
+ *   background) forces card backgrounds black, so that dark ink lands on
+ *   black at ~0.09 contrast — effectively invisible (feature/spell card
+ *   descriptions, subtitles, material text, etc.).
  *
- * 해결:
- *   카드 본문 텍스트를 읽기 가능한 밝은색(#e6e6e6, 헤더 제목과 동일 톤)으로
- *   강제한다. 링크(a)·버튼·인라인 롤은 셀렉터에서 제외해 고유 색을 유지한다.
+ * Fix:
+ *   Force card body text to a readable bright color (#e6e6e6, the same tone
+ *   as the header title). Links (a), buttons and inline rolls are excluded
+ *   from the selectors so they keep their own colors.
  *
- * ⚠️ CASCADE LAYER (필수): module.json 에서
- *      { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" } 로 등록.
- *    dnd5e 시스템 CSS 는 system(8) 레이어에 들어간다. modules(9) 레이어의
- *    !important 는 레이어 역전 규칙상 system 의 !important 에 진다. 현재 dnd5e
- *    잉크색은 !important 가 아니라 일반 상속이지만, 다크테마 변형이 !important 를
- *    걸 가능성에 대비해 fe-dx3rd-compat.css 와 동일하게 layouts(7) 레이어에서
- *    !important 로 확실히 이긴다.
+ * ⚠️ CASCADE LAYER (required): registered in module.json as
+ *      { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" }.
+ *    dnd5e system CSS lands in the system(8) layer. An !important in
+ *    modules(9) loses to a system-layer !important under the layer-reversal
+ *    rule. dnd5e's ink is currently a plain (non-important) inheritance,
+ *    but in case a dark-theme variant ever adds !important, this file wins
+ *    decisively from layouts(7) — same approach as fe-dx3rd-compat.css.
+ *
+ * Tidy scope: every rule matching Tidy 5e sheet DOM moved to
+ *   styles/fe-tidy-retro.css (same layer, registered right after this file).
+ *   Where a selector arm had to keep its exact original specificity on the
+ *   opposite-scope side, the other arm is neutralised as `X:not(*)` — dead,
+ *   by design; do not "clean it up" (see the fe-tidy-retro.css header).
  * ================================================================ */
 
-/* D&D 5e 체크 제어는 네이티브 input과 dnd5e-checkbox 웹 컴포넌트가 공존한다.
-   두 구현 모두 색 변수만 레트로 팔레트로 바꾸고, 컴포넌트가 정한 14px/16px
-   변형과 label/grid 배치는 그대로 보존한다. */
+/* D&D 5e check controls mix native inputs and the dnd5e-checkbox web
+   component. Both implementations only get their color variables switched
+   to the retro palette — the component-defined 14px/16px variants and the
+   label/grid layout stay untouched. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
+  :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*))
   input[type="checkbox"] {
   --checkbox-background-color: rgb(0 0 0 / 0.42) !important;
   --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -37,7 +49,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
+  :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*))
   dnd5e-checkbox {
   --checkbox-border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.68) !important;
   --checkbox-empty-color: rgb(0 0 0 / 0.42) !important;
@@ -45,7 +57,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
+  :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*))
   :is(input[type="checkbox"], dnd5e-checkbox):is(:disabled, [disabled]) {
   --checkbox-background-color: rgb(0 0 0 / 0.22) !important;
   --checkbox-checked-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
@@ -53,11 +65,13 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   --checkbox-empty-color: rgb(0 0 0 / 0.22) !important;
 }
 
-/* 여성 에디션 상태 UI가 D&D5e/Tidy5e 액터 시트 헤더에 주입하는 버튼.
-   원래 DX3rd 호환 파일에 섞여 있어 다른 시스템에서도 무조건 적용됐다.
-   여기서는 D&D5e 표식 아래에만 유지해, 좁은 헤더에서 세로로 넘치지 않게 한다. */
+/* Buttons female_edition's status UI injects into D&D5e/Tidy5e actor-sheet
+   headers. They used to live in the DX3rd compat file, applying to every
+   system unconditionally. They are kept under the D&D5e marker here so the
+   narrow headers do not overflow vertically. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor)
+  :is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor:not(*))
   .window-header
   .fedr-sheet-btn {
   align-items: center !important;
@@ -103,7 +117,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor)
+  :is(.dnd5e2.application.sheet.actor, .tidy5e-sheet.application.actor:not(*))
   .window-header
   .fedr-sheet-btn
   i {
@@ -113,17 +127,20 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 /* ----------------------------------------------------------------
- * 레트로 채팅 표면 — 과거에는 fe-dx3rd-compat.css의 범용 선택자가 이
- * 역할까지 겸했다. 이 규칙을 dnd5e 범위에 명시하면 DX3rd의 카드/메시지
- * 규칙이 D&D 채팅에 우연히 영향을 주는 의존을 제거할 수 있다.
+ * Retro chat surfaces — this role used to be covered incidentally by
+ * fe-dx3rd-compat.css's generic selectors. Declaring the rule explicitly
+ * under dnd5e scope removes the dependency where DX3rd's card/message
+ * rules could accidentally affect D&D chat.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background: #000000 !important;
   background-image: none !important;
-  /* 유저 색상 없는(= 마스터 내레이션/NPC) 메시지도 플레이어와 같은 명도·알파를
-     쓴다 — 경위는 fe-dx3rd-compat.css §14 헤더 주석 참조. */
+  /* User-color-less (= master narration/NPC) messages use the same
+     lightness/alpha as players — see the fe-dx3rd-compat.css §14 header
+     comment for the rationale. */
   border-color: var(--fe-ac-90) !important;
   color: var(--fe-ac-90, #e6e6e6) !important;
 }
@@ -176,27 +193,35 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
-/* 카드 컨테이너 기준색 — 명시적 색이 없는 모든 자손 텍스트가 상속받는 안전망.
- * 레트로 테마일 때만 적용한다: 카드 배경을 검정으로 강제하는 건 fe-retro-theme
- * 뿐이다(.chat-card{background:#000}). fe-userbg-base-black 은 메시지(li) 틴트의
- * 하부 베이스일 뿐 카드 배경을 어둡게 하지 않으므로, 그 스코프로 글씨를 밝게 하면
- * 레트로 OFF 시 "밝은 카드 위 밝은 글씨"로 사라진다. */
+/* Card-container base color — the safety net inherited by every descendant
+ * text with no explicit color. Retro theme only: forcing the card
+ * background black is exclusively fe-retro-theme's act
+ * (.chat-card{background:#000}). fe-userbg-base-black is only the
+ * underlying base of the message (li) tint — it does not darken the card
+ * itself — so brightening text under that scope would produce "bright
+ * text on a bright card" and vanish when retro is OFF. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card {
   color: var(--fe-ac-90) !important;
 }
 
-/* dnd5e 가 어두운 잉크/회색을 "직접" 지정하는 본문 요소들을 덮어쓴다.
- * a / button / .inline-roll / [data-action] 등 상호작용·색상 요소는 제외.
+/* Overrides the body elements dnd5e gives its dark ink/grey "directly".
+ * Interactive/colored elements — a / button / .inline-roll / [data-action]
+ * — are excluded.
  *
- * 조상 목록에 로그(.chat-log / #fe-chat-export-log)를 반드시 포함할 것: 아카이브 셸은
- * #fe-chat-export-sidebar / #fe-chat-export-chat 이라 `#sidebar #chat` 으로는 닿지 않는다.
- * 위 컨테이너 규칙은 fe-chat-archive.css 가 .chat-card 에 색을 직접 걸어 우연히 메워주지만,
- * 이 규칙의 대상은 자기 color 를 "직접" 가진 자손들이라 상속으로는 구제되지 않는다 →
- * 닿지 못하면 아카이브에서 검정 카드 위에 dnd5e 의 어두운 잉크가 남아 글자가 사라진다.
- * `#sidebar #chat` 을 :is() 안에 남겨 특이도를 (2,0,0) 으로 고정한다(:is() 는 인자 중
- * 최댓값을 취하므로 라이브 캐스케이드는 그대로다). */
+ * The ancestor list MUST include a log (.chat-log / #fe-chat-export-log):
+ * the archive shell is #fe-chat-export-sidebar / #fe-chat-export-chat, so
+ * `#sidebar #chat` cannot reach it. The container rule above is
+ * coincidentally filled in by fe-chat-archive.css painting .chat-card
+ * directly, but this rule's targets are descendants with a "direct" color
+ * of their own — inheritance cannot rescue them → if it misses, the dark
+ * dnd5e ink survives on black cards in the archive and the text vanishes.
+ * `#sidebar #chat` is kept inside :is() to pin specificity at (2,0,0)
+ * (:is() takes the max of its arguments, so the live cascade is
+ * unchanged). */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card
@@ -207,35 +232,39 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   color: var(--fe-ac-90) !important;
 }
 
-
 /* ----------------------------------------------------------------
- * body.theme-light 아래 dnd5e 앱 전체의 텍스트 토큰 (MUST keep)
+ * dnd5e app-wide text tokens under body.theme-light (MUST keep)
  *
- * dnd5e 는 라이트 팔레트를 `body.theme-light .dnd5e2 { … }` 로 걸면서
- * 코어 텍스트 토큰(--color-text-primary 등)을 ".dnd5e2 자기 자신에" 선언한다
- * (dnd5e.css:413-418, 5.3.3 기준). 우리 레트로 리맵은 같은 토큰을
- * fe-dx3rd-compat.css 의 `body.fe-retro-theme { … !important }` 에 선언한다.
+ * dnd5e hangs its light palette on `body.theme-light .dnd5e2 { … }` while
+ * declaring the core text tokens (--color-text-primary etc.) ".dnd5e2
+ * itself" (dnd5e.css:413-418, as of 5.3.3). Our retro remap declares the
+ * same tokens on `body.fe-retro-theme { … !important }` in
+ * fe-dx3rd-compat.css.
  *
- * ⚠️ 커스텀 프로퍼티는 "가장 가까운 선언 요소"가 이긴다 — 서로 다른 요소라
- *    !important 도 특이도도 개입하지 못한다. 즉 <body> 에 건 리맵은 .dnd5e2
- *    안쪽으로 절대 도달하지 못하고, dnd5e.css 에서 `color: var(--color-text-primary)`
- *    로 칠하는 46개 규칙이 전부 어두운 잉크로 남는다. 레트로는 표면을 검정으로
- *    강제하므로 결과는 "검정 위 검정".
+ * ⚠️ For custom properties, "the nearest declaring element" wins — with
+ *    different elements, neither !important nor specificity can intervene.
+ *    A remap on <body> can never reach inside .dnd5e2, so all 46 dnd5e.css
+ *    rules painting `color: var(--color-text-primary)` stay dark ink.
+ *    Retro forces surfaces black → "black on black".
  *
- * 조건: Foundry UI 테마가 light 로 해석될 때만 발생한다(core.uiConfig
- * colorScheme = light, 또는 기본값 "" + OS 라이트 모드 → game.mjs:1850-1855).
- * theme-dark 에서는 dnd5e 가 --dnd5e-color-blue-white(밝은색)를 넣어 무해하다.
+ * Condition: only occurs when the Foundry UI theme resolves to light
+ * (core.uiConfig colorScheme = light, or default "" + OS light mode →
+ * game.mjs:1850-1855). Under theme-dark dnd5e inserts
+ * --dnd5e-color-blue-white (bright), which is harmless.
  *
- * 기존 커버리지는 .dnd5e2.application.sheet.actor.standard-form 하나뿐이라
- * 아이템/액티비티/어드밴스먼트 시트·컴펜디움 브라우저·dialog-lg·휴식/굴림설정/
- * 특성선택/화폐관리 다이얼로그·롤테이블 시트가 전부 빠져 있었다.
- *   → 토큰을 ".dnd5e2 자신"에 다시 선언해 dnd5e 의 선언 지점과 같은 높이로 맞춘다.
- *      액터 시트 블록(아래 §Quadrone/standard-form)은 특이도가 더 높아 그대로 이긴다.
+ * Previous coverage was a single
+ * .dnd5e2.application.sheet.actor.standard-form — item/activity/
+ * advancement sheets, the compendium browser, dialog-lg, rest/roll-config/
+ * trait-choice/currency dialogs and roll-table sheets were all missed.
+ *   → re-declare the tokens ".dnd5e2 itself", level with dnd5e's own
+ *      declaration point. The actor-sheet block (§ Quadrone/standard-form
+ *      below) is more specific and still wins.
  *
- * theme-dark 를 굳이 배제하지 않는 이유: 이 값들은 레트로 검정 표면 기준으로
- * 고른 톤이라 다크 테마에서도 동일하게 맞는다. 테마 클래스에 의존하지 않는 편이
- * 코어 colorScheme 이 바뀌어도 깨지지 않는다.
+ * Why theme-dark is not excluded deliberately: these tones were picked
+ * against the retro black surface and fit the dark theme identically.
+ * Staying theme-class-agnostic survives any core colorScheme change.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
   --color-text-emphatic: var(--fe-ac-90) !important;
   --color-text-primary: var(--fe-ac-90) !important;
@@ -256,9 +285,11 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
   --pill-empty-text-color: var(--fe-ac-57) !important;
 }
 
-/* dnd5e 가 --icon-fill 을 .dnd5e2 가 아니라 "자손"에 다시 선언하는 세 지점
-   (dnd5e.css:517/520/538). 위 루트 블록은 더 가까운 이 선언들을 이길 수 없으므로
-   같은 요소를 직접 잡아야 한다. */
+/* The three places where dnd5e re-declares --icon-fill not on .dnd5e2 but
+   on its "descendants" (dnd5e.css:517/520/538). The root block above
+   cannot beat these nearer declarations, so the same elements are
+   targeted directly. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   .dnd5e2 :is(.items-section .item-name, .items-section .item .tags),
 body.fe-retro-theme.fe-retro-system-dnd5e
@@ -266,42 +297,49 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   --icon-fill: var(--fe-ac-90) !important;
 }
 
-
 /* ----------------------------------------------------------------
- * 캐릭터 시트 HP/리소스 미터 위에 겹쳐진 입력칸
+ * Input fields overlaid on character-sheet HP/resource meters
  *
- * dnd5e/Tidy5e 시트는 HP·리소스 값 입력칸(input.resource-value 등)을
- * 체력바(.bar, 초록 등) "위에" 겹쳐 배치한다(absolute 바 + relative 입력칸).
- * 레트로 테마는 모든 input 배경을 검정으로 강제하므로, 이 입력칸의 검정
- * 배경이 뒤의 색깔 바를 완전히 가린다(초록 체력바가 안 보임).
- *   → 미터 오버레이 입력칸만 배경을 투명화해 바가 비치게 하고, 숫자는
- *      어두운 텍스트섀도로 어느 바 색 위에서도 읽히게 한다.
- *      (레트로의 전역 text-shadow:none 을 이 요소에서만 되살린다.)
+ * dnd5e/Tidy5e sheets place the HP/resource value inputs
+ * (input.resource-value etc.) ON TOP of the health bar (.bar, green etc.)
+ * (absolute bar + relative input). Retro forces every input background
+ * black, so the input's black surface completely hides the colored bar
+ * behind it (green health bar invisible).
+ *   → only meter-overlay inputs go transparent so the bar shows through,
+ *      while the number stays readable on any bar color via a dark
+ *      text-shadow.
+ *      (Retro's global text-shadow:none is revived for this element
+ *      alone.)
  * ---------------------------------------------------------------- */
-body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet)
+
+body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*))
   :is(.portrait-hp, .meter, .progress, .resource) input,
-body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet) input.resource-value {
+body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*)) input.resource-value {
   background: transparent !important;
   text-shadow:
     0 0 2px var(--fe-retro-shadow-strong, #000000),
     0 0 3px var(--fe-retro-shadow-soft, #000000) !important;
 }
 
-
 /* ----------------------------------------------------------------
- * 채팅 굴림 결과값 박스(.dice-total) 가독성
+ * Chat roll-result box (.dice-total) readability
  *
- * dnd5e 의 결과 숫자 박스(.dice-total)는 두 종류다:
- *   · 일반 굴림        → 배경 rgba(0,0,0,0.05) (거의 투명) → 레트로 검정 카드 위
- *                        에서는 사실상 검정 배경.
- *   · 크리티컬/펌블 강조 → 원래는 연녹(rgb 204,215,197)/연적 파스텔.
- * 예전에는 후자만 어두운 글씨(#14130f)로 덮어야 했다. 이제는 모노톤 블록이
- * --dnd5e-color-success-background/-failure-background 를 --fe-ac-22/-06 으로
- * 다시 가리키므로 **두 박스 모두 어두운 면**이다 → 어두운 글씨를 그대로 두면
- * "검정 위 검정"이 된다. 그래서 분기를 없애고 한 가지 밝은 잉크로 통일한다.
- * 크리티컬/펌블의 구분은 면의 명도(22 vs 06)와 테두리가 진다.
- * transition:none — 레트로의 `* { transition: all 1ms }` 가 색/배경 전환을 시작값에
- *   고착시켜 변경이 페인트되지 않는 문제를 회피(채팅 색조 틴트와 동일 원인). */
+ * dnd5e's result-number box (.dice-total) comes in two kinds:
+ *   · normal roll          → background rgba(0,0,0,0.05) (nearly
+ *                            transparent) → effectively black on a retro
+ *                            black card.
+ *   · critical/fumble      → originally pale green (rgb 204,215,197) /
+ *                            pale-red pastel.
+ * Previously only the latter needed a dark-text (#14130f) override. Now
+ * the monotone block re-points --dnd5e-color-success-background/
+ * -failure-background to --fe-ac-22/-06, so BOTH boxes are dark surfaces
+ * → leaving dark text in place gives "black on black". The branch is
+ * gone and a single bright ink unifies both. Critical/fumble stays
+ * distinct via the surface lightness (22 vs 06) and the border.
+ * transition:none — dodges retro's `* { transition: all 1ms }` freezing
+ *   color/background transitions at their start value so the change
+ *   never paints (same cause as the chat tint). */
+
 body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
   :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total,
       .dice-total.critical, .dice-total.fumble,
@@ -310,17 +348,22 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
   transition: none !important;
 }
 
-
 /* ----------------------------------------------------------------
- * 굴림 결과 숫자 줄바꿈 방지 (테마 무관 — 레트로/일반 모두)
+ * Prevent roll-result numbers from wrapping (theme-agnostic — retro AND
+ * normal)
  *
- * dnd5e .dice-total 은 --font-primary(여성판이 CookieRun 으로 remap)+큰 글씨
- * (font-size-28)을 쓰고, 우측에 36px 구분선(::before)+펼침 셰브론(::after)이
- * 가로폭을 잡아먹는다. 포트레이트 주입으로 좁아진 채팅 폭에서 넓은 폰트가
- * 겹치면 "27" 같은 두 자리 결과값이 글자 단위(2 / 7)로 세로 분해된다.
- *   → 결과 숫자는 한 줄로 유지(nowrap). 수식(.dice-formula)은 공백 줄바꿈은
- *     허용하되 글자 단위 분해만 막는다(keep-all). 인라인 롤 결과도 동일.
- * layouts 레이어 !important 로 system 레이어 dnd5e 규칙을 확실히 이긴다. */
+ * dnd5e .dice-total uses --font-primary (remapped to CookieRun by
+ * female_edition) at a large size (font-size-28), while a 36px separator
+ * (::before) and expand chevron (::after) on the right eat its width. On
+ * the chat width narrowed by portrait injection, the wide font collides
+ * and a two-digit result like "27" decomposes vertically per glyph
+ * (2 / 7).
+ *   → the result number stays on one line (nowrap). The formula
+ *     (.dice-formula) may wrap at spaces but never decomposes per glyph
+ *     (keep-all). Inline-roll results get the same.
+ * A layouts-layer !important wins decisively over the system-layer dnd5e
+ * rules. */
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.dice-result .dice-total, .dice-roll .dice-total, .dice-total) {
   white-space: nowrap !important;
@@ -333,6 +376,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * group is centered and the number itself shifts left relative to an adjacent
  * attack total. Take the icon out of line flow and park it immediately before
  * dnd5e's 32px expand-caret compartment. */
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .dice-total
   > dnd5e-icon.midi-damage-type-icon {
@@ -350,6 +394,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * and flex centering shifts their formula/total column up by 1px. Hide only a
  * placeholder whose tooltip-part contains no rendered element; the real dice
  * tooltip lives in the separate `.dice-tooltip-collapser` that follows it. */
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .dice-result
   > .midi-dice-tooltip:not(:has(> .tooltip-part > *)) {
@@ -362,18 +407,21 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * `.dice-result` is a space-around flex column, so equal-height columns still
  * put the totals on different Y coordinates. Normalize visual order without
  * moving DOM or changing the expanded tooltip contents. */
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
   > .dice-formula {
   order: 0 !important;
 }
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
   > :is(.dice-tooltip-collapser, .midi-dice-tooltip) {
   order: 1 !important;
 }
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
@@ -386,6 +434,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
   word-break: keep-all !important;
   overflow-wrap: normal !important;
 }
+
 :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .chat-message a.inline-roll {
   white-space: nowrap !important;
@@ -393,18 +442,21 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
   overflow-wrap: normal !important;
 }
 
-
 /* ----------------------------------------------------------------
- * dnd5e 텍스트 — 강조색(--fe-ac-*) 기반으로 통일
+ * dnd5e text — unified on the accent (--fe-ac-*) base
  *
- * dx3rd 레트로는 텍스트가 강조색 톤인데 dnd5e 는 흰/회색이라 색조 오버라이드가
- * dnd5e 에선 글자에 안 먹는 듯 보였다. dnd5e 시트/채팅의 본문 텍스트를 강조색
- * 파생 톤(--fe-ac-90, 강조색 hue/sat 의 밝은 버전)으로 칠해 dx3rd 와 맞춘다.
- *   제외: Font Awesome 아이콘(아이콘 폰트 글리프), 굴림 결과 박스(.dice-total —
- *   위에서 가독성 기준으로 별도 처리), 콘텐츠 링크 색(.content-link 등 의미색 유지).
- * 강조색 스와치(픽셀 테마 강조색)를 바꾸면 이 텍스트 색도 함께 바뀐다. */
+ * dx3rd retro text is accent-toned while dnd5e's is white/grey, so the
+ * tint override looked like it did nothing to text under dnd5e. dnd5e
+ * sheet/chat body text is painted an accent-derived tone (--fe-ac-90, a
+ * bright variant of the accent's hue/sat) to match dx3rd.
+ *   Excluded: Font Awesome icons (icon-font glyphs), roll-result boxes
+ *   (.dice-total — handled separately above for readability), content-link
+ *   colors (.content-link etc. keep their semantic colors).
+ * Changing the accent swatch (pixel-theme accent) moves this text color
+ * along with it. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
-  :is(.dnd5e, .dnd5e2, .tidy5e-sheet,
+  :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*),
       #sidebar #chat, #chat-notifications, .chat-popout #chat, .chat-message, .chat-card)
   :is(span, div, p, a, button, label, td, th, dt, dd, li, small, em, strong, b,
       h1, h2, h3, h4, h5, h6, .label, .name, .title, .value, .mod,
@@ -413,23 +465,27 @@ body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
   transition: none !important;
 }
 
-
 /* ----------------------------------------------------------------
- * 인라인 롤 d20 아이콘 — 레트로에서 액센트색으로
+ * Inline-roll d20 icon — accent-colored under retro
  *
- * dnd5e 는 인라인 롤의 FA 글리프를 지우고(::before content:unset) 코어의
- * 검정 d20 SVG 를 배경으로 깐다(dnd5e.css:1863, /icons/svg/d20-black.svg).
- * 다크 테마만 --dnd5e-roll-icon-filter:invert(1) 로 뒤집는데, 레트로는
- * 표면을 검정으로 칠하면서도 fe-chat-bg-light(흰 베이스) 브랜치가 살아
- * 있으면 필터가 none 이라 검정-위-검정으로 아이콘이 사라진다.
- *   filter 로는 임의의 강조색을 못 만든다(sepia/hue-rotate 는 정해진 색만
- *   나오고, 채도 0 강조색엔 오히려 색을 입힌다) → 같은 SVG 를 mask 로 씌워
- *   background-color 를 강조색 파생 톤(--fe-ac-90)으로 칠한다. 강조색이
- *   무채색이면 밝은 회색, 채색이면 그 hue 를 따라간다.
- *   filter:none 필수 — fe-chat-bg-dark 브랜치나 dnd5e 다크 테마의 invert(1)
- *   이 남아 있으면 마스크된 강조색까지 반전시킨다.
- *   선택자는 dnd5e 자신의 스코프(:is(.dnd5e, .dnd5e2, .dnd5e2-journal))를
- *   그대로 따라가 채팅·시트·저널 어디든 동일하게 칠한다. */
+ * dnd5e removes the inline roll's FA glyph (::before content:unset) and
+ * lays core's black d20 SVG as a background (dnd5e.css:1863,
+ * /icons/svg/d20-black.svg). Only the dark theme flips it via
+ * --dnd5e-roll-icon-filter:invert(1) — but retro paints surfaces black
+ * while the fe-chat-bg-light (white base) branch can still be alive,
+ * leaving the filter at none → black-on-black, icon gone.
+ *   A filter cannot produce arbitrary accent colors (sepia/hue-rotate
+ *   only yields fixed hues, and it would tint even a 0-saturation
+ *   accent) → the same SVG is applied as a mask and background-color
+ *   paints the accent-derived tone (--fe-ac-90). A neutral accent yields
+ *   bright grey; a chromatic one follows that hue.
+ *   filter:none is required — a leftover invert(1) from the
+ *   fe-chat-bg-dark branch or the dnd5e dark theme would invert the
+ *   masked accent too.
+ *   The selector mirrors dnd5e's own scope (:is(.dnd5e, .dnd5e2,
+ *   .dnd5e2-journal)) so chat, sheets and journals are painted
+ *   identically. */
+
 body.fe-retro-theme
   :is(.dnd5e, .dnd5e2, .dnd5e2-journal)
   :is(a.inline-roll, .roll-link) > i.fa-dice-d20 {
@@ -439,1593 +495,6 @@ body.fe-retro-theme
   filter: none !important;
 }
 
-
-/* ----------------------------------------------------------------
- * Tidy5e 토글/활성·호버 글로우 복원
- *
- * 레트로의 전역 `* { box-shadow: none }` 이 Tidy 의 고양감(inspiration) 토글,
- * 우선권/능력치(block-score) 버튼 등의 "활성/호버 글로우"를 없애, 켜짐 상태가
- * 검정 사각 배경으로만 남아 꺼짐과 구별이 안 된다(비가시).
- *   → 활성/호버 시 검정 배경 대신 강조색 글로우(box-shadow)를 복원한다.
- *   transition:none — 레트로 transition 고착으로 글로우가 페인트 안 되는 문제 회피. */
-body.fe-retro-theme .tidy5e-sheet .inspiration.inspiration-1 :is(label, label i, .checkbox),
-body.fe-retro-theme .tidy5e-sheet :is(
-  .block-score-wrapper button, .block-score button,
-  .inspiration label, .exhaustion, button.transparent-button.rollable, .rollable
-):hover {
-  background: transparent !important;
-  box-shadow:
-    0 0 6px 1px hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 98%) 58% / 0.9),
-    0 0 2px 0 hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 98%) 70% / 0.95)
-    !important;
-  transition: none !important;
-}
-
-
-/* ----------------------------------------------------------------
- * Tidy5e Classic: targeted retro corrections
- *
- * Keep the sheet/window black base from fe-dx3rd-compat.css. Only remove the
- * small per-text/per-icon black boxes and outlines called out on the Tidy
- * actor sheet.
- * ---------------------------------------------------------------- */
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .portrait-hp .resource-container,
-    .portrait-hp .resource-value,
-    .portrait-hp .resource-max,
-    .portrait-hp .hp-overlay-bar,
-    .portrait-hp .hp-overlay-bar *,
-    .portrait-hp .temp-hp,
-    .portrait-hp .temp-hp *,
-    .portrait-hp button.temp-hp,
-    .rest-container,
-    .rest-container *,
-    .resting,
-    .resting *,
-    .short-rest,
-    .long-rest,
-    .hd-row,
-    .hd-row *,
-    .portrait-hd,
-    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
-    .hit-dice-counter,
-    .actor-name input,
-    [data-tidy-sheet-part="actor-name"] input,
-    .xp-tracker input,
-    .xp-tracker .experience,
-    .xp-tracker .experience *,
-    .exp-data input,
-    .exp-input,
-    .initiative-score-container .ability-roll-button,
-    .initiative-score-container .ability-abbr,
-    .initiative-score-container .ability-label-container,
-    .initiative-score-container .modifier,
-    .initiative-score-container .bonus,
-    .skills-list .tidy5e-skill-name,
-    .skills-list .skill-ability,
-    .traits .trait-list,
-    .traits .trait-tag,
-    .traits .trait-tag *,
-    .traits .pill,
-    .traits .pill *,
-    .traits .tag,
-    .traits .tag *,
-    .traits .badge,
-    .traits .badge *,
-    .traits .chip,
-    .traits .chip *,
-    .traits .button-config,
-    .traits .button-config *,
-    .list.traits .list-values,
-    .list.traits .list-values *,
-    .list.traits .trait-item,
-    .list.traits .trait-item *,
-    .list.traits .pills,
-    .list.traits .pills *,
-    .list.traits .button-config,
-    .list.traits .button-config *,
-    .tab.inventory :is(
-      .item-name,
-      .item-name *,
-      .item-summary,
-      .item-summary *,
-      .item-table-column,
-      .item-table-column *,
-      .source-label,
-      .source-custom,
-      .item-quantity,
-      .item-quantity *,
-      .item-uses,
-      .item-uses *,
-      input,
-      label
-    ),
-    .tab.journal .journal-header,
-    .tab.journal .journal-header *
-  ) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .portrait-hp .resource-container,
-    .portrait-hp .resource-value,
-    .portrait-hp .resource-max,
-    .portrait-hp .hp-overlay-bar,
-    .portrait-hp .temp-hp,
-    .rest-container,
-    .resting,
-    .short-rest,
-    .long-rest,
-    .hd-row,
-    .portrait-hd,
-    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
-    .hit-dice-counter,
-    .actor-name input,
-    [data-tidy-sheet-part="actor-name"] input,
-    .xp-tracker input,
-    .exp-data input,
-    .exp-input,
-    .initiative-score-container .ability-roll-button,
-    .skills-list .tidy5e-skill-name,
-    .skills-list .skill-ability,
-    .traits .trait-tag,
-    .traits .pill,
-    .traits .tag,
-    .traits .badge,
-    .traits .chip,
-    .list.traits .pill,
-    .list.traits .tag,
-    .list.traits .badge,
-    .list.traits .chip,
-    .tab.inventory :is(
-      .item-name,
-      .item-summary,
-      .item-table-column,
-      .source-label,
-      .source-custom,
-      .item-quantity,
-      .item-uses,
-      input,
-      label
-    ),
-    .tab.journal .journal-header
-  ):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  .tab.features :is(.item-name, .item-name *, .item-summary, .item-summary *) {
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  .tab.features :is(.item-name, .item-summary):is(:hover, :focus, :focus-visible, :active) {
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .block-score,
-    .block-score *,
-    .ability-score,
-    .ability-score *,
-    .ability-scores :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
-    .abilities :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
-    .attributes :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
-    .ac-container :is(.ac-value, .ac-label),
-    .ac-display :is(.ac-value, .ac-label),
-    .ability-labels :is(.label, .divider),
-    .ability .ability-label-container,
-    .ability .ability-label-container *,
-    .ability .ability-abbr
-  ) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.ac-container .shield, .ac-display .ac-shield) {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .block-score,
-    .ability-score,
-    .ability-scores :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
-    .attributes :is(.score, .value, .mod, .bonus, .label, label, .title, .name),
-    .ac-container :is(.ac-value, .ac-label),
-    .ac-display :is(.ac-value, .ac-label),
-    .ability .ability-label-container,
-    .ability .ability-abbr
-  ):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .inspiration,
-    .inspiration *,
-    .inspiration.inspiration-1,
-    .inspiration.inspiration-1 *,
-    .inspiration-icon,
-    .inspiration-icon.animate,
-    .exhaustion,
-    .exhaustion *,
-    .exhaustion-container,
-    .exhaustion-container *,
-    .exhaustion-wrap,
-    .exhaustion-wrap *,
-    .exhaustion-icon,
-    .exhaustion-level-option,
-    .level-display
-  ) {
-  animation: none !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  .window-header .header-sheet-edit-mode-toggle {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  outline: none !important;
-  overflow: visible !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  .window-header .header-sheet-edit-mode-toggle :is(input, label, i, svg) {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs)
-  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"]) {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  color: #000000 !important;
-  box-shadow: none !important;
-}
-
-/* Measured Tidy5e Classic controls: these inherit the global retro button
- * background, but Tidy already supplies the visual structure behind them. */
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    button.transparent-button,
-    button.transparent-inline,
-    button.transparent-inline-icon,
-    button.inline-icon-button,
-    button.inline-transparent-button,
-    button.button-menu-opener,
-    a.config-button.icon-button,
-    .config-button.attribute-value,
-    .current-hd,
-    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
-    .initiative-container .block-score-wrapper > button,
-    .initiative-container :is(.block-title, .ini-score),
-    .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
-    .portrait-hd .current-hd,
-    .profile-temp button,
-    .configure-creature-type
-  ) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    button.transparent-button,
-    button.transparent-inline,
-    button.transparent-inline-icon,
-    button.inline-icon-button,
-    button.inline-transparent-button,
-    button.button-menu-opener,
-    a.config-button.icon-button,
-    .config-button.attribute-value,
-    .current-hd,
-    .portrait-hd :is(button, a, label, span, i, svg, .current-hd, .hit-dice-counter),
-    .initiative-container .block-score-wrapper > button,
-    .ability-score-container :is(.ability-mod, .ability-save, .proficiency-toggle, .config-button),
-    .portrait-hd .current-hd,
-    .profile-temp button,
-    .configure-creature-type
-  ):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  button:is(
-    .transparent-button,
-    .transparent-inline,
-    .transparent-inline-icon,
-    .inline-icon-button,
-    .inline-transparent-button,
-    .button-menu-opener,
-    .config-button,
-    .ability-mod,
-    .ability-save,
-    .proficiency-toggle
-  ):not([disabled]):not(.window-header button),
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  a:is(.config-button, .icon-button):not(.window-header a),
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    .current-hd,
-    .portrait-hd,
-    .portrait-hd button,
-    .portrait-hd a,
-    .portrait-hd label,
-    .portrait-hd span,
-    .portrait-hd i,
-    .portrait-hd svg,
-    .initiative-container .block-score-wrapper > button,
-    .configure-creature-type
-  ) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    button.transparent-button,
-    button.transparent-inline,
-    button.transparent-inline-icon,
-    button.inline-icon-button,
-    button.inline-transparent-button,
-    button.button-menu-opener,
-    button.config-button,
-    button.ability-mod,
-    button.ability-save,
-    button.proficiency-toggle,
-    a.config-button,
-    a.icon-button
-  ):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .actor-stats
-  .vertical-line-separator {
-  background-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.32) !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.skills-list, .traits-list, .trait-list, .proficiency-list, .proficiencies-list) {
-  background: transparent !important;
-  border: 1px solid var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .traits,
-    .list.traits,
-    .trait-list,
-    .traits-list,
-    .proficiency-list,
-    .proficiencies-list,
-    [data-tidy-sheet-part*="trait"],
-    [data-tidy-sheet-part*="proficien"]
-  )
-  :is(.tag, .value, .pill, .trait-tag, .trait-item, .list-value, span, button, a, i, svg) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .traits,
-    .list.traits,
-    .trait-list,
-    .traits-list,
-    .proficiency-list,
-    .proficiencies-list,
-    [data-tidy-sheet-part*="trait"],
-    [data-tidy-sheet-part*="proficien"]
-  )
-  :is(button, a):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
-  border: 1px solid var(--fe-tidy-rule-faint, rgba(255, 255, 255, 0.09)) !important;
-  outline: none !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"]) {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  outline: none !important;
-  box-shadow: 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) inset !important;
-}
-
-/* ----------------------------------------------------------------
- * Tidy5e Classic: monochrome retro surface pass
- *
- * Keep the global black sheet base. Use neutral near-black surfaces for
- * hierarchy, accent-tinted hairlines for structure, and reserve full accent
- * fill for selected/active controls. This keeps accent override meaningful
- * without recoloring every text box.
- * ---------------------------------------------------------------- */
-body.fe-retro-theme .tidy5e-sheet.application {
-  --fe-tidy-mono-bg: #000000;
-  --fe-tidy-mono-surface: hsl(
-    var(--fe-dx3rd-accent-h, 0deg)
-    calc(var(--fe-dx3rd-accent-s, 0%) * 0.10)
-    5%
-  );
-  --fe-tidy-mono-surface-2: hsl(
-    var(--fe-dx3rd-accent-h, 0deg)
-    calc(var(--fe-dx3rd-accent-s, 0%) * 0.12)
-    8%
-  );
-  --fe-tidy-mono-hover: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08);
-  --fe-tidy-mono-line-soft: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16);
-  --fe-tidy-mono-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.30);
-  --fe-tidy-mono-line-strong: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55);
-  --fe-tidy-rule-faint: rgba(255, 255, 255, 0.09);
-  --fe-tidy-rule: rgba(255, 255, 255, 0.16);
-  --fe-tidy-rule-strong: rgba(255, 255, 255, 0.26);
-  --fe-tidy-mono-text: var(--fe-ac-90, rgba(230, 230, 230, 0.9));
-  --fe-tidy-mono-muted: var(--fe-ac-57, rgba(230, 230, 230, 0.58));
-  --fe-tidy-state-fill: rgba(255, 255, 255, 0.15);
-  --fe-tidy-state-fill-strong: rgba(255, 255, 255, 0.22);
-  --fe-tidy-state-fill-hover: rgba(255, 255, 255, 0.26);
-  --fe-tidy-state-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.72);
-  --fe-tidy-state-line-strong: var(--fe-dx3rd-accent, #ffffff);
-  --t5e-prepared-background: var(--fe-tidy-state-fill);
-  --t5e-pact-background: var(--fe-tidy-state-fill);
-  --t5e-atwill-background: var(--fe-tidy-state-fill);
-  --t5e-ritual-only-background: var(--fe-tidy-state-fill);
-  --t5e-innate-background: var(--fe-tidy-state-fill);
-  --t5e-alwaysprepared-background: var(--fe-tidy-state-fill);
-  --t5e-equipped-background: var(--fe-tidy-state-fill);
-  --t5e-prepared-item-grid-tile-outline-color: var(--fe-tidy-state-line);
-  --t5e-prepared-item-grid-tile-accent-color: var(--fe-tidy-state-line);
-  --t5e-equipped-item-grid-tile-outline-color: var(--fe-tidy-state-line);
-  --t5e-equipped-item-grid-tile-accent-color: var(--fe-tidy-state-line);
-  --t5e-pact-outline-color: var(--fe-tidy-state-line);
-  --t5e-pact-accent-color: var(--fe-tidy-state-line);
-  --t5e-atwill-outline-color: var(--fe-tidy-state-line);
-  --t5e-atwill-accent-color: var(--fe-tidy-state-line);
-  --t5e-ritual-only-outline-color: var(--fe-tidy-state-line);
-  --t5e-ritual-only-accent-color: var(--fe-tidy-state-line);
-  --t5e-innate-accent: var(--fe-tidy-state-line);
-  --t5e-alwaysprepared-outline-color: var(--fe-tidy-state-line);
-  --t5e-alwaysprepared-accent-color: var(--fe-tidy-state-line);
-  --t5e-magic-accent-color: var(--fe-tidy-state-line);
-  --t5e-attuned-color: var(--fe-tidy-state-line);
-  /* The sheet's own accent (#ff6400 upstream): spell pips, the focus-visible
-     four-way outline, entity-link hover and the settings-dialog border all
-     resolve through these, so one remap moves the whole accent family. */
-  --t5e-primary-accent-color: var(--fe-tidy-state-line-strong);
-  --t5e-settings-dialog-border-color: var(--fe-tidy-state-line-strong);
-  /* Item/spell icon backplates — parchment #ece9df in tidy's light theme would
-     stay a light tile on the black sheet; the glyph and hover inks flip with
-     it. --t5e-icon-shadow-color is deliberately not remapped: retro's global
-     box-shadow reset already removes the inset shadow it feeds. */
-  --t5e-icon-background: var(--fe-tidy-mono-surface-2);
-  --t5e-icon-font-color: var(--fe-tidy-mono-muted);
-  --t5e-icon-hover-color: var(--fe-ac-90);
-  --t5e-icon-outline-color: var(--fe-tidy-mono-line);
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.tidy5e-sheet-header, .sheet-header, .sheet-body, .tab-body, .tab-container) {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application .tidy5e-sheet-header {
-  background-color: var(--fe-tidy-mono-surface) !important;
-  border-bottom: 1px solid var(--fe-tidy-mono-line-soft) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .items-header,
-    .list-header,
-    .item-list-header,
-    .inventory-header,
-    .spell-level-header,
-    .effects-header,
-    .section-header,
-    .resources-header,
-    .favorites-header,
-    .item-table-header-row
-  ) {
-  background: var(--fe-tidy-mono-surface-2) !important;
-  border-block: 1px solid var(--fe-tidy-mono-line-soft) !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .items-list,
-    .inventory-list,
-    .features-list,
-    .spell-list,
-    .effects-list,
-    .skills-list,
-    .traits-list,
-    .trait-list,
-    .proficiency-list,
-    .proficiencies-list,
-    .item-table
-  ) {
-  border-color: var(--fe-tidy-mono-line) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item,
-    .item-row,
-    .effect,
-    .skill,
-    .trait,
-    .trait-item,
-    .proficiency,
-    .proficiency-item,
-    .item-table-row-container,
-    .item-table-row,
-    .list-row,
-    li
-  ) {
-  border-color: var(--fe-tidy-mono-line-soft) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application .item-table-row-container {
-  background: var(--fe-tidy-mono-surface) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .items-list,
-    .inventory-list,
-    .features-list,
-    .spell-list,
-    .effects-list,
-    .skills-list,
-    .traits-list,
-    .trait-list,
-    .proficiency-list,
-    .proficiencies-list,
-    .item-table
-  )
-  :is(.item, .item-row, .effect, .skill, .trait, .trait-item, .proficiency, .proficiency-item, .item-table-row-container, .item-table-row, .list-row, li):hover {
-  background: var(--fe-tidy-mono-hover) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    button.transparent-button,
-    button.transparent-inline,
-    button.transparent-inline-icon,
-    button.inline-icon-button,
-    button.inline-transparent-button,
-    button.button-menu-opener,
-    button.config-button,
-    button.ability-mod,
-    button.ability-save,
-    button.proficiency-toggle,
-    a.config-button,
-    a.icon-button
-  ):is(:hover, :focus, :focus-visible) {
-  background: var(--fe-tidy-mono-hover) !important;
-  border-color: var(--fe-tidy-mono-line-strong) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    button.transparent-button,
-    button.transparent-inline,
-    button.transparent-inline-icon,
-    button.inline-icon-button,
-    button.inline-transparent-button,
-    button.button-menu-opener,
-    button.config-button,
-    button.ability-mod,
-    button.ability-save,
-    button.proficiency-toggle,
-    a.config-button,
-    a.icon-button
-  ):active {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: none !important;
-  color: #000000 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.active, [aria-selected="true"], [aria-pressed="true"], .selected, .is-active)
-  :is(i, svg, span, label, .label, .title, .name) {
-  color: inherit !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.inspiration.inspiration-1, .inspiration.active, .exhaustion.active, .exhaustion.selected) {
-  background: var(--fe-tidy-mono-hover) !important;
-  border-color: var(--fe-tidy-mono-line-strong) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
-  color: var(--fe-dx3rd-accent, #ffffff) !important;
-  filter: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
-  background: transparent !important;
-  border: 1px solid var(--fe-tidy-rule-faint) !important;
-  color: var(--fe-tidy-mono-muted) !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible):not(.active):not([aria-selected="true"]) {
-  background: var(--fe-tidy-mono-hover) !important;
-  border-color: var(--fe-tidy-mono-line-strong) !important;
-  color: var(--fe-tidy-mono-text) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-strong) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  a.tab-option[role="tab"]:is(.active, [aria-selected="true"]) {
-  background: var(--fe-dx3rd-accent, #ffffff) !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  color: #000000 !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.subtle, .hint, .notes, .subtitle, .caption, .metadata, .source-label) {
-  color: var(--fe-tidy-mono-muted) !important;
-}
-
-/* ----------------------------------------------------------------
- * Tidy5e Classic: final form/icon state cleanup
- *
- * The global retro input/button rules are useful for ordinary Foundry dialogs,
- * but Tidy Classic already draws its own compact sheet controls. Inside the
- * actor sheet, leave the black sheet base intact and remove the extra control
- * boxes that sit directly on top of stats, inventory rows, and SVG badges.
- * ---------------------------------------------------------------- */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):is(:hover, :focus, :focus-visible, :active) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-
-/* ----------------------------------------------------------------
- * Tidy5e Classic: exceptions to the blanket input reset above, plus ability
- * block separators.
- *
- * The two rules above make every input/textarea/select on the sheet
- * transparent, so the boxes do not sit on top of stat and inventory rows. The
- * utility toolbar's search field is a standalone field and needs its edge back.
- *
- * The ability score underline is text-decoration, not border-bottom: a border
- * spans the whole 50px cell, the underline must match the glyph width.
- *
- * The modifier / save divider is a ::before background, not a box-shadow.
- * fe-retro-theme.css's global `* { box-shadow: none !important }` and this
- * file's Tidy transparent-button exceptions strip box-shadow in several layers;
- * a pseudo-element background is outside that contest.
- *
- * Do NOT add an opacity rule for .ability-mod / .ability-save here. Tidy's
- * classic.css sets `opacity: 0.4`, but the
- * `.actor-stats .ability-score-container > .ability-modifiers` rule later in
- * this file already restores `opacity: 1 !important` at (0,9,2); anything added
- * here is (0,7,2) and is dead code. */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tab [data-tidy-sheet-part="utility-toolbar"] input.search {
-  border: 1px solid var(--fe-ac-33) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tab [data-tidy-sheet-part="utility-toolbar"] input.search:is(:hover, :focus, :focus-visible, :active) {
-  border-color: var(--fe-ac-57) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats .ability-score-container .block-score > input {
-  text-decoration: underline solid var(--fe-ac-33) from-font !important;
-  text-underline-offset: 2px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .ability-score-container .ability-modifiers {
-  position: relative !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .ability-score-container .ability-modifiers::before {
-  background: var(--fe-ac-33) !important;
-  bottom: 2px !important;
-  content: "" !important;
-  left: 50% !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  top: 2px !important;
-  width: 1px !important;
-}
-
-
-/* ----------------------------------------------------------------
- * Tidy5e Classic: portrait HP bar and rest icon.
- *
- * The HP bar overrides --t5e-hp-bar-color rather than `.bar`'s background:
- * Tidy inlines `--bar-color: var(--t5e-hp-bar-color)` on the element, so
- * redefining the token keeps Tidy's colour path and only drops the alpha
- * (its default #32953299 is 60% opaque and lets the actor art show through).
- *
- * The rest icon backdrop goes on `.resting`, not on `button.rest`. That button
- * slides in on hover and otherwise sits outside `.resting`'s `overflow: hidden`;
- * what is normally visible is `span.resting-icon > i.fa-bed`. Painting the
- * container keeps the box in place in both states. */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-profile-wrap .portrait-hp {
-  --t5e-hp-bar-color: #329532 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-profile-wrap .rest-container .resting {
-  background: rgb(0 0 0 / 0.66) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .encumbrance-bar {
-  background-color: var(--fe-ac-90) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application .tidy-info-card span.key {
-  color: #000 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  overflow: visible !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > :is(button.transparent-button, .block-score, .ability-modifiers, .mod-label) {
-  border-color: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  margin-inline: auto !important;
-  min-height: 1rem !important;
-  outline: none !important;
-  text-shadow: none !important;
-  width: 100% !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  color: var(--fe-tidy-mono-text) !important;
-  padding-block: 1px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .block-score {
-  align-items: center !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  display: flex !important;
-  justify-content: center !important;
-  padding-block: 1px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .block-score
-  input {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers {
-  align-items: center !important;
-  background: transparent !important;
-  display: flex !important;
-  justify-content: center !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers
-  :is(.ability-mod, .ability-save) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  color: var(--fe-tidy-mono-text) !important;
-  min-height: 1rem !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers
-  :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  color: var(--fe-tidy-mono-muted) !important;
-  min-height: 1rem !important;
-  outline: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .mod-label {
-  background: transparent !important;
-  color: var(--fe-tidy-mono-muted) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container:is(:hover, :focus-within) {
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch {
-  align-items: center !important;
-  background: transparent !important;
-  border: 1px solid var(--fe-tidy-rule-strong) !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;
-  display: inline-flex !important;
-  height: 18px !important;
-  justify-content: center !important;
-  outline: none !important;
-  padding: 0 !important;
-  position: relative !important;
-  top: -1px !important;
-  width: 38px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;
-  height: 16px !important;
-  margin: 0 !important;
-  outline: none !important;
-  width: 36px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch:is(:hover, :focus-within) {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
-}
-
-/* Tidy5e Classic: the tab body rule sits BELOW the utility toolbar.
- *
- * Drawing it as `inset 0 1px 0` on `.tidy-tab.active` put the line inside the
- * toolbar's own band, crossing behind the search field and filter labels —
- * `section.utility-toolbar` is the tab body's first child and overlaps its top
- * edge. Moving it to the toolbar's border-bottom only recolours a border Tidy
- * already draws, so nothing shifts.
- *
- * Only 4 of the 7 tabs have a toolbar; effects, biography and journal keep the
- * old top rule via the third rule below. It ties the first rule at (0,7,2) and
- * wins on source order, so reordering them silently flips the result. */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is([data-tab-contents-for], .tidy-tab.active) {
-  border-top-color: transparent !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tab > [data-tidy-sheet-part="utility-toolbar"] {
-  border-bottom: 1px solid var(--fe-tidy-rule) !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tab:not(:has([data-tidy-sheet-part="utility-toolbar"])) {
-  box-shadow: inset 0 1px 0 var(--fe-tidy-rule) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats {
-  border-bottom-color: transparent !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tabs {
-  overflow: visible !important;
-  position: relative !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .tidy-tabs::before {
-  background: var(--fe-tidy-rule) !important;
-  content: "" !important;
-  height: 1px !important;
-  left: 16px !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  right: 16px !important;
-  top: -10px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(.item-table, .tidy-table, .items-list, .inventory-list, .features-list, .spell-list, .effects-list) {
-  border-top-color: transparent !important;
-  border-bottom-color: transparent !important;
-  box-shadow:
-    inset 0 1px 0 var(--fe-tidy-rule),
-    inset 0 -1px 0 var(--fe-tidy-rule-faint) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(.item-table-header-row, .items-header, .list-header, .item-list-header, .spell-level-header, .section-header) {
-  border-top-color: var(--fe-tidy-rule-strong) !important;
-  border-bottom-color: var(--fe-tidy-rule) !important;
-  box-shadow: inset 0 -1px 0 var(--fe-tidy-rule-faint) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(.item-table-row-container, .tidy-table-row, .tidy-table-row-v2, .item-row, .list-row) {
-  border-top-color: transparent !important;
-  box-shadow: inset 0 1px 0 var(--fe-tidy-rule-faint) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .inline-activities-container {
-  box-shadow: inset 0 1px 0 var(--fe-tidy-rule-faint) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  opacity: 1 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button
-  :is(.block-title, h4, span),
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .block-score
-  input,
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers
-  :is(.ability-mod, .ability-save) {
-  opacity: 1 !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers
-  :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item-table-row,
-    .tidy-table-row,
-    .tidy-table-row-v2,
-    .item,
-    .item-row
-  ):is(.equipped, .prepared, .attuned, .magic-item, .active),
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item-table-row.equipped,
-    .item-table-row.prepared,
-    .item-table-row.attuned,
-    .tidy-table-row.equipped,
-    .tidy-table-row.prepared,
-    .tidy-table-row.attuned,
-    .tidy-table-row-v2.equipped,
-    .tidy-table-row-v2.prepared,
-    .tidy-table-row-v2.attuned
-  ) {
-  background-color: transparent !important;
-  background-image:
-    linear-gradient(
-      to right,
-      var(--fe-tidy-state-line) 0 3px,
-      var(--fe-tidy-state-fill-strong) 3px 0.875rem,
-      var(--fe-tidy-state-fill) 0.875rem,
-      rgba(255, 255, 255, 0.04) 58%,
-      rgba(255, 255, 255, 0) 120%
-    ) !important;
-  border-color: var(--fe-tidy-mono-line-strong) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-  filter: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item-table-row,
-    .tidy-table-row,
-    .tidy-table-row-v2,
-    .item,
-    .item-row
-  ):is(.equipped, .prepared, .attuned, .magic-item, .active):hover {
-  background-color: var(--fe-tidy-state-fill) !important;
-  background-image:
-    linear-gradient(
-      to right,
-      var(--fe-tidy-state-line-strong) 0 4px,
-      var(--fe-tidy-state-fill-hover) 4px 1rem,
-      var(--fe-tidy-state-fill-strong) 1rem,
-      rgba(255, 255, 255, 0.07) 62%,
-      rgba(255, 255, 255, 0) 120%
-    ) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item-table-row,
-    .tidy-table-row,
-    .tidy-table-row-v2
-  ):is(
-    .can-prepare.prepared,
-    .can-prepare.always,
-    .method-pact,
-    .method-atwill,
-    .method-ritual,
-    .method-innate,
-    .method-spell.prepared,
-    .equipped,
-    .attuned,
-    .magic-item
-  ) {
-  --t5e-item-table-row-background: var(--fe-tidy-state-fill) !important;
-  --t5e-tidy-table-row-background: var(--fe-tidy-state-fill) !important;
-  background-color: transparent !important;
-  background-image:
-    linear-gradient(
-      to right,
-      var(--fe-tidy-state-line) 0 3px,
-      var(--fe-tidy-state-fill-strong) 3px 0.875rem,
-      var(--fe-tidy-state-fill) 0.875rem,
-      rgba(255, 255, 255, 0.04) 58%,
-      rgba(255, 255, 255, 0) 120%
-    ) !important;
-  border-color: var(--fe-tidy-mono-line-strong) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-  filter: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .item-table-row,
-    .tidy-table-row,
-    .tidy-table-row-v2
-  ):is(
-    .can-prepare.prepared,
-    .can-prepare.always,
-    .method-pact,
-    .method-atwill,
-    .method-ritual,
-    .method-innate,
-    .method-spell.prepared,
-    .equipped,
-    .attuned,
-    .magic-item
-  ):hover {
-  --t5e-item-table-row-background: var(--fe-tidy-state-fill-hover) !important;
-  --t5e-tidy-table-row-background: var(--fe-tidy-state-fill-hover) !important;
-  background-color: var(--fe-tidy-state-fill) !important;
-  background-image:
-    linear-gradient(
-      to right,
-      var(--fe-tidy-state-line-strong) 0 4px,
-      var(--fe-tidy-state-fill-hover) 4px 1rem,
-      var(--fe-tidy-state-fill-strong) 1rem,
-      rgba(255, 255, 255, 0.07) 62%,
-      rgba(255, 255, 255, 0) 120%
-    ) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.items, .spells)
-  :is(.item.equipped, .item.magic-item, .item.attuned) {
-  background: var(--fe-tidy-state-fill) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
-  filter: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.items, .spells)
-  :is(.item.equipped, .item.magic-item, .item.attuned):hover {
-  background: var(--fe-tidy-state-fill-hover) !important;
-  box-shadow: inset 0 0 0 2px var(--fe-tidy-state-line-strong) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.items, .spells)
-  :is(.item.equipped, .item.magic-item, .item.attuned)
-  :is(.item-image, .spell-image, .icon-attuned) {
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-state-line) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.items, .spells)
-  .icon-attuned {
-  background: transparent !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    .item-table-row,
-    .tidy-table-row,
-    .tidy-table-row-v2,
-    .item-table-row-container,
-    .items-list,
-    .inventory-list,
-    .features-list,
-    .spell-list,
-    .effects-list,
-    .items,
-    .spells
-  )
-  :is(
-    .item-controls,
-    .active-effect-controls,
-    .list-controls,
-    .item-table-column,
-    .item-list-button,
-    .item-control,
-    .inline-icon-button,
-    .icon-button,
-    .footer-command,
-    .button-borderless
-  ),
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    .item-controls,
-    .active-effect-controls,
-    .list-controls
-  )
-  :is(button, a, i, svg, span) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  :is(
-    .item-controls,
-    .active-effect-controls,
-    .list-controls
-  )
-  :is(button, a, .item-control, .inline-icon-button, .icon-button):is(:hover, :focus, :focus-visible) {
-  background: var(--fe-tidy-mono-hover) !important;
-  border-color: transparent !important;
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.inspiration, .inspiration.inspiration-1, .exhaustion)
-  :is(label, label i, .checkbox, i, svg):is(:hover, :focus, :focus-visible, :active),
-body.fe-retro-theme .tidy5e-sheet.application
-  .inspiration.inspiration-1 :is(label, label i, .checkbox, i, svg) {
-  animation: none !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
-  outline: none !important;
-  text-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs)
-  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"]),
-body.fe-retro-theme .tidy5e-sheet.application
-  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"]) {
-  background: var(--fe-tidy-mono-hover) !important;
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs)
-  :is(a, .item, button):is(:hover, .active, [aria-selected="true"], [aria-pressed="true"])
-  :is(i, svg, span, label, .label, .title, .name),
-body.fe-retro-theme .tidy5e-sheet.application
-  a.tab-option[role="tab"]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"])
-  :is(i, svg, span, label, .label, .title, .name) {
-  color: var(--fe-tidy-mono-text) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application svg {
-  image-rendering: pixelated !important;
-  shape-rendering: crispEdges !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application svg :is(path, rect, circle, ellipse, line, polyline, polygon, use) {
-  shape-rendering: crispEdges !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application svg image {
-  image-rendering: pixelated !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  img.item-image:not([src$=".svg" i]):not(.actor-image):not([data-edit="img"]) {
-  filter: saturate(0.82) contrast(0.96) !important;
-  image-rendering: auto !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(img.actor-image, img[data-edit="img"], .profile img, .portrait img, .portrait-hp img) {
-  filter: none !important;
-  image-rendering: auto !important;
-}
-
-/* ----------------------------------------------------------------
- * Tidy5e item pop-out cards
- *
- * Tidy attaches info cards flush to the sheet edge. The retro window frame
- * extends 10px outside the sheet, so the card visually collides with the frame.
- * Shift attached cards by 30px: 10px sheet frame + 10px card frame + 10px gap.
- * ---------------------------------------------------------------- */
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card {
-  position: absolute !important;
-  isolation: isolate !important;
-  overflow: visible !important;
-  border: none !important;
-}
-
-/* Keep the outer overflow visible for the pixel frame, but contain content
- * inside the card. Never replace the fixed attached height:
- * .info-card-content must be able to
- * shrink so long descriptions scroll instead of pushing actions past footer.
- * Detached cards fill their own window; they must not be absolutely positioned.
- */
-body.fe-retro-theme .tidy5e-sheet.application.classic.tidy-info-card-application
-  .tidy-info-card {
-  position: relative !important;
-  height: 100%;
-  min-height: 0;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card > .info-card-body {
-  min-width: 0;
-  overflow: auto;
-}
-
-/* Svelte emits command buttons as direct body children, with no button-bar
- * wrapper. Grid keeps the content row shrinkable while commands share rows;
- * flex-wrap would size the description from its full text again.
- */
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card > .info-card-body {
-  display: grid !important;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-auto-rows: auto;
-  align-content: start;
-  gap: 2px;
-  padding: 0 8px 4px;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > :not(button) {
-  grid-column: 1 / -1;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > header {
-  margin-inline: -8px;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > button {
-  grid-column: span 7;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  align-self: start;
-  justify-self: start;
-  gap: 2px;
-  width: fit-content !important;
-  max-width: 100%;
-  min-width: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 1px 2px !important;
-  font-size: 0.75rem !important;
-  line-height: 1.2 !important;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > button:last-of-type:not(.button-icon-only) {
-  grid-column: span 5;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > button.button-icon-only {
-  grid-column: span 1;
-}
-
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  .info-card-content {
-  min-height: 0;
-  min-width: 0;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  .info-card-description {
-  overflow-wrap: anywhere;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card
-  > .info-card-body > :not(.info-card-content),
-body.fe-retro-theme .tidy5e-sheet.application.classic .tidy-info-card > footer {
-  flex-shrink: 0;
-}
-
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card.attached.left {
-  translate: -30px 0 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card.attached.right {
-  translate: 30px 0 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card::before,
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
-  content: "" !important;
-  position: absolute !important;
-  inset: -10px !important;
-  box-sizing: border-box !important;
-  pointer-events: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card::before {
-  z-index: 0 !important;
-  border: 10px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  background: transparent !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
-  z-index: 0 !important;
-  border: 10px solid transparent !important;
-  border-image: url("./assets/pixel-border.png") 10 / 10px / 0 repeat !important;
-  image-rendering: pixelated !important;
-  mix-blend-mode: normal !important;
-  opacity: 1 !important;
-  background: none !important;
-  background-color: transparent !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card > * {
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-
 /* ----------------------------------------------------------------
  * Tidy5e Quadrone + dnd5e standard sheets: accent-monotone retro pass
  *
@@ -2034,9 +503,10 @@ body.fe-retro-theme .tidy5e-sheet .tidy-info-card > * {
  * low-saturation accent-derived monochrome, and remove small black text/icon
  * boxes that obscure the sheet artwork and badges.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme
   :is(
-    .tidy5e-sheet.application.quadrone,
+    .tidy5e-sheet.application.quadrone:not(*),
     .dnd5e2.application.sheet.actor.standard-form,
     .dnd5e2.application.sheet.standard-form:is(.config-sheet, .item)
   ) {
@@ -2067,11 +537,13 @@ body.fe-retro-theme
   color: var(--fe-dnd5e-mono-text) !important;
 }
 
-/* D&D5e는 기본 시트의 하위 컴포넌트마다 dark-theme 색 변수를 다시
-   참조한다. 표면을 개별 선택자로 덮는 대신, 표준 색 토큰을 여기서
-   현재 레트로 액센트로 연결해 두면 아이템/주문/효과 편집 화면에도
-   같은 색조가 전파된다. 시스템 전용 마커로 제한해 다른 시스템의
-   --dnd5e-* 호환 변수와도 충돌하지 않는다. */
+/* D&D5e's default sheet re-references dark-theme color variables per
+   sub-component. Instead of covering surfaces with individual selectors,
+   hooking the standard color tokens to the current retro accent here
+ * propagates the same hue into item/spell/effect edit screens too.
+ * Restricted to the system-specific marker so it cannot collide with
+ * --dnd5e-* compat variables of other systems. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standard-form,
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form:is(.config-sheet, .item) {
   --dnd5e-color-gold: var(--fe-dnd5e-mono-line-strong) !important;
@@ -2105,7 +577,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-for
 
 body.fe-retro-theme
   :is(
-    .tidy5e-sheet.application.quadrone,
+    .tidy5e-sheet.application.quadrone:not(*),
     .dnd5e2.application.sheet.actor.standard-form
   )
   :is(.window-content, .sheet-header, .sheet-body, .main-content, .tab-body) {
@@ -2115,7 +587,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip):not(*),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   :where(.window-content)
@@ -2163,7 +635,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip):not(*),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   :where(.window-content)
@@ -2198,7 +670,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip):not(*),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2221,7 +693,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip):not(*),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2233,7 +705,7 @@ body.fe-retro-theme
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
+    form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip):not(*),
     form.dnd5e2.application.sheet.actor.standard-form
   )
   > .window-header
@@ -2243,18 +715,6 @@ body.fe-retro-theme
   box-shadow: inset 0 0 0 1px var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(
-    .tidy5e-sheet-header,
-    .actor-vitals,
-    .level-container,
-    search,
-    .button-group,
-    .tidy-table-row,
-    .tidy-table-row-v2,
-    .item-table-row,
-    .item-table-row-container
-  ),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(
     .card,
@@ -2273,14 +733,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(
-    .items-header,
-    .tidy-table-header-row,
-    .item-table-header-row,
-    .spell-level-header,
-    .section-header
-  ),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.items-header, .items-header.header, .items-list > .header) {
   background: linear-gradient(
@@ -2294,34 +746,8 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
     inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.divider-dot, .trait-pip, .separator-dot) {
-  background: var(--fe-dnd5e-mono-line-strong) !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.actor-vitals, .actor-vitals-row, .level-container.challenge-rating) {
-  border-color: var(--fe-dnd5e-mono-line-strong) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.ability-bonus-container, .initiative-score-container, .shield) {
-  filter: saturate(0.15) contrast(0.92) brightness(0.88) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.ability-bonus-container, .initiative-score-container, .shield)
-  :is(button, span, label, div) {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-
 body.fe-retro-theme
-  :is(.tidy5e-sheet.application.quadrone, .dnd5e2.application.sheet.actor.standard-form)
+  :is(.tidy5e-sheet.application.quadrone:not(*), .dnd5e2.application.sheet.actor.standard-form)
   :is(.item-table-row, .tidy-table-row, .tidy-table-row-v2, .item, .item-row, .activity-row):hover {
   background: var(--fe-dnd5e-mono-hover) !important;
   box-shadow: inset 0 0 0 1px var(--fe-dnd5e-mono-line-strong) !important;
@@ -2388,9 +814,12 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-/* D&D5e 기본 시트에는 카드 공통 선택자 밖에 남는 상태 표면이 있다.
-   특히 경고 툴팁은 자체 theme-light 클래스로 양피지 배경을 복구하므로,
-   이들은 기본 시트 구조 안에서만 별도로 레트로 팔레트에 맞춘다. */
+/* The D&D5e default sheet still has state surfaces outside the shared
+   card selectors. The warning tooltip in particular restores its
+   parchment background via its own theme-light class — these are matched
+   to the retro palette separately, inside the default-sheet structure
+   only. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standard-form
   :is(.attunement, .encumbrance, fieldset.card > legend) {
   background: var(--fe-dnd5e-mono-surface-2, #141415) !important;
@@ -2400,9 +829,11 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.actor.standa
   color: var(--fe-dnd5e-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
 }
 
-/* --dnd5e-color-parchment 만 남긴다 (dnd5e 5.3.3 에서 30회 참조).
-   --dnd5e-color-parchment-light / --dnd5e-color-ink 은 시스템 CSS 에 참조가
-   0건이라 제거했다 — 되살리기 전에 dnd5e.css 에서 실제 사용을 먼저 확인할 것. */
+/* Only --dnd5e-color-parchment is kept (referenced 30× in dnd5e 5.3.3).
+   --dnd5e-color-parchment-light / --dnd5e-color-ink were removed — the
+   system CSS references them 0 times. Verify actual use in dnd5e.css
+   before restoring either. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(.dnd5e2.application.sheet.actor.standard-form, .dnd5e2.dnd5e-tooltip.theme-light) {
   --dnd5e-color-parchment: #000000 !important;
@@ -2420,20 +851,17 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.dnd5e-tooltip.theme-light :is(
   color: inherit !important;
 }
 
-
 /* ----------------------------------------------------------------
  * dnd5e sheet polish: thin pixel glows, not boxed tab highlights
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme
-  :is(.tidy5e-sheet.application, .dnd5e2.application.sheet.actor.standard-form) {
+  :is(.tidy5e-sheet.application:not(*), .dnd5e2.application.sheet.actor.standard-form) {
   --fe-dnd5e-tab-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.24);
   --fe-dnd5e-tab-line-lit: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.74);
   --fe-dnd5e-tab-glow: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.36);
 }
 
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
-  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.sheet-tabs)
   :is(a.item, a.control, button, [data-tab]) {
@@ -2444,10 +872,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   outline: none !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
-  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle)
-  :is(span, label, i, svg),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.sheet-tabs)
   :is(a.item, a.control, button, [data-tab])
@@ -2455,9 +879,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   border-bottom-color: var(--fe-dnd5e-tab-line) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(nav.tabs, .tabs-row, .sheet-tabs, .tidy-tabs)
-  :is(a, .item, button, [role="tab"], .tab-option):not(.sidebar-toggle):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.sheet-tabs)
   :is(a.item, a.control, button, [data-tab]):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"]) {
@@ -2473,20 +894,14 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
-  .sheet-tabs [data-tab] :is(label, span),
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.tabs-row, .tidy-tabs) :is(a.tab-option, [role="tab"], a, button):not(.sidebar-toggle)
-  :is(span, label) {
+  .sheet-tabs [data-tab] :is(label, span) {
   border-bottom: 1px solid var(--fe-dnd5e-tab-line) !important;
   box-shadow: none !important;
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .sheet-tabs [data-tab]:is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"])
-  :is(label, span),
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(.tabs-row, .tidy-tabs) :is(a.tab-option, [role="tab"], a, button):not(.sidebar-toggle):is(:hover, :focus, :focus-visible, .active, [aria-selected="true"], [aria-pressed="true"])
-  :is(span, label) {
+  :is(label, span) {
   border-bottom-color: var(--fe-dnd5e-tab-line-lit) !important;
   box-shadow:
     0 1px 0 var(--fe-dnd5e-tab-line-lit),
@@ -2500,165 +915,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   filter:
     drop-shadow(1px 0 0 var(--fe-dnd5e-tab-glow))
     drop-shadow(0 1px 0 var(--fe-dnd5e-tab-glow)) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle {
-  align-items: center !important;
-  display: inline-flex !important;
-  height: 18px !important;
-  line-height: 1 !important;
-  margin: 0 !important;
-  padding: 1px !important;
-  width: 38px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch {
-  border: 0 !important;
-  height: 16px !important;
-  min-height: 16px !important;
-  margin: 0 !important;
-  overflow: visible !important;
-  position: relative !important;
-  top: 0 !important;
-  width: 36px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch::after {
-  border: 1px solid var(--fe-tidy-rule-strong) !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;
-  content: "" !important;
-  inset: -1px !important;
-  pointer-events: none !important;
-  position: absolute !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.minimized
-  .window-header
-  .header-sheet-edit-mode-toggle,
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor.minimized
-  .window-header
-  .header-sheet-edit-mode-toggle {
-  display: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch:is(:hover, :focus-within)::after {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch > div {
-  height: 100% !important;
-  width: 100% !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.actor-name, h1.actor-name, [data-tidy-sheet-part="actor-name"]) {
-  font-size: 1.42rem !important;
-  line-height: 1.12 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.actor-name, h1.actor-name, [data-tidy-sheet-part="actor-name"])
-  :is(input, button, span) {
-  font-size: inherit !important;
-  line-height: inherit !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.concentration-bonus, .proficiency-bonus, .initiative-bonus, .ability-label-container) {
-  align-items: center !important;
-  flex-wrap: nowrap !important;
-  gap: 2px !important;
-  min-width: 0 !important;
-  white-space: nowrap !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.concentration, .proficiency-bonus)
-  :is(.label, .modifier, .value, button, span) {
-  font-size: 0.72rem !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .concentration .concentration-roll-button .label {
-  display: inline-block !important;
-  max-width: 5.5rem !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  vertical-align: bottom !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .level-container .proficiency-bonus .label {
-  display: inline-block !important;
-  max-width: 4.75rem !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container {
-  background: transparent !important;
-  box-shadow:
-    inset 0 1px 0 var(--fe-dnd5e-mono-line-faint),
-    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container
-  > :is(button.ability-roll-button, .ability-score, .ability-score-input, .ability-label-container, .config-container) {
-  border-top: 1px solid var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container
-  > :is(button.ability-roll-button, .ability-score):first-child {
-  border-top-color: transparent !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is([data-tab="journal"], .tab.journal, .tab.biography, [data-tab="biography"])
-  :is(hr, .golden-fade, tidy-gold-header-underline, fe-tidy-classic-gold-underline, .horizontal-line-separator, .separator, .faint, .light) {
-  background: var(--fe-dnd5e-mono-line) !important;
-  background-image: none !important;
-  border-color: var(--fe-dnd5e-mono-line) !important;
-  box-shadow: none !important;
-  /* The underline elements paint SVG strokes from --line-color, which
-     background/border cannot reach. */
-  --line-color: var(--fe-dnd5e-mono-line) !important;
-}
-
-/* fe-tidy-classic-gold-underline is the fork's renamed copy of
-   tidy-gold-header-underline (docs/compat.md — renamed so both bundles can
-   define their custom element). The fork also plants it inside <legend>
-   separators of its settings dialogs, outside the journal/biography scope
-   above. */
-body.fe-retro-theme .tidy5e-sheet.application fe-tidy-classic-gold-underline {
-  --line-color: var(--fe-dnd5e-mono-line, rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.26)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is([data-tab="journal"], .tab.journal, .tab.biography, [data-tab="biography"])
-  :is(.editor-rendered-content h3, h1, h2, h3, h4) {
-  border-bottom-color: var(--fe-dnd5e-mono-line) !important;
-  box-shadow: inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
@@ -2776,194 +1032,9 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   color: var(--fe-dnd5e-mono-text) !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  > .window-content {
-  box-sizing: border-box !important;
-  padding-top: 32px !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  > .window-header {
-  background: rgb(0 0 0 / 0.92) !important;
-  box-shadow: inset 0 -1px 0 var(--fe-tidy-rule, var(--fe-dnd5e-tab-line)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  .tidy-info-card
-  .info-card-body
-  > header {
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
-  position: relative !important;
-  z-index: 2 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card
-  :is(
-    button.pin,
-    button.pin-button,
-    button.sticky,
-    button[class*="pin"],
-    a[class*="pin"],
-    [data-action*="pin"],
-    [data-action*="stick"],
-    [aria-label*="Pin"],
-    [aria-label*="pin"],
-    [data-tooltip*="Pin"],
-    [data-tooltip*="pin"]
-  ) {
-  background: transparent !important;
-  background-image: none !important;
-  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-tab-line-lit)) !important;
-  box-shadow: none !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
-  outline: none !important;
-}
-
-/* Late measured fixes: Tidy's classic lock switch thumb is positioned outside
-   the switch body by the upstream component, which makes an otherwise correct
-   outline look misaligned. Draw the frame on the header control and constrain
-   the thumb inside that measured frame. */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle {
-  align-items: center !important;
-  background: transparent !important;
-  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-mono-line-strong)) !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;
-  display: inline-flex !important;
-  height: 20px !important;
-  justify-content: center !important;
-  margin: 0 !important;
-  overflow: visible !important;
-  padding: 1px 2px !important;
-  position: relative !important;
-  width: 40px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  height: 16px !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-  padding: 0 !important;
-  position: relative !important;
-  top: 0 !important;
-  width: 34px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch::after {
-  display: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div {
-  background: transparent !important;
-  border: 0 !important;
-  height: 16px !important;
-  overflow: hidden !important;
-  position: relative !important;
-  width: 34px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div[aria-checked="true"] {
-  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div::before {
-  background: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-  box-shadow: inset 0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.55)) !important;
-  bottom: auto !important;
-  height: 14px !important;
-  left: 1px !important;
-  right: auto !important;
-  top: 1px !important;
-  width: 14px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div[aria-checked="true"]::before {
-  background: var(--fe-tidy-mono-text, var(--fe-ac-90, #f0f0f0)) !important;
-  box-shadow:
-    inset 0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
-    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.42) !important;
-  left: 19px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  .thumb-icon {
-  align-items: center !important;
-  background: transparent !important;
-  border: 0 !important;
-  bottom: auto !important;
-  color: #050505 !important;
-  display: flex !important;
-  font-size: 9px !important;
-  height: 14px !important;
-  justify-content: center !important;
-  left: 1px !important;
-  line-height: 1 !important;
-  position: absolute !important;
-  right: auto !important;
-  top: 1px !important;
-  transform: none !important;
-  width: 14px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  .thumb-icon
-  :is(i, svg) {
-  color: #050505 !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div[aria-checked="true"]
-  .thumb-icon {
-  left: 19px !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle:is(:hover, :focus-within) {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  box-shadow: 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.30) !important;
-}
-
 /* dnd5e standard sheet AC: keep the useful box, but make it monotone and
    align it to the HP block instead of leaving a floating bare number. */
+
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .sheet-header
   .vitals
@@ -3037,6 +1108,7 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
 
 /* The separated right-side tab rail needs a real hit target, not icon-width
    buttons inside a filled panel. */
+
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   nav.tabs.tabs-right {
   align-items: center !important;
@@ -3070,43 +1142,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   justify-content: center !important;
   min-width: 30px !important;
   width: 30px !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  > .window-content {
-  padding-top: 0 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  > .window-header {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  > .window-header
-  :is(button, a, .header-control, .header-button) {
-  background: transparent !important;
-  border: 1px solid var(--fe-tidy-rule-strong, var(--fe-dnd5e-tab-line-lit)) !important;
-  box-shadow: none !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  .tidy-info-card
-  .info-card-body
-  > header,
-body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
-  .tidy-info-card
-  :is(.info-card-header, .info-card-title, .info-card-name, .card-header, h1, h2, h3, h4):first-child {
-  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.18) !important;
-  border: 0 !important;
-  border-bottom: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.42) !important;
-  box-shadow:
-    inset 0 -1px 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
-    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12) !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90)) !important;
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
@@ -3193,137 +1228,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   color: var(--fe-dnd5e-mono-text, #ffffff) !important;
 }
 
-/* ----------------------------------------------------------------
- * Retro sheet cleanup: late cascade fixes for icon contrast, tooltip
- * nameplates, and spell/preparation state colors.
- * ---------------------------------------------------------------- */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  .thumb-icon,
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  .thumb-icon
-  :is(i, svg) {
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #f0f0f0)) !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-  text-shadow:
-    1px 0 0 var(--fe-retro-shadow-strong, #000000),
-    -1px 0 0 var(--fe-retro-shadow-strong, #000000),
-    0 1px 0 var(--fe-retro-shadow-strong, #000000),
-    0 -1px 0 var(--fe-retro-shadow-strong, #000000) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div::before,
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch
-  > div[aria-checked="true"]::before {
-  background: #050505 !important;
-  box-shadow:
-    inset 0 0 0 1px var(--fe-tidy-rule-strong, rgb(255 255 255 / 0.34)),
-    0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.74)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
-  mix-blend-mode: normal !important;
-  opacity: 1 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet
-  .tidy-info-card
-  :is(
-    .info-card-body > header,
-    .info-card-header,
-    .info-card-title,
-    .info-card-name,
-    .card-header,
-    .name,
-    .title,
-    h1,
-    h2,
-    h3,
-    h4
-  ):first-child,
-body.fe-retro-theme .tidy5e-sheet
-  .tidy-info-card
-  .info-card-body
-  > header {
-  background:
-    linear-gradient(
-      to right,
-      rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28),
-      rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.12)
-    ) !important;
-  border: 0 !important;
-  border-bottom: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.48) !important;
-  box-shadow:
-    inset 0 -1px 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)),
-    0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-  text-shadow:
-    1px 0 0 var(--fe-retro-shadow-strong, rgb(0 0 0 / 0.82)),
-    0 1px 0 var(--fe-retro-shadow-strong, rgb(0 0 0 / 0.82)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .method-pact,
-    .method-atwill,
-    .method-innate,
-    .method-ritual,
-    .method-spell,
-    .can-prepare,
-    .spell-method,
-    .spell-method-text,
-    [class*="method-"],
-    [class*="prepared"],
-    [style*="--t5e-method-color"],
-    [style*="--t5e-item-color"]
-  ) {
-  --t5e-method-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
-  --t5e-item-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
-  --t5e-accent-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
-  --t5e-color-text-gold: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-  background-color: transparent !important;
-  border-color: var(--fe-tidy-mono-line, rgb(255 255 255 / 0.30)) !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application
-  :is(
-    .spell-method,
-    .spell-method-text,
-    .spell-component,
-    .tag,
-    .pill,
-    .badge,
-    .filter-item
-  ):is(
-    .method-pact,
-    .method-atwill,
-    .method-innate,
-    .method-ritual,
-    .prepared,
-    .active,
-    [aria-pressed="true"],
-    [aria-selected="true"]
-  ) {
-  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
-  border-color: var(--fe-tidy-state-line, var(--fe-dx3rd-accent, #ffffff)) !important;
-  box-shadow: inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22) !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-}
-
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   :is(.tab[data-tab="spells"], .spells-list, .spellcasting.card, .card.spellcasting) {
   --dnd5e-color-gold: var(--fe-dnd5e-mono-line-strong, rgb(255 255 255 / 0.50)) !important;
@@ -3380,47 +1284,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   filter: grayscale(1) saturate(0.12) !important;
 }
 
-/* dnd5e standard + Tidy Classic ability blocks: remove vertical dividers
-   without adding extra row framing. */
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .vertical-line-separator {
-  background: transparent !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-  inline-size: 0 !important;
-  margin-inline: 0 !important;
-  opacity: 0 !important;
-  width: 0 !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button,
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > .ability-modifiers
-  :is(.ability-mod, .ability-save) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container
-  > button.transparent-button::before {
-  content: none !important;
-  display: none !important;
-}
-
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .ability-scores
   .ability-score {
@@ -3451,34 +1314,19 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
 
 body.fe-retro-theme
   :is(
-    form.tidy5e-sheet.application.classic.actor,
+    form.tidy5e-sheet.application.classic.actor:not(*),
     .dnd5e2.application.sheet.actor.standard-form
   ) {
   --fe-dnd5e-ability-focus-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.56);
   --fe-dnd5e-ability-focus-glow: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.22);
 }
 
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container,
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .ability-scores
   .ability-score {
   position: relative !important;
 }
 
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container {
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-rule-faint, rgb(255 255 255 / 0.12)) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container:is(:hover, :focus-within),
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .ability-scores
   .ability-score:is(:hover, :focus-within) {
@@ -3486,19 +1334,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
     inset 0 0 0 1px var(--fe-dnd5e-ability-focus-line),
     0 0 0 1px var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.62)),
     0 0 0 2px var(--fe-dnd5e-ability-focus-glow) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container:is(:hover, :focus-within) {
-  isolation: isolate !important;
-  z-index: 4 !important;
-}
-
-/* Header menus must also cover the positioned ability modifiers and focus glow. */
-body.fe-retro-theme .tidy5e-sheet.application.actor > .controls-dropdown {
-  z-index: 30 !important;
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
@@ -3528,25 +1363,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   z-index: 1 !important;
 }
 
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container:is(:hover, :focus-within)
-  > .mod-label {
-  background: #000000 !important;
-  background-color: #000000 !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow:
-    inset 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16),
-    1px 0 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)),
-    -1px 0 0 var(--fe-retro-shadow-soft, rgb(0 0 0 / 0.70)) !important;
-  color: var(--fe-tidy-mono-text, var(--fe-ac-90, #e6e6e6)) !important;
-  position: absolute !important;
-  opacity: 1 !important;
-  z-index: 20 !important;
-}
-
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   .sheet-header
   .ability-scores
@@ -3574,167 +1390,6 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   display: none !important;
 }
 
-/* Late quadrone restore: the broad text-background cleanup must not remove
-   Tidy's ability badge silhouettes or fade the retro window frame. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone::before {
-  border-color: var(--fe-dx3rd-accent, #ffffff) !important;
-  mix-blend-mode: normal !important;
-  opacity: 1 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone::after {
-  mix-blend-mode: multiply !important;
-  opacity: 1 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container {
-  background:
-    transparent
-    url("/modules/tidy5e-sheet/images/badge_ability_dark.webp")
-    no-repeat
-    50% 0%
-    / contain !important;
-  box-shadow:
-    inset 0 1px 0 var(--fe-dnd5e-mono-line-faint),
-    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container.proficient {
-  background-image: url("/modules/tidy5e-sheet/images/badge_ability_dark_prof.webp") !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container
-  :is(
-    button,
-    input,
-    label,
-    span,
-    .ability-score,
-    .ability-score-input,
-    .ability-label-container,
-    .config-container
-  ) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-/* Tidy Quadrone: align initiative/ability badges and move row dividers into
-   the score/save rows instead of floating around the badge art. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner {
-  --fe-tidy-quadrone-badge-w: 64px;
-  --fe-tidy-quadrone-badge-h: 72px;
-  --fe-tidy-quadrone-row-line: var(--fe-dnd5e-mono-line-faint, rgba(255, 255, 255, 0.12));
-  position: relative !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner
-  > .ability.initiative {
-  overflow: visible !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner::before,
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner::after {
-  background: var(--fe-tidy-quadrone-row-line) !important;
-  content: "" !important;
-  height: 1px !important;
-  left: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  right: 0 !important;
-  z-index: 3 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner::before {
-  top: 92px !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .abilities-container-inner::after {
-  top: calc(100% - 1px) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.ability-bonus-container, .initiative-score-container) {
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .initiative-score-container {
-  align-self: center !important;
-  background:
-    transparent
-    url("/modules/tidy5e-sheet/images/badge_init_dark.webp")
-    no-repeat
-    50% 0%
-    / var(--fe-tidy-quadrone-badge-w) var(--fe-tidy-quadrone-badge-h) !important;
-  block-size: var(--fe-tidy-quadrone-badge-h) !important;
-  flex: 0 0 var(--fe-tidy-quadrone-badge-h) !important;
-  inline-size: var(--fe-tidy-quadrone-badge-w) !important;
-  max-block-size: var(--fe-tidy-quadrone-badge-h) !important;
-  max-inline-size: var(--fe-tidy-quadrone-badge-w) !important;
-  margin-top: 0 !important;
-  min-block-size: var(--fe-tidy-quadrone-badge-h) !important;
-  min-inline-size: var(--fe-tidy-quadrone-badge-w) !important;
-  transform: translateY(-6px) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container {
-  transform: translateY(-6px) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .initiative-score-container
-  > .ability-roll-button {
-  min-block-size: 47px !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container
-  > :is(button.ability-roll-button, .ability-score, .ability-score-input, .ability-label-container, .config-container) {
-  border-top: 0 !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.ability-score-container, .ability-save-container, .ability-labels > .label) {
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  :is(.ability-score-container, .ability-save-container)
-  :is(button, input, span, label, div) {
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .actor-details-subtitle-row {
-  position: relative !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .actor-details-subtitle-row::after {
-  background: var(--fe-tidy-quadrone-row-line, var(--fe-dnd5e-mono-line-faint, rgba(255, 255, 255, 0.12))) !important;
-  content: "" !important;
-  height: 1px !important;
-  left: 16px !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  right: 8px !important;
-  top: calc(100% + 2px) !important;
-}
-
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-form:is(.config-sheet, .item)
   :is(fieldset.card, fieldset.traits) {
   background: var(--fe-dnd5e-mono-surface) !important;
@@ -3760,6 +1415,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.standard-for
 /* Native ItemSheet5e is an item standard-form, not an actor/config sheet.
  * Keep its document layout, tab scrolling and icon art; theme its surfaces.
  */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standard-form {
   /* The shared actor palette deliberately desaturates surfaces. Item sheets
    * use the accent scale directly, including components which consume the
@@ -3835,6 +1491,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
 /* Remove icon backplates without clearing background-image: currency icons
  * and other image-backed glyphs use that image as their actual artwork.
  */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standard-form
   :is(i, svg, dnd5e-icon, .gold-icon) {
   color: var(--fe-ac-80) !important;
@@ -3846,6 +1503,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
 
 /* Directly colored SVG paths (and custom-element icons with local fill
  * variables) do not inherit the sheet's text color. Preserve fill="none". */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standard-form
   svg:not([fill="none"]) {
   fill: var(--fe-ac-80) !important;
@@ -3876,6 +1534,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
 
 /* Form controls and plain fieldsets are not .card elements. Explicitly
  * override the common forms layer here without changing dimensions or tabs. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standard-form
   :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
       select, textarea, formula-input, multi-select, string-tags) {
@@ -3912,6 +1571,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
 /* Spell materials combine two label-top fields and one inline checkbox.
  * Give the checkbox its natural width instead of squeezing its label into
  * the third equally shrinking column. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standard-form
   .split-group:has(input[name="system.materials.cost"]) > .form-fields {
   display: grid !important;
@@ -3960,32 +1620,37 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
 }
 
 /* ----------------------------------------------------------------
- * 채팅 카드 공통 레트로 팔레트 (midi 전용 아님 — MUST keep the wide scope)
+ * Shared retro palette for chat cards (NOT midi-only — MUST keep the
+ * wide scope)
  *
- * 바로 아래 블록은 `.chat-card.midi-chat-card` 에만 걸려 있어서, midi 를 거치지
- * 않은 **네이티브 dnd5e 카드**는 시스템 팔레트 상수를 그대로 쓰고 있었다.
- * 라이브 실측(강조색을 임시로 녹색 hue 로 돌려서 "강조색을 따르지 않는 것"만
- * 골라낸 결과):
- *   · img.gold-icon / dnd5e-icon.gold-icon → 테두리 #9f9275, 배경 rgb(13,11,11)
- *     (--dnd5e-color-gold / --dnd5e-gold-icon-background)
- *   · li.pill.transparent / section.tooltip-part / section.deltas → 흰 0.32 괘선
- *     (chat-bg-stripper.css §1j 의 --dnd5e-color-blue-gray-3 다크 리맵. 다크 테마
- *      기준으로는 맞지만 강조색을 따르지 않는다)
+ * The blocks further down hang on `.chat-card.midi-chat-card` only, so a
+ * NATIVE dnd5e card that never went through midi was still using the
+ * system palette constants. Measured live (accent hue temporarily rotated
+ * to green, so everything that stayed un-rotated stood out):
+ *   · img.gold-icon / dnd5e-icon.gold-icon → border #9f9275, background
+ *     rgb(13,11,11) (--dnd5e-color-gold / --dnd5e-gold-icon-background)
+ *   · li.pill.transparent / section.tooltip-part / section.deltas → white
+ *     0.32 hairlines (chat-bg-stripper.css §1j's --dnd5e-color-blue-gray-3
+ *     dark remap — correct for dark theme, but not accent-following)
  *   · .midi-qol-hits-display → #ddd, .midi-qol-ac → rgb(255 255 255 / 0.1)
- *     (midi 가 리터럴로 박아둔 값)
- * 텍스트는 전부 이미 --fe-ac-* 였다 — 남은 건 전부 "면·선·아이콘"이다.
+ *     (literals baked in by midi)
+ * All the text was already --fe-ac-* — what remained was surfaces, lines
+ * and icons.
  *
- * 상수를 채팅 스코프 안에서 다시 가리키는 방식을 쓴다(외부 선택자 열거 금지):
- * 한 줄로 그 상수를 읽는 모든 규칙과, 그 상수를 경유하는 alias 까지 따라온다.
+ * The approach re-points the constants inside the chat scope (no external
+ * selector enumeration): one line reaches every rule that reads the
+ * constant, plus every alias routed through it.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) {
   --dnd5e-color-gold: var(--fe-ac-80) !important;
   --dnd5e-gold-icon-background: transparent !important;
-  /* 알약/툴팁/델타 괘선. --dnd5e-border-dark/-dotted/-separator-heavy,
-     --control-border-color, --pill-border(-dotted) 가 전부 이걸 경유한다. */
+  /* Pill/tooltip/delta hairlines. --dnd5e-border-dark/-dotted/
+     -separator-heavy, --control-border-color and --pill-border(-dotted)
+     all route through this constant. */
   --dnd5e-color-blue-gray-3: var(--fe-ac-33) !important;
   --dnd5e-color-card: var(--fe-ac-08) !important;
   --dnd5e-color-parchment: var(--fe-ac-08) !important;
@@ -4003,7 +1668,8 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * The `--input-*` vars must be re-pointed ON the control: `body.theme-dark`
  * declares them on the element itself, and an element's own declaration always
  * beats an inherited one. Core's select/input rule then paints the retro
- * palette like any themed field — ac-08 면 + ac-33 선 + ac-90 잉크. */
+ * palette like any themed field — ac-08 surface + ac-33 line + ac-90 ink. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4015,8 +1681,10 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   --input-focus-outline-color: var(--fe-ac-45) !important;
 }
 
-/* midi 가 자기 CSS 에 리터럴로 박아 둔 두 곳 — 변수 경유가 없어 위 블록이 닿지
-   못한다. 선택자를 직접 잡는 예외이고, 그래서 여기 두 줄로 끝난다. */
+/* The two spots midi hard-coded as literals in its own CSS — nothing goes
+   through variables, so the block above cannot reach them. A direct-
+   selector exception, deliberately ending in two lines here. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4032,22 +1700,27 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 /* ----------------------------------------------------------------
- * 성공 / 실패 — 모노톤 (색상 제거)
+ * Success / failure — monotone (color removed)
  *
- * 레트로는 색으로 의미를 나르지 않는다. 초록/빨강을 명도 대비로 옮긴다:
- *   성공 = 채워진 밝은 면 + 밝은 윤곽선  ("켜짐")
- *   실패 = 비어 있는 어두운 면 + 흐린 윤곽선 ("꺼짐")
- * 두 값 모두 --fe-ac-* 이므로 강조색에 채도가 있으면 그 색조는 따라간다 —
- * "모노톤"은 의미색(초록/빨강)을 쓰지 않는다는 뜻이지 회색 고정이 아니다.
+ * Retro does not carry meaning by hue. Green/red moves to a lightness
+ * contrast:
+ *   success = filled bright surface + bright outline  ("on")
+ *   failure = empty dark surface + faded outline      ("off")
+ * Both values are --fe-ac-*, so a saturated accent still carries its hue
+ * — "monotone" means no semantic green/red, not fixed grey.
  *
- * midi 는 `.midi-results .target.success` 에 테두리색을 rgba(0,108,0,0.4) 로
- * 직접 박아 두어 변수 리맵이 닿지 않는다 → 그 두 줄만 따로 잡는다.
+ * midi pins `.midi-results .target.success` border-color at
+ * rgba(0,108,0,0.4) literally, so the variable remap cannot reach it →
+ * those two lines are caught separately.
  *
- * 잉크는 건드리지 않는다: `.fe-accent-text-override` 전역 스윕이 같은 layouts
- * 레이어에서 더 높은 특이도로 --fe-ac-90 을 박고 있어서, 여기에 color 를 써도
- * 죽은 선언이 된다(실측). 성공/실패 구분은 면과 테두리가 전부 진다 —
- * 어차피 --fe-ac-22 / --fe-ac-06 둘 다 밝은 잉크가 잘 읽히는 어두운 면이다.
+ * The ink is untouched: the `.fe-accent-text-override` global sweep pins
+ * --fe-ac-90 in the same layouts layer at higher specificity, so any
+ * color written here would be a dead declaration (measured). The
+ * success/failure distinction is carried entirely by surface and border
+ * — --fe-ac-22 / --fe-ac-06 are both dark surfaces where bright ink
+ * reads well anyway.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4059,11 +1732,12 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   --dnd5e-color-success-critical: var(--fe-ac-90) !important;
   --dnd5e-color-failure-critical: var(--fe-ac-57) !important;
 
-  /* 6.0 의 `.compact` 카드는 위 --dnd5e-color-* 가 아니라 이 두 별칭을 읽는다
-     (`ul.action-list .status.success/.failure`). 다크 테마에서는 이 별칭이
-     코어의 --color-level-* 로 흘러가므로 그 둘도 함께 잡아야 한다 — 그러지
-     않으면 성공 표식만 초록으로 남는다. --color-level-* 는 채팅 안에서만
-     리맵한다(바깥의 알림/경고는 의미색이 필요하다). */
+  /* 6.0's `.compact` cards read these two aliases instead of the
+     --dnd5e-color-* above (`ul.action-list .status.success/.failure`).
+     Under the dark theme these aliases flow into core's --color-level-*,
+     so both must be caught too — otherwise the success marker alone
+     stays green. --color-level-* is remapped inside chat ONLY (alerts/
+     warnings outside need their semantic colors). */
   --dnd5e-chat-status-success: var(--fe-ac-90) !important;
   --dnd5e-chat-status-failure: var(--fe-ac-57) !important;
   --color-level-success: var(--fe-ac-90) !important;
@@ -4086,16 +1760,20 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   border-color: var(--fe-ac-22) !important;
 }
 
-/* 타겟 알약(`ul.unlist.targets.pills > target-pill`) — 6.0 이 명중/빗나감 면을
-   변수가 아니라 리터럴로 칠하는 유일한 자리다(dnd5e.css:1258 #1a6b22 초록,
-   :1267 #591010 빨강). 테두리와 ::before 체크/엑스 표식은 --color-level-* 를
-   읽으므로 위 블록에서 이미 모노톤이 됐고(실측: 테두리 rgb(179,179,179)),
-   면만 초록으로 남아 있었다 — 실측 rgb(26,107,34).
-   명중 = 채워진 면, 빗나감 = 비어 있는 면. 성공/실패 어법과 같다.
+/* Target pills (`ul.unlist.targets.pills > target-pill`) — the only place
+   6.0 paints hit/miss surfaces as literals rather than variables
+   (dnd5e.css:1258 #1a6b22 green, :1267 #591010 red). The border and the
+   ::before check/cross markers read --color-level-*, so they already
+   went monotone in the block above (measured: border rgb(179,179,179)) —
+   only the surface stayed green — measured rgb(26,107,34).
+   hit = filled surface, miss = empty surface. Same idiom as
+   success/failure.
 
-   --pill-colored-text-color 는 dnd5e 의 푸른 흰색(--dnd5e-color-blue-white,
-   실측 rgb(207,210,218))이라 팔레트 밖이다. 점선 테두리도 레트로 어법(모든
-   경계는 하드 라인 하나)과 어긋나므로 같이 solid 로 눕힌다. */
+   --pill-colored-text-color is dnd5e's bluish white
+   (--dnd5e-color-blue-white, measured rgb(207,210,218)) — outside the
+   palette. The dotted border also clashes with the retro idiom (every
+   boundary is one hard line), so it flattens to solid along with it. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4119,11 +1797,12 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   background-color: var(--fe-ac-06) !important;
 }
 
-
 /* Midi chat cards contain div-based controls/results and can omit the
  * dnd5e2 class. Set their palette directly rather than relying on that class.
- * 성공/실패 배경은 위 모노톤 블록이 담당한다 — 여기서 다시 칠하지 말 것.
+ * Success/failure backgrounds are owned by the monotone block above — do
+ * NOT repaint them here.
  */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card {
   --fe-midi-card-background: var(--fe-ac-08);
   --dnd5e-color-card: var(--fe-ac-08) !important;
@@ -4167,6 +1846,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card button:hover
 /* Match the scope of the high-specificity chat ink rule above so the dice
  * get accent ink rather than its white fallback, including sidebar/popouts.
  */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4187,9 +1867,10 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card.midi-chat-card :is(.card-header, .card-header.description) {
-  /* 면을 채우지 않는다 — 카드 자체가 이미 --fe-ac-08 판이고, 그 위에 --fe-ac-22
-     띠를 하나 더 얹으면 검은 카드 안에 회색 블록만 떠 보인다(설명 박스와 같은
-     증상). 구분은 아래 강조색 괘선 하나로 충분하다. */
+  /* No surface fill — the card itself is already a --fe-ac-08 panel; laying
+     another --fe-ac-22 band on top would leave a grey block floating in a
+     black card (same symptom as the description box). A single accent
+     rule line below is distinction enough. */
   background: transparent !important;
   border-color: var(--fe-ac-45) !important;
 }
@@ -4197,6 +1878,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 /* PHB quest/advice callouts paint parchment independently of the sheet.
  * Preserve their structure, replace both parchment and directly set ink.
  */
+
 body.fe-retro-theme.fe-retro-system-dnd5e :is(.fvtt.quest, .fvtt.advice) {
   background: var(--fe-ac-12) !important;
   color: var(--fe-ac-90) !important;
@@ -4225,8 +1907,9 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(.fvtt.quest, .fvtt.advice)
 }
 
 /* Description headers share the palette in sheets and native/Midi chat cards. */
+
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet:not(*), .dnd5e2.application)
   :is(.card-header.description.collapsible, .card-description) {
   background: var(--fe-ac-22) !important;
   color: var(--fe-ac-90) !important;
@@ -4235,23 +1918,31 @@ body.fe-retro-theme
   --icon-stroke: var(--fe-ac-80) !important;
 }
 
-/* …in chat the fill is FAINT, not transparent (사용자 지시로 옛 결정 수정).
- * dnd5e 는 이 섹션을 원래부터 다른 배경(--dnd5e-chat-description-background)으로
- * 칠한다 — "본문과 다른 구역" 이라는 정보다. --fe-ac-22 채움은 검은 카드
- * 한가운데 진회색 판때기로 보여 폐기했지만, 팔레트 최하단 --fe-ac-06 은 검정
- * 위에 색조만 살짝 얹는 수준이라 어법(검은 면 + 강조선)을 깨지 않는다.
- *   괘선은 solid → 굵은 점선(3px dotted)으로. dnd5e 원래 스타일(dashed)의
- *   계보를 잇는 사용자 지시다.
- *   margin-inline:0 — dnd5e 는 -8px 로 이 섹션의 위아래 선을 카드 패딩 밖까지
- *   밀어내 양옆 세로선을 넘어가게 그린다(dnd5e.css:14884).
- *   :not(.collapsed) — dnd5e 는 접힌 섹션의 괘선을 지우는데(:14890),
- *   !important 스타일이 살아 있으면 내용 없는 빈 점선만 남는다.
- *   이 처리는 6.0 compact 의 .card-description 에만 준다 — 레거시/midi 의
- *   .card-header.description.collapsible 은 "설명 본문" 이 아니라 접이식
- *   헤더 블록이라 점선+면이 묻어 나와 시끄러웠다(아래 규칙이 종전 모습 유지).
+/* …in chat the fill is FAINT, not transparent (an old decision revised
+ * per user direction).
+ * dnd5e has always painted this section a different background
+ * (--dnd5e-chat-description-background) — that is the "a different area
+ * than the body" information. A --fe-ac-22 fill was rejected for looking
+ * like a dark-grey slab in the middle of a black card, but the palette's
+ * lowest step --fe-ac-06 only tints black faintly and does not break the
+ * idiom (black surface + accent line).
+ *   Rule line: solid → thick dotted (3px dotted). Per user direction,
+ *   continuing the lineage of dnd5e's original style (dashed).
+ *   margin-inline:0 — dnd5e pushes this section's top/bottom lines out
+ *   past the card padding at -8px so they overshoot the side borders
+ *   (dnd5e.css:14884).
+ *   :not(.collapsed) — dnd5e removes a collapsed section's rule line
+ *   (:14890); with the !important style alive, an empty dotted line
+ *   with no content would remain.
+ *   This treatment goes only to 6.0-compact's .card-description —
+ *   legacy/midi's .card-header.description.collapsible is a collapsible
+ *   header block, not "description body", and the dots+surface came out
+ *   noisy there (the rule below keeps its prior look).
  *
- * 이 블록은 위 규칙보다 뒤에 있고 선택자 특이도도 더 높으므로(:is() 안의
- * .chat-message 가 추가된다) 같은 layouts 레이어 안에서 확실히 이긴다. */
+ * This block sits after the rule above and is also more specific (the
+ * .chat-message inside :is() adds to it), so it wins decisively within
+ * the same layouts layer. */
+
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4264,7 +1955,9 @@ body.fe-retro-theme
   margin-inline: 0 !important;
 }
 
-/* 레거시/midi 카드의 접이식 헤더 블록 — 종전 어법(투명 면 + 얇은 실선 괘선). */
+/* Legacy/midi cards' collapsible header block — the prior idiom
+   (transparent surface + thin solid rule line). */
+
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4276,278 +1969,78 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet:not(*), .dnd5e2.application)
   :is(.card-header.description.collapsible, .card-description) :is(span, label, h3, h4) {
   color: var(--fe-ac-90) !important;
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet, .dnd5e2.application)
+  :is(#sidebar #chat, #chat-log, .chat-log, .tidy5e-sheet:not(*), .dnd5e2.application)
   .card-header.description.collapsible :is(i, svg, dnd5e-icon) {
   color: var(--fe-ac-80) !important;
 }
 
-/* Quadrone semantic colors: use the retro palette in light, dark and basic modes.
- *
- * ⚠️ tidy5e-sheet 14.x 는 **Classic 레이아웃을 완전히 삭제**했다(main.css 에 `classic`
- *    문자열 0회, module.json 은 dnd5e 6.0.x / Foundry v14 를 요구). 즉 14 이상에서는
- *    모든 시트가 Quadrone 이다. 이 파일에 남아 있는 `.tidy5e-sheet.application.classic …`
- *    규칙은 **tidy 13.x 이하를 쓰는 월드를 위한 하위 호환**이므로 지우지 말 것 —
- *    14 에서는 그냥 매칭되지 않고 조용히 비활성화될 뿐이다.
- *
- * 시트 종류 클래스는 `.quadrone` 뒤에 붙는다(main.css 실측):
- *   .actor(780) .encounter(221) .group(176) .character(175) .item(108)
- *   .vehicle(61) .npc(53) .tooltip(46)
- * character/npc/vehicle 은 .actor 도 함께 달고 나오므로 .actor 로 덮이지만,
- * item/group/encounter/tooltip 은 아니었다 — 아이템 시트와 툴팁이 레트로 팔레트를
- * 전혀 못 받던 구멍이다. `:is()` 는 인자 중 최대 특이도를 취하므로 `.actor` 단독일
- * 때와 특이도가 동일하다(클래스 1개) → 기존 캐스케이드 싸움은 그대로다. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip),
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) :where(.theme-light, .theme-dark, .theme-basic) {
-  --t5e-color-gold: var(--fe-ac-80) !important;
-  --t5e-color-palette-gold-35: var(--fe-ac-33) !important;
-  --t5e-color-palette-gold-45: var(--fe-ac-45) !important;
-  --t5e-color-palette-gold-56: var(--fe-ac-57) !important;
-  --t5e-color-palette-gold-62: var(--fe-ac-70) !important;
-  --t5e-color-palette-gold-75: var(--fe-ac-80) !important;
-  --t5e-color-palette-gold-89: var(--fe-ac-90) !important;
-  --t5e-color-palette-gold-94: var(--fe-ac-90) !important;
-  --t5e-color-filigree: var(--fe-ac-33) !important;
-  --t5e-color-hp-dark: var(--fe-ac-33) !important;
-  --t5e-color-hp-hd-dark: var(--fe-ac-33) !important;
-  --t5e-color-hp-hd-light: var(--fe-ac-80) !important;
-  --t5e-color-hp-hd-medium: var(--fe-ac-57) !important;
-  --t5e-color-hp-light: var(--fe-ac-80) !important;
-  --t5e-color-hp-medium: var(--fe-ac-57) !important;
-  --t5e-color-hp-temp: var(--fe-ac-57) !important;
-  --t5e-color-hp-temp-dark: var(--fe-ac-33) !important;
-  --t5e-color-icon-button: var(--fe-ac-80) !important;
-  --t5e-color-icon-dark: var(--fe-ac-80) !important;
-  --t5e-color-icon-default: var(--fe-ac-80) !important;
-  --t5e-color-icon-diminished: var(--fe-ac-57) !important;
-  --t5e-color-icon-disabled: var(--fe-ac-45) !important;
-  --t5e-color-icon-light: var(--fe-ac-80) !important;
-  --t5e-color-icon-lighter: var(--fe-ac-70) !important;
-  --t5e-color-icon-ondefault-button: var(--fe-ac-80) !important;
-  --t5e-color-icon-ondefault-default: var(--fe-ac-80) !important;
-  --t5e-color-icon-ondefault-diminished: var(--fe-ac-57) !important;
-  --t5e-color-icon-ondefault-disabled: var(--fe-ac-45) !important;
-  --t5e-color-icon-oninverse-button: var(--fe-ac-80) !important;
-  --t5e-color-icon-oninverse-default: var(--fe-ac-80) !important;
-  --t5e-color-icon-oninverse-diminished: var(--fe-ac-57) !important;
-  --t5e-color-icon-oninverse-disabled: var(--fe-ac-45) !important;
-  --t5e-color-inventory-dark: var(--fe-ac-33) !important;
-  --t5e-color-inventory-dark-over: var(--fe-ac-33) !important;
-  --t5e-color-inventory-light: var(--fe-ac-80) !important;
-  --t5e-color-inventory-light-over: var(--fe-ac-80) !important;
-  --t5e-color-inventory-max: var(--fe-ac-57) !important;
-  --t5e-color-inventory-max-over: var(--fe-ac-57) !important;
-  --t5e-color-link-default: var(--fe-ac-80) !important;
-  --t5e-color-link-hover: var(--fe-ac-80) !important;
-  --t5e-color-spellcasting-always: var(--fe-ac-45) !important;
-  --t5e-color-spellcasting-atwill: var(--fe-ac-45) !important;
-  --t5e-color-spellcasting-innate: var(--fe-ac-45) !important;
-  --t5e-color-spellcasting-pact: var(--fe-ac-45) !important;
-  --t5e-color-spellcasting-ritual: var(--fe-ac-45) !important;
-  --t5e-color-spellcasting-spell: var(--fe-ac-45) !important;
-  --t5e-color-text-default: var(--fe-ac-90) !important;
-  --t5e-color-text-disabled: var(--fe-ac-45) !important;
-  --t5e-color-text-gold: var(--fe-ac-80) !important;
-  --t5e-color-text-gold-emphasis: var(--fe-ac-80) !important;
-  --t5e-color-text-gold-light: var(--fe-ac-80) !important;
-  --t5e-color-text-lighter: var(--fe-ac-70) !important;
-  --t5e-color-text-lightest: var(--fe-ac-57) !important;
-  --t5e-color-text-oninverse-default: var(--fe-ac-90) !important;
-  --t5e-color-text-oninverse-disabled: var(--fe-ac-45) !important;
-  --t5e-color-text-oninverse-gold: var(--fe-ac-80) !important;
-  --t5e-color-text-oninverse-gold-emphasis: var(--fe-ac-80) !important;
-  --t5e-color-text-oninverse-gold-light: var(--fe-ac-80) !important;
-  --t5e-color-text-oninverse-lighter: var(--fe-ac-70) !important;
-  --t5e-color-text-oninverse-lightest: var(--fe-ac-57) !important;
-  --t5e-component-ability-background: var(--fe-ac-12) !important;
-  --t5e-component-card-dark-darker: var(--fe-ac-06) !important;
-  --t5e-component-card-dark-default: var(--fe-ac-12) !important;
-  --t5e-component-card-dark-lighter: var(--fe-ac-22) !important;
-  --t5e-component-card-darker: var(--fe-ac-06) !important;
-  --t5e-component-card-default: var(--fe-ac-12) !important;
-  --t5e-component-card-foreground: var(--fe-ac-90) !important;
-  --t5e-component-card-foreground-diminished: var(--fe-ac-57) !important;
-  --t5e-component-card-foreground-disabled: var(--fe-ac-45) !important;
-  --t5e-component-card-light-darker: var(--fe-ac-06) !important;
-  --t5e-component-card-light-default: var(--fe-ac-12) !important;
-  --t5e-component-card-light-lighter: var(--fe-ac-22) !important;
-  --t5e-component-card-lighter: var(--fe-ac-22) !important;
-  --t5e-component-card-oninverse-darker: var(--fe-ac-06) !important;
-  --t5e-component-card-oninverse-default: var(--fe-ac-12) !important;
-  --t5e-component-card-oninverse-lighter: var(--fe-ac-22) !important;
-  --t5e-component-enricher-background: var(--fe-ac-12) !important;
-  --t5e-component-enricher-background-hover: var(--fe-ac-22) !important;
-  --t5e-component-enricher-border: var(--fe-ac-33) !important;
-  --t5e-component-enricher-icon: var(--fe-ac-80) !important;
-  --t5e-component-enricher-icon-hover: var(--fe-ac-80) !important;
-  --t5e-component-enricher-text-hover-shadow: none !important;
-  --t5e-component-field-background: var(--fe-ac-06) !important;
-  --t5e-component-field-background-active: var(--fe-ac-22) !important;
-  --t5e-component-field-background-disabled: var(--fe-ac-06) !important;
-  --t5e-component-field-background-hover: var(--fe-ac-22) !important;
-  --t5e-component-field-background-hover-emphasis: var(--fe-ac-22) !important;
-  --t5e-component-field-border: var(--fe-ac-33) !important;
-  --t5e-component-field-border-hover: var(--fe-ac-33) !important;
-  --t5e-component-field-focus: var(--fe-ac-45) !important;
-  --t5e-component-pill-background: var(--fe-ac-12) !important;
-  --t5e-component-pill-border: var(--fe-ac-33) !important;
-  --t5e-component-pill-border-interactive: var(--fe-ac-33) !important;
-  --t5e-component-pill-oninverse-background: var(--fe-ac-12) !important;
-  --t5e-component-pill-oninverse-border: var(--fe-ac-33) !important;
-  --t5e-component-pill-oninverse-border-interactive: var(--fe-ac-33) !important;
-  --t5e-component-tab-border: var(--fe-ac-33) !important;
-  --t5e-component-toggle-toggled-background: var(--fe-ac-22) !important;
-  --t5e-component-toggle-toggled-background-hover: var(--fe-ac-22) !important;
-  --t5e-component-toggle-toggled-border: var(--fe-ac-33) !important;
-  --t5e-component-toggle-toggled-text: var(--fe-ac-90) !important;
-  --t5e-table-header-background-container: var(--fe-ac-12) !important;
-  --t5e-table-header-background-default: var(--fe-ac-12) !important;
-  --t5e-table-header-background-left: var(--fe-ac-12) !important;
-  --t5e-table-header-background-right: var(--fe-ac-12) !important;
-  --t5e-table-header-border-color: var(--fe-ac-33) !important;
-  --t5e-table-header-box-shadow: none !important;
-  --t5e-table-row-background-default: var(--fe-ac-12) !important;
-  --t5e-table-row-background-expanded: var(--fe-ac-12) !important;
-  --t5e-table-row-border-image: none !important;
-  --t5e-table-row-divider: var(--fe-ac-33) !important;
-  --t5e-theme-color-darker: var(--fe-ac-45) !important;
-  --t5e-theme-color-darkest: var(--fe-ac-45) !important;
-  --t5e-theme-color-default: var(--fe-ac-45) !important;
-  --t5e-theme-color-foreground: var(--fe-ac-90) !important;
-  --t5e-theme-color-foreground-darker: var(--fe-ac-90) !important;
-  --t5e-theme-color-foreground-darker-diminished: var(--fe-ac-57) !important;
-  --t5e-theme-color-foreground-darker-disabled: var(--fe-ac-45) !important;
-  --t5e-theme-color-foreground-diminished: var(--fe-ac-57) !important;
-  --t5e-theme-color-foreground-disabled: var(--fe-ac-45) !important;
-  --t5e-theme-color-header: var(--fe-ac-45) !important;
-  --t5e-theme-color-highlight: var(--fe-ac-45) !important;
-  --t5e-theme-color-highlight-hover: var(--fe-ac-45) !important;
-  --t5e-theme-color-lighter: var(--fe-ac-45) !important;
-  --t5e-theme-color-lightest: var(--fe-ac-45) !important;
-  --fe-dnd5e-mono-surface: var(--fe-ac-06);
-  --fe-dnd5e-mono-surface-2: var(--fe-ac-12);
-  --fe-dnd5e-mono-surface-3: var(--fe-ac-22);
-  --fe-dnd5e-mono-line-faint: var(--fe-ac-22);
-  --fe-dnd5e-mono-line: var(--fe-ac-33);
-  --fe-dnd5e-mono-line-strong: var(--fe-ac-45);
-  --fe-dnd5e-mono-hover: var(--fe-ac-12);
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .tidy-table-header-row {
-  --t5e-table-header-background-left: var(--fe-ac-22) !important;
-  --t5e-table-header-background-right: var(--fe-ac-12) !important;
-  --t5e-table-header-border-color: var(--fe-ac-33) !important;
-}
-
-/* Do not desaturate the accent together with the badge artwork. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) :is(.ability-bonus-container, .initiative-score-container, .shield) {
-  filter: none !important;
-  --icon-fill: var(--fe-ac-80) !important;
-  --icon-stroke: var(--fe-ac-80) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  :is(svg, dnd5e-icon, tidy-icon):not(:where(#context-menu, .context-menu) *) {
-  color: var(--fe-ac-80) !important;
-  --icon-fill: var(--fe-ac-80) !important;
-  --icon-stroke: var(--fe-ac-80) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  svg:not([fill="none"]):not(:where(#context-menu, .context-menu) *),
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  svg [fill]:not([fill="none"]):not(:where(#context-menu, .context-menu) *) {
-  fill: var(--fe-ac-80) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  svg[stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *),
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  svg [stroke]:not([stroke="none"]):not(:where(#context-menu, .context-menu) *) {
-  stroke: var(--fe-ac-80) !important;
-}
-
-/* External SVG icon files cannot inherit fill from their containing document. */
-body.fe-retro-theme .tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip)
-  img[src*=".svg"]:not([data-edit], .portrait, .actor-portrait, .item-image, .token-image) {
-  filter: brightness(0) invert(0.8) sepia(1)
-    saturate(calc(var(--fe-dx3rd-accent-s, 0%) / 1% * 0.06))
-    hue-rotate(calc(var(--fe-dx3rd-accent-h, 0deg) - 45deg)) !important;
-}
-
-/* Restore field boundaries erased by the shared borderless control cleanup. */
-body.fe-retro-theme form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .window-content
-  :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
-      select, textarea, .input-group, search, prose-mirror, code-mirror, fieldset):not(:where(.input-group, search) input) {
-  border: 1px solid var(--fe-ac-33) !important;
-  border-radius: 0 !important;
-  background-color: var(--fe-ac-06) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.quadrone:is(.actor, .item, .group, .encounter, .tooltip) .window-content
-  :is(input:not([type="hidden"]):not([type="range"]):not([type="color"]),
-      select, textarea, .input-group, search, prose-mirror, code-mirror):not(:where(.input-group, search) input):is(:hover, :focus-within) {
-  border-color: var(--fe-ac-45) !important;
-}
-
-
 /* ================================================================
- * dnd5e 6.0 — 새 채팅 카드 구조 (`.message.compact`)
+ * dnd5e 6.0 — new chat-card structure (`.message.compact`)
  * ================================================================
- * 6.0 은 채팅 메시지 마크업을 통째로 갈아엎었다. 두 구조가 **공존**한다:
+ * 6.0 rewrote the chat-message markup wholesale. Both structures
+ * **coexist**:
  *
- *   · 레거시(≤5.x, 그리고 DB 에 남아 있는 옛 메시지)
+ *   · legacy (≤5.x, and old messages still in the DB)
  *       li.chat-message.dnd5e2
  *         └ .chat-card.activation-card
  *             └ section.card-header.description.collapsible
  *                 ├ header.summary  (img.gold-icon + .name-stacked + i.fa-chevron-down)
  *                 └ section.details.collapsible-content.card-content > .wrapper
- *             ├ .card-buttons > button   (텍스트 버튼)
+ *             ├ .card-buttons > button   (text buttons)
  *             └ ul.card-footer.pills > li.pill
  *
- *   · 6.0 신구조 — `li` 에 `.compact` 가 붙는다(메시지 시스템 데이터 모델의
- *     `_onRender` 가 추가; dnd5e.mjs `element.classList.add("compact")`).
+ *   · 6.0 new structure — `li` gains `.compact` (added by the message
+ *     system data model's `_onRender`; dnd5e.mjs
+ *     `element.classList.add("compact")`).
  *       li.chat-message.dnd5e2.compact
  *         └ .chat-card
  *             ├ section.card-header[.no-description][.collapsed]
  *             │    ├ .item-icon > img.gold-icon
- *             │    ├ .activity-icon > dnd5e-icon        (선택)
+ *             │    ├ .activity-icon > dnd5e-icon        (optional)
  *             │    ├ .name-stacked > .title/.subtitle
  *             │    └ .chevron > i.fa-chevron-down
- *             ├ section.card-flavor                      (신규)
+ *             ├ section.card-flavor                      (new)
  *             ├ section.card-description.collapsible > .collapsible-content > .wrapper
- *             ├ p.supplement > strong                    (신규 strong)
- *             ├ section.icon-row > i + ul.pills > li.pill   (구 .card-footer)
- *             ├ recorded-targets                          (신규 커스텀 엘리먼트, light DOM)
- *             └ section.icon-row > ul > li > button.icon    (구 .card-buttons)
+ *             ├ p.supplement > strong                    (new strong)
+ *             ├ section.icon-row > i + ul.pills > li.pill   (old .card-footer)
+ *             ├ recorded-targets                          (new custom element, light DOM)
+ *             └ section.icon-row > ul > li > button.icon    (old .card-buttons)
  *
- * ⚠️ `header.summary` 래퍼와 `.card-content` 는 신구조에 **없다**. 대신
- *    `.card-header` 자체가 아이콘/이름/셰브런을 직접 담고, 설명은 형제
- *    `.card-description` 으로 빠졌다. 레거시 선택자는 옛 메시지를 위해
- *    그대로 두고, 신구조 선택자를 **나란히** 추가하는 방식으로만 대응한다.
+ * ⚠️ The `header.summary` wrapper and `.card-content` do NOT exist in the
+ *    new structure. `.card-header` itself holds icon/name/chevron
+ *    directly, and the description moved out to a sibling
+ *    `.card-description`. Legacy selectors stay for old messages; new-
+ *    structure selectors are added **alongside** — that is the only
+ *    supported response.
  *
- * ⚠️ 6.0 은 `li.message.compact` **자체**에 배경/금색 테두리/radius/padding:8px 를
- *    칠한다(dnd5e.css `.chat-log .message.compact`). 5.x 는 ::before 양피지만
- *    깔았으므로 이건 새로 생긴 표면이다. 텍스처 제거/유저 컬러 배경은
- *    chat-bg-stripper.css 의 `!important`(modules 레이어) 가 dnd5e 의 일반
- *    선언(system 레이어)을 이기므로 그대로 먹지만, 금색 테두리는 별도로 처리한다.
+ * ⚠️ 6.0 paints background/gold border/radius/padding:8px on
+ *    `li.message.compact` ITSELF (dnd5e.css `.chat-log .message.compact`).
+ *    5.x only laid a ::before parchment, so this is a brand-new surface.
+ *    Texture strip / user-color background still apply — their
+ *    `!important` (modules layer) beats dnd5e's plain declarations
+ *    (system layer) — but the gold border is handled separately.
  * ================================================================ */
 
-/* 카드 변수 자체를 레트로 팔레트로 갈아끼운다. dnd5e 는 이 두 변수를
-   `:where(body)` 수준에서 선언하므로 우리 쪽 `.dnd5e2`(= li) 선언이 더 가깝다. */
+/* The card variables themselves are swapped for the retro palette. dnd5e
+   declares these two at `:where(body)` level, so our `.dnd5e2` (= li)
+   declaration is nearer. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
   --dnd5e-chat-background: transparent !important;
   --dnd5e-chat-description-background: var(--fe-ac-06) !important;
 }
 
-/* 신구조 카드 파트의 텍스트 색. 기존 레거시 목록(위쪽 `.chat-card :is(p, i, …)`)
-   과 같은 톤을 쓰되, 6.0 에서 새로 생긴 요소만 모았다. `a`/`button`/인라인 롤은
-   고유 색을 지켜야 하므로 여기서도 제외한다. */
+/* Text colors for the new-structure card parts. Same tones as the legacy
+   list above (`.chat-card :is(p, i, …)`), collecting only the elements
+   new in 6.0. `a`/`button`/inline rolls are excluded here too — they must
+   keep their own colors. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4560,8 +2053,9 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   color: var(--fe-ac-90) !important;
 }
 
-/* 보조 톤은 한 단계 낮춘다 — 플레이버/보충설명/부제는 본문보다 약해야
-   원래 위계가 유지된다. */
+/* Secondary tones step down one level — flavor/supplement/subtitle must
+   stay weaker than the body or the original hierarchy is lost. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4570,8 +2064,10 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   color: var(--fe-ac-70) !important;
 }
 
-/* `.icon-row > i` 는 dnd5e 가 `--dnd5e-color-gold` 로 직접 칠한다(변수 리맵으로는
-   닿지 않는 직접 선언). 행 구분 아이콘이므로 강조색으로 돌린다. */
+/* `.icon-row > i` is painted directly by dnd5e at `--dnd5e-color-gold` (a
+   direct declaration the variable remap cannot reach). A row-separator
+   icon — turned to accent. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4579,7 +2075,8 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   color: var(--fe-ac-80) !important;
 }
 
-/* 아이콘 버튼(구 `.card-buttons > button` 의 후신). */
+/* Icon buttons (successor to the old `.card-buttons > button`). */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4599,7 +2096,8 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   border-color: var(--fe-ac-45) !important;
 }
 
-/* 알약(pill) — 구 `.card-footer.pills` 와 같은 처리. */
+/* Pills — same treatment as the old `.card-footer.pills`. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4608,8 +2106,9 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   border-color: var(--fe-ac-33) !important;
 }
 
-/* 6.0 이 li 에 직접 거는 금색 테두리. 레트로는 카드 테두리를 강조색으로
-   통일하므로 메시지 테두리도 같은 팔레트로 맞춘다. */
+/* The gold border 6.0 puts directly on the li. Retro unifies card
+   borders on accent, so the message border follows the same palette. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, .chat-popout)
   :is(.message, .chat-message).compact {
@@ -4625,28 +2124,35 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 /* ----------------------------------------------------------------
- * 채팅 카드 벡터 그래픽 — 픽셀/거친 렌더링
+ * Chat-card vector graphics — pixel/coarse rendering
  *
- * 레트로는 픽셀 테마인데 카드 안의 벡터(dnd5e-icon, 인라인 <svg>, .svg 이미지)만
- * 매끈하게 안티앨리어싱돼서 혼자 "현대적"으로 튄다. 그 둘만 거칠게 만든다.
+ * Retro is a pixel theme, yet the vectors inside cards (dnd5e-icon,
+ * inline <svg>, .svg images) stay smoothly antialiased and stick out as
+ * alone "modern". Only those go coarse.
  *
- * 두 속성을 나눠 쓰는 이유:
- *   - shape-rendering: crispEdges → SVG 도형의 안티앨리어싱을 끈다. SVG 상속
- *     속성이라 dnd5e-icon 의 closed shadow root 안 <svg> 까지 닿는다(상속은
- *     shadow 경계를 넘는다). 이 요소는 :host{display:contents} 라 박스를 만들지
- *     않으므로 filter 같은 박스 기반 효과는 쓸 수 없다 — 상속이 유일한 경로다.
- *   - image-rendering: pixelated → 래스터화된 이미지를 최근접 이웃으로 확대.
- *     <img src="*.svg"> 와 <svg><image> 에만 건다.
+ * Why two different properties:
+ *   - shape-rendering: crispEdges → disables antialiasing on SVG shapes.
+ *     An SVG-inherited property, so it reaches the <svg> inside
+ *     dnd5e-icon's closed shadow root (inheritance crosses the shadow
+ *     boundary). The element is :host{display:contents} — it builds no
+ *     box, so box-based effects like filter cannot apply; inheritance is
+ *     the only path.
+ *   - image-rendering: pixelated → scales rasterized images by
+ *     nearest-neighbor. Applied only to <img src="*.svg"> and
+ *     <svg><image>.
  *
- * 포트레이트/토큰 아트/아이템 아트(webp·png·jpg)는 명시적으로 제외한다(사용자
- * 지시). image-rendering 을 메시지나 카드 루트에 걸지 않는 것도 같은 이유 —
- * 상속 속성이라 루트에 걸면 포트레이트까지 자글자글해진다.
+ * Portraits/token art/item art (webp·png·jpg) are explicitly excluded
+ * (per user direction). image-rendering is deliberately not applied to
+ * the message or card root for the same reason — it inherits, so the
+ * portrait would go jaggy too.
  *
- * Font Awesome 은 SVG 가 아니라 글리프라 위 두 속성이 닿지 않는다 — 대신
- * fe-retro-theme.css §2 가 이미 body 전체에 -webkit-font-smoothing: none 을
- * 걸어 두어 아이콘 글리프도 함께 거칠게 나온다(실측: body 계산값 none).
- * 그래서 여기서 폰트 쪽을 다시 손댈 필요가 없다 — 추가하면 죽은 선언이 된다.
+ * Font Awesome is a glyph, not SVG — neither property reaches it.
+ * Instead, fe-retro-theme.css §2 already applies
+ * -webkit-font-smoothing: none body-wide, so icon glyphs come out coarse
+ * as well (measured: body computed value none). Nothing more needs doing
+ * on the font side here — an added declaration would be dead.
  * ---------------------------------------------------------------- */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4664,8 +2170,9 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   shape-rendering: crispEdges !important;
 }
 
-/* 사진류는 원래대로. 위 규칙이 svg 하위 <image> 로 상속되는 경우와,
-   .svg 로 끝나지 않는 모든 이미지가 여기에 해당한다. */
+/* Photographic art stays as-is — this covers <image> inheriting from the
+   svg rule above plus every image not ending in .svg. */
+
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
@@ -4674,32 +2181,36 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   image-rendering: auto !important;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Item-sheet background-texture removal (ceDnd5eItemSheetFlat)         */
+/* ------------------------------------------------------------------ */
+/* dnd5e paints every application with
+   `background: var(--dnd5e-application-background)`, whose value mixes a
+   parchment/denim image layer and a background COLOR in one shorthand.
+   So instead of swapping the variable wholesale, only the image layer is
+   switched off — the theme-chosen color survives, sparing us from
+   guessing the light/dark theme. `!important` because dnd5e declares
+   this variable inside `@scope`: scope proximity is compared BEFORE
+   specificity, so a plain declaration could never win — `!important`
+   reverses the layer order so layouts (us) beats system (dnd5e). */
 
-/* ------------------------------------------------------------------ */
-/*  아이템 시트 배경 텍스처 제거 (ceDnd5eItemSheetFlat)                */
-/* ------------------------------------------------------------------ */
-/* dnd5e 는 모든 애플리케이션을 `background: var(--dnd5e-application-background)`
-   로 칠하는데, 그 값은 양피지/데님 이미지 레이어와 배경'색'이 한 단축 속성에
-   섞여 있다. 그래서 변수를 통째로 갈아끼우지 않고 이미지 레이어만 끈다 —
-   색은 테마가 정한 값이 그대로 남으므로 밝은/어두운 테마를 우리가 추측할
-   필요가 없다. `!important` 인 이유는 dnd5e 가 이 변수를 `@scope` 안에서
-   선언하기 때문: 스코프 근접성은 명시도보다 먼저 비교되므로 일반 선언으로는
-   이길 수 없고, `!important` 는 레이어 순서를 뒤집어 layouts(우리) 가
-   system(dnd5e) 을 이긴다. */
 body.fe-dnd5e-item-flat .dnd5e2.sheet.item {
   background-image: none !important;
 }
 
-/* 머리말 위에 150px 높이로 깔리는 배너 그림. */
+/* The banner image laid 150px tall over the header. */
+
 body.fe-dnd5e-item-flat .dnd5e2.sheet.item:not(.minimized)::before {
   content: none !important;
 }
 
 /* ------------------------------------------------------------------ */
-/*  희귀도 단일 드롭다운 (ceDnd5eItemRaritySelect)                     */
+/*  Single rarity dropdown (ceDnd5eItemRaritySelect)                    */
 /* ------------------------------------------------------------------ */
-/* multi-select 위젯 자리에 들어가는 우리 <select>. 원래 위젯이 li 폭을 채우던
-   자리이므로 폭만 맞춰 주고 나머지는 dnd5e 의 폼 스타일에 맡긴다. */
+/* Our <select> that lands where the multi-select widget was. The widget
+   filled the li's width, so only the width is matched — the rest defers
+   to dnd5e's form styles. */
+
 .dnd5e2.sheet.item li.item-rarity > select.fe-item-rarity-select {
   width: 100%;
 }

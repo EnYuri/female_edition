@@ -122,12 +122,14 @@ test("midi-qol still ships the LEGACY dnd5e card markup, so its selectors stay u
  * ------------------------------------------------------------------ */
 
 const TIDY_OVERRIDE = read("styles/fe-tidy-override.css");
+const TIDY_RETRO = read("styles/fe-tidy-retro.css");
 
 test("tidy Classic rules are KEPT for tidy 13.x worlds", () => {
   // tidy5e-sheet 14 dropped the Classic layout entirely (its main.css contains no
   // "classic" at all). These rules simply stop matching there — they are backward
-  // compatibility for a world still on 13.x, not dead code to delete.
-  assert.match(DND5E_COMPAT, /\.tidy5e-sheet\.application\.classic/);
+  // compatibility for a world still on 13.x and for the maintained tidy-classic
+  // fork, not dead code to delete. They now live in styles/fe-tidy-retro.css.
+  assert.match(TIDY_RETRO, /\.tidy5e-sheet\.application\.classic/);
 });
 
 test("tidy Quadrone retro rules reach item/group/encounter/tooltip sheets too", () => {
@@ -135,10 +137,10 @@ test("tidy Quadrone retro rules reach item/group/encounter/tooltip sheets too", 
   // but item/group/encounter/tooltip did not. `:is()` keeps the specificity at one
   // class, identical to the old `.actor`, so no cascade fight changes.
   assert.match(
-    DND5E_COMPAT,
+    TIDY_RETRO,
     /\.tidy5e-sheet\.application\.quadrone:is\(\.actor, \.item, \.group, \.encounter, \.tooltip\)/,
   );
-  assert.doesNotMatch(DND5E_COMPAT, /\.tidy5e-sheet\.application\.quadrone\.actor\b/);
+  assert.doesNotMatch(TIDY_RETRO, /\.tidy5e-sheet\.application\.quadrone\.actor\b/);
 });
 
 test("tidy font variable overrides cover both the 13.x and the 14 names", () => {
@@ -153,6 +155,161 @@ test("tidy font variable overrides cover both the 13.x and the 14 names", () => 
     "--t5e-font-roboto-condensed",
   ]) {
     assert.ok(TIDY_OVERRIDE.includes(modern), `${modern} (tidy 14) missing`);
+  }
+});
+
+test("the centralized --t5e-* remap is present and every token declaration wins", () => {
+  // The remap sits on plain `.tidy5e-sheet` — NOT `.application` — because the
+  // floating Classic context menu is not an .application. All seven Classic
+  // sheet classes (character/npc/vehicle/item/container/group/encounter) and
+  // the detached info card ride on that one scope.
+  const block = TIDY_RETRO.match(/body\.fe-retro-theme \.tidy5e-sheet \{([\s\S]*?)\n\}/);
+  assert.ok(block, "the centralized .tidy5e-sheet variable remap is gone");
+
+  // layouts(7) loses to tidy's modules(9) for normal declarations regardless of
+  // specificity — `!important` reverses layer precedence, so EVERY token remap
+  // in the file must carry it (main --t5e-* block, --dod-* contamination tab,
+  // --statblock-* NPC palette, and element-level re-points alike).
+  const missing = [
+    ...stripComments(TIDY_RETRO).matchAll(
+      /(--(?:t5e|dod|statblock)-[\w-]+\s*:[^;{}]*;)/g,
+    ),
+  ].filter((m) => !m[1].includes("!important"));
+  assert.deepEqual(
+    missing.map((m) => m[1]),
+    [],
+    "a token remap declaration lost its !important",
+  );
+});
+
+/** Selector minus dead arms: any argument or compound carrying `:not(*)` can
+ * never match (`*` adds zero specificity and matches everything). Paren groups
+ * are folded innermost-first so `:is(.dnd5e2, .tidy5e-sheet:not(*))` keeps its
+ * live arm while `:is(.tidy5e-a:not(*), .tidy5e-b:not(*))` dies entirely.
+ * Real `:not(...)` arguments are exclusion filters, not positive matches, so
+ * their contents are erased before the tidy check (a `.tidy5e` inside
+ * `:not(...)` keeps tidy DOM OUT of the rule — the opposite of a leak). */
+const stripDeadSelectorArms = (sel) => {
+  const DEAD = ""; // sentinel for the `:not(*)` marker
+  // Fold one paren group: recursively fold each top-level argument first, drop
+  // arguments that are fully dead, then emit the folded group. `:not()` args
+  // are exclusions — their content is erased (`:not(#)`), and a `:not()` whose
+  // args all died excludes nothing-matcher → everything → dead itself.
+  const fold = (text) => {
+    let out = "", i = 0;
+    while (i < text.length) {
+      const open = text.indexOf("(", i);
+      if (open === -1) { out += text.slice(i); break; }
+      let depth = 0, close = -1;
+      for (let j = open; j < text.length; j++) {
+        if (text[j] === "(") depth++;
+        else if (text[j] === ")") { depth--; if (depth === 0) { close = j; break; } }
+      }
+      if (close === -1) { out += text.slice(i); break; }
+      const fn = text.slice(i, open).match(/(:[a-z-]+)$/)?.[1] || "";
+      const inner = text.slice(open + 1, close);
+      // split top-level args at depth-0 commas, fold each recursively
+      const args = [];
+      let d = 0, start = 0;
+      for (let j = 0; j <= inner.length; j++) {
+        const c = inner[j];
+        if (c === "(") d++;
+        else if (c === ")") d--;
+        if (j === inner.length || (d === 0 && c === ",")) {
+          args.push(inner.slice(start, j)); start = j + 1;
+        }
+      }
+      const live = args.map((a) => fold(a.trim())).filter((a) => a && !a.includes(DEAD));
+      const folded =
+        fn === ":not" ? (live.length ? ":not(#)" : DEAD)
+        : live.length ? `${fn}(${live.join(",")})`
+        : DEAD;
+      out += text.slice(i, open - fn.length) + folded;
+      i = close + 1;
+    }
+    return out;
+  };
+  let s = fold(sel.replace(/:not\(\*\)/g, DEAD));
+  // Drop top-level compounds that still carry the dead marker. A compound may
+  // contain balanced parens (e.g. `form.tidy5e-sheet:is(.actor):not(*)`), so
+  // split only on separators at paren depth 0.
+  let out = "", i = 0;
+  while (i < s.length) {
+    let j = i, depth = 0;
+    while (j < s.length) {
+      const c = s[j];
+      if (depth === 0 && /[\s,>+~]/.test(c)) break;
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      j++;
+    }
+    if (!s.slice(i, j).includes(DEAD)) out += s.slice(i, j);
+    if (j < s.length) out += s[j];
+    i = j + 1;
+  }
+  return out;
+};
+
+test("fe-dnd5e-compat.css carries no live Tidy selectors", () => {
+  // Every rule matching Tidy sheet DOM lives in fe-tidy-retro.css. A `.tidy5e`
+  // class inside dead `:not(*)` padding is kept to preserve a split rule's
+  // original specificity — those stay; a LIVE arm must not.
+  const offenders = [];
+  for (const m of stripComments(DND5E_COMPAT).matchAll(/([^{}]+)\{/g)) {
+    if (/\.tidy5e/.test(stripDeadSelectorArms(m[1]))) {
+      offenders.push(m[1].trim().slice(0, 120));
+    }
+  }
+  assert.deepEqual(offenders, [], "Tidy rules leaked back into fe-dnd5e-compat.css");
+});
+
+test("fe-tidy-retro.css sits in the layouts layer directly after fe-dnd5e-compat.css", () => {
+  // Order keeps the split rules in their original sequence; the layouts layer is
+  // what makes our !important the winning weight against tidy's modules-layer CSS.
+  const manifest = JSON.parse(read("module.json"));
+  const i = manifest.styles.findIndex(
+    (e) => typeof e === "object" && e.src === "styles/fe-dnd5e-compat.css",
+  );
+  assert.ok(i >= 0, "fe-dnd5e-compat.css is not registered as an object entry");
+  const next = manifest.styles[i + 1];
+  assert.equal(next?.src, "styles/fe-tidy-retro.css");
+  assert.equal(next?.layer, "layouts");
+});
+
+test("the fork's last literal colours are routed through --t5e-* tokens", () => {
+  // tidy5e-classic-global.css is edited as source (the LESS sources are
+  // unrecoverable). Each of these used to be a hardcoded paint the variable
+  // remap could not reach; now a dedicated token carries the same default,
+  // and fe-tidy-retro.css re-points it.
+  const CLASSIC_GLOBAL = read("tidy-classic/styles/tidy5e-classic-global.css");
+  for (const v of [
+    "--t5e-secret-background",
+    "--t5e-secret-revealed-background",
+    "--t5e-facility-card-background",
+    "--t5e-facility-card-blend-mode",
+    "--t5e-meter-background",
+    "--t5e-filter-include-color",
+    "--t5e-filter-exclude-color",
+    "--t5e-unidentified-glyph-color",
+    "--t5e-item-input-disabled-background",
+    "--t5e-button-borderless-hover-background",
+  ]) {
+    assert.ok(CLASSIC_GLOBAL.includes(`${v}:`), `${v} not declared in the fork baseline`);
+    assert.ok(TIDY_RETRO.includes(`${v}:`), `${v} not remapped for retro`);
+  }
+  // …and the consumption sites must actually read the tokens, not a literal.
+  for (const pattern of [
+    /section\.secret\{[^}]*background:var\(--t5e-secret-background\)/,
+    /section\.secret\.revealed\{background:var\(--t5e-secret-revealed-background\)\}/,
+    /facility:not\(\.empty\)\{[^}]*background:var\(--t5e-facility-card-background\)/,
+    /facility-progress-meter\{[^}]*background-color:var\(--t5e-meter-background\)/,
+    /filter-button-toggle\.include[^{]*\{[^}]*color:var\(--t5e-filter-include-color\)/,
+    /filter-button-toggle\.exclude[^{]*\{[^}]*color:var\(--t5e-filter-exclude-color\)/,
+    /unidentified-glyph i\{color:var\(--t5e-unidentified-glyph-color\)/,
+    /input:disabled[^{]*\{[^}]*background:var\(--t5e-item-input-disabled-background\)/,
+    /button-borderless:hover\{background:var\(--t5e-button-borderless-hover-background\)\}/,
+  ]) {
+    assert.match(CLASSIC_GLOBAL, pattern, `fork rule no longer reads its token: ${pattern}`);
   }
 });
 

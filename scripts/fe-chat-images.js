@@ -293,7 +293,8 @@ function ciBuildPopupFeatures() {
   }
 }
 
-// Open the image in a real browser window (the "새 창으로 보기" ImagePopout header button).
+// Open the image in a real browser window (the "새 창으로 보기" = "open in new window"
+// ImagePopout header button).
 // Relative paths are absolutised; data: is converted to blob: to dodge the navigation block.
 function ciOpenImageInBrowser(src) {
   if (!src) return;

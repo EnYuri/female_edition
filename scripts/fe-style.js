@@ -479,7 +479,8 @@ function feSetUserColorBgBaseClass(doc = document) {
 
     /* …and the SAME question again for speakerless/GM system messages, because they do
      * not share that base. `--fe-system-msg-bg` paints them with a colour of their own, so
-     * a white system base inside a 진회색-based log (or the reverse) left dnd5e's card
+     * a white system base inside a 진회색 (dark gray)–based log (or the reverse) left
+     * dnd5e's card
      * interior re-pointed the wrong way — measured: `li.fe-system-msg` painted #ffffff
      * while it still carried `--color-text-primary: #fff` and
      * `--dnd5e-background-card: #252830` from the body-level dark branch.
@@ -500,7 +501,7 @@ function feSetUserColorBgBaseClass(doc = document) {
   } catch {}
 }
 
-/* The dark ("진회색") base tone, as a #rrggbb string.
+/* The dark ("진회색" = dark gray) base tone, as a #rrggbb string.
  *
  * Single source of truth is `--fe-userbg-black-rgb` in `styles/chat-bg-stripper.css`
  * (raw "r g b" bytes, so CSS can alpha-compose it with `rgb(... / a)`). Read it back
@@ -525,9 +526,10 @@ function feDarkBaseHex(doc = document) {
 
 /* The colour the speakerless/GM system-message base is actually painted with.
  *
- * Picked from the same three tones as the chat-card base (흰색 / 진회색 / 사용자 지정)
- * rather than typed in as a raw colour; SYSTEM_MSG_BG_COLOR survives as the
- * "사용자 지정" value only. Two callers need this, and they must not disagree:
+ * Picked from the same three tones as the chat-card base (흰색 / 진회색 / 사용자 지정 =
+ * white / dark gray / custom) rather than typed in as a raw colour; SYSTEM_MSG_BG_COLOR
+ * survives as the "사용자 지정" (custom) value only. Two callers need this, and they must
+ * not disagree:
  * `feApplyStyleVarsFromSettings` publishes it (plus its contrast ink), and
  * `feSetUserColorBgBaseClass` decides which way THESE messages lean for the dnd5e
  * re-pointing blocks. */
@@ -718,7 +720,7 @@ function feEnsureCanvasFontsLoaded(families) {
 // This is a DIFFERENT path from CONFIG.canvasTextStyle above. Drawing#_getTextStyle
 // (client/canvas/placeables/drawing.mjs) and Note#_getTextStyle read the document's
 // own `fontFamily` and only fall back to CONFIG.defaultFontFamily when it is blank
-// (the sheet's "기본값" blank option). The family dropdown itself comes from
+// (the sheet's "기본값" = default blank option). The family dropdown itself comes from
 // FontConfig.getAvailableFontChoices(), which lists exactly the families that were
 // declared in CONFIG.fontDefinitions with `editor: true` AND then loaded through
 // FontConfig.loadFont — nothing else can appear there.
@@ -727,7 +729,7 @@ function feEnsureCanvasFontsLoaded(families) {
 //   1. declare + load them, so every module font is selectable per drawing/note
 //      (and in the journal editor's font menu, which uses the same list),
 //   2. point CONFIG.defaultFontFamily at the active primary family, so a drawing
-//      left on "기본값" uses the module font without the user picking anything.
+//      left on "기본값" (default) uses the module font without the user picking anything.
 //
 // The definitions deliberately use an empty `fonts: []`: ui-font.css already owns
 // every @font-face, so core only has to await document.fonts for that family

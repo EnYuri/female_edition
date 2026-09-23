@@ -73,7 +73,8 @@ const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
 // Collapsed (minimized) state — a client runtime flag, reset on reload.
 let _ctCollapsed = false;
 
-// Entrance animation ("위에서 부드럽게 내려와 정지"). Must be per-combatant and
+// Entrance animation ("위에서 부드럽게 내려와 정지" = slide down smoothly from the top and
+// settle). Must be per-combatant and
 // TIME-BASED, not a plain CSS class: feCtRender rebuilds the strip with innerHTML on
 // every combat/actor/token hook, so a freshly-created node would replay (or, once the
 // id is known, abruptly lose) its animation on any unrelated update mid-flight.
@@ -197,7 +198,8 @@ function feCtCanEndTurnForCombatant(combat, combatant, user = game.user) {
 // Rolling goes through `combat.rollInitiative([id])` — core's own path — for a
 // deliberate reason: on dnd5e that method builds the roll from
 // `Actor5e#getInitiativeRoll()`, i.e. the actor sheet's OWN advantage/disadvantage
-// fields, and evaluates it directly. The 유리/불리 prompt the user sees in the
+// fields, and evaluates it directly. The 유리/불리 (advantage/disadvantage) prompt the user
+// sees in the
 // native encounter tab comes from the OTHER dnd5e entry point
 // (`actor.rollInitiativeDialog()`, combat-tracker action "rollInitiative"), which
 // we intentionally never call — rolling from this tracker must be one click.
@@ -206,7 +208,8 @@ function feCtCanEndTurnForCombatant(combat, combatant, user = game.user) {
 
 // In-flight guard. The rollable test reads the LIVE `initiative`, which is still null
 // until the roll's update round-trips — so a double-click (or an impatient second click
-// on 전체 굴림) would pass the guard twice and roll the same combatant twice before the
+// on 전체 굴림 = roll-all) would pass the guard twice and roll the same combatant twice
+// before the
 // first call resolves. dblclick on the d20 is already ignored for opening the sheet, but
 // a dblclick still delivers TWO click events, so this has to be handled here.
 const _ctRollingIds = new Set();
@@ -337,7 +340,7 @@ function feCtControlButtons(combat) {
   const started = Number(round) > 0;
   return [
     // Shown only while somebody still needs a roll — same self-explanatory pattern as
-    // 전투 개시 (which disappears once the encounter has started).
+    // 전투 개시 (begin combat — which disappears once the encounter has started).
     feCtHasUnrolledCombatants(combat)
       ? feCtBtn("roll-all", "fa-dice-d20", feLocalize("FECT.RollAll"))
       : null,
@@ -705,7 +708,7 @@ async function feCtHandleAction(action) {
   // The collapse toggle is personal UI, so handle it before the GM gate.
   if (action === "toggle-collapse") {
     _ctCollapsed = !_ctCollapsed;
-    feCtScheduleRender(); // 버튼 아이콘/툴팁도 상태에 맞게 갱신
+    feCtScheduleRender(); // re-sync the button icon/tooltip to the new state
     return;
   }
   if (!game.user?.isGM) return;
@@ -729,7 +732,7 @@ async function feCtHandleAction(action) {
       }
       case "end-combat": await combat.endCombat(); break;
       // Core's rollAll() already filters to owned combatants whose initiative is null,
-      // and on dnd5e it routes through Combat#rollInitiative → no 유리/불리 dialog.
+      // and on dnd5e it routes through Combat#rollInitiative → no 유리/불리 (adv/disadv) dialog.
       case "roll-all": {
         if (_ctRollingAll) break;
         if (!feCtHasUnrolledCombatants(combat)) {

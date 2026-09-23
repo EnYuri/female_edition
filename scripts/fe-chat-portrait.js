@@ -817,7 +817,8 @@ function cpUpsertPortrait(message, messageEl) {
   // Narrator messages hide the base header entirely; round-marker messages keep their original
   // header because, for several modules, the header *is* the marker UI.
   // The dx3rd combat notices are round markers too, but their header is NOT marker UI —
-  // it is just the GM's (or the acting actor's) name on a "라운드 3" / "메인 프로세스" line.
+  // it is just the GM's (or the acting actor's) name on a "라운드 3" (round 3) /
+  // "메인 프로세스" (main process) line.
   // dnd5e's own combat notices have no header; match that and hide it like a narrator line.
   const isNarratorSpecial = cpIsNarratorToolsMessage(message, messageEl);
   const isRoundMarkerSpecial = cpIsRoundMarkerMessage(message, messageEl);

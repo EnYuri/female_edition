@@ -28,7 +28,7 @@ if (!globalThis.__femaleEditionUpdateCheckInstalled) {
     }, 4000);
   });
 
-  // Wire the "흐에알겠는" dismiss button on our update-notice chat card.
+  // Wire the "흐에알겠는" (≈ "fine, got it") dismiss button on our update-notice chat card.
   Hooks.on("renderChatMessageHTML", (message, html) => {
     try {
       if (!message?.flags?.female_edition?.updateNotice) return;

@@ -1,25 +1,29 @@
 /*
  * fe-retro-common.css
- * female_edition — 시스템과 무관하게 적용되는 레트로 표면 보정
+ * female_edition — retro surface fixes applied regardless of game system
  *
- * 이 파일은 fe-dx3rd-compat.css 뒤, fe-dnd5e-compat.css 앞에 layouts
- * 레이어로 로드된다. 기존의 실제 우선순위를 보존하면서, 시스템 파일이
- * Theatre·타이핑 표시·툴팁·주사위 같은 공통 기능의 의존점이 되는 것을 막는다.
+ * This file loads in the layouts layer AFTER fe-dx3rd-compat.css and BEFORE
+ * fe-dnd5e-compat.css. It preserves the existing effective precedence while
+ * keeping system files from becoming the dependency point of shared features
+ * like Theatre, the typing indicator, tooltips, and dice.
  *
- * 코어 폼 컨트롤의 표면(input·select·textarea, color-picker 등 입력 래퍼
- * 커스텀 엘리먼트, 체크박스, ::placeholder)은 이 파일이 아니라
- * fe-retro-forms.css 가 소유한다. 그 파일은 이 파일 바로 뒤에 로드된다.
- * button 만은 예외로 여기 남아 있다 — 이유는 § 전역 버튼 절의 주석 참고.
+ * Core form-control surfaces (input·select·textarea, input-wrapper custom
+ * elements like color-picker, checkbox, ::placeholder) are owned by
+ * fe-retro-forms.css, NOT this file — it loads immediately after this one.
+ * `button` alone is the exception staying here — see the § global-button
+ * section comment for why.
  */
 
-/* ── <select> 요소 ─────────────────────────────────────────────
- * 셀렉트는 화살표·내부 여백·option 팝업이 하나의 레이아웃 계약이다. 전역
- * appearance:none과 20px 우측 패딩은 DX3rd AppV2의 좁은 행 및 dnd5e의
- * 변수 기반 컨트롤을 덮어쓴다. 공통 레이어에서는 소유하지 않고, DX3rd·D&D
- * 및 Theatre처럼 구조를 아는 규칙만 각자 범위에서 꾸민다.
- * (배경·글자색·테두리색만 fe-retro-forms.css § F1 이 칠한다.) */
+/* ── <select> elements ───────────────────────────────────────
+ * A select's arrow, inner padding, and option popup are one layout
+ * contract. A global appearance:none + 20px right padding would stomp
+ * DX3rd AppV2's narrow rows and dnd5e's variable-driven controls. The
+ * shared layer does not own them — only rules that know the structure
+ * (DX3rd, D&D, Theatre) style each within its own scope.
+ * (Only background/text/border colors are painted, by fe-retro-forms.css
+ * § F1.) */
 
-/* ── Foundry 툴팁 ────────────────────────────────────────────── */
+/* ── Foundry tooltips ──────────────────────────────────────── */
 body.fe-retro-theme
   :is(#tooltip, .tooltip, .toolclip, foundry-tooltip, [data-tooltip-content]) {
   background:     #000000 !important;
@@ -29,7 +33,7 @@ body.fe-retro-theme
   outline-offset: 0px !important;
 }
 
-/* ── Foundry 컨텍스트 메뉴 ─────────────────────────────────── */
+/* ── Foundry context menu ──────────────────────────────────── */
 body.fe-retro-theme
   :is(#context-menu, nav.context-menu, menu.context-menu, .context-menu) {
   --text-color: var(--fe-ac-90) !important;
@@ -63,54 +67,16 @@ body.fe-retro-theme
   color: #000000 !important;
 }
 
-/* ── Foundry 캔버스 제어 ───────────────────────────────────── */
-/* Tidy's floating menu has its own ink rules on entries and icons. Match
- * that scope explicitly; inherited menu colors cannot override those rules. */
-body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context) {
-  --t5e-primary-font-color: var(--fe-ac-90) !important;
-  --t5e-secondary-font-color: var(--fe-ac-70) !important;
-  --t5e-faint-color: var(--fe-ac-22) !important;
-  background: var(--fe-ac-06) !important;
-  border-color: var(--fe-ac-45) !important;
-}
-
-body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
-  :is(a, li.context-item) {
-  background: transparent !important;
-  color: var(--fe-ac-90) !important;
-}
-
-body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
-  :is(a, li.context-item) :is(i, dnd5e-icon, svg) {
-  color: var(--fe-ac-80) !important;
-  --icon-fill: var(--fe-ac-80) !important;
-  --icon-stroke: var(--fe-ac-80) !important;
-}
-
-body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
-  :is(a, li.context-item):is(:hover, :focus-visible) {
-  --t5e-primary-font-color: #000000 !important;
-  background: var(--fe-ac-80) !important;
-  color: #000000 !important;
-  outline-color: var(--fe-ac-45) !important;
-}
-
-body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classic.context)
-  :is(a, li.context-item):is(:hover, :focus-visible) * {
-  color: #000000 !important;
-  --icon-fill: #000000 !important;
-  --icon-stroke: #000000 !important;
-}
-
+/* ── Foundry canvas controls ───────────────────────────────── */
 body.fe-retro-theme #navigation { background: transparent !important; }
 
-/* ── Foundry 창 프레임 ─────────────────────────────────────── */
+/* ── Foundry window frame ──────────────────────────────────── */
 body.fe-retro-theme :is(.window-app, .application) {
   background: #000 !important;
   background-image: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  /* 창 드래그 중 위치 변화에는 전환을 걸지 않는다. */
+  /* No transition on position changes while a window is being dragged. */
   transition-property: none !important;
 }
 
@@ -138,28 +104,33 @@ body.fe-retro-theme .application :is(footer, nav.tabs) {
   background-image: none !important;
 }
 
-/* ── 씬 설정 탭 가시성 ─────────────────────────────────────────
- * SceneConfig의 탭 nav는 `sheet-tabs tabs top-tabs`이고, 코어가
- * `nav.tabs.sheet-tabs.top-tabs { border-top: none }`으로 상단 보더를 지워
- * 하단 한 줄만 --color-tabs-border(다크 테마 = --color-dark-5)로 남긴다.
- * 레트로는 nav를 #000으로 칠하지만 그 변수는 재정의하지 않으므로, 검정
- * 표면 위의 거의 검정 선이 되어 nav 경계가 사라진다.
+/* ── Scene Config tab visibility ─────────────────────────────
+ * SceneConfig's tab nav is `sheet-tabs tabs top-tabs`, and core removes the
+ * top border via `nav.tabs.sheet-tabs.top-tabs { border-top: none }`,
+ * leaving a single bottom line in --color-tabs-border (--color-dark-5 on
+ * the dark theme). Retro paints the nav #000 without redefining that
+ * variable, so the line becomes near-black on black — the nav boundary
+ * disappears.
  *
- * 활성/비활성 구분도 코어에서는 color 하나뿐인데(secondary → emphatic),
- * 레트로 매핑은 L70%/α0.82 → L90%/α0.82라 알파가 같다. 강조색 채도가 0인
- * 흑백 구성에서는 회색 70% vs 90% 차이만 남아 사실상 읽히지 않는다.
+ * Core also distinguishes active/inactive only by color (secondary →
+ * emphatic), and the retro mapping is L70%/α0.82 → L90%/α0.82 — equal
+ * alpha. In a monochrome (0-saturation accent) setup only the grey 70%-vs-90%
+ * difference remains — effectively unreadable.
  *
- * 그래서 (1) 경계선을 테두리 전용 토큰으로 끌어올리고, (2) 활성 표시를
- * 색이 아닌 강조색 밑줄로 옮긴다. 비활성의 후퇴는 명도가 아니라 알파로
- * 만든다 — 텍스트 명도 하한 70% 원칙(fe-dx3rd-compat.css § 색 토큰)을
- * 지키면서 검정 배경에서의 실효 밝기만 낮추기 위함이다.
+ * So (1) the boundary is lifted to a dedicated border token, and (2) the
+ * active state moves from color to an accent underline. Inactive recession
+ * is done via alpha, not lightness — to honor the 70%-lightness floor
+ * (fe-dx3rd-compat.css § color tokens) while still lowering the effective
+ * brightness on black.
  *
- * nav 하단선은 코어가 이미 border-bottom을 갖고 있으므로 색만 바꾼다.
- * 반면 활성 밑줄은 box-shadow inset으로 그린다 — <a>에는 보더가 없어
- * border-bottom을 추가하면 높이가 2px 늘어 탭 행 전체가 흔들린다.
+ * The nav bottom line only recolors — core already has a border-bottom
+ * there. The active underline, though, is drawn as an inset box-shadow —
+ * the <a> has no border, so adding border-bottom would grow it 2px and
+ * shift the whole tab row.
  *
- * 항목 사이 세로 구분선도 한때 넣었으나 뺐다. 하단선 + 세로선이 겹치면
- * 탭 하나하나가 테두리 박스처럼 읽혀 과했다 — 밑줄 하나로 충분하다. */
+ * Vertical separators between items were tried and removed: bottom line +
+ * vertical lines read as each tab getting its own border box — too heavy;
+ * one underline is enough. */
 body.fe-retro-theme .application.scene-config nav.tabs {
   border-bottom: 1px solid var(--fe-ac-33) !important;
 }
@@ -188,19 +159,23 @@ body.fe-retro-theme :is(.window-app, .application)
   color: var(--fe-ac-90) !important;
 }
 
-/* 헤더 컨트롤 hover 비주얼 통일 — 전역 button:hover(§ 강조색 면 + 검정 글씨)가
-   창 헤더까지 내려오면 두 가지가 깨진다.
-   (1) 바로 위 hover 규칙이 (0,4,1) 로 글씨를 --fe-ac-90(밝은 색)으로 못박으므로
-       강조색이 밝은 계열일 때 흰 바탕에 흰 글씨가 된다 — DX3rd 시트 헤더의
-       "액터 타입"/"프로토타입 토큰" 처럼 라벨이 있는 header-control 에서 실제로
-       글자가 사라졌다. DX3rd 시트는 아래 .window-app/.application 규칙의
-       :not(.dx3rd-emanim) 시스템 가드에 걸려 어두운 hover 면(--fe-ac-12)을
-       받지 못하고 전역 규칙으로 떨어지기 때문에 이 조합이 성립한다.
-   (2) 헤더 컨트롤은 면 없는 아이콘/텍스트 버튼이라 강조색 면을 깔면 시트 본문
-       버튼의 hover(어두운 면 + 강조색 테두리)와 표현이 어긋난다.
-   → 시스템과 무관하게 레트로 평균값인 "어두운 면 + 강조색 테두리 + 밝은 글씨"로
-   통일한다. 명시도 (0,5,2) 이므로 전역 규칙은 이기고, 자체 헤더 팔레트를 가진
-   fe-dnd5e-compat.css 의 (0,9,x) 규칙들에는 진다(의도한 우선순위). */
+/* Unified hover visual for header controls — letting the global button:hover
+   (§ accent surface + black text) reach window headers breaks two things.
+   (1) The hover rule right above pins text to --fe-ac-90 (a bright tone) at
+       (0,4,1), so with a light-family accent it becomes white text on a
+       white surface — labeled header-controls like DX3rd sheet headers'
+       "Actor Type"/"Prototype Token" actually lost their text. DX3rd sheets
+       hit the :not(.dx3rd-emanim) system guard of the .window-app/
+       .application rule below, so they never get the dark hover surface
+       (--fe-ac-12) and fall through to the global rule — enabling exactly
+       this combination.
+   (2) Header controls are surface-less icon/text buttons; laying an accent
+       surface under them clashes with the body-button hover idiom (dark
+       surface + accent border).
+   → Unified to the system-agnostic retro mean: "dark surface + accent
+   border + bright text". At (0,5,2) it beats the global rule and loses to
+   fe-dnd5e-compat.css's (0,9,x) rules that own their header palette
+   (intended precedence). */
 body.fe-retro-theme :is(.window-app, .application) .window-header
   :is(.header-control, .close, .minimize, .header-button):not([disabled]) {
   background: transparent !important;
@@ -214,15 +189,16 @@ body.fe-retro-theme :is(.window-app, .application) .window-header
   color: var(--fe-ac-90) !important;
 }
 
-/* 아이콘·라벨은 버튼 색을 그대로 따른다. 헤더 버튼 내부의 span 은 § 본문 텍스트
-   규칙(--fe-ac-57)에 잡혀 hover 시에도 어두운 채로 남는다. */
+/* Icon and label follow the button color as-is. A span inside a header
+   button is caught by the § body-text rule (--fe-ac-57) and would stay dark
+   even on hover. */
 body.fe-retro-theme :is(.window-app, .application) .window-header
   :is(.header-control, .close, .minimize, .header-button):not([disabled]) :is(i, span, svg) {
   color: inherit !important;
 }
 
 
-/* 모듈이 주입한 헤더 버튼은 코어 최소화 상태에서 숨긴다. */
+/* Module-injected header buttons are hidden while core is minimized. */
 body.fe-retro-theme .application.minimized .window-header
   :is(.fedr-sheet-btn, .fet-stage-btn, .header-control:not([data-action="close"])) {
   display: none !important;
@@ -248,7 +224,8 @@ body.fe-retro-theme
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22)) !important;
 }
 
-/* Plutonium/5etools의 내부 창 표면은 특정 게임 시스템에 종속되지 않는다. */
+/* Plutonium/5etools' internal window surfaces are not tied to a specific
+   game system. */
 body.fe-retro-theme :is(.window-content.ve-app-window, .ve-app-window) {
   background: #000000 !important;
   background-image: none !important;
@@ -332,7 +309,7 @@ body.fe-retro-theme :is(.control-tool-wrapper, .controls-dropdown) {
   border-color: var(--fe-ac-22) !important;
 }
 
-/* ── Foundry 핫바·플레이어·사이드바 ────────────────────────── */
+/* ── Foundry hotbar · players · sidebar ────────────────────── */
 body.fe-retro-theme #hotbar {
   background: #000 !important;
   background-image: none !important;
@@ -378,7 +355,7 @@ body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
 body.fe-retro-theme .sidebar-tab :is(a, li, label) { color: var(--fe-ac-57) !important; }
 body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) { color: var(--fe-ac-80) !important; }
 
-/* 모듈 공통 타이핑 인디케이터. 점은 currentColor를 따라간다. */
+/* Shared typing indicator. The dots follow currentColor. */
 body.fe-retro-theme #fe-typing-notify {
   color: var(--fe-ac-80) !important;
   background: transparent !important;
@@ -386,7 +363,7 @@ body.fe-retro-theme #fe-typing-notify {
   text-shadow: none !important;
 }
 
-/* ── 채팅 입력 및 시스템 중립 창 ───────────────────────────── */
+/* ── Chat input & system-neutral windows ───────────────────── */
 body.fe-retro-theme :is(#chat-form, :is(chat-sidebar, .chat-sidebar) footer, :is(chat-sidebar, .chat-sidebar) .chat-footer) {
   background: #000 !important;
   border-color: var(--fe-ac-22) !important;
@@ -429,16 +406,19 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
   border-color: var(--fe-ac-70) !important;
 }
 
-/* 텍스트류 input · select · textarea 표면, 입력 래퍼 커스텀 엘리먼트, 체크박스,
-   ::placeholder → fe-retro-forms.css 로 이관. button 은 여기 남는다 — 아래 전역
-   button 규칙과 위 채팅 컨트롤 button 규칙이 동일 명시도 동률이라 소스 순서로
-   승자가 갈리고, 다른 파일로 옮기면 그 동률이 조용히 뒤집힌다.
+/* Text-type input · select · textarea surfaces, input-wrapper custom
+   elements, checkbox, ::placeholder → moved to fe-retro-forms.css. `button`
+   stays here — the global button rule below and the chat-controls button
+   rule above tie at equal specificity, so the winner is decided by source
+   order; moving it to another file would silently flip that tie.
 
-   단 하나의 예외가 `:not(<입력 래퍼> > *)` 가드다. color-picker / file-picker /
-   formula-input / .input-group 의 직계 자식 버튼은 자유 버튼이 아니라 껍데기의
-   구성 부품이며(코어가 transparent 로 명시), 불투명하게 칠하면 껍데기의 테두리를
-   덮어 잘라 먹는다. 그 표면은 fe-retro-forms.css § F2 가 소유한다. 가드 없이는
-   아래 규칙이 명시도 (0,7,3) 으로 § F2 의 (0,5,3) 을 이겨버린다 — 실측 확인.
+   The single exception is the `:not(<input wrapper> > *)` guard. Direct
+   child buttons of color-picker / file-picker / formula-input /
+   .input-group are not free-standing buttons but components OF the shell
+   (core explicitly makes them transparent), and painting them opaque
+   covers and clips the shell's border. That surface is owned by
+   fe-retro-forms.css § F2. Without the guard, the rule below at (0,7,3)
+   would beat § F2's (0,5,3) — measured live.
 
    The Tidy5e guards (.transparent-button / .transparent-inline /
    .transparent-inline-icon / .inline-transparent-button / .item-list-button /
@@ -473,7 +453,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
   color: var(--fe-ac-57) !important;
 }
 
-/* ── 공통 아이콘·사이드바 버튼·Theatre 헤더 ─────────────────── */
+/* ── Shared icons · sidebar buttons · Theatre header ───────── */
 body.fe-retro-theme i[class*="fa"] { color: inherit !important; }
 
 body.fe-retro-theme .sidebar-tab button,
@@ -496,8 +476,9 @@ body.fe-retro-theme :is(.window-app, .application) .fet-stage-btn:hover { color:
 body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove { color: #c94444 !important; }
 body.fe-retro-theme :is(.window-app, .application) .fet-stage-remove:hover { color: #ff6b6b !important; }
 
-/* ── 전역 버튼 및 보조 텍스트 ──────────────────────────────────
- * 스크린 패널 면 탭은 활성 상태에서 자체 배경을 관리하므로 제외한다. */
+/* ── Global buttons & secondary text ─────────────────────────
+ * Screen-panel face tabs manage their own background while active, so they
+ * are excluded. */
 body.fe-retro-theme button:not(.fe-sp-face-tab) {
   background-color: #000000 !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
@@ -551,7 +532,7 @@ body.fe-retro-theme .sound-controls
 body.fe-retro-theme :is([class*="subtle"], .hint, .notes) { color: var(--fe-ac-t33) !important; }
 body.fe-retro-theme [class*="secondary"] { color: var(--fe-ac-57) !important; }
 
-/* ── ProseMirror 공통 UI ────────────────────────────────────── */
+/* ── ProseMirror shared UI ─────────────────────────────────── */
 body.fe-retro-theme #prosemirror-dropdown {
   color: var(--fe-ac-90) !important;
   --dropdown-background: #000000 !important;
@@ -616,7 +597,8 @@ body.fe-retro-theme :is(.prosemirror, prose-mirror) menu button:is(:hover, .acti
 
 body.fe-retro-theme :is(.prosemirror, prose-mirror) menu .pm-dropdown > span { color: var(--fe-ac-70) !important; }
 
-/* 코어의 전체 화면 클릭-닫기 오버레이는 창 배경·픽셀 외곽선을 받지 않는다. */
+/* Core's full-screen click-to-close overlay gets no window background or
+   pixel outline. */
 body.fe-retro-theme dialog.menu-dialog.prosemirror {
   background: transparent !important;
   background-image: none !important;
@@ -629,7 +611,7 @@ body.fe-retro-theme dialog.menu-dialog.prosemirror::after {
   display: none !important;
 }
 
-/* ── Theatre 이모트·대사 박스 ───────────────────────────────── */
+/* ── Theatre emote · dialogue box ──────────────────────────── */
 body.fe-retro-theme .fe-stage-emote-menu {
   background:     #000000 !important;
   border:         1px solid var(--fe-dx3rd-accent, #ffffff) !important;
@@ -691,7 +673,7 @@ body.fe-retro-theme .fe-stage-nav-remove-cur:hover {
   color: #f77 !important;
 }
 
-/* 9-슬라이스 테두리가 컨테이너에 잘리지 않도록 한다. */
+/* Keeps the 9-slice border from being clipped by the container. */
 body.fe-retro-theme .fe-stage-textbox {
   overflow: visible !important;
   isolation: isolate !important;
@@ -738,7 +720,7 @@ body.fe-retro-theme .fe-stage-dock:not(.fe-stage-dock--inset) .fe-stage-portrait
   bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
 }
 
-/* ── 주사위·인라인 롤 ───────────────────────────────────────── */
+/* ── Dice · inline rolls ───────────────────────────────────── */
 body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
@@ -775,8 +757,9 @@ body.fe-retro-theme
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) {
-  /* 유저색이 없는 메시지의 기본 윤곽선. 리터럴 #ffffff 였는데, 강조색에 색조를
-     넣으면 여기만 흰색으로 남아 튀었다(강조색을 녹색으로 돌려 실측). */
+  /* Default outline for messages without a user color. It was a literal
+     #ffffff, but once the accent picks up a hue this alone stayed white and
+     stuck out (measured with the accent turned green). */
   --fe-dice-outline: var(--fe-ac-90, #ffffff);
 }
 
@@ -810,15 +793,16 @@ body.fe-retro-theme
     1px 2px 0 var(--fe-dice-outline), 2px 2px 0 var(--fe-dice-outline) !important;
 }
 
-/* 주사위 눈 글자색.
- * core 는 `.dice-tooltip .dice-rolls .roll { color: #000 }` 을 하드코드한다
- * (foundry2.css:5630). 위 .dice-tooltip 규칙이 패널을 #000 으로 칠하므로,
- * 그대로 두면 눈금이 배경과 똑같은 검정이 되어 사라진다 — 바로 위 윤곽선
- * text-shadow 의 흰 ±2px 후광만 남아 오히려 더 읽기 어려워진다.
- * .exploded/.fumble 만 자기 color 를 갖고 있어서 "일부 주사위만 숫자가
- * 보인다"로 나타난다. 상태 클래스가 없는 눈을 밝은 액센트로 되돌린다.
- * (.discarded/.rerolled 는 core 가 color:inherit + opacity 필터로 흐리게
- *  처리하므로 여기서 상속받아 의도대로 어두워진다.) */
+/* Dice-pip text color.
+ * Core hardcodes `.dice-tooltip .dice-rolls .roll { color: #000 }`
+ * (foundry2.css:5630). Since the .dice-tooltip rule above paints the panel
+ * #000, leaving it makes the pips the same black as the background — only
+ * the white ±2px halo from the outline text-shadow above remains, making
+ * them even harder to read.
+ * Only .exploded/.fumble carry their own color, which presented as "some
+ * dice show numbers". Pips with no state class return to a bright accent.
+ * (.discarded/.rerolled get color:inherit + an opacity filter from core, so
+ *  they inherit this and dim as intended.) */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
@@ -826,17 +810,19 @@ body.fe-retro-theme
   color: var(--fe-ac-90, #e6e6e6) !important;
 }
 
-/* core 의 성공/실패 색(#18520b / #aa0200)은 검정 패널 위에서 판독 불가다.
- * 예전에는 의미를 살리려고 밝은 초록/빨강(#4ade80 / #ff6b6b)으로 올렸지만,
- * 레트로는 의미를 **색으로 나르지 않는다** → 명도 축으로 옮긴다:
- *   성공/최대 = --fe-ac-96 (불투명 L=96%, 팔레트의 최상단)
- *   실패/최소 = --fe-ac-t22 (L=82% · 채도 24% · α .82, 눈에 띄게 바랜 톤)
- *   폭발/펌블 = 어두운 알(--fe-ac-12) + 밝은 후광으로 "반전"시켜 구분.
- *              후광 밝기만 다르다(폭발 --fe-ac-96 / 펌블 --fe-ac-45).
- * 강조색에 채도가 있으면 그 색조는 따라간다 — 모노톤은 "회색 고정"이 아니라
- * "의미색(초록/빨강)을 쓰지 않는다"는 뜻이다.
- * 색을 뒤트는 sepia/hue-rotate 필터는 끈다(그 필터는 우리 윤곽선 text-shadow
- * 까지 함께 물들인다). */
+/* Core's success/failure colors (#18520b / #aa0200) are unreadable on the
+ * black panel. They used to lift to bright green/red (#4ade80 / #ff6b6b)
+ * to preserve meaning, but retro does NOT carry meaning by hue → moved to
+ * the lightness axis instead:
+ *   success/max = --fe-ac-96 (opaque L=96%, top of the palette)
+ *   failure/min = --fe-ac-t22 (L=82% · S=24% · α .82, a visibly faded tone)
+ *   exploded/fumble = dark shell (--fe-ac-12) + bright halo as an
+ *              "inverted" distinction. Only the halo brightness differs
+ *              (exploded --fe-ac-96 / fumble --fe-ac-45).
+ * When the accent has saturation, its hue still carries — monotone means
+ * "no semantic green/red", not "fixed grey".
+ * The sepia/hue-rotate filters that recolor are disabled (those filters
+ * would tint our outline text-shadow along with the text). */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
@@ -892,10 +878,11 @@ body.fe-retro-theme
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
 }
 
-/* ── 롤테이블 결과 행 (.table-results) ───────────────────────
- * 코어의 결과 행(li.flexrow)은 검은 판 위에 아이콘과 문장만 떠 있어 행 경계가
- * 없고, 왼쪽 결과 아이콘(img)도 테두리가 없다 — monks .item-image(아래 §)와
- * 같은 사정이다. 행과 아이콘 각각에 옅은 하드 라인을 둘러 결을 맞춘다. */
+/* ── Roll-table result rows (.table-results) ─────────────────
+ * Core's result row (li.flexrow) floats an icon and a sentence on the black
+ * panel with no row boundary, and the left result icon (img) has no border
+ * either — same situation as monks' .item-image (§ below). A faint hard
+ * line on both the row and the icon matches the texture. */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   :is(.chat-message, .message) .table-results > li {
@@ -908,16 +895,18 @@ body.fe-retro-theme
   border: 1px solid var(--fe-ac-33) !important;
 }
 
-/* ── monks-tokenbar 카드 (세이브 요청 / 대조 굴림) ───────────
- * 이 모듈은 카드 안쪽 구분선을 양피지 리터럴로 직접 박는다(tokenbar.css):
+/* ── monks-tokenbar cards (save requests / contested rolls) ──
+ * This module hard-codes its card's inner separators as parchment literals
+ * (tokenbar.css):
  *   .card-header            → 2px groove #ffffff
  *   .items-list .items-header → 2px groove #eeede0
  *   .items-list .item       → 1px solid #c9c7b8
- *   .card-footer span       → 2px groove #ffffff (오른쪽 구분선)
- * 변수 경유가 전혀 없어서 팔레트 리맵으로는 닿지 않고, 강조색에 색조를 넣으면
- * 이 세 줄만 양피지색으로 남는다(강조색을 녹색으로 돌려 실측). 선택자를 직접
- * 잡는 수밖에 없다 — 대신 dnd5e 와 무관한 모듈이므로 여기(공통)에 둔다.
- * groove → solid: 레트로는 모든 경계를 하드 라인 하나로 그린다(§7·§16과 동일). */
+ *   .card-footer span       → 2px groove #ffffff (right separator)
+ * Nothing goes through variables, so the palette remap cannot reach them —
+ * give the accent a hue and these three lines stay parchment (measured
+ * with the accent turned green). The only option is selecting them
+ * directly — kept here (common) because the module is dnd5e-agnostic.
+ * groove → solid: retro draws every boundary as one hard line (§7·§16). */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .monks-tokenbar :is(.card-header, .items-list .items-header, .items-list .item,
@@ -926,17 +915,20 @@ body.fe-retro-theme
   border-style: solid !important;
 }
 
-/* 같은 사정의 두 번째 묶음 — 성공/실패 색.
- * tokenbar.css 는 내성 성공을 #468847(초록), 실패를 #b94a48(빨강) 리터럴로 칠한다:
+/* A second bundle in the same situation — success/failure colors.
+ * tokenbar.css paints passed saves #468847 (green) and failures #b94a48
+ * (red) as literals:
  *   .dice-total a.result-passed.selected / .dice-result.success .total / .dice-text.passed
  *   .dice-total a.result-failed.selected / .dice-result.fail .total    / .dice-text.failed
- *   .item-roll .adv-btn.advantage / .disadvantage  (이점/불이익 +- 버튼)
- *   .dice-roll a.add-xp                            (초록 면 + 흰 글자)
- * 레트로는 의미를 색으로 나르지 않는다 → 명도축으로 옮긴다:
- *   성공/이점 = 밝은 쪽(--fe-ac-90), 실패/불이익 = 흐린 쪽(--fe-ac-57).
- * 이 잉크는 dnd5e 전역 스윕(.fe-accent-text-override)이 닿지 않는다 — 스윕은
- * fe-retro-system-dnd5e 게이트가 걸려 있고 [class*="fa-"] 를 제외하는데, 여기서
- * 초록으로 남는 건 그 제외 대상인 아이콘과 그 부모다. 그래서 따로 잡는다. */
+ *   .item-roll .adv-btn.advantage / .disadvantage  (advantage/disadvantage +- buttons)
+ *   .dice-roll a.add-xp                            (green surface + white text)
+ * Retro does not carry meaning by hue → moved to the lightness axis:
+ *   success/advantage = bright (--fe-ac-90), failure/disadvantage = faded
+ *   (--fe-ac-57).
+ * This ink is outside the dnd5e global sweep (.fe-accent-text-override) —
+ * the sweep is gated on fe-retro-system-dnd5e and excludes [class*="fa-"],
+ * and what stays green here is exactly that excluded icon and its parent.
+ * Hence a dedicated rule. */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .monks-tokenbar :is(
@@ -961,7 +953,8 @@ body.fe-retro-theme
   color: var(--fe-ac-57) !important;
 }
 
-/* XP 지급 버튼만 면을 칠하던 곳이다. 초록 면 → 어두운 면 + 밝은 윤곽선(§7 어법). */
+/* Only the XP-grant button had its surface painted here. Green surface →
+   dark surface + bright outline (§7 idiom). */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .monks-tokenbar li.item .dice-roll a.add-xp {
@@ -970,19 +963,20 @@ body.fe-retro-theme
   color: var(--fe-ac-90) !important;
 }
 
-/* 행(.item-name.flexrow) 왼쪽의 토큰 아이콘. 배경 이미지를 깐 빈 div 이고
-   tokenbar.css:604 가 `border: none` 을 명시한다(실측 0px none) — 검은 판 위에
-   아트만 떠 있어 경계가 없다. midi 의 타겟/세이브 썸네일은 --dnd5e-color-gold
-   경유라 이미 --fe-ac-80 테두리를 받으므로, 같은 밝기의 하드 라인 하나를 둘러
-   결을 맞춘다. 코어가 `*{box-sizing:border-box}` 를 걸어 두어 30px 고정 폭
-   (flex: 0 0 30px)은 그대로고 아트만 2px 안쪽으로 들어온다. */
+/* The token icon left of the row (.item-name.flexrow). It is an empty div
+   with a background image, and tokenbar.css:604 declares `border: none`
+   (measured 0px none) — the art floats on the black panel with no edge.
+ * midi's target/save thumbnails already get a --fe-ac-80 border via
+ * --dnd5e-color-gold, so a single hard line of the same brightness matches
+ * the texture. Core's `*{box-sizing:border-box}` keeps the 30px fixed
+ * width (flex: 0 0 30px) — only the art moves 2px inward. */
 body.fe-retro-theme
   :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
   .monks-tokenbar .item .item-image {
   border: 1px solid var(--fe-ac-80) !important;
 }
 
-/* ── 공통 최상위 강조 텍스트 ────────────────────────────────── */
+/* ── Common top-level accent text ──────────────────────────── */
 body.fe-retro-theme :is(.window-app, .application) .window-title,
 body.fe-retro-theme :is(.window-app, .application) h1.window-title,
 body.fe-retro-theme .message-sender,
@@ -992,26 +986,26 @@ body.fe-retro-theme .fe-stage-textbox-name {
   color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-/* ── 패키지 태그 칩 (모듈 관리 / 시스템·월드 목록) ─────────────
- * 마크업: templates/setup/parts/package-tags.hbs
+/* ── Package tag chips (module management / system·world lists) ──
+ * Markup: templates/setup/parts/package-tags.hbs
  *   .package-list .package .package-overview.tags > span.tag
- * 코어(foundry2.css:6880~)는 이 칩을 "채워진 면"으로 그린다 —
- * 기본 background:var(--color-cool-4) 에 더해 종류별로 하드코딩된 색이
- * 따로 붙는다(javascript #803c62, css #1e5c6f, compendium #3b3a80,
- * languages #224224, unavailable #750000, unknown #b07900, badge 는
- * --color-level-{warning,error,success}-bg).
+ * Core (foundry2.css:6880~) draws these chips as "filled surfaces" —
+ * beyond the default background:var(--color-cool-4), per-type hardcoded
+ * colors are pinned on (javascript #803c62, css #1e5c6f, compendium
+ * #3b3a80, languages #224224, unavailable #750000, unknown #b07900, and
+ * badge uses --color-level-{warning,error,success}-bg).
  *
- * 레트로에서는 그 면이 아이콘·버전 글자를 삼켜 읽기 어렵다. 면을 걷어내고
- * 테두리만 남긴다.
+ * Under retro that surface swallows the icon and version text — strip the
+ * surface and keep only the border.
  *
- * ⚠️ 테두리 색을 일괄로 흰색으로 덮지 않는다. 면이 사라진 뒤에는 테두리가
- *    상태(호환/경고/오류)를 전달하는 **유일한** 신호로 남기 때문이다.
- *    기본 칩만 강조색으로 올리고, .badge 계열의 border-color 는 코어가
- *    정한 값을 그대로 둔다.
+ * ⚠️ Border color is NOT flattened to white across the board. Once the
+ *    surface is gone, the border is the ONLY remaining signal for status
+ *    (compatible/warning/error). Only the default chip lifts to accent;
+ *    .badge-family border-color keeps the values core assigned.
  *
- * ⚠️ background-color 가 아니라 background 단축 속성으로 덮는다 — 코어도
- *    단축 속성으로 주기 때문에, background-color 만 지우면 나중에 코어가
- *    background-image 를 얹었을 때 그것이 남는다. */
+ * ⚠️ Overridden via the `background` shorthand, not `background-color` —
+ *    core also sets the shorthand, so clearing only background-color would
+ *    leave any background-image core adds later in place. */
 
 body.fe-retro-theme .package-list .package .tags > .tag {
   background: transparent !important;
@@ -1019,7 +1013,7 @@ body.fe-retro-theme .package-list .package .tags > .tag {
   color: var(--fe-ac-90, rgba(230, 230, 230, 0.9)) !important;
 }
 
-/* 상태 배지는 면만 지우고 테두리색은 코어 값을 유지한다. */
+/* Status badges: strip only the surface; border color keeps core's values. */
 body.fe-retro-theme .package-list .package .tags > .tag.badge {
   background: transparent !important;
 }
@@ -1028,8 +1022,8 @@ body.fe-retro-theme .package-list .package .tags > .tag.badge.neutral {
   border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45)) !important;
 }
 
-/* 코어는 hover / .active / .loading 상태에서 칩 면을 다시 칠한다
-   (foundry2.css:14604~). 그것도 같이 막는다. */
+/* Core repaints the chip surface on hover / .active / .loading too
+   (foundry2.css:14604~) — blocked here as well. */
 body.fe-retro-theme .package-list .package:is(:hover, .active, .loading) .tags > .tag {
   background: transparent !important;
 }

@@ -262,64 +262,76 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
 }
 
 
-/* ── 병합 그룹 외곽선 (옵션: body.fe-chat-group-outline) ─────────────────────────
- * 병합 그룹(또는 단일 메시지)을 외곽선으로 감싸 박스처럼 표시한다. 기본은 꺼짐.
+/* ── Merge-group outline (option: body.fe-chat-group-outline) ─────────────────
+ * Wraps a merge group (or a single message) in an outline to display it as
+ * a box. Off by default.
  *
- * 동작 원리: 위 standard 병합 규칙들이 그룹 내부 경계의 border-width 를 이미 0 으로
- *   만든다(start 하단 / mid 상·하 / end 상단, 명시도 0,5,0 의 !important). 따라서
- *   "낮은 명시도(0,3,0)"의 기본 테두리를 모든 메시지에 깔면, 내부 경계는 병합 규칙이
- *   이겨 0 으로 남고 그룹 바깥 둘레만 테두리가 그려진다 → 그룹 박스.
- * 색상: 유저 색상(.fe-has-user-color) 우선, 없으면 액센트.
- *   폴백은 예전에 리터럴 rgba(255,255,255,0.45) 였다. 마스터/시스템 메시지는
- *   .fe-has-user-color 가 붙지 않으므로(fe-render-state.js: GM 내레이션·NPC 는 틴트 억제)
- *   항상 이 폴백을 쓰는데, 순백 고정이라 액센트 색조가 전혀 반영되지 않고 플레이어
- *   쪽 알파(0.6)보다 옅었다 → 마스터만 색조·농도가 튀었다. 액센트 원색 + 알파 0.6
- *   으로 맞춘다. 명도를 깎는 --fe-ac-90-* 계열은 쓰지 말 것(fe-dx3rd-compat.css §14
- *   헤더 주석: 마스터 테두리만 어두워진다).
- * transition:none — 레트로의 `* { transition: all 1ms }` 가 테두리 변경을 시작값에
- *   고착시키는 문제(채팅 색조 틴트와 동일 원인)를 회피. */
+ * How it works: the standard merge rules above already zero the border-width
+ *   at group-internal boundaries (start bottom / mid top+bottom / end top —
+ *   (0,5,0) !important). So laying a low-specificity (0,3,0) default border
+ *   on every message leaves the internal boundaries at 0 (the merge rules
+ *   win) and draws the border only around the group perimeter → group box.
+ * Color: user color (.fe-has-user-color) first, else accent.
+ *   The fallback used to be the literal rgba(255,255,255,0.45).
+ *   Master/system messages never get .fe-has-user-color
+ *   (fe-render-state.js suppresses the tint for GM narration·NPCs), so they
+ *   always used that fallback — fixed pure white reflected none of the
+ *   accent hue and was fainter than the player-side alpha (0.6) → only the
+ *   master cards stood out in hue·density. Now matched to raw accent +
+ *   alpha 0.6. Do NOT use the lightness-clipped --fe-ac-90-* family here
+ *   (fe-dx3rd-compat.css §14 header comment: only the master border
+ *   darkens).
+ * transition:none — avoids retro's `* { transition: all 1ms }` pinning a
+ *   border change to its start value (same cause as the chat-tint case). */
 body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message {
   --fe-group-outline-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6);
   border: 3px solid var(--fe-group-outline-color) !important;
   transition: none !important;
 }
 
-/* 유저 색상이 있으면 그 색으로 */
+/* With a user color, use that color */
 body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color {
   --fe-group-outline-color: rgb(var(--fe-user-color-rgb, 255 255 255) / 0.6);
 }
 
-/* 내레이터/라운드 마커 등 특수 메시지는 외곽선 제외 (기본보다 높은 명시도) */
+/* Special messages (narrator/round markers etc.) excluded from the
+   outline (higher specificity than the default) */
 body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message:is(.narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"]) {
   border: 0 !important;
 }
 
 
-/* ── 메시지 테두리 유저색 끄기 (옵션: body.fe-hide-msg-border-usercolor) ────────
- * 코어(client/documents/chat-message.mjs:442)가 화자 없는(OOC 스타일) 메시지의
- * <li> 에 `style="border-color:{author 유저 색상}"` 을 인라인으로 직접 박는다.
- * 코어 설정 UI에는 이걸 끄는 옵션이 없다 — female_edition 기능도 아니고, 순수
- * 코어 기본 동작이다. 인라인 값은 !important 가 아니므로 아래 한 줄로 이긴다.
+/* ── Disable user-color message borders
+ * (option: body.fe-hide-msg-border-usercolor) ────────
+ * Core (client/documents/chat-message.mjs:442) writes
+ * `style="border-color:{author user color}"` inline on the <li> of
+ * speakerless (OOC-style) messages.
+ * Core settings UI has no toggle for this — it is not a female_edition
+ * feature but pure core default behavior. The inline value is not
+ * !important, so the single rule below wins.
  *
- * `border-color` 만 되돌리고 `border`(폭/스타일)는 건드리지 않는다 — 코어의
- * `--chat-message-border-color`(기본 회색, foundry2.css) 로 복귀시키는 것이
- * 목적이지 테두리 자체를 지우는 게 아니다.
+ * Only `border-color` is restored; `border` (width/style) is untouched —
+ * the goal is returning to core's `--chat-message-border-color`
+ * (default grey, foundry2.css), not removing the border itself.
  *
- * :not(.fe-chat-group-outline) — 병합 그룹 외곽선 기능이 켜져 있으면 그쪽이
- * 의도적으로 유저 색상 테두리를 그리므로 이 옵션과 상충한다. body 클래스
- * 조합으로 그룹 외곽선 쪽을 우선시켜, 선택자 명시도 경쟁 없이 깔끔하게 양보한다. */
+ * :not(.fe-chat-group-outline) — when the merge-group outline feature is
+ * on it intentionally draws user-color borders, conflicting with this
+ * option. The body-class combination yields to the group outline, a clean
+ * concession with no selector-specificity contest. */
 body.fe-hide-msg-border-usercolor:not(.fe-chat-group-outline)
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message {
   border-color: var(--chat-message-border-color) !important;
 }
 
-/* 레트로에서는 코어 회색 대신 레트로 강조색으로 — 위 규칙과 같은 선택자에 body
- * 클래스 하나(.fe-retro-theme)를 더 얹었을 뿐이라 명시도로 자연히 이긴다.
- * transition:none — 레트로의 전역 `transition-duration:1ms !important`(§1) 가
- * border-color 변경(설정 저장/레트로 토글의 라이브 반영)을 시작값에 고착시키는
- * 함정을 회피한다(위 유저 색상 틴트 예외와 동일 원인·동일 처방). */
+/* Under retro, the retro accent instead of core grey — same selector as
+ * the rule above plus one body class (.fe-retro-theme), so it wins on
+ * specificity naturally.
+ * transition:none — avoids retro's global
+ * `transition-duration:1ms !important` (§1) pinning a border-color change
+ * (settings save / live retro toggle) to its start value (same cause,
+ * same cure as the user-color tint exception above). */
 body.fe-retro-theme.fe-hide-msg-border-usercolor:not(.fe-chat-group-outline)
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message {
@@ -359,11 +371,14 @@ body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #
   display: none !important;
 }
 
-/* 병합이 접는 것은 "화자 정보"(이름/포트레이트/타임스탬프)이지 메시지 내용이 아니다.
-   flavor 텍스트(core 템플릿의 header > span.flavor-text)는 그 메시지에만 있는 내용이라
-   후속 메시지에서도 살려야 한다 — 내용이 flavor 에만 있는 메시지(굴림 flavor 등)는
-   헤더를 통째로 숨기면 글자가 아예 사라져 버린다.
-   그래서 hide 모드에서는 헤더를 지우는 대신 flavor 를 제외한 자식만 지운다. */
+/* What merge collapses is the "speaker info" (name/portrait/timestamp),
+   not the message content.
+   The flavor text (core template's header > span.flavor-text) is content
+   unique to that message and must survive in follow messages — a message
+   whose content lives only in the flavor (roll flavors etc.) would lose
+   all its text if the header were hidden wholesale.
+   So in hide mode, instead of removing the header, only its non-flavor
+   children are removed. */
 body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text:not(:empty)) {
   display: block !important;
   padding: 0 !important;

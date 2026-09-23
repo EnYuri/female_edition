@@ -485,7 +485,7 @@ function fePatchChatContextOptions(inject) {
 }
 
 /**
- * Install the "메시지 수정" entry into the chat message context menu.
+ * Install the "메시지 수정" (edit message) entry into the chat message context menu.
  *
  * Important: this must run during init (before ChatLog creates its ContextMenu)
  * or Foundry may bind a handler to the original _getEntryContextOptions.

@@ -584,7 +584,7 @@ export async function feArchivePrint(win) {
   // its `document.visibilityState` is "hidden" (verified) and Chromium does not run
   // rAF for a hidden window at all. `win.focus()` two lines up does not help: focus
   // stealing is blocked. The old `catch` never fired either — a rAF that is simply
-  // never serviced does not throw. So the user pressed "인쇄" and waited a minute-plus
+  // never serviced does not throw. So the user pressed "인쇄" (print) and waited a minute-plus
   // for a frame that only arrived when the compositor happened to wake the window,
   // which is why the delay looked random.
   //

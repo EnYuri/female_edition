@@ -371,7 +371,7 @@ async function cpResampleToDataURL(
     // peak allocation 4x and removing one full-size draw entirely.
     // Bound the ladder on the LARGER dimension, and never clamp the smaller one to
     // `target`. The old loop tested `work.width` alone and clamped both next dims with
-    // `Math.max(target, …)`, which for "자르기 없음" (contain, non-square source) was
+    // `Math.max(target, …)`, which for "자르기 없음" (no crop; contain, non-square source) was
     // wrong in both directions: a TALL portrait stopped a step early (final canvas→canvas
     // draw up to ~2.4:1 instead of ≤2:1), and a WIDE one had its height floored at
     // `target` mid-ladder — e.g. 4000×1000 became a 250×128 work canvas holding a
@@ -444,7 +444,8 @@ function cpMaybeApplyHQResample(img, size, shape, anchorTop = false) {
     //
     // Measured live 2026-08-07 on v14: after the export pass, calling this on the archive log
     // took 48/48 portraits from 256x256 back to 64x64. That is the whole of the reported
-    // "아카이브 PDF에서 일부 포트레이트만 저해상도" — and it presents as "일부" only because
+    // "아카이브 PDF에서 일부 포트레이트만 저해상도" (only some portraits low-res in the archive
+    // PDF) — and it presents as "일부" (some) only because
     // the two passes RACE: `feNormalizeArchivePortraitImages` enqueues the HQ jobs during
     // render and `feUpgradePortraitsForExport` awaits network fetches, so which one lands
     // last varies per source (a big source decodes slower and lands after ⇒ that speaker is
@@ -580,7 +581,8 @@ function cpShouldUseHQResample(img, shape) {
     // as `… fe-print-chatlog fe-chat-archive fe-chat-archive-window …`
     // (`fe-archive-document.js`, feBuildArchiveDocument), so it carries BOTH. Testing print
     // first made this branch unreachable and silently disabled HQ resampling in every
-    // archive window — the reported "아카이브에서 포트레이트 안티에일리어싱이 안 된다".
+    // archive window — the reported "아카이브에서 포트레이트 안티에일리어싱이 안 된다"
+    // (portrait anti-aliasing does not apply in the archive).
     if (body?.classList?.contains("fe-chat-archive")) return true;
 
     // Genuine print/PDF path only — `feExportChatLogToPDFInline` adds `fe-print-chatlog`
@@ -659,7 +661,8 @@ function cpEffectiveExportTarget(srcW, srcH, fit, targetPx) {
  *                                             answer; the caller must pin it and keep
  *                                             it out of the avatar downscaler.
  *
- * That third case is not a detail — it is where the "NPC 포트레이트만 저해상도" report
+ * That third case is not a detail — it is where the "NPC 포트레이트만 저해상도" (only NPC
+ * portraits low-res) report
  * came from. Two sources land in it and BOTH used to fall through to a low-resolution
  * ceiling that the large-art portraits never hit:
  *

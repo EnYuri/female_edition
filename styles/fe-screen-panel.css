@@ -3,8 +3,9 @@
 /* ----- Dropdown menu ----- */
 .fe-sp-menu {
   position: fixed;
-  /* 좌상단이 기본값 — JS 는 붙인 뒤 실측해서 뷰포트 안으로 클램프한 좌표만 덮어쓴다.
-     inset 이 auto 면 fixed 요소가 static 위치에 잠깐 놓여 측정값이 흔들린다. */
+  /* Top-left is the default — JS measures after attaching and only overwrites
+     with viewport-clamped coordinates. With inset:auto a fixed element sits
+     briefly at its static position and the measurement wobbles. */
   left: 0;
   top: 0;
   z-index: 100;
@@ -87,8 +88,8 @@
 }
 
 /* ----- Hover tooltip ----- */
-/* 크기를 재는 한 프레임 동안만 — .active 로 켜 두되 보이지는 않게 한다
-   (JS 가 style.visibility 를 쓰지 않는다). */
+/* Only for the one frame it is measured — kept on via .active but invisible
+   (JS does not write style.visibility). */
 .fe-sp-menu.fe-sp-measuring {
   visibility: hidden;
 }
@@ -125,13 +126,14 @@
    and let the content area scroll internally. */
 .fe-screen-panel-sheet {
   max-height: 80vh;
-  /* 테두리·면 색을 currentColor 에서 뽑는다 (MUST keep). 이 시트의 색들은 원래
-     rgba(0, 0, 0, …) 였는데 그건 '밝은 시트'를 전제한 값이고, 코어 기본 테마가
-     theme-dark 인 월드에서는 통째로 보이지 않았다 — 실측: 활성 탭 테두리
-     rgba(0,0,0,0.15) 가 검은 시트 위에서 사라져, 화면에 보이던 주황 외곽선은
-     우리 스타일이 아니라 코어의 포커스 링이었다. currentColor 는 테마를 따라
-     뒤집히므로 밝은 테마/어두운 테마 양쪽에서 같은 대비를 낸다. 레트로 테마는
-     아래 별도 블록이 명시적으로 덮으므로 영향이 없다. */
+  /* Border and surface colors are drawn from currentColor (MUST keep). This
+     sheet's colors were originally rgba(0, 0, 0, …), which assumed a 'light
+     sheet' — on a world whose core theme is theme-dark they were invisible
+     wholesale — measured: the active tab border rgba(0,0,0,0.15) vanished on
+     the black sheet, and the orange outline actually seen was core's focus
+     ring, not our style. currentColor flips with the theme, so both light
+     and dark themes get the same contrast. The retro theme is explicitly
+     overridden by a separate block below, so it is unaffected. */
   --fe-sp-line: color-mix(in srgb, currentColor 20%, transparent);
   --fe-sp-line-strong: color-mix(in srgb, currentColor 40%, transparent);
   --fe-sp-fill: color-mix(in srgb, currentColor 7%, transparent);
@@ -141,10 +143,11 @@
   overflow-y: auto;
 }
 
-/* 프로토타입 토큰 설정은 토큰화된 패널에서만 의미가 있다(타일 패널에는 토큰이 없다).
-   AppV2 프레임 버튼은 창 프레임 생성 시 한 번만 만들어지고 이후 렌더에서 다시
-   만들어지지 않으므로, 버튼 자체는 항상 만들고 표시 여부만 매 렌더마다
-   #syncTokenizeButton이 루트에 다는 .fe-sp-tokenized 로 뒤집는다. */
+/* Prototype-token settings only make sense on a tokenized panel (a tile
+   panel has no token). AppV2 frame buttons are created once when the window
+   frame is built and never rebuilt on later renders, so the button is
+   always created and only its visibility is flipped per render via the
+   .fe-sp-tokenized class #syncTokenizeButton puts on the root. */
 .fe-screen-panel-sheet:not(.fe-sp-tokenized)
   .window-header button[data-action="configurePrototypeToken"] {
   display: none;
@@ -167,12 +170,14 @@
   font-size: 12px;
   font-weight: 600;
 }
-/* 위치 고정 / 더블클릭으로 면 전환은 같은 그리드 행에 나란히 놓인다. 예전에는 각
-   칸에 인라인 설명문(.notes)이 붙어 있었고 두 힌트의 길이가 크게 달라서(LockedHint
-   가 거의 두 배) `justify-content: end` 바닥 정렬과 맞물려 정작 눈이 가는 체크박스
-   줄이 서로 다른 높이에 앉았다. 설명문을 툴팁으로 옮기면서 두 칸 모두 한 줄이 되었으므로
-   가운데 정렬로 위쪽 입력 칸들과 나란히 앉힌다. 설명문을 다시 인라인으로 되돌린다면
-   이 정렬부터 손봐야 한다. */
+/* Position lock / double-click face-switching sit side by side on the same
+   grid row. Previously each cell had an inline note (.notes), and the two
+   hints differed greatly in length (LockedHint was almost twice as long), so
+   combined with the `justify-content: end` bottom alignment the checkboxes
+   the eye actually goes to sat at different heights. With the notes moved
+   into tooltips both cells are one line, so center alignment sits them level
+   with the input rows above. If the notes ever go back inline, this
+   alignment needs revisiting first. */
 .fe-screen-panel-sheet .fe-sp-field-checkbox {
   justify-content: center;
 }
@@ -194,20 +199,23 @@
 }
 
 /* ----- Face tab navigation -----
-   줄바꿈(wrap)이지 가로 스크롤이 아니다 (MUST keep). `overflow-x: auto` 는 이 nav 를
-   스크롤 컨테이너로 만들고, 스크롤 컨테이너는 가로만이 아니라 블록 축도 함께 잘라낸다.
-   면 탭은 <button class="… active"> 라서 코어 foundry2.css 의
+   Wrapping, NOT horizontal scrolling (MUST keep). `overflow-x: auto` turns
+   this nav into a scroll container, and a scroll container clips the block
+   axis too, not just the horizontal. Face tabs are <button class="… active">,
+   so they receive core foundry2.css's
    `a.button.active, button.active { outline: 1px solid …; box-shadow: 0 0 4px …; }`
-   (layer(elements.forms)) 를 그대로 받는데, outline 과 box-shadow 는 테두리 상자
-   '바깥'에 그려진다 — 스크롤 컨테이너가 그걸 잘라냈다. 이것이 실제로 보고된
-   "활성화 시 외곽선 클리핑" 의 정체다. 이 코어 글로우는 살려 둔다: 테마를 따라가고
-   활성 탭을 어느 테마에서든 분명히 표시해 준다. 다만 그러려면 이 nav 가 절대
-   클리핑하면 안 된다. 면이 많으면 스크롤 대신 다음 줄로 넘어간다.
+   (layer(elements.forms)) — and outline/box-shadow paint OUTSIDE the border
+   box, which the scroll container clipped. That was the reported
+   "active-tab outline clipping" bug. That core glow is kept deliberately: it
+   follows the theme and marks the active tab clearly in every theme — but
+   only if this nav never clips. With many faces, tabs wrap to the next line
+   instead of scrolling.
 
-   경계선은 탭이 아니라 이 nav 가 갖는다. 아래 `.fe-sp-face` / `.fe-sp-empty` 는
-   `border-top: none` 이라 상자의 윗변을 누군가는 그려 줘야 하는데, 예전처럼 탭마다
-   테두리를 두르면 그 윗변이 탭 폭만큼만 이어지다 끊긴다. nav 가 한 줄로 그으면
-   상자 너비 전체를 덮고, 활성 탭은 그 선 위에 앉는다. */
+   The boundary line belongs to this nav, not the tabs. `.fe-sp-face` /
+   `.fe-sp-empty` below have `border-top: none`, so someone must paint the
+   box's top edge — with a border on every tab, that edge ran only as far as
+   the tabs and then broke off. A single line on the nav covers the box's
+   full width and the active tab sits on it. */
 .fe-screen-panel-sheet .fe-sp-face-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -217,17 +225,20 @@
   padding: 0 2px;
   border-bottom: 1px solid var(--fe-sp-line);
 }
-/* 비활성 탭은 테두리·배경 없이 물러나 있고, 활성 탭만 아래 `.fe-sp-face` 상자와
-   똑같은 배경·테두리색을 입어 하나의 도형으로 이어진다(면 상자는 `border-top: none`).
-   테두리 두께가 상태와 무관하게 같아야 줄이 흔들리지 않으므로, 네 변 모두 항상
-   1px 로 두고 색만 바꾼다 — 예전의 `border-bottom: none` ↔ `1px solid transparent`
-   전환은 활성 탭만 1px 높이게 만들었다. */
+/* Inactive tabs recede with no border/background; only the active tab wears
+   the same background/border color as the `.fe-sp-face` box below, joining
+   into one shape (the face box has `border-top: none`).
+   Border thickness must be state-independent or the row shifts — all four
+   sides stay 1px always and only the color changes — the old
+   `border-bottom: none` ↔ `1px solid transparent` switch made the active
+   tab 1px taller. */
 .fe-screen-panel-sheet .fe-sp-face-tab {
   flex: 0 0 auto;
   display: flex;
-  /* 코어의 `button { justify-content: center }` 를 명시적으로 덮는다 — 탭 내용은
-     항상 왼쪽에서 시작해야 하고, max-width 에 걸린 탭이 가운데 정렬로 양쪽이
-     동시에 잘려 나가는 것도 막는다. */
+  /* Explicitly override core's `button { justify-content: center }` — tab
+     content must always start from the left, and this also prevents a
+     max-width-clamped tab from clipping on BOTH sides under center
+     alignment. */
   justify-content: flex-start;
   align-items: center;
   gap: 6px;
@@ -247,10 +258,11 @@
     opacity 0.15s,
     background 0.15s;
 }
-/* Faces are images — the thumbnail is what actually identifies a tab. 테두리를 또렷하게
-   두는 것이 핵심이다: 어두운 아트를 쓴 면은 20px 썸네일이 그냥 검은 사각형이라,
-   액자가 보이지 않으면 레이블 왼쪽의 영문 모를 여백으로 읽힌다. 이미지가 없는 면도
-   같은 칸(.fe-sp-face-tab-thumb-empty)을 받아 탭들의 왼쪽 구조가 항상 같다. */
+/* Faces are images — the thumbnail is what actually identifies a tab.
+   A crisp border is the point: for a face with dark art the 20px thumbnail is
+   just a black square, so without a visible frame it reads as unexplained
+   blank space left of the label. A face with no image gets the same cell
+   (.fe-sp-face-tab-thumb-empty) so every tab's left structure is identical. */
 .fe-screen-panel-sheet .fe-sp-face-tab-thumb {
   flex: 0 0 auto;
   width: 20px;
@@ -293,8 +305,9 @@
 .fe-screen-panel-sheet .fe-sp-face-tab-add:hover {
   opacity: 0.9;
 }
-/* 어트리뷰트 탭에는 탭 줄 바로 아래에 붙는 상자가 없으므로 간격만 더 준다.
-   경계선 자체는 이제 두 탭 모두 위의 공통 규칙이 갖는다. */
+/* The attributes tab has no box directly under the tab row, so it only gets
+   extra spacing. The boundary line itself is now owned by the shared rule
+   above for both tabs. */
 .fe-screen-panel-sheet .fe-sp-attrs-tab .fe-sp-face-tabs {
   margin-bottom: 8px;
 }
@@ -332,8 +345,9 @@
   flex-direction: column;
   gap: 6px;
 }
-/* 활성 탭이 이 상자와 하나로 이어져 보여야 하므로 배경·테두리를 같은 변수에서
-   뽑는다 — 한쪽만 바꾸면 탭이 상자에서 떨어져 나온다. */
+/* The active tab must read as one shape with this box, so background and
+   border come from the same variables — change one side and the tab detaches
+   from the box. */
 .fe-screen-panel-sheet .fe-sp-face {
   display: none;
   gap: 8px;
@@ -662,13 +676,16 @@
   height: var(--fe-sp-ov-vh);
   overflow: hidden;
   margin-bottom: 8px;
-  /* 어디까지가 미리보기인지 한눈에 들어와야 한다: 레터박스(이 상자의 배경)와 시트
-     배경이 비슷해서 경계가 녹아 보였다. 굵기를 2px 로 올리지는 않는다 — box-sizing 이
-     border-box 라 콘텐츠 높이가 4px 더 줄어드는데 stage 의 contain-fit 은 여전히
-     --fe-sp-ov-vh 전체로 나누므로 둘이 어긋난다. 대신 진한 1px 테두리 + 바깥쪽
-     1px 링(box-shadow, 레이아웃 비용 0)으로 이중 경계를 만들고, 안쪽 링은 아래
-     ::before 가 콘텐츠 '위에' 그린다. inset box-shadow 는 배경 직후에 칠해지므로
-     뷰포트를 꽉 채운 면 이미지에 그대로 덮여 사라진다 — 실제로 그렇게 삼켜졌다. */
+  /* Where the preview ends must be obvious at a glance: the letterbox (this
+     box's background) and the sheet background are similar, so the edge
+     melted away. The thickness does NOT go to 2px — box-sizing is border-box,
+     so content height would shrink 4px while the stage's contain-fit still
+     divides by the whole --fe-sp-ov-vh, and the two would disagree. Instead a
+     darker 1px border + an outer 1px ring (box-shadow, zero layout cost) make
+     a double boundary; the inner ring is painted 'above' the content by the
+     ::before below. inset box-shadow paints right after the background, so a
+     viewport-filling face image simply covers it — that is exactly how it
+     got swallowed. */
   border: 1px solid rgba(0, 0, 0, 0.45);
   border-radius: 4px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
@@ -680,11 +697,13 @@
   touch-action: none;
   background: rgba(0, 0, 0, 0.06);
 }
-/* 안쪽 링. 콘텐츠 '위에' 올라타야 하므로 pseudo-element 다 — 면 이미지는 뷰포트를
-   꽉 채우고 stage 는 이 상자의 자식이라, 배경 레이어에 그려지는 inset box-shadow 로는
-   이미지에 덮여 사라진다. z-index 5 는 리셋 버튼/줌 표시(둘 다 4)보다 위지만 둘 다
-   4px 안쪽에 있어 겹치지 않고, pointer-events: none 이라 팬/줌/마커 드래그를 가리지
-   않는다. inset 0 에 대응하는 반지름은 바깥 4px 에서 테두리 1px 을 뺀 3px. */
+/* The inner ring. It must sit 'above' the content, so it is a
+   pseudo-element — the face image fills the viewport and the stage is this
+   box's child, so an inset box-shadow painted on the background layer gets
+   covered by the image. z-index 5 sits above the reset button/zoom readout
+   (both 4) but never overlaps them since both live inside the inner 4px,
+   and pointer-events:none keeps pan/zoom/marker drags unblocked. The radius
+   matching inset 0 is the outer 4px minus the 1px border = 3px. */
 .fe-screen-panel-sheet .fe-sp-overlay-preview::before {
   content: "";
   position: absolute;
@@ -1109,7 +1128,8 @@
   color: #d08a20;
   cursor: help;
 }
-/* The path itself is no longer in the row (it moved into the 설정 dialog), so the
+/* The path itself is no longer in the row (it moved into the 설정 = settings
+   dialog), so the
    warning colors the button that opens the place where it is fixed. */
 .fe-screen-panel-sheet .fe-sp-overlay-warn a[data-action="feEditOverlay"] {
   color: #d08a20;
@@ -1238,9 +1258,10 @@
   gap: 6px;
   font-weight: 600;
 }
-/* 값 바 표시가 꺼져 있으면 통째로 접힌다. 폼에서 제거하지 않고 감추기만 하는 이유는
-   [적용] 콜백이 form.elements.bar* 를 그대로 읽기 때문. 이 규칙이 display 를 지정하므로
-   UA 의 [hidden]{display:none} 을 이기고, 따라서 [hidden] 분기를 따로 둬야 한다. */
+/* Collapses entirely while "show value bar" is off. Hidden rather than
+   removed from the form because the [apply] callback still reads
+   form.elements.bar*. Since this rule sets display, it beats the UA's
+   [hidden]{display:none} — hence the dedicated [hidden] branch. */
 .fe-sp-overlay-edit-form .fe-sp-overlay-bar-fields {
   display: flex;
   flex-direction: column;
@@ -1250,15 +1271,18 @@
   display: none;
 }
 
-/* 오버레이 설정 다이얼로그의 높이 상한 (MUST keep).
-   바 설정 8칸을 모두 펼치면 내용이 화면보다 길어지는데, 코어의
-   `.application .window-content { overflow: hidden }` 이 넘치는 부분을 잘라내므로
-   폼 맨 아래 <footer> 의 [적용] 버튼이 통째로 사라져 클릭 자체가 불가능했다.
-   (v14.365 실측: 다이얼로그 높이 777px, 버튼 top 840px — 창 밖.) 증상이 "설정이 저장되지
-   않는다"로 보였던 원인이 이것이다. Enter 로는 저장됐다.
-   ApplicationV2#_updatePosition 의 height:"auto" 분기는 max-height 로 클램프하지 않지만
-   getBoundingClientRect() 로 "브라우저가 실제로 그린" 박스를 재므로 CSS max-height 는
-   존중된다 — CLAUDE.md 의 "AppV2 Auto-Height Sheets Need Explicit Scroll" 규칙 그대로. */
+/* Height cap for the overlay settings dialog (MUST keep).
+   Expanding all eight bar fields makes the content taller than the screen,
+   and core's `.application .window-content { overflow: hidden }` clips the
+   overflow — the [apply] button in the form's bottom <footer> disappeared
+   entirely and could not be clicked at all.
+   (Measured on v14.365: dialog height 777px, button top 840px — outside the
+   window.) That is why the symptom looked like "settings do not save".
+   Enter did save it.
+   ApplicationV2#_updatePosition's height:"auto" branch does not clamp with
+   max-height, but it measures via getBoundingClientRect() — "the box the
+   browser actually painted" — so a CSS max-height IS respected — exactly the
+   "AppV2 Auto-Height Sheets Need Explicit Scroll" rule in CLAUDE.md. */
 .application.dialog.fe-sp-overlay-edit-dialog {
   max-height: 85vh;
 }
@@ -1319,9 +1343,9 @@ body.fe-retro-theme
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
 }
 
-/* 미리보기 뷰포트만은 그룹 규칙의 옅은 테두리로는 경계가 읽히지 않는다 — 밝은
-   테두리 + 어두운 바깥/안쪽 링으로 이중 경계를 만든다. 그룹 규칙과 명시도가 같으므로
-   반드시 뒤에 온다. */
+/* The preview viewport alone needs more than the group rule's faint border
+   to read as a boundary — a bright border + dark outer/inner rings make a
+   double edge. Equal specificity to the group rule, so it must come after. */
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-overlay-preview {
   border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45));
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
@@ -1342,16 +1366,18 @@ body.fe-retro-theme
   border-color: var(--fe-ac-22, rgba(255, 255, 255, 0.22));
 }
 
-/* 썸네일만은 그룹의 --fe-ac-22 보다 진해야 한다 — 어두운 면 아트는 검은 시트 위에서
-   액자선이 없으면 썸네일이 아니라 빈 여백으로 읽힌다. */
+/* The thumbnail alone must be darker than the group's --fe-ac-22 — on a
+   black sheet, dark face art without a frame line reads as empty space, not
+   a thumbnail. */
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab-thumb {
   border-color: var(--fe-ac-45, rgba(255, 255, 255, 0.45));
 }
 
-/* 면 탭: 비활성은 물러나고 활성만 아래 면 상자와 같은 배경으로 이어진다. 이 파일의
-   기본 규칙과 같은 구조를 유지해야 하므로 배경/테두리를 여기서 직접 잡는다 —
-   위의 :is() 그룹에 .fe-sp-face-tab 을 다시 넣지 말 것. 넣으면 비활성 탭까지
-   칠해져 활성/비활성 구분이 뒤집힌다. */
+/* Face tabs: inactive recede, only the active one flows into the face box's
+   background below. The same structure as this file's base rule must be
+   kept, so background/border are set directly here — do NOT add
+   .fe-sp-face-tab back into the :is() group above: that would paint inactive
+   tabs too and invert the active/inactive distinction. */
 body.fe-retro-theme .fe-screen-panel-sheet .fe-sp-face-tab {
   background: transparent;
   border-color: transparent;

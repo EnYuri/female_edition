@@ -1,7 +1,8 @@
 import { feFormat } from "./fe-i18n.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // fe-typing-indicator.js
-// "다른 사람이 입력하고 있습니다" typing indicator for Foundry VTT v13 + v14.
+// "다른 사람이 입력하고 있습니다" (someone else is typing) typing indicator for Foundry VTT
+// v13 + v14.
 //
 // Design ported/adapted from CautiousGamemastersPack (CGMP) typing-notifier.js
 // (MIT, Alan Davies / Shoyu Vanilla), reimplemented to fit female_edition.
@@ -119,6 +120,7 @@ function feHandleSocket(payload, senderId) {
   // Identify the typist from the SERVER-authenticated sender, not from `payload.user`.
   // The packet-owned id was trusted verbatim, so any client could emit
   // `{type, event:"typing", user:"<someone else's id>"}` and put a "…님이 입력 중"
+  // ("… is typing")
   // caption under another player's name. The other four listeners on this shared
   // channel (screen-panel, combat-tracker, music, resource-ui) all already resolve the
   // sender this way; this one was the outlier. `payload.user` stays as the v13

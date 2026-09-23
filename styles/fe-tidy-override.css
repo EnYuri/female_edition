@@ -29,17 +29,19 @@
   --t5e-primary-font-family: var(--fe-font-primary) !important;
   --t5e-secondary-font-family: var(--fe-font-secondary) !important;
 
-  /* tidy5e-sheet 14 (Quadrone 전용) 이름. 13.x 의 `--t5e-font-family-body` 는
-     14 에 존재하지 않고, 본문 계열이 default / forms / longform 셋으로 쪼개졌다
-     (main.css 실측: family-default 4회, family-forms 3회, family-longform 사용).
-     위 13.x 이름들은 하위 호환으로 남겨 둔다 — 없는 변수를 선언하는 건 무해하다. */
+  /* tidy5e-sheet 14 (Quadrone-only) names. The 13.x `--t5e-font-family-body`
+     does not exist in 14 — the body family split into default / forms /
+     longform (measured in main.css: family-default 4×, family-forms 3×,
+     family-longform). The 13.x names above are kept for back-compat —
+     declaring a missing variable is harmless. */
   --t5e-font-family-default: var(--fe-font-secondary) !important;
   --t5e-font-family-forms: var(--fe-font-secondary) !important;
   --t5e-font-family-longform: var(--fe-font-secondary) !important;
-  /* 직접 쓰이는 서체 이름 변수(각 3·6회). 주의: tidy 14 의 합성 변수
-     (`--t5e-font-title-medium: 400 var(--font-size-28) "Modesto Condensed", …`)는
-     서체 이름을 값 안에 **직접** 박아 두므로 이 둘을 바꿔도 닿지 않는다. 그쪽은
-     아래 요소 단위 font-family 규칙들이 덮는다. */
+  /* The directly-referenced font-family name variables (3× and 6× each). Note:
+     tidy 14's composite variables (`--t5e-font-title-medium: 400 var(--font-size-28)
+     "Modesto Condensed", …`) hard-code the family name INSIDE the value, so
+     changing these two does not reach them — the per-element font-family rules
+     below cover those. */
   --t5e-font-modesto-condensed: var(--fe-font-primary) !important;
   --t5e-font-roboto-condensed: var(--fe-font-secondary) !important;
 }
@@ -113,7 +115,7 @@
  * - .tidy5e-sheet.application:where(.classic) .block-score>
  * - .sheet.application:where(.classic):where(.actor) .level
  * - .portrait-hp.svelte
- * - (추가) .portrait-hp / .resource-container / .xp-tracker / .no-gap / .actor-movement
+ * - (added) .portrait-hp / .resource-container / .xp-tracker / .no-gap / .actor-movement
  */
 
 /* Ability score blocks (numbers/labels inside the block) */

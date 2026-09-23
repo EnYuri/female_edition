@@ -9,10 +9,12 @@
  *     body.crlngn-ui.crlngn-chat .chat-message { color: var(--cui-chat-text-primary) }
  *
  * `--cui-chat-card-bg` defaults to a near-white parchment. That repaint clobbers
- * female_edition's own dark-backgrounded surfaces (내레이터 / 라운드 마커) and the
+ * female_edition's own dark-backgrounded surfaces (내레이터 narrator /
+ * 라운드 마커 round marker) and the
  * per-user color tint — and because female keeps the LIGHT foreground text on
  * those surfaces, the result is light text on crlngn's forced light card =
- * "텍스트와 카드가 둘 다 허옇게" (unreadable).
+ * "텍스트와 카드가 둘 다 허옇게" (both text and card washed-out white =
+ * unreadable).
  *
  * FIX — cascade layer priority (NOT specificity):
  *   This file is registered in module.json with { "layer": "layouts" }.
@@ -30,7 +32,7 @@
  * chat-bg-stripper.css; only the layer + the body.crlngn-ui guard differ.
  * ========================================================================== */
 
-/* --- 내레이터 채팅: 어두운 배경 + 밝은 글씨 복원 ------------------------------ */
+/* --- Narrator chat: restore dark background + light text -------------------- */
 body.crlngn-ui :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.narrator-chat, .fe-narrator-chat),
 body.crlngn-ui #chat-notifications .message:is(.narrator-chat, .fe-narrator-chat) {
   background: var(--fe-narrator-bg, #3f3d39) !important;
@@ -50,7 +52,7 @@ body.crlngn-ui #chat-notifications .message:is(.narrator-chat, .fe-narrator-chat
   color: var(--fe-narrator-meta, rgb(242 239 232 / 0.74)) !important;
 }
 
-/* --- 라운드 마커: 어두운 배경 + 밝은 글씨 복원 ------------------------------- */
+/* --- Round marker: restore dark background + light text ---------------------- */
 body.crlngn-ui :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)),
 body.crlngn-ui #chat-notifications .message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) {
   background: var(--fe-round-marker-bg, #4b4843) !important;
@@ -79,7 +81,7 @@ body.crlngn-ui #chat-notifications .message:is(.narrator-chat, .fe-narrator-chat
   box-shadow: none !important;
 }
 
-/* --- 유저 색상 채팅 배경(메시지 배경 = 발화자 색) 복원 ------------------------ *
+/* --- Restore per-user chat background (message bg = speaker color) ----------- *
  * crlngn forces .chat-message background to its parchment with !important; re-assert
  * female's per-user tint so the message bubble keeps the speaker's color. */
 body.crlngn-ui.fe-msg-bg-usercolor:not(.fe-retro-theme) :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
@@ -88,7 +90,7 @@ body.crlngn-ui.fe-msg-bg-usercolor:not(.fe-retro-theme) #chat-notifications .mes
   background-blend-mode: screen !important;
 }
 
-/* Opaque-base variants (흰/검정/커스텀 베이스). Solid base decoupled from the tint
+/* Opaque-base variants (white/black/custom base). Solid base decoupled from the tint
  * toggle (see chat-bg-stripper.css): keyed on the base class, not fe-msg-bg-usercolor. */
 body.crlngn-ui:not(.fe-retro-theme).fe-userbg-base-white :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
 body.crlngn-ui:not(.fe-retro-theme).fe-userbg-base-white #chat-notifications .message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
@@ -108,7 +110,8 @@ body.crlngn-ui:not(.fe-retro-theme):is(.fe-userbg-base-white, .fe-userbg-base-bl
 }
 
 /* =============================================================================
- * 일반 메시지 카드·글씨 색 강제 정의 — body.fe-force-normal-msg-color (설정 토글)
+ * Forced normal-message card/text colors — body.fe-force-normal-msg-color
+ * (setting toggle)
  * =============================================================================
  *
  * Setting S.FORCE_NORMAL_MSG_COLOR ("ceForceNormalMsgColor", client scope, default
@@ -120,8 +123,9 @@ body.crlngn-ui:not(.fe-retro-theme):is(.fe-userbg-base-white, .fe-userbg-base-bl
  * system default) in worlds with no chat-repainting module, so it is safe to leave
  * on generally; primary purpose is the crlngn-ui conflict.
  *
- * Scope EXCLUDES female's own painted surfaces (per-user color tint, 내레이터,
- * 라운드 마커) via the :not() chain — those stay female-styled (handled above).
+ * Scope EXCLUDES female's own painted surfaces (per-user color tint, 내레이터
+ * narrator, 라운드 마커 round marker) via the :not() chain — those stay
+ * female-styled (handled above).
  * The tokens are THEME-AWARE: --dnd5e-background-card flips light/dark with the
  * dnd5e theme, --color-text-primary is Foundry v13's theme-aware text color.
  * Descendants with their OWN explicit color (inline rolls, content links, colored
@@ -135,7 +139,8 @@ body.crlngn-ui:not(.fe-retro-theme):is(.fe-userbg-base-white, .fe-userbg-base-bl
  * without the guard the later source order would let "system default" clobber the
  * pixel chat. The per-user tint re-assertion above is likewise excluded — retro
  * intentionally uses black bg + a user-color BORDER, not the tint fill. 내레이터 /
- * 라운드 마커 are NOT excluded: retro leaves them untouched, so female's dark
+ * 라운드 마커 (narrator / round marker) are NOT excluded: retro leaves them
+ * untouched, so female's dark
  * narrator/round surface (identical values) stays consistent either way. */
 body.fe-force-normal-msg-color:not(.fe-retro-theme) :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log) .chat-message:not(.fe-has-user-color):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)),
 body.fe-force-normal-msg-color:not(.fe-retro-theme) #chat-notifications .message:not(.fe-has-user-color):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
@@ -150,7 +155,7 @@ body.fe-force-normal-msg-color:not(.fe-retro-theme) #chat-notifications .message
 }
 
 /* =============================================================================
- * 채팅 제목(h1~h6) 폰트 — crlngn 하드코딩 우회 방지
+ * Chat heading (h1~h6) fonts — bypass crlngn's hard-coding
  * =============================================================================
  *
  * female_edition normally fonts headings via VARIABLE REMAP (ui-font.css remaps
@@ -161,7 +166,8 @@ body.fe-force-normal-msg-color:not(.fe-retro-theme) #chat-notifications .message
  * `.chat-message :is(h2,h3)` (cui-font-t) and `.chat-message :is(h4,h5,h6)`
  * (cui-font-ui) to `var(--crlngn-font-*)` — NOT via the core vars — so the remap
  * can't reach them. This explicit selector re-asserts female's heading category
- * (큰 글자 = --fe-font-primary, identical to what the --font-h* remap already
+ * (the large-text category = --fe-font-primary, identical to what the --font-h*
+ * remap already
  * produces in every mode: cookie / cookieAll / geurimilgi / neodgm / user font),
  * winning because `!important` beats crlngn's non-important declarations regardless
  * of layer/specificity. Scoped to body.crlngn-ui + body.fe-fonts-enabled so it is a

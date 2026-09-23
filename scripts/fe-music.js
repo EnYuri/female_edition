@@ -849,7 +849,7 @@ function registerSidebarButton() {
 
 Hooks.once("init", () => {
   // World-scope GM config. config:false — surfaced via the unified settings menu
-  // (the "음악" section), never the core Module Settings sheet, per project convention.
+  // (the "음악" = music section), never the core Module Settings sheet, per project convention.
   feRegisterSetting(S.MUSIC_ENABLED);
   feRegisterSetting(S.MUSIC_PLAYLIST_NAME);
   feRegisterSetting(S.MUSIC_UPLOAD_ROOT, () => {

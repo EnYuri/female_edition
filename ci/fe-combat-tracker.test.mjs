@@ -127,12 +127,12 @@ test("the hidden dial's glyphs come from the data", () => {
   assert.match(DBP, /feDbpHiddenCells\(raw\.value, feDbpDigits\(raw\.max\)\)/);
   assert.match(DBP, /new Array\(glyphs\.length\)\.fill\("\?"\)/, "max drums follow the value drums");
   assert.match(DBP, /new Array\(digits\)\.fill\("\?"\)/);
-  // The partial-reveal mode may only ever write a literal "0" — the drums it opens are
-  // the leading zeros ABOVE the value's own digits, so writing anything derived from the
-  // value there would leak the value itself.
+  // The partial-reveal mode may write a literal "0" (leading zeros) or the value's
+  // MOST SIGNIFICANT digit — every other drum stays masked.
   const fn = DBP.slice(DBP.indexOf("function feDbpHiddenCells"));
   const body = fn.slice(0, fn.indexOf("\n}"));
-  assert.deepEqual([...body.matchAll(/cells\[[^\]]+\]\s*=\s*([^;]+);/g)].map((m) => m[1]), ['"0"']);
+  assert.deepEqual([...body.matchAll(/cells\[[^\]]+\]\s*=\s*([^;]+);/g)].map((m) => m[1]), ['"0"', "s[0]"]);
+  assert.match(body, /s\.length > 1/, "the leading digit opens only when it is not the ones place");
 });
 
 // A counter reads 027/027, never 027/27 — the max drums pad to the dial's width

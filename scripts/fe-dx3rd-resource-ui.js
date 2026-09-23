@@ -38,7 +38,7 @@ const CONTAINER_OWN_ID = "fe-dx3rd-rui-container-own";
 const PC_CARDS_PER_ROW    = 5; // horizontal container: new row every 5
 const ENEMY_CARDS_PER_COL = 8; // vertical container: new column every 8
 const ACCENT_BTN_ID    = "fe-dx3rd-accent-btn";
-const SHOW_FLAG        = "showInResourceUi"; // 이 플래그가 있으면 → RUI에 표시 (토큰 무관)
+const SHOW_FLAG        = "showInResourceUi"; // flag set → shown in the RUI (token-independent)
 const POS_KEY          = `${MODULE_ID}.ruiPos`;
 const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 
@@ -606,7 +606,7 @@ function _normalizeHex(raw) {
 // variables recolour a large part of the retro stylesheet, so dragging a native
 // colour picker used to repaint the whole UI dozens of times per second and made
 // the value hard to judge (and hard to cancel). The dialog previews only its own
-// swatch; the document is touched once, on 확인.
+// swatch; the document is touched once, on 확인 (confirm).
 async function _openAccentDialog(label) {
   const DialogV2 = foundry?.applications?.api?.DialogV2;
   if (!DialogV2) return;

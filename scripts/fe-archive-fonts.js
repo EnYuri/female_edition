@@ -178,10 +178,12 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
     return neodgmRule;
   }
 
-  // Geurimilgi routing for the mixed "쿠키런 + 그림일기" preset (small text / cards /
+  // Geurimilgi routing for the mixed "쿠키런 + 그림일기" (CookieRun + Geurimilgi) preset
+  // (small text / cards /
   // tooltips = Geurimilgi). If the face was embedded, the export MUST route the
   // geurimilgi var to it — otherwise that half of the mixed preset silently falls back
-  // to a system font and only CookieRun shows ("하나만 적용" bug). If it could NOT be
+  // to a system font and only CookieRun shows ("하나만 적용" = only one applied bug).
+  // If it could NOT be
   // embedded (over cap / fetch failed), keep the readable system stack.
   const geurimilgiSystemStack =
     `"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, -apple-system, sans-serif, var(--fe-symbol-fallback)`;

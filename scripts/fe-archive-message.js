@@ -63,14 +63,16 @@ export function feFormatArchiveTimestamp(msg) {
 // locale string — never core's relative one.
 //
 // Core rewrites `<time.message-timestamp>` in the live log to a relative string
-// ("9일 19시간 전") from `ChatLog#updateTimestamps`, on a timer. Messages the
+// ("9일 19시간 전" = "9 days 19 hours ago") from `ChatLog#updateTimestamps`, on a timer.
+// Messages the
 // exporter CLONES from the live DOM therefore carry that text, while messages it
 // rebuilds from the database get the absolute date — and which path a message
 // takes depends only on whether it is still in the (pruned) live log. Measured on
 // a 2938-message export: 2664 absolute + 274 relative, the 274 being the newest
 // tail. Two formats in one document, changing mid-scroll.
 //
-// Relative text is also just wrong once saved: "9일 전" is anchored to the export
+// Relative text is also just wrong once saved: "9일 전" ("9 days ago") is anchored to the
+// export
 // moment and silently rots as the file ages.
 export function feNormalizeArchiveTimestamps(node, msg) {
   try {
@@ -418,7 +420,7 @@ export function feCollapseRepeatedItemDescriptions(node, seenItems) {
   }
 }
 
-// midi-qol's damage-application cards are self-titled ("HP 업데이트 됨" and a
+// midi-qol's damage-application cards are self-titled ("HP 업데이트 됨" = "HP updated" and a
 // per-target table) and are whispered to the GM. Their sender header is pure
 // noise in an export — it repeats the GM's own name, adds a "To: <GM>" subtitle
 // and (because our portrait injector treats them like any other message) a 64px
@@ -1158,7 +1160,8 @@ export function feFallbackRenderChatMessage(doc, msg) {
   // core-render paths inherit it for free — and this fresh-build path was the only
   // one that dropped it, so OOC messages older than the sidebar's live DOM window
   // rendered gray in the archive while the recent ones were colored
-  // ("이전 페이지들만 유저색 테두리가 없음"). Verified live: messages carrying the
+  // ("이전 페이지들만 유저색 테두리가 없음" = earlier pages lack the user-colored border).
+  // Verified live: messages carrying the
   // `ic` class had no inline border-color, non-IC ones did.
   //
   // Do NOT widen this to every message — coloring IC borders too would make the

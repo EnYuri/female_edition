@@ -13,10 +13,10 @@ Hooks.once("init", () => {
   if (!AH || typeof AH.getDefaultSoundName !== "function") return;
 
   AH.getDefaultSoundName = function (src) {
-    const file = String(src).split("/").pop();          // 경로 → 파일명
+    const file = String(src).split("/").pop();          // path → filename
     const dot = file.lastIndexOf(".");
-    const base = dot > 0 ? file.slice(0, dot) : file;    // 확장자만 제거(닷파일/무확장자는 유지)
-    try { return decodeURIComponent(base); }             // %20 등 디코드
-    catch { return base; }                               // 잘못된 % 시퀀스면 원본 그대로
+    const base = dot > 0 ? file.slice(0, dot) : file;    // strip only the extension (keep dotfiles/extensionless)
+    try { return decodeURIComponent(base); }             // decode %20 etc.
+    catch { return base; }                               // invalid % sequence → keep as-is
   };
 });

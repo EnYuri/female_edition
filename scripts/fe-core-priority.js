@@ -9,7 +9,7 @@ import {
 import { feHasOwn, feValuesEqual } from "./fe-util.js";
 
 // =====================================================================
-// Core client-setting enforcement ("일반 환경 설정 GM 강제")
+// Core client-setting enforcement ("일반 환경 설정 GM 강제" = GM-forced core client settings)
 //
 // A sibling of fe-gm-priority.js, for Foundry's OWN client-scope settings
 // (game.settings namespace "core") instead of this module's.
@@ -38,7 +38,7 @@ import { feHasOwn, feValuesEqual } from "./fe-util.js";
 //
 // Scope of what is forced: every "core" setting that is client-scope AND
 // `config: true` — i.e. exactly the checkboxes/selects Foundry shows in its own
-// 환경 설정 panel — minus FE_CORE_PRIORITY_EXCLUDED_KEYS. Deriving the list from
+// 환경 설정 (client settings) panel — minus FE_CORE_PRIORITY_EXCLUDED_KEYS. Deriving the list from
 // the live registry rather than hardcoding it means a Foundry update that adds or
 // removes a client setting is picked up without a code change.
 // =====================================================================
@@ -67,7 +67,7 @@ function feIsCorePriorityEnabled() {
 }
 
 // A core setting participates when it is client-scope and user-facing. The
-// `config` gate is what limits us to the visible 환경 설정 panel: core also
+// `config` gate is what limits us to the visible 환경 설정 (client settings) panel: core also
 // registers ~27 client-scope settings with `config: false` (window positions,
 // favorite paths, tour progress, collapsed UI state…) which are per-client
 // bookkeeping and would be actively harmful to force.

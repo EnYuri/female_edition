@@ -146,30 +146,27 @@ function feDbpDigits(max) {
 // dial uses (feDbpDigits(max)), so the reading never changes width when an actor is
 // revealed or when a spin starts.
 //
-// With ceCombatTrackerHiddenPartial on, every LEADING ZERO opens. Those places are zero
-// by construction, so there is nothing there to hide: the mode can never print a digit
-// the value actually has, and what it publishes is the value's digit COUNT, i.e. an
-// upper bound. On a 5-drum dial:
+// With ceCombatTrackerHiddenPartial on, the leading zeros open AND the value's
+// MOST SIGNIFICANT digit is revealed — what stays secret is everything below it,
+// so a masked actor publishes only the order of magnitude ("8?" for 80-89). On a
+// 5-drum dial:
 //
-//   5 digits → "?????"   nothing above the top digit, so nothing opens
-//   4 digits → "0????"
-//   3 digits → "00???"
-//   2 digits → "000??"
-//   1 digit  → "0000?"   the ones place is never one of the leading zeros
-//   0        → "00000"   zero has no significant digit at all, so every drum is one
-//
-// The drums that open are always strictly to the LEFT of every digit the value has,
-// which is why a one-digit value cannot expose its ones place no matter how wide the
-// dial is. Zero is the one reading this mode states outright, and deliberately: 1-9 and
-// 0 are indistinguishable by digit count, so the ones drum is the only place that can
-// say "down" at all, and a downed combatant is not the secret the feature protects.
+//   12345 → "1????"
+//   1234  → "01???"
+//   123   → "001??"
+//   12    → "0001?"
+//   1-9   → "0000?"   the leading digit IS the ones place, which stays masked
+//   0     → "00000"   zero still reads outright: a downed combatant is not the
+//                     secret this feature protects
 function feDbpHiddenCells(value, digits) {
   const cells = new Array(digits).fill("?");
   if (feCtSetting(S.COMBAT_TRACKER_HIDDEN_PARTIAL) === true) {
-    // Clamped, so `used` is at most `digits` and a full-width value opens nothing.
+    // Clamped, so `used` is at most `digits` and the writes never run off the dial.
     const v = feDbpClampValue(Math.round(Number(value) || 0), digits);
-    const used = v === 0 ? 0 : String(v).length;
+    const s = String(v);
+    const used = v === 0 ? 0 : s.length;
     for (let i = 0; i < digits - used; i++) cells[i] = "0";
+    if (s.length > 1) cells[digits - s.length] = s[0];
   }
   return cells;
 }
@@ -638,7 +635,8 @@ let _dbpInkCtx = null;
 // not by the box, so `line-height: 1em` centres the digits in their 1em window only
 // by luck. CookieRun happens to land at 0.505; the stock sans-serif sits at 0.565
 // and has its feet clipped off by the window's overflow — which is exactly what
-// "다이얼이 덜 돌아간 것 같다" looks like, on a dial that is in fact parked dead on its
+// "다이얼이 덜 돌아간 것 같다" (the dial seems to have spun less) looks like, on a dial that is
+// in fact parked dead on its
 // digit. The separator and the max drums show it too, and they never rotate at all:
 // that is the tell that separates this from a spin that did not finish.
 //
@@ -831,7 +829,8 @@ function feDbpObserveActorHp(actor) {
 }
 
 // The per-actor HP secrecy toggle used to live here as a second actor-sheet header
-// button of its own. It is the status panel's "수치 숨기기" entry now — one flag, one
+// button of its own. It is the status panel's "수치 숨기기" (hide values) entry now — one
+// flag, one
 // toggle (fe-hp-mask.js); a sheet showing two buttons for the same bit was the whole
 // reason to merge them.
 

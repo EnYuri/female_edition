@@ -1,46 +1,52 @@
 /* ================================================================
  * fe-dx3rd-compat.css
- * female_edition — DX3rd 시스템군 픽셀 고대비 테마
+ * female_edition — pixel high-contrast theme for the DX3rd system family
  *
- * 활성화: body.fe-retro-theme. DX3rd 전용 표면은
- *         body.fe-retro-theme.fe-retro-system-dx3rd로 한정한다.
- *   NeoDGM 폰트 오버라이드(fe-neodgm-mode)와 함께 사용 권장.
+ * Enabled by: body.fe-retro-theme. DX3rd-specific surfaces are further
+ *         restricted to body.fe-retro-theme.fe-retro-system-dx3rd.
+ *   Recommended together with the NeoDGM font override (fe-neodgm-mode).
  *
- * ⚠️ CASCADE LAYER (필수): 이 파일은 module.json 에서
- *      { "src": "...", "layer": "layouts" } 로 등록된다.
- *    Foundry v13+ 는 @layer reset,…,layouts,system,modules,exceptions 순서를
- *    foundry2.css 에서 선언한다. 매니페스트 styles 는 기본적으로 modules(9) 레이어에
- *    주입되는데, DX3rd 시스템 CSS 는 system(8) 레이어에 들어간다.
- *    !important 선언은 레이어 순서가 "역전" — 먼저 선언된 레이어가 이긴다.
- *    따라서 modules(9) 의 !important 는 아무리 명시도가 높아도 system(8) 의
- *    !important 에 진다(예: .sheet-main input { background:#404040 !important }).
- *    이 파일을 system 보다 앞선 layouts(7) 레이어로 주입해야 !important 끼리의
- *    싸움에서 우리가 이긴다. 아래 명시도 트릭(:not(), (0,6,2) 등)은 같은 레이어
- *    내부의 형제 규칙 정렬용 보조 수단일 뿐, system 을 이기는 핵심은 레이어다.
- *    경쟁 규칙은 전부 !important — 비-!important 규칙은 .fedr-* / #fe-dx3rd-rui-* 등
- *    모듈 자체 요소뿐이라 레이어 이동에 따른 회귀 없음.
+ * ⚠️ CASCADE LAYER (required): this file is registered in module.json as
+ *      { "src": "...", "layer": "layouts" }.
+ *    Foundry v13+ declares the order
+ *    @layer reset,…,layouts,system,modules,exceptions in foundry2.css.
+ *    Manifest styles land in the modules(9) layer by default, while DX3rd
+ *    system CSS lands in system(8).
+ *    For !important declarations the layer order REVERSES — the earlier
+ *    layer wins. So a modules(9) !important always loses to a system(8)
+ *    !important however specific it is
+ *    (e.g. .sheet-main input { background:#404040 !important }).
+ *    This file must be injected into layouts(7), ahead of system, to win
+ *    the !important-vs-!important fight. The specificity tricks below
+ *    (:not(), (0,6,2), etc.) are only for ordering sibling rules inside
+ *    the same layer — the layer itself is what beats system.
+ *    Every competing rule is !important — non-!important rules only touch
+ *    the module's own elements (.fedr-* / #fe-dx3rd-rui-*), so no
+ *    regression from the layer move.
  *
- * 원칙:
- *   · 모든 border-radius → 0 (각진 픽셀 형태)
- *   · -webkit-font-smoothing: none (안티에일리어싱 OFF)
- *   · transition / animation → 즉각 반응 (픽셀 UI 감각)
- *   · box-shadow / text-shadow 전역 제거 → 하드 outline 대체
- *   · dx3rd skewX 트랜스폼 유지, scale·glow hover 제거
+ * Principles:
+ *   · every border-radius → 0 (angular pixel shape)
+ *   · -webkit-font-smoothing: none (antialiasing OFF)
+ *   · transition / animation → instant (pixel-UI feel)
+ *   · box-shadow / text-shadow removed globally → hard outlines instead
+ *   · keep dx3rd's skewX transforms; drop scale/glow hovers
  * ================================================================ */
 
 /* ────────────────────────────────────────────────────────────────
- * ℹ️  § 1 ~ § 7 (안티에일리어싱/border-radius/트랜지션/그림자/SVG/포커스/
- *     전역 컨트롤) 과 § 16 (픽셀 사선 테두리) 은 시스템-중립 "범용 베이스"라
- *     styles/fe-retro-theme.css 로 분리했다. 그 파일은 module.json 에서 이
- *     파일보다 "먼저" 로드되므로(동일 layouts 레이어), 아래 남은 섹션들이
- *     참조하는 §1~§7·§16 의 소스-순서·명시도 관계는 그대로 유지된다.
- *     (섹션 번호는 재정렬하지 않는다 — 상호 참조 주석 보존.)
+ * ℹ️  § 1 ~ § 7 (antialiasing/border-radius/transitions/shadows/SVG/
+ *     focus/global controls) and § 16 (pixel slash borders) were split
+ *     out into styles/fe-retro-theme.css as a system-neutral "generic
+ *     base". That file loads BEFORE this one in module.json (same
+ *     layouts layer), so the source-order/specificity relationships the
+ *     remaining sections rely on are unchanged.
+ *     (Section numbers are NOT renumbered — cross-reference comments
+ *     preserved.)
  * ──────────────────────────────────────────────────────────────── */
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 8  dx3rd 액션 UI 버튼
- *       skewX(-20deg) 유지, scale(1.1) 제거, box-shadow → border 강조
+ * § 8  dx3rd action-UI buttons
+ *       keep skewX(-20deg), remove scale(1.1), box-shadow → border accent
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(
@@ -53,22 +59,23 @@ body.fe-retro-theme :is(
   .dx3rd-sub-action-ui-timing-btn,
   .dx3rd-side-control-btn
 ):hover:not(:disabled) {
-  transform:    skewX(-20deg) !important; /* scale 제거 */
+  transform:    skewX(-20deg) !important; /* scale removed */
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
   outline:      1px solid var(--fe-dx3rd-accent, #ffffff) !important;
   outline-offset: 0 !important;
   opacity:      1 !important;
 }
 
-/* active 조건 상태 — glow 없이 하드 컬러 테두리 */
+/* active condition state — hard color border, no glow */
 body.fe-retro-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
   outline:      1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
   outline-offset: 0 !important;
 }
 
-/* 전투 프로세스 액션 트래커 — 시스템 쪽은 반투명 청회색 패널과 하드코드
-   텍스트 색을 사용한다. 레트로에서는 불투명 검정 패널과 accent 계열만 쓴다. */
+/* Combat-process action tracker — the system uses a translucent
+   blue-grey panel and hardcoded text colors. Under retro it is an opaque
+   black panel with accent-family colors only. */
 body.fe-retro-theme .dx3rd-action-ui.dx3rd-action-tracker {
   background: #000000 !important;
   border-left-color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -128,10 +135,10 @@ body.fe-retro-theme .dx3rd-action-tracker-turn-controls button:hover:not(:disabl
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 9  dx3rd 아이템 선택 팝업
+ * § 9  dx3rd item-selection popup
  * ══════════════════════════════════════════════════════════════ */
 
-/* 팝업 창 자체 — 하드 2px 엣지 */
+/* The popup window itself — hard 2px edge */
 body.fe-retro-theme .dx3rd-item-selection-window {
   border: 2px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
 }
@@ -144,7 +151,7 @@ body.fe-retro-theme .dx3rd-item-selection-btn:hover {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 10  dx3rd 채팅 아이템 카드 (:is(.dx3rd-item-chat, .dx3rd-item-info))
+ * § 10  dx3rd chat item cards (:is(.dx3rd-item-chat, .dx3rd-item-info))
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) {
@@ -156,9 +163,10 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) button:not([disabled
   outline-offset: 0 !important;
 }
 
-/* 원본 dx3rd는 아이템 카드와 판정 카드 모두 `.header .title`에 검정을 직접
-   지정한다. 레트로 채팅의 검정 바탕에서는 상속만으로 복구되지 않으므로 원본
-   래퍼 안에서 명시적으로 밝은 액센트 톤을 되돌린다. */
+/* Original dx3rd pins `.header .title` to black directly on both item
+   and check cards. On retro chat's black surface inheritance alone
+   cannot restore it, so a bright accent tone is re-declared explicitly
+   inside the original wrapper. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(.dx3rd-item-info, .dx3rd-roll) > .header .title {
   color: var(--fe-ac-90) !important;
@@ -168,8 +176,9 @@ body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info > .header {
   border-bottom: 1px solid var(--fe-ac-22) !important;
 }
 
-/* 원본 카드의 동작 버튼은 `.chat-btn`, 접힌 목록은 `.effect-list` / `.weapon-list`를
-   사용한다. 현대 시스템의 use-item-btn 계열과 같은 외곽선형 대비를 준다. */
+/* The original card's action buttons are `.chat-btn`, collapsed lists
+   `.effect-list` / `.weapon-list`. They get the same outline-style
+   contrast as modern systems' use-item-btn family. */
 body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info .chat-btn {
   background: transparent !important;
   color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -181,7 +190,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd .dx3rd-item-info
   border-color: var(--fe-ac-22) !important;
 }
 
-/* 이펙트 이름 토글 hover — 시스템 #4a9eff 파란색 → 액센트 흰색 + 글로우 */
+/* Effect-name toggle hover — system #4a9eff blue → accent white + glow */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-name-toggle:hover {
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
   text-shadow:
@@ -189,8 +198,10 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-name-toggle:ho
     0 0 10px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
 }
 
-/* dx3rd 오류 메시지 — 순수 적색 + 노란 윤곽(inline style color도 override)
-   §4의 text-shadow:none(명시도 0,1,1)보다 이 규칙(0,3,0)이 우위이므로 shadow가 의도적으로 유지됨. */
+/* dx3rd error messages — pure red + yellow outline (overrides inline
+   style color too)
+   This rule (0,3,0) outranks §4's text-shadow:none (0,1,1), so the
+   shadow intentionally survives. */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .dx3rd-error,
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .dx3rd-error strong {
   color:       #ff0000 !important;
@@ -203,9 +214,9 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .dx3rd-error strong 
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 11  dx3rd 시트 인풋 포커스
- *        .sheet-stat / .sheet-main 인풋은 border: none이므로
- *        outline으로 강조
+ * § 11  dx3rd sheet input focus
+ *        .sheet-stat / .sheet-main inputs are border:none, so they
+ *        highlight via outline
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) :is(input, select, textarea):focus {
@@ -213,9 +224,10 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) :is(input, sel
   outline-offset: 0 !important;
 }
 
-/* DX3rd 네이티브 체크박스/라디오 전용 색상. AppV1·AppV2 시트와 시스템
-   다이얼로그만 대상으로 하며, 16/20/22px 크기·margin·filter는 시스템 CSS가
-   소유한다. 전역 checkbox 규칙을 두지 않아 표 셀과 아이템 제어가 붕괴하지 않는다. */
+/* Colors for DX3rd native checkboxes/radios only. Scoped to AppV1·AppV2
+   sheets and system dialogs; the 16/20/22px sizing, margins and filter
+   stay owned by the system CSS. No global checkbox rule — keeps table
+   cells and item controls from collapsing. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd, .item-extend-dialog, .dx3rd-casting-dialog, .dx3rd-scene-open-dialog)
   :is(input[type="checkbox"], input[type="radio"]) {
@@ -231,15 +243,18 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   --checkbox-checked-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
 }
 
-/* 시스템의 공통 다이얼로그 input:focus glow가 장비 체크박스와 주문 선택
-   라디오(같은 클래스 사용)에도 적용된다. 레트로에서는 하드 outline만 남긴다. */
+/* The system's shared-dialog input:focus glow also reaches equipment
+   checkboxes and spell-selection radios (same class). Under retro only
+   the hard outline remains. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input.equipment-checkbox {
   box-shadow: none !important;
 }
 
-/* 아이템 이름 밑줄은 상태 전환이 아니라 정보 탐색의 시각적 단서다. 전역 1ms
-   규칙에서 이 의도적 hover 드로우만 제외해, 시스템 본래의 250ms 폭 전환을 유지한다. */
+/* The item-name underline is a visual affordance for information
+   navigation, not a state transition. It is exempted from the global 1ms
+   rule so this deliberate hover draw keeps the system's original 250ms
+   width transition. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-label::after {
   transition-duration: 250ms !important;
@@ -248,7 +263,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 12  드롭 존 — 픽셀 스타일 점선 → 실선
+ * § 12  drop zone — pixel-style dashed → solid
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[data-drop-zone].drag-over {
@@ -259,23 +274,25 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[da
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .items-list[data-drop-zone="spells"]:empty::before {
   border:      2px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
-  border-style: dashed !important;        /* 점선은 유지 (UX 힌트) */
+  border-style: dashed !important;        /* Dashed kept (UX hint) */
 }
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 13  액센트 색상 변수 · 채팅 패널 배경 — 불투명 검정
+ * § 13  accent color variables · chat panel background — opaque black
  *
- *  --fe-dx3rd-accent : 글씨·테두리 기본색(기본 흰색).
- *  세션 중 즉시 변경:
+ *  --fe-dx3rd-accent : default text/border color (default white).
+ *  Live-change mid-session via:
  *    document.documentElement.style.setProperty('--fe-dx3rd-accent','red')
  * ══════════════════════════════════════════════════════════════ */
 
-/* --fe-dx3rd-accent, --fe-dx3rd-card-border-alpha 는 JS(feApplyStyleVarsFromSettings)가
-   document.documentElement 인라인 스타일로 설정한다. 여기서 body 규칙으로 선언하면
-   html 인라인 스타일의 상속보다 body 자체 선언이 우선하므로 JS 세팅이 무시됨 → 선언 없음. */
+/* --fe-dx3rd-accent and --fe-dx3rd-card-border-alpha are set by JS
+   (feApplyStyleVarsFromSettings) as inline styles on
+   document.documentElement. Declaring them on body here would beat the
+   html inline style's inheritance — silently ignoring the JS settings →
+   no declaration here. */
 
-/* 채팅 사이드바 패널 + 스크롤 컨테이너 + 로그 영역 */
+/* Chat sidebar panel + scroll container + log area */
 body.fe-retro-theme.fe-retro-system-dx3rd :is(#sidebar #chat, .tab.chat, .chat-sidebar, chat-sidebar),
 body.fe-retro-theme.fe-retro-system-dx3rd .chat-scroll,
 body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log) {
@@ -285,32 +302,38 @@ body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log)
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 14  채팅 메시지 — 검정 배경 · 액센트 테두리 · 액센트 글씨
- *        내레이터/라운드마커는 자체 배경 유지를 위해 제외.
+ * § 14  chat messages — black background · accent border · accent text
+ *        Narrator/round markers are excluded — they keep their own
+ *        backgrounds.
  *
- *  .fe-has-user-color 메시지: 외곽선 = 유저 색 / 0.82 알파
- *  유저 색상 없는 메시지:      외곽선 = --fe-ac-90 (동일 명도·알파)
+ *  .fe-has-user-color messages: outline = user color / 0.82 alpha
+ *  Messages without user color: outline = --fe-ac-90 (same
+ *                               lightness/alpha)
  *
- *  ── 마스터(GM) 내레이션·NPC 메시지는 fe-render-state.js 가 의도적으로
- *  .fe-has-user-color 를 떼므로(과거 로그가 GM 개인색으로 도배되는 것 방지) 항상
- *  아래쪽 기본 규칙을 탄다. 그래서 이 두 규칙의 농도가 어긋나면 "마스터 카드만
- *  테두리가 다르다" 로 즉시 드러난다.
+ *  ── Master (GM) narration / NPC messages: fe-render-state.js
+ *  deliberately REMOVES .fe-has-user-color from them (prevents old logs
+ *  being plastered in the GM's personal color), so they always take the
+ *  default rule below. If these two rules' densities ever diverge it
+ *  shows immediately as "only master cards have a different border".
  *
- *  ── 알파가 0.5 가 아니라 0.82 인 이유 (라이브 v14 실측, 2026-08-02):
- *  유저 색상 **틴트**가 꺼져 있고 하부 배경(fe-userbg-base-*)만 켜진 조합에서는
- *  fe-render-state.js 가 .fe-has-user-color 클래스는 붙이되 --fe-user-color-rgb 는
- *  일부러 설정하지 않는다(그쪽 주석 참조). 그러면 위 규칙의 rgb(var(...)/α) 가
- *  invalid at computed-value time 이 되어 border-color 가 초기값 currentColor 로
- *  떨어지고, 그 currentColor 는 §14 가 지정한 --fe-ac-90 = rgba(230,230,230,0.82) 다.
- *  즉 실사용 화면의 플레이어 테두리는 0.5 가 아니라 **0.82** 였다. 여기를 0.5 로
- *  맞추면 마스터만 눈에 띄게 어두워진다(그렇게 한 번 틀렸다).
+ *  ── Why alpha is 0.82, not 0.5 (measured live on v14, 2026-08-02):
+ *  With the user-color TINT off and only the lower base
+ *  (fe-userbg-base-*) on, fe-render-state.js adds .fe-has-user-color
+ *  but deliberately does NOT set --fe-user-color-rgb (see its comment).
+ *  The rgb(var(...)/α) above then becomes invalid at computed-value
+ *  time, border-color falls back to the initial currentColor, and that
+ *  currentColor is the --fe-ac-90 = rgba(230,230,230,0.82) §14 assigns.
+ *  I.e. the player border actually seen was 0.82, not 0.5. Setting this
+ *  to 0.5 would darken only the master cards visibly (mistaken once).
  *
- *  ── --fe-user-color-rgb 에 폴백(230 230 230)을 명시해 IACVT 경로 자체를 없앤다.
- *  currentColor 로 떨어져 "우연히 맞는" 상태에 의존하지 않기 위함 — 나중에 §14 의
- *  color 를 바꾸면 테두리까지 같이 끌려가는 숨은 결합이 된다.
+ *  ── --fe-user-color-rgb carries an explicit fallback (230 230 230) to
+ *  remove the IACVT path entirely — no reliance on the "accidentally
+ *  correct" currentColor fallback, which would hide a coupling where
+ *  changing §14's color drags the border along.
  *
- *  ── 명도(L)를 깎는 --fe-ac-90-50 같은 변형은 쓰지 말 것. 액센트 원색과 밝기를
- *  맞춰야 하는 자리에는 부적합하다(이것도 한 번 틀렸다).
+ *  ── Do NOT use lightness-clipping variants like --fe-ac-90-50 here.
+ *  A spot that must match the accent's own brightness is the wrong
+ *  place for one (mistaken once too).
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme.fe-retro-system-dx3rd
@@ -322,15 +345,16 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   color:            var(--fe-ac-90) !important;
 }
 
-/* 유저 색상 있는 메시지 → 외곽선만 유저 색으로 오버라이드 (알파는 위와 동일).
-   폴백 230 230 230 = --fe-ac-90 의 명도 — 헤더 주석 참조. */
+/* Messages with a user color → only the outline overrides to the user
+   color (alpha same as above).
+   Fallback 230 230 230 = --fe-ac-90's lightness — see header comment. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   border-color: rgb(var(--fe-user-color-rgb, 230 230 230) / 0.82) !important;
 }
 
-/* 메시지 헤더 · 콘텐츠 서브 영역 — 투명(검정 상속) */
+/* Message header · content sub-areas — transparent (inherit black) */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
@@ -339,10 +363,12 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   background-image: none        !important;
 }
 
-/* 텍스트 요소 — 명도는 항상 90% 고정(항상 밝음), 액센트 색조만 얹어 계층 분리.
- * --fe-dx3rd-accent-h / -s 는 fe-style.js feApplyStyleVarsFromSettings() 에서 설정.
- * 주 텍스트: --fe-ac-90 사용 (알파 0.82 — 가시성 완화).
- * 부 텍스트: 동일 명도·색조, 알파 0.6 으로 계층 표현. */
+/* Text elements — lightness pinned at 90% (always bright); only the
+ * accent hue is layered on to separate the hierarchy.
+ * --fe-dx3rd-accent-h / -s are set by fe-style.js
+ * feApplyStyleVarsFromSettings().
+ * Primary text: --fe-ac-90 (alpha 0.82 — visibility softening).
+ * Secondary text: same lightness/hue at alpha 0.6 for hierarchy. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
@@ -357,7 +383,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.6) !important;
 }
 
-/* 메시지 텍스처 pseudo-element 완전 제거 */
+/* Message-texture pseudo-element fully removed */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message::before,
@@ -368,17 +394,20 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   background-image: none            !important;
 }
 
-/* 병합 그룹 내부 가로 실선 제거.
-   ── 원인(라이브 v14.363 확인): 유저색 채팅 틴트는 각 .chat-message 에 *반투명*
-   배경(rgb(user)/0.15)을 칠한다. standard 병합 모드는 mid/end 에 margin-top: -spacing
-   을 줘 박스를 붙이는데, 이 월드에서는 flex row-gap 이 세로 간격에 기여하지 않아
-   순수 -2px *겹침*이 된다. 그 2px 겹침 구간에서 반투명 배경이 두 번 칠해져 색이
-   진해지고 → 가로 실선처럼 보인다. (테두리는 이미 0 으로 접혀 있으므로 테두리가
-   아니다.)
-   ── 해법: 병합 그룹 내부 경계의 겹침을 제거해 정확히 맞닿게(gap 0) 한다. 그러면
-   반투명 배경이 픽셀당 한 번만 칠해져 이음새가 사라진다. layouts 레이어라
-   fe-chat-enhance.css(modules)의 margin !important 를 이긴다. simple 모드의 의도된
-   간격은 건드리지 않도록 standard 모드로 한정. */
+/* Remove the horizontal rule inside merge groups.
+   ── Cause (confirmed live on v14.363): the user-color chat tint paints
+   each .chat-message a *translucent* background (rgb(user)/0.15). The
+   standard merge mode pulls mid/end boxes together with margin-top:
+   -spacing, and in this world the flex row-gap contributes nothing to
+   the vertical gap — leaving a pure -2px *overlap*. In that 2px overlap
+   the translucent background paints twice and darkens → reads as a
+   horizontal rule. (The border is already collapsed to 0, so it is not
+   a border.)
+   ── Fix: remove the overlap at merge-group internal boundaries so they
+   abut exactly (gap 0). The translucent background then paints once per
+   pixel and the seam disappears. Being in the layouts layer it beats
+   fe-chat-enhance.css's (modules) margin !important. Scoped to standard
+   mode so simple mode's intended spacing is untouched. */
 body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
@@ -389,7 +418,8 @@ body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
   margin-bottom: 0 !important;
 }
-/* 내부 경계 테두리도 0 으로 (simple 모드 및 방어용 — standard 는 이미 접힘) */
+/* Internal-boundary borders also to 0 (simple mode + defensive —
+   standard is already collapsed) */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
@@ -403,16 +433,16 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 15  채팅카드 — 검정 내부 · 유저 색상(또는 액센트) 테두리
+ * § 15  chat cards — black interior · user-color (or accent) border
  *
- *  .fe-has-user-color 메시지: 카드 테두리 = 유저 색상
- *  유저 색상 없는 메시지:     카드 테두리 = 액센트(흰색)
+ *  .fe-has-user-color messages: card border = user color
+ *  Messages without user color: card border = accent (white)
  *
- *  카드 내부 description 섹션의 밝은 회색 배경(--fe-chat-desc-bg)도
- *  검정으로 재정의.
+ *  The card's internal description section's light-grey background
+ *  (--fe-chat-desc-bg) is also overridden to black.
  * ══════════════════════════════════════════════════════════════ */
 
-/* 채팅카드 전체 — 검정 배경 · 액센트 글씨 */
+/* Whole chat card — black background · accent text */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
@@ -421,8 +451,8 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   color:      var(--fe-ac-90) !important;
 }
 
-/* 채팅카드 내 서브 영역 — 투명(검정 상속).
-   description 박스의 --fe-chat-desc-bg 회색도 제거. */
+/* Sub-areas inside chat cards — transparent (inherit black).
+   The description box's --fe-chat-desc-bg grey is also removed. */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message
@@ -433,7 +463,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   background: transparent !important;
 }
 
-/* 유저 색상 있는 메시지 → 카드 테두리 = 유저 색상 + 알파 */
+/* Messages with a user color → card border = user color + alpha */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
@@ -441,9 +471,11 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
 }
 
-/* 유저 색상 없는 메시지 → 카드 테두리 = 액센트(흰색) + 알파.
-   여기는 알파가 양쪽 모두 --fe-dx3rd-card-border-alpha 로 이미 같다 — 손대지 말 것.
-   명도를 L=90% 로 고정해봤다가 마스터 카드만 어두워져서 되돌렸다(§14 헤더 주석 참조). */
+/* Messages without a user color → card border = accent (white) + alpha.
+   Alpha is already equal on both sides via --fe-dx3rd-card-border-alpha
+   — leave it alone.
+   Pinning lightness at L=90% was tried and reverted: only the master
+   cards darkened (see the §14 header comment). */
 body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.fe-has-user-color)
@@ -453,56 +485,66 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 17  픽셀 캐릭터 스테이터스 (#fe-dx3rd-rui-container)
- *        좌상단 고정 — 씬 내 가시 액터 HP · 침식률 실시간 표시
+ * § 17  pixel character status (#fe-dx3rd-rui-container)
+ *        Fixed top-left — live HP/erosion display for visible actors
+ *        in the scene
  *        JS: scripts/fe-dx3rd-resource-ui.js
  *
- *  HP 바:  빈 상태 = HP 최대, 채워질수록 HP 0에 가까움 (역방향)
- *  침식률:  0 = 빈 바, 100 = 만 바 (시각 상한 100 고정)
+ *  HP bar:  empty = max HP, fills toward 0 HP (reverse direction)
+ *  Erosion: 0 = empty bar, 100 = full bar (visual cap fixed at 100)
  * ══════════════════════════════════════════════════════════════ */
 
-/* 시트 헤더에 삽입한 스테이터스 버튼은 창 최소화 시 숨긴다.
-   코어는 최소화 시 .header-control만 숨기고(.header-control[data-action=close]만 유지),
-   삽입 버튼은 .header-button 클래스라 AppV2(dnd5e 5.x)에서 텍스트째 남아 헤더가 줄지
-   않았다. v1 시트는 `.window-app.minimized .window-header > *`로 이미 숨겨지므로
-   `.minimized` 하나로 양쪽 셸을 모두 커버한다. */
+/* Status buttons injected into sheet headers are hidden while the
+   window is minimized.
+   Core only hides .header-control on minimize (keeping
+   .header-control[data-action=close]); our injected buttons carry the
+   .header-button class, so under AppV2 (dnd5e 5.x) they stayed as text
+   and kept the header from shrinking. v1 sheets are already hidden by
+   `.window-app.minimized .window-header > *`, so one `.minimized`
+   selector covers both shells. */
 .minimized .fedr-sheet-btn {
   display: none !important;
 }
 
-/* 컨테이너 공통: fixed, pointer-events 차단 (카드만 auto)
-   위치(left/top/right)만 JS(_getOrCreateContainer)가 인라인으로 설정한다 — 사이드바
-   폭·nav 하단·드래그 좌표라 실측이 필요하다. 방향/줄바꿈/정렬은 전부 여기 있다.
-   (예전엔 JS 가 매 렌더마다 여기와 똑같은 값을 인라인으로 다시 썼다.)
-   z-index: 70 — 기본 UI 패널(~30) 위, 윈도우(100+) 아래 */
+/* Shared container: fixed, pointer-events blocked (cards re-enable auto)
+   Only position (left/top/right) is set inline by JS
+   (_getOrCreateContainer) — sidebar width, nav bottom and drag
+   coordinates all need measuring. Direction/wrapping/alignment all live
+   here.
+   (JS used to rewrite these same values inline on every render.)
+   z-index: 70 — above the base UI panels (~30), below windows (100+) */
 #fe-dx3rd-rui-container,
 #fe-dx3rd-rui-container-own {
   position: fixed;
   top: 8px;
-  left: 8px;        /* JS inline style로 덮어씀 (PC는 left:auto + right로 우상단 배치) */
+  left: 8px;        /* Overridden by JS inline style (PCs get left:auto + right for
+   top-right placement) */
   z-index: 70;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 0;           /* 카드 margin(10px)이 간격 담당 */
+  gap: 0;           /* The card margin (10px) provides the spacing */
   pointer-events: none;
 }
 
-/* 카드가 없거나 전역 표시가 꺼져 있을 때 (JS 가 style.display 를 쓰지 않는다) */
+/* While there are no cards or global display is off (JS does not write
+   style.display) */
 #fe-dx3rd-rui-container.fedr-hidden,
 #fe-dx3rd-rui-container-own.fedr-hidden {
   display: none;
 }
 
-/* enemy 타입: 좌상단, 세로 정렬. --fedr-wrap-h = 카드 N개분 높이(JS 실측) →
-   그만큼 차면 다음 열로 넘어간다. 열은 왼쪽부터 채운다(align-content). */
+/* enemy type: top-left, column direction. --fedr-wrap-h = height for N
+   cards (measured by JS) → once filled, wraps to the next column.
+   Columns fill from the left (align-content). */
 #fe-dx3rd-rui-container {
   flex-direction: column;
   max-height: var(--fedr-wrap-h, none);
 }
 
-/* PC 타입: 우상단(사이드바 왼쪽), 가로 정렬. --fedr-wrap-w = 카드 N개분 폭.
-   justify-content: flex-end — 마지막 부분 행도 우측 정렬 */
+/* PC type: top-right (left of the sidebar), row direction.
+   --fedr-wrap-w = width for N cards.
+   justify-content: flex-end — the last partial row also right-aligns */
 #fe-dx3rd-rui-container-own {
   flex-direction: row;
   align-items: flex-start;
@@ -510,15 +552,20 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   max-width: var(--fedr-wrap-w, none);
 }
 
-/* 컨테이너를 끄는 동안 커서를 문서 전체에 고정 — 카드 밖으로 나가도 유지된다 */
+/* While dragging the container, the cursor is pinned document-wide —
+   it survives leaving the card */
 body.fedr-dragging {
   cursor: grabbing;
 }
 
-/* 개별 액터 카드: name-row(절대 위치) + card-body(포트레이트+패널)
-   pointer-events: auto — 카드에서 mousedown이 컨테이너로 버블업 → 드래그 트리거
-   margin: 10px — ::after(inset:-10px) 바깥 테두리가 인접 카드와 겹치지 않게
-   isolation: isolate — ::after multiply 블렌딩을 카드 내부로 제한 */
+/* Individual actor card: name-row (absolute) + card-body
+   (portrait+panel)
+   pointer-events: auto — mousedown on a card bubbles to the container →
+   triggers the drag
+   margin: 10px — keeps the ::after (inset:-10px) outer border from
+   overlapping the neighboring card
+   isolation: isolate — confines the ::after multiply blending inside
+   the card */
 .fedr-actor-card {
   position: relative;
   background: #000000;
@@ -532,7 +579,8 @@ body.fedr-dragging {
   isolation: isolate;
 }
 
-/* 카드 내부 레이아웃 컨테이너: overflow:hidden으로 포트레이트 하단 클리핑 보장 */
+/* Card inner layout container: overflow:hidden guarantees the
+   portrait's bottom clipping */
 .fedr-card-body {
   display: flex;
   flex-direction: row;
@@ -542,7 +590,8 @@ body.fedr-dragging {
   overflow: hidden;
 }
 
-/* 카드 테두리 accent 백드롭 — ::after multiply 의 배경색 공급 (z-index: 99, ::after 아래) */
+/* Card-border accent backdrop — supplies the background color for
+   ::after's multiply (z-index: 99, under ::after) */
 .fedr-actor-card::before {
   content: '' !important;
   position: absolute !important;
@@ -554,9 +603,10 @@ body.fedr-dragging {
   background: transparent !important;
 }
 
-/* 카드 테두리 — 9-슬라이스 (게임 대사창 패턴)
-   inset: -10px + box-sizing border-box → 10px 보더가 전부 카드 바깥, 콘텐츠 침범 X
-   mix-blend-mode: multiply — 흰 픽셀 × ::before accent = accent */
+/* Card border — 9-slice (game dialogue-box pattern)
+   inset: -10px + box-sizing border-box → the whole 10px border sits
+   outside the card, never intruding on content
+   mix-blend-mode: multiply — white pixels × ::before accent = accent */
 .fedr-actor-card::after {
   content: '' !important;
   position: absolute !important;
@@ -576,7 +626,8 @@ body.fedr-dragging {
           mask-border: none !important;
 }
 
-/* 포트레이트 래퍼: card-body의 flex stretch로 높이 채움, overflow:hidden으로 클리핑 */
+/* Portrait wrapper: filled by card-body's flex stretch, clipped by
+   overflow:hidden */
 .fedr-portrait-wrap {
   flex-shrink: 0;
   width: var(--fedr-pw, 98px);
@@ -586,10 +637,13 @@ body.fedr-dragging {
   box-sizing: border-box;
 }
 
-/* 카드 서브트리 image-rendering 강제 auto — image-rendering 은 상속 속성이므로,
-   ::after 보더 장식(image-rendering: pixelated)과 무관하게 컨테이너→카드→래퍼까지
-   auto 로 못박아 포트레이트로 픽셀 렌더가 상속/전파되지 않게 한다.
-   보더 장식 자체(.fedr-actor-card::after)는 pixelated 유지 — 장식만 픽셀. */
+/* Force image-rendering: auto through the card subtree —
+   image-rendering is inherited, so regardless of the ::after border
+   ornament (image-rendering: pixelated) the container→card→wrapper
+   chain is pinned to auto and pixel rendering cannot propagate to the
+   portrait.
+   The border ornament itself (.fedr-actor-card::after) stays pixelated
+   — only the ornament is pixel. */
 #fe-dx3rd-rui-container,
 #fe-dx3rd-rui-container-own,
 .fedr-actor-card,
@@ -603,15 +657,17 @@ body.fedr-dragging {
   height: 100%;
   display: block;
   image-rendering: auto !important;
-  /* 독립 컴포지팅 레이어로 승격 — 인접 border-image(pixelated)의 레이어 단위
-     nearest-neighbor 래스터화가 포트레이트로 번지는 Chromium 동작 차단.
-     (overflow:hidden 클리핑은 transform 자식에도 그대로 적용되어 유지됨) */
+  /* Promote to its own compositing layer — blocks the Chromium behavior
+     where a neighboring border-image (pixelated)'s layer-wide
+     nearest-neighbor rasterization bleeds into the portrait.
+     (overflow:hidden clipping still applies to transformed children,
+     so it is kept.) */
   transform: translateZ(0);
   object-fit: cover;
   object-position: top center;
 }
 
-/* 패널: 자원 바 영역 */
+/* Panel: resource-bar area */
 .fedr-panel {
   flex: 1;
   display: flex;
@@ -622,9 +678,10 @@ body.fedr-dragging {
   min-width: 0;
 }
 
-/* 이름 행 — 패널(자원 바) 쪽 상단 테두리 중앙에 삽입.
-   left: --fedr-pw = 포트레이트 너비 이후(패널 시작점)
-   width: 100% - --fedr-pw = 패널 너비 */
+/* Name row — inserted centered on the panel (resource-bar) side's top
+   border.
+   left: --fedr-pw = after the portrait width (panel start)
+   width: 100% - --fedr-pw = panel width */
 .fedr-name-row {
   position: absolute;
   top: -5px;
@@ -655,7 +712,7 @@ body.fedr-dragging {
   max-width: 100%;
 }
 
-/* 바 레이아웃 */
+/* Bar layout */
 .fedr-bars {
   display: flex;
   flex-direction: column;
@@ -669,7 +726,7 @@ body.fedr-dragging {
   gap: 2px;
 }
 
-/* 자원 바 박스 */
+/* Resource-bar box */
 .fedr-bar {
   width: 100%;
   height: 10px;
@@ -680,7 +737,8 @@ body.fedr-dragging {
   box-sizing: border-box;
 }
 
-/* 채움 — 길이는 JS 가 카드에 실어 주는 퍼센트 커스텀 프로퍼티에서 온다 */
+/* Fill — length comes from a percentage custom property JS sets on the
+   card */
 .fedr-fill {
   position: absolute;
   top: 0;
@@ -696,12 +754,13 @@ body.fedr-dragging {
   width: var(--fedr-enc-pct, 0%);
 }
 
-/* 침식률이 없는 시스템(dnd5e 등) — 카드에 .fedr-no-enc 가 붙으면 그룹째 숨김 */
+/* Systems without erosion (dnd5e etc.) — .fedr-no-enc on the card
+   hides the whole group */
 .fedr-actor-card.fedr-no-enc .fedr-enc-group {
   display: none;
 }
 
-/* 수치 행 — 레이블 키(HP 등) 좌측, 수치 우측 */
+/* Value row — label key (HP etc.) left, value right */
 .fedr-label-row {
   display: flex;
   justify-content: space-between;
@@ -715,7 +774,7 @@ body.fedr-dragging {
   line-height: 1;
 }
 
-/* 수치 라벨 */
+/* Value label */
 .fedr-label {
   font-family: var(--fe-font-primary, monospace);
   font-size: 12px;
@@ -724,13 +783,15 @@ body.fedr-dragging {
   line-height: 1;
 }
 
-/* ─── 카드 우클릭 컨텍스트 메뉴 ─── */
+/* ─── Card right-click context menu ─── */
 
 .fedr-ctx-menu {
   position: fixed;
-  /* 좌상단이 기본값 — JS 는 붙인 뒤 실측해서 뷰포트 안으로 클램프한 좌표만 덮어쓴다.
-     inset 이 auto 면 fixed 요소가 static 위치(문서 맨 끝)에 잠깐 놓여 측정 전에
-     스크롤이 생길 수 있다. 예전엔 JS 가 이 두 줄을 인라인으로 먼저 썼다. */
+  /* Top-left is the default — JS measures after attaching and only
+     overwrites with viewport-clamped coordinates. With inset:auto a
+     fixed element sits briefly at its static position (end of
+     document), which can create scroll before measuring. JS used to
+     write these two lines inline first. */
   left: 0;
   top: 0;
   z-index: 9999;
@@ -775,7 +836,7 @@ body.fedr-dragging {
   color: inherit;
 }
 
-/* ─── 강조색 스와치 버튼 ─── */
+/* ─── Accent swatch button ─── */
 .fe-dx3rd-accent-btn {
   width: 16px;
   height: 16px;
@@ -791,9 +852,10 @@ body.fedr-dragging {
   overflow: hidden;
 }
 
-/* 액센트 색 선택 다이얼로그 (templates/fe-dx3rd-accent-dialog.hbs).
-   예전엔 이 규칙들이 전부 content 문자열의 인라인 style 이었다.
-   미리보기 스와치는 챗 컨트롤 버튼과 같은 --fe-accent-swatch 를 읽는다. */
+/* Accent-color picker dialog (templates/fe-dx3rd-accent-dialog.hbs).
+   These rules used to be inline styles inside the content string.
+   The preview swatch reads the same --fe-accent-swatch as the chat-
+   controls button. */
 .fe-accent-dialog {
   display: flex;
   align-items: center;
@@ -838,22 +900,25 @@ body.fedr-dragging {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.75) !important;
 }
 
-/* 스와치는 다이얼로그를 여는 버튼이다 — 내부 <input type="color"> 없음 */
+/* The swatch IS the button that opens the dialog — no inner
+   <input type="color"> */
 
 /* ══════════════════════════════════════════════════════════════
- * § 17-b  상태 UI 기본값 — FVTT 네이티브 톤 · 둥근 패널
+ * § 17-b  status-UI defaults — native FVTT tone · rounded panel
  *
- *  픽셀 스타일은 body.fe-retro-theme 블록에서만 다시 켠다. 기본값을
- *  일반 테마로 두어 부정 선택자에 의존하지 않는다.
+ *  Pixel styling is re-enabled only inside the body.fe-retro-theme
+ *  block. Defaults stay the normal theme so nothing depends on a
+ *  negation selector.
  * ══════════════════════════════════════════════════════════════ */
 
-/* 픽셀 보더 장식(::before 액센트 백드롭 / ::after border-image) 제거 */
+/* Pixel border ornaments removed (::before accent backdrop /
+   ::after border-image) */
 .fedr-actor-card::before,
 .fedr-actor-card::after {
   display: none !important;
 }
 
-/* 카드 — 둥근 어두운 패널 + 은은한 외곽선 */
+/* Card — rounded dark panel + subtle outline */
 .fedr-actor-card {
   background:    rgba(20, 21, 26, 0.92);
   border:        1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.12));
@@ -861,17 +926,18 @@ body.fedr-dragging {
   box-shadow:    0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-/* 내부 본체 — 카드 곡률에 맞춰 포트레이트/패널 클립 (이미 overflow:hidden) */
+/* Inner body — clips portrait/panel to the card's curvature (already
+   overflow:hidden) */
 .fedr-card-body {
   border-radius: 7px;
 }
 
-/* 포트레이트 구분선 — 은은하게 */
+/* Portrait separator — subtle */
 .fedr-portrait-wrap {
   border-right: 1px solid rgba(255, 255, 255, 0.10);
 }
 
-/* 이름 — FVTT 밝은 텍스트색, 시스템 폰트, 반투명 backing */
+/* Name — FVTT bright text, system font, translucent backing */
 .fedr-name {
   color:         var(--color-text-light-highlight, #f0f0e0);
   background:    rgba(16, 17, 22, 0.95);
@@ -879,25 +945,27 @@ body.fedr-dragging {
   border-radius: 3px;
 }
 
-/* 자원 바 트랙 */
+/* Resource-bar track */
 .fedr-bar {
   background:    rgba(0, 0, 0, 0.35);
   border:        1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 3px;
 }
 
-/* 채움 — 저채도 의미색 (HP 감소 시 채워짐 = 적색, 침식률 상승 = 청보라) */
+/* Fill — low-saturation semantic colors (fills as HP drops = red,
+   erosion rising = blue-violet) */
 .fedr-hp  .fedr-fill { background: #b06a6a; }
 .fedr-enc .fedr-fill { background: #6a7fb0; }
 
-/* 수치 텍스트 — FVTT 톤, 시스템 폰트 */
+/* Value text — FVTT tone, system font */
 .fedr-label-key,
 .fedr-label {
   color:       var(--color-text-light-primary, #c9c7b8);
   font-family: inherit;
 }
 
-/* 픽셀 테마에서만 상태 UI의 9-slice 장식과 강조색 톤을 켠다. */
+/* The status UI's 9-slice ornament and accent tone turn on only under
+   the pixel theme. */
 body.fe-retro-theme .fedr-actor-card {
   background: #000000;
   border: none;
@@ -964,22 +1032,26 @@ body.fe-retro-theme .fedr-ctx-item:hover {
 }
 
 /* ══════════════════════════════════════════════════════════════
- * § 19  DX3rd 시트 · 다이얼로그 내부 — 강조색 오버라이드
- *        검정이 아닌 모든 색상 → 강조색(명도 조정)
+ * § 19  Inside DX3rd sheets · dialogs — accent override
+ *        every non-black color → accent (lightness-adjusted)
  * ══════════════════════════════════════════════════════════════ */
 
-/* ── AppV1/심플 액터 시트 포트레이트: 상단 기준 정렬 (아래쪽만 크롭) ─────────
-   object-fit: cover 가 적용된 메인/심플 시트에서 상단(얼굴)을 보존하고
-   세로가 넘칠 때 하단만 잘라낸다. 인라인 style 에는 object-position 이 없으므로
-   적용되며, 픽셀 테마와 무관한 레이아웃 보정이라 테마 게이트 없이 둔다.
-   AppV2 actor-sheet-v2는 시스템 appv2-sheets.css가 자체 보정하므로 제외한다.
-   (fe-portrait-hq.js 의 고품질 축소본도 비율 보존 풀이미지라 동일하게 동작) */
+/* ── AppV1/simple actor-sheet portraits: top-anchored (crop only the
+   bottom) ─────────
+   On main/simple sheets where object-fit: cover applies, the top (the
+   face) is preserved and only the bottom is cropped on vertical
+   overflow. No object-position exists in the inline style, so this
+   applies; it is a theme-agnostic layout fix, so no theme gate.
+   AppV2 actor-sheet-v2 is excluded — the system's appv2-sheets.css
+   fixes it on its own.
+   (fe-portrait-hq.js's high-quality downscales are also ratio-
+   preserving full images, so they behave identically.) */
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd):not(.actor-sheet-v2) .grid-img .profile-img,
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd):not(.actor-sheet-v2) .simple-sheet-portrait .profile-img {
   object-position: top center !important;
 }
 
-/* ── 시트: 헤더·제목 텍스트 ─────────────────────────────────── */
+/* ── Sheet: header · title text ─────────────────────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .progress-bar input {
   color: var(--fe-ac-90) !important;
@@ -990,15 +1062,16 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-h
   border-bottom-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
 }
 
-/* ── 시트: 이름박스·스탯리스트 테두리 제거(#404040 bg는 유지) ────── */
-/* 사용자 요청: 회색 사다리꼴 박스의 밝은 강조 외곽선을 제거. 배경은 유지. */
+/* ── Sheet: name-box · stat-list border removal (the #404040 bg stays) */
+/* User request: remove the bright accent outline of the grey
+   trapezoid boxes. Background stays. */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .stat-list::before {
   border-color: transparent !important;
 }
 
-/* ── 시트: 노란색 호버(#ffbb00) 모두 강조색으로 ─────────────── */
+/* ── Sheet: every yellow hover (#ffbb00) → accent ───────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-stat .main-grid .stat-box .skill-create:hover i,
@@ -1009,7 +1082,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   color: var(--fe-ac-90) !important;
 }
 
-/* ── 시트: 인침식 바 ────────────────────────────────────────── */
+/* ── Sheet: erosion bar ────────────────────────────────────── */
 
 body.fe-retro-theme .encroachment-bar {
   background:   var(--fe-ac-12) !important;
@@ -1030,9 +1103,12 @@ body.fe-retro-theme .encroachment-value-input {
   color: var(--fe-ac-90) !important;
 }
 
-/* 침식률 바 입력칸 — 바 채움이 보이도록 투명 배경 복원.
-   일반 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input { background:#000 } 규칙을 예외 처리.
-   overflow:hidden 바 안에서 text-shadow 외곽선은 가장자리가 잘리므로 글리프 stroke를 쓴다. */
+/* Erosion-bar input — restore transparent background so the bar fill
+   shows through.
+   Exemption from the generic :is(.double-cross-3rd, .dx3rd-emanim,
+   .dx3rd) input { background:#000 } rule.
+   Inside an overflow:hidden bar a text-shadow outline clips at the
+   edges, so glyph stroke is used instead. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-value-input {
   background: transparent !important;
   border: none !important;
@@ -1042,12 +1118,14 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-
   paint-order: stroke fill !important;
 }
 
-/* 침식 다이스/레벨 애드온(.dice-addon)도 게이지 바 위에 위치 — 일반
-   input{background:#000} 규칙이 검정 박스를 만들어 게이지 채움을 가린다.
-   배경/테두리를 제거하고, 가독성은 글자 stroke로 확보한다.
-   stroke 는 상속되므로 .dice-addon 에 한 번 걸면
-   라벨 아이콘·슬래시·입력 텍스트 전부에 동일한 외곽선이 적용된다.
-   글자색은 강조색(색조 오버라이드), 외곽선은 검정 stroke 로 어떤 채움색 위에서도 판독. */
+/* The erosion dice/level addon (.dice-addon) also sits on top of the
+   gauge bar — the generic input{background:#000} rule builds a black
+   box hiding the gauge fill.
+   Background/border removed; readability comes from glyph stroke.
+   Stroke inherits, so one declaration on .dice-addon gives the label
+   icon, slash and input text the same outline.
+   Text is accent (tint override); the black-stroke outline reads on
+   any fill color. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar .dice-addon {
   text-shadow: none !important;
   -webkit-text-fill-color: var(--fe-ac-90) !important;
@@ -1060,24 +1138,29 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-
   color:      var(--fe-ac-90) !important;
 }
 
-/* 침식률 바 내부 입력칸(값·주사위·레벨)은 바보다 좁고 우측으로 치우쳐 있어,
-   범용 input hover/focus outline(§10·§11)이 바와 어긋난 사각형으로 그려진다.
-   바 자체가 이미 흰색 테두리로 강조되므로, 내부 입력칸의 outline 은 억제한다. */
+/* Inputs inside the erosion bar (value·dice·level) are narrower than
+   the bar and right-shifted, so the generic input hover/focus outline
+   (§10·§11) draws a rectangle misaligned with the bar.
+   The bar itself is already accented by a white border — the inner
+   inputs' outline is suppressed. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar input:is(:hover, :focus, :focus-visible, :active),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .encroachment-bar select:is(:hover, :focus, :focus-visible, :active) {
   outline: none !important;
 }
 
-/* .sheet-stat 의 입력 필드(액터 네임·코드네임, 백병/사격/회피/지각/RC/의지 등 기능치,
-   HP·행동치·이동 값칸)는 좌측 라벨 박스(.title::before)가 이미 강조 테두리를 가져
-   값칸까지 hover/focus outline(§6·§7·§11)을 그리면 이중으로 산만해진다.
-   해설 탭 이하 입력(.sheet-attributes, 별도 컨테이너)은 대상이 아니므로 outline 을 유지한다.
-   특이도 (0,4,2) 로 §6(0,2,1)·§7(0,3,2)·§11(0,3,2) 을 모두 이긴다. */
+/* .sheet-stat input fields (actor name/codename, stats like
+   백병/사격/회피/지각/RC/의지 — melee/ranged/dodge/perception/RC/will,
+   HP/action/move cells) already get an accent border on the left label
+   box (.title::before); a value-cell hover/focus outline (§6·§7·§11)
+   would double-up and clutter.
+   Inputs below the description tab (.sheet-attributes, a separate
+   container) are out of scope and keep the outline.
+   Specificity (0,4,2) beats §6 (0,2,1), §7 (0,3,2) and §11 (0,3,2). */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-stat :is(input, select, textarea):is(:hover, :focus, :focus-visible, :active) {
   outline: none !important;
 }
 
-/* ── 시트: 주사위 색상(폭주/침식) ──────────────────────────── */
+/* ── Sheet: dice colors (frenzy/erosion) ───────────────────── */
 
 /* Chat-tooltip dice number glyphs. DX/DS terms render as `<li class="roll dice">`,
    and special results put `text-shadow:none` on an inner span. A text-shadow
@@ -1108,7 +1191,7 @@ body.fe-retro-theme .dice-rolls .dice.exploded {
   box-shadow: inset 0 0 0 2px #d32f2f !important;
 }
 
-/* ── 시트: 소진 아이템(crimson) · titus ─────────────────────── */
+/* ── Sheet: exhausted items (crimson) · titus ──────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item.item-exhausted {
   outline: 1px solid #dc143c !important;
@@ -1126,7 +1209,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   outline-offset: -1px !important;
 }
 
-/* ── 시트: 드롭존 ─────────────────────────────────────────── */
+/* ── Sheet: drop zone ──────────────────────────────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[data-drop-zone="spells"].drag-over {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -1138,7 +1221,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .items-list[da
   color: rgb(from var(--fe-ac-90) r g b / 0.5) !important;
 }
 
-/* ── 어빌리티·스킬 입력박스(rgba white bg) ──────────────────── */
+/* ── Ability/skill input boxes (rgba white bg) ─────────────── */
 
 body.fe-retro-theme .ability-input-box,
 body.fe-retro-theme .skill-input-box {
@@ -1153,7 +1236,7 @@ body.fe-retro-theme .skill-input-box[readonly] {
   color: rgb(from var(--fe-ac-90) r g b / 0.35) !important;
 }
 
-/* ── 액션 UI: 타이틀·버튼 ───────────────────────────────────── */
+/* ── Action UI: title · buttons ────────────────────────────── */
 
 body.fe-retro-theme .dx3rd-action-ui-title {
   color: var(--fe-ac-90) !important;
@@ -1209,7 +1292,7 @@ body.fe-retro-theme .dx3rd-sub-action-ui-timing-btn:disabled {
   color: rgb(from var(--fe-ac-90) r g b / 0.3) !important;
 }
 
-/* ── 팝업 윈도우(아이템 선택/스탯-스킬/타이밍) ─────────────── */
+/* ── Popup windows (item selection / stat-skill / timing) ──── */
 
 body.fe-retro-theme :is(
   .dx3rd-item-selection-window,
@@ -1285,7 +1368,7 @@ body.fe-retro-theme .dx3rd-stat-divider {
   border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.25) !important;
 }
 
-/* ── 마술 주사위 제거 다이얼로그 ─────────────────────────────── */
+/* ── Magic-dice removal dialog ─────────────────────────────── */
 
 body.fe-retro-theme .spell-dice-remove-dialog {
   background: #000000 !important;
@@ -1359,7 +1442,7 @@ body.fe-retro-theme .spell-dice-confirm-button:hover:not(:disabled) {
   outline-offset: 0 !important;
 }
 
-/* ── 장비 / 무기 선택 다이얼로그 ─────────────────────────────── */
+/* ── Equipment / weapon selection dialogs ──────────────────── */
 
 body.fe-retro-theme :is(.equipment-table, .weapon-table) thead th {
   background: #000000 !important;
@@ -1416,7 +1499,7 @@ body.fe-retro-theme :is(.equipment-dialog-buttons, .weapon-dialog-buttons) butto
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
 }
 
-/* ── 스킬 설정 다이얼로그 ─────────────────────────────────────── */
+/* ── Skill settings dialog ─────────────────────────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-settings-dialog .attribute-header {
   color: var(--fe-ac-90) !important;
@@ -1465,7 +1548,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd).skills-setting
   color: var(--fe-ac-90) !important;
 }
 
-/* ── 아이템 확장 다이얼로그 ─────────────────────────────────── */
+/* ── Item expansion dialog ─────────────────────────────────── */
 
 body.fe-retro-theme .item-extend-dialog .top-tabs button {
   color: var(--fe-ac-90) !important;
@@ -1508,11 +1591,15 @@ body.fe-retro-theme .item-extend-dialog .sub-tab-content {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
 }
 
-/* form-label 은 height:26px 고정 박스인데 dx3rd 원본에 세로 정렬 장치(flex/line-height)가
-   없어 텍스트가 박스 상단에 붙는다. 같은 grid 행의 <input>/<select> 는 네이티브로 세로
-   가운데라, 라벨("공식"·"타이밍"·"대상")과 값의 상하가 어긋나 보인다(retro 픽셀 폰트에서
-   특히 도드라짐). flex 로 세로 가운데 정렬해 행 안에서 라벨·값 높이를 맞춘다.
-   justify-content:center 는 기존 text-align:center 의 가로 가운데를 유지한다. */
+/* form-label is a fixed height:26px box, but the original dx3rd CSS
+   has no vertical-alignment mechanism (flex/line-height), so text hugs
+   the top of the box. The <input>/<select> on the same grid row is
+   natively centered, so label ("공식"/"타이밍"/"대상" — formula/timing/
+   target) and value look vertically misaligned (especially glaring
+   with retro pixel fonts). flex centers the label vertically within
+   the row.
+   justify-content:center preserves the existing text-align:center
+   horizontal centering. */
 body.fe-retro-theme .item-extend-dialog .form-label {
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.3) !important;
   color: var(--fe-ac-90) !important;
@@ -1586,7 +1673,7 @@ body.fe-retro-theme .item-extend-dialog select[disabled] {
   color: rgb(from var(--fe-ac-90) r g b / 0.35) !important;
 }
 
-/* ── 콤보 다이얼로그 ─────────────────────────────────────────── */
+/* ── Combo dialog ───────────────────────────────────────────── */
 
 body.fe-retro-theme .dx3rd-combo-selection-dialog {
   background: #000000 !important;
@@ -1611,103 +1698,131 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .combo-dialog 
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.2) !important;
 }
 
-/* ── 어빌리티 다이얼로그 제목 ────────────────────────────────── */
+/* ── Ability-dialog title ───────────────────────────────────── */
 
 body.fe-retro-theme .ability-title-box {
   color: var(--fe-ac-90) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
- * § 20  FVTT + DX3rd 직접 색상 오버라이드 — 강조색(H·S) + 원본 명도(L)
+ * § 20  FVTT + DX3rd direct color override — accent (H·S) + original
+ *        lightness (L)
  *
- *  원칙:
- *    · 원본 색상의 명도(L)를 유지하고 H·S만 강조색으로 교체
- *    · 공식: hsl(ACCENT_H, ACCENT_S, ORIGINAL_L%)
- *    · §20 내에서는 --fe-dx3rd-accent 직접 참조 금지 (명도 오염 방지)
- *    · 배경: 흑색(#000) 고정
+ *  Principles:
+ *    · keep each original color's lightness (L); swap only H·S to the
+ *      accent
+ *    · formula: hsl(ACCENT_H, ACCENT_S, ORIGINAL_L%)
+ *    · within §20, never reference --fe-dx3rd-accent directly (avoids
+ *      lightness contamination)
+ *    · backgrounds: fixed black (#000)
  *
- *  변수 명명: --fe-ac-{L}  (L = 원본 색상의 명도 기준치 %)
- *    90 : 원본 흰 텍스트 / FVTT text-primary  (L≈90)
- *    80 : DX3rd 탭 비활성 #bcc8de             (L≈80)
- *    70 : FVTT warm-1, 창 제목                (L≈70)
- *    57 : FVTT warm-2, 보조 헤딩              (원본 L≈57 → 실제 L=70%/α=0.55, 명도 하한 적용)
- *    45 : FVTT warm-3                         (원본 L≈45 → 실제 L=70%/α=0.42, 명도 하한 적용)
- *    33 : 테두리·배경 전용(텍스트 직접 사용 금지 — warm-4/씨어터 nav는 인라인 표현으로 대체)
- *    22 : 테두리·배경 전용(텍스트 직접 사용 금지 — warm-5는 인라인 표현으로 대체)
- *    12 : hover·active 배경 틴트              (L≈12)
- *    06 : 깊은 배경 틴트                      (L≈ 6)
+ *  Variable naming: --fe-ac-{L}  (L = the original color's baseline
+ *    lightness %)
+ *    90 : original white text / FVTT text-primary  (L≈90)
+ *    80 : DX3rd inactive tab #bcc8de              (L≈80)
+ *    70 : FVTT warm-1, window title               (L≈70)
+ *    57 : FVTT warm-2, secondary heading          (orig. L≈57 → actually L=70%/α=0.55, lightness floor applied)
+ *    45 : FVTT warm-3                             (orig. L≈45 → actually L=70%/α=0.42, lightness floor applied)
+ *    33 : borders/backgrounds only (never directly on text — warm-4/
+ *         theatre nav use inline expressions instead)
+ *    22 : borders/backgrounds only (never directly on text — warm-5
+ *         uses an inline expression instead)
+ *    12 : hover/active background tint           (L≈12)
+ *    06 : deep background tint                   (L≈ 6)
  *
- *  텍스트 명도 하한 원칙:
- *    · color 속성에는 L=70% 이상만 허용.
- *    · 계층 구분은 알파(α) 또는 채도(S) 축소로만 표현.
- *    · --fe-ac-33/22는 테두리·배경 전용으로 남기고
- *      텍스트 맥락에서는 인라인 hsl(H calc(S*k) 70%/α) 표현을 직접 사용.
+ *  Text lightness floor:
+ *    · color properties may only use L=70% or above.
+ *    · hierarchy is expressed only via alpha (α) or reduced
+ *      saturation (S).
+ *    · --fe-ac-33/22 stay reserved for borders/backgrounds; in text
+ *      contexts use an inline hsl(H calc(S*k) 70%/α) expression.
  * ══════════════════════════════════════════════════════════════ */
 
-/* ── 파생 변수 + FVTT 루트 CSS 변수 재정의 ──────────────────── */
+/* ── Derived variables + FVTT root CSS-variable overrides ───── */
 body.fe-retro-theme {
 
-  /* 강조색 H·S + 원본 명도(L) — 텍스트 색상 변수에 알파 0.82 적용 (가시성 완화) */
+  /* Accent H·S + original lightness (L) — text-color variables get
+   alpha 0.82 (visibility softening) */
   --fe-ac-90: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.82);
-  /* 계열의 최상단 — 불투명 L=96%. --fe-ac-90(L90/α.82) 한 단계 위가 필요한
-     "가장 강한 상태"(성공 눈금 등) 전용이고, 본문 텍스트에는 쓰지 않는다.
-     ⚠️ L=100% 로 두지 말 것: HSL 은 L=100% 에서 채도가 의미를 잃어 H·S 와 무관하게
-        무조건 #ffffff 가 된다 — 강조색 계열이 아니라 "변수로 감싼 흰색"이 되고,
-        색조를 넣은 순간 여기만 흰색으로 튄다. 96% 는 불투명이라 --fe-ac-90 보다
-        확실히 밝으면서 채도가 살아 있는 상단 끝점이다.
-     --fe-dx3rd-accent(원본 강조색)를 쓰지 않는 이유는 §20 머리말 그대로다:
-        원본은 자기 명도를 갖고 있어서 어두운 강조색을 고르면 검은 패널 위에서
-        읽히지 않는다. */
+  /* Top of the family — opaque L=96%. Reserved for the "strongest
+     state" (success pips etc.) that must sit one step above
+     --fe-ac-90 (L90/α.82); not for body text.
+     ⚠️ Do NOT set L=100%: at L=100% HSL saturation becomes
+        meaningless — it is #ffffff regardless of H·S, i.e. not an
+        accent-family color but "white wrapped in a variable", and the
+        moment a hue is chosen this spot alone pops white.
+        96% is opaque, clearly brighter than --fe-ac-90, and keeps
+        saturation alive as the top endpoint.
+     Why not --fe-dx3rd-accent (the raw accent): exactly as the §20
+        preamble says — the raw accent carries its own lightness, so a
+        dark accent becomes unreadable on black panels. */
   --fe-ac-96: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%);
-  /* --fe-ac-90 alpha 변형 — 구 rgb(from accent / X) 패턴 대체용. 명도 90% 고정으로 채도 오염 방지 */
+  /* --fe-ac-90 alpha variants — replacement for the old
+   rgb(from accent / X) pattern. Lightness pinned at 90% prevents
+   saturation contamination */
   --fe-ac-90-50: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.50);
   --fe-ac-90-40: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.40);
   --fe-ac-90-35: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.35);
   --fe-ac-90-30: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 90% / 0.30);
   --fe-ac-80: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 80% / 0.82);
   --fe-ac-70: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 70% / 0.82);
-  /* 명도 하한 70% 적용: 원본 L=57%/45% 역할을 유지하되 L=70% 고정, 알파는 원본 그대로.
-     계층 구분: --fe-ac-57 = L=70%/α=0.82, --fe-ac-45 = L=70% 불투명.
-     주요 강조 텍스트(L=90%)는 §31 filter(명도·채도)로 상위 계층을 시각적으로 분리. */
+  /* Lightness floor 70% applied: keeps the original L=57%/45% roles
+     but pinned at L=70%, alpha as the original.
+     Hierarchy: --fe-ac-57 = L=70%/α=0.82, --fe-ac-45 = L=70% opaque.
+     The top-tier accent text (L=90%) is visually separated from the
+     upper tiers by the §31 filter (lightness·saturation). */
   --fe-ac-57: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 70% / 0.82);
   --fe-ac-45: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 70%);
-  /* 테두리·배경 전용 — 텍스트 직접 사용 금지 (warm-4/5 토큰 및 씨어터 nav는 인라인으로 처리) */
+  /* Borders/backgrounds only — never directly on text (warm-4/5
+   tokens and theatre nav are handled inline) */
   --fe-ac-33: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 33%);
   --fe-ac-22: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 22%);
   --fe-ac-12: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 12%);
-  /* 채팅 카드 내부면용 — 12는 "조금 짙다", 06은 카드와 구분이 안 되는 실측 중간값. */
+  /* For chat-card interior surfaces — 12 measured "slightly too
+   dark", 06 indistinguishable from the card; this is the measured
+   midpoint. */
   --fe-ac-08: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%)  8%);
   --fe-ac-06: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%)  6%);
-  /* 대비용 그림자: 검정 베이스 판독성은 유지하되 색조 오버라이드 hue를 아주 낮은 명도로 반영. */
+  /* Contrast shadow: keeps black-base readability while reflecting
+   the tint-override hue at a very low lightness. */
   --fe-retro-shadow-strong: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.55) 4% / 0.96);
   --fe-retro-shadow-soft: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.45) 7% / 0.74);
-  /* 텍스트 채도-단계 — 검은 배경에서 L 고정·S 축소로 시인성 보장.
-     --fe-ac-33/22는 테두리·배경 전용이므로 텍스트에는 t-시리즈 사용.
-     L=84/82% 고정 + S 비율 축소 → 채도 있는 강조색에서 "흐릿한 느낌" 표현. */
+  /* Text saturation steps — legibility on black via pinned L ·
+     reduced S.
+     --fe-ac-33/22 are border/background-only, so text uses the
+     t- series.
+     L=84/82% pinned + proportional S reduction → a "faded" feel
+     from a saturated accent. */
   --fe-ac-t33: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.6) 84% / 0.82);
   --fe-ac-t22: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.24) 82% / 0.82);
 
-  /* FVTT warm → 강조색(H·S) + 명도 하한 70% 적용.
-     warm-1~3: --fe-ac-* 변수 참조(이미 L=70% 이상).
-     warm-4~5: --fe-ac-33/22는 테두리 전용이므로 인라인 L=70% + S 축소 + 알파 축소. */
+  /* FVTT warm → accent (H·S) + lightness floor 70%.
+     warm-1~3: reference the --fe-ac-* variables (already ≥ L=70%).
+     warm-4~5: --fe-ac-33/22 are border-only, so inline L=70% +
+     reduced S + reduced alpha. */
   --color-warm-1: var(--fe-ac-70)  !important;
   --color-warm-2: var(--fe-ac-57)  !important;
   --color-warm-3: var(--fe-ac-45)  !important;
-  /* warm-4/5: L=70% 하한 + 채도 축소로 "흐릿함" 표현(알파 미사용) */
+  /* warm-4/5: L=70% floor + reduced saturation for the "faded" look
+   (no alpha) */
   --color-warm-4: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.45) 70%) !important;
   --color-warm-5: hsl(var(--fe-dx3rd-accent-h, 0deg) calc(var(--fe-dx3rd-accent-s, 0%) * 0.25) 70%) !important;
 
-  /* FVTT light 토큰 — button-border/placeholder/text-subtle 등이 이 토큰을 직접 참조.
-     alias 변수(--button-border-color 등)를 바꿔봐야 소용없고 여기를 바꿔야 작동함 */
+  /* FVTT light tokens — button-border/placeholder/text-subtle etc.
+     reference these tokens directly.
+     Changing the alias variables (--button-border-color etc.) does
+     nothing — this is the level that must change to work. */
   --color-light-1: var(--fe-ac-90)  !important;
   --color-light-2: var(--fe-ac-80)  !important;
   --color-light-3: var(--fe-ac-70)  !important;
   --color-light-4: var(--fe-ac-57)  !important;
   --color-light-5: var(--fe-ac-t33) !important;
 
-  /* FVTT cool 토큰 — button 배경(--button-background-color: var(--color-cool-5-50)) 참조.
-     cool은 배경·비활성 계열 → 낮은 L 단계 사용.
-     cool-5/-50: 버튼 배경 등 극히 어두운 틴트 → --fe-ac-12(L=12%) */
+  /* FVTT cool tokens — referenced by button backgrounds
+     (--button-background-color: var(--color-cool-5-50)).
+     cool = background/disabled family → use the low-L steps.
+     cool-5/-50: ultra-dark tints like button backgrounds →
+     --fe-ac-12 (L=12%) */
   --color-cool-1: var(--fe-ac-57)  !important;
   --color-cool-2: var(--fe-ac-45)  !important;
   --color-cool-3: var(--fe-ac-33)  !important;
@@ -1715,7 +1830,8 @@ body.fe-retro-theme {
   --color-cool-5: var(--fe-ac-12)  !important;
   --color-cool-5-50: var(--fe-ac-12) !important;
 
-  /* FVTT 변수 재정의 — !important: Foundry :root 선언이 !important를 쓸 경우 대비 */
+  /* FVTT variable overrides — !important: in case Foundry's :root
+   declarations use !important */
   --button-background-color:        #000000                                              !important;
   --button-border-color:            rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
   --button-text-color:              var(--fe-ac-90)                                      !important;
@@ -1738,7 +1854,7 @@ body.fe-retro-theme {
   --color-level-information:        var(--fe-ac-70)                                      !important;
 }
 
-/* ── B. 윈도우 chrome ───────────────────────────────────────── */
+/* ── B. Window chrome ───────────────────────────────────────── */
 
 /* DX3rd AppV2 actor sheets enforce min-width:850px so the fixed-width sheet
    grid does not wrap. That is correct while open, but it prevents Foundry's
@@ -1756,7 +1872,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd .application.minimized .window-header 
   display: none !important;
 }
 
-/* ── F. DX3rd 시트 배경 오버라이드 ─────────────────────────── */
+/* ── F. DX3rd sheet background overrides ────────────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-body,
@@ -1766,15 +1882,18 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-header 
   background-image: none !important;
 }
 
-/* .sheet-header 내 비버튼 요소(backtrack-btn * 등)에
-   DX3rd non-!important explicit 규칙이 흰색을 덮어쓰는 것 방지.
-   더 구체적인 하위 규칙들(progress-bar input, backtrack-btn button 등)은
-   더 높은 명시도로 별도 처리되므로 충돌 없음. */
+/* Prevent DX3rd's non-!important explicit rules from overwriting
+   white on non-button elements inside .sheet-header (backtrack-btn
+   * etc.).
+   More specific sub-rules (progress-bar input, backtrack-btn button
+   etc.) are handled separately at higher specificity — no
+   conflict. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-header {
   color: var(--fe-ac-90) !important;
 }
 
-/* 아이템 시트 헤더 — DX3rd { color: #fff } 명시 규칙 상속값 덮어씀 방지 */
+/* Item-sheet header — prevents DX3rd's { color: #fff } explicit
+   rule's inherited value from overwriting */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
@@ -1784,8 +1903,10 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-h
   color: var(--fe-ac-90) !important;
 }
 
-/* Simple sheet — DX3rd { color: #fff !important } 카운터 오버라이드
-   명시도: (0,4,1) > DX3rd의 (0,2,0) → !important 중 우리 규칙 우선 */
+/* Simple sheet — counter-override of DX3rd's { color: #fff
+   !important }
+   Specificity: (0,4,1) > DX3rd's (0,2,0) → among !important ours
+   wins */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .simple-sheet-name .actor-name {
   color: var(--fe-ac-90) !important;
 }
@@ -1830,9 +1951,12 @@ body.fe-retro-theme .double-cross-3rd .spell-description {
   color: var(--fe-ac-80) !important;
 }
 
-/* 회색 skew pseudo-element 배경 (#404040 → 강조색 색조 유지, 박스 형태 보존)
-   사용자 요청: 값칸(HP/능력치/스킬 등) 사다리꼴의 밝은 강조 외곽선을 제거한다.
-   배경(ac-22 회색 채움)은 유지하여 박스 형태는 남고, 테두리만 투명화한다. */
+/* Grey skew pseudo-element background (#404040 → accent hue kept,
+   box shape preserved)
+   User request: remove the bright accent outline on the trapezoid
+   value cells (HP/abilities/skills etc.).
+   The background (ac-22 grey fill) stays so the box shape remains;
+   only the border is made transparent. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .name-wrapper::before,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .stat-box .stat-list::before,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .value::before,
@@ -1841,41 +1965,53 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   border-color: transparent !important;
 }
 
-/* 라벨 박스(능력치 헤더 육체/감각/정신/사회, HP·행동치·이동·재산점 등)의
-   skew 박스(.title::before). 사용자 요청: 검은 배경 라벨 박스는 외곽선을 유지한다
-   (회색 값칸/스킬 박스만 외곽선 제거 — 그쪽은 위 규칙에서 gray bg + transparent 처리).
-   회색 skill-box .title 은 .main-grid .skill-box .title::before(특이도 상위)에서 투명화. */
+/* Label boxes (ability headers 육체/감각/정신/사회 — body/sense/mind/
+   social, HP/action/move/property etc.) — the skew box
+   (.title::before). User request: label boxes with black backgrounds
+   KEEP their outline (only the grey value/skill boxes lose it — those
+   get gray bg + transparent in the rule above).
+   The grey skill-box .title is made transparent by
+   .main-grid .skill-box .title::before (higher specificity). */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .title::before {
   border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6) !important;
 }
 
-/* 요구 1: 능력치 헤더(육체/감각/정신/사회)의 외곽선이 아래 기능치 사다리꼴 박스에
-   묻히지 않도록 stat-header를 기능치 박스(같은 stat-box 스태킹 컨텍스트 내 z:2)보다
-   위로 올린다. 라벨 ::before(z:-1)까지 헤더 컨텍스트째 상단에 렌더된다. */
+/* Requirement 1: raise the stat-header (육체/감각/정신/사회 ability
+   header) above the stat-value trapezoid boxes (z:2 within the same
+   stat-box stacking context) so its outline is not buried under the
+   box below. The label ::before (z:-1) renders at the top together
+   with the header's own context. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .stat-header {
   position: relative !important;
   z-index:  5 !important;
 }
 
-/* 요구 2: 기능치 사다리꼴 박스 구분. 인접한 두 박스의 맞닿는 면에 강조 구분선.
-   구분선을 위 박스 하단(border-bottom)에 그리면 DOM상 나중에 그려지는 아래 박스
-   ::before 에 덮여 묻힌다 → 나중에(위에) 그려지는 아래 박스의 상단(border-top)에
-   그려 묻힘을 방지한다(위/첫 행 제외). 같은 divider 라인이라 위치는 동일.
-   위 .main-grid .skill-box .title::before(투명화)보다 특이도 상위. */
+/* Requirement 2: separate the stat-value trapezoid boxes. An accent
+   divider on the touching faces of two adjacent boxes.
+   Drawing the divider on the upper box's bottom (border-bottom) gets
+   it painted over and buried by the lower box's ::before (drawn
+   later in DOM order) → draw it on the lower (later-painted) box's
+   top (border-top) instead (skips the first row). Same divider line
+   position either way.
+   Higher specificity than the .main-grid .skill-box .title::before
+   (transparent) rule above. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .skill-box label.skill:not(:first-of-type) .title.skill-roll::before {
   border-top-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.5) !important;
 }
 
-/* 스탯박스 입력 — 투명 배경으로 ::before 강조색 색조 노출.
-   background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
-   padding-right 복원 — 전역 select 규칙의 20px 화살표 여백 불필요. */
+/* Stat-box inputs — transparent background exposes the ::before
+   accent tint.
+   The background shorthand intentionally resets background-image:
+   none (arrow suppression).
+   padding-right restored — the global select rule's 20px arrow
+   space is unneeded. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat select {
   background:    transparent !important;
   padding-right: 0.5rem !important;
 }
 
-/* 다이아몬드 배경 (#404040 → 강조색 색조) */
+/* Diamond background (#404040 → accent hue) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .diamond {
   background:  var(--fe-ac-06) !important;
   box-shadow:  0 0 0 2px var(--fe-ac-57) inset !important;
@@ -1886,7 +2022,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
               0 0 6px var(--fe-ac-12) !important;
 }
 
-/* DX3rd 시트 탭 — 비활성(--fe-ac-80) · 활성(--fe-ac-90) */
+/* DX3rd sheet tabs — inactive (--fe-ac-80) · active (--fe-ac-90) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .tabs .item {
   background:   #000000 !important;
   color:        var(--fe-ac-80) !important;
@@ -1899,34 +2035,40 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .tabs .item.ac
   border-color: var(--fe-ac-90) !important;
 }
 
-/* DX3rd 시트 일반 텍스트 (레이블·셀·단락) */
+/* DX3rd sheet general text (labels · cells · paragraphs) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) :is(label, td, th, p) {
   color: var(--fe-ac-80) !important;
 }
 
-/* 아이템 이름/레이블 — 구조가 h4.item-name > span.item-label > span 이라
-   위 :is(label,td,th,p) 에 안 잡혀 코어 기본 회색으로 남았다. 액센트로 교체.
-   .item-name span 으로 중첩 span(실제 텍스트)까지 직접 덮는다.
-   (item-exhausted 의 색은 §… 별도 규칙이 더 높은 명시도로 유지됨) */
+/* Item names/labels — the structure is
+   h4.item-name > span.item-label > span, which the
+   :is(label,td,th,p) above never matched, leaving the core default
+   grey. Switched to accent.
+   .item-name span covers the nested span (the actual text) directly.
+   (item-exhausted's color is kept by a separate higher-specificity
+   rule in §…) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-name,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-label,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item-name span {
   color: var(--fe-ac-90) !important;
 }
 
-/* .highlight — DX3rd { color:#19499b !important }(system 레이어) 고정 청색을
-   픽셀 테마 액센트 글씨로 되돌린다.
-   layouts 레이어(7) < system 레이어(8) 이므로 !important 싸움에서 우리가 이긴다.
+/* .highlight — restore DX3rd's { color:#19499b !important }
+   (system layer) fixed blue to the pixel theme's accent text.
+   layouts layer (7) < system layer (8), so we win the !important
+   fight.
 
-   파란색 글자 외곽선(text-shadow 스트로크)은 제거됨 — 액센트 색 + bold 만 유지. */
+   The blue-text outline (text-shadow stroke) is removed — only
+   accent color + bold remain. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .highlight {
   color:        var(--fe-ac-90) !important;
   font-weight:  bold !important;
   text-shadow:  none !important;
 }
 
-/* sheet-stat .title 텍스트 — DX3rd { color: white } (0,4,0) 일반 규칙 무력화
-   stat-box·dice-info 내 skew 레이블 모두 포함 */
+/* sheet-stat .title text — neutralize DX3rd's { color: white }
+   (0,4,0) plain rule
+   Covers all skew labels in stat-box · dice-info */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .title {
   color: var(--fe-ac-90) !important;
   text-shadow:
@@ -1936,8 +2078,10 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
     -1px  0   0 #000000, 1px  0   0 #000000 !important;
 }
 
-/* DX3rd 입력 필드 전반 (일반 규칙, !important 없는 DX3rd 규칙 무력화)
-   체크박스/라디오는 시스템의 전용 크기 보정과 브라우저 네이티브 페인트를 유지한다. */
+/* DX3rd input fields in general (plain rule — neutralizes
+   non-!important DX3rd rules)
+   Checkboxes/radios keep the system's dedicated sizing and the
+   browser's native paint. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) input:not([type="checkbox"]):not([type="radio"]),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) select {
   color:            var(--fe-ac-90) !important;
@@ -1945,24 +2089,25 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) select {
   border-color:     var(--fe-ac-22) !important;
 }
 
-/* .sheet-stat 입력 color — DX3rd 원본 !important 명시도 (0,5,1)/(0,3,1) 무력화
-   우리 명시도: input:not() → (0,6,2), select/textarea → (0,4,2)
-   background는 건드리지 않음 — line 1719 transparent 규칙이 담당
-   ※ .sheet-main은 §26이 별도 처리 */
+/* .sheet-stat input color — neutralizes DX3rd's original
+   !important specificity (0,5,1)/(0,3,1)
+   Ours: input:not() → (0,6,2), select/textarea → (0,4,2)
+   background untouched — the line-1719 transparent rule handles it
+   ※ .sheet-main is handled separately by §26 */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat input:not([type="checkbox"]):not([type="radio"]),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat select,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat textarea {
   color: var(--fe-ac-90) !important;
 }
 
-/* addon-critical-min 흰 박스 */
+/* addon-critical-min white box */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info .title .addon-critical-min {
   background:   #000 !important;
   color:        var(--fe-ac-90) !important;
   border:       1px solid var(--fe-ac-22) !important;
 }
 
-/* stat / attribute 입력 투명 배경 유지 */
+/* stat / attribute inputs keep transparent background */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper :is(
   .stat-list .stat,
   .sheet-attributes .attribute-value,
@@ -1971,7 +2116,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   background: transparent !important;
 }
 
-/* ── G. DX3rd 채팅 버튼 (흰 배경 → 흑색) ─────────────────── */
+/* ── G. DX3rd chat buttons (white background → black) ────────── */
 
 body.fe-retro-theme :is(.chat-btn.invoke-spell, .chat-btn.spell-overflow) {
   background:   #000 !important;
@@ -1985,7 +2130,7 @@ body.fe-retro-theme :is(.chat-btn.invoke-spell, .chat-btn.spell-overflow):hover 
 }
 
 
-/* ── DX3rd 시트 헤더 백트랙 버튼 ───────────────────────────── */
+/* ── DX3rd sheet-header backtrack button ────────────────────── */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .backtrack-btn button {
   background:   #000 !important;
@@ -1998,18 +2143,23 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   border-color: var(--fe-ac-70) !important;
 }
 
-/* sheet-header .select-box 세로 정렬 — 코어 foundry2.css 가 select 에
-   line-height: var(--input-height)(=2rem=32px) 를 걸어, select 값 텍스트가
-   박스 위쪽으로 떠 중앙에서 어긋난다(헤드리스 렌더로 확인: 2rem→상단, normal→중앙).
-   line-height: normal 로 라인박스를 글리프에 맞추면 UA 의 select 내부 center
-   정렬이 정확해진다. 테마 무관(픽셀/일반 공통) — layouts 레이어(7)라 코어
-   elements 레이어(3) 일반 선언을 이긴다(!important 불필요). */
+/* sheet-header .select-box vertical alignment — core foundry2.css
+   sets line-height: var(--input-height) (=2rem=32px) on select, so
+   the value text floats to the top of the box, off-center
+   (confirmed via headless render: 2rem→top, normal→center).
+   line-height: normal fits the line box to the glyph and the UA's
+   internal select centering becomes exact. Theme-agnostic
+   (pixel/normal alike) — being in the layouts layer (7) it beats
+   core's elements layer (3) plain declarations (no !important
+   needed). */
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .select-box {
   line-height: normal;
 }
 
-/* ── sheet-header .select-box — DX3rd { color: white; background: black } (0,4,0) 무력화.
-   background: #000(무채색) → var(--fe-ac-06)(색조 포함 극도 어두운 배경)으로 hue 오버라이드. */
+/* ── sheet-header .select-box — neutralize DX3rd's
+   { color: white; background: black } (0,4,0).
+   background: #000 (achromatic) → var(--fe-ac-06) (ultra-dark
+   tinted background) for the hue override. */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-header .select-box {
   color:            var(--fe-ac-90) !important;
@@ -2021,49 +2171,70 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   background: #000 !important;
 }
 
-/* ── DX3rd 시트·다이얼로그 입력/셀렉트 텍스트 정렬 정상화 (테마 무관) ────────────
-   증상: 값 텍스트가 가운데 정렬인데 좌측으로 치우치고, 위/아래로 들쭉날쭉.
+/* ── DX3rd sheet·dialog input/select text-alignment normalization
+   (theme-agnostic) ────────────
+   Symptom: value text is center-aligned but shifted left and
+   vertically uneven.
 
-   [가로 — input] 코어 input 패딩(1px 3px) + 시스템 우측 패딩(8px) 비대칭 → 중앙이 왼쪽으로.
-     좌우 패딩을 4px 대칭으로 통일해 진짜 중앙 정렬. layouts 레이어라 시스템(8) 을
-     이기려면 !important. 좌측정렬 필드(이름/코드네임 .name)는 제외 — 의도된 좌측 패딩 보존.
-     체크박스/라디오는 네이티브 페인트가 padding-box와 따로 그려져 내부/외곽이 어긋나므로 제외. */
+   [Horizontal — input] core input padding (1px 3px) + asymmetric
+     system right padding (8px) → center shifts left.
+     Unified to symmetric 4px padding for a true center. To beat
+     system(8) from the layouts layer, !important is needed.
+     Left-aligned fields (.name for name/codename) are excluded —
+     their intentional left padding is preserved.
+     Checkboxes/radios are excluded — native paint draws outside the
+     padding-box and inner/outer would misalign. */
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   input:not([type="checkbox"]):not([type="radio"]):not(.name):not([name="name"]):not([name="system.codeName"]) {
   padding-left:  4px !important;
   padding-right: 4px !important;
 }
 
-/* [세로 — select] 코어가 select 에 line-height: var(--input-height) 를 걸어 값이 위로 뜸
-     → normal 로 라인박스를 글리프에 맞춰 UA 의 select 내부 중앙 정렬을 정확히 한다.
-   주의(가로): input·select 의 우측 패딩(8~20px)은 코어/시스템이 매우 높은 우선순위
-     (:is(#…) 추정)로 박아둬 어떤 author 스타일시트 규칙으로도 못 이긴다(인라인 !important
-     만 가능). 그래서 가로 픽셀단위 중앙 정렬은 scripts/fe-dx3rd-input-align.js 가 렌더 시
-     인라인으로 마무리한다. 이 CSS 규칙들은 그 전 단계의 first-paint 베이스라인이다. */
+/* [Vertical — select] core sets line-height: var(--input-height)
+     on select, floating the value upward → normal fits the line box
+     to the glyph so the UA's internal select centering is exact.
+   Note (horizontal): the right padding (8~20px) on input·select is
+     pinned by core/system at very high priority (probably :is(#…))
+     and cannot be beaten by any author stylesheet rule (only inline
+     !important can). So pixel-exact horizontal centering is finished
+     by scripts/fe-dx3rd-input-align.js writing inline styles at
+     render time. These CSS rules are the first-paint baseline before
+     that. */
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) select {
   line-height:     normal !important;
   text-align:      center !important;
   text-align-last: center !important;
 }
 
-/* ── 능력치 이름 라벨(.main-grid .stat-box .title) 세로 정렬 — 폰트/테마 무관 ──────
-   증상: 신체/감각/정신/사교 라벨 텍스트가 박스 안에서 위로 들떠 보인다.
-   원인: dx3rd 원본이 이 라벨을 height:42px 로 만들면서 line-height:32px(10px 부족)만
-     걸고 flex 세로 정렬 장치를 빼먹었다 — 같은 파일의 EXP/HP/Move 등 일반 stat-box
-     .title 변형(width:80px/height:32px)은 display:flex+align-items:center 로 제대로
-     처리돼 있는데, main-grid(능력치) 변형만 빠짐. 기본 Signika 폰트에서도 이미
-     어긋나는 dx3rd 자체의 사전 결함이다(female_edition 유무와 무관하게 존재).
-     여기에 female_edition 폰트 스왑(쿠키런/그림일기/NeoDGM)이 켜지면 글꼴마다 다른
-     ascent/descent 비율이 더해져 한층 더 어긋난다 — NeoDGM(진짜 비트맵/픽셀 폰트)이
-     비율이 가장 비대칭이라 가장 도드라지지만, 레트로 픽셀 "테마"가 원인이 아니라
-     "폰트 선택"이 원인이다(세 폰트 모드 전부에서 발생, 테마 전용 버그 아님).
-   해결: dx3rd 자신의 다른 stat-box .title 변형과 동일한 flex 중앙 정렬을 적용하고,
-     "line-height를 박스 높이에 맞춰 박아 중앙을 흉내내는" 구식 트릭을 normal 로 풀어
-     flex가 실제 여백을 재분배하게 한다. text-align:center(상위 .sheet-stat .title
-     규칙 상속)는 flex 컨테이너에서 무력화되므로 justify-content:center 로 대체.
-   유지보수 원칙: dx3rd CSS에서 새 정렬 버그를 발견하면 그 요소가 이 "line-height ==
-     box height" 패턴을 쓰는지 먼저 확인할 것 — padding 미세조정 대신 flex 치환으로
-     고치면 폰트가 무엇이든 재발하지 않는다. */
+/* ── Ability-name label (.main-grid .stat-box .title) vertical
+   alignment — font/theme-agnostic ──────
+   Symptom: 신체/감각/정신/사교 (body/sense/mind/social) label text
+   looks lifted upward inside its box.
+   Cause: the original dx3rd makes these labels height:42px but sets
+     only line-height:32px (10px short) with no flex vertical-
+     centering — the same file's EXP/HP/Move generic stat-box .title
+     variants (width:80px/height:32px) DO use
+     display:flex+align-items:center; only the main-grid (ability)
+     variant misses it. This is a pre-existing dx3rd defect, present
+     even on the default Signika font (exists regardless of
+     female_edition).
+     With female_edition's font swap (CookieRun/Geurimilgi/NeoDGM)
+     each font's different ascent/descent ratio worsens it further —
+     NeoDGM (a true bitmap/pixel font) has the most asymmetric ratio
+     and shows it worst, but the cause is "font choice", not the
+     retro pixel "theme" (occurs in all three font modes; not a
+     theme-only bug).
+   Fix: apply the same flex centering dx3rd itself uses on its other
+     stat-box .title variants, and undo the old trick of "faking
+     centering by pinning line-height to the box height" back to
+     normal so flex can actually redistribute the space.
+     text-align:center (inherited from the ancestor .sheet-stat
+     .title rule) is dead inside a flex container — replaced by
+     justify-content:center.
+   Maintenance rule: when a new alignment bug surfaces in dx3rd CSS,
+     first check whether that element uses this "line-height ==
+     box height" pattern — fix it by swapping to flex, not by
+     nudging padding, and it stays fixed for any font. */
 :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .main-grid .stat-box .title {
   display:         flex !important;
   align-items:     center !important;
@@ -2071,7 +2242,8 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   line-height:     normal !important;
 }
 
-/* ── 채팅카드(:is(.dx3rd-item-chat, .dx3rd-item-info)) 피쳐 설명 — gray 오버라이드 ── */
+/* ── Chat cards (:is(.dx3rd-item-chat, .dx3rd-item-info)) feature
+   descriptions — gray override ── */
 
 body.fe-retro-theme
   :is(#chat-log, .chat-log, ol.chat-log)
@@ -2083,19 +2255,22 @@ body.fe-retro-theme
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 23  DX3rd 시트 대비 보정
- *        (1) cell--title 흰 배경 addon → 검은 강조색 배경 (텍스트 대비 보존)
- *        (2) 커버·출신 등 특성 입력칸 — 밝은 강조색 윤곽선으로 구분
+ * § 23  DX3rd sheet contrast fixes
+ *        (1) cell--title white-background addon → black accent
+ *            background (preserves text contrast)
+ *        (2) trait input cells (cover/origin etc.) — bright accent
+ *            outline to distinguish
  * ══════════════════════════════════════════════════════════════ */
 
-/* (1) 흰 배경 addon 수정 */
+/* (1) Fix the white-background addon */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .cell--title .left-addon,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .cell--title .addon {
   background: var(--fe-ac-06) !important;
   color:      var(--fe-ac-90) !important;
 }
 
-/* (2) 특성 입력칸 (커버·출신·경험·배우·각성·충동·욕망 등) — 밝은 강조색 테두리 */
+/* (2) Trait input cells (cover/origin/experience/actor/awakening/
+   impulse/desire etc.) — bright accent border */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell input:not([type="checkbox"]):not([type="radio"]),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell select,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell textarea {
@@ -2104,33 +2279,41 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 25  DX3rd 시트 가시성 보정
- *        다이스 영역 + 상태이상 셀 — 검정 배경에서 구분선 추가
+ * § 25  DX3rd sheet visibility fixes
+ *        dice area + status-effect cells — divider added on the
+ *        black background
  * ══════════════════════════════════════════════════════════════ */
 
-/* 다이스(Dice) 영역 박스 — 직사각형 outline 은 제거한다. .dice-info 의 사각
-   경계는 시트 본래 영역 모양이 아니며, 안쪽 .title 의 치우친 사다리꼴(skew)
-   레이블과 어긋나 보인다. 강조 윤곽선은 아래에서 사다리꼴 ::before 에만 부여.
-   배경 틴트(L=6%)는 검정 바탕에서의 영역 구분용으로 유지. */
+/* Dice-area box — the rectangular outline is removed. .dice-info's
+   rectangular boundary is not the sheet's native area shape and
+   looks misaligned with the skewed trapezoid label of the inner
+   .title. The accent outline is applied only to the trapezoid
+   ::before below.
+   The background tint (L=6%) stays to separate the area on
+   black. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info {
   background:       var(--fe-ac-06) !important;
 }
 
-/* 다이스 레이블(.title)의 skew 사다리꼴 ::before. 다이스 박스는 어두운 틴트(ac-06)
-   바탕의 검은 라벨 박스이므로 사용자 요청대로 외곽선을 유지한다.
-   .dice-info .title 은 상위 .sheet-stat .title 규칙보다 특이도가 높으므로 여기서 명시. */
+/* The dice label (.title)'s skewed trapezoid ::before. The dice box
+   is a black label box on a dark tint (ac-06) — per user request it
+   keeps its outline.
+   .dice-info .title outranks the .sheet-stat .title rule above, so
+   it is declared here explicitly. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-stat .dice-info .title::before {
   border: 1px solid var(--fe-ac-57) !important;
 }
 
-/* 상태이상·기타 조건 셀 헤더(.cell--title) — 어두운 틴트 + 테두리 */
+/* Status-effect / other condition-cell headers (.cell--title) —
+   dark tint + border */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .cell .cell--title {
   background:   var(--fe-ac-06) !important;
   border:       1px solid var(--fe-ac-22) !important;
   color:        var(--fe-ac-90) !important;
 }
 
-/* 조건 셀 전체 외곽 — 약한 구분선으로 각 셀 경계 표시 */
+/* Whole condition-cell outline — a faint divider marks each cell
+   boundary */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-attributes .cell {
   outline:        1px solid var(--fe-ac-12) !important;
   outline-offset: -1px !important;
@@ -2138,20 +2321,25 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 26  DX3rd sheet-main 폼 요소 강제 재정의
- *        시스템 CSS 두 규칙을 모두 덮어써야 함:
- *          일반 상태  (0,5,1) !important → background:#404040
- *          :focus 상태(0,6,1) !important → background:#404040
- *        ※ 이 !important 들을 이기는 핵심은 명시도가 아니라 레이어다(파일 상단 주석 참조).
- *          layouts(7) < system(8) 이므로 우리 !important 가 우선. 명시도는 보조.
+ * § 26  DX3rd sheet-main form elements — forced override
+ *        Both system CSS rules must be overridden:
+ *          normal state (0,5,1) !important → background:#404040
+ *          :focus state (0,6,1) !important → background:#404040
+ *        ※ What beats these !importants is the layer, not
+ *          specificity (see the file-top comment).
+ *          layouts(7) < system(8), so our !important wins.
+ *          Specificity is secondary.
  *
- *        배경 명도를 L=20% 로 고정 — L=6%는 어떤 색조를 줘도
- *        육안으로 구분 불가능(진회색)하므로 색조 오버라이드 효과 없음.
- *        disabled는 L=10% 로 낮춰 비활성 상태를 시각적으로 구분.
+ *        Background lightness pinned at L=20% — at L=6% no hue is
+ *        visually distinguishable (dark grey), so the tint override
+ *        has no effect.
+ *        disabled drops to L=10% to mark the inactive state.
  * ══════════════════════════════════════════════════════════════ */
 
-/* background 단축 속성 → background-image: none 리셋(화살표 억제) 의도적.
-   padding-right 복원 — sheet-main은 좁은 입력칸이 많아 20px 화살표 여백 불필요. */
+/* The background shorthand intentionally resets background-image:
+   none (arrow suppression).
+   padding-right restored — sheet-main has many narrow cells where
+   the 20px arrow space is unneeded. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main
   input:not([type="checkbox"]):not([type="radio"]),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main select,
@@ -2162,7 +2350,8 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   padding-right: 0.5rem !important;
 }
 
-/* :focus 상태 — 시스템 CSS (0,6,1) 대비 (0,7,2) 명시도로 완전 덮어씀 */
+/* :focus state — fully overrides the system CSS (0,6,1) at (0,7,2)
+   specificity */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main
   input:not([type="checkbox"]):not([type="radio"]):focus,
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper .sheet-main select:focus,
@@ -2177,8 +2366,9 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .sheet-wrapper
   color:      var(--fe-ac-t22) !important;
 }
 
-/* 침식률 프로그래스 바 최종 예외 — 뒤쪽 범용 input 규칙이 검정 배경을
-   다시 입히므로, 바 위의 텍스트/입력은 이 위치에서 투명 배경으로 고정한다. */
+/* Erosion progress-bar final exemption — later generic input rules
+   paint the black background again, so text/inputs on the bar are
+   pinned transparent at this position. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
   .sheet-wrapper .sheet-header .encroachment-bar :is(input:not([type="checkbox"]):not([type="radio"]), label, .dice-addon, .encroachment-value-text),
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
@@ -2254,9 +2444,11 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
 }
 
 
-/* 에디터 편집 연필(prose-mirror > button.icon.toggle) — 전역 button 규칙(§30)의
-   1px 테두리가 Foundry 기본 좌우 패딩(0 8px)과 겹쳐 작은 연필 아이콘보다
-   헐거운 사각 외곽선을 만든다. 패딩 제거 + 정사각으로 외곽선을 아이콘에 맞춘다. */
+/* Editor pencil (prose-mirror > button.icon.toggle) — the global
+   button rule (§30)'s 1px border plus Foundry's default horizontal
+   padding (0 8px) draw a loose rectangular outline around the tiny
+   pencil icon. Padding removed + made square so the outline hugs
+   the icon. */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) prose-mirror.editor button.icon.toggle {
   padding: 0 !important;
   box-sizing: border-box !important;
@@ -2271,13 +2463,15 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) prose-mirror.e
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 31  주요 강조 텍스트 — accent 직접 적용
- *        §4 의 text-shadow:none이 이미 적용되어 글로우 없음.
- *        · 채팅 발신자·창 제목 등 최상위 계층 텍스트를 accent 색상으로 직접 지정.
- *        · --fe-ac-90(L=90%/α=0.82)보다 선명한 accent 원색으로 계층 최상위 표현.
+ * § 31  Primary accent text — direct accent
+ *        §4's text-shadow:none already applies — no glow.
+ *        · Top-tier text (chat senders, window titles etc.) is set
+ *          directly to the accent color.
+ *        · The raw accent is one step above --fe-ac-90
+ *          (L=90%/α=0.82) and marks the top of the hierarchy.
  * ══════════════════════════════════════════════════════════════ */
 
-/* DX3rd 스테이터스 카드 이름 · 액션 UI 제목 */
+/* DX3rd status-card names · action-UI titles */
 body.fe-retro-theme .fedr-name,
 body.fe-retro-theme .dx3rd-action-ui-title {
   color: var(--fe-dx3rd-accent, #ffffff) !important;
@@ -2285,38 +2479,44 @@ body.fe-retro-theme .dx3rd-action-ui-title {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 32  인라인 롤 — 강조색 색조 적용
- *        Foundry/시스템 CSS가 a.inline-roll에 자체 color·background를
- *        설정하여 검정 배경에서 텍스트가 보이지 않는 문제 수정.
- *        §14의 .message-content color 상속이 inline-roll에 도달하지
- *        못하는 경우를 대비해 속성을 직접 적용.
+ * § 32  Inline rolls — accent tint
+ *        Foundry/system CSS sets its own color·background on
+ *        a.inline-roll, making the text invisible on the black
+ *        background.
+ *        Properties are applied directly in case §14's
+ *        .message-content color inheritance does not reach
+ *        inline-roll.
  * ══════════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════════
- * § 33  DX3rd 강조 텍스트 클래스
- *        .highlight 처리는 §20(line ~1982)으로 일원화한다 —
- *          color: var(--fe-ac-90) + bold + #4a9eff 글리프 stroke(text-shadow).
- *        DX3rd { color:#19499b !important }(system 레이어)는 §20이
- *        layouts 레이어 !important 로 이미 제압한다.
- *        (이전엔 여기서 color 를 raw accent 로 다시 덮어써 §20 의 ac-90 이
- *         무효화됐었음 — 동일 셀렉터·동일 명시도에서 소스 순서상 §33 우선.)
+ * § 33  DX3rd accent text classes
+ *        .highlight handling is unified into §20 (line ~1982) —
+ *          color: var(--fe-ac-90) + bold + #4a9eff glyph stroke
+ *          (text-shadow).
+ *        DX3rd's { color:#19499b !important } (system layer) is
+ *        already suppressed by §20's layouts-layer !important.
+ *        (Previously this section re-overrode color to the raw
+ *         accent, which voided §20's ac-90 — same selector, same
+ *         specificity, and §33 won by source order.)
  * ══════════════════════════════════════════════════════════════ */
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 34  DX3rd 아이템 시트 헤더 입력칸 — 흰 배경 제거
- *        시스템 CSS가 flex-item input / level input 에
- *        background:white; color:black 을 명시 → 흑색 배경 복원.
+ * § 34  DX3rd item-sheet header input cells — remove white
+ *        background
+ *        System CSS explicitly sets background:white; color:black
+ *        on flex-item inputs / level inputs → restore black
+ *        background.
  * ══════════════════════════════════════════════════════════════ */
 
-/* 아이템 시트 헤더 우측 플렉스 입력칸 (방어력·이동력 등 수치) */
+/* Item-sheet header right-side flex inputs (defense/movement etc.) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header .flex-item input {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
   border:     1px solid var(--fe-ac-45) !important;
 }
 
-/* 아이템 레벨 입력칸 */
+/* Item-level input */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-header .header-fields .level input {
   background: #000 !important;
   color:      var(--fe-ac-90) !important;
@@ -2325,9 +2525,11 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .item .sheet-h
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 35  레벨 배지(.level) — 흰 배경/검정 텍스트 → 액센트 반전
- *        combo-item .item-name 안의 .level pill만 대상.
- *        .header-fields .level 은 레이아웃 컨테이너 div이므로 제외.
+ * § 35  Level badge (.level) — white bg/black text → accent
+ *        inversion
+ *        Only the .level pill inside combo-item .item-name.
+ *        .header-fields .level is a layout container div and is
+ *        excluded.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .combo-item .item-name .level,
@@ -2338,22 +2540,27 @@ body.fe-retro-theme .combo-items-dialog .level {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 36  dx3rd-item-chat 내부 구조 — 액센트 통합
+ * § 36  dx3rd-item-chat internal structure — unified accent
  *
- *  (1) use-item 버튼 — 외곽선형, attack-roll / success 버튼 — 흰 배경 반전
- *  (2) 내부 구분선 #AAA/#DDD → 액센트 계열
- *  (3) combo-toggle-btn:hover — §10 item-name-toggle 패턴 적용
- *  (4) item-type / protect-unequip 보조 요소
+ *  (1) use-item buttons — outline style, attack-roll / success
+ *      buttons — white-background inversion
+ *  (2) internal dividers #AAA/#DDD → accent family
+ *  (3) combo-toggle-btn:hover — §10 item-name-toggle pattern
+ *  (4) item-type / protect-unequip auxiliary elements
  * ══════════════════════════════════════════════════════════════ */
 
-/* ── (1) 액션 버튼 ─────────────────────────────────────────── */
+/* ── (1) Action buttons ─────────────────────────────────────── */
 
-/* use-item-btn(무기 사용 등)과 attack-roll-btn(공격)은 시스템 CSS에서 원래
-   동일한 외곽선형 버튼(투명 배경 + currentColor 테두리)이다. 이전엔 공격 버튼만
-   흰(액센트) 채움 + 검정 글자로 반전시켜 강조했으나, 고대비 레트로에서 채움색이
-   글자색과 비슷하게 보여 텍스트가 묻히는 문제가 있었다(사용자 보고).
-   → 공격 버튼도 다른 버튼과 동일하게 외곽선형으로 통일한다.
-   반전 채움 강조는 success / win-check 버튼에만 남긴다. */
+/* use-item-btn (weapon use etc.) and attack-roll-btn (attack) are
+   originally the same outline-style button in the system CSS
+   (transparent background + currentColor border). The attack button
+   used to be inverted to a white(accent) fill + black text to
+   emphasize it, but under high-contrast retro the fill reads too
+   close to the text color and the text drowned (user report).
+   → The attack button is unified to the same outline style as the
+   other buttons.
+   The inverted-fill emphasis stays only on success / win-check
+   buttons. */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .use-item-btn,
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .attack-roll-btn {
   background: transparent !important;
@@ -2387,7 +2594,7 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .attack-roll-btn:hov
   outline-offset: 0 !important;
 }
 
-/* ── (2) 내부 구분선 · 섹션 테두리 ──────────────────────────── */
+/* ── (2) Internal dividers · section borders ────────────────── */
 
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-header {
   border-bottom-color: var(--fe-ac-22) !important;
@@ -2401,7 +2608,8 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .effect-details .det
   border-bottom-color: var(--fe-ac-12) !important;
 }
 
-/* detail-row 짝수 줄 배경 — 원본 rgba(0,0,0,0.05) 는 검정에서 불가시 → 미세 틴트 */
+/* detail-row even-line background — the original rgba(0,0,0,0.05)
+   is invisible on black → subtle tint */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .effect-details .detail-row:nth-child(even) {
   background: var(--fe-ac-06) !important;
 }
@@ -2424,20 +2632,20 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-item-header {
   border-bottom-color: var(--fe-ac-12) !important;
 }
 
-/* ── (3) combo-toggle-btn:hover — item-name-toggle 패턴 ──────── */
+/* ── (3) combo-toggle-btn:hover — item-name-toggle pattern ──── */
 
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .combo-toggle-btn:hover {
   color: hsl(var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 0%) 96%) !important;
 }
 
-/* ── (4) 보조 텍스트 · 작은 버튼 ────────────────────────────── */
+/* ── (4) Auxiliary text · small buttons ─────────────────────── */
 
-/* item-type 소형 부제목 (#888 → t33) */
+/* item-type small subtitle (#888 → t33) */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .item-type {
   color: var(--fe-ac-t33) !important;
 }
 
-/* protect-unequip — 비활성(회색) 소형 버튼 */
+/* protect-unequip — inactive (grey) small button */
 body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .protect-unequip-btn {
   border-color: var(--fe-ac-22) !important;
   color:        var(--fe-ac-57) !important;
@@ -2451,7 +2659,7 @@ body.fe-retro-theme :is(.dx3rd-item-chat, .dx3rd-item-info) .protect-unequip-btn
 
 /* ══════════════════════════════════════════════════════════════
  * § 37  combo-items-dialog / book-spell-list-dialog
- *        시스템 CSS의 #ddd 회색 테두리 → 액센트 계열
+ *        System CSS's #ddd grey borders → accent family
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(.combo-items-dialog, .book-spell-list-dialog) .item {
@@ -2468,9 +2676,11 @@ body.fe-retro-theme :is(.combo-items-dialog, .book-spell-list-dialog) .info-tabl
   color:      var(--fe-ac-90) !important;
 }
 
-/* 마도서 소유 술식 — 위 th 규칙의 background/color 덮어씌우기를 복원.
-   시맨틱 빨강(이미 소유)은 의도적 색상 — 위 th 규칙(0,4,2)과 동일 명시도이지만
-   이 선언이 나중에 위치하므로 소스 순서로 우선됨. */
+/* Owned grimoire spells — restore over the th rule's
+   background/color override above.
+   The semantic red (already owned) is intentional — same
+   specificity as the th rule (0,4,2) but declared later, so it
+   wins by source order. */
 body.fe-retro-theme .book-spell-list-dialog .owned-spell .info-table :is(th, td) {
   background: #000000 !important;
   color:      red !important;
@@ -2478,27 +2688,29 @@ body.fe-retro-theme .book-spell-list-dialog .owned-spell .info-table :is(th, td)
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 38  어트리뷰트 목록 구분선 + sublimation + applied-effect 테이블
+ * § 38  attribute-list dividers + sublimation + applied-effect
+ *        table
  * ══════════════════════════════════════════════════════════════ */
 
-/* 어트리뷰트 헤더 (#AAA 테두리) */
+/* Attribute header (#AAA border) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .attributes-header {
   background:   var(--fe-ac-06) !important;
   border-color: var(--fe-ac-22) !important;
 }
 
-/* 어트리뷰트 목록 항목 하단 구분선 (#AAA) */
+/* Attribute-list item bottom divider (#AAA) */
 body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd) .attributes-list li > * {
   border-bottom-color: var(--fe-ac-12) !important;
 }
 
-/* 서브리메이션 액션 버튼 hover (원본 #e0e0e0 밝은 회색 → 액센트 반전) */
+/* Sublimation action-button hover (original #e0e0e0 light grey →
+   accent inversion) */
 body.fe-retro-theme .sublimation-action-btn:hover {
   background-color: var(--fe-dx3rd-accent, #ffffff) !important;
   color:            #000000 !important;
 }
 
-/* applied-effect-table (#ccc 테두리) */
+/* applied-effect-table (#ccc borders) */
 body.fe-retro-theme .applied-effect-table :is(th, td) {
   border-color: var(--fe-ac-22) !important;
 }
@@ -2509,28 +2721,34 @@ body.fe-retro-theme .applied-effect-table th {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 40  마름모꼴 메인프로세스(이니셔티브 카운트) 알림 (#diamond-frame)
+ * § 40  diamond-shaped main-process (initiative-count)
+ *        notification (#diamond-frame)
  *
- *  DX3rd combat.js 의 showTurnActor() 가 <style id="diamond-style"> 를
- *  document.head 에 JS 주입한다. 그 규칙은 "언레이어드(레이어 없음) 일반
- *  선언" 이라 우리의 layouts 레이어 일반 규칙을 이긴다(언레이어드 > 레이어드).
- *  → 모두 !important 로 오버라이드한다(!important 는 레이어 무관하게 일반 선언을
- *    이긴다).
+ *  DX3rd combat.js's showTurnActor() injects a
+ *  <style id="diamond-style"> into document.head. Those rules are
+ *  "unlayered (no layer) plain declarations", so they beat our
+ *  layouts-layer plain rules (unlayered > layered).
+ *  → Everything is overridden with !important (!important beats
+ *    plain declarations regardless of layer).
  *
- *  (A) 모든 테마 공통 — 포트레이트 회색 빈영역 소거:
- *      원본 #diamond-frame 은 radial-gradient(회색) 배경 + img{object-fit:contain}
- *      이라 포트레이트가 정사각형이 아니거나 투명 PNG 면 빈자리/투명영역에 옅은
- *      회색이 비친다. 배경을 투명으로 죽이고 cover 로 마름모를 가득 채워 빈영역
- *      자체를 없앤다(머리 잘림 완화 위해 object-position: top center).
+ *  (A) All themes — remove the grey empty area on portraits:
+ *      the original #diamond-frame has a radial-gradient (grey)
+ *      background + img{object-fit:contain}, so non-square or
+ *      transparent-PNG portraits show pale grey through the
+ *      empty/transparent areas. Kill the background and fill the
+ *      diamond with cover so no empty area exists (object-position:
+ *      top center softens head cropping).
  *
- *  (B) 픽셀 테마(body.fe-retro-theme) 한정:
- *      · 테두리 black → 액센트(흰색 기본)로 픽셀 다이아몬드 외곽선
- *      · 라벨 폰트 sans-serif → 픽셀 폰트(--fe-font-primary)
- *      · §4 가 text-shadow 를 전역 제거하므로 라벨 가독성용 하드 1px 검정
- *        아웃라인(소프트 글로우 아님 — 픽셀 톤)으로 재공급
+ *  (B) Pixel theme only (body.fe-retro-theme):
+ *      · border black → accent (default white) pixel-diamond
+ *        outline
+ *      · label font sans-serif → pixel font (--fe-font-primary)
+ *      · §4 removes text-shadow globally, so label readability is
+ *        re-supplied by a hard 1px black outline (not a soft glow —
+ *        pixel tone)
  * ══════════════════════════════════════════════════════════════ */
 
-/* (A) 모든 테마 — 회색 빈영역 소거 */
+/* (A) All themes — remove the grey empty area */
 #diamond-frame {
   background:       transparent !important;
   background-image: none        !important;
@@ -2540,12 +2758,12 @@ body.fe-retro-theme .applied-effect-table th {
   object-position: top center !important;
 }
 
-/* (B) 픽셀 테마 — 액센트 외곽선 */
+/* (B) Pixel theme — accent outline */
 body.fe-retro-theme #diamond-frame {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-/* (B) 픽셀 테마 — 라벨 폰트/색/하드 아웃라인 */
+/* (B) Pixel theme — label font/color/hard outline */
 body.fe-retro-theme :is(#diamond-label-left, #diamond-label-right) {
   font-family: var(--fe-font-primary, monospace) !important;
   color:       var(--fe-ac-90) !important;
@@ -2558,9 +2776,10 @@ body.fe-retro-theme :is(#diamond-label-left, #diamond-label-right) {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 41  DX3rd 상태 HUD — 캔버스 우상단 상태 아이콘
- *        위치·크기와 상태 아이콘 자체는 시스템에 맡기고, 레트로 테마에서는
- *        반투명 둥근 프레임만 검정/액센트의 하드 프레임으로 교체한다.
+ * § 41  DX3rd status HUD — status icons top-right of the canvas
+ *        Position/size and the status icons themselves stay with
+ *        the system; under the retro theme only the translucent
+ *        rounded frame is replaced by a black/accent hard frame.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme #dx3rd-condition-hud .dx3rd-condition-hud-icon {
@@ -2582,10 +2801,12 @@ body.fe-retro-theme #dx3rd-condition-hud .dx3rd-condition-hud-badge {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 42  DX3rd 커스텀 DOM 다이얼로그
- *        일부 사용/판정 다이얼로그는 Foundry Application이 아니라 body에
- *        직접 삽입되고 배경·테두리를 인라인으로 지정한다. 공통 버튼은 앞선
- *        전역 버튼 규칙에 맡기고, 여기서는 독립 루트와 의미색만 보정한다.
+ * § 42  DX3rd custom DOM dialogs
+ *        Some use/check dialogs are not Foundry Applications but
+ *        injected directly into body with inline background/border
+ *        styles. Shared buttons are left to the earlier global
+ *        button rules; only standalone roots and semantic colors
+ *        are fixed here.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :is(

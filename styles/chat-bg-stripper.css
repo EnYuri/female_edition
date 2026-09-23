@@ -2,7 +2,7 @@
  *
  * - JS removes ONLY texture url() layers and keeps Chat Portrait's color overlay.
  * - Portrait hiding + related layout tweaks are now OPTIONAL via module setting:
- *     "채팅 포트레이트 숨김" (adds body class: fe-hide-portraits)
+ *     "채팅 포트레이트 숨김" (hide chat portraits; adds body class: fe-hide-portraits)
  * - Bold emphasis in chat content is slightly enlarged for readability.
  */
 
@@ -381,7 +381,8 @@ body:is(.fe-userbg-base-white, .fe-userbg-base-black, .fe-userbg-base-custom)
  * SPEAKERLESS/GM SYSTEM MESSAGES ARE A SECOND, INDEPENDENT BASE, and every ink block from
  * here down needs both arms because of it. `--fe-system-msg-bg` (§ further down) paints
  * `li.fe-system-msg` with a colour of its own, so the body-level lean can be flat wrong for
- * exactly those messages — measured with a 진회색 chat-card base and a white system base:
+ * exactly those messages — measured with a 진회색 (dark gray) chat-card base and a white
+ * system base:
  * `li.fe-system-msg` painted `#ffffff` while still carrying `--color-text-primary: #fff`
  * and `--dnd5e-background-card: #252830` from the dark branch. `fe-style.js` therefore
  * publishes a SECOND pair, `body.fe-sysmsg-bg-light` / `fe-sysmsg-bg-dark`, and every
@@ -496,12 +497,13 @@ body.fe-sysmsg-bg-light
   --dnd5e-background-5: rgb(0 0 0 / 0.05);
   --dnd5e-gold-icon-background: var(--dnd5e-color-light-gray);
   --dnd5e-chat-description-background: transparent;
-  /* Ours, not dnd5e's: the 약간의 회색 box §the description rule further up paints with
+  /* Ours, not dnd5e's: the 약간의 회색 (light gray) box §the description rule further up
+   paints with
    * `background-color: … !important`, which overrides the dnd5e variable right above it.
    * It sat in `:root` as a fixed #f0f0f0, so on a dark base it rendered the description
    * section light-grey while the ink stayed light — measured #f0f0f0 on #f0f0f0, i.e.
    * invisible. The dark value is a translucent HIGHLIGHT rather than a literal colour so
-   * it composites correctly over any dark base (진회색 or a custom one). */
+   * it composites correctly over any dark base (진회색 = dark gray, or a custom one). */
   --fe-chat-desc-bg: #f0f0f0;
   --dnd5e-chat-button-background: rgb(0 0 0 / 0.05);
   --control-active-background-color: rgb(0 0 0 / 0.2);
@@ -510,7 +512,8 @@ body.fe-sysmsg-bg-light
    * `--dnd5e-color-blue-gray-3` raw for two chat lines it never routes through a
    * `--dnd5e-border-*` alias — `.card-description` gets `border-block: 1px dashed …` and
    * `.deltas` gets `border-block-start: 1px dashed …` — so those two can only be
-   * reached here. Measured on a 진회색 base: a #434857 dashed rule on a ~#3a3340 box, i.e. no
+   * reached here. Measured on a 진회색 (dark gray) base: a #434857 dashed rule on a
+   * ~#3a3340 box, i.e. no
    * visible line at all. Re-pointing the constant also lifts every alias in the dark
    * block below that resolves through it (border-dark / -dotted / -separator-heavy,
    * --control-border-color, --pill-border[-dotted]) — they wash out for exactly the same
@@ -707,20 +710,22 @@ body.fe-system-msg-bg #chat-notifications
   color: var(--fe-system-msg-text, inherit) !important;
 }
 
-/* 레트로 테마 + 하부 배경색 켜짐: 배경(사용자가 고른 색)은 그대로 두고, 발신자
- * 이름만 다른 모든 메시지와 똑같이 레트로 강조색으로 되돌린다.
+/* Retro theme + lower background ON: keep the (user-picked) background as is,
+ * but revert the sender NAME to the same retro accent color every other
+ * message gets.
  *
- * 이유: fe-retro-common.css 의 "공통 최상위 강조 텍스트" 규칙
+ * Why: fe-retro-common.css's "common top-level accent text" rule
  * (`body.fe-retro-theme .message-sender { color: var(--fe-dx3rd-accent) !important }`)
- * 이 모든 발신자 이름을 강조색으로 칠하는데, 그 선택자는 클래스 2개(ID 없음)뿐이라
- * 위쪽 `.fe-system-msg .message-header .message-sender` 규칙(ID 1개 + 클래스 5개,
- * `--fe-system-msg-text` 사용)에 명시도로 밀린다. 그래서 GM/시스템 메시지만
- * 발신자 이름이 (배경색 기준 흑백 대비인) `--fe-system-msg-text` 로 남고 다른
- * 메시지처럼 강조색이 적용되지 않았다 — 신고된 그 문제.
+ * paints every sender name accent, but that selector is only 2 classes (no ID),
+ * so it loses on specificity to the `.fe-system-msg .message-header
+ * .message-sender` rule above (1 ID + 5 classes, uses `--fe-system-msg-text`).
+ * As a result only GM/system messages kept their sender name at
+ * `--fe-system-msg-text` (the black/white contrast value against the bg)
+ * instead of accent — the reported bug.
  *
- * 본문(.message-content)은 손대지 않는다 — 다른 발신자 이름 강조 규칙도 본문까지는
- * 건드리지 않고, 배경 대비로 계산된 `--fe-system-msg-text` 가 본문 가독성에는
- * 여전히 맞는 값이다. */
+ * The body (.message-content) is untouched — the other sender-accent rules do
+ * not reach the body either, and `--fe-system-msg-text`, computed for
+ * background contrast, is still the right value for body readability. */
 body.fe-retro-theme.fe-system-msg-bg
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-system-msg .message-header .message-sender,
@@ -729,16 +734,17 @@ body.fe-retro-theme.fe-system-msg-bg #chat-notifications
   color: var(--fe-dx3rd-accent, #ffffff) !important;
 }
 
-/* 레트로 테마 + 하부 배경색 꺼짐: "하부 배경색" 자체를 안 켰다고 해서 배경이
- * 없어야 하는 건 아니다 — 레트로는 기본적으로 채팅을 검게 칠하는 테마이므로,
- * GM/시스템 메시지도 기본값은 검정이어야 한다. 이 규칙이 없으면 §2d 텍스처
- * 제거 규칙이 `.fe-system-msg` 를 일부러 건드리지 않게 걸어 둔 exclusion 때문에
- * (이 파일 위쪽 "System-agnostic element-level texture strip" 참고), 시스템별로
- * 원래 있던 배경(예:
- * Dungeon World 의 `.message{background:#fff}`)이 그대로 새어 나온다 —
- * "하부 배경색을 설정 안 해도 기본은 검정이어야 한다"는 것과 반대로 흰색이
- * 남는 상태. `:not(.fe-system-msg-bg)` 로 이 규칙과 위 사용자 지정 배경 규칙이
- * 서로 배타적으로 갈리게 해서, 사용자가 직접 색을 고르면 항상 그 색이 이긴다. */
+/* Retro theme + lower background OFF: not enabling "lower background color"
+ * does not mean there should be no background — retro is a theme that paints
+ * chat black by default, so GM/system messages should also default to black.
+ * Without this rule, the §2d texture-strip rules' deliberate
+ * `.fe-system-msg` exclusion (see "System-agnostic element-level texture
+ * strip" further up this file) lets each system's own original background
+ * leak through (e.g. Dungeon World's `.message{background:#fff}`) — the
+ * opposite of "the default should be black even without a configured
+ * lower-background color": white is what remains. `:not(.fe-system-msg-bg)`
+ * makes this rule and the user-picked background rule above mutually
+ * exclusive, so a user-picked color always wins. */
 body.fe-retro-theme:not(.fe-system-msg-bg)
   :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message.fe-system-msg,
@@ -878,7 +884,7 @@ body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .m
   margin: 0 !important;
   padding: 0 !important;
 }
-/* 아바타/포트레잇 숨김 */
+/* Avatar/portrait hiding */
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .avatar,
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > img,
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > video {
@@ -886,7 +892,7 @@ body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .m
 }
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender { gap: 0 !important; }
 
-/* Chat Portrait 스킬/굴림 아이콘 숨김 */
+/* Hide Chat Portrait skill/roll icons */
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img.chat-portrait-image-size-name-dnd5e,
 body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img[class*="chat-portrait-image-size"] {
   display: none !important;
@@ -948,7 +954,8 @@ body.fe-strip-chat-textures
  * (`body:is(.fe-userbg-base-white, …) .chat-message.fe-has-user-color:not(…)×6`, further up
  * this file) — both land on 1 ID + 9 classes. A specificity tie falls back to source order,
  * and this rule sits LATER in the file, so it started winning there too: every non-GM
- * player's card background went transparent/dark, even with "채팅카드 하부 배경" configured.
+ * player's card background went transparent/dark, even with "채팅카드 하부 배경"
+ * (chat-card lower background) configured.
  * Verified live. `:not(.fe-has-user-color)` closes that gap — a message carrying that class
  * already has its own dedicated background story (the base-white/black/custom rule, or the
  * tint), so this rule has no business repainting it regardless of how the specificity math
@@ -1009,23 +1016,25 @@ body.fe-chatcard-icon-crop .chat-card img.gold-icon {
 
 
 /* --------------------------------
- * 2e) dnd5e 6.0 `.message.compact` 표면
+ * 2e) dnd5e 6.0 `.message.compact` surface
  * --------------------------------
- * dnd5e 6.0 은 채팅 메시지 `li` **자체**에 배경 + 금색 테두리 + radius + padding 을
- * 칠한다(`.chat-log .message.compact { background: var(--dnd5e-chat-background);
- * border: var(--dnd5e-border-gold); … }`). 5.x 는 ::before 양피지만 깔았으므로
- * 텍스처 제거 대상이 하나 늘어난 셈이다.
+ * dnd5e 6.0 paints background + gold border + radius + padding on the chat
+ * message `li` ITSELF (`.chat-log .message.compact { background:
+ * var(--dnd5e-chat-background); border: var(--dnd5e-border-gold); … }`).
+ * 5.x only laid a ::before parchment, so this adds one more strip target.
  *
- * 배경(background-image / background-color)은 위 2c/2d 규칙이 이미 덮는다 —
- * 우리 쪽은 `modules` 레이어의 `!important`, dnd5e 는 `system` 레이어의 일반
- * 선언이라 레이어 순서만으로 이긴다. 남는 건 테두리뿐이므로 여기서만 처리한다.
+ * The background (background-image / background-color) is already covered by
+ * the 2c/2d rules above — ours are `!important` in the `modules` layer vs
+ * dnd5e's plain declarations in `system`, so layer order alone wins. Only
+ * the border remains, handled here.
  *
- * 병합(fe-merge-*)은 테두리 폭을 자기 `!important` 로 따로 조절하는데, 이 규칙은
- * `border-color` 만 건드리므로 병합 기하와 충돌하지 않는다.
+ * Merge (fe-merge-*) adjusts border WIDTH under its own `!important`; this
+ * rule only touches `border-color`, so it cannot collide with merge geometry.
  *
- * 레트로 테마는 같은 테두리를 강조색으로 되살린다(fe-dnd5e-compat.css, layouts
- * 레이어 → `!important` 역전으로 이쪽을 이긴다). 즉 "텍스처 제거 ON + 레트로 OFF"
- * 에서만 테두리가 사라진다. */
+ * The retro theme revives the same border in accent color
+ * (fe-dnd5e-compat.css, `layouts` layer → wins over this via `!important`
+ * reversal). I.e. the border disappears only under "texture strip ON + retro
+ * OFF". */
 body.fe-strip-chat-textures
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log, #fe-chat-export-container)
   :is(.message, .chat-message).compact:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {

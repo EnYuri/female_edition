@@ -130,21 +130,24 @@ body.fe-retro-theme.fe-accent-text-override .fe-narrator-content {
 }
 
 /* ── Retro theme: pixelated screentone (halftone dot) band ────────────────
- * 부드러운 그라데이션 대신 만화 스크린톤(망점) 텍스처. 핵심 트릭:
- *   1) repeating-conic-gradient 로 작은 타일(4px) 안에 흑/투명 쐐기 4개를 만들면
- *      타일이 이어 붙을 때 격자형 망점(다이아몬드) 패턴이 된다. 직선 경계라
- *      radial-gradient 원형 점보다 앤티얼리어싱이 훨씬 적어 "픽셀"처럼 보인다.
- *      image-rendering:pixelated 는 보조 힌트(그라디언트엔 보장되진 않지만
- *      무해함 — 실제 비트맵 보더에 쓰는 패턴과 동일한 관례를 맞춤, §16 참고).
- *   2) 점 텍스처 자체는 고정 밀도(50%)로 두고, 기존의 세로 posterize 알파
- *      단계를 background 가 아니라 mask-image 로 재사용한다 — 망점이 보이는
- *      "형태"(중앙이 가장 짙고 위/아래로 페이드)는 이전과 동일하게 유지하면서,
- *      칠해지는 잉크 자체만 평면색 → 점무늬로 바뀐다. mask 알파는 점/공백의
- *      대비(공백은 항상 0)를 그대로 보존하므로 단계마다 망점이 옅어지는
- *      것처럼 보인다(실제 망점처럼 점 크기가 변하진 않지만, 같은 시각 효과의
- *      저비용 근사).
- * 베이스 룰이 background-size/image-rendering/mask-image 를 전부 정의하고,
- * 아래 accent 룰은 background-image(점 색상)만 덮어써 mask 는 자연히 공유된다. */
+ * Manga-style screentone (halftone) texture instead of a soft gradient. The trick:
+ *   1) repeating-conic-gradient draws four black/transparent wedges inside a
+ *      small 4px tile; when the tiles join they form a diamond-grid halftone
+ *      pattern. Straight edges antialias far less than radial-gradient dots, so
+ *      it reads as "pixel". image-rendering:pixelated is a secondary hint (not
+ *      guaranteed on gradients, but harmless — same convention as the real
+ *      bitmap-border pattern, see §16).
+ *   2) the dot texture itself stays at fixed density (50%); the existing
+ *      vertical posterize alpha steps are reused as mask-image instead of
+ *      background — the halftone's visible "shape" (darkest at center, fading
+ *      top/bottom) is unchanged while only the painted ink switches from flat
+ *      color to dots. The mask alpha preserves the dot/void contrast verbatim
+ *      (voids stay 0), so each step LOOKS like a lighter halftone (the dots do
+ *      not actually resize as in real halftone — a cheap approximation of the
+ *      same visual effect).
+ * The base rule defines background-size/image-rendering/mask-image entirely;
+ * the accent rule below only overrides background-image (the dot color), so the
+ * mask is shared naturally. */
 body.fe-retro-theme .fe-narrator-bg {
   background-color: transparent;
   background-image: repeating-conic-gradient(
@@ -179,7 +182,7 @@ body.fe-retro-theme .fe-narrator-bg {
   );
 }
 
-/* Accent override (text 색조 오버라이드 ON): tint the screentone dots with the
+/* Accent override (text tint override ON): tint the screentone dots with the
    accent hue instead of neutral black. Only background-image is redeclared —
    background-size/image-rendering/mask-image fall through from the base rule
    above (per-property cascade, no need to duplicate the mask). */
@@ -216,7 +219,7 @@ body.fe-retro-theme.fe-accent-text-override .fe-narrator-bg {
   font-style: italic;
 }
 
-/* description background — accent override (색조 오버라이드 ON): dark accent-hued
+/* description background — accent override (tint override ON): dark accent-hued
    tint instead of neutral grey. !important to beat any retro chat-background rule
    in an earlier cascade layer. */
 body.fe-retro-theme.fe-accent-text-override

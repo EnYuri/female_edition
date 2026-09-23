@@ -38,7 +38,8 @@ const FE_PANEL_SOCKET = Object.freeze({
 
 const FE_PANEL_DEFAULT_SIZE = 400;
 
-// Display order for the "패널 어트리뷰트" tab (both the panel's own customAttributes
+// Display order for the "패널 어트리뷰트" (panel attributes) tab (both the panel's own
+// customAttributes
 // and any reference actor's real attributes): these common names first, in this
 // order, then everything else alphabetically. Purely a display concern — storage
 // order is untouched.

@@ -302,7 +302,8 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
 }
 
 /* Card/box INTERNAL text = secondary (Geurimilgi) in the mixed "쿠키런 + 그림일기"
-   preset. The broad `.chat-message *` cookie rule above forces the chat font onto EVERY
+   (CookieRun + Geurimilgi) preset. The broad `.chat-message *` cookie rule above forces
+   the chat font onto EVERY
    message descendant — including chat-card / dx3rd-item-chat descriptions that must stay
    secondary. In the LIVE sidebar those descendants simply INHERIT secondary from the card
    container (no such `*` rule exists there); only the export re-breaks that inheritance.
@@ -1173,7 +1174,8 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
 /* ==========================================================================
  * Roll breakdowns & collapsibles: ALWAYS EXPANDED in exports
  * ==========================================================================
- * Reported 2026-08-12 ("HTML 저장 → PDF 인쇄" path): the collapsed die
+ * Reported 2026-08-12 ("HTML 저장 → PDF 인쇄" = HTML save → PDF print path):
+ * the collapsed die
  * breakdown printed ON TOP of the total/HP row.
  *
  * There are THREE independent 0fr-grid collapsers in play, all of which rely

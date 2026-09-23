@@ -53,7 +53,8 @@ const FE_ARCHIVE_POST_PASS_CHUNK = 60;
  * with no await between them, so they coalesced into ONE ~4,000 ms `longtask`.
  * The archive popup and Foundry share an event loop, so for those seconds
  * NEITHER window responded to a click; that is the whole of the reported
- * "아카이브 렌더 직후 클릭이 지연된다". The work itself is irreducible (every
+ * "아카이브 렌더 직후 클릭이 지연된다" (clicks lag right after an archive render). The work
+ * itself is irreducible (every
  * message really does need each pass) — what was wrong was doing it in one
  * uninterruptible block.
  * @param {Window} win
@@ -192,7 +193,8 @@ export async function feMaybeYieldForUI(targetWindow = window) {
   // closing the archive popup mid-render hung feRenderMessagesIntoLog forever — the
   // export promise never settled, feExportChatLogToPDF's `finally` never ran, and
   // `feArchiveLaunchInProgress` stayed true for the rest of the session. That is the
-  // reported "아직 렌더 중" that no longer clears. Bail out before scheduling anything.
+  // reported "아직 렌더 중" (still rendering) that no longer clears. Bail out before
+  // scheduling anything.
   if (feArchiveWindowClosed(targetWindow)) return;
 
   // MUST keep yielding even when the target document is HIDDEN.
@@ -203,7 +205,8 @@ export async function feMaybeYieldForUI(targetWindow = window) {
   // uninterrupted synchronous burst. The popup shares its event loop with the
   // Foundry window that is driving the render, so alt-tabbing away from a 3000
   // message archive freezes BOTH windows solid until it finishes — the reported
-  // "알탭 하면 아예 뻗는다". Under ~1200 messages it was short enough to pass for
+  // "알탭 하면 아예 뻗는다" (alt-tabbing freezes it completely). Under ~1200 messages it was
+  // short enough to pass for
   // normal slowness, which is why it surfaced only on a very large log.
   //
   // MessageChannel is the fix for the original problem too: a port message is an

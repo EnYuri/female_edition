@@ -20,7 +20,7 @@
 // The archive's <link>-only inliner therefore missed all of them: the saved HTML
 // kept the raw `@import "modules/…"` with a relative URL that cannot resolve in a
 // standalone file:// document (and, even online, loses the documented cascade-
-// layer !important precedence). The result was "CSS 규칙 파괴" plus fonts that
+// layer !important precedence). The result was "CSS 규칙 파괴" (CSS rules destroyed) plus fonts that
 // never applied (so Chromium's PDF export embedded nothing).
 //
 // feAssembleInlinedStyleBlock rebuilds such a block: it inlines each import's

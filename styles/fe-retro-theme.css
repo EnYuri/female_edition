@@ -1,45 +1,49 @@
 /* ================================================================
  * fe-retro-theme.css
- * female_edition — 레트로/픽셀 테마 "범용 베이스" (시스템 중립)
+ * female_edition — retro/pixel theme "generic base" (system-neutral)
  *
- * 활성화: body.fe-retro-theme
+ * Enabled by: body.fe-retro-theme
  *
- * 이 파일은 특정 게임 시스템(dnd5e / dx3rd)과 무관한 레트로 테마의
- * 공통 원시 규칙만 담는다. 시스템 전용 강조색·시트 오버라이드는
- * fe-dx3rd-compat.css / fe-dnd5e-compat.css 에, 각 기능(전투 트래커·
- * 내레이터·무대 등) 전용 튜닝은 해당 기능 CSS 에 colocate 되어 있다.
- * 런타임은 body에 fe-retro-system-dnd5e 또는 fe-retro-system-dx3rd를
- * 추가한다. 이것들은 별도 설정이 아니라 시스템 전용 표면이 다른 시스템으로
- * 새지 않게 하는 내부 범위 표식이다.
+ * This file holds only the retro theme's common primitives, independent of
+ * any game system (dnd5e / dx3rd). System-specific accent/sheet overrides
+ * live in fe-dx3rd-compat.css / fe-dnd5e-compat.css; per-feature tuning
+ * (combat tracker, narrator, theatre, …) is colocated in each feature's
+ * CSS. At runtime the body also gets fe-retro-system-dnd5e or
+ * fe-retro-system-dx3rd — not separate settings, but internal scope
+ * markers keeping system-specific surfaces from leaking into other
+ * systems.
  *
- * 담는 것:
- *   · § 1  안티에일리어싱 OFF
- *   · § 2  border-radius 전역 제거
- *   · § 3  트랜지션 · 애니메이션 즉각 반응 (+ #pause / 스피너 예외)
- *   · § 4  소프트 그림자 전역 제거 (+ 유저색 틴트 복원 예외)
- *   · § 5  SVG 아이콘 픽셀 렌더링 (<img> 제외)
- *   · § 6  포커스 하드 아웃라인
- *   · § 7  Foundry 전역 컨트롤 고대비 테두리
- *   · § 16 픽셀 사선 슬래시 테두리 (윈도우/사이드바)
- *   (섹션 번호는 fe-dx3rd-compat.css 의 원본 번호를 그대로 유지한다.)
+ * Contains:
+ *   · § 1  antialiasing OFF
+ *   · § 2  global border-radius removal
+ *   · § 3  transitions · animations made instant (+ #pause / spinner
+ *          exceptions)
+ *   · § 4  global soft-shadow removal (+ user-color tint restore
+ *          exception)
+ *   · § 5  pixel rendering for SVG icons (excludes <img>)
+ *   · § 6  hard focus outline
+ *   · § 7  high-contrast borders on Foundry global controls
+ *   · § 16 pixel diagonal-slash borders (windows/sidebar)
+ *   (Section numbers are kept identical to their origin,
+ *   fe-dx3rd-compat.css.)
  *
- * ⚠️ CASCADE LAYER (필수): module.json 에서
- *      { "src": "styles/fe-retro-theme.css", "layer": "layouts" } 로 등록.
- *    반드시 fe-dx3rd-compat.css / fe-dnd5e-compat.css "앞"에 로드한다 —
- *    동일 layouts 레이어 · 동일 명시도에서는 소스 순서로 승자가 갈리며,
- *    시스템 전용 파일들이 이 베이스를 (필요한 곳에서) 덮어쓰도록 설계됐다.
- *    자세한 레이어 역전 규칙은 fe-dx3rd-compat.css 인트로 참고.
+ * ⚠️ CASCADE LAYER (required): registered in module.json as
+ *      { "src": "styles/fe-retro-theme.css", "layer": "layouts" }.
+ *    Must load BEFORE fe-dx3rd-compat.css / fe-dnd5e-compat.css — at equal
+ *    layer and specificity the winner is source order, and the system
+ *    files are designed to override this base where needed. See the
+ *    fe-dx3rd-compat.css intro for the layer-reversal rules.
  *
- * 원칙:
- *   · 모든 border-radius → 0 (각진 픽셀 형태)
- *   · -webkit-font-smoothing: none (안티에일리어싱 OFF)
- *   · transition / animation → 즉각 반응 (픽셀 UI 감각)
- *   · box-shadow / text-shadow 전역 제거 → 하드 outline 대체
+ * Principles:
+ *   · every border-radius → 0 (angular pixel shape)
+ *   · -webkit-font-smoothing: none (antialiasing OFF)
+ *   · transition / animation → instant (pixel-UI feel)
+ *   · box-shadow / text-shadow removed globally → hard outlines instead
  * ================================================================ */
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 1  안티에일리어싱 OFF
+ * § 1  antialiasing OFF
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme,
@@ -52,7 +56,7 @@ body.fe-retro-theme * {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 2  border-radius 전역 제거
+ * § 2  global border-radius removal
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme *,
@@ -63,13 +67,14 @@ body.fe-retro-theme *::after {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 3  트랜지션 · 애니메이션 즉각 반응
- *       duration을 0ms가 "아닌" 1ms로 설정한다 — 0ms 트랜지션/애니메이션은
- *       transitionend / animationend 이벤트를 발생시키지 않는다. ApplicationV2의
- *       close()/minimize()는 max-height 트랜지션의 transitionend를 기다리는데
- *       (_awaitTransition), 0ms면 이벤트가 영영 안 와서 1000ms 폴백 타임아웃까지
- *       창이 안 닫힌다. 1ms는 시각적으로 즉각(0ms와 구분 불가)이면서 이벤트는
- *       정상 발생시켜 창 닫힘/최소화가 즉시 끝난다.
+ * § 3  transitions · animations made instant
+ *       duration is set to 1ms, NOT 0ms — 0ms transitions/animations never
+ *       fire transitionend / animationend. ApplicationV2's
+ *       close()/minimize() waits for the max-height transition's
+ *       transitionend (_awaitTransition), so at 0ms the event never arrives
+ *       and the window takes the 1000ms fallback timeout to close. 1ms is
+ *       visually instant (indistinguishable from 0ms) while still firing
+ *       the event, so close/minimize completes immediately.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme *,
@@ -81,7 +86,8 @@ body.fe-retro-theme *::after {
   animation-delay:      0ms !important;
 }
 
-/* 일시정지 UI 회전 애니메이션 복원 — 위 1ms 규칙으로 기어가 과도하게 빠르게 회전함 */
+/* Restore the pause-UI rotation animation — the 1ms rule above spun the
+   gear excessively fast */
 body.fe-retro-theme :is(#pause, #pause *),
 body.fe-retro-theme :is(#pause, #pause *)::before,
 body.fe-retro-theme :is(#pause, #pause *)::after {
@@ -89,9 +95,10 @@ body.fe-retro-theme :is(#pause, #pause *)::after {
   animation-delay:    0s !important;
 }
 
-/* 일시정지 배경 — /narrate 오버레이와 같은 픽셀 스크린톤으로 교체.
-   core 기본값은 #pause 자체에 부드러운 좌우 그라디언트를 깔기 때문에
-   background/mask를 함께 덮어써 중앙이 짙고 양끝이 사라지는 형태만 유지한다. */
+/* Pause background — swapped for the same pixel screentone as the /narrate
+   overlay. Core's default lays a soft left-right gradient on #pause itself,
+   so background and mask are overridden together, keeping only the
+   dark-center, fading-edges shape. */
 body.fe-retro-theme #pause {
   background-color: transparent !important;
   background-image: repeating-conic-gradient(
@@ -130,12 +137,14 @@ body.fe-retro-theme.fe-accent-text-override #pause {
   ) !important;
 }
 
-/* 배틀 트래커 등장/퇴장 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
-   트래커의 등장/퇴장은 "전투가 시작/종료됐다"를 알리는 상태 전환이라 즉시
-   나타났다 사라지면 전투 종료를 놓친다. #pause 기어와 같은 예외 패턴.
-   개별 값은 fe-combat-tracker.css 가 요소마다 --fe-ct-anim-dur / --fe-ct-anim-delay
-   로 실어 보내므로 여기서는 그 두 변수를 그대로 되살리기만 한다 — 지속시간을
-   여기에 하드코딩하면 두 파일이 조용히 어긋난다. */
+/* Restore combat-tracker entrance/exit — the 1ms crush above targets
+   decorative motion, but the tracker's entrance/exit is a STATE transition
+   announcing "combat started/ended"; instant appear/vanish would let the
+   end of combat go unnoticed. Same exception pattern as the #pause gear.
+   Per-element values are fed by fe-combat-tracker.css via
+   --fe-ct-anim-dur / --fe-ct-anim-delay, so this file only revives those
+   two variables — hardcoding durations here would let the two files drift
+   apart silently. */
 body.fe-retro-theme #fe-combat-tracker
   :is(.fe-ct-inner, .fe-ct-portrait):is(.is-entering, .is-leaving) {
   animation-duration: var(--fe-ct-anim-dur, 320ms) !important;
@@ -153,19 +162,20 @@ body.fe-retro-theme #fe-combat-tracker
   animation-delay:    var(--fe-ct-anim-delay, 0ms) !important;
 }
 
-/* 로딩 스피너류 복원 — 위 1ms 크러시는 장식 모션 제거가 목적이지만,
-   "상태를 알리는" 무한 회전 스피너까지 1ms로 돌면 정지/뭉개짐처럼 보인다.
-   일시정지 기어와 동일한 예외 패턴으로 정상 회전 주기를 복원한다.
-   (Font Awesome .fa-spin 기본 2s / .fa-spin-pulse·.fa-pulse 1s) */
+/* Restore loading spinners — the 1ms crush above targets decorative
+   motion, but a status-announcing infinite spinner at 1ms looks frozen or
+   crushed. Normal rotation periods are restored under the same exception
+   pattern as the pause gear.
+   (Font Awesome .fa-spin defaults to 2s / .fa-spin-pulse·.fa-pulse 1s) */
 body.fe-retro-theme :is(.fa-spin, .fa-spin-pulse, .fa-pulse, .fa-spinner, .loading, #loading) {
   animation-duration: 1.5s !important;
 }
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 4  소프트 그림자 전역 제거
- *       filter: drop-shadow(…)는 dx3rd 타이틀 아웃라인 효과에 사용되므로
- *       제거하지 않음. box-shadow / text-shadow만 제거.
+ * § 4  global soft-shadow removal
+ *       filter: drop-shadow(…) is kept — it is used by the dx3rd title
+ *       outline effect. Only box-shadow / text-shadow are removed.
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme * {
@@ -173,17 +183,21 @@ body.fe-retro-theme * {
   text-shadow: none !important;
 }
 
-/* 예외: 채팅 메시지 유저색 배경 틴트 복원 (레트로에서 색조/박스감 유지).
+/* Exception: restore the per-user chat-message background tint (keeps
+ * hue/box feel under retro).
  *
- * 색조 오버라이드(fe-msg-bg-usercolor)는 chat-bg-stripper.css 에서 메시지 전체를
- * 유저 색으로 옅게 칠한다(흰/검정 베이스에선 거대 inset box-shadow 9999px 로).
- * 레트로는 두 가지로 이 틴트를 죽인다:
- *   1) 위의 전역 `* { box-shadow: none }` → inset 틴트 제거.
- *   2) 전역 `* { transition: all 1ms }` → 메시지 배경이 전환 "시작값"(검정)에
- *      고착돼, background-color 로 칠해도 페인트가 검정에 멈춘다.
- * → 채팅 메시지 한정으로 transition 을 끄고 background-color 로 직접 틴트를 깔아
- *   box-shadow/transition 양쪽 함정을 모두 피한다. 유저별 색 구분이 복원된다.
- * (선택자 명시도가 `*` 보다 높아 같은 layouts 레이어 내에서 우선한다.) */
+ * The tint override (fe-msg-bg-usercolor) lightly paints the whole message
+ * with the user's color in chat-bg-stripper.css (as a giant 9999px inset
+ * box-shadow on white/black bases). Retro kills that tint two ways:
+ *   1) the global `* { box-shadow: none }` above → removes the inset tint.
+ *   2) the global `* { transition: all 1ms }` → the message background
+ *      freezes at its transition "start value" (black), so painting
+ *      background-color still stops at black.
+ * → For chat messages only, transition is disabled and the tint is laid
+ *   directly via background-color, dodging both traps. Per-user color
+ *   distinction is restored.
+ * (This selector out-specifies `*`, so it wins within the same layouts
+ *  layer.) */
 body.fe-retro-theme.fe-msg-bg-usercolor
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
@@ -240,30 +254,32 @@ body.fe-retro-theme
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 5  SVG 아이콘만 픽셀 렌더링 — <img> 포트레이트/토큰/저널은 제외
+ * § 5  pixel rendering for SVG icons only — <img> portraits/tokens/
+ *      journals excluded
  * ══════════════════════════════════════════════════════════════ */
 
-/* SVG 벡터 모양(아이콘) — crispEdges */
+/* SVG vector shapes (icons) — crispEdges */
 body.fe-retro-theme svg {
   shape-rendering: crispEdges;
 }
 
-/* SVG 내부 <image> 요소(액터 초상 등) — 일반 보간 복원 */
+/* <image> elements inside SVG (actor portraits etc.) — restore normal
+   interpolation */
 body.fe-retro-theme svg image {
   image-rendering: auto !important;
   shape-rendering:  auto !important;
 }
 
-/* <img> 태그 전체 — 포트레이트·토큰·저널 이미지 보호
-   !important: border-image 의 image-rendering: pixelated 가 일부 Chromium 버전에서
-   실제 img 엘리먼트까지 영향을 줄 수 있으므로 명시적으로 차단 */
+/* All <img> tags — protect portraits, tokens, journal images
+   !important: border-image's image-rendering: pixelated can affect actual
+   img elements on some Chromium builds, so block it explicitly */
 body.fe-retro-theme img {
   image-rendering: auto !important;
 }
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 6  포커스 — glow 제거, 하드 2px 아웃라인
+ * § 6  focus — glow removed, hard 2px outline
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme :focus-visible {
@@ -277,25 +293,27 @@ body.fe-retro-theme :focus:not(:focus-visible) {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 7  Foundry 전역 컨트롤 — 고대비 테두리
+ * § 7  Foundry global controls — high-contrast borders
  * ══════════════════════════════════════════════════════════════ */
 
-/* 인터랙티브 요소 hover: 소프트 ring 대신 1px 하드 outline */
+/* Interactive-element hover: hard 1px outline instead of a soft ring */
 body.fe-retro-theme :is(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea):not([disabled]):hover {
   outline:        1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.55) !important;
   outline-offset: 0 !important;
 }
 
-/* 체크박스/라디오는 이 베이스 레이어에서 꾸미지 않는다. 코어 폼, DX3rd 시트·전용
-   다이얼로그, D&D의 dnd5e-checkbox 웹 컴포넌트가 서로 다른 glyph·크기·여백
-   계약을 사용한다. 각 영역은 자기 파일이 소유한다:
-     · 코어 폼  → fe-retro-forms.css § F3 (코어 상태 글리프 + 레트로 색 변수)
-     · DX3rd    → fe-dx3rd-compat.css (--checkbox-* 색 변수만)
-     · D&D 5e   → fe-dnd5e-compat.css (--checkbox-* 색 변수만)
-   § 2 의 `border-radius: 0` 은 체크박스에 효과가 없다 — 둥근 모서리는 테두리가
-   아니라 Font Awesome 글리프 자체의 모양이다. */
+/* Checkboxes/radios are NOT styled at this base layer. Core forms, DX3rd
+   sheets/special dialogs, and D&D's dnd5e-checkbox web component each use
+   different glyph/size/spacing contracts. Each area is owned by its own
+   file:
+     · core forms → fe-retro-forms.css § F3 (core state glyphs + retro
+       color variables)
+     · DX3rd      → fe-dx3rd-compat.css (--checkbox-* color variables only)
+     · D&D 5e     → fe-dnd5e-compat.css (--checkbox-* color variables only)
+   § 2's `border-radius: 0` has no effect on checkboxes — the rounding is
+   in the Font Awesome glyph's shape itself, not a border. */
 
-/* Foundry 윈도우 테두리 강화 */
+/* Stronger Foundry window borders */
 body.fe-retro-theme .window-app,
 body.fe-retro-theme .application {
   border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
@@ -303,38 +321,47 @@ body.fe-retro-theme .application {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 16  픽셀 사선 슬래시 테두리 (게임 대사창 스타일)
- *        대상: 팝업 윈도우(.window-app), 사이드바 좌측 엣지(#sidebar-content)
+ * § 16  pixel diagonal-slash borders (JRPG dialogue-box style)
+ *        Targets: popup windows (.window-app), sidebar left edge
+ *        (#sidebar-content)
  *
- *  기법: border-image 9-슬라이스 (검정 배경 보존)
- *    · pixel-border.png (52×52) — 4px 검정 패딩 + 6×6 흰 모서리 + 32px 슬래시 변
- *    · 변 슬라이스 32px = 슬래시 주기 8px × 4 → 타일링 시 대각선 끊김 없음
- *    · 원본 이미지 그대로 표시 (마스크 X) → 검정 배경 + 흰 패턴 모두 보존
- *    · 사이드바는 pixel-border-side.png (6×8) 좌측 안쪽에 세로 반복
- *      (Foundry #sidebar-content overflow:hidden 유지 위해 외각 X)
+ *  Technique: border-image 9-slice (black background preserved)
+ *    · pixel-border.png (52×52) — 4px black padding + 6×6 white corners +
+ *      32px slash sides
+ *    · 32px side slice = slash period 8px × 4 → no diagonal breaks when
+ *      tiled
+ *    · source image shown as-is (no mask) → both the black background and
+ *      the white pattern survive
+ *    · sidebar uses pixel-border-side.png (6×8) repeated vertically just
+ *      inside the left edge (kept inside so Foundry's #sidebar-content
+ *      overflow:hidden stays)
  *
- *  외각 배치(.window-app/.application/.fe-stage-textbox/.fedr-actor-card):
- *    inset: -10px + box-sizing: border-box → ::after 가 element 외각으로 10px 펼쳐짐
- *    → 내부 UI 침범 X
- *  슬라이스: 10px (4px 외측 검정 + 6px 패턴)
- *  렌더 두께: 10px (1:1 픽셀, image-rendering: pixelated)
- *  색상: ::before accent 백드롭 + mix-blend-mode: multiply
- *    → 흰 슬래시 픽셀 × accent = accent, 검정 픽셀 × 무엇이든 = 검정
- *    → accent=#fff(기본)이면 multiply 항등원 — 외형 변화 없음
+ *  Outer placement (.window-app/.application/.fe-stage-textbox/.fedr-actor-card):
+ *    inset: -10px + box-sizing: border-box → ::after expands 10px past the
+ *    element's edge → does not intrude on inner UI
+ *  Slice: 10px (4px outer black + 6px pattern)
+ *  Rendered thickness: 10px (1:1 pixels, image-rendering: pixelated)
+ *  Color: ::before accent backdrop + mix-blend-mode: multiply
+ *    → white slash pixels × accent = accent, black pixels × anything =
+ *      black
+ *    → accent=#fff (default) makes multiply an identity — no visual change
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme {
   --fe-dx3rd-border-width: 10px;
 }
 
-/* 기존 솔리드 윈도우 테두리(§7) → 픽셀 테두리(§16 pseudo)로 대체
-   .application 포함 — v14 ApplicationV2 윈도우의 솔리드 보더도 제거 */
+/* Replace the old solid window border (§7) with the pixel border
+   (§16 pseudo)
+   .application included — removes the solid border of v14 ApplicationV2
+   windows too */
 body.fe-retro-theme .window-app,
 body.fe-retro-theme .application {
   border: none !important;
 }
 
-/* stacking context — ::after position:absolute 의 기준 컨텍스트 보장 */
+/* stacking context — guarantees the positioning context for
+   ::after position:absolute */
 body.fe-retro-theme #sidebar {
   isolation: isolate !important;
 }
@@ -342,20 +369,26 @@ body.fe-retro-theme #sidebar {
 body.fe-retro-theme #sidebar-content {
   position: relative !important;
   isolation: isolate !important;
-  padding-left: 6px !important; /* ::after 패턴 폭(6px) 만큼 콘텐츠 인세트 — 2px 흑색 내부 여백 포함 */
-  /* overflow: hidden 유지 — Foundry 사이드바 collapse 애니메이션이 의존 */
+  padding-left: 6px !important; /* Content inset by the ::after pattern width (6px) — includes a 2px inner
+   black padding */
+  /* Keep overflow: hidden — Foundry's sidebar collapse animation depends on
+   it */
 }
 
-/* overflow: visible — inset:-10px ::after 가 잘리지 않도록 (기본값 visible 이지만 방어적)
-   isolation: isolate — ::after mix-blend-mode multiply 가 window 외부 요소와 혼합되지 않도록 */
+/* overflow: visible — so the inset:-10px ::after is not clipped (visible is
+   the default, but defensive)
+   isolation: isolate — keeps the ::after mix-blend-mode: multiply from
+   blending with elements outside the window */
 body.fe-retro-theme .window-app,
 body.fe-retro-theme .application {
   overflow: visible !important;
   isolation: isolate !important;
 }
 
-/* .window-app / .application: accent 백드롭 — ::after mix-blend-mode: multiply 의 배경색 공급
-   border-only (background: transparent) → 외각 10px 띠에만 accent 색상이 존재 */
+/* .window-app / .application: accent backdrop — supplies the background
+   color for ::after's mix-blend-mode: multiply
+   border-only (background: transparent) → accent exists only on the outer
+   10px band */
 body.fe-retro-theme .window-app::before,
 body.fe-retro-theme .application::before {
   content: '' !important;
@@ -367,9 +400,11 @@ body.fe-retro-theme .application::before {
   background: transparent !important;
 }
 
-/* .window-app / .application: 9-슬라이스 테두리, 전체 외각 (inset -10px)
-   mix-blend-mode: multiply — 흰 픽셀 × ::before accent = accent, 검정 픽셀 = 검정
-   .application 포함 — v14 ApplicationV2 윈도우 커버 */
+/* .window-app / .application: 9-slice border over the whole outer edge
+   (inset -10px)
+   mix-blend-mode: multiply — white pixels × ::before accent = accent,
+   black pixels = black
+   .application included — covers v14 ApplicationV2 windows */
 body.fe-retro-theme .window-app::after,
 body.fe-retro-theme .application::after {
   content: '' !important;
@@ -390,25 +425,29 @@ body.fe-retro-theme .application::after {
           mask-border: none !important;
 }
 
-/* ── 최소화(minimized) 윈도우: 콘텐츠 클리핑 + 안쪽 픽셀 프레임 ────────
-   [근본 원인 — 라이브 v14.363 실측]
-   Foundry v14 는 AppV1 처럼 window-content 를 display:none 으로 숨기지 않고,
-   창을 max-height:header-height 로 클램프한 뒤 `.application { overflow:hidden }`
-   의 클리핑으로 본문을 가린다(v14 foundry2.css 엔 `.minimized … display` 규칙이
-   아예 없다 — CSS 클리핑 방식). 그런데 이 파일 위쪽(§16)이 픽셀 액자(::after
-   inset:-10px)가 잘리지 않도록 `.application/.window-app { overflow:visible }`
-   를 걸어, 이 클리핑을 무력화한다. 그 결과 V2 시트를 최소화하면 본문(window-content,
-   여전히 display:flex)이 헤더 아래로 삐져나와 "넓은 검은 띠"가 남는다(사용자 보고).
-   (AppV1 시트는 최소화 시 window-content 를 display:none 처리하므로 무관.)
+/* ── Minimized windows: content clipping + inner pixel frame ──
+   [Root cause — measured live on v14.363]
+   Foundry v14 does not display:none the window-content like AppV1 did;
+   it clamps the window to max-height:header-height and hides the body via
+   `.application { overflow:hidden }` clipping (v14 foundry2.css has no
+   `.minimized … display` rule at all — CSS clipping). But §16 above set
+   `.application/.window-app { overflow:visible }` so the pixel frame
+   (::after inset:-10px) is not clipped — which defeats that clipping.
+   Result: minimizing a V2 sheet left the body (window-content, still
+   display:flex) sticking out under the header as a "wide black band"
+   (user report).
+   (AppV1 sheets display:none the window-content on minimize, so they are
+   unaffected.)
 
-   [해법]
-   ① 최소화 상태에서만 overflow:hidden 을 복원 → 본문 클리핑 정상화(넓은 띠 제거).
-      같은 layouts 레이어의 §16 overflow:visible(0,2,1)보다 .minimized 로 특이도
-      (0,3,1)가 높아 확실히 이긴다.
-   ② 바깥(inset:-10px) 프레임은 잘리므로, 최소화 때에는 같은 9-슬라이스를
-      창 내부 6px에 다시 그린다. 36px 높이의 AppV2 제목줄에서도 장식이 남고,
-      본문 클리핑에는 관여하지 않는다. 헤더를 한 단계 위에 두어 제목·닫기
-      버튼 위로 장식이 겹치지 않게 한다. */
+   [Fix]
+   ① Restore overflow:hidden only while minimized → body clipping works
+      again (band gone). .minimized raises specificity to (0,3,1) vs §16's
+      overflow:visible at (0,2,1) in the same layouts layer — a clear win.
+   ② The outer (inset:-10px) frame is now clipped, so while minimized the
+      same 9-slice is redrawn 6px INSIDE the window. The decoration
+      survives even on the 36px AppV2 title bar and does not interfere
+      with body clipping. The header is kept one level up so the ornament
+      does not overlap the title/close buttons. */
 body.fe-retro-theme .application.minimized,
 body.fe-retro-theme .window-app.minimized {
   overflow: hidden !important;
@@ -439,8 +478,10 @@ body.fe-retro-theme .window-app.minimized::after {
   border-image-width: 6px !important;
 }
 
-/* #sidebar-content: accent 백드롭 — 좌측 6px 띠에 accent 색 공급
-   isolation:isolate(부모) 덕분에 multiply 블렌딩이 사이드바 내부에만 적용 */
+/* #sidebar-content: accent backdrop — supplies accent color to the left
+   6px band
+   Thanks to isolation:isolate (the parent), the multiply blending applies
+   only inside the sidebar */
 body.fe-retro-theme #sidebar-content::before {
   content: '' !important;
   position: absolute !important;
@@ -453,10 +494,13 @@ body.fe-retro-theme #sidebar-content::before {
   ) !important;
 }
 
-/* #sidebar-content: 좌측 엣지 안쪽에 세로 반복 슬래시 (6px 폭)
-   inset:0 + background-size 6×8 + repeat-y → 좌측 6px만 패턴, 나머지는 자연 투명
-   mix-blend-mode: multiply — 흰 픽셀 × ::before accent = accent, 검정 픽셀 = 검정
-   (Foundry overflow:hidden 유지 위해 외각으로 안 펼침) */
+/* #sidebar-content: vertical repeating slash just inside the left edge
+   (6px wide)
+   inset:0 + background-size 6×8 + repeat-y → pattern only in the left 6px;
+   the rest stays naturally transparent
+   mix-blend-mode: multiply — white pixels × ::before accent = accent,
+   black pixels = black
+   (not expanded outward, to preserve Foundry's overflow:hidden) */
 body.fe-retro-theme #sidebar-content::after {
   content: '' !important;
   position: absolute !important;

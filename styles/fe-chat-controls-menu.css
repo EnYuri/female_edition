@@ -260,10 +260,11 @@ body.fe-retro-theme #fe-ctrl-menu-panel :is(.ui-control, .control-icon, .control
   display: none !important;
 }
 
-/* ── 텍스트 색조 오버라이드 OFF → 강조색 스와치 버튼 숨김 ──────── */
-/* 오버라이드가 꺼지면 강조색 전체가 기본 백색으로 강제되므로(fe-style.js),
-   색을 바꾸는 스와치 피커도 숨겨 기능을 사실상 비활성화한다. body 클래스는
-   feSetAccentTextOverrideClass 가 설정에 따라 토글하므로 자동으로 반응한다. */
+/* ── Text-tint override OFF → hide the accent swatch buttons ────────── */
+/* When the override is off, the accent color is forced back to the default
+   white (fe-style.js), so the swatch picker that changes it is hidden too —
+   effectively disabling the feature. The body class is toggled by
+   feSetAccentTextOverrideClass with the setting, so this reacts automatically. */
 body:not(.fe-accent-text-override) #fe-dx3rd-accent-btn {
   display: none !important;
 }

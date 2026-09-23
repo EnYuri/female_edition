@@ -1,7 +1,8 @@
-/* fe-filepicker-preview.css — FilePicker 미리보기 사이드바 */
+/* fe-filepicker-preview.css — FilePicker preview sidebar */
 
-/* .window-content 를 grid 로: 왼쪽=기존 파트들, 오른쪽=미리보기 사이드바.
-   DOM 래핑 없이 자식만 배치하므로 코어의 부분 재렌더에 안전. */
+/* .window-content as a grid: left = the existing parts, right = the preview
+   sidebar. Children are placed without any DOM wrapping, so it survives core's
+   partial re-renders. */
 .fe-fp-has-preview .window-content {
   display: grid;
   grid-template-columns: 1fr 288px;
@@ -12,7 +13,7 @@
   min-height: 0;
 }
 
-/* 기본값은 왼쪽 컬럼. 탭만 전체 폭을 쓴다. */
+/* Default is the left column. Only the tabs span the full width. */
 .fe-fp-has-preview .window-content > :not(.fe-fp-preview) {
   grid-column: 1;
   min-width: 0;
@@ -43,10 +44,11 @@
   grid-row: 5;
 }
 
-/* 미리보기 사이드바는 탭 아래부터 창 바닥까지 오른쪽 전체를 차지한다.
-   왼쪽의 경로/목록/업로드/선택 영역과 같은 세로 범위를 공유하되 겹치지 않는다.
-   위 대부분 = 미리보기, 아래 약 1/4 = 드롭존. min-height:0 + overflow:hidden 으로 내부 콘텐츠가
-   grid 트랙 높이를 강제로 키우지 못하게 한다. */
+/* The preview sidebar occupies the whole right side from under the tabs to the
+   window bottom. It shares the same vertical range as the path/list/upload/
+   select areas on the left without overlapping them.
+   Upper ~3/4 = preview, lower ~1/4 = dropzone. min-height:0 + overflow:hidden
+   keep inner content from force-growing the grid track height. */
 .fe-fp-preview {
   grid-column: 2;
   grid-row: 2 / -1;
@@ -63,7 +65,7 @@
   border: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.12));
 }
 
-/* ── 상단: 미리보기 ── */
+/* ── Top: preview ── */
 .fe-fp-preview-body {
   flex: 3 1 0;
   min-height: 0;
@@ -116,10 +118,11 @@
   padding: 16px;
 }
 
-/* 폰트 미리보기 — 실제 패밀리 이름은 파일마다 다르므로 JS 가
-   --fe-fp-font-family 로 실어 보낸다(선언 자체는 여기 있다).
-   var() 안에 sans-serif 폴백을 둔 이유: 값이 비어 있으면 `font-family: , sans-serif`
-   가 되어 선언 전체가 무효가 되고 상속값으로 떨어진다. */
+/* Font preview — the real family name differs per file, so JS feeds it via
+   --fe-fp-font-family (the declaration itself lives here).
+   Why the sans-serif fallback inside var(): an empty value would produce
+   `font-family: , sans-serif`, invalidating the whole declaration and falling
+   back to the inherited value. */
 .fe-fp-font {
   font-family: var(--fe-fp-font-family, sans-serif), sans-serif;
   font-size: 1.4rem;
@@ -140,7 +143,7 @@
 .fe-fp-sub,
 .fe-fp-dim { opacity: 0.7; }
 
-/* ── 하단: 드롭존 ── */
+/* ── Bottom: dropzone ── */
 .fe-fp-preview-drop {
   flex: 1 1 0;
   min-height: 70px;
@@ -158,7 +161,7 @@
 }
 .fe-fp-preview-drop > i { font-size: 1.8rem; opacity: 0.8; }
 
-/* ── 드래그 오버 / 업로드 중 ── */
+/* ── Drag-over / uploading ── */
 .fe-fp-preview.fe-fp-dragover .fe-fp-preview-drop {
   border-color: var(--color-text-hyperlink, #ff7b8a);
   background: rgba(255, 123, 138, 0.14);
@@ -168,10 +171,11 @@
 
 
 /* ════════════════════════════════════════════════════════════════════════
-   픽셀(레트로) 테마 — body.fe-retro-theme
-   전역 `* { box-shadow:none; text-shadow:none }` 로 그림자 기반 경계가 사라지므로
-   accent 색(--fe-ac-* / --fe-dx3rd-accent)으로 실선 테두리를 명시한다. !important 로
-   전역 규칙을 이긴다. 둥근 모서리 제거(픽셀 룩).
+   Pixel (retro) theme — body.fe-retro-theme
+   The global `* { box-shadow:none; text-shadow:none }` removes shadow-based
+   edges, so solid borders in the accent color (--fe-ac-* / --fe-dx3rd-accent)
+   are declared explicitly. !important beats the global rule. Rounded corners
+   removed (pixel look).
    ════════════════════════════════════════════════════════════════════════ */
 body.fe-retro-theme .fe-fp-preview {
   background: #000 !important;

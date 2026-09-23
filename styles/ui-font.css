@@ -1,40 +1,47 @@
 /* female_edition — UI + Chat Font Override for Foundry VTT v13 / dnd5e 5.2.5
  *
- * 구조:
- *  1) @font-face 등록 (항상 로드 — 폰트 설정과 무관)
- *  2) CSS 변수 선언 (fe-* 내부 변수: 항상, Foundry/dnd5e 재정의: fe-fonts-enabled 조건)
- *  3) 전역 UI 폰트 적용      (body.fe-fonts-enabled 조건)
- *  4) 채팅 폰트 적용         (body.fe-fonts-enabled 조건)
- *  5) dnd5e 시트 폰트 적용   (body.fe-fonts-enabled 조건)
- *  6) Font Awesome 아이콘 수정 (body.fe-fonts-enabled 조건)
- *  7) 예외 / 패치            (body.fe-fonts-enabled 조건)
+ * Structure:
+ *  1) @font-face registration (always loaded — regardless of font settings)
+ *  2) CSS variable declarations (fe-* internal vars: always; Foundry/dnd5e
+ *     overrides: fe-fonts-enabled only)
+ *  3) Global UI font application    (body.fe-fonts-enabled only)
+ *  4) Chat font application         (body.fe-fonts-enabled only)
+ *  5) dnd5e sheet font application  (body.fe-fonts-enabled only)
+ *  6) Font Awesome icon fixes       (body.fe-fonts-enabled only)
+ *  7) Exceptions / patches          (body.fe-fonts-enabled only)
  *
- * NOTE: CookieRun/Geurimilgi는 unicode-range로 KR + Latin 범위만 담당.
- *       그 외 문자(기호, 이모지 등)는 fallback 스택으로 자동 처리됨.
+ * NOTE: CookieRun/Geurimilgi cover only the KR + Latin ranges via
+ *       unicode-range. Other characters (symbols, emoji, etc.) are handled
+ *       automatically by the fallback stack.
  *
- * 폰트 on/off: JS에서 document.body.classList.toggle("fe-fonts-enabled", enabled)
- *              @font-face는 항상 등록되어 있으나 fe-fonts-enabled 없이는 적용 안 됨.
+ * Font on/off: JS toggles document.body.classList.toggle("fe-fonts-enabled",
+ *              enabled). @font-face is always registered, but nothing applies
+ *              without fe-fonts-enabled.
  */
 
-/* Neo둥근모 Pro — 공식 웹폰트 키트의 고정 버전.
- * 모듈에 TTF를 동봉하지 않아 배포 용량을 줄이고, WOFF2를 우선 사용한다.
- * `latest` 대신 1.020을 고정해 배포 후 글꼴 결과가 예고 없이 바뀌지 않게 한다. */
+/* NeoDunggeunmo Pro — pinned version of the official webfont kit.
+ * No TTF is bundled with the module (smaller download); WOFF2 comes first.
+ * Pinned to 1.020 instead of `latest` so the font result cannot silently
+ * change after release. */
 @import url("https://cdn.jsdelivr.net/gh/neodgm/neodgm-pro-webfont@1.020/neodgm_pro/style.css");
 
 /* ===================================================
- * 1) @font-face 등록 (항상 로드)
+ * 1) @font-face registration (always loaded)
  * =================================================== */
 
-/* OTF 단독 — CookieRun과 동일한 구성.
- * 이전에는 TTF 폴백을 두 번째 src로 놓았으나, .gitattributes가 TTF 쪽을
- * export-ignore 하면서 배포본에는 존재하지 않는 파일을 가리키는 죽은 항목이 됐다.
- * 두 파일은 같은 서체이며 cmap 커버리지가 완전히 동일하다(한글 11172/11172,
- * 글리프 12640개 일치). 크기 차이는 CFF vs glyf 인코딩 차이일 뿐이다.
- * 그래도 OTF여야 하는 이유는 따로 있다: 아카이브 내보내기의 폰트 임베드는
- * base64 팬창으로 인한 Chromium/Electron OOM을 막으려고 파일당 상한(1.2MB)을 두는데,
- * 6.3MB TTF는 그 상한을 넘어 항상 제외되고 저장된 파일에서 face 로드가 실패했다
- * (document.fonts → "FE Geurimilgi: error"). 730KB OTF는 상한 아래라 자동으로 임베드된다.
- * TTF를 되살리지 말 것. */
+/* OTF only — same setup as CookieRun.
+ * A TTF fallback used to sit as the second src, but .gitattributes
+ * export-ignores the TTF, leaving a dead entry pointing at a file that does
+ * not exist in the distributed package.
+ * The two files are the same typeface with fully identical cmap coverage
+ * (Korean 11172/11172, 12640 matching glyphs). The size difference is just
+ * CFF vs glyf encoding.
+ * Why OTF specifically matters: archive export's font embedding caps each
+ * file (1.2MB) to avoid Chromium/Electron OOM from base64 bloat — the
+ * 6.3MB TTF always exceeded it, so face loading failed in saved files
+ * (document.fonts → "FE Geurimilgi: error"). The 730KB OTF is under the
+ * cap and embeds automatically.
+ * Do NOT revive the TTF. */
 @font-face {
   font-family: "FE Geurimilgi";
   src:
@@ -75,9 +82,11 @@
   unicode-range: U+0020-007E, U+00A0-00FF, U+AC00-D7A3, U+1100-11FF, U+3130-318F;
 }
 
-/* Mona10 — 외부 웹폰트(MonadABXY/mona-font), jsDelivr CDN 에서 로드.
-   픽셀 비트맵 계열 폰트라 NeoDGM 모드와 동일하게 다룬다(아래 fe-mona-mode).
-   로컬 파일이 아니므로 인터넷 연결이 있어야 적용된다(없으면 fallback 스택). */
+/* Mona10 — external webfont (MonadABXY/mona-font), loaded from jsDelivr.
+   A pixel bitmap-family font — handled identically to the NeoDGM mode
+   (see fe-mona-mode below).
+   Not a local file, so it only applies with an internet connection
+   (otherwise the fallback stack). */
 @font-face {
   font-family: "Mona10";
   src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona10.woff2") format("woff2");
@@ -94,10 +103,11 @@
   font-display: swap;
 }
 
-/* Mona12 — 다국어(CJK 등) 커버리지가 넓은 12px 변형. Mona10 에 없는 글리프의
-   fallback 으로 쓴다. Korean 전용 텍스트 변형(Mona12 Text KR)을 한글에 우선.
-   @font-face 는 실제로 매칭 글리프가 렌더될 때만 받아오므로(브라우저 lazy-load),
-   미사용 패밀리를 미리 선언해도 네트워크 비용은 없다. */
+/* Mona12 — a 12px variant with wide multilingual (CJK etc.) coverage.
+   Serves as the fallback for glyphs Mona10 lacks. Its Korean-only text
+   variant (Mona12 Text KR) takes priority for Korean.
+   @font-face only downloads when a matching glyph actually renders
+   (browser lazy-load), so declaring unused families costs no network. */
 @font-face {
   font-family: "Mona12 Text KR";
   src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12TextKR.woff2") format("woff2");
@@ -122,8 +132,9 @@
   font-display: swap;
 }
 
-/* 이모지 — Mona 픽셀 이모지(컬러 우선, 흑백 보조). 일반 심볼/이모지 fallback
-   (Segoe UI Emoji 등)보다 앞에 두어 Mona 이모지가 우선 적용된다. */
+/* Emoji — Mona pixel emoji (color first, monochrome as backup). Placed
+   ahead of the general symbol/emoji fallback (Segoe UI Emoji etc.) so the
+   Mona emoji win. */
 @font-face {
   font-family: "Mona12 Color Emoji";
   src: url("https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/Mona12ColorEmoji.woff2") format("woff2");
@@ -140,10 +151,11 @@
   font-display: swap;
 }
 
-/* Galmuri11 — 외부 웹폰트(quiple/galmuri), jsDelivr(npm) CDN 에서 로드.
-   한글·라틴·CJK·이모지를 한 폰트로 폭넓게 커버하는 픽셀 폰트라 Mona 처럼
-   변형을 섞을 필요 없이 단일 패밀리로 충분하다. 로컬 파일이 아니므로 인터넷
-   연결이 있어야 적용된다(없으면 fallback 스택). */
+/* Galmuri11 — external webfont (quiple/galmuri), loaded from jsDelivr
+   (npm) CDN. A pixel font covering Korean/Latin/CJK/emoji broadly in one
+   family, so unlike Mona no variant mixing is needed — a single family
+   suffices. Not a local file, so it only applies with an internet
+   connection (otherwise the fallback stack). */
 @font-face {
   font-family: "Galmuri11";
   src: url("https://cdn.jsdelivr.net/npm/galmuri/dist/Galmuri11.woff2") format("woff2");
@@ -161,19 +173,20 @@
 }
 
 /* ===================================================
- * 2-a) CSS 변수 선언 — fe-* 내부 변수 (항상 정의)
- *       레이아웃/크기 변수는 폰트 on/off와 무관하게 유지
+ * 2-a) CSS variable declarations — fe-* internal vars (always defined)
+ *       Layout/size variables are kept regardless of the font on/off
  * =================================================== */
 
 :root {
-  /* 이모지/기호 fallback */
+  /* Emoji/symbol fallback */
   --fe-symbol-fallback:
     "Segoe UI Symbol",
     "Segoe UI Emoji",
     "Apple Color Emoji",
     "Noto Color Emoji";
 
-  /* 폰트 스택 정의 (fe-fonts-enabled 없이도 변수는 존재, 단 적용 안 됨) */
+  /* Font-stack definitions (variables exist without fe-fonts-enabled — they
+   just do not apply) */
   --fe-font-primary:
     "FE CookieRun",
     "Signika",
@@ -209,7 +222,8 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* 유저(로컬/폴더) 폰트 — JS(feSetUserFontMode)가 선택값으로 채운다. 비활성 시 미설정. */
+  /* User (local/folder) font — filled by JS (feSetUserFontMode) with the
+   chosen value. Unset while disabled. */
   --fe-user-font-family:
     "FE CookieRun",
     "Signika",
@@ -218,19 +232,23 @@
     sans-serif,
     var(--fe-symbol-fallback);
 
-  /* 적용 대상별 변수 기본값 (fe-fonts-enabled 없을 때 inherit 방지) */
+  /* Per-target variable defaults (prevents inherit while fe-fonts-enabled is
+   off) */
   --fe-ui-font-family:          inherit;
   --fe-chat-font-family:        inherit;
   --fe-dnd5e-label-font-family: inherit;
 
-  /* Font Awesome 변수.
-   * FA는 메이저 버전마다 패밀리 이름과 변수 이름이 모두 바뀐다. v13=FA6, v14=FA7.
-   * v14의 all.min.css는 --fa-style-family-classic은 그대로 두었지만
-   * --fa-style-family-brands는 --fa-family-brands로 **이름을 바꿨다**. 그래서
-   * 예전의 단일 var() 참조는 v14에서 폴백인 "Font Awesome 6 Brands"로 떨어졌고,
-   * 그 패밀리는 v14에 존재하지 않아 브랜드 아이콘이 두부(□)로 깨졌다.
-   * 새 이름 → 옛 이름 → 리터럴 스택 순으로 훑는다. 리터럴 폴백은 버전 무관 스택으로
-   * 두어야 하며, 글리프 단위 폴백이므로 한 스택이 Pro/Free/Brands를 모두 커버한다. */
+  /* Font Awesome variables.
+   * FA renames both its family names and variable names every major
+   * version. v13 = FA6, v14 = FA7.
+   * v14's all.min.css kept --fa-style-family-classic but RENAMED
+   * --fa-style-family-brands to --fa-family-brands. The old single var()
+   * reference therefore fell back to the literal "Font Awesome 6 Brands"
+   * on v14 — a family that does not exist there, so brand icons rendered
+   * as tofu (□).
+   * Probed in order: new name → old name → literal stack. The literal
+   * fallback must be a version-agnostic stack — glyph-level fallback lets
+   * one stack cover Pro/Free/Brands all at once. */
   --fe-fa-classic:
     var(--fa-family-classic,
       var(--fa-style-family-classic,
@@ -240,7 +258,7 @@
       var(--fa-style-family-brands,
         "Font Awesome 7 Brands", "Font Awesome 6 Brands", "Font Awesome 5 Brands"));
 
-  /* UI 크기 / 레이아웃 (JS feApplyStyleVarsFromSettings로 덮어씌워짐) */
+  /* UI size / layout (overwritten by JS feApplyStyleVarsFromSettings) */
   --fe-chat-title-size:         22px;
   --fe-chat-subtitle-size:      14px;
   --fe-chat-meta-size:          12px;
@@ -257,45 +275,51 @@
 }
 
 /* ===================================================
- * 2-b) CSS 변수 선언 — Foundry/dnd5e 재정의
- *       body.fe-fonts-enabled 일 때만 적용
+ * 2-b) CSS variable declarations — Foundry/dnd5e overrides
+ *       Applied only while body.fe-fonts-enabled
  * =================================================== */
 
 body.fe-fonts-enabled {
-  /* 적용 대상별 변수 활성화 */
+  /* Per-target variable activation */
   --fe-ui-font-family:          var(--fe-font-primary);
   --fe-chat-font-family:        var(--fe-font-primary);
   --fe-dnd5e-label-font-family: var(--fe-font-primary);
 
-  /* Foundry 전역 폰트 변수 재정의
-   * NOTE: 변수 재선언에 !important 를 단다 — 경쟁 모듈/시스템이 인라인이나
-   *       이른 레이어(system/layouts)에서 --font-primary 등을 important 로
-   *       덮어 우리가 명시적으로 안 잡는(코어의 var(--font-primary) 상속에
-   *       맡기는) 자손 요소를 끌어가는 "폰트 밀림" 경로를 막는다. ui-font.css
-   *       자체가 layouts 레이어로 등록돼(module.json) important 우선순위에서
-   *       system/modules 보다 위에 서므로, 이 important 변수 선언이 실제로 이긴다. */
+  /* Foundry global font-variable overrides
+   * NOTE: variable redeclarations carry !important — it blocks the "font
+   *       leak" path where a competing module/system covers --font-primary
+   *       etc. inline or in an early layer (system/layouts) with
+   *       !important, dragging away descendant elements we deliberately do
+   *       not target (the ones inheriting core's var(--font-primary)).
+   *       ui-font.css itself is registered in the layouts layer
+   *       (module.json), which outranks system/modules for !important —
+   *       so these important variable declarations actually win. */
   --font-primary:   var(--fe-font-primary) !important;
   --font-sans:      var(--fe-font-primary) !important;
   --font-serif:     var(--fe-font-primary) !important;
   --font-h1:        var(--fe-font-primary) !important;
   --font-h2:        var(--fe-font-primary) !important;
   --font-h3:        var(--fe-font-primary) !important;
-  /* h4~h6 도 매핑 — Foundry 코어는 h4 { font-family: var(--font-h4) } 로
-     --font-h4 기본값 "Bruno Ace" 를 직접 지정한다(.window-app 의 상속 폰트가
-     아닌 h4 자신의 선언이 우선). 이를 빼면 DX3rd .sheet-main 의 h4 > span(.highlight)
-     같은 헤딩 하위 텍스트가 커스텀 폰트(NeoDGM 등) 대신 Bruno Ace 로 표시됨. */
+  /* h4~h6 are mapped too — Foundry core pins h4 { font-family:
+     var(--font-h4) } with default "Bruno Ace" (h4's OWN declaration beats
+     the inherited font from .window-app). Without this, heading-level text
+     like DX3rd .sheet-main's h4 > span (.highlight) renders in Bruno Ace
+     instead of the custom font (NeoDGM etc.). */
   --font-h4:        var(--fe-font-primary) !important;
   --font-h5:        var(--fe-font-primary) !important;
   --font-h6:        var(--fe-font-primary) !important;
   --font-monospace: var(--fe-ui-font-family) !important;
-  /* blockquote — 코어가 --font-blockquote(기본 Signika/Palatino)를 blockquote 에
-     직접 지정하므로 이 변수를 빼면 인용문만 커스텀 폰트(그림일기/NeoDGM)가 안 먹는다. */
+  /* blockquote — core pins --font-blockquote (default Signika/Palatino)
+     directly on blockquote, so omitting this variable leaves only
+     blockquotes without the custom font (Geurimilgi/NeoDGM). */
   --font-blockquote: var(--fe-font-primary) !important;
 
-  /* dnd5e 폰트 변수 재정의
-   * NOTE: roboto-condensed 는 dnd5e 신형(quadrone) 시트가 라벨/스킬명에 쓰는
-   *       별도 변수다. 이걸 빼면 신형 캐릭터 시트의 .roboto-condensed-upper,
-   *       a.skill-name 등이 커스텀 폰트 대신 "Roboto Condensed" 로 남는다. */
+  /* dnd5e font-variable overrides
+   * NOTE: roboto-condensed is a separate variable the new-style dnd5e
+   *       (quadrone) sheets use for labels/skill names. Omitting it
+   *       leaves .roboto-condensed-upper, a.skill-name etc. on the new
+   *       character sheet in "Roboto Condensed" instead of the custom
+   *       font. */
   --dnd5e-font-roboto:           var(--fe-font-primary);
   --dnd5e-font-roboto-slab:      var(--fe-font-primary);
   --dnd5e-font-roboto-condensed: var(--fe-font-primary);
@@ -303,46 +327,58 @@ body.fe-fonts-enabled {
   --dnd5e-font-modesto:          var(--fe-font-primary);
 }
 
-/* Foundry 코어는 @layer variables.base 의 `body.game .app` 에서 --font-primary 를
-   Signika 로 다시 선언한다. 이 선언이 .app 요소 "자신"에 직접 걸리므로, 위의
-   body 레벨 오버라이드가 .app 내부 자손으로 상속되지 못하고 가려진다.
-   특히 코어 `body.game .app h1..h6 { font-family: var(--font-primary) }`(특정도
-   0,2,3)가 헤딩을 Signika 로 되돌려, DX3rd 시트의 h4 등이 커스텀 폰트 대신
-   Signika 로 표시됐다(--font-h4 는 코어가 .app 에서 재선언 안 해 NeoDGM 유지되지만,
-   헤딩 규칙이 --font-h4 가 아니라 --font-primary 를 쓰는 게 함정).
-   → .app/.application 자신에도 important 로 재선언해 관통시킨다. ui-font.css 는
-     layer(layouts)이고 코어의 해당 변수 선언은 normal 이므로 이 선언이 이긴다. */
+/* Foundry core re-declares --font-primary as Signika on `body.game .app`
+   in @layer variables.base. That declaration lands ON the .app element
+   itself, so the body-level override above cannot inherit into .app
+   descendants — it gets shadowed.
+   In particular, core's `body.game .app h1..h6 { font-family:
+   var(--font-primary) }` (specificity 0,2,3) reverts headings to Signika
+   — DX3rd sheet h4 elements rendered in Signika instead of the custom
+   font (--font-h4 survives as NeoDGM since core does not re-declare it
+   on .app, but the trap is that the heading rule reads --font-primary,
+   not --font-h4).
+   → re-declare on .app/.application itself with important to punch
+     through. ui-font.css is layer(layouts) and core's variable
+     declaration there is normal, so this declaration wins. */
 body.fe-fonts-enabled :is(.app, .application) {
   --font-primary: var(--fe-font-primary) !important;
 }
 
-/* 채팅/전체 글꼴 선택 (모듈 설정)
- *  의미별 분류:
- *    큰 글자(--fe-font-primary, 아웃라인용 강조): 헤더·창 제목·발화자 제목/이름·
- *      목차·헤딩(h1~h6)·능력치 라벨·**일반 채팅 메시지 본문/인라인** → 쿠키런
- *    작은 글자(--fe-font-secondary, 가독용 본문): **채팅 카드/박스 내부 텍스트**
- *      (아이템/주문 카드·midi-qol·dx3rd 칩)·시트 아이템/주문 설명·툴팁·메타 → 그림일기
- *  - cookie     "쿠키런 + 그림일기"(혼합): 큰=쿠키런, 작은/UI=그림일기.
- *  - cookieAll  "쿠키런": secondary/geurimilgi 변수까지 쿠키런으로 remap → 전부 쿠키런.
- *  - geurimilgi "그림일기": primary 까지 그림일기로 remap → 전부 그림일기.
- *  primary/secondary 변수가 모드별로 remap 되므로 아래 요소별 규칙은
- *  primary(큰)/secondary(작은) 만 참조하면 세 모드 모두 자동으로 맞는다. */
+/* Chat/global font selection (module setting)
+ *  Classification by role:
+ *    Large text (--fe-font-primary, display/outline): headers, window
+ *      titles, speaker titles/names, TOCs, headings (h1~h6), ability
+ *      labels, **normal chat-message body/inline** → CookieRun
+ *    Small text (--fe-font-secondary, readable body): **text inside chat
+ *      cards/boxes** (item/spell cards · midi-qol · dx3rd chips), sheet
+ *      item/spell descriptions, tooltips, meta → Geurimilgi
+ *  - cookie     "쿠키런 + 그림일기" (CookieRun + Geurimilgi, mixed):
+ *    large = CookieRun, small/UI = Geurimilgi.
+ *  - cookieAll  "쿠키런" (CookieRun): remaps even the secondary/geurimilgi
+ *    variables to CookieRun → everything CookieRun.
+ *  - geurimilgi "그림일기" (Geurimilgi): remaps even primary to
+ *    Geurimilgi → everything Geurimilgi.
+ *  The primary/secondary variables remap per mode, so the per-element
+ *  rules below only need to reference primary (large) / secondary (small)
+ *  to fit all three modes automatically. */
 body.fe-fonts-enabled.fe-chat-font-cookie {
-  /* 혼합: 일반 채팅 본문 = 큰 글자(쿠키런, 기존대로). 카드/박스 내부는 별도 규칙에서 secondary */
+  /* Mixed: normal chat body = large text (CookieRun, as before). Card/box
+   interiors get secondary via separate rules. */
   --fe-chat-font-family: var(--fe-font-primary);
 }
 body.fe-fonts-enabled.fe-chat-font-cookie-all {
   --fe-font-geurimilgi:  var(--fe-font-primary);
   --fe-font-secondary:   var(--fe-font-primary);
   --fe-chat-font-family: var(--fe-font-primary);
-  /* 단일 전체교체 — 카드 OFF용 안전폰트도 쿠키런을 따라간다(그렇지 않으면 카드만 Signika). */
+  /* Single full-replace — the card-OFF safe font follows CookieRun too
+   (otherwise only cards stay Signika). */
   --fe-chat-card-system-font-family: var(--fe-font-primary);
 }
 body.fe-fonts-enabled.fe-chat-font-geurimilgi {
   --fe-font-primary:     var(--fe-font-geurimilgi);
   --fe-font-secondary:   var(--fe-font-geurimilgi);
   --fe-chat-font-family: var(--fe-font-geurimilgi);
-  /* 단일 전체교체 — 카드 OFF용 안전폰트도 그림일기를 따라간다. */
+  /* Single full-replace — the card-OFF safe font follows Geurimilgi too. */
   --fe-chat-card-system-font-family: var(--fe-font-geurimilgi);
 }
 
@@ -352,13 +388,13 @@ body.fe-fonts-enabled.fe-ui-font-geurimilgi {
   --fe-dnd5e-label-font-family: var(--fe-font-geurimilgi);
 }
 
-/* 모든 커스텀 폰트를 NeoDGM 픽셀 폰트로 전체 교체 */
+/* Replace every custom font with the NeoDGM pixel font */
 body.fe-fonts-enabled.fe-neodgm-mode {
   --fe-font-primary:    "NeoDunggeunmo Pro", monospace;
   --fe-font-geurimilgi: "NeoDunggeunmo Pro", monospace;
   --fe-font-secondary:  "NeoDunggeunmo Pro", monospace;
-  /* 전체 교체 모드 — 카드 OFF용 안전폰트도 픽셀폰트를 따라간다(그렇지 않으면
-     토글 OFF 시 카드만 Signika 로 남는다). */
+  /* Full-replace mode — the card-OFF safe font follows the pixel font too
+     (otherwise only cards stay Signika with the toggle OFF). */
   --fe-chat-card-system-font-family: "NeoDunggeunmo Pro", monospace;
   font-kerning: normal;
   font-variant-ligatures: common-ligatures;
@@ -379,12 +415,14 @@ body.fe-fonts-enabled.fe-neodgm-mode * {
   text-rendering: optimizeSpeed !important;
 }
 
-/* 모든 커스텀 폰트를 Mona 웹폰트(픽셀)로 전체 교체 — NeoDGM 모드와 동형.
-   글리프 단위 CSS fallback 으로 변형을 자동 혼합한다:
-     베이스 Mona10 → (없는 글리프) 한글 Mona12 Text KR → 그 외 다국어 Mona12
-     → 이모지 Mona 픽셀 이모지(컬러/흑백) → monospace → 일반 심볼 fallback.
-   브라우저가 코드포인트별로 첫 번째 보유 패밀리를 골라 쓰므로, 라틴/숫자는
-   Mona10 그대로, 한글/CJK 는 Mona12 계열, 이모지는 Mona 이모지로 떨어진다. */
+/* Replace every custom font with the Mona webfont (pixel) — same shape as
+   the NeoDGM mode. Variants mix automatically via per-glyph CSS fallback:
+     base Mona10 → (missing glyphs) Korean Mona12 Text KR → other
+     multilingual Mona12 → emoji Mona pixel emoji (color/mono) →
+     monospace → generic symbol fallback.
+   The browser picks the first family holding each codepoint, so
+   Latin/digits stay Mona10, Korean/CJK fall to the Mona12 family, and
+   emoji to Mona emoji. */
 body.fe-fonts-enabled.fe-mona-mode {
   --fe-mona-stack:
     "Mona10",
@@ -397,7 +435,7 @@ body.fe-fonts-enabled.fe-mona-mode {
   --fe-font-primary:    var(--fe-mona-stack);
   --fe-font-geurimilgi: var(--fe-mona-stack);
   --fe-font-secondary:  var(--fe-mona-stack);
-  --fe-chat-card-system-font-family: var(--fe-mona-stack); /* 전체 교체 — 카드 OFF도 픽셀 */
+  --fe-chat-card-system-font-family: var(--fe-mona-stack); /* Full-replace — card OFF gets pixel too */
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
@@ -413,14 +451,15 @@ body.fe-fonts-enabled.fe-mona-mode * {
   text-rendering: optimizeSpeed !important;
 }
 
-/* 모든 커스텀 폰트를 Galmuri11 웹폰트(픽셀)로 전체 교체 — NeoDGM/Mona 모드와 동형.
-   Galmuri11 한 패밀리가 한글/라틴/CJK/이모지를 폭넓게 커버하므로 스택 혼합 불필요. */
+/* Replace every custom font with the Galmuri11 webfont (pixel) — same
+   shape as the NeoDGM/Mona modes. A single Galmuri11 family covers
+   Korean/Latin/CJK/emoji broadly, so no stack mixing needed. */
 body.fe-fonts-enabled.fe-galmuri-mode {
   --fe-galmuri-stack: "Galmuri11", monospace, var(--fe-symbol-fallback);
   --fe-font-primary:    var(--fe-galmuri-stack);
   --fe-font-geurimilgi: var(--fe-galmuri-stack);
   --fe-font-secondary:  var(--fe-galmuri-stack);
-  --fe-chat-card-system-font-family: var(--fe-galmuri-stack); /* 전체 교체 — 카드 OFF도 픽셀 */
+  --fe-chat-card-system-font-family: var(--fe-galmuri-stack); /* Full-replace — card OFF gets pixel too */
   font-feature-settings: "kern" 1;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
@@ -436,9 +475,10 @@ body.fe-fonts-enabled.fe-galmuri-mode * {
   text-rendering: optimizeSpeed !important;
 }
 
-/* 유저(로컬/폴더) 폰트로 전체 교체 — NeoDGM 모드와 동일하게 모든 폰트 변수를
-   remap 한다. cookie/neodgm 등 다른 모드 클래스보다 "뒤"에 선언해, 둘 다 켜져도
-   (저장된 채팅 글꼴 선택값이 남아 있어도) 유저 폰트가 우선 적용되게 한다. */
+/* Full-replace with the user (local/folder) font — remaps every font
+   variable like the NeoDGM mode. Declared "after" the other mode classes
+   (cookie/neodgm etc.), so the user font wins even when both are on (i.e.
+   a saved chat-font choice lingers). */
 body.fe-fonts-enabled.fe-user-font-mode {
   --fe-font-primary:     var(--fe-user-font-family);
   --fe-font-geurimilgi:  var(--fe-user-font-family);
@@ -446,10 +486,10 @@ body.fe-fonts-enabled.fe-user-font-mode {
   --fe-chat-font-family: var(--fe-user-font-family);
   --fe-ui-font-family:   var(--fe-user-font-family);
   --fe-dnd5e-label-font-family: var(--fe-user-font-family);
-  --fe-chat-card-system-font-family: var(--fe-user-font-family); /* 전체 교체 — 카드 OFF도 유저폰트 */
+  --fe-chat-card-system-font-family: var(--fe-user-font-family); /* Full-replace — card OFF gets the user font too */
 }
 
-/* dnd5e 스코프 재어설트 */
+/* dnd5e-scope re-assert */
 body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) {
   --dnd5e-font-roboto:           var(--fe-font-primary) !important;
   --dnd5e-font-roboto-slab:      var(--fe-font-primary) !important;
@@ -459,7 +499,7 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) {
 }
 
 /* ===================================================
- * 3) 전역 UI 폰트 적용
+ * 3) Global UI font application
  * =================================================== */
 
 body.fe-fonts-enabled,
@@ -503,12 +543,14 @@ body.fe-fonts-enabled :is(#interface, #ui, #sidebar, .window-app, .application)
 }
 
 /* ===================================================
- * 4) 채팅 폰트 적용
+ * 4) Chat font application
  * =================================================== */
 
-/* 일반 채팅 메시지 본문 = --fe-chat-font-family (혼합/쿠키런 모드에서 쿠키런, 기존대로)
-   #fe-chat-export-log 도 포함 — 채팅 아카이브(HTML/PDF 내보내기·인쇄) 창은
-   #sidebar/#chat 이 아닌 전용 id 구조를 쓰므로 별도로 스코프해야 한다. */
+/* Normal chat-message body = --fe-chat-font-family (CookieRun in
+   mixed/cookieRun modes, as before)
+   #fe-chat-export-log included — the chat-archive (HTML/PDF export/print)
+   window uses its own id structure, not #sidebar/#chat, so it must be
+   scoped separately. */
 body.fe-fonts-enabled #sidebar #chat,
 body.fe-fonts-enabled #sidebar #chat :is(.chat-log, #chat-log, ol.chat-log),
 body.fe-fonts-enabled #sidebar #chat :is(.chat-message, .message-header, .message-content, .flavor-text),
@@ -522,11 +564,13 @@ body.fe-fonts-enabled #fe-chat-export-log :is(.chat-message, .message-header, .m
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 채팅 카드/박스 내부 텍스트.
-   옵션 OFF: 메시지 본문(primary) 상속을 끊고 안전한 시스템 폰트로 복원.
-   옵션 ON: 작은 글자(secondary). 혼합에서 그림일기.
-   아이템/주문 카드·midi-qol·dx3rd 칩 — .message-content 의 본문 폰트를 덮어쓴다.
-   (위와 동일한 이유로 #fe-chat-export-log 도 포함) */
+/* Text inside chat cards/boxes.
+   Option OFF: severs inheritance of the message body (primary) and
+   restores a safe system font.
+   Option ON: small text (secondary) — Geurimilgi in mixed mode.
+   Item/spell cards · midi-qol · dx3rd chips — overrides the body font of
+   .message-content.
+   (#fe-chat-export-log included for the same reason as above) */
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font) .chat-popout #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
@@ -549,12 +593,17 @@ body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.cha
   font-family: var(--fe-chat-card-system-font-family) !important;
 }
 
-/* dx3rd 카드의 폼 컨트롤(button/input/select/textarea)만 상속을 강제한다.
-   dx3rd 카드는 변수(--font-*)를 쓰지 않는 순수 HTML 이라 컨테이너(:is(.dx3rd-item-chat, .dx3rd-item-info))의
-   font-family 가 대부분 상속으로 내려가지만, 폼 컨트롤은 UA 기본 font-family 때문에
-   상속을 받지 않아 카드 폰트가 빠진다. inherit 로 컨테이너의 카드 폰트를 물려받게 한다.
-   (넓은 * 규칙은 FontAwesome 아이콘·다이스 폰트까지 덮어써 아이콘이 깨질 수 있어 쓰지 않는다.
-    inherit 는 OFF/ON 두 모드의 컨테이너 폰트를 그대로 따라가므로 규칙 하나로 충분하다.) */
+/* Only the form controls (button/input/select/textarea) inside dx3rd
+   cards are forced to inherit.
+   dx3rd cards are pure HTML using no variables (--font-*), so most of the
+   container's (:is(.dx3rd-item-chat, .dx3rd-item-info)) font-family
+   descends by inheritance — but form controls do not inherit because of
+   the UA default font-family, dropping the card font. `inherit` hands
+   them the container's card font.
+   (A broad * rule is not used — it would override FontAwesome icons and
+    dice fonts, possibly breaking icons.
+    `inherit` tracks the container font of BOTH OFF and ON modes, so one
+    rule suffices.) */
 body.fe-fonts-enabled #sidebar #chat :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
 body.fe-fonts-enabled #chat-notifications :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
 body.fe-fonts-enabled .chat-popout #chat :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
@@ -562,14 +611,15 @@ body.fe-fonts-enabled #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info
   font-family: inherit !important;
 }
 
-/* monks-tokenbar 의 h3/탐색 행은 tokenbar.css 가 font-family 를 리터럴로
-   박는다("Modesto Condensed", "Palatino Linotype", serif — :642 의
-   .sheet .items-header h3, :754 의 .card-header h3, :1360 의
-   #assignexperience .sheet-navigation). 요소에 직접 선언된 font-family 는
-   상속을 이기므로 컨테이너의 카드 폰트가 내려가지 못한다. 위 dx3rd 폼 컨트롤과
-   같은 사정 — inherit 로 물려받으면 카드 폰트 OFF(시스템)/ON(세컨더리) 두
-   모드를 모두 올바르게 따라간다. #assignexperience 는 다이얼로그라 채팅
-   표면 밖 — 상속원은 .application 의 UI 폰트다. */
+/* monks-tokenbar's h3/navigation rows get literal font-family from
+   tokenbar.css ("Modesto Condensed", "Palatino Linotype", serif — :642's
+   .sheet .items-header h3, :754's .card-header h3, :1360's
+   #assignexperience .sheet-navigation). A font-family declared on the
+   element itself beats inheritance, so the container's card font cannot
+   descend. Same situation as the dx3rd form controls above — inherit
+   tracks both card-font OFF (system) and ON (secondary) modes correctly.
+   #assignexperience is a dialog — outside the chat surface — so its
+   inheritance source is .application's UI font. */
 body.fe-fonts-enabled #sidebar #chat .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
 body.fe-fonts-enabled #chat-notifications .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
 body.fe-fonts-enabled .chat-popout #chat .monks-tokenbar.chat-card :is(.card-header h3, .sheet .items-list .items-header h3),
@@ -665,7 +715,8 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
    But this sheet is `layer(layouts)` and that one is `layer(modules)`, and for
    `!important` the layer order REVERSES (see CLAUDE.md § CSS Cascade Layers), so the
    `display: inline-flex !important` above beat it no matter how specific the merge
-   selector was — a merged follow message kept showing "34분 전" beside its flavor line.
+   selector was — a merged follow message kept showing "34분 전" (34 minutes ago)
+   beside its flavor line.
    The exception has to live in THIS sheet for the same reason. All three follow-header
    modes (hide / name / portrait) hide the metadata, so no mode needs it back. */
 body.fe-fonts-enabled.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
@@ -720,7 +771,7 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
   font-family: var(--fe-chat-font-family) !important;
 }
 
-/* 툴팁 = 작은 글자(그림일기). 다이스 툴팁 포함 */
+/* Tooltips = small text (Geurimilgi). Dice tooltips included. */
 body.fe-fonts-enabled #tooltip {
   font-family: var(--fe-font-secondary) !important;
 }
@@ -768,7 +819,7 @@ body.fe-fonts-enabled :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications
 }
 
 /* ===================================================
- * 5) dnd5e 시트 폰트 적용
+ * 5) dnd5e sheet font application
  * =================================================== */
 
 body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) :is(
@@ -829,17 +880,21 @@ body.fe-fonts-enabled .tidy5e-sheet.application.quadrone
   font-family: var(--fe-dnd5e-label-font-family, var(--fe-font-primary)) !important;
 }
 
-/* 아이템/주문/피처 설명·디스크립션 본문 = 작은 글자(그림일기).
-   시트의 설명 탭/요약, 전기(biography)/노트, 채팅 카드 설명을 모두 커버
-   (편집 영역은 .prosemirror 규칙). dnd5e.css(코어) + tidy5e-sheet.css +
-   dx3rd-emanim / double-cross-3rd 의 styles.css 세 곳 모두 실제 클래스명을 대조해 작성 —
-   bare .editor-content/.description/.summary 는 세 시스템 모두에서 "서술형
-   본문" 용도로 일관되게 쓰여 좁은 조상 제약 없이 잡아도 안전하다(헤더/라벨은
-   위 §5 첫 블록에서 이미 primary 로 못박혀 있어 specificity 충돌 없음).
-   조상 스코프에 .tidy5e-sheet(Tidy5e 는 애플리케이션 루트에 .dnd5e2 대신/더불어
-   이 클래스를 씀)와 .dx3rd-emanim / .double-cross-3rd / .dx3rd(dx3rd 시트 루트)를 추가 — 이전에는 §5가
-   dnd5e/tidy5e 에만 스코프돼 dx3rd 시트 설명문이 secondary 분리를 못 받고
-   §3 전역 규칙의 primary 폰트로만 떨어졌었다. */
+/* Item/spell/feature description & flavor body = small text
+   (Geurimilgi).
+   Covers the sheet's description tab/summary, biography/notes, and chat-
+   card descriptions (edit areas fall under the .prosemirror rule).
+   Written against the actual class names in dnd5e.css (core) +
+   tidy5e-sheet.css + dx3rd-emanim / double-cross-3rd's styles.css —
+   bare .editor-content/.description/.summary is used consistently for
+   "prose body" across all three systems, so it is safe to match without
+   a narrow ancestor constraint (headers/labels are already pinned to
+   primary in §5's first block — no specificity collision).
+   Ancestor scope adds .tidy5e-sheet (Tidy5e uses this class on the
+   application root instead of/in addition to .dnd5e2) and .dx3rd-emanim /
+   .double-cross-3rd / .dx3rd (dx3rd sheet roots) — previously §5 was
+   scoped to dnd5e/tidy5e only, so dx3rd sheet descriptions never got the
+   secondary split and only fell through to §3's global primary font. */
 body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .tidy5e-sheet, .dx3rd-emanim, .double-cross-3rd, .dx3rd) :is(
   .editor-content,
   .description,
@@ -887,24 +942,27 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .tidy5e-sheet, .dx3rd-emanim, .double
 }
 
 /* ===================================================
- * 5b) Dungeon World 시트/사이드바/채팅 폰트 적용
+ * 5b) Dungeon World sheet/sidebar/chat font application
  * ===================================================
- * DW 는 §3 전역 규칙처럼 루트 한 곳에만 폰트를 걸지 않고, 자손 요소마다
- * 직접 font-family:"Alegreya"/"Metamorphous" 를 박아 둔다. 상속은 "그 요소를
- * 직접 지정한 선언" 에게 언제나 지므로 — !important 여부·레이어와 무관하게 —
- * 아래 요소들은 §3 이 루트에 건 폰트가 닿지 않는다. DW 쪽 선언은 전부
- * !important 가 없지만, 우리 쪽도 같은 요소를 직접 잡아야 이긴다.
+ * Unlike §3's global rule, DW does not hang the font on one root — it
+ * hardcodes font-family:"Alegreya"/"Metamorphous" on individual
+ * descendant elements. Inheritance always loses to a declaration on the
+ * element itself — regardless of !important or layers — so the font §3
+ * sets on the root never reaches the elements below. DW's declarations
+ * are all non-important, but we still must target the same elements
+ * directly to win.
  *
- * body.fe-system-dw 는 레트로와 무관한 "시스템 존재" 표식(fe-style.js)이다.
- * fe-retro-system-dw 로 게이트하면 레트로가 꺼진 월드에서 폰트가 통째로
- * 빠지므로 절대 바꾸지 말 것.
+ * body.fe-system-dw is a retro-independent "system present" marker
+ * (fe-style.js). Do NOT gate this on fe-retro-system-dw — the font would
+ * disappear entirely in worlds with retro off.
  *
- * 매핑은 DW 의 의도를 그대로 옮긴다: 표제용 Metamorphous → --fe-font-primary,
- * 본문용 Alegreya → 상속(= §3 이 정한 --fe-ui-font-family). ::before 를 쓰는
- * 아이콘(.cell__title.error::before 등)은 선택자에 넣지 않는다 — Font Awesome
- * 지정을 덮으면 아이콘이 두부가 된다. */
+ * The mapping keeps DW's intent: display-face Metamorphous →
+ * --fe-font-primary, body-face Alegreya → inherit (= --fe-ui-font-family
+ * set by §3). Icon elements using ::before (.cell__title.error::before
+ * etc.) are left out of the selectors — overriding the Font Awesome
+ * assignment would turn the icons to tofu. */
 
-/* 시트: 표제 계열 */
+/* Sheet: display family */
 body.fe-fonts-enabled.fe-system-dw .dungeonworld :is(
   label,
   h1,
@@ -916,12 +974,14 @@ body.fe-fonts-enabled.fe-system-dw .dungeonworld :is(
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 시트: 본문 계열 소제목 — DW 가 일부러 본문 폰트로 둔 자리라 상속으로 되돌린다 */
+/* Sheet: body-family subheads — places DW deliberately set in the body
+   font, so they return to inherit */
 body.fe-fonts-enabled.fe-system-dw .dungeonworld :is(h3, h4, h5, h6) {
   font-family: inherit !important;
 }
 
-/* 사이드바: .sidebar-tab 자신이 직접 지정돼 있어 #sidebar 상속이 끊긴다 */
+/* Sidebar: .sidebar-tab itself is directly assigned, cutting the
+   #sidebar inheritance */
 body.fe-fonts-enabled.fe-system-dw #sidebar .sidebar-tab,
 body.fe-fonts-enabled.fe-system-dw .sidebar-popout .sidebar-tab {
   font-family: var(--fe-ui-font-family) !important;
@@ -943,16 +1003,18 @@ body.fe-fonts-enabled.fe-system-dw :is(#sidebar, .sidebar-popout) .sidebar-tab .
   font-family: inherit !important;
 }
 
-/* 채팅: 발신자명(alias) 은 .title/.subtitle 이 없는 평문일 때 §4 가 못 잡는다 */
+/* Chat: the sender name (alias) on plain text without .title/.subtitle
+   is outside §4's reach */
 body.fe-fonts-enabled.fe-system-dw
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message .message-sender {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 채팅 카드 내부는 카드 폰트 토글(fe-chatcard-custom-font)이 정한 값을 따라야
-   하므로 primary 로 못박지 않고 상속으로 되돌린다. .cell__title / h2 는
-   chat-move.html 상 .chat-card 안쪽이다. */
+/* Inside chat cards, text must follow the card-font toggle
+   (fe-chatcard-custom-font), so it returns to inherit instead of being
+   pinned to primary. .cell__title / h2 sit inside .chat-card in
+   chat-move.html. */
 body.fe-fonts-enabled.fe-system-dw
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message :is(.dw-chat-card, .chat-card) :is(
@@ -965,19 +1027,22 @@ body.fe-fonts-enabled.fe-system-dw
   font-family: inherit !important;
 }
 
-/* 시트 창 제목줄: DW 는 .window-header 자체에 Metamorphous 를 건다. §3 은 그
-   안의 .window-title / .window-subtitle 만 잡으므로, 헤더 버튼 라벨처럼 그
-   둘에 속하지 않는 텍스트가 시스템 폰트로 남는다. 헤더 자신을 잡아 덮는다.
-   아이콘은 안전하다 — .fa-* 요소는 §6 규칙이 자기 자신을 직접 매치하므로
-   여기서 상속되는 값보다 우선한다(상속은 직접 선언에 진다). */
+/* Sheet window title bar: DW applies Metamorphous to .window-header
+   itself. §3 only catches the .window-title / .window-subtitle inside
+   it, so text belonging to neither — like header-button labels — stayed
+   in the system font. The header itself is caught and overridden.
+   Icons are safe — .fa-* elements are matched directly by the §6 rule,
+   which beats any value inherited here (inheritance loses to a direct
+   declaration). */
 body.fe-fonts-enabled.fe-system-dw .dungeonworld .window-header {
   font-family: var(--fe-font-primary) !important;
 }
 
-/* 채팅 로그의 표제 태그. .vtt .chat-log h1~h5 는 카드 밖에도 적용되므로
-   (내레이션·저널 붙여넣기·다른 모듈 메시지 등) 카드 내부 규칙만으로는 부족하다.
-   카드 안쪽은 위 블록이 이미 inherit 로 돌려 놓았고, :not() 으로 그 영역을
-   비켜 가게 해서 카드 폰트 토글을 침범하지 않는다. */
+/* Heading tags in the chat log. .vtt .chat-log h1~h5 also applies outside
+   cards (narration, pasted journal entries, other modules' messages), so
+   card-internal rules alone are insufficient. Card interiors were already
+   returned to inherit by the block above; :not() steers around that area
+   so the card-font toggle is not violated. */
 body.fe-fonts-enabled.fe-system-dw
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message
@@ -986,7 +1051,7 @@ body.fe-fonts-enabled.fe-system-dw
 }
 
 /* ===================================================
- * 6) Font Awesome 아이콘 수정
+ * 6) Font Awesome icon fixes
  * =================================================== */
 
 body.fe-fonts-enabled :is(
@@ -1052,7 +1117,7 @@ body.fe-fonts-enabled button.clear-remaining.icon.fa-solid::after {
 }
 
 /* ===================================================
- * 7) 예외 / 패치
+ * 7) Exceptions / patches
  * =================================================== */
 
 body.fe-fonts-enabled code,
@@ -1067,16 +1132,19 @@ body.fe-fonts-enabled .ve-night-mode .rd__h--3 {
   font-style: normal !important;
 }
 
-/* 브라우저 확장(Grammarly류) 폰트 오염 무력화.
- * 이런 확장은 편집/붙여넣기 시 텍스트를 <span style="font-family:'gg mono, ...'">
- * 으로 감싸며, 그 값은 콤마 목록 전체가 한 따옴표에 들어간 무효값이다. 이 무효값은
- * 부모의 상속을 끊으면서 정작 아무 폰트에도 매칭되지 않아 브라우저 기본 폰트로
- * fallback → FE 폰트만 깨져 보인다. 게다가 이 span 은 액터 바이오/저널의 저장
- * HTML 에 그대로 박혀 영구화된다.
- *   → 오염의 시그니처 폰트("gg mono")만 표적해 inherit 로 되돌린다. 사용자가
- *      에디터 폰트 드롭다운으로 직접 고른 정상 폰트(단일 유효 패밀리명)는
- *      이 시그니처를 포함하지 않으므로 그대로 보존된다.
- *      (오염 인라인 선언에는 !important 가 없어 스타일시트 !important 가 이긴다.) */
+/* Neutralize font pollution from browser extensions (Grammarly-type).
+ * Such extensions wrap text as <span style="font-family:'gg mono, ...'">
+ * on edit/paste — an invalid value where the whole comma list sits inside
+ * one pair of quotes. The invalid value severs inheritance from the
+ * parent while matching no font at all, so the browser falls back to its
+ * default → only the FE fonts look broken. Worse, the span persists into
+ * saved actor-bio/journal HTML.
+ *   → target only the pollution's signature font ("gg mono") and return
+ *      it to inherit. A legitimate font the user picked via the editor
+ *      font dropdown (a single valid family name) contains no such
+ *      signature and is preserved.
+ *      (The polluted inline declaration has no !important, so the
+ *       stylesheet !important wins.) */
 body.fe-fonts-enabled [style*="gg mono"] {
   font-family: inherit !important;
 }

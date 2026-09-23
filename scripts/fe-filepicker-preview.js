@@ -445,12 +445,12 @@ function _previewLocal(aside, file) {
 
 async function _previewPicked(aside, url, name) {
   if (!url) return;
-  if (aside.dataset.fePreviewKey === url) return; // 동일 파일 재선택 → 스킵
+  if (aside.dataset.fePreviewKey === url) return; // same file re-picked → skip
   _revoke(aside);
   const cat = _classify(name);
   _writePreview(aside, { url, name, cat });
   const meta = await _headMeta(url);
-  if (aside.dataset.fePreviewKey !== url) return; // 그 사이 다른 걸 선택
+  if (aside.dataset.fePreviewKey !== url) return; // something else was picked meanwhile
   const sub = aside.querySelector("[data-fe-sub]");
   if (sub) {
     const date = meta.mtime ? new Date(meta.mtime).toLocaleDateString() : "";

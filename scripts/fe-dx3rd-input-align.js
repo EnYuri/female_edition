@@ -27,8 +27,8 @@ function _textWidth(text, cs) {
 
 function _alignInput(el) {
   const t = (el.getAttribute("type") || "text").toLowerCase();
-  if (t !== "text" && t !== "number") return;               // 텍스트형 값칸만
-  if (getComputedStyle(el).textAlign !== "center") return;  // 좌측정렬(이름 등) 보존
+  if (t !== "text" && t !== "number") return;               // text-type value fields only
+  if (getComputedStyle(el).textAlign !== "center") return;  // keep left-aligned fields (names etc.)
   el.style.setProperty("padding-left",  "4px", "important");
   el.style.setProperty("padding-right", "4px", "important");
 }
@@ -42,8 +42,8 @@ function _alignSelect(el) {
   const txt   = el.options?.[el.selectedIndex]?.text ?? "";
   const tw    = _textWidth(txt, cs);
   const inner = el.clientWidth;                              // content + padding
-  let pad = hasArrow ? 16 : 4;                               // 화살표 있으면 우측 공간 확보
-  const maxPad = Math.max(2, Math.floor((inner - tw) / 2) - 2); // 클리핑 방지 상한
+  let pad = hasArrow ? 16 : 4;                               // reserve right-side room when an arrow exists
+  const maxPad = Math.max(2, Math.floor((inner - tw) / 2) - 2); // clamp to prevent clipping
   pad = Math.min(pad, maxPad);
   el.style.setProperty("padding-left",  `${pad}px`, "important");
   el.style.setProperty("padding-right", `${pad}px`, "important");
@@ -54,7 +54,7 @@ function _alignEl(el) {
   try {
     if (el.tagName === "INPUT") _alignInput(el);
     else if (el.tagName === "SELECT") _alignSelect(el);
-  } catch { /* 정렬 실패는 무시 — 기능에 영향 없음 */ }
+  } catch { /* ignore alignment failures — no functional impact */ }
 }
 
 function _alignRoot(root) {
@@ -77,7 +77,7 @@ function _start() {
   const obs = new MutationObserver(muts => {
     for (const m of muts) for (const n of m.addedNodes) {
       if (n.nodeType !== 1) continue;
-      if (!n.closest?.(DX3RD_ROOT_SELECTOR)) continue;       // dx3rd 윈도우 밖 → 빠른 탈출
+      if (!n.closest?.(DX3RD_ROOT_SELECTOR)) continue;       // outside a dx3rd window → fast bail
       if (n.matches?.("input, select")) pending.add(n);
       n.querySelectorAll?.("input, select").forEach(e => pending.add(e));
     }

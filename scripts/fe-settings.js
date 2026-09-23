@@ -285,7 +285,8 @@ function feRegisterSettingsMenu({
       };
 
       // Module font/-folder fonts (no permission needed). System fonts are loaded
-      // on demand via the "시스템 폰트 불러오기" button in _onRender (user gesture).
+      // on demand via the "시스템 폰트 불러오기" (load system fonts) button in _onRender
+      // (user gesture).
       let userFontModuleList = [];
       try { userFontModuleList = await feRegisterModuleFolderFonts(); } catch { /* no-op */ }
 
@@ -298,7 +299,8 @@ function feRegisterSettingsMenu({
         localFontsSupported: feLocalFontsSupported(),
         warnings: { chatPortraitDup: feIsChatPortraitModuleActive() },
         isGM:     !!game.user?.isGM,
-        // Rendered as the "이런 것들이 강제됩니다" list. Read from the LIVE core
+        // Rendered as the "이런 것들이 강제됩니다" (these are being forced) list. Read from
+        // the LIVE core
         // settings registry rather than hardcoded in the template, so a Foundry
         // update that adds or drops a client setting cannot make the note lie.
         corePriorityKeys: feListCorePriorityKeys(),
@@ -378,12 +380,13 @@ function feRegisterSettingsMenu({
       sync();
     }
 
-    // Wires up the "폰트" section's user-font UI (added in fe-settings-menu.hbs):
-    //   · the "유저 폰트 사용" checkbox shows the user-font row and hides the module
-    //     font dropdown (and vice-versa);
+    // Wires up the "폰트" (fonts) section's user-font UI (added in fe-settings-menu.hbs):
+    //   · the "유저 폰트 사용" (use user font) checkbox shows the user-font row and hides
+    //     the module font dropdown (and vice-versa);
     //   · the picker <select> writes into the ceUserFontFamily text input;
     //   · the preview box live-renders whatever family the text input holds;
-    //   · the "시스템 폰트 불러오기" button enumerates installed fonts on click
+    //   · the "시스템 폰트 불러오기" (load system fonts) button enumerates installed fonts
+    //     on click
     //     (a real user gesture, so the permission prompt only appears intentionally).
     #wireUserFontControls() {
       const root = this.element;
@@ -560,7 +563,8 @@ function feRegisterSettingsMenu({
       // (unregistered on this core/version/system, validation error, permission)
       // must NOT abort the whole batch — otherwise the per-world capture below is
       // skipped and feHydrateWorldSettings silently reverts EVERY change on the next
-      // reload (the long-standing "저장이 안 된다" recurrence). Unregistered keys are
+      // reload (the long-standing "저장이 안 된다" = settings do not save recurrence).
+      // Unregistered keys are
       // skipped (some settings are conditionally registered per system/version, but
       // are still listed unconditionally below), failures are collected and surfaced.
       const failed = [];

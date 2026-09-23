@@ -325,7 +325,7 @@ export async function feCollectVisibleChatMessages(user = game.user, { liveMessa
 
   // Applied here — inside collection — rather than alongside feApplyMessageRange, so the
   // count handed to the range dialog is the already-filtered count. Filtering later would
-  // make "1~100번째" refer to a list the user never saw.
+  // make "1~100번째" (items 1–100) refer to a list the user never saw.
   const excludeWhispers = !!feSetting(S.EXPORT_EXCLUDE_WHISPERS);
 
   const visibleDocs = all

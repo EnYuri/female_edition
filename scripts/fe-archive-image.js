@@ -830,7 +830,7 @@ async function feEncodeCanvasToBlob(canvas, { webpQuality = 0.82, jpegQuality = 
     if (pngBlob && pngBlob.size <= 650_000) return pngBlob;
   }
 
-  // Prefer webp for normal content, but keep quality high in the "품질 우선" path.
+  // Prefer webp for normal content, but keep quality high in the "품질 우선" (quality-first) path.
   const tryTypes = preferLossless
     ? [
         { type: "image/webp", quality: Math.max(webpQuality, 0.92) },

@@ -169,7 +169,8 @@ function feHasGmPriorityOverride(key) {
 // drops every OTHER key's new value, leaving its STALE override in the store;
 // feSyncLocalGmPrioritySettings then forces local back to that stale override,
 // reverting all-but-one of the saved changes (the "두 설정을 같이 저장하면 하나만
-// 적용·저장, 다시 저장하면 됨" bug). Chaining each critical section onto one
+// 적용·저장, 다시 저장하면 됨" = saving two settings together applies only one — save again
+// bug). Chaining each critical section onto one
 // promise makes its read and write atomic w.r.t. the others. The lock is
 // process-local (one client); cross-client propagation still goes through
 // game.settings exactly as before.
@@ -273,7 +274,8 @@ async function feSeedGmPriorityOverridesFromLocal({ force = false } = {}) {
 }
 
 // Apply the GM's override values into THIS client's local game.settings. Gated on
-// enabled — when "GM 설정 전역 강제" is OFF this is a no-op, so nothing is ever
+// enabled — when "GM 설정 전역 강제" (GM global setting enforcement) is OFF this is a no-op,
+// so nothing is ever
 // forced while the feature is disabled. Before overwriting a key for the first
 // time, the client's own pre-force value is recorded in the backup store so it can
 // be restored verbatim when enforcement is later turned off.

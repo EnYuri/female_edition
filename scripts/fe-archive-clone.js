@@ -124,7 +124,8 @@ const FE_ARCHIVE_TEXT_STYLE_PROPS = [
   // live faces load from Foundry-origin absolute url()s that 404 offline, so those
   // elements fall back to the system default. Only the live-CLONED messages mirror
   // (recent messages, clustered on the LAST pages), so the symptom was "마지막
-  // 페이지만 기본 폰트". Fresh-built messages never mirror and were always correct;
+  // 페이지만 기본 폰트" (only the last pages show the default font). Fresh-built messages
+  // never mirror and were always correct;
   // dropping font-family here makes cloned messages match them. (font-size/weight/
   // style/line-height stay — they vary per message and have no offline-face issue.)
   "color", "font-size", "font-style", "font-weight", "line-height",
@@ -176,7 +177,8 @@ const FE_ARCHIVE_TREE_MAX_SIMPLE = 72;
 // happened to compute at its narrow (~300px) width. Mirroring copies the live
 // computed flex/grid/justify/align/display onto the clone with `!important`,
 // which overrides the export's portrait grid and traps the timestamp inside a
-// sidebar-width slice (the "타임스탬프가 사이드바 폭에 갇힘" bug). After mirroring
+// sidebar-width slice (the "타임스탬프가 사이드바 폭에 갇힘" = timestamp stuck in the
+// sidebar width bug). After mirroring
 // we therefore STRIP these layout-geometry inline props from the header region so
 // the export CSS (and feNormalizeArchiveMessageLayout) governs the header layout.
 // Visual props (color, background, border, font, text, opacity, filter) are kept.
@@ -317,7 +319,8 @@ function feCopyComputedCustomProperties(srcEl, dstEl) {
       // and copying that inline with !important shadows the embedded routing for
       // the whole message subtree. In a standalone file:// HTML the live faces
       // 404, so text falls to the next candidate — for --fe-font-secondary that
-      // is "FE CookieRun", so the mixed "쿠키런 + 그림일기" preset silently painted
+      // is "FE CookieRun", so the mixed "쿠키런 + 그림일기" (CookieRun + Geurimilgi) preset
+      // silently painted
       // its Geurimilgi text (card descriptions / metadata) in CookieRun. All
       // `font`-named vars are global routing/weight values (never per-message
       // dynamic), so excluding them loses nothing. This is the same

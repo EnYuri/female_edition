@@ -1,7 +1,7 @@
 import { feNormalizeChatMessageId, feExtractHTMLElement, feCreateElementFromHTML } from "./fe-util.js";
 
 const feInlineRollSnapshots = new Map(); // messageId → { anchors: string[] }
-const FE_INLINE_ROLL_SNAPSHOT_MAX = 400; // 세션 내 최대 보관 메시지 수
+const FE_INLINE_ROLL_SNAPSHOT_MAX = 400; // max messages kept per session
 
 // Messages currently being frozen by feFreezeInlineRollsIntoContent.
 // While a message is in this set, updateChatMessage must NOT clear its snapshot —

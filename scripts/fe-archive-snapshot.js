@@ -64,7 +64,8 @@ const FE_EXPORT_STYLESHEET_TOTAL_BYTES = 10_000_000;
 // the largest CDN face we can select (Mona12-Bold.woff2, 1_304_316B). Keep at parity
 // with MAX_PER_FILE_BYTES_COOKIE in feBuildEmbeddedCookieRunFontCSS. Do NOT raise past
 // ~1.4MB to catch Geurimilgi (6.3MB TTF) — base64 expansion is an OOM risk there, and
-// the "커스텀 폰트 임베드" setting already routes it through a separate 7MB allowance.
+// the "커스텀 폰트 임베드" (embed custom fonts) setting already routes it through a separate
+// 7MB allowance.
 //
 // The tight image cap is deliberate: chat-relevant art (small SVGs, badge webps) fits,
 // while decorative sheet banners never visible in a message fall out for free.

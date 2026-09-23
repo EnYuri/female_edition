@@ -447,7 +447,8 @@ export function feSerializeBodyToParts(body) {
 // `window.print()` well above CSS pixels, and a reader may zoom or open the file on a
 // HiDPI screen. Anything at 1x (which is what the live `src` data URL is on a dpr-1
 // machine) is visibly blocky in all three cases — that is exactly the "터무니없이 낮은
-// 해상도" report. A 256px pre-cropped PNG costs ~60-100 KB and dedups across every
+// 해상도" (absurdly low resolution) report. A 256px pre-cropped PNG costs ~60-100 KB and
+// dedups across every
 // message from the same actor, so the whole log usually adds well under 1 MB.
 // The 4x multiplier IS the print budget: 300 DPI over CSS's 96 DPI reference is
 // 3.125 device px per CSS px, so 4x covers 300 DPI with headroom at every portrait
@@ -520,7 +521,8 @@ export async function feUpgradePortraitsForExport(
     // FIXED total is the wrong shape here: a log with many distinct speakers on a remote
     // Foundry host spends its whole budget on healthy-but-slow fetches and then silently
     // degrades the entire tail — and the tail is where the one-off NPCs live, which is
-    // the second half of the "NPC만 저해상도" report. What the budget must actually bound
+    // the second half of the "NPC만 저해상도" (only NPC portraits low-res) report. What the
+    // budget must actually bound
     // is a batch of DEAD paths, and those make no progress by definition. The hard
     // ceiling below still bounds the pathological case where the two interleave.
     let deadline = performance.now() + FE_EXPORT_PORTRAIT_BUDGET_MS;
@@ -563,7 +565,8 @@ export async function feUpgradePortraitsForExport(
         // `cssBox × avatarDpr` ≈ 96px on the print path, and `keepSelfContainedSrc`
         // keeping the 64px live screen bitmap on the saved-HTML path). That asymmetry —
         // large portrait art upgraded to 256px, small/default art capped at 64-96px —
-        // is the reported "PC는 선명한데 NPC 포트레이트만 저해상도".
+        // is the reported "PC는 선명한데 NPC 포트레이트만 저해상도" (PCs sharp, only NPC
+        // portraits low-res).
         if (!info.keepOriginal) return;
         const prevSrc = img.getAttribute("src");
         const prevSrcset = img.getAttribute("srcset");

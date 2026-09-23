@@ -55,7 +55,7 @@ const _fet = {
   inserts: new Map(),
   /** Map<theatreId, insertObj> — receive-only render targets for other users' stage chat */
   displayInserts: new Map(),
-  /** local client: theatreId being spoken as, null for "자신으로 말하기", _FET_NONE for "없음" */
+  /** local client: theatreId being spoken as, null for "자신으로 말하기" (speak as self), _FET_NONE for "없음" (none) */
   speakingAs: _FET_NONE,
   /** ChatMessage id currently selected by cross-speaker history recall, or null for live mode. */
   recallMessageId: null,
@@ -657,7 +657,7 @@ export function fetAddToStage(actorOrId) {
   _fetInjectInsert(theatreId, actor.id, name, src, emotes, false);
   // Adding an actor is an explicit local action, so make that actor the active
   // stage speaker immediately. Session restore uses the internal inject/promote
-  // helpers directly and therefore still starts in the deliberate "없음" mode.
+  // helpers directly and therefore still starts in the deliberate "없음" (none) mode.
   _fetSetSpeakingAs(theatreId);
 }
 
@@ -977,9 +977,9 @@ function _fetPlainTextFromContent(content) {
     .body.textContent ?? "").trim();
 }
 
-// 말풍선에 남길 서식 태그. 속성은 하나도 복사하지 않으므로(`onerror`/`href` 포함)
-// 마크다운 결과 HTML을 그대로 붙여도 스크립트가 실행될 수 없다. 허용 목록에 없는
-// 요소는 껍데기만 벗기고 자식 텍스트는 살린다.
+// Formatting tags kept in the speech bubble. No attributes are copied at all (including
+// `onerror`/`href`), so pasting markdown-result HTML verbatim cannot execute scripts.
+// Elements off the allowlist are unwrapped while their child text survives.
 const _FET_MD_TAGS = new Set([
   "P", "BR", "HR", "STRONG", "B", "EM", "I", "S", "DEL", "U", "CODE", "PRE",
   "BLOCKQUOTE", "UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "SPAN",
@@ -988,9 +988,9 @@ const _FET_MD_TAGS = new Set([
 const _FET_MD_FORMAT_SELECTOR =
   "strong, b, em, i, s, del, u, code, pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6, hr, br, p + p";
 
-// 채팅과 동일한 마크다운 결과(fe-markdown.js가 preCreateChatMessage에서 만들어 둔 HTML)를
-// 말풍선에서도 보여주기 위한 안전 파서. DOMParser는 브라우징 컨텍스트가 없어 리소스를
-// 불러오지 않고, 여기서 다시 요소를 새로 만들며 속성을 전부 버린다.
+// Safe parser that shows the same markdown result in the bubble as in chat (the HTML
+// fe-markdown.js built in preCreateChatMessage). DOMParser has no browsing context so it
+// loads no resources, and every element is rebuilt here with all attributes dropped.
 function _fetBuildFormattedFragment(content) {
   const doc = new DOMParser().parseFromString(String(content ?? ""), "text/html");
   const frag = document.createDocumentFragment();
@@ -1042,7 +1042,7 @@ function _fetTryRenderRichContent(insert, messageId) {
   insert.cancelTypewriter?.();
   insert.contentEl.textContent = "";
   insert.contentEl.classList.add("fe-stage-textbox-content--rich");
-  // 미디어가 섞인 메시지도 본문의 마크다운 서식은 동일하게 보여야 한다.
+  // Messages mixing media must still show the body text's markdown formatting unchanged.
   if (_fetFragmentHasFormatting(clone)) {
     insert.contentEl.classList.add("fe-stage-textbox-content--md");
   }
@@ -1073,7 +1073,7 @@ function _fetRecallTargetForMessage(message) {
   const actorId = message?.speaker?.actor;
   if (actorId) {
     const theatreId = _FET_ID_PREFIX + actorId;
-    // A normal message sent while the stage selector is "없음" has no stageId,
+    // A normal message sent while the stage selector is "없음" (none) has no stageId,
     // but it is still an actor's utterance. Include it in the history and let
     // _fetEnsureMessageDisplayInsert create a receive-only display insert when
     // it is recalled. This never adds the actor to the user's dropdown or
@@ -1201,8 +1201,8 @@ function _fetShowText(theatreId, text, userColor, opts = {}) {
 
   const renderedRich = opts.messageId ? _fetTryRenderRichContent(insert, opts.messageId) : false;
   if (!renderedRich) {
-    // 채팅에 적용된 마크다운 결과 HTML을 말풍선에서도 동일하게 보여준다. 마크다운이
-    // 꺼져 있거나 평문이면 텍스트 노드 하나짜리 프래그먼트가 되어 예전과 같다.
+    // Show the same markdown-result HTML applied to chat in the bubble too. With markdown
+    // off or plain text, the fragment is a single text node and behaves as before.
     const frag = _fetBuildFormattedFragment(opts.content ?? text);
     if (_fetFragmentHasFormatting(frag)) {
       insert.contentEl.classList.add("fe-stage-textbox-content--md");
@@ -1262,9 +1262,9 @@ function _fetEnsureMessageDisplayInsert(chatMessage, theatreId) {
   return _fetInjectDisplayInsert(theatreId, actorId, name, src, emotes);
 }
 
-// 서식이 붙은 DOM을 그대로 심어 둔 뒤, 텍스트 노드를 순서대로 비웠다가 한 글자씩
-// 되돌려 채우는 타자기. 문자열을 이어 붙이는 방식이면 <strong> 같은 태그가 매 프레임
-// 다시 파싱되므로, 노드를 유지한 채 nodeValue만 늘린다.
+// Typewriter that inserts the formatted DOM once, then empties each text node in order
+// and refills it character by character. String concatenation would re-parse tags like
+// <strong> every frame, so the nodes stay and only their nodeValue grows.
 function _fetTypewriter(el, frag) {
   el.appendChild(frag);
 
@@ -1303,7 +1303,7 @@ function _fetTypewriter(el, frag) {
 Hooks.on("chatMessage", (_log, _message, chatData) => {
   if (!_fetEnabled) return;
 
-  // "없음" mode: theatre does not modify the message, but GM needs IC-mode bypass.
+  // "없음" (none) mode: theatre does not modify the message, but GM needs IC-mode bypass.
   // v14 PaC validates speaker.actor in #processChatCommand before preCreateChatMessage.
   // GMs without a canvas token selected have no actor → force OOC to bypass validation.
   if (_fet.speakingAs === _FET_NONE) {
@@ -1321,7 +1321,7 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
   }
 
   if (!_fet.speakingAs) {
-    // "자신으로 말하기": Foundry v14 PaC (ic mode) validates speaker.actor in
+    // "자신으로 말하기" (speak as self): Foundry v14 PaC (ic mode) validates speaker.actor in
     // #processChatCommand before preCreateChatMessage fires. Pre-seed the character
     // actor here so the ic-mode check passes when the player has an assigned character.
     if (_fetNavEl && !game.user.isGM) {
@@ -1336,7 +1336,7 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
         } catch { /* messageMode not registered on v13 — no-op */ }
       }
     } else if (game.user.isGM && _fetNavEl) {
-      // GM "자신으로 말하기": no character assigned → force OOC to bypass IC validation.
+      // GM "자신으로 말하기" (speak as self): no character assigned → force OOC to bypass IC validation.
       try {
         if (game.settings.get("core", "messageMode") === "ic") {
           if (!chatData.speaker?.actor && !chatData.speaker?.token) {
@@ -1359,7 +1359,8 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
 // A message the user did NOT type as plain chat — an item/attack card, initiative,
 // or any system/other-module generated message. Such messages carry either their
 // own system/module flags (anything outside core/female_edition) or chat-card HTML
-// in their content. When "시스템 메시지 제외" is on we leave these at their original
+// in their content. When "시스템 메시지 제외" (exclude system messages) is on we leave these at
+// their original
 // speaker instead of overriding them into the active stage actor's speech.
 function _fetIsSystemMessage(chatMessage, data) {
   const flags = data?.flags ?? chatMessage.flags ?? {};
@@ -1393,14 +1394,14 @@ Hooks.on("preCreateChatMessage", (chatMessage, data, _options, userId) => {
 
   const theatreId = _fet.speakingAs;
 
-  // "없음" mode: no theatre overrides — let Foundry resolve speaker naturally
+  // "없음" (none) mode: no theatre overrides — let Foundry resolve speaker naturally
   if (theatreId === _FET_NONE) return;
 
   const insert = theatreId ? _fet.inserts.get(theatreId) : null;
 
   if (!insert) {
     if (_fetNavEl) {
-      // "자신으로 말하기" is deliberately a user speaker, never the selected
+      // "자신으로 말하기" (speak as self) is deliberately a user speaker, never the selected
       // canvas token. In IC mode the chatMessage hook may temporarily seed an
       // actor solely for Foundry's pre-create validation; that validation has
       // already completed by this hook. Finish as an explicit OOC message so
@@ -1509,7 +1510,7 @@ async function _fetOpenActorConfig(actorId) {
   // consumes it is `wait()` (api/dialog.mjs:420), which wires it as
   // `dialog.addEventListener("render", …)`. Passed to the constructor it is simply an
   // unknown option: silently ignored, no warning. Every listener below — file picker,
-  // 감정 제거, 감정 추가 — was therefore dead, so the whole dialog was read-only apart
+  // remove-emote, add-emote — was therefore dead, so the whole dialog was read-only apart
   // from typing into the rows that already existed.
   const { DialogV2 } = foundry.applications.api;
   await DialogV2.wait({
@@ -1760,13 +1761,13 @@ function _fetGetActorSheetActor(app) {
 // ApplicationV2 sheets already ship their own header-controls dropdown (the
 // "⋯" button, `data-action="toggleControls"` — core
 // application.mjs `_getHeaderControls()` / `_headerControlButtons()`). Rather
-// than building a bespoke dropdown, "무대 설정" is pushed straight into THAT
+// than building a bespoke dropdown, "무대 설정" (stage settings) is pushed straight into THAT
 // menu via the `getHeaderControls{ClassName}` hook chain, which always
 // includes the base class name too ("getHeaderControlsApplicationV2" —
 // `Application#_callHooks` walks `inheritanceChain()` and fires one hook per
 // class, ApplicationV2 last), so this single registration covers every AppV2
 // actor sheet regardless of system. v1 sheets (classic FormApplication, e.g.
-// DX3rd) have no such menu at all — those keep "무대 설정" as a plain header
+// DX3rd) have no such menu at all — those keep "무대 설정" (stage settings) as a plain header
 // button (see the windowHeader fallback branch in _fetInjectSheetButtons).
 function _fetOnGetHeaderControls(app, controls) {
   if (!_fetEnabled) return;
@@ -1834,7 +1835,7 @@ function _fetInjectSheetButtons(app, el) {
     // buttons are already in the container — our injected controls sort last
     // (lower priority than the existing header menu), not first.
     // Final order (left → right): [core buttons] [add/switch] [remove].
-    // "무대 설정" (owners only) lives in the sheet's own native "⋯" controls dropdown
+    // "무대 설정" (stage settings; owners only) lives in the sheet's own native "⋯" controls dropdown
     // instead — see _fetOnGetHeaderControls above.
     if (onStage) {
       headerBtns.append(mkBtn("fet-stage-switch", "fa-comment-dots", feLocalize("FE.Common.SwitchSpeaker"),
@@ -1854,7 +1855,7 @@ function _fetInjectSheetButtons(app, el) {
     // This branch also catches AppV2 sheets that simply lack the dnd5e-style
     // .header-buttons container — those DO have the native "⋯" dropdown (it's
     // part of every ApplicationV2 frame, see application.mjs _renderFrame),
-    // so "무대 설정" must NOT be added here too or it would duplicate the
+    // so "무대 설정" (stage settings) must NOT be added here too or it would duplicate the
     // _fetOnGetHeaderControls entry. Only genuine v1 sheets (no
     // [data-action="toggleControls"] at all) get the plain fallback button.
     const closeBtn = windowHeader.querySelector('[data-action="close"], .header-control.close-window, .header-button.close');

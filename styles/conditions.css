@@ -1,4 +1,4 @@
-/* Effects 탭이 class로 구분될 때 대비 */
+/* In case the Effects tab ever becomes class-distinguished */
 .tidy5e-sheet .effects [data-condition-id="condfemalemating"],
 .tidy5e-sheet .effects-tab [data-condition-id="condfemalemating"] {
   display: none !important;

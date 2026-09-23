@@ -19,7 +19,7 @@
   width: var(--fet-box-width);
   height: var(--fet-box-height);
   pointer-events: none;
-  z-index: 70;   /* 캔버스·컨트롤(~60) 위, Foundry 창 UI(100+) 아래 */
+  z-index: 70;   /* Above canvas/controls (~60), below Foundry window UI (100+) */
   overflow: visible;
 }
 
@@ -202,15 +202,16 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
 
 .fe-stage-textbox-content {
   flex: 1;
-  min-height: 0;            /* flex 자식이 줄어들 수 있어야 overflow 스크롤이 작동 */
+  min-height: 0;            /* Flex children must be allowed to shrink for overflow scrolling to work */
   overflow-y: auto;
   word-break: break-word;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.12) transparent;
 }
 
-/* 임베드 이미지/표가 올라온 메시지를 회상하거나 라이브로 받았을 때 — 가로 넘침
-   방지 + 세로는 본문 영역(고정 높이) 안에서 스크롤. */
+/* When a message containing an embedded image/table is recalled or received
+   live — prevent horizontal overflow; vertical scrolls inside the fixed-height
+   body area. */
 .fe-stage-textbox-content--rich :is(img, video, picture) {
   max-width: 100%;
   height: auto;
@@ -223,9 +224,9 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
 .fe-stage-textbox-content--rich p:first-child { margin-top: 0; }
 .fe-stage-textbox-content--rich p:last-child  { margin-bottom: 0; }
 
-/* ── 말풍선 마크다운 서식 (채팅창과 동일한 문법) ─────────────────
-   fe-markdown.js가 만든 결과 HTML을 그대로 재현한다. 말풍선은 높이가 고정된
-   좁은 영역이라 여백/글자 크기만 채팅보다 촘촘하게 조인다. */
+/* ── Speech-bubble markdown styling (same syntax as the chat log) ────
+   Reproduces the HTML fe-markdown.js produces. A bubble is a narrow
+   fixed-height area, so margins/font sizes are tighter than chat's. */
 
 .fe-stage-textbox-content--md p {
   margin: 0 0 0.45em;
@@ -251,8 +252,9 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
 
 .fe-stage-textbox-content--md :is(strong, b) { font-weight: 700; }
 
-/* font-synthesis: 이탤릭 자형이 없는 폰트(한글 웹폰트 대부분)에서도 기울임이
-   실제로 보이도록 브라우저 합성을 허용한다. ui-font.css의 채팅 규칙과 같은 이유. */
+/* font-synthesis: allow browser-synthesized oblique so italics actually show
+   in fonts without an italic glyph (most Korean webfonts). Same rationale as
+   ui-font.css's chat rule. */
 .fe-stage-textbox-content--md :is(em, i) {
   font-style: italic;
   font-synthesis: style;
@@ -299,7 +301,7 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
   border-top: 1px solid rgba(255, 255, 255, 0.25);
 }
 
-/* ── 말풍선 우상단 버튼 툴바: [이전 발화 <] [닫기 ✕] ───────────── */
+/* ── Bubble top-right button toolbar: [previous utterance <] [close ✕] ── */
 
 .fe-stage-textbox-tools {
   position: absolute;
@@ -333,8 +335,9 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-/* 호버 강조 — 테마 불문 백색 글로우. box-shadow 는 retro(fe-dx3rd-compat)에서
-   전역 제거되므로 filter: drop-shadow 로 글로우를 줘 픽셀 테마에서도 살아남는다. */
+/* Hover highlight — white glow regardless of theme. box-shadow is globally
+   removed in retro (fe-dx3rd-compat), so the glow uses filter: drop-shadow
+   to survive the pixel theme. */
 .fe-stage-textbox-btn:hover,
 .fe-stage-textbox-close:hover {
   color: #fff;
@@ -344,9 +347,10 @@ body:not(.fe-retro-theme) .fe-stage-dock--plain-name .fe-stage-textbox-name {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   픽셀(레트로) 테마 — 기본 일반 말풍선을 픽셀 톤으로 전환.
-   실제 9-slice 외곽선은 fe-dx3rd-compat.css 의 body.fe-retro-theme 블록이
-   담당하므로, 여기서는 테마별 기본 표시 상태만 전환한다.
+   Pixel (retro) theme — switch the default plain bubble to pixel tone.
+   The real 9-slice outline is owned by the body.fe-retro-theme block in
+   fe-dx3rd-compat.css; this file only toggles the per-theme default
+   display state.
    ═══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme .fe-stage-textbox {
@@ -369,12 +373,14 @@ body.fe-retro-theme .fe-stage-label {
   display: none;
 }
 
-/* ── 무대 말풍선 글꼴 — 이름·본문 모두 큰 글자(primary, 쿠키런) ──────
-   커스텀 폰트가 켜져 있을 때만 적용. primary 변수는 글꼴 모드(쿠키런/
-   그림일기/NeoDGM/유저폰트)별로 ui-font.css 에서 remap 되므로 모든 모드에서
-   자동으로 맞는다. 이전에는 font-family 미지정으로 body 의 --fe-ui-font-family
-   (=UI 글꼴 토글값)만 상속받아, '쿠키런+그림일기'에서도 이름이 쿠키런이
-   아니었다. */
+/* ── Stage bubble fonts — name and body both use the large (primary,
+   CookieRun) face ──────
+   Applies only while custom fonts are enabled. The primary variable is
+   remapped per font mode (CookieRun / Geurimilgi / NeoDGM / user font) in
+   ui-font.css, so it fits every mode automatically. Previously font-family
+   was unspecified, so the bubbles only inherited body's --fe-ui-font-family
+   (the UI-font toggle value) — under 'CookieRun + Geurimilgi' the name was
+   NOT CookieRun. */
 body.fe-fonts-enabled .fe-stage-textbox-name,
 body.fe-fonts-enabled .fe-stage-label,
 body.fe-fonts-enabled .fe-stage-textbox-content {

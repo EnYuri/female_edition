@@ -145,6 +145,7 @@ class FeMarkerGlowFilter extends PIXI.Filter {
 
 // A LIGHTWEIGHT silhouette outline — a crisp edge line tracing the token image's own
 // shape (NOT the soft, multi-sample gradient glow). Used for the Alt "오브젝트 강조"
+// (highlight objects)
 // highlight, which lights up EVERY visible token at once: the glow shader (16 angles ×
 // 22 distance = ~350 samples/px) would be far too heavy across a whole scene, so this
 // samples only a few px out (THICK) over 16 angles -> a thin, hard-edged ring at a
@@ -319,7 +320,8 @@ function feTgUiScale() {
 }
 
 // Glow on real selection (controlled) and on the token under the cursor when the hover
-// setting is on. The native "오브젝트 강조" / Alt key (`layer.highlightObjects`) lights up
+// setting is on. The native "오브젝트 강조" (highlight objects) / Alt key
+// (`layer.highlightObjects`) lights up
 // EVERY visible token: we replace core's square/circle selector with a lightweight
 // silhouette OUTLINE (feTgGetOutlineFilter) — crisp, cheap, tracks the token image shape.
 function feTgShouldGlow(token) {

@@ -71,7 +71,7 @@ const S = {
   EDIT_ENABLED: "ceEditEnabled",
   GM_PRIORITY_ENABLED: "ceGmPriorityEnabled",
   GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf",
-  // Forces Foundry's OWN client-scope settings (the 환경 설정 panel) from the GM
+  // Forces Foundry's OWN client-scope settings (the 환경 설정 / client settings panel) from the GM
   // onto every player. Separate from GM_PRIORITY_ENABLED and default OFF: that
   // one only redirects reads of THIS module's settings, while this one
   // write-through overwrites core values in each player's localStorage.
@@ -1384,7 +1384,7 @@ const FE_SETTING_DEFINITIONS = {
     config: false,
     type: Boolean,
   },
-  // 동적 배틀 포트레이트 — MOTHER-style status box over the lower 2/5 of a
+  // 동적 배틀 포트레이트 (dynamic battle portrait) — MOTHER-style status box over the lower 2/5 of a
   // vertical portrait. No reload key: feCtRender rebuilds the strip wholesale.
   "ceCombatTrackerDynamicPortrait": {
     name: "FECT.Settings.DynamicPortraitName",

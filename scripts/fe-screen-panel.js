@@ -659,7 +659,7 @@ function applyPanelTileVisibility(tile) {
     // No actor → not ours any more (feResolvePanelPlacementActor). MUST bail BEFORE the
     // `disabled` branch: the per-user gate below hides the placeable from everyone who
     // is not an OBSERVER of the panel, and "no actor" fails that test for EVERY user
-    // including the GM. A ghost that happened to be left in "표시 끔" would have been
+    // including the GM. A ghost that happened to be left in "표시 끔" (hidden) would have been
     // invisible to the whole world, permanently and with no UI to reveal it — the one
     // state where it really would have been unreachable. This subtracts nothing now, so
     // core's own visibility (recomputed first, see onPanelPlaceableUpdate) stands.
@@ -1277,7 +1277,8 @@ async function feOpenBarValueEditor(linkedActor, attr, currentValue) {
 async function feScreenPanelPlaceOnScene(actor, center = {}) {
   // The last of the three placement entry points to be gated (the directory entry and the
   // canvas drop guard are gated at their hooks). This one is also the sheet footer's
-  // "씬에 올리기" button, reached through globalThis — and the sheet keeps opening with
+  // "씬에 올리기" (place on scene) button, reached through globalThis — and the sheet keeps
+  // opening with
   // the feature off, so the check has to live in the function, not only at its callers.
   if (!isPanelFeatureEnabled()) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.FeatureOff")); return; }
   if (!canvas?.scene) { ui.notifications?.warn(game.i18n.localize("FESP.Menu.NoScene")); return; }
@@ -1909,7 +1910,8 @@ Hooks.on("deleteTile", (doc) => {
  * 2. **Force a state refresh when our own panel FLAG changed (MUST keep).** Core assigns
  *    render flags strictly from the document's own fields — `tile.mjs` / `token.mjs`
  *    `_onUpdate` list `hidden`/`sort`/`locked`/`x`/`y`/`texture`/… and nothing else — so
- *    a **flags-only** update ("표시 전환" `disabled`, "위치 고정" `locked`, or a face flip
+ *    a **flags-only** update (the "표시 전환" show/hide `disabled` toggle, the "위치 고정"
+ *    position-lock `locked`, or a face flip
  *    between two faces that share an image) sets NO flags at all. `RenderFlags#set` then
  *    adds the object to `pendingRenderFlags` with an empty set, and
  *    `PlaceableObject#applyRenderFlags` early-returns on `!this.renderFlags.size` — so
@@ -2157,11 +2159,13 @@ function feResolvePanelPlacementActor(doc) {
 
 /**
  * WHICH lock pins this placement's position: `"placement"` (`flag.locked`, the canvas
- * right-click menu), `"panel"` (`actor.system.locked`, the sheet's 위치 고정), or null.
+ * right-click menu), `"panel"` (`actor.system.locked`, the sheet's 위치 고정 = position-lock
+ * checkbox), or null.
  *
  * The source matters, not just the boolean, because only ONE of the two can be released
  * from the canvas menu. Collapsing them into a bare `true` produced two lies at once: a
- * warning telling the user to "우클릭 메뉴에서 고정을 해제하세요" for a lock the menu
+ * warning telling the user to "우클릭 메뉴에서 고정을 해제하세요" (release the lock from the
+ * right-click menu) for a lock the menu
  * cannot touch, and a menu row offering a per-placement toggle that visibly did nothing
  * while the panel-level lock stood behind it.
  *
@@ -2248,7 +2252,8 @@ Hooks.on("dropCanvasData", fePanelGated((_canvas, data) => {
   return false;
 }));
 
-// Add panel entries to the Actor directory context menu. Gated: "토큰화" / "씬에 올리기" are
+// Add panel entries to the Actor directory context menu. Gated: "토큰화" (tokenize) /
+// "씬에 올리기" (place on scene) are
 // placement operations, and nothing may be placed while the feature is off.
 Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
   const actorOf = (li) => {
@@ -2290,7 +2295,7 @@ Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
     }),
   ];
 
-  // Sit directly under core's "편집" (SIDEBAR.Edit) — the slot fe-theatre.js uses for its
+  // Sit directly under core's "편집" (edit, SIDEBAR.Edit) — the slot fe-theatre.js uses for its
   // own stage entries, which are excluded for panels (a panel is a display board, not a
   // character). v14 core labels the entry with the un-localized key, v13 and some modules
   // use `name` already localized, so match both. Fall back to the top when not found.
@@ -2301,7 +2306,8 @@ Hooks.on("getActorContextOptions", fePanelGated((directory, options) => {
 }));
 
 /**
- * Scenes sidebar → right-click → "원본 없는 패널 배치 정리".
+ * Scenes sidebar → right-click → "원본 없는 패널 배치 정리" (clean up orphan panel
+ * placements).
  *
  * SELF-REVEALING: the entry is only present when that scene actually has ghosts, so it
  * doubles as the notification that they exist. That is the whole job the automatic sweep

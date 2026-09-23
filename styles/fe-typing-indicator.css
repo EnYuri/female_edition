@@ -1,5 +1,5 @@
 /* fe-typing-indicator.css
- * "…님이 입력 중" typing indicator shown above the chat input.
+ * "…님이 입력 중" ("…is typing") indicator shown above the chat input.
  * Lives in the chat input area (next to #chat-message), never inside .chat-log,
  * so it does not affect fe-chat-prune DOM pruning.
  */

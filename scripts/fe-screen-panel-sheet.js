@@ -20,7 +20,7 @@ const FE_PREVIEW_ZOOM_MAX = 20;
 // Floor for a dragged text box, in face-image pixels. Small enough not to get in the
 // way, large enough that a box can always be grabbed again — a zero-size frame has no
 // grips left to pull. "No box at all" (0 = auto / no wrap) is a separate state and is
-// reached by typing 0 in the "설정" dialog, not by collapsing the frame.
+// reached by typing 0 in the "설정" (settings) dialog, not by collapsing the frame.
 const FE_OVERLAY_BOX_MIN_PX = 16;
 
 /** Natural image dimensions, or null when the selected path cannot be decoded. */
@@ -1683,7 +1683,8 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
      * every field here carries a different attribute set, and the differences are
      * load-bearing. `barMin`/`barMax` accept negatives so they must have NO `min`;
      * `fontSize` floors at 4, `barHeight` at 1, the rest at 0; four fields carry a
-     * "0 = 자동" placeholder that is the only place that rule is stated in the UI. A
+     * "0 = 자동" (0 = auto) placeholder that is the only place that rule is stated in the UI.
+     * A
      * builder that generated the `<input>` too would have to pick defaults for those,
      * and a default `min="0"` alone would silently stop the browser from accepting a
      * negative `barMin`. Worse, this markup is bound to the ok callback purely by the
@@ -1762,11 +1763,13 @@ class ScreenPanelSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     await foundry.applications.api.DialogV2.prompt({
       window: { title: game.i18n.format("FESP.Sheet.OverlayEditTitle", { n: oi + 1 }) },
       // Scoping class for the height cap in fe-screen-panel.css — see the CSS comment:
-      // without it the fully-expanded bar block pushes the "적용" footer past the window
+      // without it the fully-expanded bar block pushes the "적용" (apply) footer past the
+      // window
       // bottom and .window-content's `overflow: hidden` clips it away entirely.
       classes: ["fe-sp-overlay-edit-dialog"],
       content,
-      // The bar's eight fields are dead weight while "값 바 표시" is off — and they were the
+      // The bar's eight fields are dead weight while "값 바 표시" (show value bar) is off —
+      // and they were the
       // bulk of the height that made the footer unreachable. They stay IN the form (hidden,
       // not removed) so the ok callback's `form.elements.bar*` reads keep working unchanged.
       render: (_event, dialog) => {

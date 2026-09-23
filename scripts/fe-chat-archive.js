@@ -533,7 +533,8 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     // (feEnsureArchiveEmbeddedFonts + feWaitForFonts before win.print()); this inline
     // fallback went straight from the image wait to print, so Chromium could capture the
     // page while a webface was still loading and rasterize the fallback font into the
-    // PDF — the "PDF에 폰트가 임베드되지 않는다" symptom, even though the same document
+    // PDF — the "PDF에 폰트가 임베드되지 않는다" (fonts not embedded in the PDF) symptom,
+    // even though the same document
     // looked correct on screen a moment later.
     //
     // No font CSS is injected here, unlike the popup: this IS the live Foundry document,
@@ -675,7 +676,8 @@ async function feRenderChatArchiveWindow(win, {
 } = {}) {
   if (!win || win.closed) throw new Error("Archive window is not available.");
 
-  // Treat the chat-bg-stripper's "채팅 카드 텍스쳐 제거" setting as an implicit
+  // Treat the chat-bg-stripper's "채팅 카드 텍스쳐 제거" (remove chat-card texture) setting as
+  // an implicit
   // export optimization request. Users expect the archive/saved HTML to match the
   // live chat appearance.
   const stripTexturesSetting = (() => {
@@ -954,7 +956,8 @@ async function feRenderChatArchiveWindow(win, {
     // module stylesheets. The popup is an about:blank document whose <style>@import
     // "modules/…/ui-font.css"> resolves through <base href> unreliably; when it loses
     // the race, feWaitForFonts finds no registered @font-face and print captures with
-    // NO custom font ("PDF 폰트 미적용" bug). The embedded CSS carries the same faces as
+    // NO custom font ("PDF 폰트 미적용" = font not applied in PDF bug). The embedded CSS
+    // carries the same faces as
     // data: URLs (no network, no @import) and correctly routes BOTH the CookieRun and
     // Geurimilgi vars, so the mixed preset renders in full. Done at render time (not at
     // print) so fonts settle well before win.print() — avoids a mid-reflow capture.

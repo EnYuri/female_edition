@@ -202,11 +202,13 @@
 }
 
 #fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-active {
-  /* 현재 턴 강조 — 기본 크기보다 10% 크게. 확대분과 글로우가 스트립 밖으로
-     나가는 것은 .fe-ct-combatants 의 --fe-ct-spill(패딩/음수 마진/translate 세 짝)
-     으로 처리한다 — 세로 패딩을 키우면 트래커 박스 자체가 두꺼워진다.
-     transform 은 여기서 다시 선언하지 않는다: 위 규칙의 합성 transform 이 이
-     --fe-ct-zoom 을 읽으므로, 다시 쓰면 흔들림 키프레임과 두 벌로 갈라진다. */
+  /* Current-turn emphasis — 10% larger than the base size. The extra size and
+     glow spilling outside the strip are handled by .fe-ct-combatants's
+     --fe-ct-spill (the padding/negative-margin/translate trio) — growing the
+     vertical padding would thicken the tracker box itself.
+     transform is NOT redeclared here: the rule above composes a transform
+     that already reads this --fe-ct-zoom, so re-writing it would split it
+     into two copies fighting the shake keyframes. */
   --fe-ct-zoom: 1.1;
   /* (1.1 - 1) / (2 * 1.1) = +4.545% — keep in step with --fe-ct-zoom above.
      POSITIVE on purpose: mirrored twice (the card's own flip, then the strip's),
@@ -218,14 +220,17 @@
   border-color: var(--fe-dx3rd-accent, #ffd54a);
 }
 
-/* 현재 턴 글로우는 프레임(=액터 이미지)이 아니라 그 "바깥 아웃라인 링"에만 건다.
-   .fe-ct-frame 에 filter 를 걸면 drop-shadow 가 이미지 실루엣 전체를 감싸 그림
-   전체가 빛나 보였다. 대신 프레임보다 3px 큰 테두리 전용 pseudo-element 를 겹치고
-   거기에만 drop-shadow 를 먹인다 → 빛이 윤곽선에 몰린다.
-   box-shadow 가 아니라 filter 인 이유는 그대로다: fe-dx3rd-compat.css(layouts 레이어)의
-   전역 box-shadow:none !important 는 modules 레이어의 !important 로도 못 이긴다.
-   프레임은 overflow:hidden 이라(이미지를 둥근 박스에 맞춰 자름) 링을 그 안에 둘 수
-   없고, 그래서 .fe-ct-portrait 쪽 pseudo 를 쓴다. */
+/* The current-turn glow lands only on the frame's outer outline ring, not on
+   the frame (= the actor image) itself. Putting a filter on .fe-ct-frame wraps
+   the drop-shadow around the image's whole silhouette, making the entire
+   picture glow. Instead a dedicated pseudo-element 3px larger than the frame
+   is overlaid and only IT gets the drop-shadow → the light concentrates on
+   the contour.
+   filter over box-shadow for the same reason as before: fe-dx3rd-compat.css
+   (layouts layer) has a global box-shadow:none !important that a modules-layer
+   !important cannot beat.
+   The frame is overflow:hidden (it crops the image to the rounded box), so
+   the ring cannot live inside it — hence the .fe-ct-portrait pseudo. */
 .fe-ct-portrait.is-active::after {
   content: "";
   position: absolute;
@@ -236,15 +241,17 @@
   border: 2px solid var(--fe-dx3rd-accent, #ffd54a);
   border-radius: calc(var(--fe-ct-round, 6px) + 3px);
   pointer-events: none;
-  /* 이니셔티브 배지(z-index:5)/HP 바보다 아래 — 링은 얇은 윤곽선일 뿐이다 */
+  /* Below the initiative badge (z-index:5) and the HP bar — the ring is only a
+   thin outline */
   z-index: 4;
   animation: fe-ct-active-glow 0.7s ease-in-out infinite;
 }
 
 @keyframes fe-ct-active-glow {
-  /* 두 키프레임의 filter 함수 목록 길이/순서는 반드시 같아야 한다 — 다르면 CSS가
-     보간을 discrete 로 떨어뜨려 부드러운 명멸 대신 툭툭 끊기는 전환이 된다.
-     주기 0.7s = 0.35초 밝아지고 0.35초 어두워지는 명멸. */
+  /* Both keyframes must list the same filter functions in the same order and
+     count — otherwise CSS drops interpolation to discrete and the smooth
+     pulse becomes a stepped flicker.
+     Period 0.7s = 0.35s brightening + 0.35s dimming. */
   0%, 100% {
     filter: drop-shadow(0 0 7px var(--fe-dx3rd-accent, #ffd54a))
             drop-shadow(0 0 4px var(--fe-dx3rd-accent, #ffd54a))
@@ -252,8 +259,9 @@
     opacity: 0.85;
   }
   50% {
-    /* drop-shadow 를 겹칠수록 빛이 누적된다 — 반경을 키우는 것보다 겹치는 쪽이
-       "더 강한 빛"으로 읽힌다(반경만 키우면 옅게 퍼지기만 한다). */
+    /* Stacked drop-shadows accumulate light — layering reads as "stronger
+       light" better than a bigger radius (a bigger radius only diffuses
+       thinner). */
     filter: drop-shadow(0 0 26px var(--fe-dx3rd-accent, #ffd54a))
             drop-shadow(0 0 14px var(--fe-dx3rd-accent, #ffd54a))
             drop-shadow(0 0 6px var(--fe-dx3rd-accent, #ffd54a));
@@ -261,7 +269,7 @@
   }
 }
 
-/* 모션 최소화 설정에서는 깜박임 대신 은은한 고정 글로우 */
+/* Under reduced-motion, a soft static glow instead of the blink */
 @media (prefers-reduced-motion: reduce) {
   .fe-ct-portrait.is-active::after {
     animation: none;
@@ -279,10 +287,13 @@
   opacity: 0.5;
 }
 
-/* 호버 시 나타나는 「턴 종료」 >> 표식 — 현재 턴이면서 권한이 있는 유저의 포트레이트에만
-   렌더된다(JS). 배경 채우기 없이, 프레임 전체를 덮는 컨테이너 중앙에 큰 글로우 글자만
-   띄운다(예시 모듈 방식). 컨테이너 자체는 pointer-events:none — 글자 밖 영역의 선택/패닝/
-   더블클릭(시트 열기)을 그대로 통과시키고, 클릭 대상은 글자(>>) 그 자체다. */
+/* The hover-revealed 「턴 종료」(end turn) >> marker — rendered by JS only on
+   the portrait of the current turn's combatant when the user has permission.
+   No background fill: a large glowing glyph floats at the center of a
+   container covering the whole frame (the exemplar module's approach). The
+   container itself is pointer-events:none — clicks pass through the
+   non-glyph area to selection/panning/double-click (sheet open); the glyph
+   (>>) itself is the click target. */
 .fe-ct-endturn {
   position: absolute;
   left: 0;
@@ -299,8 +310,8 @@
   line-height: 1;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.7);
 }
-/* 글자 자체만 상호작용 대상 — 기본은 투명, 포트레이트 호버 시 드러나고 글자에
-   직접 호버하면 완전 불투명 + 살짝 확대 */
+/* Only the glyph itself is interactive — transparent by default, revealed on
+   portrait hover, fully opaque + slightly enlarged when hovered directly */
 .fe-ct-endturn > * {
   opacity: 0;
   cursor: pointer;
@@ -314,9 +325,10 @@
   opacity: 1;
   transform: scale(1.12);
 }
-/* 이니셔티브 굴림 d20 — 아직 이니셔티브가 없고 소유 중인 전투원에게만 그려진다.
-   ">>"(턴 종료)와 같은 자리를 쓰지만 JS에서 상호 배타로 렌더하므로 겹치지 않는다.
-   행동을 유도하는 표시라 hover 전에도 보이게 두고(0.6), hover 시 또렷해진다. */
+/* Initiative-roll d20 — drawn only on owned combatants with no initiative yet.
+   Shares the same spot as ">>" (end turn) but JS renders them mutually
+   exclusively, so they never overlap. A call-to-action cue, so it is visible
+   (0.6) even before hover and sharpens on hover. */
 .fe-ct-rollinit {
   position: absolute;
   left: 0;
@@ -347,23 +359,27 @@
   transform: scale(1.15) rotate(-12deg);
 }
 
-/* ── 등장 / 퇴장 애니메이션 ────────────────────────────
-   세로 이동은 개별 포트레이트가 한다 — 왼쪽부터 차례로 내려오고, 끝날 땐
-   오른쪽부터 차례로 올라간다. 바(.fe-ct-inner)는 이동 없이 페이드만 한다 —
-   바가 같이 움직이면 전체가 한 덩어리로 내려오는 것처럼 보여 순차 등장이
-   읽히지 않는다.
+/* ── Entrance / exit animations ────────────────────────────
+   Vertical motion belongs to each portrait — they slide down in order from
+   the left on entrance, and slide up in order from the right on exit. The
+   bar (.fe-ct-inner) only fades without moving — if the bar moved too, the
+   whole strip would read as one slab descending and the staggered entrance
+   would be lost.
 
-   transform 순서가 중요하다: 스트립이 scaleY(-1)로 뒤집혀 있고 자식이 그걸
-   되돌리므로, `scaleY(-1) translateY(-N%)` — 뒤집기 먼저, 이동 나중 — 가
-   시각적으로 "위로"다. 순서를 바꾸면 아래로 간다(브라우저에서 실측).
-   이동은 .fe-ct-combatants 의 overflow-y:hidden 에 잘리므로, 포트레이트는
-   스트립 윗변 뒤에서 미끄러져 나오고 다시 그리로 사라진다. 이게 의도된
-   모양이다 — 스크롤바를 위로 보내는 설계상 클리핑은 피할 수 없다.
+   Transform order matters: the strip is flipped with scaleY(-1) and each
+   child un-flips itself, so `scaleY(-1) translateY(-N%)` — flip first,
+   translate second — is visually "up". Reversing the order sends it down
+   (measured in the browser).
+   The motion is clipped by .fe-ct-combatants's overflow-y:hidden, so
+   portraits slide out from behind the strip's top edge and vanish back
+   there. That is the intended look — the scrollbar-at-top design makes the
+   clipping unavoidable.
 
-   duration/delay 를 --fe-ct-anim-dur / --fe-ct-anim-delay 로 한 번 더 거치는 이유:
-   레트로 테마가 전역 * { animation-duration: 1ms !important } 로 모든 애니메이션을
-   뭉개버린다. fe-retro-theme.css 의 예외 규칙이 이 두 변수를 그대로 다시
-   적용해서 값을 한 곳에서만 관리한다. */
+   duration/delay go through --fe-ct-anim-dur / --fe-ct-anim-delay because
+   the retro theme flattens every animation with a global
+   `* { animation-duration: 1ms !important }`. An exception rule in
+   fe-retro-theme.css re-applies these two variables so the values live in
+   one place. */
 @keyframes fe-ct-bar-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -420,8 +436,10 @@
   animation-delay: var(--fe-ct-anim-delay);
 }
 
-/* 접근성: 모션 최소화 설정에서는 이동/스케일 없이 즉시 표시/제거.
-   (JS 도 이 경우 퇴장을 건너뛰고 바로 비우지만, 규칙은 안전망으로 남겨 둔다.) */
+/* Accessibility: under reduced-motion, show/remove instantly with no
+   movement or scaling.
+   (JS also skips the exit animation and clears immediately in that case;
+   the rule stays as a safety net.) */
 @media (prefers-reduced-motion: reduce) {
   .fe-ct-inner.is-entering,
   .fe-ct-inner.is-leaving,
@@ -431,7 +449,7 @@
   }
 }
 
-/* 기본 테마는 fa 벡터 아이콘, 픽셀 글자는 숨김 */
+/* Default theme shows the fa vector icon; the pixel glyph is hidden */
 .fe-ct-endturn .fe-ct-endturn-px {
   display: none;
 }
@@ -619,9 +637,9 @@ body.fe-retro-theme .fe-ct-init {
 body.fe-retro-theme .fe-ct-hp {
   border: 1px solid var(--fe-ac-33, rgba(255, 255, 255, 0.3));
 }
-/* 레트로에서도 강조는 위의 ::after 링 하나로 끝낸다. 예전에는 여기서 프레임에
-   outline 을 하나 더 그렸는데, 링이 생긴 뒤로는 동심원 두 줄이 되어 지저분했다.
-   되살리지 말 것. */
+/* In retro the emphasis also ends at the single ::after ring above. An extra
+   outline used to be drawn on the frame here, but once the ring existed it
+   became two concentric lines — messy. Do not restore it. */
 body.fe-retro-theme .fe-ct-portrait.is-active::after {
   border-radius: 0;
 }
@@ -636,12 +654,13 @@ body.fe-retro-theme .fe-ct-name {
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
 }
 
-/* 레트로 테마의 >> 표식 — 배경 채우기 없이, fa 벡터 아이콘 대신 각진 픽셀 폰트
-   ">>" 글자를 노출한다(픽셀 폰트 자체가 각져 있어 안티에일리어싱이 사실상 없다). */
+/* The retro theme's >> marker — no background fill; instead of the fa vector
+   icon it exposes an angular pixel-font ">>" glyph (a pixel font is already
+   angular, so there is virtually no antialiasing). */
 body.fe-retro-theme .fe-ct-rollinit {
   color: var(--fe-ac-90, #fff);
   image-rendering: pixelated;
-  /* §4의 전역 text-shadow:none !important 를 이기고 외곽선 유지 */
+  /* Beat §4's global text-shadow:none !important to keep the outline */
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
 }
 
@@ -657,7 +676,7 @@ body.fe-retro-theme .fe-ct-endturn .fe-ct-endturn-px {
   display: inline;
   font-weight: bold;
   letter-spacing: -0.06em;
-  /* §4의 전역 text-shadow:none !important 를 이기고 하드 픽셀 외곽선 유지 */
+  /* Beat §4's global text-shadow:none !important to keep the hard pixel outline */
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
 }
 
@@ -762,7 +781,8 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
   background: var(--fe-ac-12, rgba(255, 255, 255, 0.18));
 }
 
-/* destructive entry (전투원 제거) — declared after the retro block so it wins the
+/* destructive entry (전투원 제거 = combatant removal) — declared after the
+   retro block so it wins the
    equal-specificity tie against the retro item color rule */
 .fe-ct-context-menu .fe-ct-ctx-item.is-danger,
 .fe-ct-context-menu.fe-retro-theme .fe-ct-ctx-item.is-danger {
@@ -899,7 +919,8 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
      between two digits belongs to the surface and travels — see .fe-dbp-strip > span.
 
      Putting the curvature on the strip instead (tried, and it is what "돌아가다보면
-     음영이 사라진다" was) makes the dial go flat at every fractional offset: at
+     음영이 사라진다" = the shading disappears as it spins, was) makes the dial go
+     flat at every fractional offset: at
      d = n + 0.5 the specular band is split in half across the window edges and the
      window shows two dark thirds and no lit middle at all. Only at a whole offset
      did it ever look like a cylinder.
