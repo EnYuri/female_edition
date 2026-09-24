@@ -10,6 +10,7 @@
   import { CONSTANTS } from 'src/constants';
   import ItemImage from './ItemImage.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationTypeLabel } from 'src/foundry/dnd5e-compat';
   import { settings } from 'src/settings/settings.svelte';
   import { Activities } from 'src/features/activities/activities';
   import type { ActivityItemContext } from 'src/types/types';
@@ -45,6 +46,12 @@
 
   function getActivityUsageLabel(activity: Activity5e) {
     return (
+      localizedActivationTypeLabel(
+        activity.activation?.type,
+        typeof activity.activation?.value === 'number'
+          ? activity.activation.value
+          : undefined,
+      ) ??
       CONFIG.DND5E.activityActivationTypes[activity.activation?.type]?.label ??
       activity.activation?.type ??
       ''

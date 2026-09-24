@@ -142,15 +142,58 @@ export class SpecialTraitsApplication extends DocumentSheetDialog<DocumentSheetA
     }));
 
     if (this.document.type === CONSTANTS.SHEET_TYPE_NPC) {
+      const npcFields: SpecialTraitSectionField[] = [];
+      const schemaFields = this.document.system.schema.fields;
+
+      if (schemaFields.identifier) {
+        npcFields.push({
+          field: schemaFields.identifier,
+          hint: 'DND5E.IdentifierError',
+          name: 'system.identifier',
+          placeholder: this.document.identifier,
+          value: this.document.system.identifier,
+        });
+      }
+
+      if (schemaFields.traits?.fields?.important) {
+        npcFields.push({
+          field: schemaFields.traits.fields.important,
+          name: 'system.traits.important',
+          value: this.document.system.traits.important,
+        });
+      }
+
+      const priceFields = schemaFields.attributes?.fields?.price?.fields;
+      if (priceFields?.value && priceFields?.denomination) {
+        npcFields.push({
+          name: 'system.attributes.price',
+          group: {
+            label: 'DND5E.NPC.FIELDS.attributes.price.label',
+            hint: 'DND5E.NPC.FIELDS.attributes.price.hint',
+          },
+          fields: [
+            {
+              classes: 'label-top',
+              field: priceFields.value,
+              name: 'system.attributes.price.value',
+              value: this.document.system.attributes.price.value,
+              label: priceFields.value.label,
+            },
+            {
+              choices: CONFIG.DND5E.currencies,
+              classes: 'label-top',
+              field: priceFields.denomination,
+              name: 'system.attributes.price.denomination',
+              value: this.document.system.attributes.price.denomination,
+              label: priceFields.denomination.label,
+            },
+          ],
+        });
+      }
+
       flags.sections.unshift({
         label: game.i18n.localize('DND5E.NPC.Label'),
-        fields: [
-          {
-            field: this.document.system.schema.fields.traits.fields.important,
-            name: 'system.traits.important',
-            value: this.document.system.traits.important,
-          },
-        ],
+        fields: npcFields,
       });
     }
 

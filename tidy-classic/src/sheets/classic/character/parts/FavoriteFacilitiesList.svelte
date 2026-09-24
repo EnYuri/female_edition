@@ -20,9 +20,10 @@
 
   interface Props {
     section: FacilitySection;
+    expandedOverride?: boolean;
   }
 
-  let { section }: Props = $props();
+  let { section, expandedOverride = undefined }: Props = $props();
 
   let context = $derived(getCharacterSheetContext());
 
@@ -48,7 +49,7 @@
 />
 
 <section class="facility-list-section">
-  <ItemTable key={section.key}>
+  <ItemTable key={section.key} {expandedOverride}>
     {#snippet header()}
       <ItemTableHeaderRow>
         <!-- Name -->

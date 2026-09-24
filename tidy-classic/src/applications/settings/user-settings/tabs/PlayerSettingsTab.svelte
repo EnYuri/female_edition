@@ -101,6 +101,43 @@
   id="useContextMenu"
 />
 
+<h3>{localize('TIDY5E.Settings.ReferenceTooltipsHeader')}</h3>
+
+<CheckboxSetting
+  bind:value={context.settings.referenceTooltipCondition}
+  name={SettingsProvider.settings.referenceTooltipCondition.options.name}
+  hint={SettingsProvider.settings.referenceTooltipCondition.options.hint}
+  id="referenceTooltipCondition"
+/>
+
+<CheckboxSetting
+  bind:value={context.settings.referenceTooltipCreatureType}
+  name={SettingsProvider.settings.referenceTooltipCreatureType.options.name}
+  hint={SettingsProvider.settings.referenceTooltipCreatureType.options.hint}
+  id="referenceTooltipCreatureType"
+/>
+
+<CheckboxSetting
+  bind:value={context.settings.referenceTooltipMastery}
+  name={SettingsProvider.settings.referenceTooltipMastery.options.name}
+  hint={SettingsProvider.settings.referenceTooltipMastery.options.hint}
+  id="referenceTooltipMastery"
+/>
+
+<CheckboxSetting
+  bind:value={context.settings.referenceTooltipSkill}
+  name={SettingsProvider.settings.referenceTooltipSkill.options.name}
+  hint={SettingsProvider.settings.referenceTooltipSkill.options.hint}
+  id="referenceTooltipSkill"
+/>
+
+<CheckboxSetting
+  bind:value={context.settings.referenceTooltipTool}
+  name={SettingsProvider.settings.referenceTooltipTool.options.name}
+  hint={SettingsProvider.settings.referenceTooltipTool.options.hint}
+  id="referenceTooltipTool"
+/>
+
 <h3>{localize('TIDY5E.Settings.MulticlassSpellbookFilterLabel')}</h3>
 
 <CheckboxSetting

@@ -111,9 +111,18 @@
           <i class="fa-solid fa-pencil"></i>
         {/if}
       {:else}
-        <div class="attribute-pin-name truncate" title={ctx.document.name}>
+        <button
+          type="button"
+          class="attribute-pin-name truncate transparent-button"
+          title={ctx.document.name}
+          onclick={() =>
+            ctx.document.sheet?.render({
+              force: true,
+              mode: CONSTANTS.SHEET_MODE_PLAY,
+            })}
+        >
           {coalesce(ctx.alias, ctx.document.name)}
-        </div>
+        </button>
       {/if}
     </div>
     <div class="attribute-counter {ctx.resource}">

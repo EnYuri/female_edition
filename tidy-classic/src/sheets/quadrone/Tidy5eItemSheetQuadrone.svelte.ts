@@ -1169,7 +1169,7 @@ export class Tidy5eItemSheetQuadrone extends TidyExtensibleDocumentSheetMixin<
     if (args.tabId === CONSTANTS.TAB_EFFECTS) {
       return await ActiveEffect.implementation.create(
         {
-          name: game.i18n.localize('DND5E.EffectNew'),
+          name: FoundryAdapter.localize('DND5E.EffectNew'),
           icon: 'icons/svg/aura.svg',
           type: datasetType,
           ...restDataSet,

@@ -38,6 +38,9 @@ desktop.ini
 *.bak
 tmp/
 
+# Scratch file left over from lang-key auditing — local only.
+tidy-classic/public/tmp_keys.json
+
 #tempzip
 *.zip
 

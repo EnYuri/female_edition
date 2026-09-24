@@ -693,7 +693,7 @@ export function Tidy5eActorSheetQuadroneBase<
 
       // If petrified, display "All Damage" instead of all damage types separately
       if (this.document.hasConditionEffect('petrification')) {
-        traits.dr = [{ label: game.i18n.localize('DND5E.DamageAll') }];
+        traits.dr = [{ label: FoundryAdapter.localize('DND5E.DamageAll') }];
       }
 
       // Prepare damage modifications
@@ -1157,9 +1157,10 @@ export function Tidy5eActorSheetQuadroneBase<
      * @protected
      */
     _applyTooltips(element: HTMLElement) {
-      if ('tooltip' in element.dataset) return;
+      if ('tooltip' in element.dataset || 'tooltipHtml' in element.dataset)
+        return;
       const uuid = element.dataset.referenceTooltip ?? this.actor.uuid;
-      element.dataset.tooltip = `
+      element.dataset.tooltipHtml = `
           <section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse"></i></section>
         `;
       if (element.dataset.attribution)
@@ -1191,7 +1192,7 @@ export function Tidy5eActorSheetQuadroneBase<
       if (args.tabId === CONSTANTS.TAB_EFFECTS) {
         return await ActiveEffect.implementation.create(
           {
-            name: game.i18n.localize('DND5E.EffectNew'),
+            name: FoundryAdapter.localize('DND5E.EffectNew'),
             icon: 'icons/svg/aura.svg',
             type: datasetType,
             ...restDataSet,

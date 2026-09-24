@@ -23,6 +23,7 @@
   import { TidyFlags } from "src/foundry/TidyFlags";
   import { SheetSections } from 'src/features/sections/SheetSections';
   import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
+  import { settings } from 'src/settings/settings.svelte';
 
   let context = $derived(getContainerSheetClassicContext());
 
@@ -42,6 +43,7 @@
   setSearchResultsContext(searchResults);
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -51,6 +53,12 @@
   });
 
   const localize = FoundryAdapter.localize;
+
+  let hasCurrency = $derived(
+    Object.values(context.item.system.currency ?? {}).some(
+      (value: any) => Number(value) > 0,
+    ),
+  );
 
   let utilityBarCommands = $derived(
     context.utilities[tabId]?.utilityToolbarCommands ?? [],
@@ -74,6 +82,21 @@
 <div class="container-contents-wrapper">
   <div role="presentation" class="currency-wrapper">
     <Currency document={context.item} />
+    {#if hasCurrency && context.item.actor && context.editable}
+      <button
+        type="button"
+        class="transfer-currency highlight-on-hover"
+        data-action="transfer-currency"
+        data-item-id={context.item.id}
+        title={localize(
+          'TIDY5E.Containers.TransferCurrencyToParent.Tooltip',
+        )}
+        tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
+      >
+        <i class="fas fa-person-arrow-up-from-line"></i>
+        {localize('TIDY5E.Containers.TransferCurrency.Label')}
+      </button>
+    {/if}
   </div>
 
   <UtilityToolbar>
@@ -180,5 +203,23 @@
     padding-right: 0.75rem;
     padding-top: 0.25rem;
     margin-block-end: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .currency-wrapper :global(.inventory-currency) {
+    flex: 1;
+  }
+
+  .transfer-currency {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border: 0.0625rem solid var(--t5e-faint-color);
+    border-radius: 0.1875rem;
+    white-space: nowrap;
   }
 </style>

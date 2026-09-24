@@ -56,6 +56,28 @@
         </p>
       </div>
     </fieldset>
+    <fieldset>
+      <legend>
+        <h2>{localize('TIDY5E.Settings.SwapAbilityScoreAndBonusSection')}</h2>
+        <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline>
+      </legend>
+
+      <div class="form-group slim">
+        <label for="swap-ability-score-and-bonus-{idPrefix}">
+          {localize('TIDY5E.Settings.SwapAbilityScoreAndBonus.name')}
+        </label>
+        <div class="form-fields">
+          <input
+            id="swap-ability-score-and-bonus-{idPrefix}"
+            type="checkbox"
+            bind:checked={config.swapAbilityScoreAndBonus}
+          />
+        </div>
+        <p class="hint">
+          {localize('TIDY5E.Settings.SwapAbilityScoreAndBonus.hint')}
+        </p>
+      </div>
+    </fieldset>
   </div>
 </div>
 <div class="button-bar">

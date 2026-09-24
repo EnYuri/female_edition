@@ -140,17 +140,21 @@
       ctx: itemContext[item.id],
     }))}
 
+    {@const visibleItemCount = ItemVisibility.countVisibleItems(
+      section.items,
+      searchResults.uuids,
+    )}
+
     <section class="container-contents-list-section">
       <TidyTable
         key={section.key}
         data-custom-section={section.custom ? true : null}
         {gridTemplateColumns}
+        expandedOverride={searchResults.isSearching
+          ? visibleItemCount > 0
+          : undefined}
       >
         {#snippet header()}
-          {@const visibleItemCount = ItemVisibility.countVisibleItems(
-            section.items,
-            searchResults.uuids,
-          )}
           <TidyTableHeaderRow>
             <TidyTableHeaderCell primary={true}>
               {localize(section.label)}

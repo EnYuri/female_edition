@@ -30,6 +30,7 @@ export type GroupSheetClassicContext = {
   filterPins: Record<string, Set<string>>;
   groupLanguages: GroupLanguage[];
   groupSkills: GroupSkill[];
+  groupAbilities: GroupAbility[];
   inventory: InventorySection[];
   isGM: boolean;
   itemContext: Record<string, GroupItemContext>;
@@ -260,3 +261,35 @@ export interface GroupSkill {
   key: string;
   members: Actor5e[];
 }
+
+export type GroupAbilityMeasure = {
+  total: number;
+  value: string;
+  sign: string;
+};
+
+export type GroupMemberAbilityContext = {
+  mod: number;
+  modSign: string;
+  modValue: string;
+  proficient: number;
+  save: number;
+  saveSign: string;
+  saveValue: string;
+  score: number;
+  scoreValue: string;
+  scoreSign: string;
+};
+
+export type GroupAbility = {
+  key: string;
+  name: string;
+  proficient: boolean;
+  high: GroupAbilityMeasure;
+  low: GroupAbilityMeasure;
+  saveHigh: GroupAbilityMeasure;
+  saveLow: GroupAbilityMeasure;
+  score: number;
+  members: Actor5e[];
+  identifiers: Map<string, GroupMemberAbilityContext>;
+};

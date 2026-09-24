@@ -8,6 +8,7 @@
   import Checkbox from 'src/components/inputs/Checkbox.svelte';
   import DetailsMountable from '../parts/DetailsMountable.svelte';
   import FieldUses from '../parts/FieldUses.svelte';
+  import TextInput from 'src/components/inputs/TextInput.svelte';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getItemSheetContext());
@@ -21,6 +22,24 @@
   <h3 class="form-header">
     {localize('DND5E.ItemEquipmentDetails')}
   </h3>
+
+  {#if context.item.system.schema.fields.identifier}
+    <!-- Identifier -->
+    <div class="form-group">
+      <label for="{appId}-identifier">{localize('DND5E.Identifier')}</label>
+      <div class="form-fields">
+        <TextInput
+          id="{appId}-identifier"
+          document={context.item}
+          field="system.identifier"
+          value={context.source.identifier}
+          placeholder={context.item.identifier}
+          disabled={!context.editable}
+        />
+      </div>
+      <p class="hint">{localize('DND5E.IdentifierError')}</p>
+    </div>
+  {/if}
 
   <!-- Equipment Type -->
   <div class="form-group">

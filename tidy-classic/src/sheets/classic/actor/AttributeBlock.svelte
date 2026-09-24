@@ -39,6 +39,8 @@
       `system.abilities.${id}.proficient`,
     ),
   );
+
+  let swapScoreAndBonus = $derived(settings.value.swapAbilityScoreAndBonus);
 </script>
 
 <div
@@ -57,36 +59,72 @@
     }}
   />
   <BlockScore>
-    <TextInput
-      document={context.actor}
-      field="system.abilities.{id}.value"
-      value={ability.value}
-      placeholder="10"
-      selectOnFocus={true}
-      allowDeltaChanges={true}
-      disabled={context.lockSensitiveFields}
-      attributes={{
-        'data-tidy-sheet-part': CONSTANTS.SHEET_PARTS.ABILITY_SCORE,
-      }}
-    />
+    {#if swapScoreAndBonus}
+      <button
+        type="button"
+        class="ability-score-swap transparent-button"
+        class:rollable={context.editable}
+        title={localize('DND5E.AbilityModifier')}
+        onclick={(event) =>
+          context.actor.rollAbilityCheck({ ability: id, event })}
+        tabindex={!settings.value.useDefaultSheetAttributeTabbing &&
+        settings.value.useAccessibleKeyboardSupport
+          ? 0
+          : -1}
+        disabled={!context.editable}
+        data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ABILITY_TEST_ROLLER}
+      >
+        {formatAsModifier(ability.mod)}
+      </button>
+    {:else}
+      <TextInput
+        document={context.actor}
+        field="system.abilities.{id}.value"
+        value={ability.value}
+        placeholder="10"
+        selectOnFocus={true}
+        allowDeltaChanges={true}
+        disabled={context.lockSensitiveFields}
+        attributes={{
+          'data-tidy-sheet-part': CONSTANTS.SHEET_PARTS.ABILITY_SCORE,
+        }}
+      />
+    {/if}
   </BlockScore>
   <div class="ability-modifiers">
-    <button
-      type="button"
-      class="ability-mod transparent-button"
-      class:rollable={context.editable}
-      title={localize('DND5E.AbilityModifier')}
-      onclick={(event) =>
-        context.actor.rollAbilityCheck({ ability: id, event })}
-      tabindex={!settings.value.useDefaultSheetAttributeTabbing &&
-      settings.value.useAccessibleKeyboardSupport
-        ? 0
-        : -1}
-      disabled={!context.editable}
-      data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ABILITY_TEST_ROLLER}
-    >
-      {formatAsModifier(ability.mod)}
-    </button>
+    {#if swapScoreAndBonus}
+      <TextInput
+        document={context.actor}
+        field="system.abilities.{id}.value"
+        value={ability.value}
+        placeholder="10"
+        selectOnFocus={true}
+        allowDeltaChanges={true}
+        disabled={context.lockSensitiveFields || !context.editable}
+        class="ability-mod ability-score-input-swap"
+        title={ability.label}
+        attributes={{
+          'data-tidy-sheet-part': CONSTANTS.SHEET_PARTS.ABILITY_SCORE,
+        }}
+      />
+    {:else}
+      <button
+        type="button"
+        class="ability-mod transparent-button"
+        class:rollable={context.editable}
+        title={localize('DND5E.AbilityModifier')}
+        onclick={(event) =>
+          context.actor.rollAbilityCheck({ ability: id, event })}
+        tabindex={!settings.value.useDefaultSheetAttributeTabbing &&
+        settings.value.useAccessibleKeyboardSupport
+          ? 0
+          : -1}
+        disabled={!context.editable}
+        data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ABILITY_TEST_ROLLER}
+      >
+        {formatAsModifier(ability.mod)}
+      </button>
+    {/if}
     <button
       type="button"
       class="ability-save transparent-button"

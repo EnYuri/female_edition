@@ -7,6 +7,7 @@
   import GroupMemberListItemProfile from './GroupMemberListItemProfile.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { getRollMode } from 'src/foundry/core-compat';
+  import { getMovementSpeed } from 'src/foundry/dnd5e-compat';
   import { settings } from 'src/settings/settings.svelte';
   import { getGroupSheetClassicContext } from 'src/sheets/sheet-context.svelte';
 
@@ -20,6 +21,14 @@
   let { member, ctx }: Props = $props();
 
   const localize = FoundryAdapter.localize;
+
+  let movement = $derived(member.system.attributes?.movement ?? {});
+  let walkSpeed = $derived(getMovementSpeed(movement, 'walk'));
+  let movementUnitAbbr = $derived(
+    CONFIG.DND5E.movementUnits?.[movement.units]?.abbreviation ??
+      Object.values(CONFIG.DND5E.movementUnits ?? {})[0]?.abbreviation ??
+      '',
+  );
 
   function onPerceptionClicked(
     event: MouseEvent & {
@@ -72,7 +81,13 @@
     {#if ctx.canObserve}
       <div class="flex-row extra-small-gap">
         <AcShieldBase cssClass="group-ac-shield">
-          <span class="ac-value">{member.system.attributes.ac.value}</span>
+          <span
+            class="ac-value"
+            data-attribution="attributes.ac"
+            data-attribution-caption="DND5E.ArmorClass"
+            data-reference-tooltip={member.uuid}
+            >{member.system.attributes.ac.value}</span
+          >
         </AcShieldBase>
         <div class="flex-1">
           <div class="flex-row extra-small-gap">
@@ -90,6 +105,23 @@
               {/if}
             </span>
           </div>
+          {#if walkSpeed !== undefined}
+            <div class="flex-row extra-small-gap">
+              <span>
+                <i
+                  class="fas fa-person-running fa-fw text-body-secondary"
+                  title={localize('DND5E.Speed')}
+                ></i>
+              </span>
+              <span
+                data-attribution="attributes.movement"
+                data-attribution-caption="DND5E.Speed"
+                data-reference-tooltip={member.uuid}
+              >
+                {walkSpeed} {movementUnitAbbr}
+              </span>
+            </div>
+          {/if}
           {#if ctx.conditionImmunities.length}
             <div class="flex-row extra-small-gap">
               <span>

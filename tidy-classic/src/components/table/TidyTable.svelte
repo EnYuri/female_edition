@@ -19,6 +19,11 @@
     key: string;
     toggleable?: boolean;
     gridTemplateColumns?: TidyTableColumns;
+    /**
+     * When defined, overrides the tracked expansion state — e.g. to
+     * auto-expand sections with hits while searching.
+     */
+    expandedOverride?: boolean;
     header?: Snippet;
     body?: Snippet;
     [key: string]: any;
@@ -28,6 +33,7 @@
     key,
     toggleable = true,
     gridTemplateColumns = [],
+    expandedOverride = undefined,
     header,
     body,
     ...rest
@@ -61,7 +67,9 @@
   }
 
   let expanded = $derived(
-    !toggleable || sectionExpansionTracker.isExpanded(key, tabId, location),
+    !toggleable ||
+      (expandedOverride ??
+        sectionExpansionTracker.isExpanded(key, tabId, location)),
   );
 </script>
 

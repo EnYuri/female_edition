@@ -4,6 +4,7 @@
   import { type ActivitySection } from 'src/types/types';
   import type { Activity5e } from 'src/foundry/dnd5e.types';
   import { Activities } from 'src/features/activities/activities';
+  import { localizedActivationTypeLabel } from 'src/foundry/dnd5e-compat';
   import TidyTable, {
     type TidyTableColumns,
   } from 'src/components/table/TidyTable.svelte';
@@ -137,7 +138,12 @@
         <TidyTableCell>
           {#if activity.activation?.type}
             <span class="truncate">
-              {activity.activationLabels?.activation ?? ''}
+              {localizedActivationTypeLabel(
+                activity.activation.type,
+                typeof activity.activation.value === 'number'
+                  ? activity.activation.value
+                  : undefined,
+              ) ?? activity.activationLabels?.activation ?? ''}
             </span>
           {/if}
         </TidyTableCell>

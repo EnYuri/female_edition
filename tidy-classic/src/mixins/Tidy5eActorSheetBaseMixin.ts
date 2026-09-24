@@ -66,6 +66,31 @@ export function Tidy5eActorSheetBaseMixin(BaseApplication: any) {
     /*  Application Lifecycle Functions             */
     /* -------------------------------------------- */
 
+    async _onRender(context: any, options: any) {
+      await super._onRender(context, options);
+
+      // Apply attribution & reference tooltips
+      this.element
+        ?.querySelectorAll('[data-attribution],[data-reference-tooltip]')
+        .forEach((e: HTMLElement) => this._applyTooltips(e));
+    }
+
+    /**
+     * Apply a property attribution tooltip to an element.
+     * @param {HTMLElement} element  The element to get the tooltip.
+     * @protected
+     */
+    _applyTooltips(element: HTMLElement) {
+      if ('tooltip' in element.dataset || 'tooltipHtml' in element.dataset)
+        return;
+      const uuid = element.dataset.referenceTooltip ?? this.actor.uuid;
+      element.dataset.tooltipHtml = `
+      <section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse"></i></section>
+    `;
+      if (element.dataset.attribution)
+        element.dataset.tooltipClass = 'property-attribution';
+    }
+
     /**
      * Perform any dynamic behavior on controls which depends on the current state of the sheet.
      * @returns

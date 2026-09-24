@@ -3,8 +3,9 @@ import type { CONSTANTS } from 'src/constants';
 export type ContextMenuEntry = {
   name?: string;
   icon?: string;
+  classes?: string;
   group?: string;
-  callback?: ($entryElement: any) => void;
+  callback?: ($entryElement: any, event?: Event) => void;
   condition?: ($entryElement: any) => void;
 };
 

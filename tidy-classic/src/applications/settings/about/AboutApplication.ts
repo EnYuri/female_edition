@@ -20,7 +20,7 @@ export class AboutApplication extends SvelteApplicationMixin<
   };
 
   get title() {
-    return FoundryAdapter.localize('TIDY5E.Settings.About.dialogTitle');
+    return FoundryAdapter.localize('FE_TIDY.About.dialogTitle');
   }
 
   _createComponent(node: HTMLElement): Record<string, any> {

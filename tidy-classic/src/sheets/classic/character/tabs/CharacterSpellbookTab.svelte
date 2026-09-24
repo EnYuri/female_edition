@@ -53,6 +53,7 @@
   );
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -159,11 +160,23 @@
         )}
 
         {#if (searchCriteria.trim() === '' && context.unlocked) || visibleItemCount > 0 || !!section.slots}
-          {#if layoutMode === 'list'}
-            <SpellbookList {section} />
-          {:else}
-            <SpellbookGrid {section} />
-          {/if}
+          {@const expandedOverride = searchCriteria.trim() !== ''
+            ? visibleItemCount > 0
+            : undefined}
+          {@const unavailable =
+            searchCriteria.trim() !== '' &&
+            visibleItemCount === 0 &&
+            !!section.slots}
+          <div
+            class="spellbook-section-wrapper"
+            class:unavailable
+          >
+            {#if layoutMode === 'list'}
+              <SpellbookList {section} {expandedOverride} />
+            {:else}
+              <SpellbookGrid {section} {expandedOverride} />
+            {/if}
+          </div>
         {/if}
       {/if}
     {/each}
@@ -180,5 +193,9 @@
     margin-left: 0.25rem;
     margin-right: 0.25rem;
     align-self: center;
+  }
+
+  .spellbook-section-wrapper.unavailable {
+    opacity: 0.5;
   }
 </style>

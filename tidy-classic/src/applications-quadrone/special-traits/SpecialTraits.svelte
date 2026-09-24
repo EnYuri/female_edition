@@ -54,22 +54,58 @@
         <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline>
       </legend>
       {#each section.fields as fieldContext}
-        {@const isCheckbox =
-          fieldContext instanceof foundry.data.fields.BooleanField}
-        {@const id = `${context.actor.id}-${fieldContext.name.slugify().replaceAll('.', '-')}`}
-        <FormGroup
-          labelFor={id}
-          document={context.actor}
-          field={fieldContext.field}
-          config={{
-            id,
-            value: fieldContext.value,
-            name: fieldContext.name,
-          }}
-          localize={true}
-          groupClasses={{ slim: isCheckbox }}
-          disableOverriddenInputs
-        />
+        {#if fieldContext.group}
+          <FormGroup
+            labelFor="{context.actor.id}-{fieldContext.fields?.[0]?.name
+              .slugify()
+              .replaceAll('.', '-')}"
+            document={context.actor}
+            localize={true}
+            groupClasses="split-group"
+            disableOverriddenInputs
+            label={fieldContext.group.label}
+            hint={fieldContext.group.hint}
+          >
+            {#each fieldContext.fields ?? [] as fieldGroupMember}
+              {@const memberId = `${context.actor.id}-${fieldGroupMember.name.slugify().replaceAll('.', '-')}`}
+              <FormGroup
+                document={context.actor}
+                field={fieldGroupMember.field}
+                choices={fieldGroupMember.choices}
+                label={fieldGroupMember.label}
+                labelFor={memberId}
+                config={{
+                  id: memberId,
+                  value: fieldGroupMember.value,
+                  name: fieldGroupMember.name,
+                  classes: fieldGroupMember.classes,
+                  placeholder: fieldGroupMember.placeholder,
+                }}
+                groupClasses={fieldGroupMember.classes}
+                disableOverriddenInputs
+              />
+            {/each}
+          </FormGroup>
+        {:else}
+          {@const isCheckbox =
+            fieldContext instanceof foundry.data.fields.BooleanField}
+          {@const id = `${context.actor.id}-${fieldContext.name.slugify().replaceAll('.', '-')}`}
+          <FormGroup
+            labelFor={id}
+            document={context.actor}
+            field={fieldContext.field}
+            hint={fieldContext.hint}
+            config={{
+              id,
+              value: fieldContext.value,
+              name: fieldContext.name,
+              placeholder: fieldContext.placeholder,
+            }}
+            localize={true}
+            groupClasses={{ slim: isCheckbox }}
+            disableOverriddenInputs
+          />
+        {/if}
       {/each}
     </fieldset>
   {/each}

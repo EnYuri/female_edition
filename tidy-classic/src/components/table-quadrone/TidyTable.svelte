@@ -14,6 +14,11 @@
     key: string;
     toggleable?: boolean;
     dataset?: Record<string, string>;
+    /**
+     * When defined, overrides the tracked expansion state — e.g. to
+     * auto-expand sections with hits while searching.
+     */
+    expandedOverride?: boolean;
     header?: Snippet<[boolean]>;
     body?: Snippet;
   }
@@ -21,9 +26,10 @@
   let {
     key,
     toggleable = true,
+    dataset,
+    expandedOverride = undefined,
     header,
     body,
-    dataset,
     ...rest
   }: Props = $props();
 
@@ -58,7 +64,9 @@
   }
 
   let expanded = $derived(
-    !toggleable || sectionExpansionTracker.isExpanded(key, tabId, location),
+    !toggleable ||
+      (expandedOverride ??
+        sectionExpansionTracker.isExpanded(key, tabId, location)),
   );
 </script>
 

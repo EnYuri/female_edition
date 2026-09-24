@@ -65,6 +65,19 @@ export function getActiveEffectContextOptions(effect: any, app: any) {
       callback: () => effect.sheet.render(true),
     },
     {
+      name: 'TIDY5E.ContextMenuActionViewSourceItem',
+      icon: "<i class='fas fa-eye fa-fw'></i>",
+      callback: () =>
+        effect.item.sheet.render({
+          force: true,
+          mode: CONSTANTS.SHEET_MODE_PLAY,
+        }),
+      condition: () =>
+        !!effect.item &&
+        app.document.documentName !== CONSTANTS.DOCUMENT_NAME_ITEM,
+      group: 'common',
+    },
+    {
       name: 'DND5E.ContextMenuActionDuplicate',
       icon: "<i class='fas fa-copy fa-fw'></i>",
       callback: () =>

@@ -17,4 +17,4 @@ consolidated in [`font/LICENSES.txt`](font/LICENSES.txt).
 
 ## Licenses
 
-The bundled Tidy 5e Sheets Classic layout is a maintained fork of the MIT-licensed Tidy 5e Sheets v12.5.5, originally created by **kgar**. The upstream project is available at [kgar/foundry-vtt-tidy-5e-sheets](https://github.com/kgar/foundry-vtt-tidy-5e-sheets).
+The bundled Tidy 5e Sheet-Classic layout is maintained by **EnYuri** as part of female_edition. It is a fork of the MIT-licensed Tidy 5e Sheets v12.5.5, originally created by **kgar**. The upstream source is available at [kgar/foundry-vtt-tidy-5e-sheets](https://github.com/kgar/foundry-vtt-tidy-5e-sheets). Report issues with this fork at [female_edition/issues](https://github.com/EnYuri/female_edition/issues).

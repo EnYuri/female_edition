@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CONSTANTS } from 'src/constants';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import {
     type CharacterSheetContext,
     type NpcSheetContext,
@@ -52,6 +53,7 @@
     spellComponentsBaseWidth?: string;
     targetBaseWidth?: string;
     usageBaseWidth?: string;
+    expandedOverride?: boolean;
   }
 
   let {
@@ -63,6 +65,7 @@
     spellComponentsBaseWidth = '3.75rem',
     targetBaseWidth = '7.5rem',
     usageBaseWidth = '7.5rem',
+    expandedOverride = undefined,
   }: Props = $props();
 
   let inlineToggleService = getContext<InlineToggleService>(
@@ -153,6 +156,7 @@
   <ItemTable
     key={section.key}
     data-custom-section={section.custom ? true : null}
+    {expandedOverride}
   >
     {#snippet header()}
       {@const visibleItemCount = ItemVisibility.countVisibleItems(
@@ -327,7 +331,7 @@
               baseWidth={usageBaseWidth}
               title={localize('DND5E.SpellUsage')}
             >
-              {spell.labels.activation}
+              {localizedActivationLabel(spell)}
             </ItemTableCell>
             {#if context.editable && context.useClassicControls}
               <ItemTableCell baseWidth={classicControlsColumnWidth}>

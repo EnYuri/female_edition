@@ -108,6 +108,16 @@
   const localize = FoundryAdapter.localize;
 
   $effect(() => {
+    const emphasizedTabId = sheet?.emphasizedTabId;
+    if (emphasizedTabId) {
+      sheet.emphasizedTabId = undefined;
+      const emphasizedTab = tabs.find((tab) => tab.id === emphasizedTabId);
+      if (emphasizedTab) {
+        selectTab(emphasizedTab);
+        return;
+      }
+    }
+
     if (!tabs.some((tab) => tab.id === selectedTabId)) {
       selectTab(tabs[0]);
     }

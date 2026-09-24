@@ -9,6 +9,7 @@ import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 export type HomebrewConfigContext = {
   enableBankedInspiration: boolean;
   bankedInspirationGmOnly: boolean;
+  swapAbilityScoreAndBonus: boolean;
 };
 
 export class HomebrewSettingsApplication extends SvelteApplicationMixin<
@@ -17,6 +18,7 @@ export class HomebrewSettingsApplication extends SvelteApplicationMixin<
   _config: HomebrewConfigContext = $state({
     bankedInspirationGmOnly: false,
     enableBankedInspiration: false,
+    swapAbilityScoreAndBonus: false,
   });
 
   static DEFAULT_OPTIONS: Partial<ApplicationConfiguration> = {
@@ -62,6 +64,7 @@ export class HomebrewSettingsApplication extends SvelteApplicationMixin<
     return {
       enableBankedInspiration: settings.value.enableBankedInspiration,
       bankedInspirationGmOnly: settings.value.bankedInspirationGmOnly,
+      swapAbilityScoreAndBonus: settings.value.swapAbilityScoreAndBonus,
     };
   }
 
@@ -73,6 +76,10 @@ export class HomebrewSettingsApplication extends SvelteApplicationMixin<
     await FoundryAdapter.setTidySetting(
       'bankedInspirationGmOnly',
       this._config.bankedInspirationGmOnly
+    );
+    await FoundryAdapter.setTidySetting(
+      'swapAbilityScoreAndBonus',
+      this._config.swapAbilityScoreAndBonus
     );
 
     await this.close();

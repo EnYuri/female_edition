@@ -645,6 +645,7 @@ export class Tidy5eNpcSheet
           relativeTo: this.actor,
         }
       ),
+      gear: [],
       habitat: [],
       hasLegendaries: false,
       hideEmptySpellbook: false,
@@ -809,6 +810,23 @@ export class Tidy5eNpcSheet
           a.label.localeCompare(b.label, game.i18n.lang)
         );
     }
+
+    // Gear (dnd5e 6.x: items flagged with the "gear" property)
+    context.gear = this.actor.items
+      .filter(
+        (i: Item5e) =>
+          i.system.quantity &&
+          i.system.properties?.has?.('gear') &&
+          typeof i.system.gearPresentationData === 'function'
+      )
+      .map((i: Item5e) => {
+        const { name } = i.system.gearPresentationData();
+        return {
+          item: i,
+          label: name,
+          quantity: i.system.quantity > 1 ? i.system.quantity : undefined,
+        };
+      });
 
     let tabs = await NpcSheetClassicRuntime.getTabs(context);
 
@@ -1134,6 +1152,36 @@ export class Tidy5eNpcSheet
 
   _disableFields(...args: any[]) {
     debug('Ignoring call to disable fields. Delegating to Tidy Sheets...');
+  }
+
+  /* -------------------------------------------- */
+  /*  Drag & Drop                                 */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onDragStart(
+    event: DragEvent & { target: HTMLElement; currentTarget: HTMLElement }
+  ) {
+    const target = event.currentTarget;
+    if (target?.matches('[data-item-id][data-gear]')) {
+      const itemId = target.getAttribute('data-item-id');
+      const item = await this.actor.items
+        .get(itemId)
+        ?.system.asGear?.();
+      if (item) {
+        event.dataTransfer?.setData(
+          'text/plain',
+          JSON.stringify({
+            data: item.isEmbedded
+              ? item.toObject()
+              : game.items.fromCompendium(item),
+            type: 'Item',
+          })
+        );
+        return;
+      }
+    }
+    return super._onDragStart(event);
   }
 
   /* -------------------------------------------- */

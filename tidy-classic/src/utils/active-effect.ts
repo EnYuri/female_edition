@@ -1,10 +1,60 @@
 import type { ActiveEffect5e } from 'src/types/types';
+import type { Item5e } from 'src/types/item.types';
 import { isNil } from './data';
 import { debug, error } from './logging';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import { getEffectChangeTypeLabel } from 'src/foundry/core-compat';
 
+/**
+ * Labels for effect category types.
+ */
+const EFFECT_CATEGORY_TYPE_LABEL_KEYS: Record<string, string> = {
+  temporary: 'DND5E.EFFECT.Status.Temporary',
+  passive: 'DND5E.EFFECT.Status.Passive',
+  inactive: 'DND5E.EFFECT.Status.Inactive',
+  suppressed: 'DND5E.EFFECT.Status.Unavailable',
+};
+
 export class ActiveEffectsHelper {
+  /**
+   * Get the short-form label for an effect category, e.g. "Passive" for the
+   * "Passive Effects" category. Falls back to the category's own label for any
+   * category the system adds later.
+   */
+  static getEffectCategoryTypeLabel(category: {
+    type: string;
+    label: string;
+  }): string {
+    return EFFECT_CATEGORY_TYPE_LABEL_KEYS[category.type] ?? category.label;
+  }
+
+  /**
+   * Map each rider effect ID on an item to the names of the enchantment effects
+   * that apply it so that we can show tooltips.
+   */
+  static getRiderEffectParentNames(item: Item5e): Record<string, string[]> {
+    const result: Record<string, string[]> = {};
+
+    const enchantmentEffects =
+      item.system?.activities
+        ?.getByType?.('enchant')
+        ?.flatMap((activity: any) => activity.effects) ?? [];
+
+    for (const enchantmentEffect of enchantmentEffects) {
+      const parentName = item.effects.get(enchantmentEffect._id)?.name;
+
+      if (!parentName) {
+        continue;
+      }
+
+      for (const riderId of enchantmentEffect.riders?.effect ?? []) {
+        (result[riderId] ??= []).push(parentName);
+      }
+    }
+
+    return result;
+  }
+
   static isActiveEffectAppliedToField(document: any, field: string) {
     try {
       return (

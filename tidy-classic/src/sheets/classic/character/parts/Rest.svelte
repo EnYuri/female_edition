@@ -1,4 +1,8 @@
 <script lang="ts">
+  import {
+    getRestTypes,
+    initiateActorRest,
+  } from 'src/foundry/dnd5e-compat';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { settings } from 'src/settings/settings.svelte';
   import { getCharacterSheetContext } from 'src/sheets/sheet-context.svelte';
@@ -9,36 +13,28 @@
 </script>
 
 <div class="rest-container" class:rounded={context.useRoundedPortraitStyle}>
-  <div class="resting">
+  <div
+    class="resting"
+    style:--rest-expanded-width="{2.875 + Object.keys(getRestTypes()).length * 2}rem"
+  >
     <span class="resting-icon" title={localize('TIDY5E.RestHint')}
       ><i class="rest-icon fas fa-bed"></i></span
     >
-    <button
-      type="button"
-      class="rest icon-button"
-      title={localize('TIDY5E.ShortRest')}
-      onclick={() => context.actor.shortRest()}
-      disabled={!context.editable}
-      tabindex={!settings.value.useDefaultSheetHpTabbing &&
-      settings.value.useAccessibleKeyboardSupport
-        ? 0
-        : -1}
-    >
-      <i class="fas fa-hourglass-half"></i>
-    </button>
-    <button
-      type="button"
-      class="rest icon-button"
-      title={localize('TIDY5E.LongRest')}
-      onclick={() => context.actor.longRest()}
-      disabled={!context.editable}
-      tabindex={!settings.value.useDefaultSheetHpTabbing &&
-      settings.value.useAccessibleKeyboardSupport
-        ? 0
-        : -1}
-    >
-      <i class="fas fa-hourglass-end"></i>
-    </button>
+    {#each Object.entries(getRestTypes()) as [key, rest]}
+      <button
+        type="button"
+        class="rest icon-button"
+        title={localize(rest.label ?? key)}
+        onclick={() => initiateActorRest(context.actor, key)}
+        disabled={!context.editable}
+        tabindex={!settings.value.useDefaultSheetHpTabbing &&
+        settings.value.useAccessibleKeyboardSupport
+          ? 0
+          : -1}
+      >
+        <i class={rest.icon ?? 'fas fa-bed'}></i>
+      </button>
+    {/each}
   </div>
 </div>
 
@@ -59,7 +55,7 @@
     .resting {
       &:is(:global(:hover)),
       &:has(:global(button:focus-visible)) {
-        width: 6.875rem;
+        width: var(--rest-expanded-width, 6.875rem);
       }
     }
   }

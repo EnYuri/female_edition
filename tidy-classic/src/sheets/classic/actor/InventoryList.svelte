@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import type { Item5e } from 'src/types/item.types';
   import ItemTable from '../../../components/item-list/v1/ItemTable.svelte';
   import ItemTableHeaderRow from '../../../components/item-list/v1/ItemTableHeaderRow.svelte';
@@ -34,6 +35,7 @@
   import { InlineToggleService } from 'src/features/expand-collapse/InlineToggleService.svelte';
   import { getSearchResultsContext } from 'src/features/search/search.svelte';
   import { getSheetContext } from 'src/sheets/sheet-context.svelte';
+  import { settings } from 'src/settings/settings.svelte';
   import { TidyFlags } from 'src/foundry/TidyFlags';
   import { isItemInActionList } from 'src/features/actions/actions.svelte';
 
@@ -47,6 +49,7 @@
     includeWeightColumn?: boolean;
     allowAttuneControl?: boolean;
     allowEquipControl?: boolean;
+    expandedOverride?: boolean;
   }
 
   let {
@@ -59,6 +62,7 @@
     includeWeightColumn = true,
     allowAttuneControl = true,
     allowEquipControl = true,
+    expandedOverride = undefined,
   }: Props = $props();
 
   let inlineToggleService = getContext<InlineToggleService>(
@@ -190,6 +194,7 @@
   <ItemTable
     key={section.key}
     data-custom-section={section.custom ? true : null}
+    {expandedOverride}
   >
     {#snippet header()}
       <ItemTableHeaderRow>
@@ -253,6 +258,28 @@
                 >
               </ItemName>
               <div class="primary-cell-extras">
+                {#if context.actor.system?.traits?.weaponProf?.mastery?.value?.has?.(
+                    item.system.type?.baseItem ?? ''
+                  )}
+                  {@const mastery =
+                    CONFIG.DND5E.weaponMasteries?.[item.system.mastery]}
+                  {@const masteryReference = settings.value
+                    .referenceTooltipMastery
+                    ? mastery?.reference
+                    : undefined}
+                  {@const masteryTooltip = mastery?.label
+                    ? localize('TIDY5E.ITEM.Weapon.Mastery.Label', {
+                        mastery: mastery.label,
+                      })
+                    : localize('DND5E.WEAPON.Mastery.Label')}
+                  <div class="item-detail weapon-mastery">
+                    <i
+                      class="item-state-icon fas fa-circle-star highlighted"
+                      data-tooltip={!masteryReference ? masteryTooltip : null}
+                      data-reference-tooltip={masteryReference ?? null}
+                    ></i>
+                  </div>
+                {/if}
                 {#if !context.useClassicControls}
                   {#if ctx?.attunement && !FoundryAdapter.concealDetails(item)}
                     <div class="item-detail attunement">
@@ -296,7 +323,7 @@
             </ItemTableCell>
             <ItemTableCell baseWidth="7.5rem" title={localize('DND5E.Usage')}>
               {#if ItemUtils.hasActivationType(item)}
-                {item.labels?.activation ?? ''}
+                {localizedActivationLabel(item)}
               {/if}
             </ItemTableCell>
             <ItemTableCell baseWidth="3rem">
@@ -340,7 +367,8 @@
 
 <style lang="less">
   .inventory-list-section {
-    .item-detail.attunement {
+    .item-detail.attunement,
+    .item-detail.weapon-mastery {
       display: flex;
       align-items: center;
       justify-content: center;

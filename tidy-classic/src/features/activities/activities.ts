@@ -1,4 +1,8 @@
 import type { Activity5e } from 'src/foundry/dnd5e.types';
+import {
+  localizedActivationTypeLabel,
+  resolveLocalizationKey,
+} from 'src/foundry/dnd5e-compat';
 import { TidyHooks } from 'src/foundry/TidyHooks';
 import type { Item5e } from 'src/types/item.types';
 import type {
@@ -66,9 +70,14 @@ export class Activities {
       isOnCooldown,
       activation: activationAbbr
         ? `${activity.activation.value ?? ''}${game.i18n.localize(
-            activationAbbr
+            resolveLocalizationKey(activationAbbr)
           )}`
-        : activity.labels.activation,
+        : (localizedActivationTypeLabel(
+            activity.activation?.type,
+            typeof activity.activation?.value === 'number'
+              ? activity.activation.value
+              : undefined
+          ) ?? activity.labels.activation),
       save: activity.save
         ? {
             ability: activity.save.ability?.size

@@ -7,6 +7,7 @@
     RenderableClassicControl,
   } from 'src/types/types';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import ItemTable from 'src/components/item-list/v1/ItemTable.svelte';
   import ItemTableHeaderRow from 'src/components/item-list/v1/ItemTableHeaderRow.svelte';
   import ItemTableColumn from 'src/components/item-list/v1/ItemTableColumn.svelte';
@@ -197,7 +198,7 @@
               </ItemTableCell>
               <ItemTableCell baseWidth="7.5rem">
                 {#if ItemUtils.hasActivationType(item)}
-                  <span>{item.labels?.activation ?? ''}</span>
+                  <span>{localizedActivationLabel(item)}</span>
                 {/if}
               </ItemTableCell>
 

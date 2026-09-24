@@ -37,6 +37,7 @@
         x.type !== CONSTANTS.SECTION_TYPE_ACTIVITY,
     );
 
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -59,6 +60,9 @@
         )}
         <InventoryList
           {section}
+          expandedOverride={searchResults.isSearching
+            ? visibleItemCount > 0
+            : undefined}
           lockControls={true}
           allowFavoriteIconNextToName={false}
           includeWeightColumn={false}
@@ -71,17 +75,41 @@
       {/if}
       <!-- TODO: Cut a copy of the Favorite Features component and custom tailor it for the generic section -->
       {#if section.type === CONSTANTS.SECTION_TYPE_FEATURE}
-        <FavoriteFeaturesList {section} />
+        {@const visibleItemCount = ItemVisibility.countVisibleItems(
+          section.items,
+          searchResults.uuids,
+        )}
+        <FavoriteFeaturesList
+          {section}
+          expandedOverride={searchResults.isSearching
+            ? visibleItemCount > 0
+            : undefined}
+        />
       {/if}
       {#if section.type === CONSTANTS.SECTION_TYPE_SPELLBOOK}
-        <FavoriteSpellsList {section} />
+        {@const visibleItemCount = ItemVisibility.countVisibleItems(
+          section.items,
+          searchResults.uuids,
+        )}
+        <FavoriteSpellsList
+          {section}
+          expandedOverride={searchResults.isSearching
+            ? visibleItemCount > 0
+            : undefined}
+        />
       {/if}
       {#if section.type === CONSTANTS.SECTION_TYPE_EFFECT}
         {@const visibleEffectIdSubset = FoundryAdapter.searchEffects(
           searchCriteria,
           section.effects.map((e) => e.effect),
         )}
-        <FavoriteEffectsList {section} {visibleEffectIdSubset} />
+        <FavoriteEffectsList
+          {section}
+          {visibleEffectIdSubset}
+          expandedOverride={searchCriteria.trim() !== ''
+            ? visibleEffectIdSubset.size > 0
+            : undefined}
+        />
       {/if}
       {#if section.type === CONSTANTS.SECTION_TYPE_FACILITY}
         <FavoriteFacilitiesList {section} />

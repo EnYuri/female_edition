@@ -16,6 +16,7 @@
   import TidyTableRow from 'src/components/table/TidyTableRow.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import { settings } from 'src/settings/settings.svelte';
+  import { getMovementSpeed } from 'src/foundry/dnd5e-compat';
   import { getEncounterSheetClassicContext } from 'src/sheets/sheet-context.svelte';
 
   interface Props {
@@ -57,6 +58,14 @@
         name: 'Formula',
         width: '7rem',
       },
+      {
+        name: 'Speed',
+        width: '4.5rem',
+      },
+      {
+        name: 'AC',
+        width: '3rem',
+      },
     ];
 
     if (section.showCrColumn) {
@@ -85,6 +94,14 @@
     return false;
   }
 
+  function memberMovementUnitAbbr(units: string | undefined): string {
+    return (
+      CONFIG.DND5E.movementUnits?.[units]?.abbreviation ??
+      Object.values(CONFIG.DND5E.movementUnits ?? {})[0]?.abbreviation ??
+      ''
+    );
+  }
+
   function saveFormulaChange(
     context: EncounterSheetClassicContext,
     ev: Event & { currentTarget: HTMLInputElement },
@@ -111,6 +128,12 @@
         </TidyTableHeaderCell>
         <TidyTableHeaderCell>
           <!-- Formula -->
+        </TidyTableHeaderCell>
+        <TidyTableHeaderCell>
+          {localize('DND5E.Speed')}
+        </TidyTableHeaderCell>
+        <TidyTableHeaderCell>
+          {localize('DND5E.AC')}
         </TidyTableHeaderCell>
         {#if section.showCrColumn}
           <TidyTableHeaderCell>
@@ -193,6 +216,34 @@
                   saveFormulaChange(context, ev, member.uuid)}
                 placeholder={localize('DND5E.Formula')}
               />
+            </TidyTableCell>
+            <TidyTableCell>
+              {@const memberMovement = member.system.attributes?.movement}
+              {@const memberWalk = memberMovement
+                ? getMovementSpeed(memberMovement, 'walk')
+                : undefined}
+              {#if memberWalk !== undefined}
+                <span
+                  class="text-body"
+                  data-attribution="attributes.movement"
+                  data-attribution-caption="DND5E.Speed"
+                  data-reference-tooltip={member.uuid}
+                >
+                  {memberWalk}&nbsp;{memberMovementUnitAbbr(
+                    memberMovement.units,
+                  )}
+                </span>
+              {/if}
+            </TidyTableCell>
+            <TidyTableCell>
+              <span
+                class="text-body semibold"
+                data-attribution="attributes.ac"
+                data-attribution-caption="DND5E.ArmorClass"
+                data-reference-tooltip={member.uuid}
+              >
+                {member.system.attributes?.ac?.value ?? '—'}
+              </span>
             </TidyTableCell>
             {#if section.showCrColumn}
               <TidyTableCell>

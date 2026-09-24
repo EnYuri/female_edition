@@ -11,6 +11,7 @@
   import ItemTable from 'src/components/item-list/v1/ItemTable.svelte';
   import ItemTableColumn from 'src/components/item-list/v1/ItemTableColumn.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import ItemTableRow from 'src/components/item-list/v1/ItemTableRow.svelte';
   import ItemTableCell from 'src/components/item-list/v1/ItemTableCell.svelte';
   import { CONSTANTS } from 'src/constants';
@@ -99,6 +100,7 @@
   );
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -226,6 +228,9 @@
           <ItemTable
             key={section.key}
             data-custom-section={section.custom ? true : null}
+            expandedOverride={searchCriteria.trim() !== ''
+              ? visibleItemCount > 0
+              : undefined}
           >
             {#snippet header()}
               <ItemTableHeaderRow>
@@ -329,7 +334,7 @@
                     {#if section.hasActions}
                       <ItemTableCell baseWidth="7.5rem">
                         {#if ItemUtils.hasActivationType(item)}
-                          {item.labels?.activation ?? ''}
+                          {localizedActivationLabel(item)}
                         {/if}
                       </ItemTableCell>
                     {/if}
@@ -436,9 +441,17 @@
           <div class="flex-1 small-padding-bottom flex-column small-gap">
             {#each spellbook as section (section.key)}
               {#if section.show}
+                {@const visibleItemCount = ItemVisibility.countVisibleItems(
+                  section.items,
+                  searchResults.uuids,
+                )}
+                {@const expandedOverride = searchCriteria.trim() !== ''
+                  ? visibleItemCount > 0
+                  : undefined}
                 {#if layoutMode === 'list'}
                   <SpellbookList
                     {section}
+                    {expandedOverride}
                     allowFavorites={false}
                     includeRange={false}
                     includeSchool={false}
@@ -447,7 +460,7 @@
                     usageBaseWidth="5.625rem"
                   />
                 {:else}
-                  <SpellbookGrid {section} />
+                  <SpellbookGrid {section} {expandedOverride} />
                 {/if}
               {/if}
             {/each}

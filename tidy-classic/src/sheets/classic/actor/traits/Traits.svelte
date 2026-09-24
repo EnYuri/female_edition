@@ -1,5 +1,8 @@
 <script lang="ts">
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { initiateActorRest } from 'src/foundry/dnd5e-compat';
+  import { CONSTANTS } from 'src/constants';
+  import { settings } from 'src/settings/settings.svelte';
   import type { ActorSheetContextV1, NpcSheetContext } from 'src/types/types';
   import TraitSection from './TraitSection.svelte';
   import TraitSectionTools from './TraitSectionTools.svelte';
@@ -38,9 +41,26 @@
       useConfigureButton={false}
       traitCssClass="counter"
     >
-      <span class="hit-dice-counter">
-        {context.system.attributes.hd.value}/{context.system.attributes.hd.max}
-      </span>
+      {#if context.actor.type === CONSTANTS.SHEET_TYPE_NPC && context.editable}
+        <button
+          type="button"
+          class="hit-dice-counter transparent-button"
+          title="{localize('DND5E.HitDice')} / {localize('TIDY5E.ShortRest')}"
+          onclick={() =>
+            initiateActorRest(context.actor, 'short', {
+              chat: settings.value.showNpcRestInChat,
+            })}
+          tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
+        >
+          {context.system.attributes.hd.value}/{context.system.attributes.hd
+            .max}
+        </button>
+      {:else}
+        <span class="hit-dice-counter">
+          {context.system.attributes.hd.value}/{context.system.attributes.hd
+            .max}
+        </span>
+      {/if}
     </TraitSection>
   {/if}
   {#if context.system.attributes?.death && (context.isCharacter || context.actor.system.traits.important)}
@@ -312,6 +332,41 @@
         {#each context.treasure as { label }}
           <li class="trait-tag">
             {label}
+          </li>
+        {/each}
+      </ul>
+    </TraitSection>
+  {/if}
+
+  {#if context.isNPC && 'gear' in context}
+    <TraitSection
+      title={localize('DND5E.Gear.Label')}
+      iconCssClass="fa-solid fa-axe"
+      show={!!context.gear.length}
+      useConfigureButton={false}
+    >
+      <ul class="trait-list">
+        {#each context.gear as gearEntry}
+          <li
+            class="trait-tag trait-gear"
+            data-item-id={gearEntry.item.id}
+            data-gear
+            data-tidy-draggable
+            data-uuid={gearEntry.item.uuid}
+          >
+            <button
+              type="button"
+              class="transparent-button trait-gear-name"
+              title={localize('TIDY5E.ContextMenuActionView')}
+              onclick={() => gearEntry.item.sheet?.render({ force: true })}
+              tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
+            >
+              {gearEntry.label}
+            </button>
+            {#if gearEntry.quantity}
+              <span class="text-secondary">|</span>
+              {gearEntry.quantity}
+            {/if}
           </li>
         {/each}
       </ul>

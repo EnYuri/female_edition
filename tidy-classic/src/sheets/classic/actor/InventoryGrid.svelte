@@ -22,9 +22,10 @@
 
   interface Props {
     section: InventorySection;
+    expandedOverride?: boolean;
   }
 
-  let { section }: Props = $props();
+  let { section, expandedOverride = undefined }: Props = $props();
 
   let context =
     $derived(getSheetContext<CharacterSheetContext | NpcSheetContext>());
@@ -89,7 +90,11 @@
   declareLocation('inventory-grid');
 </script>
 
-<ItemTable key={section.key} data-custom-section={section.custom ? true : null}>
+<ItemTable
+  key={section.key}
+  data-custom-section={section.custom ? true : null}
+  {expandedOverride}
+>
   {#snippet header()}
     <ItemTableHeaderRow>
       <ItemTableColumn primary={true}>

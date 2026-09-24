@@ -19,9 +19,54 @@
   let appId = $derived(context.document.id);
 
   const localize = FoundryAdapter.localize;
+
+  // dnd5e 5.3+ stores the spell's source class as `system.sourceItem`
+  // (`class:<identifier>`); older versions used `system.sourceClass`.
+  let usesSourceItem = $derived(
+    'sourceItem' in (context.item.system?.schema?.fields ?? {}),
+  );
+
+  let sourceItem = $derived(
+    context.document.parent?.identifiedItems
+      ?.get(context.source.sourceItem)
+      ?.first(),
+  );
+
+  let sourceItemLocked = $derived(
+    !!sourceItem && sourceItem.type !== CONSTANTS.ITEM_TYPE_CLASS,
+  );
+
+  let sourceItemOptions = $derived(
+    sourceItemLocked
+      ? [{ value: context.source.sourceItem, text: sourceItem.name }]
+      : Object.entries<any>(
+          context.document.parent?.spellcastingClasses ?? {},
+        ).map(([identifier, item]) => ({
+          value: `${item.type}:${identifier}`,
+          text: item.name,
+        })),
+  );
 </script>
 
 <h3 class="form-header">{localize('DND5E.SpellDetails')}</h3>
+
+{#if context.item.system.schema.fields.identifier}
+  <!-- Identifier -->
+  <div class="form-group">
+    <label for="{appId}-identifier">{localize('DND5E.Identifier')}</label>
+    <div class="form-fields">
+      <TextInput
+        id="{appId}-identifier"
+        document={context.item}
+        field="system.identifier"
+        value={context.source.identifier}
+        placeholder={context.item.identifier}
+        disabled={!context.editable}
+      />
+    </div>
+    <p class="hint">{localize('DND5E.IdentifierError')}</p>
+  </div>
+{/if}
 
 <!-- Spell Level -->
 <div class="form-group">
@@ -186,7 +231,32 @@
 </div>
 
 <!-- Source Class -->
-{#if context.isEmbedded}
+{#if context.isEmbedded && usesSourceItem}
+  <div class="form-group">
+    <label for="{appId}-sourceItem">{localize('DND5E.SpellSourceClass')}</label
+    >
+    <div class="form-fields">
+      <Select
+        id="{appId}-sourceItem"
+        document={context.item}
+        field="system.sourceItem"
+        value={context.source.sourceItem}
+        disabled={!context.editable || sourceItemLocked}
+        blankValue=""
+      >
+        <SelectOptions
+          data={sourceItemOptions}
+          valueProp="value"
+          labelProp="text"
+          blank=""
+        />
+      </Select>
+    </div>
+    {#if sourceItemLocked}
+      <p class="hint">{localize('DND5E.SourceItem.LockedHint')}</p>
+    {/if}
+  </div>
+{:else if context.isEmbedded}
   <div class="form-group">
     <label for="{appId}-sourceClass">{localize('DND5E.SpellSourceClass')}</label
     >
@@ -235,8 +305,10 @@
       <TextInput
         id="{appId}-sourceClass"
         document={context.item}
-        field="system.sourceClass"
-        value={context.source.sourceClass}
+        field={usesSourceItem ? 'system.sourceItem' : 'system.sourceClass'}
+        value={usesSourceItem
+          ? context.source.sourceItem
+          : context.source.sourceClass}
         disabled={!context.editable}
       />
     </div>

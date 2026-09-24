@@ -133,7 +133,7 @@
           {@const bgImg = chosen.img.includes(
             'systems/dnd5e/icons/svg/items/facility.svg',
           )
-            ? '../../modules/tidy5e-sheet/images/facility-default-background.webp'
+            ? 'modules/female_edition/tidy-classic/public/images/facility-default-background.webp'
             : chosen.img}
 
           {@const img = !chosen.disabled
@@ -292,7 +292,7 @@
           {@const bgImg = chosen.img.includes(
             'systems/dnd5e/icons/svg/items/facility.svg',
           )
-            ? '../../modules/tidy5e-sheet/images/facility-default-background.webp'
+            ? 'modules/female_edition/tidy-classic/public/images/facility-default-background.webp'
             : chosen.img}
 
           {@const img = !chosen.disabled

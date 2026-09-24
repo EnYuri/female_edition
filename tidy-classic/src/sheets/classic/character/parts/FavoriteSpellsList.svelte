@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CONSTANTS } from 'src/constants';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import { type SpellbookSection } from 'src/types/types';
   import ItemName from '../../../../components/item-list/ItemName.svelte';
   import ItemTable from '../../../../components/item-list/v1/ItemTable.svelte';
@@ -22,9 +23,10 @@
 
   interface Props {
     section: SpellbookSection;
+    expandedOverride?: boolean;
   }
 
-  let { section }: Props = $props();
+  let { section, expandedOverride = undefined }: Props = $props();
 
   let inlineToggleService = getContext<InlineToggleService>(
     CONSTANTS.SVELTE_CONTEXT.INLINE_TOGGLE_SERVICE,
@@ -49,6 +51,7 @@
   <ItemTable
     key={section.key}
     data-custom-section={section.custom ? true : null}
+    {expandedOverride}
   >
     {#snippet header()}
       {@const visibleItemCount = ItemVisibility.countVisibleItems(
@@ -153,7 +156,7 @@
               baseWidth="7.5rem"
               title={localize('DND5E.SpellUsage')}
             >
-              {spell.labels.activation}
+              {localizedActivationLabel(spell)}
             </ItemTableCell>
           {/snippet}
         </ItemTableRow>

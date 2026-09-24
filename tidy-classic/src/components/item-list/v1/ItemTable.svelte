@@ -17,12 +17,24 @@
      * Denotes whether the table can be expanded and collapsed.
      */
     toggleable?: boolean;
+    /**
+     * When defined, overrides the tracked expansion state — e.g. to
+     * auto-expand sections with hits while searching.
+     */
+    expandedOverride?: boolean;
     header?: Snippet;
     body?: Snippet;
     [key: string]: any;
   }
 
-  let { key, toggleable = true, header, body, ...rest }: Props = $props();
+  let {
+    key,
+    toggleable = true,
+    expandedOverride = undefined,
+    header,
+    body,
+    ...rest
+  }: Props = $props();
 
   let { class: cssClass, ...attributes } = rest;
 
@@ -48,7 +60,9 @@
   }
 
   let expanded = $derived(
-    !toggleable || sectionExpansionTracker.isExpanded(key, tabId, location),
+    !toggleable ||
+      (expandedOverride ??
+        sectionExpansionTracker.isExpanded(key, tabId, location)),
   );
 </script>
 

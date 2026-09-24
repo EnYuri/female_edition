@@ -1,9 +1,20 @@
 <script lang="ts">
+  import {
+    getRestTypes,
+    initiateActorRest,
+    refreshActor,
+  } from 'src/foundry/dnd5e-compat';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { settings } from 'src/settings/settings.svelte';
   import { getNpcSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getNpcSheetContext());
+
+  let restTypeCount = $derived(Object.keys(getRestTypes()).length);
+  let showRefresh = $derived(FoundryAdapter.userIsGm());
+  let expandedWidth = $derived(
+    2.125 + 1.875 * (restTypeCount + (showRefresh ? 1 : 0)),
+  );
 
   const localize = FoundryAdapter.localize;
 </script>
@@ -13,42 +24,43 @@
   class:has-rounded-portrait={context.useRoundedPortraitStyle}
   title={localize('TIDY5E.RestHint')}
 >
-  <div class="resting">
+  <div class="resting" style:--rest-expanded-width="{expandedWidth}rem">
     <span class="resting-icon">
       <i class="rest-icon fas fa-bed"></i>
     </span>
-    <button
-      type="button"
-      class="rest short-rest inline-icon-button"
-      title={localize('TIDY5E.ShortRest')}
-      onclick={() =>
-        context.actor.shortRest({
-          chat: settings.value.showNpcRestInChat,
-        })}
-      disabled={!context.editable}
-      tabindex={!settings.value.useDefaultSheetHpTabbing &&
-      settings.value.useAccessibleKeyboardSupport
-        ? 0
-        : -1}
-    >
-      <i class="fas fa-hourglass-half"></i>
-    </button>
-    <button
-      type="button"
-      class="rest long-rest inline-icon-button"
-      title={localize('TIDY5E.LongRest')}
-      onclick={() =>
-        context.actor.longRest({
-          chat: settings.value.showNpcRestInChat,
-        })}
-      disabled={!context.editable}
-      tabindex={!settings.value.useDefaultSheetHpTabbing &&
-      settings.value.useAccessibleKeyboardSupport
-        ? 0
-        : -1}
-    >
-      <i class="fas fa-hourglass-end"></i>
-    </button>
+    {#if showRefresh}
+      <button
+        type="button"
+        class="rest inline-icon-button"
+        title={localize('TIDY5E.NPC.Refresh.label')}
+        onclick={() => refreshActor(context.actor)}
+        disabled={!context.editable}
+        tabindex={!settings.value.useDefaultSheetHpTabbing &&
+        settings.value.useAccessibleKeyboardSupport
+          ? 0
+          : -1}
+      >
+        <i class="fas fa-arrows-rotate-reverse"></i>
+      </button>
+    {/if}
+    {#each Object.entries(getRestTypes()) as [key, rest]}
+      <button
+        type="button"
+        class="rest {key}-rest inline-icon-button"
+        title={localize(rest.label ?? key)}
+        onclick={() =>
+          initiateActorRest(context.actor, key, {
+            chat: settings.value.showNpcRestInChat,
+          })}
+        disabled={!context.editable}
+        tabindex={!settings.value.useDefaultSheetHpTabbing &&
+        settings.value.useAccessibleKeyboardSupport
+          ? 0
+          : -1}
+      >
+        <i class={rest.icon ?? 'fas fa-bed'}></i>
+      </button>
+    {/each}
   </div>
 </div>
 
@@ -74,7 +86,7 @@
 
     &:hover,
     &:focus-within {
-      width: 5.875rem;
+      width: var(--rest-expanded-width, 5.875rem);
     }
 
     .rest {

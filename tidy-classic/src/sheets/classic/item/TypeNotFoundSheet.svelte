@@ -1,17 +1,23 @@
 <script lang="ts">
+  import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getItemSheetContext());
+  const localize = FoundryAdapter.localize;
 </script>
 
-<h2>Item Type Not Found</h2>
+<h2>{localize('FE_TIDY.TypeNotFound.Title')}</h2>
 
 <p>
-  The item type <code>{context.item.type}</code> does not have a sheet in Tidy
-  5e Sheets. Please request any item type sheets in an issue on the
+  {localize('FE_TIDY.TypeNotFound.Prefix')}
+  <code>{context.item.type}</code>
+  {localize('FE_TIDY.TypeNotFound.Suffix')}
+</p>
+<p>
   <a
     target="_blank"
-    href="https://github.com/kgar/foundry-vtt-tidy-5e-sheets/issues"
-    >Tidy 5e github repository</a
+    rel="noopener noreferrer"
+    href="https://github.com/EnYuri/female_edition/issues"
+    >{localize('FE_TIDY.TypeNotFound.Report')}</a
   >.
 </p>

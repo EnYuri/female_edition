@@ -564,6 +564,12 @@ export type NpcHabitat = {
   subtype?: string;
 };
 
+export type NpcGearEntry = {
+  item: Item5e;
+  label: string;
+  quantity?: number;
+};
+
 export type NpcSheetContext = {
   appearanceEnrichedHtml: string;
   biographyEnrichedHtml: string;
@@ -574,6 +580,7 @@ export type NpcSheetContext = {
   features: NpcAbilitySection[];
   flags: SpecialTraits;
   flawEnrichedHtml: string;
+  gear: NpcGearEntry[];
   hasLegendaries: boolean;
   habitat: { label: string }[];
   hideEmptySpellbook: boolean;
@@ -738,7 +745,7 @@ export type EncumbranceContext = {
 };
 
 export type SpecialTraitSectionField = {
-  field: DataField; // A data field subclass from Foundry or dnd5e
+  field?: DataField; // A data field subclass from Foundry or dnd5e
   hint?: string;
   input?: any; // A function that receives field and config; e.g., createCheckboxInput(field, config)
   name: string;
@@ -746,6 +753,19 @@ export type SpecialTraitSectionField = {
   type?: any; // Boolean(), String(), Number(), etc.
   placeholder?: any; // A placeholder of the specified type; e.g., 30
   value?: any;
+  /** Option choices for select inputs. */
+  choices?: Record<string, unknown> | unknown[];
+  /** Additional classes for the field's form group. */
+  classes?: string;
+  /** Label override for the field's form group. */
+  label?: string;
+  /** Group heading (label/hint) when this entry wraps nested `fields`. */
+  group?: {
+    label?: string;
+    hint?: string;
+  };
+  /** Nested fields rendered together under one labeled form group. */
+  fields?: SpecialTraitSectionField[];
 };
 
 export type SpecialTraitClass = {

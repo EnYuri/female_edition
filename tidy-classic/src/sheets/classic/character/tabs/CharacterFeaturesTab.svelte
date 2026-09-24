@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import {
     type CharacterFeatureSection,
     type RenderableClassicControl,
@@ -117,6 +118,7 @@
   );
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -183,6 +185,9 @@
           <ItemTable
             key={section.key}
             data-custom-section={section.custom ? true : null}
+            expandedOverride={searchCriteria.trim() !== ''
+              ? visibleItemCount > 0
+              : undefined}
           >
             {#snippet header()}
               <ItemTableHeaderRow>
@@ -289,7 +294,7 @@
                     {#if section.showUsagesColumn}
                       <ItemTableCell baseWidth="7.5rem">
                         {#if ItemUtils.hasActivationType(item)}
-                          {item.labels?.activation ?? ''}
+                          {localizedActivationLabel(item)}
                         {/if}
                       </ItemTableCell>
                     {/if}

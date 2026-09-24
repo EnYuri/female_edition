@@ -4,6 +4,7 @@
   import SelectOptions from 'src/components/inputs/SelectOptions.svelte';
   import ItemProperties from '../parts/ItemProperties.svelte';
   import ContentConcealer from 'src/components/content-concealment/ContentConcealer.svelte';
+  import TextInput from 'src/components/inputs/TextInput.svelte';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getItemSheetContext());
@@ -15,6 +16,24 @@
 
 <ContentConcealer conceal={context.concealDetails}>
   <h3 class="form-header">{localize('DND5E.ItemLootDetails')}</h3>
+
+  {#if context.item.system.schema.fields.identifier}
+    <!-- Identifier -->
+    <div class="form-group">
+      <label for="{appId}-identifier">{localize('DND5E.Identifier')}</label>
+      <div class="form-fields">
+        <TextInput
+          id="{appId}-identifier"
+          document={context.item}
+          field="system.identifier"
+          value={context.source.identifier}
+          placeholder={context.item.identifier}
+          disabled={!context.editable}
+        />
+      </div>
+      <p class="hint">{localize('DND5E.IdentifierError')}</p>
+    </div>
+  {/if}
 
   <!-- Loot Type -->
   <div class="form-group">

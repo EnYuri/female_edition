@@ -2832,7 +2832,7 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
   .ability-bonus-container {
   background:
     transparent
-    url("/modules/tidy5e-sheet/images/badge_ability_dark.webp")
+    url("/modules/female_edition/tidy-classic/public/images/badge_ability_dark.webp")
     no-repeat
     50% 0%
     / contain !important;
@@ -2843,7 +2843,7 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
   .ability-bonus-container.proficient {
-  background-image: url("/modules/tidy5e-sheet/images/badge_ability_dark_prof.webp") !important;
+  background-image: url("/modules/female_edition/tidy-classic/public/images/badge_ability_dark_prof.webp") !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
@@ -2914,7 +2914,7 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
   align-self: center !important;
   background:
     transparent
-    url("/modules/tidy5e-sheet/images/badge_init_dark.webp")
+    url("/modules/female_edition/tidy-classic/public/images/badge_init_dark.webp")
     no-repeat
     50% 0%
     / var(--fe-tidy-quadrone-badge-w) var(--fe-tidy-quadrone-badge-h) !important;

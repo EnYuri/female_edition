@@ -41,6 +41,24 @@
   );
 
   let localize = FoundryAdapter.localize;
+
+  // Sheet pins participate in search: only matching pins remain while searching.
+  let visibleAttributePins = $derived.by(() => {
+    const trimmed = searchCriteria.trim().toLowerCase();
+
+    if (trimmed === '') {
+      return context.attributePins;
+    }
+
+    return context.attributePins.filter(
+      (pin) =>
+        pin.alias?.toLowerCase().includes(trimmed) ||
+        (pin.type === 'item'
+          ? FoundryAdapter.searchItem(pin.document, searchCriteria)
+          : pin.document.name.toLowerCase().includes(trimmed) ||
+            FoundryAdapter.searchItem(pin.document.item, searchCriteria)),
+    );
+  });
 </script>
 
 <UtilityToolbar>
@@ -101,9 +119,9 @@
       {/if}
     </section>
     <section class="main-panel">
-      {#if context.attributePins.length}
+      {#if visibleAttributePins.length}
         <div class="attribute-pins">
-          {#each context.attributePins as ctx (ctx.id)}
+          {#each visibleAttributePins as ctx (ctx.id)}
             <svelte:boundary
               onerror={(e) =>
                 error(

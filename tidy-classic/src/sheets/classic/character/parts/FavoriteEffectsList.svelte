@@ -19,9 +19,14 @@
      * Useful for showing only search results, for example.
      */
     visibleEffectIdSubset?: Set<string> | null;
+    expandedOverride?: boolean;
   }
 
-  let { section, visibleEffectIdSubset = null }: Props = $props();
+  let {
+    section,
+    visibleEffectIdSubset = null,
+    expandedOverride = undefined,
+  }: Props = $props();
 
   const localize = FoundryAdapter.localize;
 
@@ -33,7 +38,7 @@
   const controlsColumnWidth = '3rem';
 </script>
 
-<ItemTable key={section.key} class="favorite-effects">
+<ItemTable key={section.key} class="favorite-effects" {expandedOverride}>
   {#snippet header()}
     <ItemTableHeaderRow>
       <ItemTableColumn primary={true}>

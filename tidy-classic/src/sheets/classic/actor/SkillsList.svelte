@@ -120,11 +120,17 @@
           skillRef.skill.prof.hasProficiency > 0)}
 
       {#if showSkill}
+        {@const reference =
+          settings.value.referenceTooltipSkill && skillRef.skill
+            ? CONFIG.DND5E.skills[skillRef.key]?.reference
+            : undefined}
         <li
           class="proficiency-row skill"
           class:proficient={skillRef.skill.prof.hasProficiency}
           data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.SKILL_CONTAINER}
           data-key={skillRef.key}
+          data-reference-tooltip={reference ?? null}
+          data-tooltip-direction="RIGHT"
         >
           {#if context.editable && context.unlocked}
             {@const activeEffectApplied =
@@ -210,7 +216,11 @@
                 onSkillAbilityChange(option, skillRef)}
             />
           {:else}
-            <span class="skill-ability">{skillRef.skill.abbreviation}</span>
+            <span
+              class="skill-ability"
+              data-context-menu={CONSTANTS.CONTEXT_MENU_TYPE_SKILL_ROLL}
+              >{skillRef.skill.abbreviation}</span
+            >
           {/if}
 
           <span class="skill-mod">{formatAsModifier(skillRef.skill.total)}</span

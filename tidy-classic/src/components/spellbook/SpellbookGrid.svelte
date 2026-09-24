@@ -23,9 +23,14 @@
   interface Props {
     section: SpellbookSection;
     cssClass?: string | null;
+    expandedOverride?: boolean;
   }
 
-  let { section, cssClass = null }: Props = $props();
+  let {
+    section,
+    cssClass = null,
+    expandedOverride = undefined,
+  }: Props = $props();
 
   let context =
     $derived(getSheetContext<CharacterSheetContext | NpcSheetContext>());
@@ -81,6 +86,7 @@
   <ItemTable
     key={section.key}
     data-custom-section={section.custom ? true : null}
+    {expandedOverride}
   >
     {#snippet header()}
       <ItemTableHeaderRow>

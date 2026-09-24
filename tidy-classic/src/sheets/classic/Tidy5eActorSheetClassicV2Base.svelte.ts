@@ -547,7 +547,7 @@ export function Tidy5eActorSheetClassicV2Base<
           trait === 'dr' &&
           this.document.hasConditionEffect('petrification')
         ) {
-          data.selected = { custom1: game.i18n.localize('DND5E.DamageAll') };
+          data.selected = { custom1: FoundryAdapter.localize('DND5E.DamageAll') };
           data.cssClass = '';
         }
       }
@@ -791,9 +791,10 @@ export function Tidy5eActorSheetClassicV2Base<
      * @protected
      */
     _applyTooltips(element: HTMLElement) {
-      if ('tooltip' in element.dataset) return;
+      if ('tooltip' in element.dataset || 'tooltipHtml' in element.dataset)
+        return;
       const uuid = element.dataset.referenceTooltip ?? this.actor.uuid;
-      element.dataset.tooltip = `
+      element.dataset.tooltipHtml = `
       <section class="loading" data-uuid="${uuid}"><i class="fas fa-spinner fa-spin-pulse"></i></section>
     `;
       if (element.dataset.attribution)

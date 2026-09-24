@@ -6,6 +6,7 @@
   import ItemTableRow from '../../../../components/item-list/v1/ItemTableRow.svelte';
   import ItemTableCell from '../../../../components/item-list/v1/ItemTableCell.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+  import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
   import { CONSTANTS } from 'src/constants';
   import ItemName from '../../../../components/item-list/ItemName.svelte';
   import ItemUseButton from '../../../../components/item-list/ItemUseButton.svelte';
@@ -20,9 +21,10 @@
 
   interface Props {
     section: Omit<CharacterFeatureSection, 'type'>;
+    expandedOverride?: boolean;
   }
 
-  let { section }: Props = $props();
+  let { section, expandedOverride = undefined }: Props = $props();
 
   let context = $derived(getCharacterSheetContext());
 
@@ -39,7 +41,11 @@
   const localize = FoundryAdapter.localize;
 </script>
 
-<ItemTable key={section.key} data-custom-section={section.custom ? true : null}>
+<ItemTable
+    key={section.key}
+    data-custom-section={section.custom ? true : null}
+    {expandedOverride}
+  >
   {#snippet header()}
     {@const visibleItemCount = ItemVisibility.countVisibleItems(
       section.items,
@@ -106,7 +112,7 @@
           </ItemTableCell>
           <ItemTableCell baseWidth="7.5rem">
             {#if ItemUtils.hasActivationType(item)}
-              {item.labels?.activation ?? ''}
+              {localizedActivationLabel(item)}
             {/if}
           </ItemTableCell>
         {/snippet}

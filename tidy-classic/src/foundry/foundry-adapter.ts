@@ -30,6 +30,8 @@ import {
   getMovementSpeed,
   getSenseLabel,
   getSenseRange,
+  localizedActivationTypeLabel,
+  resolveLocalizationKey,
 } from 'src/foundry/dnd5e-compat';
 
 const quadroneSheetRegex = /Tidy.*Quadrone/;
@@ -122,18 +124,19 @@ export const FoundryAdapter = {
     return `modules/${CONSTANTS.SETTINGS_NAMESPACE}/tidy-classic/public/templates/${templateName}`;
   },
   localize(value: string, options?: Record<string, unknown>) {
+    const key = resolveLocalizationKey(value);
     if (options) {
-      return game.i18n.format(value, options);
+      return game.i18n.format(key, options);
     }
 
-    return game.i18n.localize(value);
+    return game.i18n.localize(key);
   },
   // TODO: Extract a dedicated ActiveEffectManager or the like
   addEffect(effectType: string, parent: any) {
     const isActor = parent instanceof Actor;
 
     const effectData = {
-      name: isActor ? game.i18n.localize('DND5E.EffectNew') : parent.name,
+      name: isActor ? game.i18n.localize(resolveLocalizationKey('DND5E.EffectNew')) : parent.name,
       icon: isActor ? 'icons/svg/aura.svg' : parent.img,
       origin: parent.uuid,
       'duration.rounds': effectType === 'temporary' ? 1 : undefined,
@@ -1573,7 +1576,9 @@ export const FoundryAdapter = {
         hour: 'DND5E.TimeHourAbbr',
         day: 'DND5E.TimeDayAbbr',
       }[type || ''],
-      label: CONFIG.DND5E.activityActivationTypes[type]?.label,
+      label:
+        localizedActivationTypeLabel(type) ??
+        CONFIG.DND5E.activityActivationTypes[type]?.label,
     };
   },
   getAdvancementOriginId(item: Item5e) {

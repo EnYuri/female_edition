@@ -4,6 +4,10 @@
   import { CONSTANTS } from 'src/constants';
   import Select from 'src/components/inputs/Select.svelte';
   import SelectOptions from 'src/components/inputs/SelectOptions.svelte';
+  import {
+    getRestTypes,
+    initiateActorRest,
+  } from 'src/foundry/dnd5e-compat';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { settings } from 'src/settings/settings.svelte';
   import ActorProfile from '../actor/ActorProfile.svelte';
@@ -118,24 +122,18 @@
           <i class="fa-solid fa-location-dot"></i>
           {localize('DND5E.Group.PlaceMembers')}
         </button>
-        <button
-          type="button"
-          class="group-action-button flex-row small-gap rest-button flex-grow-0 flex-basis-max-content"
-          onclick={() => context.actor.shortRest({ advanceTime: true })}
-          tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
-        >
-          <i class="fa-solid fa-utensils"></i>
-          {localize('DND5E.REST.Short.Label')}
-        </button>
-        <button
-          type="button"
-          class="group-action-button flex-row small-gap rest-button flex-grow-0 flex-basis-max-content"
-          onclick={() => context.actor.longRest({ advanceTime: true })}
-          tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
-        >
-          <i class="fa-solid fa-campground"></i>
-          {localize('DND5E.REST.Long.Label')}
-        </button>
+        {#each Object.entries(getRestTypes()) as [key, rest]}
+          <button
+            type="button"
+            class="group-action-button flex-row small-gap rest-button flex-grow-0 flex-basis-max-content"
+            onclick={() =>
+              initiateActorRest(context.actor, key, { advanceTime: true })}
+            tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
+          >
+            <i class={rest.icon ?? 'fas fa-bed'}></i>
+            {localize(rest.label ?? key)}
+          </button>
+        {/each}
       </div>
     {/if}
   </div>

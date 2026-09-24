@@ -12,6 +12,11 @@ export type UserSettingsContext = {
     inlineActivitiesPosition: CurrentSettings['inlineActivitiesPosition'];
     moveCharacterTraitsToRightOfSkills: CurrentSettings['moveCharacterTraitsToRightOfSkills'];
     moveNpcTraitsToRightOfSkills: CurrentSettings['moveNpcTraitsToRightOfSkills'];
+    referenceTooltipCondition: CurrentSettings['referenceTooltipCondition'];
+    referenceTooltipCreatureType: CurrentSettings['referenceTooltipCreatureType'];
+    referenceTooltipMastery: CurrentSettings['referenceTooltipMastery'];
+    referenceTooltipSkill: CurrentSettings['referenceTooltipSkill'];
+    referenceTooltipTool: CurrentSettings['referenceTooltipTool'];
     showClassList: CurrentSettings['showClassList'];
     showEquippedAmmoOnly: CurrentSettings['showEquippedAmmoOnly'];
     showExhaustionOnHover: CurrentSettings['showExhaustionOnHover'];

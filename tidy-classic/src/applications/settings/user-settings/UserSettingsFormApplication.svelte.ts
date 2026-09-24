@@ -79,6 +79,12 @@ export class UserSettingsFormApplication extends SvelteApplicationMixin<
           currentSettings.moveCharacterTraitsToRightOfSkills,
         moveNpcTraitsToRightOfSkills:
           currentSettings.moveNpcTraitsToRightOfSkills,
+        referenceTooltipCondition: currentSettings.referenceTooltipCondition,
+        referenceTooltipCreatureType:
+          currentSettings.referenceTooltipCreatureType,
+        referenceTooltipMastery: currentSettings.referenceTooltipMastery,
+        referenceTooltipSkill: currentSettings.referenceTooltipSkill,
+        referenceTooltipTool: currentSettings.referenceTooltipTool,
         showClassList: currentSettings.showClassList,
         showEquippedAmmoOnly: currentSettings.showEquippedAmmoOnly,
         showExhaustionOnHover: currentSettings.showExhaustionOnHover,

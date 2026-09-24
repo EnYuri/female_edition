@@ -48,6 +48,7 @@
   setSearchResultsContext(searchResults);
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -109,9 +110,13 @@
       )}
       {#if section.show}
         {#if (searchCriteria.trim() === '' && context.unlocked) || visibleItemCount > 0}
+          {@const expandedOverride = searchCriteria.trim() !== ''
+            ? visibleItemCount > 0
+            : undefined}
           {#if layoutMode === 'list'}
             <InventoryList
               {section}
+              {expandedOverride}
               allowEquipControl={false}
               allowAttuneControl={false}
               allowFavoriteIconNextToName={false}
@@ -122,7 +127,7 @@
               {/snippet}
             </InventoryList>
           {:else}
-            <InventoryGrid {section} />
+            <InventoryGrid {section} {expandedOverride} />
           {/if}
         {/if}
       {/if}

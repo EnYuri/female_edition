@@ -11,6 +11,13 @@
   let text = $derived(
     coalesce(context.system.details.type.label, localize('DND5E.CreatureType')),
   );
+
+  let reference = $derived(
+    settings.value.referenceTooltipCreatureType
+      ? CONFIG.DND5E.creatureTypes?.[context.system.details.type?.value]
+          ?.reference
+      : undefined,
+  );
 </script>
 
 {#if context.editable && (context.actor.type === 'npc' || context.system.details?.race?.id)}
@@ -20,13 +27,15 @@
     onclick={() => FoundryAdapter.renderCreatureTypeConfig(context.actor)}
     title={localize('DND5E.CreatureType')}
     tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
+    data-reference-tooltip={reference ?? null}
   >
     {text}
   </button>
 {:else}
   <span
     class="creature-type-label truncate"
-    title={localize('DND5E.CreatureType')}>{text}</span
+    title={localize('DND5E.CreatureType')}
+    data-reference-tooltip={reference ?? null}>{text}</span
   >
 {/if}
 

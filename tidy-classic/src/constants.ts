@@ -152,10 +152,12 @@ export const CONSTANTS = {
   CONTEXT_MENU_TYPE_FACILITY_OCCUPANTS: 'facility-occupants',
   CONTEXT_MENU_TYPE_VEHICLE_MEMBER: 'vehicle-member',
   CONTEXT_MENU_TYPE_GROUP_MEMBER: 'group-member',
+  CONTEXT_MENU_TYPE_GROUP_SKILL_ROLL: 'group-skill-roll',
   CONTEXT_MENU_TYPE_KEYED_FAVORITE: 'keyed-favorite',
   CONTEXT_MENU_TYPE_ITEMS: 'items',
   CONTEXT_MENU_TYPE_ITEM_ADVANCEMENT: 'item-advancement',
   CONTEXT_MENU_TYPE_SECTION: 'section',
+  CONTEXT_MENU_TYPE_SKILL_ROLL: 'skill-roll',
   CHARACTER_FEAT_SECTION_BACKGROUND: 'background',
   CHARACTER_FEAT_SECTION_CLASSES: 'classes',
   CHARACTER_FEAT_SECTION_ACTIVE: 'active',
@@ -518,6 +520,7 @@ export const CONSTANTS = {
     EXPANDED_ITEMS: 'expandedItems',
     FUNCTIONS: 'functions',
     HOVERED_FACILITY_OCCUPANT: 'hoveredFacilityOccupant',
+    INLINE_EFFECTS_READONLY: 'inlineEffectsReadonly',
     HP_TOOLTIP: 'hpTooltip',
     INLINE_TOGGLE_SERVICE: 'inlineToggleService',
     ITEM_FILTER_SERVICE: 'itemFilterService',
@@ -543,6 +546,12 @@ export const CONSTANTS = {
     USE_DEFAULT: 'useDefault',
     VALIDATE: 'validate',
   },
+  /**
+   * dnd5e roll request handler key for group ability checks. Shares the
+   * upstream key so request messages are interchangeable when the official
+   * module is also installed; registered with `??=` to avoid clobbering it.
+   */
+  ROLL_REQUEST_ABILITY_KEY: 'tidy5e-sheet.ability',
   WIKI_LINK: 'https://github.com/kgar/foundry-vtt-tidy-5e-sheets/wiki',
   WIKI_LINK_CHANGE_ALL_SHEETS_GUIDE:
     'https://github.com/kgar/foundry-vtt-tidy-5e-sheets/wiki/1.-Getting-Started#set-the-default-for-all-sheets',

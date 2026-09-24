@@ -17,6 +17,10 @@ import TypeNotFoundSheet from './item/TypeNotFoundSheet.svelte';
 import { mount } from 'svelte';
 import { TidyHooks } from 'src/foundry/TidyHooks';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+import {
+  localizedActivationLabel,
+  localizedActivationTypeLabel,
+} from 'src/foundry/dnd5e-compat';
 import { TabManager } from 'src/runtime/tab/TabManager';
 import type { GroupableSelectOption, Tab } from 'src/types/types';
 import { getPercentage } from 'src/utils/numbers';
@@ -324,7 +328,11 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
         ...Object.entries(CONFIG.DND5E.activityActivationTypes).map(
           // @ts-ignore
           ([value, { label, group }]) => {
-            return { value, label, group: group ?? '' };
+            return {
+              value,
+              label: localizedActivationTypeLabel(value) ?? label,
+              group: group ?? '',
+            };
           }
         ),
         { value: '', label: 'DND5E.NoneActionLabel' },
@@ -463,7 +471,10 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
       context.properties.active.push(
         ...(this.item.system.cardProperties ?? []),
         // @ts-expect-error
-        ...Object.values(this.item.labels.activations?.[0] ?? {}),
+        ...Object.entries(this.item.labels.activations?.[0] ?? {}).map(
+          ([key, value]) =>
+            key === 'activation' ? localizedActivationLabel(this.item) : value
+        ),
         ...(this.item.system.equippableItemCardProperties ?? [])
       );
     }

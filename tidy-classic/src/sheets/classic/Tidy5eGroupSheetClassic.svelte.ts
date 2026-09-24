@@ -17,8 +17,10 @@ import type {
   Group5e,
   Group5eMember,
   Group5eXp,
+  GroupAbility,
   GroupItemContext,
   GroupLanguage,
+  GroupMemberAbilityContext,
   GroupMemberContext,
   GroupMemberSection,
   GroupMemberSkillInfo,
@@ -42,7 +44,8 @@ import { initTidy5eContextMenu } from 'src/context-menu/tidy5e-context-menu';
 import { debug, warn } from 'src/utils/logging';
 import { processInputChangeDeltaFromValues } from 'src/utils/form';
 import { isNil } from 'src/utils/data';
-import { formatAsModifier } from 'src/utils/formatting';
+import { formatAsModifier, getModifierData } from 'src/utils/formatting';
+import { TidyHooks } from 'src/foundry/TidyHooks';
 import { SvelteApplicationMixin } from 'src/mixins/SvelteApplicationMixin.svelte';
 import { Activities } from 'src/features/activities/activities';
 import AttachedInfoCard from 'src/components/info-card/AttachedInfoCard.svelte';
@@ -56,7 +59,11 @@ import {
 } from 'src/mixins/TidyDocumentSheetMixin.svelte';
 import GroupSheetClassicRuntime from 'src/runtime/actor/GroupSheetClassicRuntime.svelte';
 import SheetHeaderModeToggleV2 from './shared/SheetHeaderModeToggleV2.svelte';
-import { getSenseLabel, getSenseRange } from 'src/foundry/dnd5e-compat';
+import {
+  getSenseLabel,
+  getSenseRange,
+  refreshActor,
+} from 'src/foundry/dnd5e-compat';
 
 type MemberStats = {
   currentHP: number;
@@ -226,6 +233,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       memberContext,
       groupLanguages,
       groupSkills,
+      groupAbilities,
     } = this.#prepareMembers();
 
     const source = this.actor.toObject();
@@ -475,6 +483,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       filterPins: ItemFilterRuntime.defaultFilterPins[this.actor.type],
       groupLanguages: groupLanguages,
       groupSkills: groupSkills,
+      groupAbilities: groupAbilities,
       healthPercentage: getPercentage(stats.currentHP, stats.maxHP),
       inventory: Object.values(inventory),
       isGM: game.user.isGM,
@@ -563,12 +572,22 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     });
   }
 
+  /**
+   * Quietly refreshes the given members via a long rest and re-renders.
+   * Intended for the GM-only "refresh all NPCs" section action.
+   */
+  async refreshMembers(members: Actor5e[]) {
+    await Promise.all(members.map((member) => refreshActor(member)));
+    this.render();
+  }
+
   #prepareMembers(): {
     sections: GroupMemberSection[];
     stats: MemberStats;
     memberContext: GroupSheetClassicContext['memberContext'];
     groupLanguages: GroupLanguage[];
     groupSkills: GroupSkill[];
+    groupAbilities: GroupAbility[];
   } {
     const stats: MemberStats = {
       currentHP: 0,
@@ -619,6 +638,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     const memberContext: GroupSheetClassicContext['memberContext'] = {};
     const groupLanguages: Record<string, GroupLanguage> = {};
     const groupSkills: Record<string, GroupSkill> = {};
+    const groupAbilities = this.#createGroupAbilityMap();
     const collectAggregates = FoundryAdapter.userIsGm();
     const configuredSkills = Object.entries(CONFIG.DND5E.skills);
 
@@ -682,6 +702,10 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
           groupSkill.total = Math.max(groupSkill.total, skill.total);
           groupSkill.members.push(member);
         }
+      }
+
+      if (collectAggregates) {
+        this.#prepareMemberAbilities(member, groupAbilities);
       }
 
       if (ctx.canObserve) {
@@ -775,7 +799,88 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       groupSkills: Object.values(groupSkills).sort((a, b) =>
         a.label.localeCompare(b.label, game.i18n.lang)
       ),
+      groupAbilities: [...groupAbilities.values()],
     };
+  }
+
+  #createGroupAbilityMap(): Map<string, GroupAbility> {
+    return new Map<string, GroupAbility>(
+      Object.entries(CONFIG.DND5E.abilities).map(
+        ([key, ability]: [string, any]) => [
+          key,
+          {
+            name: ability.label ?? ability.name ?? key,
+            key,
+            proficient: false,
+            high: { total: -Infinity, value: '∞', sign: '-' },
+            low: { total: Infinity, value: '∞', sign: '+' },
+            saveHigh: { total: -Infinity, value: '∞', sign: '-' },
+            saveLow: { total: Infinity, value: '∞', sign: '+' },
+            score: -Infinity,
+            members: [],
+            identifiers: new Map<string, GroupMemberAbilityContext>(),
+          },
+        ]
+      )
+    );
+  }
+
+  #prepareMemberAbilities(
+    member: Actor5e,
+    abilities: Map<string, GroupAbility>
+  ) {
+    for (let [key, ability] of Object.entries<any>(
+      member.system.abilities ?? {}
+    )) {
+      let groupAbility = abilities.get(key);
+
+      if (!groupAbility) {
+        continue;
+      }
+
+      const modData = getModifierData(ability.mod);
+      const saveData = getModifierData(ability.save?.value);
+      const scoreData = getModifierData(ability.value);
+
+      if (ability.mod > groupAbility.high.total) {
+        groupAbility.high = { total: ability.mod, ...modData };
+      }
+
+      if (ability.mod < groupAbility.low.total) {
+        groupAbility.low = { total: ability.mod, ...modData };
+      }
+
+      if (ability.save?.value > groupAbility.saveHigh.total) {
+        groupAbility.saveHigh = { total: ability.save.value, ...saveData };
+      }
+
+      if (ability.save?.value < groupAbility.saveLow.total) {
+        groupAbility.saveLow = { total: ability.save.value, ...saveData };
+      }
+
+      if (ability.value > groupAbility.score) {
+        groupAbility.score = ability.value;
+      }
+
+      groupAbility.identifiers.set(member.uuid, {
+        mod: ability.mod,
+        modSign: modData.sign,
+        modValue: modData.value,
+        proficient: ability.proficient,
+        save: ability.save?.value,
+        saveSign: saveData.sign,
+        saveValue: saveData.value,
+        score: ability.value,
+        scoreValue: scoreData.value,
+        scoreSign: scoreData.sign,
+      });
+
+      groupAbility.proficient ||= ability.proficient > 0;
+
+      if (!groupAbility.members.includes(member)) {
+        groupAbility.members.push(member);
+      }
+    }
   }
 
   #createEmptyGroupLanguage(language: any): GroupLanguage {
@@ -1017,6 +1122,75 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
   // Actions
   // ---------------------------------------------
 
+  onRollAbility(options: { ability: string; event: Event }) {
+    if (
+      !FoundryAdapter.userIsGm() ||
+      TidyHooks.tidy5eSheetsPrePromptGroupAbilityRoll(this, options) === false
+    ) {
+      return;
+    }
+
+    return this.rollAbility(options);
+  }
+
+  async rollAbility(config: { ability: string }) {
+    if (!config.ability) {
+      return;
+    }
+
+    const abilityConfig = CONFIG.DND5E.abilities[config.ability];
+    const abilityLabel = (abilityConfig as any)?.label ?? '';
+
+    await foundry.documents.ChatMessage.implementation.create({
+      flavor: FoundryAdapter.localize('DND5E.AbilityPromptTitle', {
+        ability: abilityLabel,
+      }),
+      speaker: ChatMessage.getSpeaker({
+        actor: this.actor,
+        alias: this.actor.name,
+      }),
+      system: {
+        button: {
+          icon: 'fa-solid fa-dice-d20',
+          label: FoundryAdapter.localize('TIDY5E.ACTOR.Ability.Action.Roll', {
+            ability: abilityLabel,
+          }),
+        },
+        data: { ...config },
+        handler: CONSTANTS.ROLL_REQUEST_ABILITY_KEY,
+        targets: this.actor.system.members.flatMap(
+          ({ actor }: { actor: Actor5e }) =>
+            actor?.system.abilities ? [{ actor: actor.uuid }] : []
+        ),
+      },
+      type: 'request',
+    });
+
+    return false;
+  }
+
+  onRollSavingThrow(options: { ability: string; event: Event }) {
+    if (
+      !FoundryAdapter.userIsGm() ||
+      TidyHooks.tidy5eSheetsPrePromptGroupSavingThrowRoll(this, options) ===
+        false
+    ) {
+      return;
+    }
+
+    return this.rollSavingThrow(options);
+  }
+
+  async rollSavingThrow(config: { ability: string }) {
+    if (!config.ability) {
+      return;
+    }
+
+    await this.document.system.rollSavingThrow(config);
+
+    return false;
+  }
+
   award() {
     const award = new dnd5e.applications.Award({
       award: {
@@ -1024,6 +1198,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       },
       origin: this.actor,
     });
+
     award.render(true);
   }
 }

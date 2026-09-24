@@ -69,6 +69,7 @@
   setSearchResultsContext(searchResults);
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = ItemVisibility.getItemsToShowAtDepth({
       criteria: searchCriteria,
       itemContext: context.itemContext,
@@ -118,7 +119,10 @@
       searchResults.uuids,
     )}
     {#if visibleItemCount > 0 && section.show}
-      <ItemTable key={section.key}>
+      <ItemTable
+        key={section.key}
+        expandedOverride={searchCriteria.trim() !== '' ? true : undefined}
+      >
         {#snippet header()}
           <ItemTableHeaderRow>
             <ItemTableColumn primary={true}>

@@ -1,6 +1,7 @@
 import type { Item5e } from 'src/types/item.types';
 import type { PropertyEntry } from './properties.types';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+import { localizedActivationLabel } from 'src/foundry/dnd5e-compat';
 
 export class ItemProperties {
   static getAdditionalItemProperties(item: Item5e): PropertyEntry[] {
@@ -20,7 +21,7 @@ function getSpellItemProperties(item: Item5e): PropertyEntry[] {
 
   entries.push({
     label: FoundryAdapter.localize('DND5E.SpellCastTime'),
-    value: labels.activation,
+    value: localizedActivationLabel(item),
   });
 
   entries.push({

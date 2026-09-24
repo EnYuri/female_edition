@@ -137,6 +137,7 @@ Hooks.once('init', () => {
   initSettings();
   initRuntime();
   initKeybindings();
+  registerCustomTidyRollRequests();
 });
 
 Hooks.once('ready', async () => {
@@ -195,3 +196,27 @@ Hooks.once('setup', async () => {
     )
     .join('\n\n');
 });
+
+function registerCustomTidyRollRequests() {
+  // dnd5e's roll-request system is only present on newer versions.
+  const requests = (CONFIG.DND5E as any)?.requests;
+  if (!requests) {
+    return;
+  }
+
+  requests[CONSTANTS.ROLL_REQUEST_ABILITY_KEY] ??= async (
+    actor: any,
+    request: any,
+    config: any,
+    { event }: { event?: Event } = {}
+  ) => {
+    const data = {};
+    foundry.utils.setProperty(data, 'flags.dnd5e.requestResult', {
+      actorUuid: actor.uuid,
+      requestId: request.id,
+    });
+    const [roll] =
+      (await actor.rollAbilityCheck({ ...config, event }, {}, { data })) ?? [];
+    return roll?.parent ?? null;
+  };
+}

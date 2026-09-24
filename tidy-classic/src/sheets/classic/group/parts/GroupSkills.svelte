@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CONSTANTS } from 'src/constants';
   import { getGroupSheetClassicContext } from 'src/sheets/sheet-context.svelte';
   import GroupSkillTooltip from 'src/tooltips/GroupSkillTooltip.svelte';
   import { formatAsModifier } from 'src/utils/formatting';
@@ -12,6 +13,8 @@
   {#each context.groupSkills as groupSkill}
     <span
       class="tag"
+      data-key={groupSkill.key}
+      data-context-menu={CONSTANTS.CONTEXT_MENU_TYPE_GROUP_SKILL_ROLL}
       data-tooltip-direction="UP"
       onmouseover={(ev) =>
         groupSkillTooltip.tryShow(ev, {

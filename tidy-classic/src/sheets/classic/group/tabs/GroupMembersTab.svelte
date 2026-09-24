@@ -10,6 +10,7 @@
   import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
   import GroupLanguages from '../parts/GroupLanguages.svelte';
   import GroupSkills from '../parts/GroupSkills.svelte';
+  import GroupAbilities from '../parts/GroupAbilities.svelte';
   import UnderlinedTabStrip from 'src/components/tabs/UnderlinedTabStrip.svelte';
   import ExpandableContainer from 'src/components/expandable/ExpandableContainer.svelte';
   import { getGroupSheetClassicContext } from 'src/sheets/sheet-context.svelte';
@@ -34,6 +35,7 @@
   setSearchResultsContext(searchResults);
 
   $effect(() => {
+    searchResults.criteria = searchCriteria;
     searchResults.uuids = FoundryAdapter.searchActors(
       searchCriteria,
       context.system.members.map((m) => m.actor),
@@ -51,6 +53,7 @@
   let aggregateTabs = {
     languages: localize('DND5E.Languages'),
     skills: localize('DND5E.Skills'),
+    abilities: localize('DND5E.Abilities'),
   } as const;
 
   let selectedAggregateTab = $state(aggregateTabs.languages);
@@ -88,6 +91,9 @@
           </div>
           <div class:hidden={selectedAggregateTab !== aggregateTabs.skills}>
             <GroupSkills />
+          </div>
+          <div class:hidden={selectedAggregateTab !== aggregateTabs.abilities}>
+            <GroupAbilities />
           </div>
         </div>
       </ExpandableContainer>

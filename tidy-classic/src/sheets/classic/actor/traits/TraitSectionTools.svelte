@@ -15,6 +15,24 @@
   let context = $derived(getSheetContext<ActorSheetContextV1>());
 
   const localize = FoundryAdapter.localize;
+
+  /**
+   * Resolves a tool's base item UUID for reference tooltips.
+   * `Trait.getBaseItemUUID` is probed because it is absent on older dnd5e;
+   * a config `id` that already looks like a UUID is used directly.
+   */
+  function getToolReference(key: string): string | undefined {
+    const id = CONFIG.DND5E.tools?.[key]?.id;
+    if (!id) {
+      return undefined;
+    }
+
+    if (typeof dnd5e.documents.Trait?.getBaseItemUUID === 'function') {
+      return dnd5e.documents.Trait.getBaseItemUUID(id);
+    }
+
+    return id.includes('.') ? id : undefined;
+  }
 </script>
 
 <ul
@@ -22,10 +40,15 @@
   data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.TOOLS_LIST}
 >
   {#each tools as [key, tool]}
+    {@const reference = settings.value.referenceTooltipTool
+      ? getToolReference(key)
+      : undefined}
     <li
       class="tool"
       data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.TOOL_CONTAINER}
       data-key={key}
+      data-reference-tooltip={reference ?? null}
+      data-tooltip-direction="RIGHT"
     >
       {#if context.editable && !context.lockSensitiveFields}
         {@const activeEffectApplied =

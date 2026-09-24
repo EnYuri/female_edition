@@ -15,7 +15,7 @@ import type {
   Tab,
   TidySectionBase,
 } from 'src/types/types';
-import { error } from 'src/utils/logging';
+import { error, warn } from 'src/utils/logging';
 import type { RenderResult } from './SvelteApplicationMixin.svelte';
 import {
   CustomContentRendererV2,
@@ -65,6 +65,11 @@ export function TidyExtensibleDocumentSheetMixin<
     _mode = $state<number | undefined>();
     _headerControlSettings: Map<string, SheetHeaderControlPosition> = new Map();
     _sectionForMenu?: TidySectionBase;
+    /**
+     * The tab that should be selected on the next render or on the next
+     * change of this property. Consumed by the `Tabs` component.
+     */
+    emphasizedTabId = $state<string | undefined>(undefined);
 
     constructor(options: TConstructorArgs) {
       super(options);
@@ -129,8 +134,139 @@ export function TidyExtensibleDocumentSheetMixin<
           });
           await fp.browse();
         },
+        emphasize: async function (
+          this: TidyDocumentSheet,
+          _event: Event,
+          target: HTMLElement
+        ) {
+          const {
+            emphasizeTabId,
+            emphasizeSelector,
+            emphasizeUuid,
+          } = target.dataset;
+
+          let sheet: any = this;
+
+          if (emphasizeUuid) {
+            const doc = await fromUuid(emphasizeUuid);
+            sheet = doc?.sheet;
+
+            if (!sheet) {
+              return;
+            }
+
+            await sheet.render({ force: true });
+          }
+
+          await sheet.emphasize?.(emphasizeTabId, emphasizeSelector);
+        },
+        'transfer-currency': async function (
+          this: TidyDocumentSheet,
+          _event: Event,
+          target: HTMLElement
+        ) {
+          const itemId = target.closest<HTMLElement>('[data-item-id]')?.dataset
+            .itemId;
+          const container =
+            (itemId ? this.actor?.items?.get(itemId) : null) ?? this.document;
+          const actor = container?.actor ?? this.actor;
+
+          if (!actor || !container?.system?.currency) {
+            warn(`No actor or currency found for container ${container?.uuid}.`);
+            return;
+          }
+
+          const containerUpdate: Record<string, number> = {};
+          const actorUpdate: Record<string, number> = {};
+          const originalActorCurrency: Record<string, number> = {};
+
+          for (const key of Object.keys(CONFIG.DND5E?.currencies ?? {})) {
+            const containerValue = container.system.currency?.[key] ?? 0;
+            const actorValue = actor.system.currency?.[key] ?? 0;
+
+            if (containerValue > 0) {
+              containerUpdate[`system.currency.${key}`] = 0;
+              actorUpdate[`system.currency.${key}`] =
+                actorValue + containerValue;
+              originalActorCurrency[`system.currency.${key}`] = actorValue;
+            }
+          }
+
+          if (foundry.utils.isEmpty(containerUpdate)) {
+            return;
+          }
+
+          const modifyBatch = (foundry.documents as any).modifyBatch;
+          if (typeof modifyBatch === 'function') {
+            const actorOperation = actor.parent
+              ? {
+                  action: 'update',
+                  documentName: 'ActorDelta',
+                  parent: actor.parent,
+                  updates: [{ _id: actor.parent.delta.id, ...actorUpdate }],
+                }
+              : {
+                  action: 'update',
+                  documentName: 'Actor',
+                  updates: [{ _id: actor.id, ...actorUpdate }],
+                };
+
+            await modifyBatch([
+              actorOperation,
+              {
+                action: 'update',
+                documentName: 'Item',
+                parent: actor,
+                updates: [{ _id: container.id, ...containerUpdate }],
+              },
+            ]);
+            return;
+          }
+
+          // Foundry v13 has no document batch API. Credit first, then restore
+          // the actor's original balance if the container debit is rejected.
+          if (!(await actor.update(actorUpdate))) {
+            return;
+          }
+          try {
+            if (!(await container.update(containerUpdate))) {
+              throw new Error('The container currency update was cancelled.');
+            }
+          } catch (transferError) {
+            try {
+              if (!(await actor.update(originalActorCurrency))) {
+                throw new Error('The actor currency rollback was cancelled.');
+              }
+            } catch (rollbackError) {
+              error('Container currency transfer could not be rolled back.', true, {
+                transferError,
+                rollbackError,
+              });
+            }
+            throw transferError;
+          }
+        },
       },
     };
+
+    /**
+     * Selects a tab and/or focuses an element on this sheet.
+     * Used by the `emphasize` sheet action.
+     */
+    async emphasize(tabId: string | undefined, selector: string | undefined) {
+      if (tabId) {
+        this.emphasizedTabId = tabId;
+      }
+
+      if (selector) {
+        // Give Svelte a chance to mount the newly selected tab's contents.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const element = this.element?.querySelector(selector);
+        if (element instanceof HTMLElement) {
+          element.focus();
+        }
+      }
+    }
 
     get sheetMode() {
       return this._fixedMode ?? this._mode;
