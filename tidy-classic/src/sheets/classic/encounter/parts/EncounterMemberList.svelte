@@ -14,6 +14,7 @@
   import RemoveMemberControl from '../../group/parts/RemoveMemberControl.svelte';
   import TidyTableCell from 'src/components/table/TidyTableCell.svelte';
   import TidyTableRow from 'src/components/table/TidyTableRow.svelte';
+  import FormulaInput from 'src/components/inputs/FormulaInput.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import { settings } from 'src/settings/settings.svelte';
   import { getMovementSpeed } from 'src/foundry/dnd5e-compat';
@@ -205,15 +206,17 @@
               />
             </TidyTableCell>
             <TidyTableCell>
-              <TextInput
+              <FormulaInput
                 class="centered"
                 document={context.actor}
                 field="system.members.{ctx.index}.quantity.formula"
                 value={context.system.members[ctx.index].quantity.formula}
-                allowDeltaChanges={true}
-                selectOnFocus={true}
-                onSaveChange={(ev) =>
-                  saveFormulaChange(context, ev, member.uuid)}
+                onSave={(v) =>
+                  context.actor.sheet.updateMemberFormula(member.uuid, {
+                    currentTarget: { value: v },
+                  } as Event & {
+                    currentTarget: EventTarget & HTMLInputElement;
+                  })}
                 placeholder={localize('DND5E.Formula')}
               />
             </TidyTableCell>

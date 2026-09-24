@@ -11,6 +11,7 @@
   import GroupLanguages from '../parts/GroupLanguages.svelte';
   import GroupSkills from '../parts/GroupSkills.svelte';
   import GroupAbilities from '../parts/GroupAbilities.svelte';
+  import GroupMasteries from '../parts/GroupMasteries.svelte';
   import UnderlinedTabStrip from 'src/components/tabs/UnderlinedTabStrip.svelte';
   import ExpandableContainer from 'src/components/expandable/ExpandableContainer.svelte';
   import { getGroupSheetClassicContext } from 'src/sheets/sheet-context.svelte';
@@ -54,6 +55,7 @@
     languages: localize('DND5E.Languages'),
     skills: localize('DND5E.Skills'),
     abilities: localize('DND5E.Abilities'),
+    masteries: localize('DND5E.WEAPON.FIELDS.mastery.label'),
   } as const;
 
   let selectedAggregateTab = $state(aggregateTabs.languages);
@@ -94,6 +96,9 @@
           </div>
           <div class:hidden={selectedAggregateTab !== aggregateTabs.abilities}>
             <GroupAbilities />
+          </div>
+          <div class:hidden={selectedAggregateTab !== aggregateTabs.masteries}>
+            <GroupMasteries />
           </div>
         </div>
       </ExpandableContainer>

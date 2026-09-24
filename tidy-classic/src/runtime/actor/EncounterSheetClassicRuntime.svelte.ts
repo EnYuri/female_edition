@@ -5,6 +5,7 @@ import type { RegisteredTab } from '../types';
 import EncounterMembersTab from 'src/sheets/classic/encounter/tabs/EncounterMembersTab.svelte';
 import EncounterInventoryTab from 'src/sheets/classic/encounter/tabs/EncounterInventoryTab.svelte';
 import EncounterDescriptionTab from 'src/sheets/classic/encounter/tabs/EncounterDescriptionTab.svelte';
+import ActorEffectsTab from 'src/sheets/classic/actor/ActorEffectsTab.svelte';
 
 const defaultEncounterClassicTabs: RegisteredTab<EncounterSheetClassicContext>[] =
   [
@@ -22,6 +23,15 @@ const defaultEncounterClassicTabs: RegisteredTab<EncounterSheetClassicContext>[]
       title: 'DND5E.Inventory',
       content: {
         component: EncounterInventoryTab,
+        type: 'svelte',
+      },
+      layout: 'classic',
+    },
+    {
+      id: CONSTANTS.TAB_EFFECTS,
+      title: 'DND5E.Effects',
+      content: {
+        component: ActorEffectsTab,
         type: 'svelte',
       },
       layout: 'classic',

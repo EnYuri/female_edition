@@ -7,9 +7,11 @@
   import { CONSTANTS } from 'src/constants';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
+  import UnderlinedTabStrip from 'src/components/tabs/UnderlinedTabStrip.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import PinnedFilterToggles from 'src/components/filter/PinnedFilterToggles.svelte';
   import { ItemFilterRuntime } from 'src/runtime/item/ItemFilterRuntime.svelte';
+  import { AttributePins } from 'src/features/attribute-pins/AttributePins';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
   import { TidyFlags } from 'src/foundry/TidyFlags';
   import { getCharacterSheetContext } from 'src/sheets/sheet-context.svelte';
@@ -42,15 +44,28 @@
 
   let localize = FoundryAdapter.localize;
 
+  const sidePanelTabs = {
+    skills: localize('DND5E.Skills'),
+    traits: localize('TIDY5E.CharacterTraits.Title'),
+  } as const;
+
+  let sidePanelTab = $state<string>(sidePanelTabs.skills);
+
   // Sheet pins participate in search: only matching pins remain while searching.
   let visibleAttributePins = $derived.by(() => {
+    const attributePins = context.attributePins.filter(
+      (pin) =>
+        (pin.tab ?? AttributePins.DEFAULT_TAB) ===
+        AttributePins.DEFAULT_TAB
+    );
+
     const trimmed = searchCriteria.trim().toLowerCase();
 
     if (trimmed === '') {
-      return context.attributePins;
+      return attributePins;
     }
 
-    return context.attributePins.filter(
+    return attributePins.filter(
       (pin) =>
         pin.alias?.toLowerCase().includes(trimmed) ||
         (pin.type === 'item'
@@ -108,14 +123,29 @@
 <div class="scroll-container">
   <div class="attributes-tab-contents">
     <section class="side-panel">
-      <SkillsList
-        actor={context.actor}
-        toggleable={settings.value.toggleEmptyCharacterSkills}
-        expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
-        toggleField={TidyFlags.skillsExpanded.prop}
-      />
       {#if !settings.value.moveCharacterTraitsToRightOfSkills}
-        <Traits />
+        <UnderlinedTabStrip
+          class="side-panel-tabs"
+          tabs={[localize('DND5E.Skills'), localize('TIDY5E.CharacterTraits.Title')]}
+          bind:selected={sidePanelTab}
+        />
+        {#if sidePanelTab === sidePanelTabs.skills}
+          <SkillsList
+            actor={context.actor}
+            toggleable={settings.value.toggleEmptyCharacterSkills}
+            expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
+            toggleField={TidyFlags.skillsExpanded.prop}
+          />
+        {:else}
+          <Traits />
+        {/if}
+      {:else}
+        <SkillsList
+          actor={context.actor}
+          toggleable={settings.value.toggleEmptyCharacterSkills}
+          expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
+          toggleField={TidyFlags.skillsExpanded.prop}
+        />
       {/if}
     </section>
     <section class="main-panel">

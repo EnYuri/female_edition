@@ -369,20 +369,22 @@ export class Tidy5eVehicleSheet
 
     const memberUuids = this.actor.system[area]?.value ?? [];
 
-    const memberCounts: Record<string, { actor: Actor5e; quantity: number }> =
-      {};
+    const memberCounts: Record<
+      string,
+      { actor?: Actor5e; uuid: string; quantity: number }
+    > = {};
 
     for (const uuid of memberUuids) {
       if (memberCounts[uuid]) {
         memberCounts[uuid].quantity++;
       } else {
         const actor = await fromUuid(uuid);
-        if (actor) {
-          memberCounts[uuid] = {
-            actor,
-            quantity: 1,
-          };
-        }
+        // Keep broken links as rows so they can be cleaned up.
+        memberCounts[uuid] = {
+          actor: actor ?? undefined,
+          uuid,
+          quantity: 1,
+        };
       }
     }
 

@@ -48,7 +48,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each activeEffect.changes as change}
+        {#each summaryData.changes ?? activeEffect.changes as change}
           {@const modeLabel = ActiveEffectsHelper.findMode(change)}
 
           <tr>
@@ -57,7 +57,12 @@
               class="truncate"
               style="word-wrap: break-all"
             >
-              {change.key}
+              <span class="effect-change-label flex-column">
+                <span class="effect-change-key">{change.key}</span>
+                {#if 'name' in change && change.name && change.name !== change.key}
+                  <span class="effect-change-name">{change.name}</span>
+                {/if}
+              </span>
             </td>
             <td>
               {modeLabel}
@@ -93,6 +98,11 @@
     th,
     td {
       padding: 0.25rem;
+    }
+
+    .effect-change-name {
+      color: var(--t5e-tertiary-color);
+      font-size: 0.75rem;
     }
   }
 </style>

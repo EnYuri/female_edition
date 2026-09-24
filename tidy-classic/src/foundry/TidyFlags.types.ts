@@ -13,6 +13,8 @@ type AttributePinBase = {
   /** The sort value */
   sort: number;
   alias?: string;
+  /** The tab where this pin is displayed. Absent means the Attributes tab. */
+  tab?: string;
 };
 
 export type AttributeItemPinFlag = AttributePinBase & {

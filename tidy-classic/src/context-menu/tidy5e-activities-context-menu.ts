@@ -39,7 +39,7 @@ export function configureActivitiesContextMenu(element: HTMLElement, app: any) {
 
   const menuItems = isQuadroneSheet
     ? getContextMenuOptionsQuadrone(activity, app, configurable, element)
-    : getContextMenuOptions(activity, app, configurable);
+    : getContextMenuOptions(activity, app, configurable, element);
 
   /**
    * A hook even that fires when the context menu for an Activity is opened.
@@ -56,7 +56,8 @@ export function configureActivitiesContextMenu(element: HTMLElement, app: any) {
 function getContextMenuOptions(
   activity: Activity5e,
   app: any,
-  configurable: boolean
+  configurable: boolean,
+  element: HTMLElement
 ): ContextMenuEntry[] {
   const entries: ContextMenuEntry[] = [];
 
@@ -99,28 +100,30 @@ function getContextMenuOptions(
     });
   }
 
+  const pinTabId = AttributePins.getTabFromElement(element);
+
   entries.push({
     name: 'TIDY5E.ContextMenuActionPinToAttributes',
     icon: `<i class="fa-solid fa-thumbtack"></i>`,
-    callback: async () => await AttributePins.pin(activity, 'activity'),
+    callback: async () => await AttributePins.pin(activity, 'activity', pinTabId),
     condition: () =>
       app.actor &&
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
       AttributePins.isPinnable(activity, 'activity') &&
-      !AttributePins.isPinned(activity),
+      !AttributePins.isPinned(activity, pinTabId),
     group: 'pins',
   });
 
   entries.push({
     name: 'TIDY5E.ContextMenuActionUnpinFromAttributes',
     icon: `<i class="fa-solid fa-xmark" style='color: var(--t5e-warning-accent-color)'></i>`,
-    callback: async () => await AttributePins.unpin(activity),
+    callback: async () => await AttributePins.unpin(activity, pinTabId),
     condition: () =>
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
       AttributePins.isPinnable(activity, 'activity') &&
-      AttributePins.isPinned(activity),
+      AttributePins.isPinned(activity, pinTabId),
     group: 'pins',
   });
 

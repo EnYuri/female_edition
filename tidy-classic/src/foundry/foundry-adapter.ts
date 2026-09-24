@@ -1038,6 +1038,10 @@ export const FoundryAdapter = {
     return game.dnd5e.config.abilities[abbr];
   },
   async actorTryUseItem(item: Item5e, event: Event) {
+    if (item.type === CONSTANTS.ITEM_TYPE_CONTAINER) {
+      return item.sheet.render({ force: true });
+    }
+
     const config = { legacy: false, event };
 
     const suppressItemUse =

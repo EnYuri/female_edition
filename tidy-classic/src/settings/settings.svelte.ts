@@ -945,6 +945,7 @@ export function createSettings() {
           default: [
             CONSTANTS.TAB_MEMBERS,
             CONSTANTS.TAB_ACTOR_INVENTORY,
+            CONSTANTS.TAB_EFFECTS,
             CONSTANTS.TAB_DESCRIPTION,
           ],
         },

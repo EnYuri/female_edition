@@ -460,6 +460,8 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
       disableExperience:
         systemSettings.value.levelingMode ===
         CONSTANTS.SYSTEM_SETTING_LEVELING_MODE_NO_XP,
+      allowEffectsManagement:
+        FoundryAdapter.allowCharacterEffectsManagement(this.actor),
       effects: dnd5e.applications.components.EffectsElement.prepareCategories(
         this.actor.allApplicableEffects()
       ),

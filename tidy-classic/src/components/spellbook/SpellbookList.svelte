@@ -22,7 +22,7 @@
   import SpellPrepareControl from '../spellbook/SpellPrepareControl.svelte';
   import InlineFavoriteIcon from '../item-list/InlineFavoriteIcon.svelte';
   import ItemFavoriteControl from '../item-list/controls/ItemFavoriteControl.svelte';
-  import { getContext, type ComponentProps } from 'svelte';
+  import { getContext, setContext, type ComponentProps } from 'svelte';
   import ActionFilterOverrideControl from '../item-list/controls/ActionFilterOverrideControl.svelte';
   import { SpellSchool } from 'src/features/spell-school/SpellSchool';
   import { declareLocation } from 'src/types/location-awareness.types';
@@ -67,6 +67,8 @@
     usageBaseWidth = '7.5rem',
     expandedOverride = undefined,
   }: Props = $props();
+
+  setContext(CONSTANTS.SVELTE_CONTEXT.INLINE_EFFECTS_READONLY, true);
 
   let inlineToggleService = getContext<InlineToggleService>(
     CONSTANTS.SVELTE_CONTEXT.INLINE_TOGGLE_SERVICE,
@@ -173,12 +175,14 @@
             <SpellSlotManagement {section} />
           {/if}
         </ItemTableColumn>
-        <ItemTableColumn
-          baseWidth={spellComponentsBaseWidth}
-          title={localize('DND5E.SpellComponents')}
-        >
-          <i class="fas fa-mortar-pestle"></i>
-        </ItemTableColumn>
+        {#if context.actor.type !== CONSTANTS.SHEET_TYPE_NPC}
+          <ItemTableColumn
+            baseWidth={spellComponentsBaseWidth}
+            title={localize('DND5E.SpellComponents')}
+          >
+            <i class="fas fa-mortar-pestle"></i>
+          </ItemTableColumn>
+        {/if}
         {#if includeSchool}
           <ItemTableColumn
             baseWidth={spellSchoolBaseWidth}
@@ -193,6 +197,14 @@
         >
           {localize('DND5E.Target')}
         </ItemTableColumn>
+        {#if context.actor.type === CONSTANTS.SHEET_TYPE_NPC}
+          <ItemTableColumn
+            baseWidth={spellComponentsBaseWidth}
+            title={localize('DND5E.SpellComponents')}
+          >
+            <i class="fas fa-mortar-pestle"></i>
+          </ItemTableColumn>
+        {/if}
         {#if includeRange}
           <ItemTableColumn baseWidth="4.375rem" title={localize('DND5E.Range')}>
             {localize('DND5E.Range')}
@@ -282,15 +294,17 @@
                 {/if}
               </div>
             </ItemTableCell>
-            <ItemTableCell
-              baseWidth={spellComponentsBaseWidth}
-              cssClass="no-gap"
-            >
-              <SpellComponents
-                {spell}
-                spellComponentLabels={context.spellComponentLabels}
-              />
-            </ItemTableCell>
+            {#if context.actor.type !== CONSTANTS.SHEET_TYPE_NPC}
+              <ItemTableCell
+                baseWidth={spellComponentsBaseWidth}
+                cssClass="no-gap"
+              >
+                <SpellComponents
+                  {spell}
+                  spellComponentLabels={context.spellComponentLabels}
+                />
+              </ItemTableCell>
+            {/if}
             {#if includeSchool}
               {@const icon = SpellSchool.getIcon(spell.system.school)}
               <ItemTableCell
@@ -319,6 +333,17 @@
                 {localize('DND5E.None')}
               {/if}
             </ItemTableCell>
+            {#if context.actor.type === CONSTANTS.SHEET_TYPE_NPC}
+              <ItemTableCell
+                baseWidth={spellComponentsBaseWidth}
+                cssClass="no-gap"
+              >
+                <SpellComponents
+                  {spell}
+                  spellComponentLabels={context.spellComponentLabels}
+                />
+              </ItemTableCell>
+            {/if}
             {#if includeRange}
               <ItemTableCell
                 baseWidth="4.375rem"

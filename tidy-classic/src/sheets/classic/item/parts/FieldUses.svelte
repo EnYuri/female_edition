@@ -3,6 +3,7 @@
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import NumberInput from 'src/components/inputs/NumberInput.svelte';
   import Checkbox from 'src/components/inputs/Checkbox.svelte';
+  import FormulaInput from 'src/components/inputs/FormulaInput.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import { settings } from 'src/settings/settings.svelte';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
@@ -165,16 +166,11 @@
                 />
               </select>
             {:else if recovery.data.type === 'formula'}
-              <input
-                type="text"
+              <FormulaInput
                 id="{appId}-uses-recovery-{index}-formula"
-                data-tidy-field="system.uses.recovery.{index}.formula"
-                onchange={(ev) =>
-                  context.sheet.updateRecovery(
-                    index,
-                    'formula',
-                    ev.currentTarget.value,
-                  )}
+                document={context.item}
+                field="system.uses.recovery.{index}.formula"
+                onSave={(v) => context.sheet.updateRecovery(index, 'formula', v)}
                 disabled={!context.editable}
                 value={recovery.data.formula ?? ''}
               />

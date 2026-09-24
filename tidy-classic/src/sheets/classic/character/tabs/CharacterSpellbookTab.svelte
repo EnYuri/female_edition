@@ -5,12 +5,13 @@
   import SpellbookFooter from '../../../../components/spellbook/SpellbookFooter.svelte';
   import SpellbookGrid from '../../../../components/spellbook/SpellbookGrid.svelte';
   import SpellbookClassFilter from '../../../../components/spellbook/SpellbookClassFilter.svelte';
-  import { getContext } from 'svelte';
+  import { getContext, setContext } from 'svelte';
   import NoSpells from 'src/sheets/classic/actor/NoSpells.svelte';
   import Notice from '../../../../components/notice/Notice.svelte';
   import { settings } from 'src/settings/settings.svelte';
   import { CONSTANTS } from 'src/constants';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
+  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -29,6 +30,8 @@
   import { getCharacterSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getCharacterSheetContext());
+
+  setContext(CONSTANTS.SVELTE_CONTEXT.INLINE_EFFECTS_READONLY, true);
 
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
@@ -145,6 +148,8 @@
     />
   {/each}
 </UtilityToolbar>
+
+  <TabPins {tabId} {searchCriteria} />
 <div
   class="scroll-container flex-column small-gap"
   data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEMS_CONTAINER}

@@ -5,6 +5,7 @@ import type { RegisteredTab } from '../types';
 import GroupMembersTab from 'src/sheets/classic/group/tabs/GroupMembersTab.svelte';
 import GroupInventoryTab from 'src/sheets/classic/group/tabs/GroupInventoryTab.svelte';
 import GroupDescriptionTab from 'src/sheets/classic/group/tabs/GroupDescriptionTab.svelte';
+import ActorEffectsTab from 'src/sheets/classic/actor/ActorEffectsTab.svelte';
 
 const defaultGroupClassicTabs: RegisteredTab<GroupSheetClassicContext>[] = [
   {
@@ -21,6 +22,15 @@ const defaultGroupClassicTabs: RegisteredTab<GroupSheetClassicContext>[] = [
     title: 'DND5E.Inventory',
     content: {
       component: GroupInventoryTab,
+      type: 'svelte',
+    },
+    layout: 'classic',
+  },
+  {
+    id: CONSTANTS.TAB_EFFECTS,
+    title: 'DND5E.Effects',
+    content: {
+      component: ActorEffectsTab,
       type: 'svelte',
     },
     layout: 'classic',

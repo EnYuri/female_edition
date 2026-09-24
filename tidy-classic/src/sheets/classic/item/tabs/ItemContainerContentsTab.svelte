@@ -156,23 +156,29 @@
     {/if}
   </UtilityToolbar>
 
-  <div
-    class="tidy-container-contents scroll-container flex-column small-gap"
-    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEMS_CONTAINER}
-  >
-    <ContainerContentsSections
-      contents={context.containerContents.contents}
-      container={context.item}
-      editable={context.editable}
-      itemContext={context.containerContents.itemContext}
-      {inlineToggleService}
-      lockItemQuantity={context.lockItemQuantity}
-      sheetDocument={context.item}
-    />
-  </div>
-  <footer class="container-contents-footer">
-    <CapacityBar container={context.item} capacity={context.capacity} />
-  </footer>
+  {#if (context.item.system as any).canViewContents !== false || context.unlocked}
+    <div
+      class="tidy-container-contents scroll-container flex-column small-gap"
+      data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEMS_CONTAINER}
+    >
+      <ContainerContentsSections
+        contents={context.containerContents.contents}
+        container={context.item}
+        editable={context.editable}
+        itemContext={context.containerContents.itemContext}
+        {inlineToggleService}
+        lockItemQuantity={context.lockItemQuantity}
+        sheetDocument={context.item}
+      />
+    </div>
+    <footer class="container-contents-footer">
+      <CapacityBar container={context.item} capacity={context.capacity} />
+    </footer>
+  {:else}
+    <p class="unidentified-notice">
+      {localize('DND5E.Unidentified.Notice')}
+    </p>
+  {/if}
 </div>
 
 <style lang="less">
@@ -197,6 +203,12 @@
     display: flex;
     gap: 0.25rem;
     flex-direction: column;
+  }
+
+  .unidentified-notice {
+    padding: 0.25rem;
+    font-style: italic;
+    color: var(--t5e-secondary-color);
   }
 
   .currency-wrapper {

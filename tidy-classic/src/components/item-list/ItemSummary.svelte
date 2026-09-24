@@ -13,6 +13,7 @@
   import { ItemProperties } from 'src/features/properties/ItemProperties.svelte';
   import PropertyTag from '../properties/PropertyTag.svelte';
   import InlineEffectsList from './InlineEffectsList.svelte';
+  import VehicleItemCrew from 'src/sheets/classic/vehicle/parts/VehicleItemCrew.svelte';
   import { getSheetContext } from 'src/sheets/sheet-context.svelte';
 
   interface Props {
@@ -119,6 +120,10 @@
   </div>
 
   <InlineEffectsList {item} />
+
+  {#if item.system.crew?.max}
+    <VehicleItemCrew {item} />
+  {/if}
 
   {#if itemSummaryCommands.length}
     <HorizontalLineSeparator />

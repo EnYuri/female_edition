@@ -55,32 +55,42 @@
         {#snippet body()}
           {#each section.members as member}
             <ItemTableRow getDragData={() => {
-              const data = member.actor.toDragData();
-              return data;
+              return member.actor?.toDragData();
             }}>
               <!-- Image -->
               <ItemTableCell primary={true}>
-                <a
-                  class="item-use-button"
-                  onclick={(event) =>
-                    member.actor.sheet.render({ force: true })}
-                >
-                  <img
-                    class="item-image always-visible"
-                    alt={member.actor.name}
-                    src={member.actor.img}
-                    data-tidy-sheet-part={CONSTANTS.SHEET_PARTS
-                      .ACTOR_PORTRAIT_IMAGE}
-                  />
-                </a>
-                <!-- Name -->
-                <a
-                  onclick={(event) =>
-                    member.actor.sheet.render({ force: true })}
-                  class="member-name truncate"
-                >
-                  <span class="truncate flex-1">{member.actor.name}</span>
-                </a>
+                {#if member.actor}
+                  <a
+                    class="item-use-button"
+                    onclick={(event) =>
+                      member.actor.sheet.render({ force: true })}
+                  >
+                    <img
+                      class="item-image always-visible"
+                      alt={member.actor.name}
+                      src={member.actor.img}
+                      data-tidy-sheet-part={CONSTANTS.SHEET_PARTS
+                        .ACTOR_PORTRAIT_IMAGE}
+                    />
+                  </a>
+                  <!-- Name -->
+                  <a
+                    onclick={(event) =>
+                      member.actor.sheet.render({ force: true })}
+                    class="member-name truncate"
+                  >
+                    <span class="truncate flex-1">{member.actor.name}</span>
+                  </a>
+                {:else}
+                  <i
+                    class="fas fa-link-slash item-image always-visible broken-link-icon"
+                  ></i>
+                  <span class="member-name truncate broken-link">
+                    <span class="truncate flex-1"
+                      >{localize('TIDY5E.BrokenLink')}</span
+                    >
+                  </span>
+                {/if}
                 <!-- TODO: Open actor on click -->
               </ItemTableCell>
               <ItemTableCell baseWidth={'4.5rem'}>
@@ -90,20 +100,32 @@
                   onchange={(ev) =>
                     context.actor.system.adjustCrew(
                       area,
-                      member.actor.uuid,
+                      member.uuid,
                       ev.currentTarget.value,
                     )}
                   class="text-align-center"
-                  disabled={!context.editable}
+                  disabled={!context.editable || !member.actor}
                 />
               </ItemTableCell>
               {#if context.unlocked}
                 <ItemTableCell baseWidth={classicControlsEditableRowBaseWidth}>
-                  <ItemDeleteControl
-                    item={member.actor}
-                    deleteFn={(actor: Actor5e) =>
-                      context.actor.system.adjustCrew(area, actor.uuid, 0)}
-                  />
+                  {#if member.actor}
+                    <ItemDeleteControl
+                      item={member.actor}
+                      deleteFn={(actor: Actor5e) =>
+                        context.actor.system.adjustCrew(area, actor.uuid, 0)}
+                    />
+                  {:else}
+                    <button
+                      type="button"
+                      class="item-list-button"
+                      title={localize('TIDY5E.Remove')}
+                      onclick={() =>
+                        context.actor.system.adjustCrew(area, member.uuid, 0)}
+                    >
+                      <i class="fas fa-trash fa-fw"></i>
+                    </button>
+                  {/if}
                 </ItemTableCell>
               {/if}
             </ItemTableRow>
@@ -128,5 +150,16 @@
     min-width: 0;
     display: flex;
     align-items: center;
+  }
+
+  .broken-link {
+    color: var(--t5e-warning-accent-color, #994040);
+  }
+
+  .broken-link-icon {
+    font-size: 1.25rem;
+    width: 1.5rem;
+    text-align: center;
+    color: var(--t5e-warning-accent-color, #994040);
   }
 </style>

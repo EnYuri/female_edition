@@ -416,6 +416,11 @@ export class Tidy5eContainerSheetClassic extends TidyExtensibleDocumentSheetMixi
       return;
     }
 
+    // Confirm with system prompt before adding to an unidentified container.
+    if (!((await this.item.system.canDropContents?.()) ?? true)) {
+      return;
+    }
+
     if (data.type === 'Folder') {
       return await this._onDropFolder(event, data);
     }

@@ -15,6 +15,7 @@
   import { settings } from 'src/settings/settings.svelte';
   import { CONSTANTS } from 'src/constants';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
+  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -104,6 +105,8 @@
     />
   {/each}
 </UtilityToolbar>
+
+  <TabPins {tabId} {searchCriteria} />
 
 <div
   class="tidy-inventory-container scroll-container flex-column small-gap"

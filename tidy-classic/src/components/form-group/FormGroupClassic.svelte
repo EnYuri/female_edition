@@ -8,6 +8,7 @@
   } from 'foundry.data.fields';
   import { componentWithProps } from 'src/utils/component';
   import TextInput from '../inputs/TextInput.svelte';
+  import FormulaInput from '../inputs/FormulaInput.svelte';
   import NumberInput from '../inputs/NumberInput.svelte';
   import Checkbox from '../inputs/Checkbox.svelte';
   import Select from '../inputs/Select.svelte';
@@ -146,11 +147,10 @@
             tooltip: effectOverrideTooltip,
           })
         : !field.choices
-          ? componentWithProps(TextInput, {
+          ? componentWithProps(FormulaInput, {
               document: document,
               field: effectiveField,
               id: id,
-              selectOnFocus: false,
               value,
               disabled,
               tooltip: effectOverrideTooltip,

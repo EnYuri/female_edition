@@ -31,6 +31,7 @@ export type GroupSheetClassicContext = {
   groupLanguages: GroupLanguage[];
   groupSkills: GroupSkill[];
   groupAbilities: GroupAbility[];
+  groupMasteries: GroupLanguage[];
   inventory: InventorySection[];
   isGM: boolean;
   itemContext: Record<string, GroupItemContext>;

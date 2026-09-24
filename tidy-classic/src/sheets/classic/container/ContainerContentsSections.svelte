@@ -52,6 +52,12 @@
 
   const tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
+  // Unidentified containers with the "unidentifiedContents" property hide
+  // their contents from non-GMs (system canViewContents getter).
+  let contentsConcealed = $derived(
+    (container.system as any).canViewContents === false,
+  );
+
   let configuredContents = $derived(
     SheetSections.configureInventory(
       contents.filter((i) => i.items.length),
@@ -133,6 +139,11 @@
   const localize = FoundryAdapter.localize;
 </script>
 
+{#if contentsConcealed}
+  <p class="unidentified-notice">
+    {localize('DND5E.Unidentified.Notice')}
+  </p>
+{:else}
 {#each configuredContents as section (section.key)}
   {#if section.show}
     {@const itemEntries = section.items.map((item) => ({
@@ -290,3 +301,12 @@
     </section>
   {/if}
 {/each}
+{/if}
+
+<style lang="less">
+  .unidentified-notice {
+    padding: 0.25rem;
+    font-style: italic;
+    color: var(--t5e-secondary-color);
+  }
+</style>

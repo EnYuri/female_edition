@@ -1770,6 +1770,18 @@ body.fe-retro-theme .tidy5e-sheet.application
   image-rendering: auto !important;
 }
 
+/* Actor portraits embedded in member/crew lists reuse item-icon classes
+   (.item-image) or sit unclassed (.member-list-item-image, crew slots) —
+   exempt them from the icon desaturation filter and keep smooth scaling. */
+body.fe-retro-theme .tidy5e-sheet.application
+  :is(img[data-tidy-sheet-part="actor-portrait-image"],
+      img.member-list-item-image, img.encounter-member-list-item-image,
+      .crew-member img, .crew-slot img, .vehicle-crew-slot img,
+      .member-list-item-image-wrapper img) {
+  filter: none !important;
+  image-rendering: auto !important;
+}
+
 /* ----------------------------------------------------------------
  * Tidy5e item pop-out cards
  *

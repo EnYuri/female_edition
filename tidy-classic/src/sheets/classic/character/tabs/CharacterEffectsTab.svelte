@@ -13,6 +13,8 @@
   import ItemControl from '../../../../components/item-list/controls/ItemControl.svelte';
   import Notice from 'src/components/notice/Notice.svelte';
   import { declareLocation } from 'src/types/location-awareness.types';
+  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
+  import { CONSTANTS } from 'src/constants';
   import ActorConditions from '../../actor/ActorConditions.svelte';
   import ClassicControls from 'src/sheets/classic/shared/ClassicControls.svelte';
   import ActorEffectToggleControl from 'src/components/item-list/controls/ActorEffectToggleControl.svelte';
@@ -93,6 +95,7 @@
 </script>
 
 <div class="scroll-container flex-column small-gap">
+  <TabPins tabId={CONSTANTS.TAB_EFFECTS} />
   {#if !context.allowEffectsManagement && context.unlocked}
     <Notice>{localize('TIDY5E.GMOnlyEdit')}</Notice>
   {/if}

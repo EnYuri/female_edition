@@ -18,6 +18,7 @@
   import ActionFilterOverrideControl from 'src/components/item-list/controls/ActionFilterOverrideControl.svelte';
   import { declareLocation } from 'src/types/location-awareness.types';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
+  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -111,6 +112,8 @@
     />
   {/each}
 </UtilityToolbar>
+
+  <TabPins {tabId} {searchCriteria} />
 
 <div class="actions-tab-container scroll-container flex-column small-gap">
   {#each actions as section (section.key)}

@@ -234,6 +234,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       groupLanguages,
       groupSkills,
       groupAbilities,
+      groupMasteries,
     } = this.#prepareMembers();
 
     const source = this.actor.toObject();
@@ -476,6 +477,8 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       disableExperience:
         systemSettings.value.levelingMode ===
         CONSTANTS.SYSTEM_SETTING_LEVELING_MODE_NO_XP,
+      allowEffectsManagement:
+        FoundryAdapter.allowCharacterEffectsManagement(this.actor),
       effects: dnd5e.applications.components.EffectsElement.prepareCategories(
         this.actor.allApplicableEffects()
       ),
@@ -484,6 +487,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       groupLanguages: groupLanguages,
       groupSkills: groupSkills,
       groupAbilities: groupAbilities,
+      groupMasteries: groupMasteries,
       healthPercentage: getPercentage(stats.currentHP, stats.maxHP),
       inventory: Object.values(inventory),
       isGM: game.user.isGM,
@@ -588,6 +592,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     groupLanguages: GroupLanguage[];
     groupSkills: GroupSkill[];
     groupAbilities: GroupAbility[];
+    groupMasteries: GroupLanguage[];
   } {
     const stats: MemberStats = {
       currentHP: 0,
@@ -637,6 +642,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
 
     const memberContext: GroupSheetClassicContext['memberContext'] = {};
     const groupLanguages: Record<string, GroupLanguage> = {};
+    const groupMasteries: Record<string, GroupLanguage> = {};
     const groupSkills: Record<string, GroupSkill> = {};
     const groupAbilities = this.#createGroupAbilityMap();
     const collectAggregates = FoundryAdapter.userIsGm();
@@ -670,6 +676,28 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       }
 
       sections[member.type].members.push(member);
+
+      if (collectAggregates) {
+        const masteryValue =
+          member.system.traits?.weaponProf?.mastery?.value;
+        const masteryKeys =
+          masteryValue instanceof Set || Array.isArray(masteryValue)
+            ? [...masteryValue]
+            : Object.keys(masteryValue ?? {}).filter(
+                (k) => masteryValue[k],
+              );
+        for (const key of masteryKeys) {
+          const label =
+            CONFIG.DND5E.weaponMasteries?.[key]?.label ??
+            dnd5e.documents.Trait.keyLabel(key, { trait: 'weapon' }) ??
+            key;
+
+          const groupMastery = (groupMasteries[label] ??=
+            this.#createEmptyGroupLanguage(label));
+
+          groupMastery.members.push(member);
+        }
+      }
 
       if (collectAggregates && member.system.traits?.languages?.value) {
         const customLanguageString =
@@ -800,6 +828,9 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
         a.label.localeCompare(b.label, game.i18n.lang)
       ),
       groupAbilities: [...groupAbilities.values()],
+      groupMasteries: Object.values(groupMasteries).sort((a, b) =>
+        a.label.localeCompare(b.label, game.i18n.lang)
+      ),
     };
   }
 

@@ -71,6 +71,16 @@
               effectDocument.description ?? '',
             ),
           },
+          changes: await Promise.all(
+            (effectDocument.changes ?? []).map((change: any) =>
+              effectDocument.getSheetChangeContext?.(change) ?? {
+                key: change.key,
+                name: change.key,
+                value: change.value,
+                type: change.type,
+              },
+            ),
+          ),
         };
       } else if (effectDocument && !expanded && summaryData !== undefined) {
         // Reset chat data for non-expanded, hydrated chatData

@@ -3,18 +3,13 @@
   import TabContents from 'src/components/tabs/TabContents.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import ItemProfilePicture from './parts/ItemProfilePicture.svelte';
-  import Select from 'src/components/inputs/Select.svelte';
-  import SelectOptions from 'src/components/inputs/SelectOptions.svelte';
+  import ItemRarityInput from 'src/components/inputs/ItemRarityInput.svelte';
   import Source from '../shared/Source.svelte';
   import { CONSTANTS } from 'src/constants';
   import ItemIdentifiableName from './parts/ItemIdentifiableName.svelte';
   import ItemHeaderToggles from './parts/ItemHeaderToggles.svelte';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
-  import {
-    buildItemRarityUpdate,
-    getItemRarity,
-  } from 'src/foundry/dnd5e-compat';
-
+  
   let context = $derived(getItemSheetContext());
 
   let appId = $derived(context.document.id);
@@ -48,22 +43,7 @@
         {#if context.concealDetails}
           <span>{localize('DND5E.Unidentified.Title')}</span>
         {:else}
-          <Select
-            id="{appId}-rarity"
-            document={context.item}
-            field="system.rarity"
-            buildUpdate={(rarity) =>
-              buildItemRarityUpdate(context.item, rarity)}
-            class="item-rarity"
-            value={getItemRarity(context.item)}
-            disabled={!context.editable}
-            blankValue=""
-          >
-            <SelectOptions
-              data={context.config.itemRarity}
-              blank={localize('DND5E.Rarity')}
-            />
-          </Select>
+          <ItemRarityInput item={context.item} {context} id="{appId}-rarity" />
         {/if}
       </li>
       <li class="flex-row">

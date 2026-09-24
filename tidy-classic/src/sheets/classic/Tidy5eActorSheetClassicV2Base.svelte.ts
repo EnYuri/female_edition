@@ -368,38 +368,31 @@ export function Tidy5eActorSheetClassicV2Base<
     _getMovementSpeed(systemData: any, largestPrimary = false) {
       const movement = systemData.attributes.movement ?? {};
       const speed = (key: string) => getMovementSpeed(movement, key);
+      const movementLabel = (key: string) => {
+        const locKey = `DND5E.MOVEMENT.Type.${key.capitalize()}`;
+        if (game.i18n.has(locKey, false)) {
+          return FoundryAdapter.localize(locKey);
+        }
+        const config = (CONFIG.DND5E.movementTypes as any)?.[key];
+        const label = typeof config === 'string' ? config : config?.label;
+        return label ? FoundryAdapter.localize(label) : key;
+      };
 
       // Prepare an array of available movement speeds
-      let speeds: [number | undefined, string][] = [
-        [
-          speed('burrow'),
-          `${game.i18n.localize('DND5E.MOVEMENT.Type.Burrow')} ${speed(
-            'burrow'
-          )}`,
-        ],
-        [
-          speed('climb'),
-          `${game.i18n.localize('DND5E.MOVEMENT.Type.Climb')} ${speed('climb')}`,
-        ],
-        [
-          speed('fly'),
-          `${game.i18n.localize('DND5E.MOVEMENT.Type.Fly')} ${speed('fly')}${
-            movement.hover
-              ? ` (${game.i18n.localize('DND5E.MOVEMENT.Hover')})`
-              : ''
-          }`,
-        ],
-        [
-          speed('swim'),
-          `${game.i18n.localize('DND5E.MOVEMENT.Type.Swim')} ${speed('swim')}`,
-        ],
-      ];
-      if (largestPrimary) {
-        speeds.push([
-          speed('walk'),
-          `${game.i18n.localize('DND5E.MOVEMENT.Type.Walk')} ${speed('walk')}`,
-        ]);
-      }
+      let speeds: [number | undefined, string][] = Object.keys(
+        CONFIG.DND5E.movementTypes ?? {}
+      )
+        .filter((key) => largestPrimary || key !== 'walk')
+        .map((key) => {
+          const value = speed(key);
+          const label = `${movementLabel(key)} ${value}`;
+          return [
+            value,
+            key === CONSTANTS.MOVEMENT_FLY && movement.hover
+              ? `${label} (${game.i18n.localize('DND5E.MOVEMENT.Hover')})`
+              : label,
+          ];
+        });
 
       // Filter and sort speeds on their values
       speeds = speeds

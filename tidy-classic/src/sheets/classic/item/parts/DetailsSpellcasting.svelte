@@ -2,6 +2,7 @@
   import SelectOptions from 'src/components/inputs/SelectOptions.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import Select from 'src/components/inputs/Select.svelte';
+  import FormulaInput from 'src/components/inputs/FormulaInput.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
   import { MaxPreparedSpellsConfigFormApplication } from 'src/applications/max-prepared-spells-config/MaxPreparedSpellsConfigFormApplication.svelte';
@@ -85,12 +86,11 @@
     >{localize('DND5E.SpellPreparation.Formula')}</label
   >
   <div class="form-fields">
-    <TextInput
+    <FormulaInput
       id="{appId}-spellcasting-preparation-formula"
       document={context.item}
       field="system.spellcasting.preparation.formula"
       value={context.system.spellcasting.preparation.formula}
-      dataset={{ formulaEditor: true }}
       disabled={!context.editable}
       placeholder="—"
     />

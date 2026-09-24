@@ -640,7 +640,9 @@ export type VehicleItemQuadroneContext = {
 } & ActorItemQuadroneContext;
 
 export type VehicleMember = {
-  actor: Actor5e;
+  /** Undefined when the member's actor was deleted; the row renders as a broken link that can be removed. */
+  actor?: Actor5e;
+  uuid: string;
   quantity: number;
   // etc.
 };
@@ -949,6 +951,8 @@ export type EffectSummaryData = {
   description: {
     value: string;
   };
+  /** When provided, each change may carry an explained `name` (e.g. "Damage Resistances" for system.traits.dr.value). */
+  changes?: { key: string; name?: string; value?: any; type?: string }[];
 };
 
 export type MaxPreparedSpellFormula = {
@@ -1044,6 +1048,7 @@ export type ActorV2 = {
 export type ActorSheetClassicContextV2<TActor = ActorV2> = {
   actor: TActor;
   actorPortraitCommands: RegisteredPortraitMenuCommand[];
+  allowEffectsManagement: boolean;
   customContent: CustomContent[];
   editable: boolean;
   healthPercentage: number;

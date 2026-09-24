@@ -650,6 +650,15 @@ export function TidyExtensibleDocumentSheetMixin<
     }
 
     /**
+     * The dnd5e system's "Toggle Sheet Mode" keybinding calls `changeMode()`
+     * on the active window's app. Alias to our own sheet-mode toggle so the
+     * system keybinding works on Tidy sheets.
+     */
+    async changeMode() {
+      await this.toggleSheetMode();
+    }
+
+    /**
      * Toggles the user's sheet mode relative to the current mode.
      * @protected
      */

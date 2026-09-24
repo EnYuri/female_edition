@@ -1,7 +1,7 @@
 <script lang="ts">
   import SkillsList from 'src/sheets/classic/actor/SkillsList.svelte';
   import Traits from '../../actor/traits/Traits.svelte';
-  import { getContext, type ComponentProps } from 'svelte';
+  import { getContext, setContext, type ComponentProps } from 'svelte';
   import type {
     ItemLayoutMode,
     RenderableClassicControl,

@@ -4,6 +4,7 @@
   import Select from 'src/components/inputs/Select.svelte';
   import SelectOptions from 'src/components/inputs/SelectOptions.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
+  import FormulaInput from 'src/components/inputs/FormulaInput.svelte';
   import Checkbox from 'src/components/inputs/Checkbox.svelte';
   import { mapSystemDamageTypesToSave } from 'src/utils/system-properties-classic';
   import type { GroupableSelectOption } from 'src/types/types';
@@ -63,7 +64,7 @@
     />
 
     {#if source.custom.enabled}
-      <TextInput
+      <FormulaInput
         id="{idPrefix}custom-formula"
         document={context.item}
         field="{prefix}custom.formula"

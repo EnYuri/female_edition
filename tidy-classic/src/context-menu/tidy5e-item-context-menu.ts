@@ -176,27 +176,29 @@ export function getItemContextOptions(
         !FoundryAdapter.isLockedInCompendium(item),
     });
 
+    const pinTabId = AttributePins.getTabFromElement(element);
+
     options.push({
       name: 'TIDY5E.ContextMenuActionPinToAttributes',
       icon: `<i class="fa-solid fa-thumbtack"></i>`,
-      callback: () => AttributePins.pin(item, 'item'),
+      callback: () => AttributePins.pin(item, 'item', pinTabId),
       condition: () =>
         item.isOwner &&
         !FoundryAdapter.isLockedInCompendium(item) &&
         AttributePins.isPinnable(item, 'item') &&
-        !AttributePins.isPinned(item),
+        !AttributePins.isPinned(item, pinTabId),
       group: 'pins',
     });
 
     options.push({
       name: 'TIDY5E.ContextMenuActionUnpinFromAttributes',
       icon: `<i class="fa-solid fa-xmark" style='color: var(--t5e-warning-accent-color)'></i>`,
-      callback: () => AttributePins.unpin(item),
+      callback: () => AttributePins.unpin(item, pinTabId),
       condition: () =>
         item.isOwner &&
         !FoundryAdapter.isLockedInCompendium(item) &&
         AttributePins.isPinnable(item, 'item') &&
-        AttributePins.isPinned(item),
+        AttributePins.isPinned(item, pinTabId),
       group: 'pins',
     });
 

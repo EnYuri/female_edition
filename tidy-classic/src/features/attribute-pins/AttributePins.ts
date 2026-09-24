@@ -21,16 +21,30 @@ export class AttributePins {
       : false;
   }
 
-  static isPinned(doc: any): boolean {
+  /**
+   * The default pin location. Pins saved before per-tab support carry no `tab`
+   * field and continue to display here.
+   */
+  static readonly DEFAULT_TAB = CONSTANTS.TAB_CHARACTER_ATTRIBUTES;
+
+  static isPinned(doc: any, tab?: string): boolean {
     const flagPins = doc.actor ? TidyFlags.attributePins.get(doc.actor) : [];
 
     const relativeUuid = this.getRelativeUUID(doc);
 
-    return flagPins.some((x) => x.id === relativeUuid);
+    return flagPins.some(
+      (x) =>
+        x.id === relativeUuid &&
+        (tab === undefined || (x.tab ?? this.DEFAULT_TAB) === tab)
+    );
   }
 
-  static async pin(doc: any, type: AttributePinFlag['type']) {
-    if (!doc.actor || this.isPinned(doc)) {
+  static async pin(
+    doc: any,
+    type: AttributePinFlag['type'],
+    tab?: string
+  ) {
+    if (!doc.actor || this.isPinned(doc, tab)) {
       return;
     }
 
@@ -53,12 +67,16 @@ export class AttributePins {
       return { ...p };
     });
 
+    const tabField =
+      tab !== undefined && tab !== this.DEFAULT_TAB ? { tab } : {};
+
     if (type === 'activity') {
       newPins.push({
         type: 'activity',
         id: relativeUuid,
         sort: maxSort + CONST.SORT_INTEGER_DENSITY,
         resource: 'limited-uses',
+        ...tabField,
       });
     } else if (type === 'item') {
       newPins.push({
@@ -69,6 +87,7 @@ export class AttributePins {
           doc.type === CONSTANTS.ITEM_TYPE_CONSUMABLE
             ? 'quantity'
             : 'limited-uses',
+        ...tabField,
       });
     }
 
@@ -77,8 +96,8 @@ export class AttributePins {
     return TidyFlags.attributePins.set(doc.actor, newPins);
   }
 
-  static async unpin(doc: Item5e | Activity5e) {
-    if (!doc.actor || !this.isPinned(doc)) {
+  static async unpin(doc: Item5e | Activity5e, tab?: string) {
+    if (!doc.actor || !this.isPinned(doc, tab)) {
       return;
     }
 
@@ -86,11 +105,28 @@ export class AttributePins {
 
     const relativeUuid = this.getRelativeUUID(doc);
 
-    let newPins = flagPins.filter((x) => x.id !== relativeUuid);
+    let newPins = flagPins.filter(
+      (x) =>
+        !(
+          x.id === relativeUuid &&
+          (tab === undefined || (x.tab ?? this.DEFAULT_TAB) === tab)
+        )
+    );
 
     newPins = await this.preparePinsForForSaving(doc, newPins);
 
     return TidyFlags.attributePins.set(doc.actor, newPins);
+  }
+
+  /**
+   * Resolves the tab that a sheet element belongs to, for pinning to that tab.
+   */
+  static getTabFromElement(element: HTMLElement): string | undefined {
+    return (
+      element
+        .closest('[data-tab-contents-for]')
+        ?.getAttribute('data-tab-contents-for') ?? undefined
+    );
   }
 
   static getRelativeUUID(doc: any) {
