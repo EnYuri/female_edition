@@ -8,6 +8,10 @@
     field: string;
     document: any;
     blankValue?: any;
+    /** Build the update payload. Defaults to `{ [field]: value }`. Needed where the
+     *  running dnd5e version does not accept `field` as written — see
+     *  `buildItemRarityUpdate` in src/foundry/dnd5e-compat.ts. */
+    buildUpdate?: ((value: unknown) => Record<string, unknown>) | null;
     children?: Snippet;
   } & HTMLSelectAttributes;
 
@@ -17,6 +21,7 @@
     field,
     document,
     blankValue = null,
+    buildUpdate = null,
     children,
     ...rest
   }: Props = $props();
@@ -39,10 +44,11 @@
     }
 
     const targetValue = event.currentTarget.value;
+    const resolved = targetValue !== '' ? targetValue : blankValue;
 
-    await document.update({
-      [field]: targetValue !== '' ? targetValue : blankValue,
-    });
+    await document.update(
+      buildUpdate ? buildUpdate(resolved) : { [field]: resolved }
+    );
   }
 </script>
 

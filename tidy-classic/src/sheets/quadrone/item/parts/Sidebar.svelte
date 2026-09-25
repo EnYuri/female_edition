@@ -16,6 +16,10 @@
   import { coalesce } from 'src/utils/formatting';
   import TextInputQuadrone from 'src/components/inputs/TextInputQuadrone.svelte';
   import { settings } from 'src/settings/settings.svelte';
+  import {
+    buildItemRarityUpdate,
+    getItemRarity,
+  } from 'src/foundry/dnd5e-compat';
 
   let context = $derived(getContainerOrItemSheetContextQuadrone());
 
@@ -34,9 +38,11 @@
     includeSidebarProperties = true,
   }: Props = $props();
 
-  // Rarity
-  let rarity = $derived(
-    context.unlocked ? context.source.rarity : context.system.rarity,
+  // Rarity — read through the shim: on dnd5e 6.0 `system.rarity` survives only as
+  // a prototype getter, so `context.source.rarity` is absent from plain `_source`.
+  let rarity = $derived(getItemRarity(context.item));
+  let hasRarity = $derived(
+    'rarity' in context.system || 'rarities' in context.system,
   );
 
   const unidentified = $derived(context.system.identified === false);
@@ -93,7 +99,7 @@
   let itemColorClasses = $derived<ClassValue>([
     unidentified && !FoundryAdapter.isInGmEditMode(context.document) ? 'disabled' : undefined,
     !unidentified && !isNil(rarity, '') ? 'rarity' : undefined,
-    !unidentified && 'rarity' in context.system
+    !unidentified && hasRarity
       ? coalesce(rarity?.slugify(), 'none')
       : undefined,
     !isNil(config?.key) ? 'spell-method' : undefined,
@@ -211,15 +217,16 @@
       />
       <ItemImageBorder />
     </div>
-    {#if 'rarity' in context.system}
+    {#if hasRarity}
       <div class="item-rarity-container">
         {#if context.unlocked && (!unidentified || FoundryAdapter.isInGmEditMode(context.document))}
           <SelectQuadrone
             id="rarity-{context.sheet.id}"
             document={context.item}
             field="system.rarity"
+            buildUpdate={(r) => buildItemRarityUpdate(context.item, r)}
             class={['item-rarity-selector', 'capitalize', itemColorClasses]}
-            value={context.source.rarity}
+            value={rarity}
             disabled={!context.editable && !FoundryAdapter.isInGmEditMode(context.document)}
             blankValue=""
           >

@@ -1029,10 +1029,14 @@ export const FoundryAdapter = {
       : game.dnd5e.config.abilityActivationTypes[activationType];
   },
   lookupDamageType(type: string) {
-    return game.dnd5e.config.damageTypes[type]?.label;
+    const config = game.dnd5e.config.damageTypes[type];
+    const label = typeof config === 'string' ? config : config?.label;
+    return label ? FoundryAdapter.localize(label) : undefined;
   },
   lookupHealingType(type: string) {
-    return game.dnd5e.config.healingTypes[type];
+    const config = game.dnd5e.config.healingTypes[type];
+    const label = typeof config === 'string' ? config : config?.label;
+    return label ? FoundryAdapter.localize(label) : undefined;
   },
   lookupAbility(abbr: string) {
     return game.dnd5e.config.abilities[abbr];
@@ -1545,8 +1549,10 @@ export const FoundryAdapter = {
       Record<string, MovementInfo>
     >((obj, [k, config]) => {
       const value = getMovementSpeed(movement, k);
+      const label =
+        typeof config === 'string' ? config : (config?.label ?? '');
       if (value)
-        obj[k] = { label: config.label, value, unit: units.abbreviation };
+        obj[k] = { label: FoundryAdapter.localize(label), value, unit: units.abbreviation };
       return obj;
     }, {} satisfies Record<string, MovementInfo>);
   },

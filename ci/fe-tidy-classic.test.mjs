@@ -288,6 +288,18 @@ test("item rarity is written through the shim, not as system.rarity", () => {
     /field="system\.rarity"\s*\n\s*buildUpdate=\{\(rarity\) => buildItemRarityUpdate/,
   );
 
+  // The Quadrone sidebar ships in the bundle even though only Classic sheets are
+  // registered — pin the same routing so reviving Quadrone can't quietly bring
+  // back a direct `system.rarity` write that 6.0 silently drops.
+  const selectQuadrone = read(
+    "tidy-classic/src/components/inputs/SelectQuadrone.svelte",
+  );
+  assert.match(selectQuadrone, /buildUpdate\s*\?\s*buildUpdate\(resolved\)/);
+  const sidebar = read(
+    "tidy-classic/src/sheets/quadrone/item/parts/Sidebar.svelte",
+  );
+  assert.match(sidebar, /buildUpdate=\{\(\w+\) => buildItemRarityUpdate/);
+
   for (const name of [
     "Consumable",
     "Container",
@@ -450,4 +462,25 @@ test("sense labels survive dnd5e 6.0 turning the config into objects", () => {
     }
   }
   assert.deepEqual(offenders, [], "a classic sheet localizes a senses config value directly");
+});
+
+test("damage/healing/movement type labels survive object-shaped config", () => {
+  // dnd5e 6.0 turned `damageTypes`, `healingTypes` and `movementTypes` into
+  // `{ key: { label, icon, ... } }` objects (they were string i18n keys on 5.x).
+  // `lookupHealingType` once returned the whole entry object — the actions-tab
+  // tooltip concatenated it as "[object Object]" — and `getMovementInfo` read
+  // `config.label` bare, which is undefined on 5.x strings. Both directions have
+  // to be normalized to a label string.
+  const adapter = read("tidy-classic/src/foundry/foundry-adapter.ts");
+  for (const fn of ["lookupDamageType", "lookupHealingType"]) {
+    const body = adapter.match(new RegExp(`${fn}\\(type: string\\)[\\s\\S]{0,300}?\\},`));
+    assert.ok(body, `${fn} not found`);
+    assert.match(body[0], /typeof config === 'string'/, `${fn} lost the string branch`);
+    assert.match(body[0], /config\?\.label/, `${fn} lost the .label read`);
+  }
+  assert.match(
+    adapter,
+    /getMovementInfo[\s\S]{0,500}?typeof config === 'string' \? config : \(?config\?\.label/,
+    "getMovementInfo lost the string|object normalization",
+  );
 });

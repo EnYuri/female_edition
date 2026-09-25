@@ -906,8 +906,10 @@ test("empty dnd5e 6 midi activity descriptions fall back to the parent item", as
     }]]),
   };
   globalThis.fromUuidSync = () => item;
-  // v13+ resolves the enricher through the ux namespace; the bare `TextEditor`
-  // global is gone in v14, which is what the implementation now calls.
+  // The bare `TextEditor` global is a deprecated compat getter (since v13,
+  // removal v15) that aliases foundry.applications.ux.TextEditor.implementation
+  // and logs a compatibility warning per access — the implementation calls the
+  // namespaced path directly, so the stub lives on globalThis.foundry.
   globalThis.foundry = {
     applications: {
       ux: {

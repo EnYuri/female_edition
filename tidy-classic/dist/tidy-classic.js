@@ -36875,7 +36875,7 @@ var select_content = /* @__PURE__ */ from_html(`<!>`, 1);
 var root$5k = /* @__PURE__ */ from_html(`<select><!></select>`);
 function SelectQuadrone($$anchor, $$props) {
   push($$props, true);
-  let blankValue = prop($$props, "blankValue", 3, null), rest = /* @__PURE__ */ rest_props($$props, [
+  let blankValue = prop($$props, "blankValue", 3, null), buildUpdate = prop($$props, "buildUpdate", 3, null), rest = /* @__PURE__ */ rest_props($$props, [
     "$$slots",
     "$$events",
     "$$legacy",
@@ -36884,6 +36884,7 @@ function SelectQuadrone($$anchor, $$props) {
     "field",
     "document",
     "blankValue",
+    "buildUpdate",
     "children"
   ]);
   let draftValue = /* @__PURE__ */ state("");
@@ -36899,9 +36900,8 @@ function SelectQuadrone($$anchor, $$props) {
       return;
     }
     const targetValue = event2.currentTarget.value;
-    await $$props.document.update({
-      [$$props.field]: targetValue !== "" ? targetValue : blankValue()
-    });
+    const resolved = targetValue !== "" ? targetValue : blankValue();
+    await $$props.document.update(buildUpdate() ? buildUpdate()(resolved) : { [$$props.field]: resolved });
   }
   var select = root$5k();
   attribute_effect(select, () => ({
@@ -37118,7 +37118,8 @@ function Sidebar($$anchor, $$props) {
   let context = /* @__PURE__ */ user_derived(getContainerOrItemSheetContextQuadrone);
   const localize = FoundryAdapter.localize;
   let includeSidebarProperties = prop($$props, "includeSidebarProperties", 3, true);
-  let rarity = /* @__PURE__ */ user_derived(() => get(context).unlocked ? get(context).source.rarity : get(context).system.rarity);
+  let rarity = /* @__PURE__ */ user_derived(() => getItemRarity(get(context).item));
+  let hasRarity = /* @__PURE__ */ user_derived(() => "rarity" in get(context).system || "rarities" in get(context).system);
   const unidentified = /* @__PURE__ */ user_derived(() => get(context).system.identified === false);
   let rarityText = /* @__PURE__ */ user_derived(() => get(unidentified) ? localize("DND5E.Unidentified.Title") : RarityColors.getRarityText(get(rarity)).titleCase());
   let itemRarities = /* @__PURE__ */ user_derived(() => Object.entries(get(context).config.itemRarity).map(([key2, value]) => {
@@ -37137,7 +37138,7 @@ function Sidebar($$anchor, $$props) {
   let itemColorClasses = /* @__PURE__ */ user_derived(() => [
     get(unidentified) && !FoundryAdapter.isInGmEditMode(get(context).document) ? "disabled" : void 0,
     !get(unidentified) && !isNil(get(rarity), "") ? "rarity" : void 0,
-    !get(unidentified) && "rarity" in get(context).system ? coalesce(get(rarity)?.slugify(), "none") : void 0,
+    !get(unidentified) && get(hasRarity) ? coalesce(get(rarity)?.slugify(), "none") : void 0,
     !isNil(get(config)?.key) ? "spell-method" : void 0,
     !isNil(get(config)?.key) ? "method-" + get(config).key.slugify() : void 0
   ]);
@@ -37214,11 +37215,12 @@ function Sidebar($$anchor, $$props) {
                 return get(context).item;
               },
               field: "system.rarity",
+              buildUpdate: (r2) => buildItemRarityUpdate(get(context).item, r2),
               get class() {
                 return get($0);
               },
               get value() {
-                return get(context).source.rarity;
+                return get(rarity);
               },
               get disabled() {
                 return get($1);
@@ -37293,7 +37295,7 @@ function Sidebar($$anchor, $$props) {
       append($$anchor2, div_5);
     };
     if_block(node_4, ($$render) => {
-      if ("rarity" in get(context).system) $$render(consequent_3);
+      if (get(hasRarity)) $$render(consequent_3);
       else if (get(d_2)) $$render(consequent_4, 1);
       else if (get(facilityIsDisabled)) $$render(consequent_5, 2);
     });
@@ -110479,10 +110481,14 @@ const FoundryAdapter = {
     return activationType === "other" ? FoundryAdapter.localize("DND5E.ActionOther") : game.dnd5e.config.abilityActivationTypes[activationType];
   },
   lookupDamageType(type2) {
-    return game.dnd5e.config.damageTypes[type2]?.label;
+    const config = game.dnd5e.config.damageTypes[type2];
+    const label = typeof config === "string" ? config : config?.label;
+    return label ? FoundryAdapter.localize(label) : void 0;
   },
   lookupHealingType(type2) {
-    return game.dnd5e.config.healingTypes[type2];
+    const config = game.dnd5e.config.healingTypes[type2];
+    const label = typeof config === "string" ? config : config?.label;
+    return label ? FoundryAdapter.localize(label) : void 0;
   },
   lookupAbility(abbr) {
     return game.dnd5e.config.abilities[abbr];
@@ -110843,8 +110849,9 @@ const FoundryAdapter = {
     const units = CONFIG.DND5E.movementUnits[movement.units || Object.keys(CONFIG.DND5E.movementUnits)[0]];
     return Object.entries(CONFIG.DND5E.movementTypes).reduce((obj, [k, config]) => {
       const value = getMovementSpeed(movement, k);
+      const label = typeof config === "string" ? config : config?.label ?? "";
       if (value)
-        obj[k] = { label: config.label, value, unit: units.abbreviation };
+        obj[k] = { label: FoundryAdapter.localize(label), value, unit: units.abbreviation };
       return obj;
     }, {});
   },
