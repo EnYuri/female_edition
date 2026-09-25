@@ -278,6 +278,16 @@ test("item rarity is written through the shim, not as system.rarity", () => {
   // falls back to its blank option and every pick looks like it did not stick.
   assert.match(compat, /system\.rarities\?\.first\?\.\(\)/);
 
+  // Upstream folded the per-sheet select into ItemRarityInput: on 6.0 it renders a
+  // <multi-select> that writes `system.rarities` directly (the real schema path), and
+  // on older systems it falls back to the shim-routed Select. Pin BOTH branches.
+  const rarityInput = read("tidy-classic/src/components/inputs/ItemRarityInput.svelte");
+  assert.match(rarityInput, /'system\.rarities':\s*el\.value/);
+  assert.match(
+    rarityInput,
+    /field="system\.rarity"\s*\n\s*buildUpdate=\{\(rarity\) => buildItemRarityUpdate/,
+  );
+
   for (const name of [
     "Consumable",
     "Container",
@@ -289,8 +299,13 @@ test("item rarity is written through the shim, not as system.rarity", () => {
     const sheet = read(`tidy-classic/src/sheets/classic/item/${name}Sheet.svelte`);
     assert.match(
       sheet,
-      /field="system\.rarity"\s*\n\s*buildUpdate=\{\(rarity\) =>/,
-      `${name}Sheet does not route rarity through buildItemRarityUpdate`,
+      /<ItemRarityInput\s/,
+      `${name}Sheet does not render the shim-routed ItemRarityInput`,
+    );
+    assert.doesNotMatch(
+      sheet,
+      /system\.rarity\b|system\.rarities\b/,
+      `${name}Sheet wires its own rarity write instead of ItemRarityInput`,
     );
   }
 });

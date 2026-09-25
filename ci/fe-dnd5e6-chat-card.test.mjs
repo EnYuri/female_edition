@@ -876,7 +876,7 @@ test("midi attack and damage cards normalize their direct-child visual order", (
 test("empty dnd5e 6 midi activity descriptions fall back to the parent item", async () => {
   const oldGame = globalThis.game;
   const oldFromUuidSync = globalThis.fromUuidSync;
-  const oldTextEditor = globalThis.TextEditor;
+  const oldFoundry = globalThis.foundry;
   const wrapper = {
     dataset: {},
     textContent: "",
@@ -906,9 +906,17 @@ test("empty dnd5e 6 midi activity descriptions fall back to the parent item", as
     }]]),
   };
   globalThis.fromUuidSync = () => item;
-  globalThis.TextEditor = {
-    implementation: {
-      enrichHTML: async (source) => `<section>${source}</section>`,
+  // v13+ resolves the enricher through the ux namespace; the bare `TextEditor`
+  // global is gone in v14, which is what the implementation now calls.
+  globalThis.foundry = {
+    applications: {
+      ux: {
+        TextEditor: {
+          implementation: {
+            enrichHTML: async (source) => `<section>${source}</section>`,
+          },
+        },
+      },
     },
   };
   const root = {
@@ -931,7 +939,7 @@ test("empty dnd5e 6 midi activity descriptions fall back to the parent item", as
   } finally {
     globalThis.game = oldGame;
     globalThis.fromUuidSync = oldFromUuidSync;
-    globalThis.TextEditor = oldTextEditor;
+    globalThis.foundry = oldFoundry;
   }
 });
 
