@@ -27,3 +27,32 @@ export function isUserInteractable(el: HTMLElement) {
     el.closest(inputTabNamesSelector)
   );
 }
+
+/**
+ * Finds the ID of the tab that contains the given element.
+ * @param element the element to evaluate
+ * @returns the ID of the containing tab, if found
+ */
+export function getTabIdFromElement(element: HTMLElement | null | undefined) {
+  const tabDataEl = element?.closest<HTMLElement>(
+    '[data-tab-contents-for], [data-tab-id]'
+  );
+
+  return (
+    tabDataEl?.getAttribute('data-tab-contents-for') ??
+    tabDataEl?.getAttribute('data-tab-id') ??
+    null
+  );
+}
+
+/**
+ * Finds the ID of the tab that the given event occurred in.
+ * @param event the event to evaluate
+ * @returns the ID of the containing tab, if found
+ */
+export function getTabIdFromEvent(event: Event) {
+  // svelte likes to eschew event.target, but we need it here
+  return getTabIdFromElement(
+    (event as Event & { target: HTMLElement }).target
+  );
+}

@@ -9,8 +9,13 @@ import { ActorInspirationRuntime } from 'src/runtime/actor/ActorInspirationRunti
 import { SettingsProvider } from 'src/settings/settings.svelte';
 import type { Item5e } from 'src/types/item.types';
 import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
+import { promptSplitStack } from 'src/foundry/dnd5e-compat';
 import { isNil } from 'src/utils/data';
-import type { ActionItemInclusionMode } from 'src/types/types';
+import { getTabIdFromElement } from 'src/utils/element';
+import type {
+  ActionItemInclusionMode,
+  AggregatePinTabInfo,
+} from 'src/types/types';
 
 /**
  * Prepare an array of context menu options which are available for owned Item documents.
@@ -157,6 +162,39 @@ export function getItemContextOptionsQuadrone(
   });
 
   options.push({
+    name: 'DND5E.SplitStack.Title',
+    icon: '<i class="fa-solid fa-arrows-split-up-and-left"></i>',
+    group: 'action',
+    condition: () =>
+      typeof item.system.split === 'function' &&
+      item.isOwner &&
+      !FoundryAdapter.isLockedInCompendium(itemParent ?? item) &&
+      (item.system.quantity ?? 0) > 1,
+    callback: () => promptSplitStack(item),
+  });
+
+  options.push({
+    name: item.system.properties?.has('gear')
+      ? 'DND5E.Gear.Action.Remove'
+      : 'DND5E.Gear.Action.Add',
+    icon: '<i class="fa-solid fa-axe fa-fw"></i>',
+    group: 'common',
+    condition: () =>
+      !!itemParent?.system.isNPC &&
+      item.isOwner &&
+      !FoundryAdapter.isLockedInCompendium(item) &&
+      !!CONFIG.Item.dataModels[item.type]?.schema.has('quantity'),
+    callback: () => {
+      const properties = item.system.toObject().properties;
+      item.update({
+        'system.properties': item.system.properties.has('gear')
+          ? properties.filter((i: string) => i !== 'gear')
+          : [...properties, 'gear'],
+      });
+    },
+  });
+
+  options.push({
     name: 'DND5E.Scroll.CreateScroll',
     icon: '<i class="fa-solid fa-scroll"></i>',
     condition: () =>
@@ -251,7 +289,7 @@ export function getItemContextOptionsQuadrone(
   });
 
   if (itemParent) {
-    const inspirationSourceItem = itemParent.items.get(
+    const inspirationSourceItem = itemParent.items?.get(
       TidyFlags.inspirationSource.get(itemParent)
     );
 
@@ -347,29 +385,65 @@ export function getItemContextOptionsQuadrone(
       }).render(true),
   });
 
+  const pinTabId = getTabIdFromElement(element);
+
   options.push({
     name: 'TIDY5E.ContextMenuActionPin',
     icon: `<i class="fa-solid fa-thumbtack"></i>`,
-    callback: () => SheetPinsProvider.pin(item, 'item'),
+    callback: () => {
+      if (pinTabId) {
+        SheetPinsProvider.pin(item, pinTabId, 'item');
+      }
+    },
     condition: () =>
       item.isOwner &&
+      item.actor &&
       !FoundryAdapter.isLockedInCompendium(item) &&
       SheetPinsProvider.isPinnable(item, 'item') &&
-      !SheetPinsProvider.isPinned(item),
+      pinTabId &&
+      !SheetPinsProvider.isPinned(item, pinTabId),
     group: 'customize',
   });
 
   options.push({
     name: 'TIDY5E.ContextMenuActionUnpin',
     icon: `<i class="fa-regular fa-thumbtack"></i>`,
-    callback: () => SheetPinsProvider.unpin(item),
+    callback: () => {
+      if (pinTabId) {
+        SheetPinsProvider.unpin(item, pinTabId);
+      }
+    },
     condition: () =>
       item.isOwner &&
+      item.actor &&
       !FoundryAdapter.isLockedInCompendium(item) &&
       SheetPinsProvider.isPinnable(item, 'item') &&
-      SheetPinsProvider.isPinned(item),
+      pinTabId &&
+      SheetPinsProvider.isPinned(item, pinTabId),
     group: 'customize',
   });
+
+  const aggregatePinTab = app.aggregatePinTab as AggregatePinTabInfo | null;
+
+  if (aggregatePinTab) {
+    options.push({
+      name: FoundryAdapter.localize('TIDY5E.ContextMenuActionPinToTab', {
+        tabName: FoundryAdapter.localize(aggregatePinTab.tabName),
+      }),
+      icon: `<i class="fa-solid fa-thumbtack"></i>`,
+      callback: () => {
+        SheetPinsProvider.pin(item, aggregatePinTab.tabId, 'item');
+      },
+      condition: () =>
+        pinTabId !== aggregatePinTab.tabId &&
+        item.isOwner &&
+        item.actor &&
+        !FoundryAdapter.isLockedInCompendium(item) &&
+        SheetPinsProvider.isPinnable(item, 'item') &&
+        !SheetPinsProvider.isPinned(item, aggregatePinTab.tabId),
+      group: 'customize',
+    });
+  }
 
   const isSheetPin = !!element.closest('[data-pin-id]');
 
@@ -377,24 +451,37 @@ export function getItemContextOptionsQuadrone(
     options.push({
       name: 'TIDY5E.ContextMenuActionShowLimitedUses',
       icon: '<i class="fa-solid fa-fw"></i>',
-      callback: () =>
-        SheetPinsProvider.setItemResourceType(item, 'limited-uses'),
+      callback: () => {
+        if (pinTabId) {
+          SheetPinsProvider.setItemResourceType(
+            item,
+            pinTabId,
+            'limited-uses'
+          );
+        }
+      },
       condition: () =>
         item.isOwner &&
         !FoundryAdapter.isLockedInCompendium(item) &&
         !isNil(item.system.quantity) &&
-        SheetPinsProvider.getResourceType(item) !== 'limited-uses',
+        pinTabId &&
+        SheetPinsProvider.getResourceType(item, pinTabId) !== 'limited-uses',
       group: 'customize',
     });
     options.push({
       name: 'TIDY5E.ContextMenuActionShowQuantity',
       icon: '<i class="fa-solid fa-fw"></i>',
-      callback: () => SheetPinsProvider.setItemResourceType(item, 'quantity'),
+      callback: () => {
+        if (pinTabId) {
+          SheetPinsProvider.setItemResourceType(item, pinTabId, 'quantity');
+        }
+      },
       condition: () =>
         item.isOwner &&
         !FoundryAdapter.isLockedInCompendium(item) &&
         !isNil(item.system.quantity) &&
-        SheetPinsProvider.getResourceType(item) !== 'quantity',
+        pinTabId &&
+        SheetPinsProvider.getResourceType(item, pinTabId) !== 'quantity',
       group: 'customize',
     });
   }

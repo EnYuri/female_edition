@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import type { ItemLayoutMode, SpellbookSection } from 'src/types/types';
   import SpellbookList from '../../../../components/spellbook/SpellbookList.svelte';
@@ -11,7 +12,7 @@
   import { settings } from 'src/settings/settings.svelte';
   import { CONSTANTS } from 'src/constants';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
-  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -34,6 +35,14 @@
   setContext(CONSTANTS.SVELTE_CONTEXT.INLINE_EFFECTS_READONLY, true);
 
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
+
 
   const searchResults = createSearchResultsState();
   setSearchResultsContext(searchResults);
@@ -149,7 +158,9 @@
   {/each}
 </UtilityToolbar>
 
-  <TabPins {tabId} {searchCriteria} />
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 <div
   class="scroll-container flex-column small-gap"
   data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEMS_CONTAINER}

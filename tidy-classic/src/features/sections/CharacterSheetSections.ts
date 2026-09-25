@@ -25,10 +25,11 @@ export class CharacterSheetSections {
     backgrounds: any[],
     classes: any[],
     feats: any[],
-    options: Partial<CharacterFeatureSection>
+    options: Partial<CharacterFeatureSection>,
+    customSectionFlag: 'section' | 'actionSection' = 'section'
   ): Record<string, CharacterFeatureSection> {
-    const customFeats = feats.filter((f) => TidyFlags.section.get(f));
-    feats = feats.filter((f) => !TidyFlags.section.get(f));
+    const customFeats = feats.filter((f) => TidyFlags[customSectionFlag].get(f));
+    feats = feats.filter((f) => !TidyFlags[customSectionFlag].get(f));
 
     const features: Record<string, CharacterFeatureSection> = {
       race: {
@@ -115,7 +116,8 @@ export class CharacterSheetSections {
       CharacterSheetSections.applyCharacterFeatureToSection(
         features,
         f,
-        options
+        options,
+        customSectionFlag
       )
     );
 
@@ -135,9 +137,10 @@ export class CharacterSheetSections {
   static applyCharacterFeatureToSection(
     features: Record<string, CharacterFeatureSection>,
     feat: Item5e,
-    customSectionOptions: Partial<CharacterFeatureSection>
+    customSectionOptions: Partial<CharacterFeatureSection>,
+    customSectionFlag: 'section' | 'actionSection' = 'section'
   ) {
-    const customSectionName = TidyFlags.section.get(feat);
+    const customSectionName = TidyFlags[customSectionFlag].get(feat);
 
     if (!customSectionName) {
       return;

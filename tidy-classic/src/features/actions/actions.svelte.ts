@@ -8,6 +8,7 @@ import type {
   ActionItemInclusionMode,
   ActionSectionClassic,
   Actor5e,
+  CharacterSheetContext,
   CharacterSheetQuadroneContext,
   CustomItemSectionQuadrone,
   TidyItemSectionBase,
@@ -142,6 +143,34 @@ function buildActionSections(
   }
 
   return Object.values(actionSections);
+}
+
+export async function getCharacterSheetTabActionSections(
+  actor: Actor5e,
+  context: CharacterSheetContext,
+): Promise<ActionSectionClassic[]> {
+  try {
+    let eligibleItems: ActionItem[] = [];
+
+    for (const item of actor.items) {
+      if (!context.itemContext[item.id]?.includeInCharacterSheetTab) {
+        continue;
+      }
+
+      eligibleItems.push(await mapActionItem(item));
+    }
+
+    const sections = buildActionSections(actor, eligibleItems);
+
+    for (const section of sections) {
+      section.type = CONSTANTS.SECTION_TYPE_CUSTOM;
+    }
+
+    return sections;
+  } catch (e) {
+    error('An error occurred while getting actions', false, e);
+    return [];
+  }
 }
 
 export async function getCharacterSheetTabActionSectionsQuadrone(

@@ -79,7 +79,7 @@
             field: effectiveField,
             id: id,
             value,
-            children: () => StringChoices(field),
+            children: StringChoices,
             disabled,
             tooltip: effectOverrideTooltip,
           })
@@ -106,7 +106,7 @@
             field: effectiveField,
             id: id,
             value,
-            children: () => NumberChoices(field),
+            children: NumberChoices,
             disabled,
             tooltip: effectOverrideTooltip,
           })
@@ -142,7 +142,7 @@
             field: effectiveField,
             id: id,
             value,
-            children: () => StringChoices(field),
+            children: StringChoices,
             disabled,
             tooltip: effectOverrideTooltip,
           })
@@ -198,7 +198,13 @@
 
     if (typeof choices === 'object') {
       return Object.entries(choices).map(([value, label]) => ({
-        label,
+        // CONFIG data like DND5E.currencies stores { label, abbreviation }
+        // objects — unwrap the display string like SelectOptions does.
+        label: (
+          (label as any)?.label ??
+          (label as any)?.abbreviation ??
+          label
+        )?.toString() ?? '',
         value,
       }));
     }
@@ -209,17 +215,20 @@
 
 <FormGroupBuilder {inputs} {...builderProps} />
 
-{#snippet StringChoices(field: StringField)}
-  {@const options = enumerateChoices(field.choices!)}
+{#snippet StringChoices()}
+  {@const f = field as StringField}
+  {@const options = enumerateChoices(f.choices!)}
   <SelectOptions
-    blank={field.blank ? '' : null}
+    blank={f.blank ? '' : null}
     labelProp="label"
     valueProp="value"
     data={options}
   />
 {/snippet}
 
-{#snippet NumberChoices(field: NumberField)}
-  {@const options = enumerateChoices(field.choices!)}
+{#snippet NumberChoices()}
+  {@const f = field as NumberField}
+  {@const options = enumerateChoices(f.choices!)}
   <SelectOptions labelProp="label" valueProp="value" data={options} />
 {/snippet}
+

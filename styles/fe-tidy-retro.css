@@ -127,8 +127,27 @@ body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
    outrank the broad `... :is(p, span, ...) { color: ... !important }` muted
    stamp in fe-retro-common.css — that rule's stacked :not() guards give it
    class-level specificity no plain class chain can beat. */
-body.fe-retro-theme .tidy5e-sheet :is(.notice, .spell-tag):not(#fe-ink) {
+body.fe-retro-theme .tidy5e-sheet .spell-tag:not(#fe-ink) {
   color: #000000 !important;
+}
+
+/* .notice bars ("Empty section" etc.) — outline-only redraw. The component's
+   warning-accent fill would otherwise keep a solid light slab; under retro it
+   is emptied so the sheet background shows through, leaving just an accent
+   outline. Text follows the muted accent tone used for secondary labels, and
+   the :not(#fe-ink) arm keeps this rule out of reach of the same muted
+   stamp the ink rule above dodges. */
+body.fe-retro-theme .tidy5e-sheet .notice:not(#fe-ink) {
+  background: transparent !important;
+  border: 1px solid var(--fe-ac-96) !important;
+  color: var(--fe-ac-57) !important;
+}
+
+/* Sheet pins: the pin card draws its edge via `box-shadow`, which retro's
+   global `* { box-shadow: none }` strips — pins then sit on a bare faint
+   fill. Restore a hard 1px outline matching the other retro surfaces. */
+body.fe-retro-theme .tidy5e-sheet .attribute-pins .attribute-pin {
+  border: 1px solid var(--fe-tidy-rule-faint, rgba(255, 255, 255, 0.09)) !important;
 }
 body.fe-retro-theme .tidy5e-sheet.quadrone .spell-component-special:not(#fe-ink) {
   color: #000000 !important;
@@ -388,6 +407,48 @@ body.fe-retro-theme .tidy5e-sheet.application
   border-color: transparent !important;
   filter: none !important;
   outline: none !important;
+}
+
+/* The exhaustion flyout expands rightward over the portrait; without its own
+   opaque surface the level numbers sit on the image and are unreadable. The
+   collapsed charm keeps the chromeless look — the surface materializes only
+   while expanded. Severity keeps the remapped mono state fills. */
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container:is(:hover, :focus-within) .exhaustion-wrap {
+  background: var(--fe-tidy-mono-surface-2) !important;
+  border-color: var(--fe-tidy-mono-line) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container:is(:hover, :focus-within) .exhaustion-level-option {
+  color: var(--fe-tidy-mono-text) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container.severity-1:is(:hover, :focus-within)
+  .exhaustion-wrap .colorized {
+  background: var(--t5e-exhaustion-severity1-background) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container.severity-2:is(:hover, :focus-within)
+  .exhaustion-wrap .colorized {
+  background: var(--t5e-exhaustion-severity2-background) !important;
+  color: var(--t5e-exhaustion-severity2-color) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container.severity-3:is(:hover, :focus-within)
+  .exhaustion-wrap .colorized {
+  background: var(--t5e-exhaustion-severity3-background) !important;
+  color: var(--t5e-exhaustion-severity3-color) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application
+  .exhaustion-container:is(:hover, :focus-within)
+  .exhaustion-level-option:is(:hover, :focus-visible) {
+  background: var(--fe-tidy-state-fill-hover) !important;
+  color: var(--fe-tidy-mono-text) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -785,7 +846,7 @@ body.fe-retro-theme .tidy5e-sheet {
   --t5e-encumbrance-outline-color: #000000 !important;
   --t5e-encumbrance-text-color: var(--fe-ac-90) !important;
   --t5e-encumbrance-bar-text-shadow-color: #000000 !important;
-  --t5e-hp-bar-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.40) !important;
+  --t5e-hp-bar-color: rgb(from var(--fe-ac-80, #cccccc) r g b / 1) !important;
   --t5e-resource-bar-color: var(--fe-tidy-state-line) !important;
   --t5e-hp-overlay-background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.4) !important;
   --t5e-death-save-icon-color: var(--fe-ac-80) !important;
@@ -837,9 +898,20 @@ body.fe-retro-theme .tidy5e-sheet.application
   background-image: none !important;
 }
 
-body.fe-retro-theme .tidy5e-sheet.application .tidy5e-sheet-header {
+/* NPC and vehicle headers are bare <header> elements without the
+   .tidy5e-sheet-header class — fold them in so the header screentone is
+   consistent across every Classic actor sheet. The tone is a real
+   background-image and always paints behind header content; halved alpha
+   versus --fe-tidy-tone-scanline keeps it reading as surface texture
+   instead of a foreground overlay. */
+body.fe-retro-theme .tidy5e-sheet.application .tidy5e-sheet-header,
+body.fe-retro-theme .tidy5e-sheet.application.classic:is(.npc, .vehicle)
+  .window-content > header {
   background-color: var(--fe-tidy-mono-surface) !important;
-  background-image: var(--fe-tidy-tone-scanline) !important;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgb(255 255 255 / 0.045) 0 1px,
+    rgb(0 0 0 / 0.14) 1px 3px) !important;
   border-bottom: 1px solid var(--fe-tidy-mono-line-soft) !important;
 }
 
@@ -1096,6 +1168,25 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
 }
 
 /* ----------------------------------------------------------------
+ * Tidy5e Classic: HP bar width/font breathing room.
+ *
+ * `.portrait-hp` is a fixed 5.25rem strip under the portrait with 1.125rem
+ * title-font text. The stock Signika metrics just fit, but the FE font stack
+ * is wider — a three-digit "104/104" spans edge to edge and longer values
+ * clip inside the value/max inputs. One notch wider plus one notch smaller
+ * keeps three digits comfortable under retro. */
+body.fe-retro-theme .tidy5e-sheet.application.classic.actor .portrait-hp {
+  width: 6.125rem !important;
+  font-size: 1rem !important;
+}
+
+body.fe-retro-theme
+  .tidy5e-sheet.application.classic.actor
+  .portrait-hp.widen-for-rounded-portrait {
+  width: 6.375rem !important;
+}
+
+/* ----------------------------------------------------------------
  * Tidy5e Classic: rest icon backdrop.
  *
  * The HP bar reads --t5e-hp-bar-color from the root remap — Tidy inlines
@@ -1110,7 +1201,73 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   :where(.window-content)
   .actor-profile-wrap .rest-container .resting {
-  background: rgb(0 0 0 / 0.66) !important;
+  background: rgb(0 0 0 / 0.4) !important;
+}
+
+/* The special-traits tab's controls inherit the classic sheet's borderless
+   input styling — invisible against the retro sheet. Schema fields (text /
+   number / select) get a readable edge and a faint fill. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .special-traits-container.tidy-form
+  :is(input:not([type='checkbox']), select) {
+  border-color: var(--fe-ac-57) !important;
+  background: var(--fe-tidy-mono-surface-2, rgb(255 255 255 / 0.06)) !important;
+}
+
+/* The flat-input reset also strips the border on :focus, so clicking a
+   schema field erases the only edge marking it as a control. Keep the edge
+   and just brighten it to signal focus instead. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .special-traits-container.tidy-form
+  :is(input:not([type='checkbox']), select):is(:focus, :focus-visible) {
+  border-color: var(--fe-ac-90) !important;
+}
+
+/* The foundry checkbox is appearance:none — its ::before IS the empty box
+   and ::after the checkmark, both drawn from the --checkbox-* vars that
+   classic fills with the (near-invisible here) light-color palette — the
+   lair checkbox and every other classic-sheet checkbox suffer the same
+   wash-out. Re-arm the vars sheet-wide instead of fighting the glyph with
+   borders or a native appearance that stacks a second box on top. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic
+  :where(.window-content)
+  input[type='checkbox'] {
+  --checkbox-background-color: var(--fe-ac-57) !important;
+  --checkbox-checked-color: var(--fe-ac-90) !important;
+  --checkbox-checkmark-color: #000000 !important;
+}
+
+/* The tidy switch's track is `--t5e-faint-color`, which retro maps to a
+   nearly-invisible tint; checked paints it the accent (white under retro —
+   a washed-out pill). Keep the track a real dark body in both states — only
+   the thumb slides; the checked thumb picks up the accent so on/off still
+   reads at a glance. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic
+  :where(.window-content)
+  .tidy-switch
+  [role='switch'] {
+  background-color: rgb(0 0 0 / 0.45) !important;
+}
+
+body.fe-retro-theme form.tidy5e-sheet.application.classic
+  :where(.window-content)
+  .tidy-switch:has(input:checked)
+  [role='switch'] {
+  box-shadow: inset 0 0 0 1px var(--fe-ac-57) !important;
+}
+
+/* The hit-dice counter (`.portrait-hd`, bottom-right of the portrait) is the
+   only corner widget with no backdrop — the rest icon gets the faint black
+   backing above, and the HD value floats bare over the portrait. Give it the
+   same faint dark backing so the two portrait corners match. */
+body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
+  :where(.window-content)
+  .actor-profile-wrap
+  .profile
+  .portrait-hd {
+  background-color: rgb(0 0 0 / 0.4) !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
@@ -2210,6 +2367,16 @@ body.fe-retro-theme .tidy5e-sheet.application
   box-shadow:
     0 1px 0 var(--fe-dnd5e-tab-line-lit),
     0 2px 0 rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.20) !important;
+}
+
+/* Actor-sheet tab strip: drop the per-label underline. The tab itself already
+   paints an accent border on hover/active (the a.tab-option[role="tab"] rules
+   above), so the text underline only doubles the state indicator. Scoped to
+   .actor — item/container sheets keep the underline for now. */
+body.fe-retro-theme .tidy5e-sheet.application.actor
+  .tidy-tabs :is(a.tab-option, [role="tab"], a, button):not(.sidebar-toggle) :is(span, label) {
+  border-bottom: none !important;
+  box-shadow: none !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor

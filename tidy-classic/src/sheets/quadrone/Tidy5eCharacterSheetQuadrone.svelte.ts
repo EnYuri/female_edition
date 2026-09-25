@@ -69,6 +69,11 @@ import { buildRelativeUuid } from 'src/foundry/core-compat';
 export class Tidy5eCharacterSheetQuadrone extends Tidy5eActorSheetQuadroneBase<CharacterSheetQuadroneContext>(
   CONSTANTS.SHEET_TYPE_CHARACTER,
 ) {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_ACTOR_ACTIONS,
+    tabName: 'TIDY5E.Actions.TabName',
+  };
+
   currentTabId: string;
   currentSidebarTabId: string;
 
@@ -1174,23 +1179,6 @@ export class Tidy5eCharacterSheetQuadrone extends Tidy5eActorSheetQuadroneBase<C
     );
   }
 
-  protected _getSheetPinTabIdsForItem(item: Item5e): string[] {
-    const tabIds: string[] = [CONSTANTS.TAB_ACTOR_ACTIONS];
-
-    const originTab = Inventory.isItemInventoryType(item)
-      ? CONSTANTS.TAB_ACTOR_INVENTORY
-      : item.type === CONSTANTS.ITEM_TYPE_SPELL
-        ? CONSTANTS.TAB_ACTOR_SPELLBOOK
-        : SheetSections.showInFeatures(item)
-          ? CONSTANTS.TAB_CHARACTER_FEATURES
-          : null;
-
-    if (originTab) {
-      tabIds.push(originTab);
-    }
-
-    return tabIds;
-  }
 
   /* -------------------------------------------- */
   /*  Life-Cycle Handlers                         */

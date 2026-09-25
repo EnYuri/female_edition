@@ -4,8 +4,12 @@ import { CONSTANTS } from 'src/constants';
 import type { RegisteredTab } from '../types';
 import GroupMembersTab from 'src/sheets/classic/group/tabs/GroupMembersTab.svelte';
 import GroupInventoryTab from 'src/sheets/classic/group/tabs/GroupInventoryTab.svelte';
+import GroupBastionsTab from 'src/sheets/classic/group/tabs/GroupBastionsTab.svelte';
 import GroupDescriptionTab from 'src/sheets/classic/group/tabs/GroupDescriptionTab.svelte';
 import ActorEffectsTab from 'src/sheets/classic/actor/ActorEffectsTab.svelte';
+import { systemSettings } from 'src/settings/settings.svelte';
+import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+import { getUnlockThresholdLevel } from 'src/features/facility/Bastion';
 
 const defaultGroupClassicTabs: RegisteredTab<GroupSheetClassicContext>[] = [
   {
@@ -23,6 +27,33 @@ const defaultGroupClassicTabs: RegisteredTab<GroupSheetClassicContext>[] = [
     content: {
       component: GroupInventoryTab,
       type: 'svelte',
+    },
+    layout: 'classic',
+  },
+  {
+    id: CONSTANTS.TAB_GROUP_BASTIONS,
+    title: 'DND5E.Bastion.Configuration.Name',
+    content: {
+      component: GroupBastionsTab,
+      type: 'svelte',
+    },
+    enabled: (context) => {
+      if (!systemSettings.value.bastionConfiguration.enabled) {
+        return false;
+      }
+
+      const members = context.bastionsContext.members;
+
+      if (!members.length) {
+        return false;
+      }
+
+      if (FoundryAdapter.userIsGm()) {
+        return true;
+      }
+
+      const threshold = getUnlockThresholdLevel();
+      return members.some((m) => m.level >= threshold);
     },
     layout: 'classic',
   },

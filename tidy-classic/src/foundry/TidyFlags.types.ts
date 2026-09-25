@@ -29,7 +29,7 @@ export type AttributeActivityPinFlag = AttributePinBase & {
 
 export type AttributePinFlag = AttributeItemPinFlag | AttributeActivityPinFlag;
 
-type SheetPinBase = {
+type SheetPinFlagDataBase = {
   /** The Item UUID, generally relative to the owning character */
   id: string;
   /** The sort value */
@@ -37,17 +37,25 @@ type SheetPinBase = {
   alias?: string;
 };
 
-export type SheetItemPinFlag = SheetPinBase & {
+export type SheetItemPinFlagData = SheetPinFlagDataBase & {
   type: 'item';
   resource: 'limited-uses' | 'quantity';
 };
 
-export type SheetActivityPinFlag = SheetPinBase & {
+export type SheetActivityPinFlagData = SheetPinFlagDataBase & {
   type: 'activity';
   resource: 'limited-uses';
 };
 
-export type SheetPinFlag = SheetItemPinFlag | SheetActivityPinFlag;
+export type AnySheetPinFlagData =
+  | SheetItemPinFlagData
+  | SheetActivityPinFlagData;
+
+export type SheetPinLegacyFlag = AnySheetPinFlagData[];
+
+export type TabSheetPinFlagData = {
+  [tabId: string]: AnySheetPinFlagData[];
+};
 
 export type DocumentJournalEntry = {
   id: string;

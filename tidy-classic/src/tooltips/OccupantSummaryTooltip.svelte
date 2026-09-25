@@ -26,7 +26,10 @@
 
     const bastionOccupants: Actor5e[] = [];
     for (const uuid of uuids) {
-      bastionOccupants.push(await fromUuid(uuid));
+      const actor = await fromUuid(uuid);
+      if (actor) {
+        bastionOccupants.push(actor);
+      }
     }
 
     occupants = bastionOccupants;

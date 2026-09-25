@@ -40,12 +40,53 @@ function getEncounterMemberContextOptions(
 ): ContextMenuEntry[] {
   let options: ContextMenuEntry[] = [
     {
+      name: 'DND5E.Group.Action.View',
+      icon: `<i class="fas fa-eye fa-fw"></i>`,
+      callback: async () => (await memberPromise)?.sheet.render(true),
+      condition: () =>
+        encounter.isOwner && !FoundryAdapter.isLockedInCompendium(encounter),
+      group: 'common',
+    },
+    {
+      name: 'DND5E.HPFormulaRollMessage',
+      icon: `<i class="fas fa-dice-d6 fa-fw"></i>`,
+      callback: async () => {
+        const member = await memberPromise;
+
+        try {
+          const roll = await member.rollNPCHitPoints();
+
+          const updates: Record<string, any> = {
+            'system.attributes.hp.max': roll.total,
+          };
+
+          if (
+            member.system.attributes.hp.value ===
+            member.system.attributes.hp.max
+          ) {
+            updates['system.attributes.hp.value'] = roll.total;
+          }
+
+          await member.update(updates);
+        } catch (error) {
+          ui.notifications.error('DND5E.HPFormulaError', { localize: true });
+          return;
+        }
+
+        encounter.sheet.render();
+      },
+      condition: () =>
+        encounter.isOwner && !FoundryAdapter.isLockedInCompendium(encounter),
+      group: 'action',
+    },
+    {
       name: 'DND5E.Group.Action.Remove',
       icon: `<i class="fas fa-trash fa-fw t5e-warning-color"></i>`,
       callback: async () =>
         await encounter.system.removeMember(await memberPromise),
       condition: () =>
         encounter.isOwner && !FoundryAdapter.isLockedInCompendium(encounter),
+      group: 'be-careful',
     },
   ];
 

@@ -11,22 +11,30 @@
   import Search from 'src/components/utility-bar/Search.svelte';
   import PinnedFilterToggles from 'src/components/filter/PinnedFilterToggles.svelte';
   import { ItemFilterRuntime } from 'src/runtime/item/ItemFilterRuntime.svelte';
-  import { AttributePins } from 'src/features/attribute-pins/AttributePins';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
   import { TidyFlags } from 'src/foundry/TidyFlags';
   import { getCharacterSheetContext } from 'src/sheets/sheet-context.svelte';
+  import {
+    createSearchResultsState,
+    setSearchResultsContext,
+  } from 'src/features/search/search.svelte';
   import { SheetSections } from 'src/features/sections/SheetSections';
   import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
-  import AttributeItemPin from '../parts/AttributeItemPin.svelte';
-  import AttributeActivityPin from '../parts/AttributeActivityPin.svelte';
-  import { error } from 'src/utils/logging';
 
   let context = $derived(getCharacterSheetContext());
 
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
   let searchCriteria: string = $state('');
+
+  const searchResults = createSearchResultsState();
+  setSearchResultsContext(searchResults);
+
+  $effect(() => {
+    searchResults.criteria = searchCriteria;
+  });
 
   let utilityBarCommands = $derived(
     context.utilities[tabId]?.utilityToolbarCommands ?? [],
@@ -51,29 +59,13 @@
 
   let sidePanelTab = $state<string>(sidePanelTabs.skills);
 
-  // Sheet pins participate in search: only matching pins remain while searching.
-  let visibleAttributePins = $derived.by(() => {
-    const attributePins = context.attributePins.filter(
-      (pin) =>
-        (pin.tab ?? AttributePins.DEFAULT_TAB) ===
-        AttributePins.DEFAULT_TAB
-    );
-
-    const trimmed = searchCriteria.trim().toLowerCase();
-
-    if (trimmed === '') {
-      return attributePins;
-    }
-
-    return attributePins.filter(
-      (pin) =>
-        pin.alias?.toLowerCase().includes(trimmed) ||
-        (pin.type === 'item'
-          ? FoundryAdapter.searchItem(pin.document, searchCriteria)
-          : pin.document.name.toLowerCase().includes(trimmed) ||
-            FoundryAdapter.searchItem(pin.document.item, searchCriteria)),
-    );
-  });
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 </script>
 
 <UtilityToolbar>
@@ -133,7 +125,7 @@
           <SkillsList
             actor={context.actor}
             toggleable={settings.value.toggleEmptyCharacterSkills}
-            expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
+            expanded={TidyFlags.skillsExpanded.get(context.actor) ?? true}
             toggleField={TidyFlags.skillsExpanded.prop}
           />
         {:else}
@@ -143,31 +135,14 @@
         <SkillsList
           actor={context.actor}
           toggleable={settings.value.toggleEmptyCharacterSkills}
-          expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
+          expanded={TidyFlags.skillsExpanded.get(context.actor) ?? true}
           toggleField={TidyFlags.skillsExpanded.prop}
         />
       {/if}
     </section>
     <section class="main-panel">
-      {#if visibleAttributePins.length}
-        <div class="attribute-pins">
-          {#each visibleAttributePins as ctx (ctx.id)}
-            <svelte:boundary
-              onerror={(e) =>
-                error(
-                  'An error occurred while rendering an attribute pin',
-                  false,
-                  e,
-                )}
-            >
-              {#if ctx.type === 'item'}
-                <AttributeItemPin {ctx} />
-              {:else if ctx.type === 'activity'}
-                <AttributeActivityPin {ctx} />
-              {/if}
-            </svelte:boundary>
-          {/each}
-        </div>
+      {#if showSheetPins}
+        <SheetPins />
       {/if}
       {#if settings.value.moveCharacterTraitsToRightOfSkills}
         <Traits />

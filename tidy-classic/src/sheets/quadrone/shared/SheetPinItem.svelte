@@ -8,6 +8,7 @@
   import type { SheetPinItemContext } from 'src/types/types';
   import { isNil } from 'src/utils/data';
   import { EventHelper } from 'src/utils/events';
+  import { getTabIdFromEvent } from 'src/utils/element';
   import { coalesce } from 'src/utils/formatting';
   import SpellPip from 'src/components/pips/SpellPip.svelte';
   import CapacityBar from '../container/parts/CapacityBar.svelte';
@@ -220,7 +221,14 @@
           selectOnFocus={true}
           placeholder={ctx.document.name}
           onSaveChange={(ev) => {
-            SheetPinsProvider.setAlias(ctx.document, ev.currentTarget.value);
+            const tabId = getTabIdFromEvent(ev);
+            if (tabId) {
+              SheetPinsProvider.setAlias(
+                ctx.document,
+                tabId,
+                ev.currentTarget.value
+              );
+            }
             return false;
           }}
         />
@@ -231,8 +239,9 @@
           onclick={(ev) => {
             const input =
               ev.currentTarget.previousElementSibling?.querySelector('input');
-            if (input) {
-              SheetPinsProvider.setAlias(ctx.document, input.value);
+            const tabId = getTabIdFromEvent(ev);
+            if (input && tabId) {
+              SheetPinsProvider.setAlias(ctx.document, tabId, input.value);
             }
             isEditing = false;
             return false;

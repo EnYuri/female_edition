@@ -671,6 +671,20 @@ label.svelte-2ijbjz {
   flex: 1;
   text-align: center;
 }
+.pin-container-capacity.svelte-e8g53z .tidy-capacity {
+  flex: 1;
+}
+.sheet-pins.svelte-w04mdj .pin-container-capacity {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.sheet-pins.svelte-w04mdj .sheet-pin .pin-activities-count {
+  font-style: italic;
+  color: var(--t5e-secondary-color);
+  padding-inline-end: 0.25rem;
+}
 .ac-display.svelte-152bzdx {
   position: relative;
 }
@@ -918,6 +932,143 @@ label.svelte-2ijbjz {
 }
 .items.svelte-eiuhmx .items-footer:where(.svelte-eiuhmx) .footer-command:where(.svelte-eiuhmx):hover {
   color: var(--t5e-tertiary-color);
+}
+.bastion-occupancy.svelte-ewoee2 {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
+}
+.bastion-occupancy.interactive.svelte-ewoee2 {
+  cursor: pointer;
+}
+.bastion-occupancy.interactive.svelte-ewoee2:hover {
+  background: var(--t5e-faint-color);
+}
+.craft-and-meter.svelte-s70bse {
+  display: flex;
+  gap: 0.125rem;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.craft-and-meter.svelte-s70bse .facility-progress-meter {
+  flex: 1;
+}
+.craft-and-meter.svelte-s70bse .crafting-item:where(.svelte-s70bse) {
+  --img-size: 1.5rem;
+  width: var(--img-size);
+  height: var(--img-size);
+  margin-inline-end: 0.125rem;
+  border-radius: 0.1875rem;
+}
+.craft-and-meter.svelte-s70bse .facility-progress-adjust:where(.svelte-s70bse) {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex: 1;
+}
+.craft-and-meter.svelte-s70bse .facility-progress-adjust:where(.svelte-s70bse) .command:where(.svelte-s70bse) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--t5e-tertiary-color);
+  transition: color 0.3s ease;
+}
+.craft-and-meter.svelte-s70bse .facility-progress-adjust:where(.svelte-s70bse) .command:where(.svelte-s70bse):hover {
+  color: var(--t5e-primary-font-color);
+}
+.craft-and-meter.svelte-s70bse .facility-progress-adjust:where(.svelte-s70bse) .command.disabled:where(.svelte-s70bse) {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.bastion-facility-row.svelte-1mr7mw .facility-use-button:where(.svelte-1mr7mw) {
+  flex: none;
+  display: flex;
+}
+.bastion-facility-row.svelte-1mr7mw .facility-image,
+.bastion-facility-row.svelte-1mr7mw .facility-image:where(.svelte-1mr7mw) {
+  --img-size: 2rem;
+  --icon-fill: var(--t5e-tertiary-color);
+  width: var(--img-size);
+  height: var(--img-size);
+  border-radius: 0.1875rem;
+  object-fit: cover;
+}
+.bastion-facility-row.svelte-1mr7mw .facility-name:where(.svelte-1mr7mw) {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bastion-facility-row.svelte-1mr7mw .facility-name:where(.svelte-1mr7mw) h4:where(.svelte-1mr7mw) {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+.bastion-facility-row.svelte-1mr7mw .facility-name:where(.svelte-1mr7mw) .subtitle:where(.svelte-1mr7mw) {
+  font-size: 0.8125rem;
+  color: var(--t5e-secondary-color);
+}
+.bastion-facility-row.disabled.svelte-1mr7mw {
+  filter: grayscale(1);
+}
+.bastion-member-header.svelte-f46fka .member-portrait:where(.svelte-f46fka) {
+  --img-size: 2rem;
+  width: var(--img-size);
+  height: var(--img-size);
+  border-radius: 0.1875rem;
+  object-fit: cover;
+  flex: none;
+}
+.bastion-member-header.svelte-f46fka .member-titles:where(.svelte-f46fka) {
+  min-width: 0;
+}
+.bastion-member-header.svelte-f46fka .member-name:where(.svelte-f46fka) {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bastion-member-header.svelte-f46fka .member-subtitle:where(.svelte-f46fka) {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--t5e-tertiary-color);
+}
+.bastion-member-header.svelte-f46fka .member-subtitle:where(.svelte-f46fka) .divider-dot:where(.svelte-f46fka)::before {
+  content: '•';
+}
+.bastion-empty-note.svelte-f46fka {
+  padding: 0.5rem;
+  color: var(--t5e-secondary-color);
+  font-style: italic;
+}
+.bastion-order-row.svelte-jkssgx .bastion-order:where(.svelte-jkssgx) {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.bastion-orders-title.svelte-18dk3yz {
+  margin: 0;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.bastion-orders-title.svelte-18dk3yz .counter:where(.svelte-18dk3yz) {
+  padding-left: 0.25rem;
+  color: var(--t5e-tertiary-color);
+}
+.bastion-orders-title.svelte-18dk3yz .counter:where(.svelte-18dk3yz) .value:where(.svelte-18dk3yz) {
+  color: var(--t5e-secondary-color);
+}
+.bastion-empty-note.svelte-18dk3yz {
+  padding: 0.5rem;
+  color: var(--t5e-secondary-color);
+  font-style: italic;
 }
 .tidy5e-classic-controls.svelte-17l6hqr {
   flex: 1;
@@ -2770,7 +2921,7 @@ header.svelte-1xgr4hu .profile:where(.svelte-1xgr4hu) .portrait:where(.svelte-1x
   height: 1.25rem;
   border-radius: 0 0 0 0.3125rem;
   overflow: hidden;
-  transition: width 0.3s ease;
+  transition: height 0.3s ease;
   background: var(--t5e-icon-background);
   display: flex;
   box-shadow: 0 0 0.625rem var(--t5e-icon-shadow-color) inset;
@@ -2779,14 +2930,18 @@ header.svelte-1xgr4hu .profile:where(.svelte-1xgr4hu) .portrait:where(.svelte-1x
 }
 .resting.svelte-bdjwh3:hover,
 .resting.svelte-bdjwh3:focus-within {
-  width: var(--rest-expanded-width, 5.875rem);
+  height: var(--rest-expanded-height, 3.75rem);
+  flex-direction: column-reverse;
+  align-items: center;
 }
 .resting.svelte-bdjwh3 .rest:where(.svelte-bdjwh3) {
-  flex: 0 0 1.875rem;
+  /* flex-basis is the vertical row height once the box expands upward;
+         the width stays at the column width. */
+  flex: 0 0 1.125rem;
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 1.875rem;
+  width: 1.5rem;
   height: 1.125rem;
   border-radius: 50%;
   cursor: pointer;
@@ -2804,11 +2959,10 @@ header.svelte-1xgr4hu .profile:where(.svelte-1xgr4hu) .portrait:where(.svelte-1x
   color: var(--t5e-primary-font-color);
 }
 .resting.svelte-bdjwh3 .resting-icon:where(.svelte-bdjwh3) {
-  flex: 0 0 1.5rem;
+  flex: 0 0 1.25rem;
   display: flex;
   width: 1.5rem;
   height: 1.125rem;
-  margin-right: 0.5rem;
   justify-content: center;
   align-items: center;
   border-radius: 0;

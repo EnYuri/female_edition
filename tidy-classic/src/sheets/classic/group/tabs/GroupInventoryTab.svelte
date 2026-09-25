@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import ExpandableContainer from 'src/components/expandable/ExpandableContainer.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
   import PinnedFilterToggles from 'src/components/filter/PinnedFilterToggles.svelte';
@@ -28,6 +29,14 @@
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
   const context = $derived(getGroupSheetClassicContext());
+
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   let inventory = $derived(
     SheetSections.configureInventory(
@@ -91,6 +100,10 @@
     />
   {/each}
 </UtilityToolbar>
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
+
 
 <div
   class="tidy-inventory-container scroll-container flex-column small-gap"

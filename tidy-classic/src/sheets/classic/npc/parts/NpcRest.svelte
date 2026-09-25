@@ -12,8 +12,11 @@
 
   let restTypeCount = $derived(Object.keys(getRestTypes()).length);
   let showRefresh = $derived(FoundryAdapter.userIsGm());
-  let expandedWidth = $derived(
-    2.125 + 1.875 * (restTypeCount + (showRefresh ? 1 : 0)),
+  // The horizontal expansion collides with the HP bar across the portrait's
+  // bottom edge — expand upward instead: icon anchored at the corner, the
+  // rest buttons stack vertically over the portrait.
+  let expandedHeight = $derived(
+    1.25 * (restTypeCount + (showRefresh ? 1 : 0) + 1),
   );
 
   const localize = FoundryAdapter.localize;
@@ -24,7 +27,7 @@
   class:has-rounded-portrait={context.useRoundedPortraitStyle}
   title={localize('TIDY5E.RestHint')}
 >
-  <div class="resting" style:--rest-expanded-width="{expandedWidth}rem">
+  <div class="resting" style:--rest-expanded-height="{expandedHeight}rem">
     <span class="resting-icon">
       <i class="rest-icon fas fa-bed"></i>
     </span>
@@ -77,7 +80,7 @@
     height: 1.25rem;
     border-radius: 0 0 0 0.3125rem;
     overflow: hidden;
-    transition: width 0.3s ease;
+    transition: height 0.3s ease;
     background: var(--t5e-icon-background);
     display: flex;
     box-shadow: 0 0 0.625rem var(--t5e-icon-shadow-color) inset;
@@ -86,15 +89,19 @@
 
     &:hover,
     &:focus-within {
-      width: var(--rest-expanded-width, 5.875rem);
+      height: var(--rest-expanded-height, 3.75rem);
+      flex-direction: column-reverse;
+      align-items: center;
     }
 
     .rest {
-      flex: 0 0 1.875rem;
+      /* flex-basis is the vertical row height once the box expands upward;
+         the width stays at the column width. */
+      flex: 0 0 1.125rem;
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 1.875rem;
+      width: 1.5rem;
       height: 1.125rem;
       border-radius: 50%;
       cursor: pointer;
@@ -116,12 +123,11 @@
     }
 
     .resting-icon {
-      flex: 0 0 1.5rem;
+      flex: 0 0 1.25rem;
       display: flex;
 
       width: 1.5rem;
       height: 1.125rem;
-      margin-right: 0.5rem;
       justify-content: center;
       align-items: center;
       border-radius: 0;

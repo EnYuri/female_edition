@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { CONSTANTS } from 'src/constants';
+  import { getContext } from 'svelte';
+  import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import {
     type ActorSheetContextV1,
@@ -22,6 +26,14 @@
   import EffectTableRow from 'src/components/item-list/v1/EffectTableRow.svelte';
 
   let context = $derived(getSheetContext<NpcSheetContext>());
+  let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   const localize = FoundryAdapter.localize;
 
@@ -85,6 +97,9 @@
   );
 </script>
 
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 <div class="scroll-container flex-column small-gap">
   {#if !context.allowEffectsManagement && context.unlocked}
     <Notice>{localize('TIDY5E.GMOnlyEdit')}</Notice>

@@ -5,8 +5,10 @@ import type {
   Actor5e,
   ActorSheetClassicContextV2,
   ActorV2,
+  CharacterFacilitiesContext,
   ContainerPanelItemContext,
   CustomContent,
+  FacilityOccupancyContext,
   InventorySection,
   ItemSaveContext,
   Tab,
@@ -18,6 +20,7 @@ import type { CONSTANTS } from 'src/constants';
 import type { Tidy5eEncounterSheetClassic } from 'src/sheets/classic/Tidy5eEncounterSheetClassic.svelte';
 
 export type GroupSheetClassicContext = {
+  bastionsContext: GroupBastionsContext;
   config: any; // TODO: If possible, convert the full CONFIG (no modules on) to a typescript type.
   currentHP: number;
   canObserveAll: boolean;
@@ -178,6 +181,39 @@ export interface Group5e extends ActorV2 {
 export type GroupMemberSection = TidySectionBase & {
   members: Actor5e[];
   showCrColumn: boolean;
+};
+
+/** Group bastion overview: one entry per observable character member. */
+export type GroupBastionsContext = {
+  members: GroupMemberBastionContext[];
+  orders: GroupBastionOrderContext[];
+};
+
+export type GroupMemberBastionContext = {
+  actor: Actor5e;
+  /** The member's bastion name, or empty when unset. */
+  name: string;
+  level: number;
+  facilities: CharacterFacilitiesContext;
+  hirelings: FacilityOccupancyContext;
+  defenders: FacilityOccupancyContext;
+};
+
+/** A facility order currently in progress for a group member. */
+export type GroupBastionOrderContext = {
+  facility: Item5e;
+  facilityName: string;
+  member: Actor5e;
+  key: string;
+  label: string;
+  progress: {
+    value: number;
+    max: number;
+    pct: number;
+    order: string;
+  };
+  craft: Item5e | null;
+  cost: number | null;
 };
 
 export interface Group5eSystem {

@@ -357,3 +357,40 @@ export function localizedActivationTypeLabel(
   }
   return undefined;
 }
+
+/**
+ * Splits a stack of identical items into two stacks, prompting for the amount
+ * when the stack is larger than two.
+ *
+ * dnd5e < 6.0 exported `dnd5e.applications.item.SplitStackDialog`; 6.0 keeps the
+ * dialog class internal, so this shim replicates it with `DialogV2.input` —
+ * same semantics: the entered amount becomes the new ("right") stack.
+ */
+export async function promptSplitStack(item: any): Promise<void> {
+  const quantity = item.system.quantity ?? 1;
+  if (quantity === 2) {
+    await item.system.split();
+    return;
+  }
+
+  const Dialog = dnd5e.applications?.item?.SplitStackDialog;
+  if (Dialog) {
+    new Dialog({ document: item }).render({ force: true });
+    return;
+  }
+
+  const max = Math.max(1, quantity - 1);
+  const right = quantity - Math.ceil(quantity / 2);
+  const fd = await foundry.applications.api.DialogV2.input({
+    window: { title: 'DND5E.SplitStack.Title' },
+    content: `<input name="right" type="number" min="1" max="${max}" step="1" value="${right}" autofocus>`,
+    ok: {
+      label: 'DND5E.SplitStack.Action',
+      icon: 'fa-solid fa-arrows-split-up-and-left',
+    },
+  });
+  if (!fd) return;
+
+  const amount = Math.clamp(Number(fd.right) || 0, 1, max);
+  if (amount) await item.system.split(amount);
+}

@@ -210,7 +210,7 @@ export async function feRestoreMidiItemDescription(message, root) {
     const source = item.system?.description?.value;
     if (typeof source !== "string" || !source.trim()) return 0;
 
-    const enriched = await TextEditor.implementation.enrichHTML(source, {
+    const enriched = await foundry.applications.ux.TextEditor.implementation.enrichHTML(source, {
       rollData: item.getRollData?.() ?? {},
       secrets: item.isOwner ?? game?.user?.isGM,
     });

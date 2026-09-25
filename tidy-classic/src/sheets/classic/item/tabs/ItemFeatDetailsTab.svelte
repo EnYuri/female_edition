@@ -9,6 +9,7 @@
   import { getItemSheetContext } from 'src/sheets/sheet-context.svelte';
   import { CONSTANTS } from 'src/constants';
   import Checkbox from 'src/components/inputs/Checkbox.svelte';
+  import FeatureOriginFormGroup from '../parts/FeatureOriginFormGroup.svelte';
 
   let context = $derived(getItemSheetContext());
 
@@ -53,6 +54,10 @@
     />
   </Select>
 </div>
+
+{#if context.item.actor?.system.isCharacter}
+  <FeatureOriginFormGroup />
+{/if}
 
 {#if context.itemSubtypes}
   {@const category =

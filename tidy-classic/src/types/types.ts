@@ -23,9 +23,9 @@ import type { Dnd5eActorCondition } from 'src/foundry/foundry-and-system';
 import type { Activity5e, SkillData, ToolData } from 'src/foundry/dnd5e.types';
 import type {
   DocumentJournalEntries,
-  AttributePinFlag,
   EncounterPlaceholder,
-  SheetPinFlag,
+  SheetItemPinFlagData,
+  SheetActivityPinFlagData,
 } from 'src/foundry/TidyFlags.types';
 import type { DataField } from 'foundry.data.fields';
 import type { Ability } from './dnd5e.actor5e.types';
@@ -384,33 +384,29 @@ export type LanguageTraitContext = {
   value?: unknown;
 };
 
-export type AttributeItemPinContext = {
-  document: Item5e;
-  linkedUses?: LinkedUses;
-} & AttributePinFlag & { type: 'item' };
-
-export type AttributeActivityPinContext = {
-  document: Activity5e;
-} & AttributePinFlag & { type: 'activity' };
-
-export type AttributePinContext =
-  | AttributeItemPinContext
-  | AttributeActivityPinContext;
-
 export type SheetPinItemContext = {
   document: Item5e;
   linkedUses?: LinkedUses;
-} & SheetPinFlag & { type: 'item' };
+  presentation: string;
+} & SheetItemPinFlagData;
 
 export type SheetPinActivityContext = {
   document: Activity5e;
-} & SheetPinFlag & { type: 'activity' };
+  presentation: string;
+} & SheetActivityPinFlagData;
 
-export type SheetPinContext = (
-  | SheetPinItemContext
-  | SheetPinActivityContext
-) & {
-  tabIds: Set<string>;
+export type SheetPinContext = SheetPinItemContext | SheetPinActivityContext;
+
+export type TabSheetPinsContext = {
+  [tabId: string]: SheetPinContext[];
+};
+
+/** Information about a tab which is able to house sheet pins from other tabs. */
+export type AggregatePinTabInfo = {
+  /** The tab ID. */
+  tabId: string;
+  /** Unlocalized tab name. */
+  tabName: string;
 };
 
 export type CharacterFacilitiesContext = {
@@ -440,7 +436,6 @@ export type CharacterSheetContext = {
   actorClassesToImages: Record<string, string>;
   allowMaxHpOverride: boolean;
   appearanceEnrichedHtml: string;
-  attributePins: AttributePinContext[];
   bastion: {
     description: string;
   };
@@ -464,6 +459,7 @@ export type CharacterSheetContext = {
   notes3EnrichedHtml: string;
   notes4EnrichedHtml: string;
   notesEnrichedHtml: string;
+  sheetTabSections: SheetTabClassicSection[];
   showContainerPanel: boolean;
   spellComponentLabels: Record<string, string>;
   spellbook: SpellbookSection[];
@@ -514,6 +510,25 @@ export type FacilityOccupantContext = {
   actor?: Actor5e;
   /** If present, this indicates there is an occupant configured to be here. */
   uuid?: string;
+};
+
+export type FacilityOccupantSlot = 'creatures' | 'defenders' | 'hirelings';
+
+/**
+ * Total of a type of occupant across facilities. Occupants retain their UUIDs
+ * even when the source actor has been deleted.
+ */
+export type FacilityOccupancyContext = {
+  slot: FacilityOccupantSlot;
+  max: number;
+  occupants: string[];
+};
+
+export type FacilityDefenderContext = {
+  img: string;
+  name: string;
+  uuid: string;
+  facility: string;
 };
 
 export type NpcAbilitySection = {
@@ -690,6 +705,7 @@ export type ActionItem = {
 };
 
 export type ActionSectionClassic = {
+  type?: typeof CONSTANTS.SECTION_TYPE_CUSTOM;
   actions: ActionItem[];
 } & TidySectionBase;
 
@@ -841,6 +857,7 @@ export type ActorSheetContextV1 = {
   isVehicle: boolean;
   limited: boolean;
   itemContext: Record<string, any>; // TODO: Consider adding itemContext generic
+  tabSheetPins: TabSheetPinsContext;
   /** All items without a container. */
   items: Item5e[];
   labels: Record<string, any>;
@@ -1054,6 +1071,7 @@ export type ActorSheetClassicContextV2<TActor = ActorV2> = {
   healthPercentage: number;
   modernRules: boolean;
   lockSensitiveFields: boolean;
+  tabSheetPins: TabSheetPinsContext;
   tabs: Tab[];
   unlocked: boolean;
   useRoundedPortraitStyle: boolean;
@@ -1143,7 +1161,7 @@ export type ActorSheetQuadroneContext<TSheet = any> = {
   limited: boolean;
   modernRules: boolean;
   owner: boolean;
-  sheetPins: SheetPinContext[];
+  tabSheetPins: TabSheetPinsContext;
   portrait: {
     src: string;
     isRandom: boolean;
@@ -1335,6 +1353,12 @@ export type SheetTabSection =
   | SpellbookSection
   // TODO: Make a type for this an propagate
   | CustomItemSectionQuadrone;
+
+export type SheetTabClassicSection =
+  | CharacterFeatureSection
+  | InventorySection
+  | SpellbookSection
+  | ActionSectionClassic;
 
 export type CharacterSheetQuadroneContext = {
   actions: TidyItemSectionBase[];

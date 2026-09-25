@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
+  import { getContext } from 'svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import {
     type CharacterSheetContext,
@@ -13,7 +15,7 @@
   import ItemControl from '../../../../components/item-list/controls/ItemControl.svelte';
   import Notice from 'src/components/notice/Notice.svelte';
   import { declareLocation } from 'src/types/location-awareness.types';
-  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import { CONSTANTS } from 'src/constants';
   import ActorConditions from '../../actor/ActorConditions.svelte';
   import ClassicControls from 'src/sheets/classic/shared/ClassicControls.svelte';
@@ -24,6 +26,16 @@
   import EffectTableRow from 'src/components/item-list/v1/EffectTableRow.svelte';
 
   let context = $derived(getSheetContext<CharacterSheetContext>());
+
+  let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
+
 
   const localize = FoundryAdapter.localize;
 
@@ -95,7 +107,9 @@
 </script>
 
 <div class="scroll-container flex-column small-gap">
-  <TabPins tabId={CONSTANTS.TAB_EFFECTS} />
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
   {#if !context.allowEffectsManagement && context.unlocked}
     <Notice>{localize('TIDY5E.GMOnlyEdit')}</Notice>
   {/if}

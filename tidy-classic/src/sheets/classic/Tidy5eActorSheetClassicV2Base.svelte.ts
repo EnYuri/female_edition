@@ -26,13 +26,17 @@ import type { Item5e } from 'src/types/item.types';
 import type {
   ActorSaves,
   ActorSheetContextV1,
+  AggregatePinTabInfo,
   DamageModificationContextEntry,
   DamageModificationData,
   SpecialTraitSectionField,
 } from 'src/types/types';
+import type { AnySheetPinFlagData } from 'src/foundry/TidyFlags.types';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
+import { getTabIdFromEvent } from 'src/utils/element';
 import { splitSemicolons } from 'src/utils/array';
 import { isNil } from 'src/utils/data';
-import { debug, error } from 'src/utils/logging';
+import { debug, error, warn } from 'src/utils/logging';
 import { firstOfSet } from 'src/utils/set';
 import { mount } from 'svelte';
 import AttachedInfoCard from 'src/components/info-card/AttachedInfoCard.svelte';
@@ -269,6 +273,9 @@ export function Tidy5eActorSheetClassicV2Base<
         skills: foundry.utils.deepClone(this.actor.system.skills ?? {}),
         showLimitedSheet: FoundryAdapter.showLimitedSheet(this.actor),
         system: this.actor.system,
+        tabSheetPins: await SheetPinsProvider.getTabSheetPinsContext(
+          this.actor
+        ),
         tabs: [],
         tools: foundry.utils.deepClone(this.actor.system.tools ?? {}),
         traits: this._prepareTraits(this.actor.system),
@@ -920,6 +927,9 @@ export function Tidy5eActorSheetClassicV2Base<
 
     #dropBehavior: DropEffectValue | null = null;
 
+    /** The tab which can house sheet pins from other tabs. `null` when the sheet has none. */
+    aggregatePinTab: AggregatePinTabInfo | null = null;
+
     async _onDrop(
       event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement }
     ): Promise<any> {
@@ -932,6 +942,19 @@ export function Tidy5eActorSheetClassicV2Base<
         // TODO: Extract hook call
         const allowed = Hooks.call('dropActorSheetData', actor, this, data);
         if (allowed === false) return;
+
+        // Sheet Pins
+        const sheetPinDoc = data.uuid ? await fromUuid(data.uuid) : null;
+
+        if (
+          sheetPinDoc?.actor === this.actor &&
+          event.target.closest('[data-tidy-sheet-part="sheet-pins"]')
+        ) {
+          return await this._onDropSheetPin(event, {
+            id: SheetPinsProvider.getRelativeUUID(sheetPinDoc),
+            doc: sheetPinDoc,
+          });
+        }
 
         // Handle different data types
         switch (data.type) {
@@ -953,6 +976,54 @@ export function Tidy5eActorSheetClassicV2Base<
       } finally {
         this.#dropBehavior = null;
       }
+    }
+
+    async _onDropSheetPin(
+      event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement },
+      data: { id: string; doc: any }
+    ) {
+      const tabId = getTabIdFromEvent(event);
+
+      if (!tabId) {
+        warn('Unable to pin. Tab ID not found.', false, { event, data });
+        return;
+      }
+
+      if (!SheetPinsProvider.isPinned(data.doc, tabId)) {
+        const pinType: AnySheetPinFlagData['type'] | undefined =
+          data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ITEM
+            ? 'item'
+            : data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ACTIVITY
+              ? 'activity'
+              : undefined;
+
+        if (pinType) {
+          await SheetPinsProvider.pin(data.doc, tabId, pinType);
+        }
+      }
+
+      return await this._onSortSheetPins(event, data.id);
+    }
+
+    async _onSortSheetPins(
+      event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement },
+      srcId: string
+    ) {
+      const tabId = getTabIdFromEvent(event);
+      const targetId = event.target
+        ?.closest('[data-pin-id]')
+        ?.getAttribute('data-pin-id');
+
+      if (!tabId || !targetId || srcId === targetId) {
+        return;
+      }
+
+      return await SheetPinsProvider.sortPins(
+        this.actor,
+        tabId,
+        srcId,
+        targetId
+      );
     }
 
     /** @override */

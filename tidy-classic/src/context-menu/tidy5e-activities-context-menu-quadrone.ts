@@ -3,6 +3,8 @@ import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import type { ContextMenuEntry } from 'src/foundry/foundry.types';
 import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import { buildRelativeUuid } from 'src/foundry/core-compat';
+import { getTabIdFromElement } from 'src/utils/element';
+import type { AggregatePinTabInfo } from 'src/types/types';
 
 export function getContextMenuOptionsQuadrone(
   activity: Activity5e,
@@ -73,30 +75,68 @@ export function getContextMenuOptionsQuadrone(
 
   // Customize - These are things Tidy provides above and beyond the system for greater customization of the sheet.
 
+  const pinTabId = getTabIdFromElement(element);
+
   entries.push({
     name: 'TIDY5E.ContextMenuActionPin',
     icon: `<i class="fa-solid fa-thumbtack"></i>`,
-    callback: async () => await SheetPinsProvider.pin(activity, 'activity'),
+    callback: async () => {
+      if (pinTabId) {
+        await SheetPinsProvider.pin(activity, pinTabId, 'activity');
+      }
+    },
     condition: () =>
       app.actor &&
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
       SheetPinsProvider.isPinnable(activity, 'activity') &&
-      !SheetPinsProvider.isPinned(activity),
+      pinTabId &&
+      !SheetPinsProvider.isPinned(activity, pinTabId),
     group: 'pins',
   });
 
   entries.push({
     name: 'TIDY5E.ContextMenuActionUnpin',
     icon: `<i class="fa-regular fa-thumbtack"></i>`,
-    callback: async () => await SheetPinsProvider.unpin(activity),
+    callback: async () => {
+      if (pinTabId) {
+        await SheetPinsProvider.unpin(activity, pinTabId);
+      }
+    },
     condition: () =>
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
       SheetPinsProvider.isPinnable(activity, 'activity') &&
-      SheetPinsProvider.isPinned(activity),
+      pinTabId &&
+      SheetPinsProvider.isPinned(activity, pinTabId),
     group: 'pins',
   });
+
+  const aggregatePinTab = app.aggregatePinTab as AggregatePinTabInfo | null;
+
+  if (aggregatePinTab) {
+    entries.push({
+      name: FoundryAdapter.localize('TIDY5E.ContextMenuActionPinToTab', {
+        tabName: FoundryAdapter.localize(aggregatePinTab.tabName),
+      }),
+      icon: `<i class="fa-solid fa-thumbtack"></i>`,
+      callback: async () => {
+        await SheetPinsProvider.pin(
+          activity,
+          aggregatePinTab.tabId,
+          'activity'
+        );
+      },
+      condition: () =>
+        pinTabId !== aggregatePinTab.tabId &&
+        app.actor &&
+        activity.item.isOwner &&
+        !FoundryAdapter.isLockedInCompendium(activity.item) &&
+        SheetPinsProvider.isPinnable(activity, 'activity') &&
+        !SheetPinsProvider.isPinned(activity, aggregatePinTab.tabId),
+      group: 'pins',
+    });
+  }
 
   // Be Careful - These are the no-going-back changes
 

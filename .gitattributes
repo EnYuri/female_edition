@@ -11,6 +11,7 @@ CLAUDE.md         export-ignore
 AGENTS.md        export-ignore
 .codex       export-ignore
 .claude       export-ignore
+.devin        export-ignore
 # Node dev tooling — never ships to Foundry users.
 package.json      export-ignore
 package-lock.json export-ignore

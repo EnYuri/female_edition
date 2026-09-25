@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import { CONSTANTS } from 'src/constants';
   import { getContext } from 'svelte';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
@@ -20,6 +21,14 @@
   const tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
   const context = $derived(getGroupSheetClassicContext());
+
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   const localize = FoundryAdapter.localize;
 
@@ -59,6 +68,10 @@
     />
   {/each}
 </UtilityToolbar>
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
+
 
 <section
   class="scroll-container flex-column small-gap"

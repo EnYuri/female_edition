@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
+  import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import { type ComponentProps } from 'svelte';
   import Traits from '../../actor/traits/Traits.svelte';
   import VehicleAttributes from '../parts/VehicleAttributes.svelte';
@@ -35,6 +38,14 @@
   import { isItemInActionList } from 'src/features/actions/actions.svelte';
   
   let context = $derived(getVehicleSheetContext());
+  let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   const localize = FoundryAdapter.localize;
 
@@ -109,6 +120,10 @@
     <Traits useSenses={false} enableSpecialTraitsConfiguration={false} />
   </div>
   <div class="main-panel flex-column small-gap">
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
+
     {#if noEntries && !context.unlocked}
       <Notice>
         {localize('TIDY5E.EmptySection')}

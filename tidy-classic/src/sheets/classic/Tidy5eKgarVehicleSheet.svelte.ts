@@ -1,4 +1,5 @@
 import { CONSTANTS } from 'src/constants';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import { settings } from 'src/settings/settings.svelte';
 import type {
@@ -47,6 +48,11 @@ export class Tidy5eVehicleSheet
     SheetExpandedItemsCacheable,
     SearchFilterCacheable
 {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_VEHICLE_ATTRIBUTES,
+    tabName: 'DND5E.Attributes',
+  };
+
   stats = $state<SheetStats>({
     lastSubmissionTime: null,
   });
@@ -242,6 +248,22 @@ export class Tidy5eVehicleSheet
         ],
       },
     };
+
+    for (const pinTabId of [
+        CONSTANTS.TAB_VEHICLE_ATTRIBUTES,
+        CONSTANTS.TAB_VEHICLE_CARGO_LEGACY,
+        CONSTANTS.TAB_ACTOR_ACTIONS,
+      ]) {
+      const utility = (utilities[pinTabId] ??= {
+        utilityToolbarCommands: [],
+      });
+      (utility.utilityToolbarCommands ??= []).push(
+        SheetPinsProvider.getToggleVisibilityUtilityCommand(
+          this.actor.type,
+          pinTabId
+        )
+      );
+    }
 
     const context: VehicleSheetContext = {
       inventory: [],

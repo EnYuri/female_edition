@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import SkillsList from 'src/sheets/classic/actor/SkillsList.svelte';
   import Traits from '../../actor/traits/Traits.svelte';
   import { getContext, setContext, type ComponentProps } from 'svelte';
@@ -63,6 +64,13 @@
 
   let context = $derived(getNpcSheetContext());
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   let inlineToggleService = getContext<InlineToggleService>(
     CONSTANTS.SVELTE_CONTEXT.INLINE_TOGGLE_SERVICE,
@@ -190,13 +198,16 @@
     />
   {/each}
 </UtilityToolbar>
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 
 <section class="npc-abilities-content" data-tidy-track-scroll-y>
   <div class="side-panel">
     <SkillsList
       actor={context.actor}
       toggleable={!settings.value.alwaysShowNpcSkills}
-      expanded={!!TidyFlags.skillsExpanded.get(context.actor)}
+      expanded={TidyFlags.skillsExpanded.get(context.actor) ?? true}
       toggleField={TidyFlags.skillsExpanded.prop}
       defaultSkills={context.defaultSkills}
     />

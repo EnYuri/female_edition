@@ -14,6 +14,22 @@ export const CLASSIC_HEADER_REGISTRATIONS = Object.freeze([
   'registerVehicleHeaderControls',
 ]);
 
+/**
+ * Custom content is duck-typed on both APIs, so a content object built from the
+ * official module's own models (e.g. Plutonium's level-up button) maps cleanly
+ * through Classic's mapToRegisteredContents. The layout option still decides
+ * which Classic runtimes receive it; 'quadrone'-only content is ignored here.
+ */
+export const CLASSIC_CONTENT_REGISTRATIONS = Object.freeze([
+  'registerActorContent',
+  'registerCharacterContent',
+  'registerEncounterContent',
+  'registerGroupContent',
+  'registerItemContent',
+  'registerNpcContent',
+  'registerVehicleContent',
+]);
+
 const wrappedApis = new WeakSet();
 
 function mirrorRegistration(owner, name, classicOwner, warn) {
@@ -40,6 +56,10 @@ export function mirrorTidyRegistrations(officialApi, classicApi, warn = console.
   wrappedApis.add(officialApi);
 
   for (const name of CLASSIC_HEADER_REGISTRATIONS) {
+    mirrorRegistration(officialApi, name, classicApi, warn);
+  }
+
+  for (const name of CLASSIC_CONTENT_REGISTRATIONS) {
     mirrorRegistration(officialApi, name, classicApi, warn);
   }
 

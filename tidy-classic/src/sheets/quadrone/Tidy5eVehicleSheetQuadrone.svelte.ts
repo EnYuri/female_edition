@@ -39,6 +39,11 @@ const localize = FoundryAdapter.localize;
 export class Tidy5eVehicleSheetQuadrone extends Tidy5eActorSheetQuadroneBase<VehicleSheetQuadroneContext>(
   CONSTANTS.SHEET_TYPE_VEHICLE
 ) {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_STATBLOCK,
+    tabName: 'TIDY5E.StatblockTabName',
+  };
+
   currentTabId: string;
 
   constructor(options?: Partial<ApplicationConfiguration> | undefined) {
@@ -569,21 +574,6 @@ export class Tidy5eVehicleSheetQuadrone extends Tidy5eActorSheetQuadroneBase<Veh
     }
   }
 
-  protected _getSheetPinTabIdsForItem(item: Item5e): string[] {
-    const tabIds: string[] = [];
-
-    // TODO: Somehow share the mountable logic somewhere
-    const originTab =
-      Inventory.isItemInventoryType(item) && !item.system.isMountable
-        ? CONSTANTS.TAB_ACTOR_INVENTORY
-        : CONSTANTS.TAB_STATBLOCK;
-
-    if (originTab) {
-      tabIds.push(originTab);
-    }
-
-    return tabIds;
-  }
 
   _prepareTravelSpeeds(): VehicleSheetQuadroneContext['travelSpeeds'] {
     const travelUnits = this.actor.system.attributes.travel?.units;

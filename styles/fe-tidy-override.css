@@ -222,3 +222,92 @@ span.flex-row.align-items-center.extra-small-gap {
   vertical-align: middle !important;
   width: auto !important;
 }
+
+/* -------------------------------------------------------------------------
+ * Tidy5e Classic: special-traits tab — controls next to their text.
+ *
+ * Stock `.form-group` is `display: flex` with `.form-group > * { flex: 2 1 0% }`
+ * (tidy5e-classic-global.css), so the checkbox/select stretches across the
+ * row and parks at the far right edge, far from the name/description it
+ * toggles. Reorder: name → description → control, control sized to content,
+ * and stop the class select from filling the row.
+ * ------------------------------------------------------------------------- */
+/* `.special-traits-container` itself carries `.tidy-form` — pinning that pair
+   in every selector outranks tidy5e-classic-global.css's same-weight
+   `.tidy-form .form-group` rules (`.form-group > * { flex: 2 1 0% }`,
+   `.form-group .hint { flex: 0 0 100% }`) which otherwise park the control
+   on a full-width line of its own at the bottom-right. */
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > label {
+  order: 1;
+  flex: 0 1 auto;
+}
+
+/* Checkboxes go to the row's top-right corner; text/number fields drop to
+   their own line below the description; the class select sits right after
+   its name. `.form-fields` is width:100% + justify-content:flex-end in
+   classic (its own bottom line); shrink it to content so the margin can
+   park it. */
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > .form-fields {
+  order: 2;
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > .form-fields:has(input[type='checkbox']) {
+  margin-left: auto;
+}
+
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > .form-fields:not(:has(input[type='checkbox'])) {
+  order: 4;
+  flex: 0 0 100%;
+  justify-content: flex-start;
+  margin-left: 0;
+}
+
+/* The inner control is `width: 100%` (classic's actor-sheet rule), so the
+   field stretches to the row's full width — cap it at a sensible size. */
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > .form-fields:not(:has(input[type='checkbox']))
+  :is(input, select) {
+  max-width: 20rem;
+}
+
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > .hint {
+  order: 3;
+  margin-left: 0;
+}
+
+.tidy5e-sheet.application:where(.classic)
+  .special-traits-container.tidy-form
+  .form-group
+  > select {
+  order: 2;
+  width: auto;
+  min-width: 12rem;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import { TidyFlags } from 'src/api';
   import {
     createSearchResultsState,
@@ -32,6 +34,13 @@
   let { tabId }: Props = $props();
 
   let context = $derived(getVehicleSheetContext());
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   let inventory = $derived(
     SheetSections.configureInventory(
@@ -95,6 +104,9 @@
     />
   {/each}
 </UtilityToolbar>
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 
 <div
   class="tidy-inventory-container scroll-container flex-column small-gap"

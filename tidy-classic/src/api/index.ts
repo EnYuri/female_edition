@@ -31,5 +31,8 @@ export type { CustomTraitEntry } from './config/actor-traits/types';
 export type {
   EncounterCombatantSettings,
   EncounterCombatantsSettings,
-  SheetPinFlag,
+  AnySheetPinFlagData,
+  SheetItemPinFlagData,
+  SheetActivityPinFlagData,
+  TabSheetPinFlagData,
 } from 'src/foundry/TidyFlags.types';

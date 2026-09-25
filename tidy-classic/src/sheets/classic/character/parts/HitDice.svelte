@@ -7,6 +7,10 @@
 
   let hitDice = $derived(context.system.attributes.hd);
   let actorLevel = $derived(context.system.details.level);
+  let hasClasses = $derived.by(() => {
+    const classes = context.system.attributes.hd.classes;
+    return (classes?.size ?? classes?.length ?? 0) > 0;
+  });
 
   const localize = FoundryAdapter.localize;
 </script>
@@ -15,14 +19,21 @@
   class="portrait-hd"
   class:rounded={context.useRoundedPortraitStyle}
   title="{localize('DND5E.HitDice')}: {hitDice}/{actorLevel}&#10;{localize(
-    'DND5E.HitDiceConfig',
+    hasClasses ? 'DND5E.HitDiceConfig' : 'DND5E.HitPointsConfig',
   )}"
 >
   <button
     type="button"
     class="current-hd config-button transparent-button"
-    onclick={context.editable &&
-      FoundryAdapter.renderHitDiceConfig(context.actor)}
+    onclick={() => {
+      if (!context.editable) {
+        return;
+      }
+
+      return hasClasses
+        ? FoundryAdapter.renderHitDiceConfig(context.actor)
+        : FoundryAdapter.renderHitPointsDialog(context.actor);
+    }}
     disabled={!context.editable}
     tabindex={!settings.value.useDefaultSheetHpTabbing &&
     settings.value.useAccessibleKeyboardSupport

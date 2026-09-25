@@ -1,4 +1,5 @@
 import { CONSTANTS } from 'src/constants';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import {
   type ApplicationClosingOptions,
   type ApplicationConfiguration,
@@ -10,6 +11,7 @@ import type {
   Actor5e,
   ActorInventoryTypes,
   DocumentSheetV2Context,
+  FacilityOccupantSlot,
   Utilities,
 } from 'src/types/types';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
@@ -18,9 +20,11 @@ import type {
   Group5eMember,
   Group5eXp,
   GroupAbility,
+  GroupBastionsContext,
   GroupItemContext,
   GroupLanguage,
   GroupMemberAbilityContext,
+  GroupMemberBastionContext,
   GroupMemberContext,
   GroupMemberSection,
   GroupMemberSkillInfo,
@@ -64,6 +68,12 @@ import {
   getSenseRange,
   refreshActor,
 } from 'src/foundry/dnd5e-compat';
+import * as Bastion from 'src/features/facility/Bastion';
+import { BastionMaintainOrderDialog } from 'src/features/facility/BastionMaintainOrderDialog';
+import {
+  FacilityOccupantSlotPropsMap,
+  FacilityOccupantSlotTypesMap,
+} from 'src/features/facility/facility';
 
 type MemberStats = {
   currentHP: number;
@@ -81,6 +91,11 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     >(foundry.applications.sheets.ActorSheetV2)
   )
 ) {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_MEMBERS,
+    tabName: 'DND5E.Group.Member.other',
+  };
+
   sectionExpansionTracker: ExpansionTracker;
 
   constructor(options?: Partial<ApplicationConfiguration> | undefined) {
@@ -425,6 +440,18 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
           },
         ],
       },
+      [CONSTANTS.TAB_GROUP_BASTIONS]: {
+        utilityToolbarCommands: [
+          {
+            id: 'take-bastion-turn',
+            title: FoundryAdapter.localize('DND5E.Bastion.Action.Advance'),
+            iconClass: 'fa-solid fa-calendar-clock fa-fw',
+            text: FoundryAdapter.localize('DND5E.Bastion.Action.Advance'),
+            execute: () => this.takeBastionTurn(),
+            visible: FoundryAdapter.userIsGm(),
+          },
+        ],
+      },
     };
 
     const uncontainedItems: Item5e[] = Array.from(this.actor.items).filter(
@@ -462,10 +489,27 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       );
     });
 
+    for (const pinTabId of [
+        CONSTANTS.TAB_MEMBERS,
+        CONSTANTS.TAB_ACTOR_INVENTORY,
+        CONSTANTS.TAB_GROUP_BASTIONS,
+      ]) {
+      const utility = (utilities[pinTabId] ??= {
+        utilityToolbarCommands: [],
+      });
+      (utility.utilityToolbarCommands ??= []).push(
+        SheetPinsProvider.getToggleVisibilityUtilityCommand(
+          this.actor.type,
+          pinTabId
+        )
+      );
+    }
+
     let context: GroupSheetClassicContext = {
       actor: this.actor,
       actorPortraitCommands:
         ActorPortraitRuntime.getEnabledPortraitMenuCommands(this.actor),
+      bastionsContext: await this.#prepareBastions(memberContext),
       canObserveAll: Object.values(memberContext).every((m) => m.canObserve),
       config: CONFIG.DND5E,
       containerPanelItems: await Inventory.getContainerPanelItems(
@@ -497,6 +541,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       lockSensitiveFields:
         (!documentSheetContext.unlocked && settings.value.useTotalSheetLock) ||
         !editable,
+      tabSheetPins: await SheetPinsProvider.getTabSheetPinsContext(this.actor),
       maxHP: stats.maxHP,
       memberContext: memberContext,
       memberSections: memberSections,
@@ -964,6 +1009,91 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     return null;
   }
 
+  /**
+   * Prepare group bastions. One entry per observable character member. Orders
+   * are shared context for the group.
+   *
+   * GMs can prep facilities before players get access via their level, but
+   * players won't see it until one of them reaches the level where bastions
+   * unlock.
+   */
+  async #prepareBastions(
+    memberContext: GroupSheetClassicContext['memberContext']
+  ): Promise<GroupBastionsContext> {
+    const bastionsContext: GroupBastionsContext = {
+      members: [],
+      orders: [],
+    };
+
+    // Skip if bastions are off.
+    if (!systemSettings.value.bastionConfiguration.enabled) {
+      return bastionsContext;
+    }
+
+    for (const memberData of this.actor.system.members) {
+      const member = memberData.actor;
+
+      if (member.type !== CONSTANTS.SHEET_TYPE_CHARACTER) {
+        continue;
+      }
+
+      if (!memberContext[member.id]?.canObserve) {
+        continue;
+      }
+
+      const { facilities } = await Bastion.prepareFacilities(member);
+
+      const memberFacilities = [
+        ...facilities.special.chosen,
+        ...facilities.basic.chosen,
+      ];
+
+      bastionsContext.members.push({
+        actor: member,
+        name: member.system.bastion?.name ?? '',
+        level: member.system.details.level,
+        facilities,
+        hirelings: Bastion.calculateOccupancy(
+          facilities.special.chosen,
+          'hirelings'
+        ),
+        defenders: Bastion.calculateOccupancy(
+          facilities.special.chosen,
+          'defenders'
+        ),
+      });
+
+      for (const facility of memberFacilities) {
+        if (!facility.progress.max) {
+          continue;
+        }
+
+        bastionsContext.orders.push({
+          facility: facility.facility,
+          facilityName: facility.name,
+          member,
+          key: facility.progress.order,
+          label:
+            CONFIG.DND5E.facilities.orders[facility.progress.order]?.label ??
+            facility.progress.order,
+          progress: {
+            value: facility.progress.value,
+            max: facility.progress.max,
+            pct: facility.progress.pct,
+            order: facility.progress.order,
+          },
+          craft: facility.craft,
+          cost: Bastion.getOrderCost(facility),
+        });
+      }
+    }
+
+    // Sort by progress
+    bastionsContext.orders.sort((a, b) => b.progress.pct - a.progress.pct);
+
+    return bastionsContext;
+  }
+
   async _prepareItems(context: GroupSheetClassicContext) {
     for (const item of context.items) {
       if (Inventory.isItemInventoryType(item)) {
@@ -1065,6 +1195,38 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     data: any
   ): Promise<object | boolean | undefined> {
     if (!this.isEditable) {
+      return false;
+    }
+
+    // Dropping an actor on a member facility's occupant slot assigns them
+    // there instead of adding them to the group.
+    const occupantTarget = event.target?.closest<HTMLElement>(
+      '[data-occupant-slot][data-member-uuid]'
+    );
+
+    if (occupantTarget && data.uuid) {
+      const memberUuid = occupantTarget.dataset.memberUuid;
+      const member = memberUuid ? fromUuidSync(memberUuid) : undefined;
+      const facilityId =
+        occupantTarget.closest<HTMLElement>('[data-facility-id]')?.dataset
+          .facilityId;
+      const slot = occupantTarget.dataset.occupantSlot as
+        | FacilityOccupantSlot
+        | undefined;
+      const prop = slot ? FacilityOccupantSlotPropsMap[slot] : undefined;
+
+      if (!member || !prop) {
+        return false;
+      }
+
+      const facility = facilityId
+        ? member.items.get(facilityId)
+        : await this.#promptForFacilityWithOpenSlot(member, slot!);
+
+      if (facility) {
+        return await Bastion.addFacilityOccupant(facility, prop, data.uuid);
+      }
+
       return false;
     }
 
@@ -1231,5 +1393,294 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
     });
 
     award.render(true);
+  }
+
+  /* -------------------------------------------- */
+  /*  Bastions                                    */
+  /* -------------------------------------------- */
+
+  /**
+   * Advance a bastion turn for characters in this group only. Not the whole world.
+   *
+   * Mirrors `dnd5e.bastion.confirmAdvance()`, which can't be reused here because
+   * it's world-level.
+   */
+  async takeBastionTurn() {
+    if (!FoundryAdapter.userIsGm()) {
+      return;
+    }
+
+    const proceed = await foundry.applications.api.DialogV2.confirm({
+      content: FoundryAdapter.localize('TIDY5E.BASTION.Group.Confirm.TakeTurn'),
+      rejectClose: false,
+      window: {
+        icon: 'fa-solid fa-chess-rook',
+        title: 'DND5E.Bastion.Action.Advance',
+      },
+    });
+
+    if (!proceed) {
+      return;
+    }
+
+    const members = this.actor.system.members
+      .map(({ actor }: { actor: Actor5e }) => actor)
+      .filter((actor: Actor5e) => !!actor);
+
+    const maintainUuids = await BastionMaintainOrderDialog.prompt(
+      members.filter((actor: Actor5e) => actor.itemTypes.facility?.length),
+      (dialog) => dialog.render({ force: true })
+    );
+
+    if (maintainUuids === null) {
+      return;
+    }
+
+    return await Bastion.advanceBastions(members, { maintainUuids });
+  }
+
+  async issueMemberMaintainOrder(member: Actor5e) {
+    if (!FoundryAdapter.userIsGm() || !member.itemTypes.facility?.length) {
+      return;
+    }
+
+    return await Bastion.issueMaintainOrder(member);
+  }
+
+  /** Issue an order to a facility owned by a group member. */
+  async useMemberFacility(
+    member: Actor5e,
+    facilityId: string | undefined,
+    event: Event
+  ) {
+    if (!this.isEditable) {
+      return;
+    }
+
+    return await Bastion.useFacility({
+      actor: member,
+      facilityId,
+      event,
+      sheet: this,
+    });
+  }
+
+  /**
+   * Nudge a member facility's order along by a day, for GMs correcting the
+   * record. Serves the facilities list and the orders list.
+   */
+  async adjustMemberFacilityProgress(args: {
+    memberUuid: string | undefined;
+    facilityId: string | undefined;
+    toAdjust: number;
+  }) {
+    if (!FoundryAdapter.userIsGm()) {
+      return;
+    }
+
+    const { memberUuid, facilityId, toAdjust } = args;
+
+    const member = memberUuid ? fromUuidSync(memberUuid) : undefined;
+
+    const facility = facilityId ? member?.items.get(facilityId) : undefined;
+
+    if (
+      !facility ||
+      !facility.isOwner ||
+      FoundryAdapter.isLockedInCompendium(facility)
+    ) {
+      return;
+    }
+
+    const { value, max } = facility.system.progress;
+
+    if (Number.isNaN(toAdjust) || !max) {
+      return;
+    }
+
+    const next = Math.clamp(value + toAdjust, 0, max);
+
+    if (next === value) {
+      return;
+    }
+
+    // If you hit the last day, check if the user wants to complete the order.
+    if (toAdjust > 0 && next >= max) {
+      const proceed = await Bastion.confirmCompleteOrder();
+
+      if (!proceed) {
+        return;
+      }
+
+      return await Bastion.completeOrder(facility);
+    }
+
+    return await facility.update({ 'system.progress.value': next });
+  }
+
+  async completeMemberFacilityOrder(facility: Item5e) {
+    if (
+      !FoundryAdapter.userIsGm() ||
+      !facility.isOwner ||
+      FoundryAdapter.isLockedInCompendium(facility)
+    ) {
+      return;
+    }
+
+    return await Bastion.completeOrder(facility);
+  }
+
+  /**
+   * Browse for a facility and create it on the member. GM only, so it ignores
+   * level restrictions.
+   */
+  async addMemberFacility(member: Actor5e, facilityType: string, event: Event) {
+    if (!this.isEditable) {
+      return;
+    }
+
+    return await Bastion.addFacility({
+      actor: member,
+      facilityType,
+      event,
+      ignoreLevelRestriction: true,
+      onSelected: (itemData) =>
+        dnd5e.documents.Item5e.createDocuments([itemData], {
+          pack: member.pack,
+          parent: member,
+          keepId: true,
+        }),
+    });
+  }
+
+  /**
+   * Fill an open occupant slot on a member's facility.
+   *
+   * Facility rows identify their facility directly. The member header row shows
+   * an occupancy total across every special facility, so it has no single
+   * target and prompts for one instead.
+   */
+  async addMemberFacilityOccupant(
+    memberUuid: string | undefined,
+    slot: FacilityOccupantSlot | undefined,
+    event: Event,
+    facilityId?: string
+  ) {
+    const member = memberUuid ? fromUuidSync(memberUuid) : undefined;
+
+    if (!member || !slot) {
+      return;
+    }
+
+    const facility = facilityId
+      ? member.items.get(facilityId)
+      : await this.#promptForFacilityWithOpenSlot(member, slot);
+
+    if (
+      !facility ||
+      !facility.isOwner ||
+      FoundryAdapter.isLockedInCompendium(facility)
+    ) {
+      return;
+    }
+
+    const prop = FacilityOccupantSlotPropsMap[slot];
+
+    if (
+      !TidyHooks.tidy5eSheetsFacilityEmptyOccupantSlotClicked(
+        event,
+        facility,
+        FacilityOccupantSlotTypesMap[slot],
+        prop
+      )
+    ) {
+      return;
+    }
+
+    const result = await dnd5e.applications.CompendiumBrowser.selectOne({
+      filters: {
+        locked: {
+          documentClass: 'Actor',
+          types: new Set(['character', 'npc', 'vehicle', 'group']),
+        },
+      },
+      // Have to specify a tab now, otherwise it defaults to items and fails.
+      tab: 'actors',
+    });
+
+    if (result) {
+      await Bastion.addFacilityOccupant(facility, prop, result);
+    }
+  }
+
+  /**
+   * Ask which of a member's facilities should receive the occupant. Resolves
+   * without prompting when there is only one candidate.
+   */
+  async #promptForFacilityWithOpenSlot(
+    member: Actor5e,
+    slot: FacilityOccupantSlot
+  ): Promise<Item5e | undefined> {
+    const candidates = Bastion.getFacilitiesWithOpenSlot(member, slot);
+
+    if (candidates.length <= 1) {
+      return candidates[0];
+    }
+
+    // Built through the DOM so facility names are escaped for us.
+    const select = document.createElement('select');
+    select.name = 'facilityId';
+    for (const facility of candidates) {
+      const option = document.createElement('option');
+      option.value = facility.id;
+      option.textContent = facility.name;
+      select.appendChild(option);
+    }
+
+    const { promise, resolve } = Promise.withResolvers<string | undefined>();
+
+    const dialog = new foundry.applications.api.DialogV2({
+      content: `<div class="form-group">${select.outerHTML}</div>`,
+      window: {
+        icon: 'fa-solid fa-house-turret',
+        title: FoundryAdapter.localize(
+          'TIDY5E.BASTION.Group.ChooseFacility.Title'
+        ),
+      },
+      buttons: [
+        {
+          action: 'choose',
+          icon: 'fa-solid fa-check',
+          label: FoundryAdapter.localize('Confirm'),
+          default: true,
+          callback: (_event: Event, button: HTMLButtonElement) =>
+            new foundry.applications.ux.FormDataExtended(button.form).object
+              .facilityId as string | undefined,
+        },
+      ],
+      submit: (result: string | undefined) => resolve(result),
+    });
+
+    dialog.addEventListener('close', () => resolve(undefined), { once: true });
+
+    dialog.render({ force: true });
+
+    const chosenId = await promise;
+
+    return chosenId ? member.items.get(chosenId) : undefined;
+  }
+
+  /**
+   * Open a member's own sheet on their bastion tab, so a GM can jump from the
+   * party overview straight to the facilities they were reading.
+   */
+  viewBastionMember(member: Actor5e) {
+    if (!Bastion.characterHasBastionTab(member)) {
+      member.sheet.render(true);
+      return;
+    }
+
+    member.sheet.emphasizedTabId = CONSTANTS.TAB_CHARACTER_BASTION;
+    member.sheet.render(true);
   }
 }

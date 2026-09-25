@@ -14,9 +14,11 @@ import type {
   ActorInventoryTypes,
   NpcHabitat,
   ActorSheetContextV1,
+  SpecialTraitSectionField,
 } from 'src/types/types';
 import NpcSheet from './npc/NpcSheet.svelte';
 import { CONSTANTS } from 'src/constants';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import { debug } from 'src/utils/logging';
 import { settings, systemSettings } from 'src/settings/settings.svelte';
 import { initTidy5eContextMenu } from 'src/context-menu/tidy5e-context-menu';
@@ -55,6 +57,11 @@ export class Tidy5eNpcSheet
     SheetExpandedItemsCacheable,
     SearchFilterCacheable
 {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_NPC_ABILITIES,
+    tabName: 'TIDY5E.Abilities',
+  };
+
   stats = $state<SheetStats>({
     lastSubmissionTime: null,
   });
@@ -603,6 +610,24 @@ export class Tidy5eNpcSheet
         defaultDocumentContext.effects
       );
 
+    for (const pinTabId of [
+        CONSTANTS.TAB_NPC_ABILITIES,
+        CONSTANTS.TAB_ACTOR_SPELLBOOK,
+        CONSTANTS.TAB_ACTOR_INVENTORY,
+        CONSTANTS.TAB_ACTOR_ACTIONS,
+        CONSTANTS.TAB_EFFECTS,
+      ]) {
+      const utility = (utilities[pinTabId] ??= {
+        utilityToolbarCommands: [],
+      });
+      (utility.utilityToolbarCommands ??= []).push(
+        SheetPinsProvider.getToggleVisibilityUtilityCommand(
+          this.actor.type,
+          pinTabId
+        )
+      );
+    }
+
     const context: NpcSheetContext = {
       appearanceEnrichedHtml: await FoundryAdapter.enrichHtml(
         TidyFlags.appearance.get(this.actor) ?? '',
@@ -1104,15 +1129,54 @@ export class Tidy5eNpcSheet
   async _prepareSpecialTraitsContext(context: ActorSheetContextV1) {
     context = await super._prepareSpecialTraitsContext(context);
 
+    const npcFields: SpecialTraitSectionField[] = [];
+    const schemaFields = this.document.system.schema.fields;
+
+    // Upstream Quadrone also exposes the NPC identifier on this tab.
+    if (schemaFields.identifier) {
+      npcFields.push({
+        field: new schemaFields.identifier.constructor({
+          label: schemaFields.identifier.label,
+          hint: 'DND5E.IdentifierError',
+        }),
+        name: 'system.identifier',
+        value: context.source.identifier,
+      });
+    }
+
+    if (schemaFields.traits?.fields?.important) {
+      npcFields.push({
+        field: schemaFields.traits.fields.important,
+        name: 'system.traits.important',
+        value: context.source.traits.important,
+      });
+    }
+
+    const priceFields = schemaFields.attributes?.fields?.price?.fields;
+    if (priceFields?.value && priceFields?.denomination) {
+      npcFields.push(
+        {
+          field: priceFields.value,
+          name: 'system.attributes.price.value',
+          value: context.source.attributes.price.value,
+        },
+        {
+          // The schema StringField carries no choices; rebuild it with the
+          // currency list so it renders as a select (upstream does the same).
+          field: new priceFields.denomination.constructor({
+            label: priceFields.denomination.label,
+            hint: priceFields.denomination.hint,
+            choices: CONFIG.DND5E.currencies,
+          }),
+          name: 'system.attributes.price.denomination',
+          value: context.source.attributes.price.denomination,
+        },
+      );
+    }
+
     context.flags.sections.unshift({
       label: game.i18n.localize('DND5E.NPC.Label'),
-      fields: [
-        {
-          field: this.document.system.schema.fields.traits.fields.important,
-          name: 'system.traits.important',
-          value: context.source.traits.important,
-        },
-      ],
+      fields: npcFields,
     });
 
     return context;

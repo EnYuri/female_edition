@@ -1350,3 +1350,9 @@ input.clr-color:focus{outline:none;border:1px solid #1e90ff}
 .tidy5e-sheet.classic.theme-light [data-tab-contents-for=drakkenheim-contamination-tab] .symptom a, .tidy5e-sheet.classic.theme-light [data-tab-contents-for=drakkenheim-contamination-tab] .symptom a i{background-color:#0003;color:#fff}
 .clr-picker.clr-picker{width:15.625rem}
 .clr-swatches button{width:2rem;height:2rem}
+.bastion-maintain-order-dialog .bastion-maintain-order-hint{margin-block-end:.5rem;font-size:.875rem}
+.bastion-maintain-order-dialog .bastion-maintain-order-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.bastion-maintain-order-dialog .bastion-maintain-order-option-label{display:flex;align-items:center;gap:.5rem;cursor:pointer}
+.bastion-maintain-order-dialog .bastion-maintain-order-portrait{--img-size: 2.25rem;width:var(--img-size);height:var(--img-size);border-radius:.25rem;object-fit:cover;flex:none}
+.bastion-maintain-order-dialog .bastion-maintain-order-text{display:flex;flex-direction:column;min-width:0}
+.bastion-maintain-order-dialog .bastion-maintain-order-subtitle{font-size:.8125rem;color:var(--color-text-secondary,#888)}

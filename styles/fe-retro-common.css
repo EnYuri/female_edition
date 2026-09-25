@@ -355,6 +355,16 @@ body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
 body.fe-retro-theme .sidebar-tab :is(a, li, label) { color: var(--fe-ac-57) !important; }
 body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) { color: var(--fe-ac-80) !important; }
 
+/* Sidebar directories keep every entry mounted (thousands of rows in large
+   worlds) — offscreen rows skip layout/paint. DOM order/scrollHeight stay
+   intact via contain-intrinsic-size, so Foundry's directory scroll behaves
+   unchanged; only render cost drops. Not applied to .chat-message — the chat
+   merge/sticky-scroll logic measures message layout. */
+body.fe-retro-theme #sidebar .directory-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 30px;
+}
+
 /* Shared typing indicator. The dots follow currentColor. */
 body.fe-retro-theme #fe-typing-notify {
   color: var(--fe-ac-80) !important;

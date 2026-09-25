@@ -5,6 +5,7 @@ import CharacterBastionTab from 'src/sheets/classic/character/tabs/CharacterBast
 import ActorInventoryTab from 'src/sheets/classic/actor/tabs/ActorInventoryTab.svelte';
 import CharacterSpellbookTab from 'src/sheets/classic/character/tabs/CharacterSpellbookTab.svelte';
 import CharacterFeaturesTab from 'src/sheets/classic/character/tabs/CharacterFeaturesTab.svelte';
+import CharacterSheetTab from 'src/sheets/classic/character/tabs/CharacterSheetTab.svelte';
 import CharacterEffectsTab from 'src/sheets/classic/character/tabs/CharacterEffectsTab.svelte';
 import CharacterBiographyTab from 'src/sheets/classic/character/tabs/CharacterBiographyTab.svelte';
 import ActorJournalTab from 'src/sheets/classic/actor/tabs/ActorJournalTab.svelte';
@@ -13,6 +14,7 @@ import ActorActionsTab from 'src/sheets/classic/actor/tabs/ActorActionsTab.svelt
 import { CONSTANTS } from 'src/constants';
 import type { RegisteredTab } from '../types';
 import { systemSettings } from 'src/settings/settings.svelte';
+import { characterHasBastionTab } from 'src/features/facility/Bastion';
 
 const defaultClassicCharacterTabs: RegisteredTab<CharacterSheetContext>[] = [
   {
@@ -22,6 +24,15 @@ const defaultClassicCharacterTabs: RegisteredTab<CharacterSheetContext>[] = [
       type: 'svelte',
     },
     id: CONSTANTS.TAB_ACTOR_ACTIONS,
+    layout: 'classic',
+  },
+  {
+    id: CONSTANTS.TAB_CHARACTER_SHEET,
+    title: 'TIDY5E.SheetTabName',
+    content: {
+      component: CharacterSheetTab,
+      type: 'svelte',
+    },
     layout: 'classic',
   },
   {
@@ -100,16 +111,7 @@ const defaultClassicCharacterTabs: RegisteredTab<CharacterSheetContext>[] = [
       component: CharacterBastionTab,
       type: 'svelte',
     },
-    enabled: (context) => {
-      const { enabled } = systemSettings.value.bastionConfiguration;
-      const { basic, special } = CONFIG.DND5E.facilities.advancement;
-      const threshold = Math.min(
-        ...Object.keys(basic).map(Number),
-        ...Object.keys(special).map(Number)
-      );
-
-      return context.actor.system.details.level >= threshold && enabled;
-    },
+    enabled: (context) => characterHasBastionTab(context.actor),
     layout: 'classic',
   },
   {

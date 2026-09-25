@@ -12,6 +12,7 @@ import DocumentActionsColumn from 'src/sheets/quadrone/item/columns/DocumentActi
 import GroupMemberHpColumn from 'src/sheets/quadrone/item/columns/GroupMemberHpColumn.svelte';
 import GroupMemberHdColumn from 'src/sheets/quadrone/item/columns/GroupMemberHdColumn.svelte';
 import GroupMemberAcColumn from 'src/sheets/quadrone/item/columns/GroupMemberAcColumn.svelte';
+import GroupMemberSpeedColumn from 'src/sheets/quadrone/item/columns/GroupMemberSpeedColumn.svelte';
 import GroupCharacterXpColumn from 'src/sheets/quadrone/item/columns/GroupXpColumn.svelte';
 import GroupVehicleDtColumn from 'src/sheets/quadrone/item/columns/GroupVehicleDtColumn.svelte';
 import GroupVehicleCrewColumn from 'src/sheets/quadrone/item/columns/GroupVehicleCrewColumn.svelte';
@@ -67,6 +68,18 @@ class GroupMemberColumnRuntimeImpl extends TableColumnRuntimeBase {
       cellContent: {
         type: 'component',
         component: GroupMemberAcColumn,
+      },
+      widthRems: 3,
+    };
+
+    const speedColumn: ColumnSpecificationBase = {
+      headerContent: {
+        type: 'html',
+        html: FoundryAdapter.localize('DND5E.Speed'),
+      },
+      cellContent: {
+        type: 'component',
+        component: GroupMemberSpeedColumn,
       },
       widthRems: 3,
     };
@@ -137,6 +150,7 @@ class GroupMemberColumnRuntimeImpl extends TableColumnRuntimeBase {
             hp: { ...hpColumn, order: 200, priority: 500 },
             hd: { ...hdColumn, order: 300, priority: 100 },
             ac: { ...acColumn, order: 400, priority: 200 },
+            speed: { ...speedColumn, order: 450, priority: 50 },
             characterXp: { ...xpColumn, order: 500, priority: 300 },
             actionsColumn: { ...actionsColumn, order: 1000, priority: 1000 },
           },
@@ -144,6 +158,7 @@ class GroupMemberColumnRuntimeImpl extends TableColumnRuntimeBase {
             hp: { ...hpColumn, order: 100, priority: 400 },
             hd: { ...hdColumn, order: 200, priority: 100 },
             ac: { ...acColumn, order: 300, priority: 200 },
+            speed: { ...speedColumn, order: 350, priority: 50 },
             npcXp: { ...xpColumn, order: 400, priority: 300 },
             actionsColumn: { ...actionsColumn, order: 1000, priority: 1000 },
           },
@@ -159,6 +174,7 @@ class GroupMemberColumnRuntimeImpl extends TableColumnRuntimeBase {
             hp: { ...hpColumn, order: 200, priority: 500 },
             hd: { ...hdColumn, order: 300, priority: 100 },
             ac: { ...acColumn, order: 400, priority: 200 },
+            speed: { ...speedColumn, order: 450, priority: 50 },
             characterXp: { ...xpColumn, order: 500, priority: 300 },
             actionsColumn: { ...actionsColumn, order: 1000, priority: 1000 },
           },

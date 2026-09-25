@@ -25,7 +25,7 @@
   import ActionFilterOverrideControl from 'src/components/item-list/controls/ActionFilterOverrideControl.svelte';
   import { declareLocation } from 'src/types/location-awareness.types';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
-  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -49,6 +49,14 @@
   let context = $derived(getCharacterSheetContext());
 
   let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
+
 
   const localize = FoundryAdapter.localize;
 
@@ -160,7 +168,9 @@
   {/each}
 </UtilityToolbar>
 
-  <TabPins {tabId} {searchCriteria} />
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 <div
   class="scroll-container flex-column small-gap"
   data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEMS_CONTAINER}

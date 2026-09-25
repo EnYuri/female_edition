@@ -3,19 +3,25 @@
   import ActivityUseButton from 'src/components/item-list/ActivityUseButton.svelte';
   import RechargeControl from 'src/components/item-list/controls/RechargeControl.svelte';
   import { CONSTANTS } from 'src/constants';
-  import { AttributePins } from 'src/features/attribute-pins/AttributePins';
+  import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
-  import { getCharacterSheetContext } from 'src/sheets/sheet-context.svelte';
-  import type { AttributeActivityPinContext } from 'src/types/types';
+  import { getSheetContext } from 'src/sheets/sheet-context.svelte';
+  import type {
+    ActorSheetContextV1,
+    SheetPinActivityContext,
+  } from 'src/types/types';
   import { isNil } from 'src/utils/data';
   import { EventHelper } from 'src/utils/events';
   import { coalesce } from 'src/utils/formatting';
+  import { getContext } from 'svelte';
 
   interface Props {
-    ctx: AttributeActivityPinContext;
+    ctx: SheetPinActivityContext;
   }
 
   let { ctx }: Props = $props();
+
+  const tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
   let img = $derived(
     ctx.document.img ===
@@ -57,13 +63,13 @@
     }
   }
 
-  let context = $derived(getCharacterSheetContext());
+  let context = $derived(getSheetContext<ActorSheetContextV1>());
 
   let localize = FoundryAdapter.localize;
 </script>
 
 <div
-  class="attribute-pin"
+  class="sheet-pin attribute-pin"
   data-tidy-draggable
   data-item-id={ctx.document.item.id}
   data-activity-id={ctx.document.id}
@@ -76,7 +82,7 @@
   ondragstart={onDragStart}
 >
   <div class="attribute-document-image">
-    <ActivityUseButton activity={ctx.document} {img} />
+    <ActivityUseButton activity={ctx.document} {img} disabled={!context.editable} />
   </div>
   <div class="attribute-pin-details">
     <div
@@ -92,7 +98,13 @@
           selectOnFocus={true}
           placeholder={ctx.document.name}
           onSaveChange={(ev) => {
-            AttributePins.setAlias(ctx.document, ev.currentTarget.value);
+            if (tabId) {
+              SheetPinsProvider.setAlias(
+                ctx.document,
+                tabId,
+                ev.currentTarget.value
+              );
+            }
             return false;
           }}
         />
@@ -114,35 +126,30 @@
         </button>
       {/if}
     </div>
-    <div class="attribute-counter {ctx.resource}">
-      {#if ctx.resource === 'limited-uses' && ctx.document.isOnCooldown}
-        <RechargeControl document={ctx.document} field="uses.spent" {uses} />
-      {:else if ctx.resource === 'limited-uses' && ctx.document.hasRecharge}
-        <span class="charged-text">
-          {#if value > 1}
-            <span>{value}</span>
-          {/if}
-          <i class="fas fa-bolt" title={localize('DND5E.Charged')}></i>
-        </span>
-      {:else if ctx.resource === 'limited-uses'}
-        <TextInput
-          document={usesDocument}
-          field="uses.spent"
-          {value}
-          onSaveChange={(ev) => saveValueChange(ev)}
-          selectOnFocus={true}
-        />
-        <span class="divider">/</span>
-        <span class="max">{maxText}</span>
-      {:else if ctx.resource === 'quantity'}
-        <TextInput
-          document={ctx.document}
-          field={'system.quantity'}
-          value={ctx.document.system.quantity}
-          selectOnFocus={true}
-        />
-      {/if}
-    </div>
+    {#if ctx.presentation !== 'none'}
+      <div class="attribute-counter {ctx.resource}">
+        {#if ctx.document.isOnCooldown}
+          <RechargeControl document={ctx.document} field="uses.spent" {uses} />
+        {:else if ctx.document.hasRecharge}
+          <span class="charged-text">
+            {#if value > 1}
+              <span>{value}</span>
+            {/if}
+            <i class="fas fa-bolt" title={localize('DND5E.Charged')}></i>
+          </span>
+        {:else}
+          <TextInput
+            document={usesDocument}
+            field="uses.spent"
+            {value}
+            onSaveChange={(ev) => saveValueChange(ev)}
+            selectOnFocus={true}
+          />
+          <span class="divider">/</span>
+          <span class="max">{maxText}</span>
+        {/if}
+      </div>
+    {/if}
   </div>
   {#if context.unlocked}
     <a

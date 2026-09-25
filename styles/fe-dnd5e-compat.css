@@ -2219,3 +2219,21 @@ body.fe-dnd5e-item-flat .dnd5e2.sheet.item:not(.minimized)::before {
 .dnd5e2.sheet.item li.item-rarity > select.fe-item-rarity-select {
   width: 100%;
 }
+
+/* ------------------------------------------------------------------
+ * Movement config — fly row's hover-checkbox label wraps mid-word.
+ *
+ * In the shared movement/senses config the fly input and the hover
+ * checkbox share one .form-fields row. The nested .form-group.checkbox
+ * may shrink below its label's min-content width (label is flex 0 1 auto
+ * with white-space: normal), so a two-syllable label like the Korean
+ * "부유" stacks vertically. Pin the label to one line; if the row still
+ * lacks room the whole checkbox group wraps as a unit instead.
+ * ------------------------------------------------------------------ */
+.dnd5e2.config-sheet[id^="movement-"] .form-fields > .form-group.checkbox {
+  flex: 0 0 auto;
+}
+
+.dnd5e2.config-sheet[id^="movement-"] .form-fields > .form-group.checkbox label {
+  white-space: nowrap;
+}

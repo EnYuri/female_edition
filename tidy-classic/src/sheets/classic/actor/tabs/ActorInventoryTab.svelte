@@ -15,7 +15,7 @@
   import { settings } from 'src/settings/settings.svelte';
   import { CONSTANTS } from 'src/constants';
   import UtilityToolbar from 'src/components/utility-bar/UtilityToolbar.svelte';
-  import TabPins from 'src/sheets/classic/actor/parts/TabPins.svelte';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import Search from 'src/components/utility-bar/Search.svelte';
   import UtilityToolbarCommand from 'src/components/utility-bar/UtilityToolbarCommand.svelte';
   import FilterMenu from 'src/components/filter/FilterButton.svelte';
@@ -42,6 +42,13 @@
 
   let context =
     $derived(getSheetContext<CharacterSheetContext | NpcSheetContext>());
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   let inventory = $derived(
     SheetSections.configureInventory(
@@ -106,7 +113,9 @@
   {/each}
 </UtilityToolbar>
 
-  <TabPins {tabId} {searchCriteria} />
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 
 <div
   class="tidy-inventory-container scroll-container flex-column small-gap"

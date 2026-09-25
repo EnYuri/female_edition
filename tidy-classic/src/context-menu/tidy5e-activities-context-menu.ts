@@ -1,5 +1,7 @@
 import { CONSTANTS } from 'src/constants';
-import { AttributePins } from 'src/features/attribute-pins/AttributePins';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
+import { getTabIdFromElement } from 'src/utils/element';
+import type { AggregatePinTabInfo } from 'src/types/types';
 import type { Activity5e } from 'src/foundry/dnd5e.types';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import type { ContextMenuEntry } from 'src/foundry/foundry.types';
@@ -100,32 +102,68 @@ function getContextMenuOptions(
     });
   }
 
-  const pinTabId = AttributePins.getTabFromElement(element);
+  const pinTabId = getTabIdFromElement(element);
 
   entries.push({
-    name: 'TIDY5E.ContextMenuActionPinToAttributes',
+    name: 'TIDY5E.ContextMenuActionPin',
     icon: `<i class="fa-solid fa-thumbtack"></i>`,
-    callback: async () => await AttributePins.pin(activity, 'activity', pinTabId),
+    callback: async () => {
+      if (pinTabId) {
+        await SheetPinsProvider.pin(activity, pinTabId, 'activity');
+      }
+    },
     condition: () =>
       app.actor &&
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
-      AttributePins.isPinnable(activity, 'activity') &&
-      !AttributePins.isPinned(activity, pinTabId),
+      SheetPinsProvider.isPinnable(activity, 'activity') &&
+      pinTabId &&
+      !SheetPinsProvider.isPinned(activity, pinTabId),
     group: 'pins',
   });
 
   entries.push({
-    name: 'TIDY5E.ContextMenuActionUnpinFromAttributes',
-    icon: `<i class="fa-solid fa-xmark" style='color: var(--t5e-warning-accent-color)'></i>`,
-    callback: async () => await AttributePins.unpin(activity, pinTabId),
+    name: 'TIDY5E.ContextMenuActionUnpin',
+    icon: `<i class="fa-regular fa-thumbtack"></i>`,
+    callback: async () => {
+      if (pinTabId) {
+        await SheetPinsProvider.unpin(activity, pinTabId);
+      }
+    },
     condition: () =>
       activity.item.isOwner &&
       !FoundryAdapter.isLockedInCompendium(activity.item) &&
-      AttributePins.isPinnable(activity, 'activity') &&
-      AttributePins.isPinned(activity, pinTabId),
+      SheetPinsProvider.isPinnable(activity, 'activity') &&
+      pinTabId &&
+      SheetPinsProvider.isPinned(activity, pinTabId),
     group: 'pins',
   });
+
+  const aggregatePinTab = app.aggregatePinTab as AggregatePinTabInfo | null;
+
+  if (aggregatePinTab) {
+    entries.push({
+      name: FoundryAdapter.localize('TIDY5E.ContextMenuActionPinToTab', {
+        tabName: FoundryAdapter.localize(aggregatePinTab.tabName),
+      }),
+      icon: `<i class="fa-solid fa-thumbtack"></i>`,
+      callback: async () => {
+        await SheetPinsProvider.pin(
+          activity,
+          aggregatePinTab.tabId,
+          'activity'
+        );
+      },
+      condition: () =>
+        pinTabId !== aggregatePinTab.tabId &&
+        app.actor &&
+        activity.item.isOwner &&
+        !FoundryAdapter.isLockedInCompendium(activity.item) &&
+        SheetPinsProvider.isPinnable(activity, 'activity') &&
+        !SheetPinsProvider.isPinned(activity, aggregatePinTab.tabId),
+      group: 'pins',
+    });
+  }
 
   if ('favorites' in (app.actor?.system ?? {})) {
     const uuid = `${buildRelativeUuid(activity.item, app.actor)}.Activity.${

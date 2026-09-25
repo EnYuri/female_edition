@@ -50,9 +50,16 @@ function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
 function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
+// The user-facing feature flag alone. Yield only stands the CARD CONTAINER
+// down — every affordance that controls the feature (sheet header entries,
+// context menu, token HUD) stays live during a combat, because the mask flag
+// also drives the tracker's "?" drums and pinning a card for after the fight
+// is still meaningful. `_ruiEnabled` = the flag AND the cards actually on
+// screen.
+function _featureOn()    { try { return feSetting(S.DX3RD_RUI_ENABLED) === true; } catch { return false; } }
 function _ruiEnabled()   {
   try {
-    if (feSetting(S.DX3RD_RUI_ENABLED) !== true) return false;
+    if (!_featureOn()) return false;
     return !_yieldsToTracker();
   } catch { return false; }
 }
@@ -80,9 +87,8 @@ function _syncTrackerYield() {
   if (yielding === _ruiYieldState) return;
   _ruiYieldState = yielding;
   feRebuildDx3rdResourceUI();
-  // Already-open sheets do not re-render, so the pin button would linger on a feature
-  // that just stood down — the same cleanup the enable toggle does.
-  if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
+  // Header affordances intentionally survive the stand-down — only the card
+  // container yields to the tracker, not the buttons that control the flags.
 }
 function _isThemeOn()    { return document.body.classList.contains("fe-retro-theme"); }
 // Panel visibility, moved from a chat toggle button to a module setting. Defaults to on.
@@ -706,7 +712,7 @@ function _refreshVisibility() {
 // Sidebar Actor directory right-click
 // v14: getActorContextOptions / v13: getActorContextMenuOptions
 function _ruiContextEntry(html, options) {
-  if (!_isSupported() || !_ruiEnabled()) return;
+  if (!_isSupported() || !_featureOn()) return;
   if (options.some(o => o.name === feLocalize("FE.Dx3rdResourceUi._ruiContextEntry"))) return;
   // v14 replaced ContextMenuEntry#name/#condition with label/visible (removal slated for
   // v16). Minimum support is v13, so emit both key pairs.
@@ -822,7 +828,7 @@ function _injectTokenHudButtons(app, el) {
   }
 
   // Status toggle — supported systems with the feature enabled only.
-  if (_isSupported() && _ruiEnabled()) {
+  if (_isSupported() && _featureOn()) {
     const pinned = _isActorPinned(actor);
     colRight.appendChild(_hudIconBtn(
       pinned ? feLocalize("FE.Dx3rdResourceUi._injectTokenHudButtons") : feLocalize("FE.Dx3rdResourceUi._injectTokenHudButtons2"),
@@ -847,7 +853,7 @@ Hooks.on("renderTokenHUD", _injectTokenHudButtons);
 // mostly future-proofing; the practical path for DX3rd today is the
 // windowHeader plain-button fallback in _injectSheetStatusBtn below.
 function _ruiOnGetHeaderControls(app, controls) {
-  if (!_isSupported() || !_ruiEnabled()) return;
+  if (!_isSupported() || !_featureOn()) return;
   const actor = app.actor ?? app.document;
   if (actor?.documentName !== "Actor") return;
   controls.push({
@@ -860,7 +866,7 @@ function _ruiOnGetHeaderControls(app, controls) {
 Hooks.on("getHeaderControlsApplicationV2", _ruiOnGetHeaderControls);
 
 function _injectSheetStatusBtn(app, el) {
-  if (!_isSupported() || !_ruiEnabled()) {
+  if (!_isSupported() || !_featureOn()) {
     el?.querySelectorAll?.(".fedr-sheet-btn")?.forEach(b => b.remove());
     return;
   }
@@ -940,7 +946,7 @@ Hooks.on("init", () => {
   feRegisterSetting(S.DX3RD_RUI_ENABLED, () => {
       feRebuildDx3rdResourceUI();
       // Clean up header buttons on already-open sheets when toggling off (no re-render).
-      if (!_ruiEnabled()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
+      if (!_featureOn()) document.querySelectorAll(".fedr-sheet-btn").forEach(b => b.remove());
     });
   feRegisterSetting(S.DX3RD_RUI_VISIBLE, _refreshVisibility);
   feRegisterSetting(S.DX3RD_RUI_YIELD_TO_TRACKER, _syncTrackerYield);
@@ -999,8 +1005,17 @@ Hooks.on("updateActor", (actor, change) => {
 
 // Synthetic actors are only enumerable through the current scene's TokenDocuments, so a
 // scene change or an unlinked-token delete cannot be reconciled from game.actors alone.
+// updateToken matters as much as updateActor: flag/HP writes on an UNLINKED token's
+// synthetic actor surface as `actorData` inside the token update — the updateActor
+// hook never sees them, so without this the pin toggle could set the flag yet the
+// card would never appear (or, worse, the flag clears while the card lingers).
 Hooks.on("canvasReady", feRebuildDx3rdResourceUI);
+Hooks.on("createToken", feRebuildDx3rdResourceUI);
 Hooks.on("deleteToken", feRebuildDx3rdResourceUI);
+Hooks.on("updateToken", (_token, change) => {
+  if (change.actorData === undefined) return;
+  feRebuildDx3rdResourceUI();
+});
 
 Hooks.on("renderChatLog",   () => { _injectAccentBtn(); });
 Hooks.on("renderChatInput", () => { _injectAccentBtn(); });

@@ -1,4 +1,5 @@
 import { CONSTANTS } from 'src/constants';
+import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import {
   type ApplicationClosingOptions,
   type ApplicationConfiguration,
@@ -69,6 +70,11 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
     >(foundry.applications.sheets.ActorSheetV2)
   )
 ) {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_MEMBERS,
+    tabName: 'DND5E.Group.Member.other',
+  };
+
   sectionExpansionTracker: ExpansionTracker;
 
   constructor(options?: Partial<ApplicationConfiguration> | undefined) {
@@ -446,6 +452,21 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
       );
     });
 
+    for (const pinTabId of [
+        CONSTANTS.TAB_MEMBERS,
+        CONSTANTS.TAB_ACTOR_INVENTORY,
+      ]) {
+      const utility = (utilities[pinTabId] ??= {
+        utilityToolbarCommands: [],
+      });
+      (utility.utilityToolbarCommands ??= []).push(
+        SheetPinsProvider.getToggleVisibilityUtilityCommand(
+          this.actor.type,
+          pinTabId
+        )
+      );
+    }
+
     let context: EncounterSheetClassicContext = {
       actor: this.actor,
       actorPortraitCommands:
@@ -478,6 +499,7 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
       lockSensitiveFields:
         (!documentSheetContext.unlocked && settings.value.useTotalSheetLock) ||
         !editable,
+      tabSheetPins: await SheetPinsProvider.getTabSheetPinsContext(this.actor),
       memberContext: memberContext,
       memberSections: memberSections,
       modernRules: FoundryAdapter.checkIfModernRules(this.actor),

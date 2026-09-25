@@ -29,6 +29,7 @@ import type {
   ActorSkillsToolsContext as ActorSkillsToolsContext,
   ActorSpeedSenseEntryContext,
   ActorTraitContext,
+  AggregatePinTabInfo,
   CreatureTypeContext,
   ExpandedItemData,
   ExpandedItemIdToLocationsMap,
@@ -56,10 +57,11 @@ import { SvelteMap } from 'svelte/reactivity';
 import { mapGetOrInsert } from 'src/utils/map';
 import { ThemeQuadrone } from 'src/theme/theme-quadrone.svelte';
 import { TabDocumentItemTypesRuntime } from 'src/runtime/item/TabDocumentItemTypesRuntime';
-import { debug } from 'src/utils/logging';
+import { debug, warn } from 'src/utils/logging';
 import { Activities } from 'src/features/activities/activities';
 import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
-import type { SheetPinFlag } from 'src/api';
+import type { AnySheetPinFlagData } from 'src/api';
+import { getTabIdFromEvent } from 'src/utils/element';
 import type { ThemeSettingsV3 } from 'src/theme/theme-quadrone.types';
 import { Container } from 'src/features/containers/Container';
 
@@ -336,7 +338,9 @@ export function Tidy5eActorSheetQuadroneBase<
         limited: this.actor.limited,
         modernRules: FoundryAdapter.checkIfModernRules(this.actor),
         owner: this.actor.isOwner,
-        sheetPins: await this._getSheetPins(),
+        tabSheetPins: await SheetPinsProvider.getTabSheetPinsContext(
+          this.actor
+        ),
         portrait: await this._preparePortrait(this.actor),
         rollData,
         saves,
@@ -1009,43 +1013,8 @@ export function Tidy5eActorSheetQuadroneBase<
       };
     }
 
-    protected abstract _getSheetPinTabIdsForItem(item: Item5e): string[];
-
-    async _getSheetPins(): Promise<SheetPinContext[]> {
-      let flagPins = TidyFlags.sheetPins
-        .get(this.actor)
-        .toSorted((a, b) => (a.sort || 0) - (b.sort || 0));
-
-      let pins: SheetPinContext[] = [];
-
-      for (const pin of flagPins) {
-        let document = await fromUuid(pin.id, { relative: this.actor });
-
-        if (document) {
-          if (pin.type === 'item') {
-            pins.push({
-              ...pin,
-              linkedUses: Activities.getLinkedUses(document),
-              document,
-              tabIds: new Set(this._getSheetPinTabIdsForItem(document)),
-            });
-          } else if (pin.type === 'activity') {
-            pins.push({
-              ...pin,
-              document,
-              tabIds: new Set(this._getSheetPinTabIdsForItem(document.item)),
-            });
-          }
-        } else {
-          // Orphaned pins may exist until the next pin/unpin action, when the pins will be reset to valid pins only.
-          debug(
-            `Attribute pin item with ID ${pin.id} not found. Excluding from final render.`
-          );
-        }
-      }
-
-      return pins;
-    }
+    /** The tab which can house sheet pins from other tabs. `null` when the sheet has none. */
+    aggregatePinTab: AggregatePinTabInfo | null = null;
 
     /* -------------------------------------------- */
     /*  Component Management                        */
@@ -1432,22 +1401,24 @@ export function Tidy5eActorSheetQuadroneBase<
       event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement },
       data: { id: string; doc: any }
     ) {
-      // If not pinned, then pin it
-      const currentPins = TidyFlags.sheetPins.get(this.actor);
+      const tabId = getTabIdFromEvent(event);
 
-      const pinType: SheetPinFlag['type'] | undefined =
-        data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ITEM
-          ? 'item'
-          : data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ACTIVITY
-          ? 'activity'
-          : undefined;
-
-      if (!pinType) {
+      if (!tabId) {
+        warn('Unable to pin. Tab ID not found.', false, { event, data });
         return;
       }
 
-      if (!currentPins.find((x) => x.id === data.id)) {
-        await SheetPinsProvider.pin(data.doc, pinType);
+      if (!SheetPinsProvider.isPinned(data.doc, tabId)) {
+        const pinType: AnySheetPinFlagData['type'] | undefined =
+          data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ITEM
+            ? 'item'
+            : data.doc.documentName === CONSTANTS.DOCUMENT_NAME_ACTIVITY
+              ? 'activity'
+              : undefined;
+
+        if (pinType) {
+          await SheetPinsProvider.pin(data.doc, tabId, pinType);
+        }
       }
 
       return await this._onSortPins(event, data.id);
@@ -1457,48 +1428,20 @@ export function Tidy5eActorSheetQuadroneBase<
       event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement },
       srcId: string
     ) {
+      const tabId = getTabIdFromEvent(event);
       const targetId = event.target
         ?.closest('[data-pin-id]')
         ?.getAttribute('data-pin-id');
 
-      if (!targetId || srcId === targetId) {
+      if (!tabId || !targetId || srcId === targetId) {
         return;
       }
 
-      let source;
-      let target;
-
-      const siblings = TidyFlags.sheetPins
-        .get(this.actor)
-        .filter((f: SheetPinFlag) => {
-          if (f.id === targetId) target = f;
-          else if (f.id === srcId) source = f;
-          return f.id !== srcId;
-        });
-
-      const updates = foundry.utils.performIntegerSort(source, {
-        target,
-        siblings,
-      });
-
-      const pins = TidyFlags.sheetPins
-        .get(this.actor)
-        .reduce(
-          (map: Map<string, SheetPinFlag>, f: SheetPinFlag) =>
-            map.set(f.id, { ...f }),
-          new Map<string, SheetPinFlag>()
-        );
-
-      for (const { target, update } of updates) {
-        const pin = pins.get(target.id);
-        if (pin && update) {
-          foundry.utils.mergeObject(pin, update);
-        }
-      }
-
-      return await TidyFlags.sheetPins.set(
+      return await SheetPinsProvider.sortPins(
         this.actor,
-        Array.from(pins.values())
+        tabId,
+        srcId,
+        targetId
       );
     }
 

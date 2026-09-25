@@ -14,7 +14,9 @@ import type {
   EncounterPlaceholders,
   EncounterPlaceholder,
   EncounterCombatantsSettings,
-  SheetPinFlag,
+  TabSheetPinFlagData,
+  SheetPinLegacyFlag,
+  AnySheetPinFlagData,
 } from './TidyFlags.types';
 import type { ThemeSettingsV3 } from 'src/theme/theme-quadrone.types';
 import type { SheetTabConfiguration } from 'src/settings/settings.types';
@@ -28,10 +30,36 @@ export class TidyFlags {
   }
 
   /**
-   * Determines whether an item whose default Action List behavior has been overridden
-   * to be included (`true`) or excluded (`false`).
-   * `undefined` means there is no override and standard Action List logic should be used.
-   * */
+   * Whether an item is included in or excluded from the character Sheet tab.
+   * `true` always includes the item; `false` excludes even automatically
+   * eligible items; unset defers to standard inclusion logic.
+   */
+  static sheetTabItemInclude = {
+    key: 'sheet-tab-item-include' as const,
+    prop: TidyFlags.getFlagPropertyPath('sheet-tab-item-include'),
+    /** Gets the item's Sheet Tab inclusion override. */
+    get(item: Item5e): boolean | undefined {
+      return (
+        TidyFlags.tryGetFlag<boolean>(
+          item,
+          TidyFlags.sheetTabItemInclude.key
+        ) ?? undefined
+      );
+    },
+    /** Sets the item's Sheet Tab inclusion override. */
+    set(item: Item5e, value: boolean): Promise<void> {
+      return TidyFlags.setFlag(item, TidyFlags.sheetTabItemInclude.key, value);
+    },
+    /**
+     * Clears the item's Sheet Tab inclusion override,
+     * meaning the item should use the standard Sheet Tab inclusion logic
+     * @param item the item with the Sheet Tab setting
+     */
+    unset(item: Item5e): Promise<void> {
+      return TidyFlags.unsetFlag(item, TidyFlags.sheetTabItemInclude.key);
+    },
+  };
+
   static actionFilterOverride = {
     key: 'action-filter-override' as const,
     prop: TidyFlags.getFlagPropertyPath('action-filter-override'),
@@ -1240,19 +1268,63 @@ export class TidyFlags {
   /**
    * Denotes the items and activities which have been pinned to a significant tab on a sheet.
    */
-  static sheetPins = {
-    key: 'sheetPins' as const,
-    prop: TidyFlags.getFlagPropertyPath('sheetPins'),
+  static tabSheetPins = {
+    key: 'tabSheetPins' as const,
+    prop: TidyFlags.getFlagPropertyPath('tabSheetPins'),
     /** Gets the actor's sheet pins. */
-    get(actor: Actor5e): SheetPinFlag[] {
-      return (
-        TidyFlags.tryGetFlag<SheetPinFlag[]>(actor, TidyFlags.sheetPins.key) ??
-        []
-      );
+    get(actor: Actor5e): TabSheetPinFlagData {
+      const stored =
+        TidyFlags.tryGetFlag<TabSheetPinFlagData>(
+          actor,
+          TidyFlags.tabSheetPins.key
+        ) ?? {};
+
+      // Copy partitions so legacy merges below never mutate flag data.
+      const data: TabSheetPinFlagData = {};
+      for (const [tabId, pins] of Object.entries(stored)) {
+        data[tabId] = [...(pins ?? [])];
+      }
+
+      // Rolling updates / backwards compatibility - if legacy flag's array data is available,
+      // use the default partition to denote this setup applies to any tab.
+      // Once the default partition exists in the stored flag, the legacy flag no longer applies.
+      if (!(CONSTANTS.PARTITION_MODULE_DEFAULT in stored)) {
+        const legacyData = TidyFlags.tryGetFlag<SheetPinLegacyFlag>(
+          actor,
+          'sheetPins'
+        );
+        if (legacyData && Array.isArray(legacyData)) {
+          data[CONSTANTS.PARTITION_MODULE_DEFAULT] = [...legacyData];
+        }
+      }
+
+      // Classic attribute pins carry a per-pin `tab` — distribute them into
+      // their recorded tab partitions so they keep displaying where they were.
+      // Tab-less pins previously meant the Attributes tab.
+      // A partition that exists in the stored flag supersedes its legacy pins.
+      const legacyAttributePins = TidyFlags.attributePins.get(actor);
+      for (const pin of legacyAttributePins) {
+        const tabId = pin.tab ?? CONSTANTS.TAB_CHARACTER_ATTRIBUTES;
+        if (tabId in stored) {
+          continue;
+        }
+        (data[tabId] ??= []).push(pin);
+      }
+
+      return data;
     },
     /** Sets the actor's sheet pins. */
-    set(actor: Actor5e, value: SheetPinFlag[]): Promise<void> {
-      return TidyFlags.setFlag(actor, TidyFlags.sheetPins.key, value);
+    setByTabId(
+      actor: Actor5e,
+      tabId: string,
+      value: AnySheetPinFlagData[]
+    ): Promise<void> {
+      // Get the existing. Update it. Fully replace the flag.
+      const data = TidyFlags.tabSheetPins.get(actor);
+
+      data[tabId] = value;
+
+      return TidyFlags.setFlag(actor, TidyFlags.tabSheetPins.key, data);
     },
   };
 

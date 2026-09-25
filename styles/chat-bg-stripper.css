@@ -754,6 +754,32 @@ body.fe-retro-theme:not(.fe-system-msg-bg) #chat-notifications
   background-blend-mode: normal !important;
 }
 
+/* Retro system skins (dnd5e / dx3rd compat) paint EVERY .chat-message black,
+ * including .fe-system-msg — the configured --fe-system-msg-bg never paints
+ * under retro regardless of what the user picked. The ink that was computed
+ * for that configured base is therefore wrong: a white base publishes
+ * --fe-system-msg-text #141414 and the fe-sysmsg-bg-light §1i arm re-points
+ * --color-text-primary to dark ink, which lands near-black on the forced
+ * black surface ("GM 메시지 텍스트가 안 보인다"). Under retro the effective
+ * system-message base is always dark, so pin the ink to the dark-side values:
+ * content text reads the same accent tone as every other message, and the
+ * §1j card aliases resolve light for card interiors. */
+body.fe-retro-theme:is(.fe-retro-system-dnd5e, .fe-retro-system-dx3rd)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg {
+  --color-text-primary: var(--color-text-light-0, #fff) !important;
+  --color-text-secondary: var(--color-text-light-6, #999) !important;
+  --color-text-emphatic: var(--color-text-light-0, #fff) !important;
+  --color-text-title: var(--color-text-light-0, #fff) !important;
+}
+
+body.fe-retro-theme:is(.fe-retro-system-dnd5e, .fe-retro-system-dx3rd)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  > .message-content {
+  color: var(--fe-ac-90, #e6e6e6) !important;
+}
+
 /* Optional GM-color tint for speakerless system messages. This is independent
  * from the ordinary user-color tint, so it never recolors normal chat cards. */
 body.fe-system-msg-color

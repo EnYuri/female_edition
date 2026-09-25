@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
+  import SheetPins from 'src/sheets/classic/actor/parts/SheetPins.svelte';
   import SpellbookFooter from 'src/components/spellbook/SpellbookFooter.svelte';
   import SpellbookGrid from 'src/components/spellbook/SpellbookGrid.svelte';
   import SpellbookList from 'src/components/spellbook/SpellbookList.svelte';
@@ -26,10 +28,16 @@
   import { getNpcSheetContext } from 'src/sheets/sheet-context.svelte';
 
   let context = $derived(getNpcSheetContext());
+  let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
+  let showSheetPins = $derived(
+    UserSheetPreferencesService.getDocumentTypeTabPreference(
+      context.document.type,
+      tabId,
+      'showSheetPins',
+    ) ?? true,
+  );
 
   setContext(CONSTANTS.SVELTE_CONTEXT.INLINE_EFFECTS_READONLY, true);
-
-  let tabId = getContext<string>(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
 
   let searchCriteria: string = $state('');
 
@@ -126,6 +134,9 @@
     />
   {/each}
 </UtilityToolbar>
+  {#if showSheetPins}
+    <SheetPins />
+  {/if}
 
 <div class="scroll-container flex-column small-gap">
   {#if noSpellLevels}

@@ -45,6 +45,11 @@ import type { Item5e } from 'src/types/item.types';
 export class Tidy5eEncounterSheetQuadrone extends Tidy5eMultiActorSheetQuadroneBase<EncounterSheetQuadroneContext>(
   CONSTANTS.SHEET_TYPE_ENCOUNTER
 ) {
+  aggregatePinTab = {
+    tabId: CONSTANTS.TAB_MEMBERS,
+    tabName: 'DND5E.Group.Member.other',
+  };
+
   static DEFAULT_ENCOUNTER_PLACEHOLDER_ICON = 'icons/svg/mystery-man.svg';
 
   currentTabId: string;
@@ -358,15 +363,6 @@ export class Tidy5eEncounterSheetQuadrone extends Tidy5eMultiActorSheetQuadroneB
     }
   }
 
-  protected _getSheetPinTabIdsForItem(item: Item5e): string[] {
-    const tabIds: string[] = [CONSTANTS.TAB_MEMBERS];
-
-    if (Inventory.isItemInventoryType(item)) {
-      tabIds.push(CONSTANTS.TAB_ACTOR_INVENTORY);
-    }
-
-    return tabIds;
-  }
 
   /* -------------------------------------------- */
   /*  Sheet Actions                               */
