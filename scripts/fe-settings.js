@@ -158,6 +158,7 @@ function feRegisterSettingsMenu({
 
         // DND5e injection
         injectCustomConditions:  feRead("injectCustomConditions"),
+        condMatingName: feRead("condMatingName"),
         injectCustomDamageTypes: feRead("injectCustomDamageTypes"),
         dmgCustom1: feRead("dmgCustom1"), dmgCustom2: feRead("dmgCustom2"),
         dmgCustom3: feRead("dmgCustom3"), dmgCustom4: feRead("dmgCustom4"),
@@ -674,7 +675,7 @@ function feRegisterSettingsMenu({
 
           // DND5e injection (world-scoped — only GM can set; fields hidden for non-GMs)
           ...(feIsDnd5eSystem() && game.user?.isGM ? [
-            bool("injectCustomConditions"), bool("injectCustomDamageTypes"),
+            bool("injectCustomConditions"), str("condMatingName"), bool("injectCustomDamageTypes"),
             str("dmgCustom1"), str("dmgCustom2"), str("dmgCustom3"), str("dmgCustom4"),
             str("dmgCustom5"), str("dmgCustom6"), str("dmgCustom7"), str("dmgCustom8"),
           ] : []),

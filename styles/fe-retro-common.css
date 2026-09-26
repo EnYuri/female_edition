@@ -459,7 +459,11 @@ body.fe-retro-theme :is(.window-app, .application) :is(h2, h3, h4):not(.window-t
   border-color: var(--fe-ac-22) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) :is(p, span, label, li, td, th) {
+/* The dx3rd roll-intervention dice draw their number as dark text with a
+   white text-shadow edge over the grey d10 svg (plus fumble/critical
+   recolors). Repainting them --fe-ac-57 makes the shadow invisible against
+   a light glyph and erases the state colors — they keep the system paint. */
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) :is(p, span, label, li, td, th):not(.dx3rd-roll-intervention-die):not(.dx3rd-roll-intervention-face) {
   color: var(--fe-ac-57) !important;
 }
 

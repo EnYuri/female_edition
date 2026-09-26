@@ -359,6 +359,7 @@ const FE_DEFAULTS = {
   "ceTypingEnabled": true,
   "ceTypingShowToPlayers": true,
   "injectCustomConditions": false,
+  "condMatingName": "00",
   "injectCustomDamageTypes": true,
   "dmgCustom1": "1",
   "dmgCustom2": "2",
@@ -612,6 +613,7 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "chatPortraitShowRoll",
   "chatPortraitShowOther",
   "injectCustomConditions",
+  "condMatingName",
   "injectCustomDamageTypes",
   "dmgCustom1",
   "dmgCustom2",
@@ -1948,6 +1950,14 @@ const FE_SETTING_DEFINITIONS = {
     restricted: true,
     requiresReload: true,
     type: Boolean,
+  },
+  "condMatingName": {
+    name: "FE.SettingsData.condMatingName.name",
+    hint: "FE.SettingsData.condMatingName.hint",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: String,
   },
 
   // inject-damage-type.js

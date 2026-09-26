@@ -43,6 +43,25 @@ const FE_AE_MODE_TO_TYPE = Object.freeze({
 
 const FE_AE_MODE_OVERRIDE = 5;
 
+const FE_COND_MATING_ID = "condfemalemating";
+const FE_COND_MATING_FALLBACK_LABEL = "00";
+
+// Display name for the mating condition — user-configurable like the custom
+// damage-type labels. Empty input falls back to the neutral "00" marker.
+function feCondMatingLabel() {
+  try {
+    const stored = game.settings.get("female_edition", "condMatingName");
+    return (stored ?? "").trim() || FE_COND_MATING_FALLBACK_LABEL;
+  } catch {
+    return FE_COND_MATING_FALLBACK_LABEL;
+  }
+}
+
+function feApplyCondMatingLabel(label) {
+  const types = CONFIG?.DND5E?.conditionTypes;
+  if (types?.[FE_COND_MATING_ID]) types[FE_COND_MATING_ID].name = label;
+}
+
 function feBuildAEChange(key, modeNumber, value, priority = 20) {
   const type = FE_AE_MODE_TO_TYPE[modeNumber] ?? "override";
   return { key, mode: modeNumber, type, value, priority };
@@ -75,10 +94,10 @@ function feBuildConditions() {
 
   return [
     {
-      id: "condfemalemating",
-      name: "MYCOND.CondFemaleMating",
+      id: FE_COND_MATING_ID,
+      name: feCondMatingLabel(),
       img: "systems/dnd5e/icons/svg/statuses/charmed.svg",
-      statuses: ["condfemalemating"],
+      statuses: [FE_COND_MATING_ID],
       changes: [
         mkOverride(feMovementKey("walk"), 0),
         mkOverride(feMovementKey("fly"), 0),
@@ -104,6 +123,8 @@ function feBuildConditions() {
 
 Hooks.once("init", () => {
   feRegisterSetting("injectCustomConditions");
+  feRegisterSetting("condMatingName", (value) =>
+    feApplyCondMatingLabel((value ?? "").trim() || FE_COND_MATING_FALLBACK_LABEL));
 
   const types = CONFIG?.DND5E?.conditionTypes;
   if (!types) return;

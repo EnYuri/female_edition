@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.12.0",
+  "version": "2.12.1",
   "authors": [
     {
       "name": "nayuri",
@@ -98,6 +98,18 @@
       "lang": "ko",
       "name": "Korean",
       "path": "lang/ko.json",
+      "flags": {}
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    },
+    {
+      "lang": "ja",
+      "name": "Japanese",
+      "path": "lang/jp.json",
       "flags": {}
     },
     {
