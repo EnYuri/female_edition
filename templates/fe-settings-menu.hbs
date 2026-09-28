@@ -1313,6 +1313,54 @@
     </div>
   </section>
 
+  <section class="fe-settings__section" data-fe-settings-tab="combat-tracker">
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.turnNotice.Title"}}</h3>
+
+    <p class="notes">{{localize "FE.SettingsMenu.turnNotice.Hint"}}</p>
+
+    {{#if isGM}}
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceTurnNoticeEnabled.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTurnNoticeEnabled" data-dtype="Boolean" {{checked values.ceTurnNoticeEnabled}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTurnNoticeEnabled.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceTurnNoticeImage.Text"}}</label>
+      <div class="form-fields">
+        <select name="ceTurnNoticeImage" data-dtype="String">
+          {{selectOptions choices.combatTrackerImage selected=values.ceTurnNoticeImage localize=true}}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceTurnNoticeShowNext.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTurnNoticeShowNext" data-dtype="Boolean" {{checked values.ceTurnNoticeShowNext}} />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceTurnNoticeHiddenHint.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceTurnNoticeHiddenHint" data-dtype="Boolean" {{checked values.ceTurnNoticeHiddenHint}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceTurnNoticeHiddenHint.Text2"}}</p>
+    </div>
+    {{/if}}
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceTurnNoticeSize.Text"}}</label>
+      <div class="form-fields">
+        <input type="range" name="ceTurnNoticeSize" data-dtype="Number" value="{{values.ceTurnNoticeSize}}" min="{{ranges.ceTurnNoticeSize.min}}" max="{{ranges.ceTurnNoticeSize.max}}" step="{{ranges.ceTurnNoticeSize.step}}" />
+        <span class="fe-range-value" data-for="ceTurnNoticeSize">{{values.ceTurnNoticeSize}}</span>
+      </div>
+    </div>
+  </section>
+
   <section class="fe-settings__section" data-fe-settings-tab="canvas">
     <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.canvas.Text2"}}</h3>
 

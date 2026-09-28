@@ -237,6 +237,13 @@ function feRegisterSettingsMenu({
         [S.COMBAT_TRACKER_HIDDEN_PARTIAL]: feRead(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
         [S.COMBAT_TRACKER_DBP_HP_STYLE]: feRead(S.COMBAT_TRACKER_DBP_HP_STYLE),
 
+        // Turn notice (world/GM: all but the portrait size, which is client)
+        [S.TURN_NOTICE_ENABLED]:     feRead(S.TURN_NOTICE_ENABLED),
+        [S.TURN_NOTICE_IMAGE]:       feRead(S.TURN_NOTICE_IMAGE),
+        [S.TURN_NOTICE_SHOW_NEXT]:   feRead(S.TURN_NOTICE_SHOW_NEXT),
+        [S.TURN_NOTICE_HIDDEN_HINT]: feRead(S.TURN_NOTICE_HIDDEN_HINT),
+        [S.TURN_NOTICE_SIZE]:        feRead(S.TURN_NOTICE_SIZE),
+
         // Music (player audio upload — world/GM)
         [S.MUSIC_ENABLED]:         feRead(S.MUSIC_ENABLED),
         [S.MUSIC_PLAYLIST_NAME]:   feRead(S.MUSIC_PLAYLIST_NAME),
@@ -744,6 +751,14 @@ function feRegisterSettingsMenu({
           bool(S.COMBAT_TRACKER_SHOW_HP), bool(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT),
           str(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT), bool(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
           str(S.COMBAT_TRACKER_DBP_HP_STYLE),
+
+          // Turn notice — world/GM gated (no reload key: hooks gate at event time);
+          // the portrait size is client-scoped and always saved.
+          ...(game.user?.isGM ? [
+            bool(S.TURN_NOTICE_ENABLED), str(S.TURN_NOTICE_IMAGE),
+            bool(S.TURN_NOTICE_SHOW_NEXT), bool(S.TURN_NOTICE_HIDDEN_HINT),
+          ] : []),
+          num(S.TURN_NOTICE_SIZE),
 
           // Music — world/GM (enabled[FE_RELOAD_REQUIRED_KEYS] + name/root/size); non-GMs lack write permission
           ...(game.user?.isGM ? [

@@ -261,6 +261,18 @@ const FE_CG_CONFLICTS = [
     own: { features: [FE_CONFLICT_FEATURE.MUSIC], settings: ["ceMusicEnabled"] },
     get detail() { return feLocalize("FE.ConflictGuard.detail11"); },
   },
+  {
+    // fe-turn-notice.js is a port of this module for worlds that lack it. The
+    // original is actively maintained, so it always keeps the job: the
+    // suppression makes feTnEnabled() false and our banner never shows.
+    // fe-turn-notice.js still keeps the original's banner above our battle
+    // tracker while it runs.
+    id: "your-turn",
+    get feature() { return feLocalize("FE.ConflictGuard.feature12"); },
+    mode: "yield",
+    own: { features: [FE_CONFLICT_FEATURE.TURN_NOTICE], settings: ["ceTurnNoticeEnabled"] },
+    get detail() { return feLocalize("FE.ConflictGuard.detail12"); },
+  },
 ];
 
 const FE_CG_RUNTIME_ACTIONS = new Map();

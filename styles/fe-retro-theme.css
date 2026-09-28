@@ -162,6 +162,15 @@ body.fe-retro-theme #fe-combat-tracker
   animation-delay:    var(--fe-ct-anim-delay, 0ms) !important;
 }
 
+/* Same exception for the turn notice (fe-turn-notice.css): it announces whose
+   turn it is, and fe-turn-notice.js removes the banner on a timer, so a crushed
+   entrance would flash it for a frame and a crushed exit would snap it away.
+   Values come from --fe-tn-anim-* on each element — never hardcode them here. */
+body.fe-retro-theme #fe-turn-notice :is(.fe-tn-banner, .fe-tn-band, .fe-tn-portrait, .fe-tn-text) {
+  animation-duration: var(--fe-tn-anim-dur, 1200ms) !important;
+  animation-delay:    var(--fe-tn-anim-delay, 0ms) !important;
+}
+
 /* Restore loading spinners — the 1ms crush above targets decorative
    motion, but a status-announcing infinite spinner at 1ms looks frozen or
    crushed. Normal rotation periods are restored under the same exception

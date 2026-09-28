@@ -1,0 +1,207 @@
+/* fe-turn-notice.css — turn notice banner (female_edition, port of "Your Turn!")
+ *
+ * Own DOM (#fe-turn-notice on <body>). Timing comes from fe-turn-notice.js as
+ * --fe-tn-in / --fe-tn-out, and the retro theme's animation crush is lifted for
+ * exactly these elements in fe-retro-theme.css through --fe-tn-anim-dur/-delay —
+ * the notice is a STATE announcement, not decoration.
+ */
+
+#fe-turn-notice {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 22vh;
+  /* above the battle tracker (70), below app windows (--z-index-window: 100) */
+  z-index: 75;
+  pointer-events: none;
+  --fe-tn-size: 340px;
+  --fe-tn-in: 1200ms;
+  --fe-tn-out: 900ms;
+  --fe-tn-left: max(16px, 8vw);
+}
+
+.fe-tn-banner {
+  --fe-tn-color: #5f9ea0;
+  position: relative;
+  height: var(--fe-tn-size);
+}
+
+.fe-tn-band {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 120px;
+  transform: translateY(-50%);
+  box-sizing: border-box;
+  background-color: color-mix(in srgb, var(--fe-tn-color) 50%, transparent);
+  border-top: 5px solid var(--fe-tn-color);
+  border-bottom: 5px solid var(--fe-tn-color);
+  --fe-tn-anim-dur: var(--fe-tn-in);
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-band-in var(--fe-tn-anim-dur) ease-out var(--fe-tn-anim-delay) both;
+}
+
+.fe-tn-portrait {
+  position: absolute;
+  left: var(--fe-tn-left);
+  top: 0;
+  width: var(--fe-tn-size);
+  height: var(--fe-tn-size);
+  object-fit: contain;
+  border: 0;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  --fe-tn-anim-dur: var(--fe-tn-in);
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-pop var(--fe-tn-anim-dur) cubic-bezier(0.34, 1.56, 0.64, 1) var(--fe-tn-anim-delay) both;
+}
+
+.fe-tn-text {
+  position: absolute;
+  left: calc(var(--fe-tn-left) + var(--fe-tn-size) + 24px);
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #f2f2f2;
+  font-weight: 700;
+  text-shadow: 2px 2px 5px #000;
+  --fe-tn-anim-dur: 500ms;
+  --fe-tn-anim-delay: calc(var(--fe-tn-in) / 3);
+  animation: fe-tn-fade-in var(--fe-tn-anim-dur) ease-out var(--fe-tn-anim-delay) both;
+}
+
+.fe-tn-title {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fe-tn-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 4px;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.fe-tn-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fe-tn-next-img {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border: 0;
+}
+
+/* ── Retro theme: black pixel-screentone band, colour only on the borders ──
+   The player colour lives ONLY on the band's top/bottom borders — the base
+   rule already paints those from --fe-tn-color, so nothing extra is needed
+   there. The fill becomes the same black screentone the pause screen and the
+   /narrate overlay wear, at a tighter 4px pitch (repeating-conic-gradient
+   dither — the trick is documented in fe-narrator.css). The shared
+   fe-tn-band-in keyframes animate background-color up to the player colour,
+   which would flash through the
+   screentone voids mid-sweep, so retro swaps in the width-only
+   fe-tn-band-in-retro; band-out animates width only and needs no variant.
+   Retro also strips every text-shadow (fe-retro-theme.css §4, !important in
+   layouts — unreachable from here), so the text carries the same hard pixel
+   outline the tracker captions wear, in the accent-family ink. */
+body.fe-retro-theme #fe-turn-notice {
+  font-family: var(--fe-font-primary, monospace);
+}
+body.fe-retro-theme .fe-tn-band {
+  background-color: transparent;
+  background-image: repeating-conic-gradient(
+    rgba(0, 0, 0, 0.92) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 4px 4px;
+  image-rendering: pixelated;
+  animation-name: fe-tn-band-in-retro;
+}
+body.fe-retro-theme .fe-tn-text {
+  color: var(--fe-ac-90, #f2f2f2);
+  /* !important to survive §4's global text-shadow:none → hard pixel outline */
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+}
+
+/* Accent-tint override ON — the same accent-hued dots pause/narrate switch to.
+   Only background-image is redeclared; size/mask-type props fall through. */
+body.fe-retro-theme.fe-accent-text-override .fe-tn-band {
+  --fe-tn-bg: var(--fe-dx3rd-accent-h, 0deg) var(--fe-dx3rd-accent-s, 80%) 10%;
+  background-image: repeating-conic-gradient(
+    hsl(var(--fe-tn-bg) / 0.92) 0% 25%,
+    transparent 0% 50%
+  );
+}
+
+/* leaving: the band withdraws while everything fades */
+.fe-tn-banner.is-out {
+  --fe-tn-anim-dur: var(--fe-tn-out);
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-fade-out var(--fe-tn-anim-dur) ease-in var(--fe-tn-anim-delay) forwards;
+}
+.fe-tn-banner.is-out .fe-tn-band {
+  --fe-tn-anim-dur: var(--fe-tn-out);
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-band-out var(--fe-tn-anim-dur) ease-in var(--fe-tn-anim-delay) forwards;
+}
+
+@keyframes fe-tn-band-in {
+  0%   { width: 0; background-color: transparent; }
+  60%  { background-color: var(--fe-tn-color); }
+  100% { width: 100%; }
+}
+
+@keyframes fe-tn-band-out {
+  from { width: 100%; }
+  to   { width: 0; }
+}
+
+/* Retro's entrance: width wipe only — the colour flash of fe-tn-band-in would
+   show through the screentone voids; see the retro block above. */
+@keyframes fe-tn-band-in-retro {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+@keyframes fe-tn-pop {
+  0%   { transform: scale(1.5); opacity: 0; }
+  20%  { transform: scale(1.2); opacity: 0; }
+  50%  { opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fe-tn-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fe-tn-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* "Your Turn!" (your-turn) compat — when the original holds the job (we yield to
+   it), its banner renders inside core's #ui-middle, a stacking context at
+   --z-index-app (30) that caps every z-index inside it, so it painted UNDER the
+   battle tracker (70). fe-turn-notice.js sets body.fe-yourturn-up while one of
+   its banners is visibly on screen (your-turn never removes a finished banner,
+   so this cannot be a :has() on the node). #ui-middle is pointer-events:none, so
+   the brief lift never steals tracker clicks. */
+body.fe-yourturn-up #ui-middle {
+  z-index: 71;
+}

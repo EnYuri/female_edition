@@ -16,6 +16,7 @@ const FE_CONFLICT_FEATURE = Object.freeze({
   CHAT_PORTRAIT: "chat-portrait",
   CHAT_IMAGES: "chat-images",
   MUSIC: "music",
+  TURN_NOTICE: "turn-notice",
 });
 
 function feSuppressConflictFeature(feature, reason = "") {

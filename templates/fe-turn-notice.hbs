@@ -1,0 +1,17 @@
+<div class="fe-tn-banner{{#if mine}} is-mine{{/if}}" style="--fe-tn-color: {{color}};">
+  <div class="fe-tn-band"></div>
+  <img class="fe-tn-portrait" src="{{img}}" data-fe-src="{{img}}" alt="" />
+  <div class="fe-tn-text">
+    <p class="fe-tn-title">{{title}}</p>
+    <div class="fe-tn-sub">
+      <span class="fe-tn-count">{{count}}</span>
+      {{#if next}}
+      <span class="fe-tn-next">
+        {{nextLabel}}
+        <img class="fe-tn-next-img" src="{{next.img}}" data-fe-src="{{next.img}}" alt="" />
+        {{next.name}}
+      </span>
+      {{/if}}
+    </div>
+  </div>
+</div>
