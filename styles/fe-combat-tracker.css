@@ -1081,8 +1081,19 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 
 .fe-dbp-strip {
   display: block;
-  transform: translateY(calc(var(--fe-dbp-d, 0) * -1em));
-  will-change: transform;
+  /* The step is a percentage of the strip's OWN height, not of `em`: the browser
+     rounds `height: 1em` into layout units (14.89px lays out as 14.875), but an
+     `em` in the transform keeps the unrounded value, so `d * -1em` drifted off
+     the cell tops by up to ~0.14px by the ninth digit — visible as top/bottom
+     rules of uneven weight. 11 cells of exactly equal rendered height means
+     `d * -100% / 11` lands on a cell edge whatever rounding layout applied. */
+  transform: translateY(calc(var(--fe-dbp-d, 0) * -100% / 11));
+  /* No `will-change`: it hoists every strip into its own composited layer, and a
+     layer is rasterised against its own pixel origin — the fractional part of
+     `d * cell` differs per digit, so each reel's glyphs and seam sampled at a
+     different subpixel phase and no two digits in a row ever looked aligned.
+     Painting the strips into the shared layer keeps every cell on one grid; the
+     paint a spin costs is a handful of 1em strips. */
 }
 
 /* THE SEAM, and nothing else. This is the only part of the dial that belongs to
@@ -1099,9 +1110,9 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
    The hairline is the one value in px rather than em: it is an edge, and has to stay
    exactly one device pixel at every portrait size. The falloff is em so it scales.
 
-   It is a background layer, NEVER a border: the reel's offset is written in `em`
-   against a cell height of exactly 1em, so a 1px border would desynchronise the
-   strip from --fe-dbp-d and the dial would drift further off with every digit. */
+   It is a background layer, NEVER a border: the strip's offset is a fraction of
+   its own height — the 11 cells stacked — so a 1px border would stretch the
+   strip without stretching the cells and desynchronise it from --fe-dbp-d. */
 .fe-dbp-strip > span {
   display: block;
   height: 1em;
