@@ -1,0 +1,233 @@
+/* ================================================================
+ * fe-lancer-compat.css
+ * female_edition — LANCER (`lancer` system) compatibility fixes
+ *
+ * Enabled by:
+ *   · § A  retro palette           → body.fe-retro-theme.fe-retro-system-lancer
+ *   · § B  chat ink vs our base    → body.fe-system-lancer, retro OFF
+ *   · § C  archive header mirror   → body.fe-system-lancer (any theme)
+ *   (fe-style.js feSetRetroThemeClass toggles both classes via
+ *    feIsLancerSystemId)
+ *
+ * Why this file is short:
+ *   LANCER is almost entirely variable-driven. Each colour theme
+ *   (theme-gms-red / gms-dark / msmc / horus / ha / ssc / ipsn / galsim) is
+ *   one `body.theme-*` block declaring --primary-color, --light-text,
+ *   --dark-text, --background-color, --secondary-*, --*-gray-color,
+ *   --tooltip-*, and every sheet, HUD and chat rule reads those. So the
+ *   compat work is re-pointing variables, not chasing selectors — and it
+ *   follows any rule a later LANCER version adds for free. The few
+ *   hard-coded colours that exist are listed in § A3.
+ *
+ * ⚠️ CASCADE LAYER (required): registered in module.json as
+ *      { "src": "styles/fe-lancer-compat.css", "layer": "layouts" }.
+ *    LANCER's bundle nests its own layers (lancer.defaults / .components /
+ *    .applications / .overrides …) but Foundry imports it inside
+ *    layer(system), so all of it ranks as `system`. Its palette variables
+ *    are NORMAL declarations there, and for normal declarations system beats
+ *    layouts — which is why every § A variable is `!important` (that
+ *    reverses the order). Same mechanism as fe-dw-compat.css § A9.
+ *
+ * ⚠️ `--darken-*` cannot be fixed through `--darken-color`. LANCER declares
+ *    `--darken-1: rgba(var(--darken-color), .1)` on :root, and a custom
+ *    property's var() is substituted where it is DECLARED, so :root's
+ *    --darken-1 is already a finished colour by the time it inherits into
+ *    body. (That is also why LANCER's own per-theme --darken-color does
+ *    nothing to --darken-1.) Each step is re-declared directly instead.
+ * ================================================================ */
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § A  Retro palette (retro only)
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── A1. Theme variables → accent ladder ──────────────────────
+ * The generic retro sheets already paint every .window-content black and
+ * pull p/span/label/li text to the accent. What they cannot reach are
+ * LANCER's coloured bands — .lancer-header, chips, clicker buttons, the
+ * chat message header — which paint --primary-color / --secondary-color as
+ * a BACKGROUND with --light-text on top. Those become accent-family bands
+ * at border/background lightness, with accent text above them.
+ *
+ * Semantic colours (--system-color, --weapon-color, --tech-color,
+ * --reaction-color, --crit/hit/miss-color, --quick/full/free-color …) are
+ * deliberately untouched — like DW's success/failure, they are
+ * information, and they are already saturated mid-dark bands carrying
+ * --light-text, so they read on black as they are. */
+body.fe-retro-theme.fe-retro-system-lancer {
+  --primary-color: var(--fe-ac-22) !important;
+  --primary-highlight: var(--fe-ac-33) !important;
+  --secondary-color: var(--fe-ac-33) !important;
+  --secondary-highlight: var(--fe-ac-33) !important;
+  --color-shadow-primary: var(--fe-dx3rd-accent, #ffffff) !important;
+
+  --light-text: var(--fe-ac-90) !important;
+  --dark-text: var(--fe-ac-90) !important;
+  --secondary-text: var(--fe-ac-90) !important;
+
+  --background-color: #000000 !important;
+  /* LANCER's light-app surface: every chat message in every theme, plus
+     core applications and the sidebar under core's light theme. */
+  --lancer-light-app-bg: #000000 !important;
+  --dark-gray-color: var(--fe-ac-12) !important;
+  --light-gray-color: var(--fe-ac-22) !important;
+  --tooltip-background: #000000 !important;
+  --tooltip-text: var(--fe-ac-90) !important;
+
+  /* Both are color-mix()es of the theme colours (primary + 90% white, and
+     background + 50% grey). --pilot-stat-color would re-derive on its own
+     from our --background-color, but --ref-color would come out near-white
+     under --dark-text, so both are pinned to the panel tint explicitly. */
+  --ref-color: var(--fe-ac-12) !important;
+  --pilot-stat-color: var(--fe-ac-12) !important;
+
+  /* Panel shading: --darken-N is how LANCER separates a .card from the
+     sheet behind it. On black a darkening is invisible, so the steps that
+     are used as SURFACES become lightenings. --darken-5 is left alone —
+     it is a shadow/deep-inset tone, and there darker is still right. */
+  --darken-1: var(--lighten-1) !important;
+  --darken-2: var(--lighten-2) !important;
+  --darken-3: var(--lighten-3) !important;
+  --darken-4: var(--lighten-4) !important;
+}
+
+/* ── A2. Places that use a palette colour as TEXT ──────────────
+ * A1 moves --primary-color / --*-gray-color to background lightness
+ * (L=12-33%), which is the one thing they must never be used as on black.
+ * These are every `color: var(--primary-color | --secondary-color |
+ * --dark-gray-color | --light-gray-color)` in LANCER's bundle. Spans and
+ * labels among them are already caught by the generic retro text rule;
+ * this covers the <i>/<div>/<a> ones it does not select. */
+body.fe-retro-theme.fe-retro-system-lancer :is(
+  .lancer-primary-text,
+  .lancer-secondary-text,
+  .size-icon,
+  .counter-hex[data-available="true"],
+  .scan-result .scan-stat-grid > .scan-stat-item.stat-size
+) {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-lancer :is(
+  .lancer-dark-gray-text,
+  .lancer-light-gray-text
+) {
+  color: var(--fe-ac-t22) !important;
+}
+
+/* A divider drawn with border-right in currentColor. */
+body.fe-retro-theme.fe-retro-system-lancer .v-divide {
+  color: var(--fe-ac-33) !important;
+}
+
+/* The selected weapon profile inverts: primary text on a --light-text
+   plate. After A1 that is an L=22 glyph on an L=90 plate — keep the
+   "this one is selected" inversion, but as a readable pair. */
+body.fe-retro-theme.fe-retro-system-lancer .weapon-profile.selected-profile {
+  background-color: var(--fe-ac-33) !important;
+  color: var(--fe-ac-96) !important;
+}
+
+/* ── A3. Hard-coded light surfaces ─────────────────────────────
+ * The complete list of light backgrounds / dark text LANCER writes as
+ * literal colours instead of theme variables. */
+
+/* `.add-button{background:#d7b6b9}` — a pink plate behind the "+". */
+body.fe-retro-theme.fe-retro-system-lancer .add-button {
+  background: #000000 !important;
+  border-color: var(--fe-ac-33) !important;
+  color: var(--fe-ac-70) !important;
+}
+
+/* `.big-editor{background-color:#dbdbdb}` — the large text editors. */
+body.fe-retro-theme.fe-retro-system-lancer .big-editor {
+  background-color: #000000 !important;
+  color: var(--fe-ac-90) !important;
+}
+
+/* `.set.ref.ref-card{color:#000}` on --ref-color (A1 makes that dark). */
+body.fe-retro-theme.fe-retro-system-lancer .set.ref.ref-card {
+  color: var(--fe-ac-90) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § B  Chat ink vs. our painted base (retro OFF)
+ * ══════════════════════════════════════════════════════════════
+ * LANCER paints every chat message with --lancer-light-app-bg (#e1e1e1)
+ * in EVERY theme, and inside cards it writes --dark-text (.large-tag,
+ * .i--dark, .lancer-button) and shades panels with --darken-N. The dark
+ * themes set --dark-text near-white (gms-dark #efefef, horus #efefef,
+ * msmc #dbdbdb …), which is LANCER's own concern on its own light chat —
+ * but once chat-bg-stripper.css paints OUR base under the message, the
+ * pairing has to follow OUR base instead. Same idea as chat-bg-stripper
+ * § 1i, which does this for core's --color-text-* aliases; the lean
+ * classes are the ones fe-style.js publishes for it (and it publishes
+ * neither while no base is painted, leaving LANCER's pairing alone).
+ *
+ * Normal declarations on purpose: LANCER never declares these on a
+ * message element, so there is no competitor on the element itself and a
+ * declaration beats the inherited body value regardless of layer.
+ * Retro is excluded: § A1 already makes the whole palette dark-side, and
+ * the lean classes there describe the base retro paints over. */
+body.fe-system-lancer.fe-chat-bg-light:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-system-lancer.fe-sysmsg-bg-light:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg {
+  --dark-text: #000000;
+}
+
+body.fe-system-lancer.fe-chat-bg-dark:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg),
+body.fe-system-lancer.fe-sysmsg-bg-dark:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg {
+  --dark-text: #efefef;
+  --darken-1: var(--lighten-1);
+  --darken-2: var(--lighten-2);
+  --darken-3: var(--lighten-3);
+  --darken-4: var(--lighten-4);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § C  Chat archive: mirror LANCER's `#chat`-scoped message rules
+ * ══════════════════════════════════════════════════════════════
+ * LANCER's v13 chat look — the --primary-color header band, padding 0 on
+ * the message, the whisper gradient — is scoped `#chat .chat-message
+ * .message …` (plus #chat-popout / #chat-notifications). The archive
+ * window's log is #fe-chat-export-log inside #fe-chat-export-chat, so none
+ * of those match there, and an archive is meant to reproduce the live
+ * chat. The `.chat-sidebar .chat-message` background rule DOES match
+ * (the shell's sidebar carries .chat-sidebar), so it is not repeated.
+ *
+ * Normal declarations in layer(layouts) are the closest stand-in for
+ * LANCER's layer(system) originals: both lose to this module's own
+ * layer(modules) archive/merge rules, exactly as the live originals do.
+ * The theme variables resolve because the archive copies <body>'s class
+ * list verbatim (fe-archive-document.js), theme-* included. */
+body.fe-system-lancer #fe-chat-export-log .chat-message.message {
+  padding: 0;
+}
+
+body.fe-system-lancer #fe-chat-export-log .chat-message.message > .message-header {
+  color: var(--light-text);
+  background-color: var(--primary-color);
+  padding: 0.5em;
+}
+
+body.fe-system-lancer #fe-chat-export-log .chat-message.message.whisper > .message-header {
+  background: linear-gradient(60deg, var(--primary-color) 30%, var(--secondary-color));
+}
+
+body.fe-system-lancer #fe-chat-export-log .chat-message.message > .message-content {
+  padding: 0.2em 0.4em 0.4em;
+}
+
+body.fe-system-lancer #fe-chat-export-log .chat-message.message > .message-content .strikethrough {
+  opacity: 0.5;
+  text-decoration: line-through;
+}

@@ -1,6 +1,6 @@
 import { feLocalize } from "./fe-i18n.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
-import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
 
@@ -191,6 +191,10 @@ function feSetRetroThemeClass(doc = document) {
       "fe-retro-system-dw",
       enabled && feIsDungeonWorldSystemId(systemId),
     );
+    body.classList.toggle(
+      "fe-retro-system-lancer",
+      enabled && feIsLancerSystemId(systemId),
+    );
 
     // Retro-independent system marker. Dungeon World hard-codes font-family on
     // individual descendants (labels, headings, .cell__title, .sidebar-tab), so
@@ -199,6 +203,11 @@ function feSetRetroThemeClass(doc = document) {
     // in ui-font.css and must apply with the retro theme OFF, so this class is
     // NOT gated on `enabled`.
     body.classList.toggle("fe-system-dw", feIsDungeonWorldSystemId(systemId));
+
+    // Same retro-independent marker for LANCER: the font variables (ui-font.css
+    // §5c), the chat-ink re-pointing and the archive mirror of its `#chat`-scoped
+    // header rules (fe-lancer-compat.css §B/§C) all apply with retro OFF.
+    body.classList.toggle("fe-system-lancer", feIsLancerSystemId(systemId));
 
     // double-cross-3rd's legacy token-adjacent combat buttons are PIXI.Graphics,
     // not DOM nodes, so the CSS theme cannot reach them. Repaint any live button

@@ -150,6 +150,15 @@
           <i class="far fa-dice-d20" data-ct-rollinit="1" data-tooltip="{{@root.labels.rollInit}}"></i>
         </div>
         {{/if}}
+        {{#if canActivate}}
+        {{!-- LANCER only: start this combatant's activation. Same centre spot and
+              visibility contract as the d20 (it borrows .fe-ct-rollinit's geometry);
+              `cci-activate` is LANCER's own glyph font, which is loaded whenever this
+              can be drawn. JS keeps it exclusive with ">>" and the d20. --}}
+        <div class="fe-ct-rollinit fe-ct-activate">
+          <i class="cci cci-activate" data-ct-activate="1" data-tooltip="{{@root.labels.activate}}"></i>
+        </div>
+        {{/if}}
       </div>
       {{/each}}
     </div>

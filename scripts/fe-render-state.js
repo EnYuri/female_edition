@@ -174,11 +174,22 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
 // Content classification helpers
 // -------------------------------------
 
+// LANCER's cards carry no `.chat-card` at all: every templates/chat/*.hbs root is
+// `<div class="card clipped…">` (clipped / clipped-bot / clipped-top). `card` alone
+// is far too common a class name to key on, so the pair is what identifies one —
+// and it is matched at the START of the class list, exactly as those templates emit
+// it, which keeps an arbitrary `.card` further inside some other markup out.
+// Classification is stamped into the message flags at creation, so LANCER messages
+// that already exist keep their old verdict; only new ones are recognised.
+const FE_LANCER_CARD_CONTENT_RE = /class=["']card clipped(?:-bot|-top)?\b/i;
+const FE_LANCER_CARD_SELECTOR = ".message-content > .card:is(.clipped, .clipped-bot, .clipped-top)";
+
 function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");
     if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b)[^"']*["']/i.test(src)) return true;
-    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info')) return true;
+    if (FE_LANCER_CARD_CONTENT_RE.test(src)) return true;
+    if (el?.querySelector?.(`.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, ${FE_LANCER_CARD_SELECTOR}`)) return true;
     return false;
   } catch {
     return false;

@@ -45,6 +45,19 @@ function feIsDungeonWorldSystemId(systemId) {
   return FE_DW_SYSTEM_IDS_LOWER.includes(String(systemId ?? "").toLowerCase());
 }
 
+// LANCER (Massif Press, the `lancer` package). Its whole palette and both font
+// faces are CSS custom properties hung on `body.theme-*` / `:root`, so the compat
+// surfaces (fe-lancer-compat.css, ui-font.css §5c) re-point variables rather than
+// chasing selectors. Its Combat subclass is activation-based (turn is `null`
+// between activations), which the battle tracker adapts to on this gate.
+const FE_LANCER_SYSTEM_IDS = Object.freeze([
+  "lancer",
+]);
+
+function feIsLancerSystemId(systemId) {
+  return FE_LANCER_SYSTEM_IDS.includes(String(systemId ?? ""));
+}
+
 const FE_RENDER_STATE_FLAG = "renderState";
 const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
 const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
@@ -61,6 +74,8 @@ export {
   feIsDx3rdSystemId,
   FE_DW_SYSTEM_IDS,
   feIsDungeonWorldSystemId,
+  FE_LANCER_SYSTEM_IDS,
+  feIsLancerSystemId,
   LEGACY_UI_FONT_KEY,
   S,
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,

@@ -21,7 +21,7 @@ import { feRegisterSetting } from "./fe-settings-data.js";
  * Self-contained except for constants. Own DOM (`#fe-combat-tracker` on <body>) +
  * own CSS (styles/fe-combat-tracker.css, unlayered — no system-layer conflict).
  */
-import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feHpMasked, feToggleHpMask } from "./fe-hp-mask.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 // Tracker portraits shrink huge sources, which CSS image-rendering cannot do well (see
@@ -193,6 +193,63 @@ function feCtCanEndTurnForCombatant(combat, combatant, user = game.user) {
   return combat.combatant?.id === combatant.id;
 }
 
+// ── LANCER activations ──────────────────────────────────────────────────────
+//
+// LANCER has no initiative order. Its Combat subclass (lancer.mjs, LancerCombat)
+// keeps `turn: null` between activations, sorts `turns` by disposition, and a
+// combatant takes its turn by spending one of `system.activations.value` through
+// `combat.activateCombatant(id)`. "End turn" is plain `nextTurn()`, which there
+// means "back to nobody active" — so the existing ">>" path needs no change.
+//
+// What does need an adapter: `LancerCombatant#prepareBaseData` forces
+// `initiative ??= 0`, so the initiative badge would read a meaningless "0" on every
+// card, and without an activate affordance this tracker could only ever watch.
+function feCtIsLancer() {
+  return feIsLancerSystemId(game.system?.id);
+}
+
+function feCtLancerActivations(c) {
+  const a = c?.system?.activations;
+  const value = Number(a?.value);
+  if (!Number.isFinite(value)) return null;
+  const max = Number(a?.max);
+  return { value, max: Number.isFinite(max) ? max : null };
+}
+
+// Mirrors the gate inside LancerCombat#activateCombatant: a GM may always activate,
+// an owner only while nobody is active. Drawing it only when NOBODY is active is
+// stricter on purpose — the button sits where ">>" does, and the two must never
+// both be drawn on one card. Non-owners get nothing: the system would only turn
+// their click into an activation REQUEST hook, which this tracker has no UI for.
+function feCtCanActivate(combat, c, user = game.user) {
+  if (!feCtIsLancer() || !combat || !c) return false;
+  if (!(Number(combat.round) > 0)) return false;
+  if (combat.turn !== null && combat.turn !== undefined) return false;
+  if (c.isDefeated) return false;
+  if (!(Number(feCtLancerActivations(c)?.value) > 0)) return false;
+  return typeof combat.activateCombatant === "function" && feCtUserOwnsCombatant(c, user);
+}
+
+// Same in-flight guard as initiative rolling: activateCombatant spends the
+// activation and then updates the turn, two round-trips a double-click can race.
+const _ctActivatingIds = new Set();
+
+async function feCtActivateFor(id) {
+  const combat = feCtGetCombat();
+  const c = combat?.combatants?.get(id);
+  if (!combat || !c || _ctActivatingIds.has(c.id)) return;
+  if (!feCtCanActivate(combat, c)) return;
+  _ctActivatingIds.add(c.id);
+  try {
+    await combat.activateCombatant(c.id);
+  } catch (e) {
+    console.error(feLocalize("FE.Diagnostics.CombatTracker.feCtActivateFor"), e);
+  } finally {
+    _ctActivatingIds.delete(c.id);
+    feCtScheduleRender();
+  }
+}
+
 // ── initiative rolling ──────────────────────────────────────────────────────
 //
 // Rolling goes through `combat.rollInitiative([id])` — core's own path — for a
@@ -267,8 +324,13 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = nu
       ? feCtDispositionColor(c) || null
       : null;
 
-  const showInit =
-    feCtSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE) && init != null && init !== "";
+  // On LANCER the badge carries the remaining activations instead (see
+  // feCtIsLancer): the same "where am I in the turn order" slot, on the one number
+  // that system actually orders turns by.
+  const lancerAct = feCtIsLancer() ? feCtLancerActivations(c) : null;
+  const showInit = feCtSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE) && (
+    feCtIsLancer() ? lancerAct != null : (init != null && init !== "")
+  );
 
   const hitDelay = dbpOpts ? feDbpHitDelay(c.id, dbpOpts.now) : null;
 
@@ -285,12 +347,15 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = nu
     // A separate flag, not a truthiness test on the number: initiative 0 is legal
     // and must still show its badge.
     showInitiative: showInit,
-    initiative: showInit ? Math.round(Number(init)) : null,
+    initiative: showInit ? Math.round(Number(lancerAct ? lancerAct.value : init)) : null,
     hp: feCtShowHpBar(c.actor) ? feCtResolveHp(c.actor) || null : null,
     // ">>" end-turn and the roll-initiative d20 both sit dead-centre on the frame, so
     // only one of them is ever drawn (see docs/combat-tracker.md).
     canEndTurn,
     canRollInit: !canEndTurn && feCtCanRollInitiative(c),
+    // LANCER's activate button takes the same centre spot. `initiative ??= 0` there
+    // already keeps canRollInit false, so the three are mutually exclusive.
+    canActivate: !canEndTurn && feCtCanActivate(c.parent, c),
     // Dynamic battle portrait. dbpOpts only arrives for the vertical aspects, and
     // when it does the name caption is hidden in CSS (.has-dbp .fe-ct-name).
     dbp: dbpOpts ? feDbpData(c, dbpOpts.size, dbpOpts.now, dbpOpts.insert) : null,
@@ -594,6 +659,7 @@ function feCtRender() {
     labels: {
       endTurn: feLocalize("FECT.Ctx.EndTurn"),
       rollInit: feLocalize("FECT.Ctx.RollInit"),
+      activate: feLocalize("FECT.Ctx.Activate"),
     },
   });
 
@@ -674,6 +740,15 @@ function feCtBindRootEvents(root) {
       if (p) await feCtRollInitiativeFor(p.dataset.combatantId);
       return;
     }
+    // LANCER: the activate overlay starts this combatant's turn.
+    const actBtn = ev.target.closest?.("[data-ct-activate]");
+    if (actBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const p = actBtn.closest?.("[data-combatant-id]");
+      if (p) await feCtActivateFor(p.dataset.combatantId);
+      return;
+    }
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitClick(port.dataset.combatantId);
   });
@@ -681,6 +756,7 @@ function feCtBindRootEvents(root) {
     // Double-clicking the ">>" / d20 button must not open the sheet — one click already acted.
     if (ev.target.closest?.("[data-ct-endturn]")) return;
     if (ev.target.closest?.("[data-ct-rollinit]")) return;
+    if (ev.target.closest?.("[data-ct-activate]")) return;
     const port = ev.target.closest?.("[data-combatant-id]");
     if (port) feCtHandlePortraitDblClick(port.dataset.combatantId);
   });
@@ -830,14 +906,22 @@ function feCtOpenContextMenu(id, x, y) {
   const isOwner = feCtUserOwnsCombatant(c);
   if (!isGM && !isOwner) return;
 
+  const lancer = feCtIsLancer();
   const items = [
+    // LANCER: starting a turn is the owner's action too, so it sits beside "end turn".
+    lancer ? {
+      action: "activate",
+      icon: "fa-bolt",
+      label: feLocalize("FECT.Ctx.Activate"),
+      disabled: !feCtCanActivate(combat, c),
+    } : null,
     {
       action: "end-turn",
       icon: "fa-hourglass-end",
       label: feLocalize("FECT.Ctx.EndTurn"),
       disabled: !feCtCanEndTurnForCombatant(combat, c),
     },
-  ];
+  ].filter(Boolean);
 
   if (isGM) items.push(
     {
@@ -856,8 +940,14 @@ function feCtOpenContextMenu(id, x, y) {
       label: c.isDefeated ? feLocalize("FECT.Ctx.Revive") : feLocalize("FECT.Ctx.Defeat"),
     },
     { action: "adjust-hp", icon: "fa-heart", label: feLocalize("FECT.Ctx.AdjustHP") },
+  );
+  // LANCER never rolls initiative (it is forced to 0), so editing or rerolling it
+  // would only disturb the disposition sort's tie-break.
+  if (isGM && !lancer) items.push(
     { action: "set-initiative", icon: "fa-dice-d20", label: feLocalize("FECT.Ctx.SetInit") },
     { action: "reroll-initiative", icon: "fa-dice", label: feLocalize("FECT.Ctx.Reroll") },
+  );
+  if (isGM) items.push(
     { action: "move-up", icon: "fa-arrow-up", label: feLocalize("FECT.Ctx.MoveUp") },
     { action: "move-down", icon: "fa-arrow-down", label: feLocalize("FECT.Ctx.MoveDown") },
   );
@@ -880,7 +970,7 @@ function feCtOpenContextMenu(id, x, y) {
   // Mirrors core's `visible` conditions (combat-tracker.mjs#_getEntryContextOptions):
   // reset only when an initiative is actually set, movement history only when it exists.
   // `clearMovementHistory` is v14-only — v13 combatants have no movement history at all.
-  if (isGM && Number.isFinite(c.initiative)) {
+  if (isGM && !lancer && Number.isFinite(c.initiative)) {
     items.push({
       action: "clear-initiative",
       icon: "fa-arrow-rotate-left",
@@ -940,6 +1030,10 @@ async function feCtHandleContextAction(action, id) {
   try {
     if (action === "end-turn") {
       await feCtRequestEndTurn(combat, c);
+      return;
+    }
+    if (action === "activate") {
+      await feCtActivateFor(c.id);
       return;
     }
     if (!game.user?.isGM) return;

@@ -1051,6 +1051,55 @@ body.fe-fonts-enabled.fe-system-dw
 }
 
 /* ===================================================
+ * 5c) LANCER font variables
+ * ===================================================
+ * The opposite case from §5b: LANCER never names a face on an element. Every
+ * font-family in its bundle (styles/lancer.css) reads one of three variables
+ * declared on :root — --header-font-family (Orbitron, its display face),
+ * --main-font-family (Helvetica), --monospace-font-family (Consolas) — and its
+ * "simple fonts" setting only re-declares --header-font-family on
+ * body.lancer-simple-fonts. So re-pointing the variables is the whole job, and
+ * it also reaches rules a later LANCER version adds.
+ *
+ * !important is required, not defensive: a custom property is an ordinary
+ * declaration, LANCER's sit in layer(system), and for NORMAL declarations
+ * system beats this sheet's layer(layouts). Only !important flips that.
+ *
+ * Mapping keeps LANCER's intent, the same as §5b: display face → primary,
+ * body face → the UI font §3 already puts on the roots. Monospace is left alone
+ * — LANCER uses it for code/formula readouts, where fixed width is the point.
+ *
+ * Chat cards: LANCER cards have no .chat-card, so §4's card blocks never see
+ * them. The same card-font toggle is honoured here on the card root
+ * (`.message-content > .card.clipped*`, the root every templates/chat/*.hbs
+ * emits — fe-render-state.js keys card classification off the same shape).
+ * The variables must be re-declared ON the card: a custom property resolved on
+ * body is inherited already-computed, so re-pointing --fe-* further down would
+ * not reach it. */
+body.fe-fonts-enabled.fe-system-lancer {
+  --header-font-family: var(--fe-font-primary) !important;
+  --main-font-family: var(--fe-ui-font-family) !important;
+}
+
+body.fe-fonts-enabled.fe-system-lancer:not(.fe-chatcard-custom-font)
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .message-content > .card:is(.clipped, .clipped-bot, .clipped-top) {
+  --header-font-family: var(--fe-chat-card-system-font-family) !important;
+  --main-font-family: var(--fe-chat-card-system-font-family) !important;
+  font-family: var(--fe-chat-card-system-font-family) !important;
+}
+
+/* Card font ON: the card's header bands keep the primary face and the body
+   takes the secondary one — the same title/description split §4 gives dnd5e. */
+body.fe-fonts-enabled.fe-system-lancer.fe-chatcard-custom-font
+  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  .message-content > .card:is(.clipped, .clipped-bot, .clipped-top) {
+  --header-font-family: var(--fe-font-primary) !important;
+  --main-font-family: var(--fe-font-secondary) !important;
+  font-family: var(--fe-font-secondary) !important;
+}
+
+/* ===================================================
  * 6) Font Awesome icon fixes
  * =================================================== */
 

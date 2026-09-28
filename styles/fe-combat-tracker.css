@@ -358,6 +358,11 @@
   opacity: 1;
   transform: scale(1.15) rotate(-12deg);
 }
+/* LANCER activate: same slot as the d20, but the tilt is a die-throw gesture
+   that does not belong on a "go" glyph. */
+.fe-ct-activate > *:hover {
+  transform: scale(1.15);
+}
 
 /* ── Entrance / exit animations ────────────────────────────
    Vertical motion belongs to each portrait — they slide down in order from
