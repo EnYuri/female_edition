@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.12.3",
+  "version": "2.12.4",
   "authors": [
     {
       "name": "nayuri",
@@ -129,7 +129,7 @@
     "verified": "14.368",
     "maximum": "14"
   },
-  "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd, dnd5e and Dungeon World. 「부레옥잠-!」",
+  "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd, dnd5e and Dungeon World, also Lancer. 「부레옥잠-!」",
   "url": "https://github.com/EnYuri/female_edition",
   "bugs": "https://github.com/EnYuri/female_edition/issues",
   "manifest": "https://github.com/EnYuri/female_edition/releases/latest/download/module.json",

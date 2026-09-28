@@ -58,6 +58,16 @@ function feIsLancerSystemId(systemId) {
   return FE_LANCER_SYSTEM_IDS.includes(String(systemId ?? ""));
 }
 
+// LANCER's chat cards carry no `.chat-card` at all: every templates/chat/*.hbs root
+// is `<div class="card clipped…">` (clipped / clipped-bot / clipped-top). `card`
+// alone is far too common a class name to key on, so the pair is what identifies
+// one — and the content test anchors at the START of the class list, exactly as
+// those templates emit it. Shared by the live merge classification
+// (fe-render-state.js) and the archive's render-path choice (fe-archive-message.js)
+// so the two can never disagree about what a LANCER card is.
+const FE_LANCER_CARD_CONTENT_RE = /class=["']card clipped(?:-bot|-top)?\b/i;
+const FE_LANCER_CARD_SELECTOR = ".message-content > .card:is(.clipped, .clipped-bot, .clipped-top)";
+
 const FE_RENDER_STATE_FLAG = "renderState";
 const FE_RENDER_SPECIAL_KIND_FLAG = "specialKind";
 const FE_RENDER_MERGE_HINT_FLAG = "mergeHint";
@@ -76,6 +86,8 @@ export {
   feIsDungeonWorldSystemId,
   FE_LANCER_SYSTEM_IDS,
   feIsLancerSystemId,
+  FE_LANCER_CARD_CONTENT_RE,
+  FE_LANCER_CARD_SELECTOR,
   LEGACY_UI_FONT_KEY,
   S,
   FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,

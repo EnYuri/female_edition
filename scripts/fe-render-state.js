@@ -2,6 +2,7 @@ import { FE_DEFAULTS } from "./fe-settings-data.js";
 import {
   MODULE_ID, S,
   FE_RENDER_STATE_FLAG, FE_RENDER_SPECIAL_KIND_FLAG, FE_RENDER_MERGE_HINT_FLAG, FE_RENDER_STATE_VERSION,
+  FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR,
 } from "./fe-constants.js";
 import {
   feExtractHTMLElement, feNormalizeChatMessageId,
@@ -174,16 +175,9 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
 // Content classification helpers
 // -------------------------------------
 
-// LANCER's cards carry no `.chat-card` at all: every templates/chat/*.hbs root is
-// `<div class="card clipped…">` (clipped / clipped-bot / clipped-top). `card` alone
-// is far too common a class name to key on, so the pair is what identifies one —
-// and it is matched at the START of the class list, exactly as those templates emit
-// it, which keeps an arbitrary `.card` further inside some other markup out.
-// Classification is stamped into the message flags at creation, so LANCER messages
-// that already exist keep their old verdict; only new ones are recognised.
-const FE_LANCER_CARD_CONTENT_RE = /class=["']card clipped(?:-bot|-top)?\b/i;
-const FE_LANCER_CARD_SELECTOR = ".message-content > .card:is(.clipped, .clipped-bot, .clipped-top)";
-
+// LANCER card roots (FE_LANCER_CARD_*, fe-constants.js). Classification is stamped
+// into the message flags at creation, so LANCER messages that already exist keep
+// their old verdict; only new ones are recognised.
 function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");

@@ -21,6 +21,7 @@ import {
   feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,
 } from "./fe-chat-enhance.js";
+import { FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR } from "./fe-constants.js";
 import { feChatPortraitUpsert } from "./fe-chat-portrait.js";
 import { cpMaybeApplyHQResample } from "./fe-chat-portrait-image.js";
 import {
@@ -339,6 +340,21 @@ export function feExpandCollapsedArchiveSections(node) {
       try {
         el.classList.remove("collapsed");
         feClearCollapsibleHideStyles(el);
+      } catch {}
+    }
+    // LANCER: a FOURTH mechanism. `.collapse` is shown by default and hidden by
+    // `.collapse.collapsed { opacity:0; max-height:0; padding:0; overflow:hidden }`
+    // (styles/lancer.css). Its renderChatMessageHTML hook re-applies whatever the
+    // user toggled this session from sessionStorage, so a section closed in the live
+    // log arrives here closed. The mirrored inline copy of that state includes
+    // `padding: 0`, which FE_COLLAPSIBLE_HIDE_PROPS deliberately does not clear for
+    // the other mechanisms (their padding is real layout) — here it is part of the
+    // hiding, so it goes too.
+    for (const el of node.querySelectorAll?.(".collapse.collapsed") ?? []) {
+      try {
+        el.classList.remove("collapsed");
+        feClearCollapsibleHideStyles(el);
+        el.style?.removeProperty?.("padding");
       } catch {}
     }
     for (const el of node.querySelectorAll?.(
@@ -1084,10 +1100,17 @@ export async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null,
 //                              HTML fallback renderer)
 // ===========================================================================
 
+// LANCER cards (FE_LANCER_CARD_*) carry no `.chat-card`, so without their own arm a
+// card with no rolls and no <img> — activation / system / talent / reaction /
+// charge — read as a plain text message. That sent every one of them outside the
+// live DOM window straight to feFallbackRenderChatMessage (LANCER's own
+// renderChatMessageHTML never ran), and stamped `fe-msg-plain`, whose archive rules
+// force `display:block` + `margin:0` onto every `.message-content > div` — i.e.
+// onto the card root itself, flattening its flex layout.
 export function feArchiveMessageLooksComplex(msg, liveEl = null) {
   try {
     const el = liveEl;
-    if (el?.querySelector?.('.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, .round-marker, .chat-images-container, .ci-message-image, img, video, table, blockquote, pre, iframe')) return true;
+    if (el?.querySelector?.(`.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, .round-marker, .chat-images-container, .ci-message-image, img, video, table, blockquote, pre, iframe, ${FE_LANCER_CARD_SELECTOR}`)) return true;
   } catch {}
   try {
     // Roll messages store the dice total in content, not the .dice-roll card HTML.
@@ -1098,6 +1121,7 @@ export function feArchiveMessageLooksComplex(msg, liveEl = null) {
   try {
     const content = String(msg?.content ?? '');
     if (!content) return false;
+    if (FE_LANCER_CARD_CONTENT_RE.test(content)) return true;
     return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img\b|<video\b|<table\b|<blockquote\b|<pre\b|<iframe\b)/i.test(content);
   } catch {
     return false;
