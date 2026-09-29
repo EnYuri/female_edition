@@ -1305,6 +1305,9 @@ Hooks.once("init", () => {
   feRegisterSetting(S.COMBAT_TRACKER_HIDE_DEFEATED, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_SHOW_HP, feCtHpDisplayChanged);
   feRegisterSetting(S.COMBAT_TRACKER_DBP_HP_STYLE, () => feCtScheduleRender());
+  // Read per HP change by feDbpSpinDuration — nothing drawn depends on them.
+  feRegisterSetting(S.COMBAT_TRACKER_DBP_SPIN_SEC);
+  feRegisterSetting(S.COMBAT_TRACKER_DBP_SPIN_JITTER_SEC);
   feRegisterSetting(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_HIDDEN_PARTIAL, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT, () => {

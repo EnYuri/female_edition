@@ -236,6 +236,8 @@ function feRegisterSettingsMenu({
         [S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT]: feRead(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT),
         [S.COMBAT_TRACKER_HIDDEN_PARTIAL]: feRead(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
         [S.COMBAT_TRACKER_DBP_HP_STYLE]: feRead(S.COMBAT_TRACKER_DBP_HP_STYLE),
+        [S.COMBAT_TRACKER_DBP_SPIN_SEC]: feRead(S.COMBAT_TRACKER_DBP_SPIN_SEC),
+        [S.COMBAT_TRACKER_DBP_SPIN_JITTER_SEC]: feRead(S.COMBAT_TRACKER_DBP_SPIN_JITTER_SEC),
 
         // Turn notice (world/GM: all but the portrait size, which is client)
         [S.TURN_NOTICE_ENABLED]:     feRead(S.TURN_NOTICE_ENABLED),
@@ -751,6 +753,7 @@ function feRegisterSettingsMenu({
           bool(S.COMBAT_TRACKER_SHOW_HP), bool(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT),
           str(S.COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT), bool(S.COMBAT_TRACKER_HIDDEN_PARTIAL),
           str(S.COMBAT_TRACKER_DBP_HP_STYLE),
+          num(S.COMBAT_TRACKER_DBP_SPIN_SEC), num(S.COMBAT_TRACKER_DBP_SPIN_JITTER_SEC),
 
           // Turn notice — world/GM gated (no reload key: hooks gate at event time);
           // the portrait size is client-scoped and always saved.

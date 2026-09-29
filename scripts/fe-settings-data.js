@@ -114,6 +114,8 @@ const S = {
   COMBAT_TRACKER_DYNAMIC_PORTRAIT_LAYOUT: "ceCombatTrackerDynamicPortraitLayout",
   COMBAT_TRACKER_HIDDEN_PARTIAL: "ceCombatTrackerHiddenPartial",
   COMBAT_TRACKER_DBP_HP_STYLE: "ceCombatTrackerDbpHpStyle",
+  COMBAT_TRACKER_DBP_SPIN_SEC: "ceCombatTrackerDbpSpinSec",
+  COMBAT_TRACKER_DBP_SPIN_JITTER_SEC: "ceCombatTrackerDbpSpinJitterSec",
   TURN_NOTICE_ENABLED: "ceTurnNoticeEnabled",
   TURN_NOTICE_IMAGE: "ceTurnNoticeImage",
   TURN_NOTICE_SHOW_NEXT: "ceTurnNoticeShowNext",
@@ -291,6 +293,8 @@ const FE_DEFAULTS = {
   "ceCombatTrackerDynamicPortraitLayout": "insert",
   "ceCombatTrackerHiddenPartial": false,
   "ceCombatTrackerDbpHpStyle": "dial",
+  "ceCombatTrackerDbpSpinSec": 4.75,
+  "ceCombatTrackerDbpSpinJitterSec": 1.25,
   "ceTurnNoticeEnabled": true,
   "ceTurnNoticeImage": "actor",
   "ceTurnNoticeShowNext": true,
@@ -587,6 +591,8 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "ceCombatTrackerDynamicPortraitLayout",
   "ceCombatTrackerHiddenPartial",
   "ceCombatTrackerDbpHpStyle",
+  "ceCombatTrackerDbpSpinSec",
+  "ceCombatTrackerDbpSpinJitterSec",
   "ceTurnNoticeEnabled",
   "ceTurnNoticeImage",
   "ceTurnNoticeShowNext",
@@ -1441,6 +1447,23 @@ const FE_SETTING_DEFINITIONS = {
     config: false,
     choices: {"dial":"FECT.Settings.DbpHpStyle.Dial","bar":"FECT.Settings.DbpHpStyle.Bar"},
     type: String,
+  },
+  // How long an HP change animates (dial spin / bar scramble), in seconds. Each change
+  // draws its own duration uniformly from sec ± jitter, so two hits never settle in
+  // lockstep. The defaults reproduce the original hardcoded 3.5~6s window.
+  "ceCombatTrackerDbpSpinSec": {
+    name: "FE.SettingsMenu.ceCombatTrackerDbpSpinSec.Text",
+    scope: "client",
+    config: false,
+    range: {"min":1,"max":10,"step":0.25},
+    type: Number,
+  },
+  "ceCombatTrackerDbpSpinJitterSec": {
+    name: "FE.SettingsMenu.ceCombatTrackerDbpSpinJitterSec.Text",
+    scope: "client",
+    config: false,
+    range: {"min":0,"max":3,"step":0.25},
+    type: Number,
   },
   "ceCombatTrackerShowHp": {
     name: "FECT.Settings.ShowHpName",

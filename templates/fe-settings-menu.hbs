@@ -1305,6 +1305,23 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerDbpSpinSec.Text"}}</label>
+      <div class="form-fields">
+        <input type="range" name="ceCombatTrackerDbpSpinSec" data-dtype="Number" value="{{values.ceCombatTrackerDbpSpinSec}}" min="{{ranges.ceCombatTrackerDbpSpinSec.min}}" max="{{ranges.ceCombatTrackerDbpSpinSec.max}}" step="{{ranges.ceCombatTrackerDbpSpinSec.step}}" />
+        <span class="fe-range-value" data-for="ceCombatTrackerDbpSpinSec">{{values.ceCombatTrackerDbpSpinSec}}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceCombatTrackerDbpSpinJitterSec.Text"}}</label>
+      <div class="form-fields">
+        <input type="range" name="ceCombatTrackerDbpSpinJitterSec" data-dtype="Number" value="{{values.ceCombatTrackerDbpSpinJitterSec}}" min="{{ranges.ceCombatTrackerDbpSpinJitterSec.min}}" max="{{ranges.ceCombatTrackerDbpSpinJitterSec.max}}" step="{{ranges.ceCombatTrackerDbpSpinJitterSec.step}}" />
+        <span class="fe-range-value" data-for="ceCombatTrackerDbpSpinJitterSec">{{values.ceCombatTrackerDbpSpinJitterSec}}</span>
+      </div>
+      <p class="notes">{{localize "FE.SettingsMenu.ceCombatTrackerDbpSpinJitterSec.Text2"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsMenu.ceCombatTrackerHiddenPartial.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerHiddenPartial" data-dtype="Boolean" {{checked values.ceCombatTrackerHiddenPartial}} />

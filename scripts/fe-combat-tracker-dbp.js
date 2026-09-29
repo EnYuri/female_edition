@@ -45,7 +45,7 @@ import {
 // the template emits it, and a handful of CSS rules, differ.
 //
 // When HP changes: (a) the artwork shakes as if hit, (b) the delta floats up out
-// of the dial, (c) the dial spins for 3.5~6s and stops on the new value. A second
+// of the dial, (c) the dial spins for a user-set length (default 3.5~6s) and stops on the new value. A second
 // hit mid-spin simply restarts the spin toward the newest value, so the dial never
 // settles on an intermediate number.
 //
@@ -75,11 +75,12 @@ import {
 // (see DBP_INK_GLYPHS) and the bar caption emits the max alone.
 const DBP_DIGITS_MIN = 3;              // a 3-reel dial by default
 const DBP_DIGITS_MAX = 5;              // …widened to 5 only for absurd HP pools
-// The floor is what the BAR's lock schedule has to fit inside: five places
-// DBP_BAR_LOCK_MS apart is 1.35s of settling, so a shorter animation would spend most
-// of its life already locked and the scramble would barely register.
-const DBP_SPIN_MIN_MS = 3500;
-const DBP_SPIN_MAX_MS = 6000;
+// The spin length is user-set (COMBAT_TRACKER_DBP_SPIN_SEC ± _JITTER_SEC, defaults
+// 4.75 ± 1.25 = the original 3.5~6s window); see feDbpSpinDuration. The floor is what
+// the BAR's lock schedule has to fit inside: five places DBP_BAR_LOCK_MS apart is 1.35s
+// of settling, so a shorter animation would spend most of its life already locked and
+// the scramble would barely register.
+const DBP_SPIN_FLOOR_MS = 1000;
 const DBP_SPIN_LEAD_MS = 120;    // hold the pre-change value before the reels break loose
 const DBP_SPIN_CRUISE = 0.55;    // fraction of the spin at full speed before the ramp-down
 const DBP_SPIN_TURNS = 12;       // full revolutions of the units reel over one spin
@@ -486,6 +487,17 @@ function feDbpData(c, size, now, insert) {
   return { insert, hp, pops, effects: eff.list, moreTip: eff.moreTip };
 }
 
+// One spin's length: uniform in sec ± jitter, clamped to DBP_SPIN_FLOOR_MS so a large
+// jitter on a short base can never produce a zero or negative duration. Read per change,
+// so a settings edit applies from the next hit without touching running animations.
+function feDbpSpinDuration() {
+  const sec = Number(feCtSetting(S.COMBAT_TRACKER_DBP_SPIN_SEC));
+  const jitter = Number(feCtSetting(S.COMBAT_TRACKER_DBP_SPIN_JITTER_SEC));
+  const base = (Number.isFinite(sec) && sec > 0 ? sec : 4.75) * 1000;
+  const spread = (Number.isFinite(jitter) && jitter > 0 ? jitter : 0) * 1000;
+  return Math.max(DBP_SPIN_FLOOR_MS, base + (Math.random() * 2 - 1) * spread);
+}
+
 // Accept one HP change. A spin already in flight is simply restarted toward the
 // newest value — since the middle of a spin is random anyway, there is nothing to
 // carry over, and the dial can only ever come to rest on the final HP.
@@ -506,7 +518,7 @@ function feDbpBeginHpAnim(c, prev, next) {
     to: next,
     start: now,
     lead,
-    dur: DBP_SPIN_MIN_MS + Math.random() * (DBP_SPIN_MAX_MS - DBP_SPIN_MIN_MS),
+    dur: feDbpSpinDuration(),
     hidden,
     bar: feCtDbpHpStyle() === "bar",
     // The decoy a hidden spin lands on, as fractions of the dial's own range —
