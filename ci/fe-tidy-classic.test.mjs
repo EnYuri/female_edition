@@ -484,3 +484,42 @@ test("damage/healing/movement type labels survive object-shaped config", () => {
     "getMovementInfo lost the string|object normalization",
   );
 });
+
+test("advancement handling follows the dnd5e 5.2+/6.0 shapes", () => {
+  // Every regression here was silent: no error, the feature just stopped.
+  //   - `system.advancement` became a collection (`.size`) / id-keyed object, so a
+  //     `.length` test skipped the AdvancementManager on every class drop.
+  //   - dropping a class the actor already has must level it up, not duplicate it.
+  //   - the V2 advancement config takes `{ document }`; `new config(advancement)` threw.
+  //   - dropping advancements onto an item must write id-keyed data, not push an array.
+  //   - Special Traits must list the `system.rolls.*.bonus` fields 6.0 moved there.
+  const classicDirs = [
+    "tidy-classic/src/sheets/classic/",
+    "tidy-classic/src/mixins/",
+    "tidy-classic/src/foundry/",
+  ];
+  const offenders = [];
+  for (const dir of classicDirs) {
+    for (const file of walk(new URL(dir, root))) {
+      if (!/\.(ts|svelte)$/.test(file)) continue;
+      const src = readFileSync(file, "utf8");
+      if (/advancement\?\.length/.test(src)) offenders.push(`${file}: advancement?.length`);
+      if (/new advancement\.constructor\.metadata\.apps\.config\(advancement\)(?![\s\S]{0,40}V1)/.test(src)
+        && !/renderAdvancementConfig/.test(src)) offenders.push(`${file}: V1 advancement config`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+
+  const base = read("tidy-classic/src/sheets/classic/Tidy5eActorSheetClassicV2Base.svelte.ts");
+  assert.match(base, /addBonus\(this\.document\.system\.schema\.fields\.rolls, true\)/);
+  assert.match(base, /onDropCreate\?\.\(event, this\.actor, itemData\)/);
+
+  const character = read("tidy-classic/src/sheets/classic/Tidy5eCharacterSheet.svelte.ts");
+  assert.match(character, /AdvancementManager\.forLevelChange\(/, "class drop no longer levels up");
+  assert.match(character, /DND5E\.SubclassDuplicateError/);
+
+  const item = read("tidy-classic/src/sheets/classic/Tidy5eItemSheetClassic.svelte.ts");
+  assert.match(item, /summary: await advancement\.summaryForLevel/);
+  assert.doesNotMatch(item, /advancementArray\.push/);
+  assert.match(adapter, /const sheet = advancement\.sheet;/);
+});

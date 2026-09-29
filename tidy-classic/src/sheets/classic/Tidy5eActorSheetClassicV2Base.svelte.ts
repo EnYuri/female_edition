@@ -35,7 +35,7 @@ import type { AnySheetPinFlagData } from 'src/foundry/TidyFlags.types';
 import { SheetPinsProvider } from 'src/features/sheet-pins/SheetPinsProvider';
 import { getTabIdFromEvent } from 'src/utils/element';
 import { splitSemicolons } from 'src/utils/array';
-import { isNil } from 'src/utils/data';
+import { hasAdvancement, isNil } from 'src/utils/data';
 import { debug, error, warn } from 'src/utils/logging';
 import { firstOfSet } from 'src/utils/set';
 import { mount } from 'svelte';
@@ -668,20 +668,28 @@ export function Tidy5eActorSheetClassicV2Base<
           value: foundry.utils.getProperty(context.flags.data, key),
         };
 
+        // Deprecated flags only show while they still hold a value (mirrors dnd5e)
+        if ((config as any).deprecated && !flag.value) {
+          continue;
+        }
+
         sections[config.section] ??= [];
         sections[config.section].push(flag);
       }
 
       // Global Bonuses
       const globals: SpecialTraitSectionField[] = [];
-      const addBonus = (field: any) => {
+      // `checkName`: dnd5e 6.0 moved the attack/damage/ability bonuses into
+      // `system.rolls`, whose schema also holds non-bonus fields; only the ones
+      // literally named `bonus` belong in this section (mirrors dnd5e).
+      const addBonus = (field: any, checkName = false) => {
         if (field === undefined) {
           return;
         }
 
         if (field instanceof foundry.data.fields.SchemaField) {
-          Object.values(field.fields).forEach((f) => addBonus(f));
-        } else {
+          Object.values(field.fields).forEach((f) => addBonus(f, checkName));
+        } else if (!checkName || field.name === 'bonus') {
           globals.push({
             field,
             name: field.fieldPath,
@@ -691,6 +699,7 @@ export function Tidy5eActorSheetClassicV2Base<
       };
 
       addBonus(this.document.system.schema.fields.bonuses);
+      addBonus(this.document.system.schema.fields.rolls, true);
 
       if (globals.length) {
         sections[game.i18n.localize('DND5E.BONUSES.FIELDS.bonuses.label')] =
@@ -1137,7 +1146,7 @@ export function Tidy5eActorSheetClassicV2Base<
     ): Promise<Item5e[]> {
       let items = itemData instanceof Array ? itemData : [itemData];
       const itemsWithoutAdvancement = items.filter(
-        (i) => !i.system.advancement?.length
+        (i) => !hasAdvancement(i.system.advancement)
       );
       const multipleAdvancements =
         items.length - itemsWithoutAdvancement.length > 1;
@@ -1246,7 +1255,7 @@ export function Tidy5eActorSheetClassicV2Base<
       // Bypass normal creation flow for any items with advancement
       if (
         this.actor.system.metadata?.supportsAdvancement &&
-        itemData.system.advancement?.length &&
+        hasAdvancement(itemData.system.advancement) &&
         !game.settings.get('dnd5e', 'disableAdvancements')
       ) {
         // Ensure that this item isn't violating the singleton rule
@@ -1280,6 +1289,11 @@ export function Tidy5eActorSheetClassicV2Base<
           return false;
         }
       }
+
+      // Let specific item types apply any changes from a drop event (dnd5e 5.x+)
+      CONFIG.Item.dataModels[
+        itemData.type as keyof typeof CONFIG.Item.dataModels
+      ]?.onDropCreate?.(event, this.actor, itemData);
 
       return itemData;
     }

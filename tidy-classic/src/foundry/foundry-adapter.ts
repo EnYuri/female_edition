@@ -895,6 +895,22 @@ export const FoundryAdapter = {
   editAdvancement(advancementItemId: string, item: Item5e) {
     const advancement = item.advancement.byId[advancementItemId];
 
+    return FoundryAdapter.renderAdvancementConfig(advancement);
+  },
+  /**
+   * dnd5e 6.0's advancement config is an ApplicationV2 PseudoDocumentSheet whose
+   * constructor takes `{ document }`; `new config(advancement)` threw on
+   * `options.document.id`. `advancement.sheet` builds (and caches) the right one on
+   * both generations, so only fall back to the V1 constructor when it is missing.
+   */
+  renderAdvancementConfig(advancement: any) {
+    if (!advancement) {
+      return;
+    }
+    const sheet = advancement.sheet;
+    if (sheet) {
+      return sheet.render(true);
+    }
     return new advancement.constructor.metadata.apps.config(advancement).render(
       true
     );

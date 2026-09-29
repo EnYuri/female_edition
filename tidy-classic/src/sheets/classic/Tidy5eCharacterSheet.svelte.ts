@@ -1598,6 +1598,75 @@ export class Tidy5eCharacterSheet
       return scroll.toObject();
     }
 
+    // Mirrors dnd5e's CharacterActorSheet#_onDropSingleItem: dropping a class the
+    // actor already has adds levels to it instead of creating a duplicate class.
+    if (itemData.type === 'class') {
+      const charLevel = this.actor.system.details.level;
+      itemData.system.levels = Math.min(
+        itemData.system.levels,
+        CONFIG.DND5E.maxLevel - charLevel
+      );
+      if (itemData.system.levels <= 0) {
+        ui.notifications.error(
+          game.i18n.format('DND5E.MaxCharacterLevelExceededWarn', {
+            max: CONFIG.DND5E.maxLevel,
+          })
+        );
+        return false;
+      }
+
+      const cls = this.actor.itemTypes.class.find(
+        (c: Item5e) => c.identifier === itemData.system.identifier
+      );
+      if (cls) {
+        const priorLevel = cls.system.levels;
+        if (!game.settings.get('dnd5e', 'disableAdvancements')) {
+          const manager =
+            dnd5e.applications.advancement.AdvancementManager.forLevelChange(
+              this.actor,
+              cls.id,
+              itemData.system.levels
+            );
+          if (manager.steps.length) {
+            manager.render(true);
+            return false;
+          }
+        }
+        await cls.update({
+          'system.levels': priorLevel + itemData.system.levels,
+        });
+        return false;
+      }
+    }
+
+    // A subclass must not collide with another subclass's identifier, nor
+    // attach to a class that already has one.
+    else if (itemData.type === 'subclass') {
+      const other = this.actor.itemTypes.subclass.find(
+        (i: Item5e) => i.identifier === itemData.system.identifier
+      );
+      if (other) {
+        ui.notifications.error(
+          game.i18n.format('DND5E.SubclassDuplicateError', {
+            identifier: other.identifier,
+          })
+        );
+        return false;
+      }
+      const cls = this.actor.itemTypes.class.find(
+        (i: Item5e) => i.identifier === itemData.system.classIdentifier
+      );
+      if (cls?.subclass) {
+        ui.notifications.error(
+          game.i18n.format('DND5E.SubclassAssignmentError', {
+            class: cls.name,
+            subclass: cls.subclass.name,
+          })
+        );
+        return false;
+      }
+    }
+
     return await super._onDropSingleItem(itemData, event);
   }
 

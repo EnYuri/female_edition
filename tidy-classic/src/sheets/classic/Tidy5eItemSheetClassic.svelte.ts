@@ -302,7 +302,7 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
         this.document.isArmor && this.document.system.type.value !== 'shield',
 
       // Advancement
-      advancement: this._getItemAdvancement(this.document),
+      advancement: await this._getItemAdvancement(this.document),
 
       effects: dnd5e.applications.components.EffectsElement.prepareCategories(
         this.document.effects,
@@ -580,7 +580,7 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
    * @param {Item5e} item  The item for which the advancement is being prepared.
    * @returns {object}     Object with advancement data grouped by levels.
    */
-  _getItemAdvancement(item: Item5e) {
+  async _getItemAdvancement(item: Item5e) {
     if (!item.system.advancement) return {};
     const advancement: Record<string, any> = {};
     const configMode = !item.parent || this.advancementConfigurationMode;
@@ -597,13 +597,17 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
       advancement.unconfigured = {
         items: item.advancement.needingConfiguration.map((a: any) => ({
           id: a.id,
+          uuid: a.uuid,
           order: a.constructor.order,
-          title: a.title,
-          icon: a.icon,
+          // dnd5e 5.1+ renamed Advancement#title/#icon to name/img (old ones are shims)
+          title: a.name ?? a.title,
+          icon: a.img ?? a.icon,
           classRestriction: a.classRestriction,
           configured: false,
           tags: this._getItemAdvancementTags(a),
-          classes: [a.icon?.endsWith('.svg') ? 'svg' : ''].filterJoin(' '),
+          classes: [(a.img ?? a.icon)?.endsWith('.svg') ? 'svg' : ''].filterJoin(
+            ' '
+          ),
         })),
         configured: 'partial',
       };
@@ -615,23 +619,29 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
     )) {
       if (!configMode)
         advancements = advancements.filter((a: any) => a.appliesToClass);
-      const items = advancements.map((advancement: any) => ({
+      // dnd5e 6.0 awaits summaryForLevel; a sync call would render "[object Promise]"
+      // for any advancement type that returns one.
+      const items = await Promise.all(advancements.map(async (advancement: any) => ({
         id: advancement.id,
+        uuid: advancement.uuid,
         order: advancement.sortingValueForLevel(level),
         title: advancement.titleForLevel(level, { configMode, legacyDisplay }),
-        icon: advancement.icon,
+        icon: advancement.img ?? advancement.icon,
         classRestriction: advancement.classRestriction,
-        summary: advancement.summaryForLevel(level, {
+        summary: await advancement.summaryForLevel(level, {
           configMode,
           legacyDisplay,
         }),
         configured: advancement.configuredForLevel(level),
         tags: this._getItemAdvancementTags(advancement),
-        value: advancement.valueForLevel?.(level),
-        classes: [advancement.icon?.endsWith('.svg') ? 'svg' : ''].filterJoin(
-          ' '
+        value: (advancement.displayValueForLevel ?? advancement.valueForLevel)?.call(
+          advancement,
+          level
         ),
-      }));
+        classes: [
+          (advancement.img ?? advancement.icon)?.endsWith('.svg') ? 'svg' : '',
+        ].filterJoin(' '),
+      })));
       if (!items.length) continue;
       advancement[level] = {
         items: items.sort((a: any, b: any) =>
@@ -1012,9 +1022,23 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
     }
 
     // If no advancements need to be applied, just add them to the item
-    const advancementArray = this.item.system.toObject().advancement;
-    advancementArray.push(...advancements.map((a: any) => a.toObject()));
-    this.item.update({ 'system.advancement': advancementArray });
+    // dnd5e 5.2+ stores advancement id-keyed (an update merges by id); older data
+    // is an array. Pushing onto the new shape threw a TypeError.
+    const existing = this.item.system.toObject().advancement;
+    if (Array.isArray(existing)) {
+      existing.push(...advancements.map((a: any) => a.toObject()));
+      this.item.update({ 'system.advancement': existing });
+      return;
+    }
+    this.item.update({
+      'system.advancement': advancements.reduce(
+        (obj: Record<string, any>, a: any) => {
+          obj[a.id] = a.toObject();
+          return obj;
+        },
+        {}
+      ),
+    });
   }
 
   async toggleAdvancementLock() {
@@ -1085,9 +1109,7 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
           { parent: this.item }
         );
       case 'edit':
-        return new advancement.constructor.metadata.apps.config(
-          advancement
-        ).render(true);
+        return FoundryAdapter.renderAdvancementConfig(advancement);
       case 'delete':
         if (
           this.item.actor?.system.metadata?.supportsAdvancement &&

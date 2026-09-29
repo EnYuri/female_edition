@@ -7126,6 +7126,17 @@ function buildDataset(obj) {
     {}
   );
 }
+function hasAdvancement(advancement) {
+  if (advancement == null) return false;
+  if (Array.isArray(advancement)) return advancement.length > 0;
+  if (typeof advancement.size === "number") {
+    return advancement.size > 0;
+  }
+  if (typeof advancement === "object") {
+    return Object.keys(advancement).length > 0;
+  }
+  return false;
+}
 function formatAsModifier(value) {
   const data = getModifierData(value);
   return `${data.sign}${data.value}`;
@@ -110364,6 +110375,22 @@ const FoundryAdapter = {
   },
   editAdvancement(advancementItemId, item) {
     const advancement = item.advancement.byId[advancementItemId];
+    return FoundryAdapter.renderAdvancementConfig(advancement);
+  },
+  /**
+   * dnd5e 6.0's advancement config is an ApplicationV2 PseudoDocumentSheet whose
+   * constructor takes `{ document }`; `new config(advancement)` threw on
+   * `options.document.id`. `advancement.sheet` builds (and caches) the right one on
+   * both generations, so only fall back to the V1 constructor when it is missing.
+   */
+  renderAdvancementConfig(advancement) {
+    if (!advancement) {
+      return;
+    }
+    const sheet = advancement.sheet;
+    if (sheet) {
+      return sheet.render(true);
+    }
     return new advancement.constructor.metadata.apps.config(advancement).render(
       true
     );
@@ -114949,17 +114976,20 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
           name: `flags.dnd5e.${key2}`,
           value: foundry.utils.getProperty(context.flags.data, key2)
         };
+        if (config.deprecated && !flag.value) {
+          continue;
+        }
         sections[config.section] ??= [];
         sections[config.section].push(flag);
       }
       const globals = [];
-      const addBonus = (field) => {
+      const addBonus = (field, checkName = false) => {
         if (field === void 0) {
           return;
         }
         if (field instanceof foundry.data.fields.SchemaField) {
-          Object.values(field.fields).forEach((f) => addBonus(f));
-        } else {
+          Object.values(field.fields).forEach((f) => addBonus(f, checkName));
+        } else if (!checkName || field.name === "bonus") {
           globals.push({
             field,
             name: field.fieldPath,
@@ -114968,6 +114998,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
         }
       };
       addBonus(this.document.system.schema.fields.bonuses);
+      addBonus(this.document.system.schema.fields.rolls, true);
       if (globals.length) {
         sections[game.i18n.localize("DND5E.BONUSES.FIELDS.bonuses.label")] = globals;
       }
@@ -115220,7 +115251,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
      */
     async _onDropItemCreate(itemData, event2, behavior) {
       let items = itemData instanceof Array ? itemData : [itemData];
-      const itemsWithoutAdvancement = items.filter((i) => !i.system.advancement?.length);
+      const itemsWithoutAdvancement = items.filter((i) => !hasAdvancement(i.system.advancement));
       const multipleAdvancements = items.length - itemsWithoutAdvancement.length > 1;
       if (multipleAdvancements && !game.settings.get("dnd5e", "disableAdvancements")) {
         ui.notifications.warn(game.i18n.format("DND5E.WarnCantAddMultipleAdvancements"));
@@ -115267,7 +115298,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
       if (stacked) {
         return false;
       }
-      if (this.actor.system.metadata?.supportsAdvancement && itemData.system.advancement?.length && !game.settings.get("dnd5e", "disableAdvancements")) {
+      if (this.actor.system.metadata?.supportsAdvancement && hasAdvancement(itemData.system.advancement) && !game.settings.get("dnd5e", "disableAdvancements")) {
         const dataModel = CONFIG.Item.dataModels[itemData.type];
         const singleton2 = dataModel?.metadata.singleton ?? false;
         if (singleton2 && this.actor.itemTypes[itemData.type].length) {
@@ -115283,6 +115314,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
           return false;
         }
       }
+      CONFIG.Item.dataModels[itemData.type]?.onDropCreate?.(event2, this.actor, itemData);
       return itemData;
     }
     /**
@@ -116264,6 +116296,38 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
       const scroll = await dnd5e.documents.Item5e.createScrollFromSpell(itemData, options2);
       return scroll.toObject();
     }
+    if (itemData.type === "class") {
+      const charLevel = this.actor.system.details.level;
+      itemData.system.levels = Math.min(itemData.system.levels, CONFIG.DND5E.maxLevel - charLevel);
+      if (itemData.system.levels <= 0) {
+        ui.notifications.error(game.i18n.format("DND5E.MaxCharacterLevelExceededWarn", { max: CONFIG.DND5E.maxLevel }));
+        return false;
+      }
+      const cls = this.actor.itemTypes.class.find((c) => c.identifier === itemData.system.identifier);
+      if (cls) {
+        const priorLevel = cls.system.levels;
+        if (!game.settings.get("dnd5e", "disableAdvancements")) {
+          const manager = dnd5e.applications.advancement.AdvancementManager.forLevelChange(this.actor, cls.id, itemData.system.levels);
+          if (manager.steps.length) {
+            manager.render(true);
+            return false;
+          }
+        }
+        await cls.update({ "system.levels": priorLevel + itemData.system.levels });
+        return false;
+      }
+    } else if (itemData.type === "subclass") {
+      const other = this.actor.itemTypes.subclass.find((i) => i.identifier === itemData.system.identifier);
+      if (other) {
+        ui.notifications.error(game.i18n.format("DND5E.SubclassDuplicateError", { identifier: other.identifier }));
+        return false;
+      }
+      const cls = this.actor.itemTypes.class.find((i) => i.identifier === itemData.system.classIdentifier);
+      if (cls?.subclass) {
+        ui.notifications.error(game.i18n.format("DND5E.SubclassAssignmentError", { class: cls.name, subclass: cls.subclass.name }));
+        return false;
+      }
+    }
     return await super._onDropSingleItem(itemData, event2);
   }
   deleteOccupant(facilityId, prop2, index2) {
@@ -116612,7 +116676,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
       // Armor Class
       hasDexModifier: this.document.isArmor && this.document.system.type.value !== "shield",
       // Advancement
-      advancement: this._getItemAdvancement(this.document),
+      advancement: await this._getItemAdvancement(this.document),
       effects: dnd5e.applications.components.EffectsElement.prepareCategories(this.document.effects, { parent: this.item }),
       concealDetails: !game.user.isGM && this.document.system.identified === false,
       toggleAdvancementLock: this.toggleAdvancementLock.bind(this),
@@ -116778,7 +116842,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
    * @param {Item5e} item  The item for which the advancement is being prepared.
    * @returns {object}     Object with advancement data grouped by levels.
    */
-  _getItemAdvancement(item) {
+  async _getItemAdvancement(item) {
     if (!item.system.advancement) return {};
     const advancement = {};
     const configMode = !item.parent || this.advancementConfigurationMode;
@@ -116788,31 +116852,36 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
       advancement.unconfigured = {
         items: item.advancement.needingConfiguration.map((a) => ({
           id: a.id,
+          uuid: a.uuid,
           order: a.constructor.order,
-          title: a.title,
-          icon: a.icon,
+          // dnd5e 5.1+ renamed Advancement#title/#icon to name/img (old ones are shims)
+          title: a.name ?? a.title,
+          icon: a.img ?? a.icon,
           classRestriction: a.classRestriction,
           configured: false,
           tags: this._getItemAdvancementTags(a),
-          classes: [a.icon?.endsWith(".svg") ? "svg" : ""].filterJoin(" ")
+          classes: [(a.img ?? a.icon)?.endsWith(".svg") ? "svg" : ""].filterJoin(" ")
         })),
         configured: "partial"
       };
     }
     for (let [level, advancements] of Object.entries(item.advancement.byLevel)) {
       if (!configMode) advancements = advancements.filter((a) => a.appliesToClass);
-      const items = advancements.map((advancement2) => ({
+      const items = await Promise.all(advancements.map(async (advancement2) => ({
         id: advancement2.id,
+        uuid: advancement2.uuid,
         order: advancement2.sortingValueForLevel(level),
         title: advancement2.titleForLevel(level, { configMode, legacyDisplay }),
-        icon: advancement2.icon,
+        icon: advancement2.img ?? advancement2.icon,
         classRestriction: advancement2.classRestriction,
-        summary: advancement2.summaryForLevel(level, { configMode, legacyDisplay }),
+        summary: await advancement2.summaryForLevel(level, { configMode, legacyDisplay }),
         configured: advancement2.configuredForLevel(level),
         tags: this._getItemAdvancementTags(advancement2),
-        value: advancement2.valueForLevel?.(level),
-        classes: [advancement2.icon?.endsWith(".svg") ? "svg" : ""].filterJoin(" ")
-      }));
+        value: (advancement2.displayValueForLevel ?? advancement2.valueForLevel)?.call(advancement2, level),
+        classes: [
+          (advancement2.img ?? advancement2.icon)?.endsWith(".svg") ? "svg" : ""
+        ].filterJoin(" ")
+      })));
       if (!items.length) continue;
       advancement[level] = {
         items: items.sort((a, b) => a.order.localeCompare(b.order, game.i18n.lang)),
@@ -117047,9 +117116,21 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
       const manager = dnd5e.applications.advancement.AdvancementManager.forNewAdvancement(this.item.actor, this.item.id, advancements);
       if (manager.steps.length) return manager.render(true);
     }
-    const advancementArray = this.item.system.toObject().advancement;
-    advancementArray.push(...advancements.map((a) => a.toObject()));
-    this.item.update({ "system.advancement": advancementArray });
+    const existing = this.item.system.toObject().advancement;
+    if (Array.isArray(existing)) {
+      existing.push(...advancements.map((a) => a.toObject()));
+      this.item.update({ "system.advancement": existing });
+      return;
+    }
+    this.item.update({
+      "system.advancement": advancements.reduce(
+        (obj, a) => {
+          obj[a.id] = a.toObject();
+          return obj;
+        },
+        {}
+      )
+    });
   }
   async toggleAdvancementLock() {
     this.advancementConfigurationMode = !this.advancementConfigurationMode;
@@ -117099,7 +117180,7 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
       case "add":
         return dnd5e.documents.advancement.Advancement.createDialog({}, { parent: this.item });
       case "edit":
-        return new advancement.constructor.metadata.apps.config(advancement).render(true);
+        return FoundryAdapter.renderAdvancementConfig(advancement);
       case "delete":
         if (this.item.actor?.system.metadata?.supportsAdvancement && !game.settings.get("dnd5e", "disableAdvancements")) {
           manager = dnd5e.applications.advancement.AdvancementManager.forDeletedAdvancement(this.item.actor, this.item.id, id);
@@ -121937,7 +122018,7 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
     async _onDropItemCreate(itemData, event2, behavior) {
       let items = itemData instanceof Array ? itemData : [itemData];
       const itemsWithoutAdvancement = items.filter(
-        (i) => !i.system.advancement?.length
+        (i) => !hasAdvancement(i.system.advancement)
       );
       const multipleAdvancements = items.length - itemsWithoutAdvancement.length > 1;
       if (multipleAdvancements && !game.settings.get("dnd5e", "disableAdvancements")) {
@@ -122002,7 +122083,7 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
       this._onDropResetData(itemData);
       const stacked = this._onDropStackConsumables(itemData, {});
       if (stacked) return false;
-      if (this.actor.system.metadata?.supportsAdvancement && itemData.system.advancement?.length && !game.settings.get("dnd5e", "disableAdvancements")) {
+      if (this.actor.system.metadata?.supportsAdvancement && hasAdvancement(itemData.system.advancement) && !game.settings.get("dnd5e", "disableAdvancements")) {
         const dataModel = CONFIG.Item.dataModels[itemData.type];
         const singleton2 = dataModel?.metadata.singleton ?? false;
         if (singleton2 && this.actor.itemTypes[itemData.type].length) {
