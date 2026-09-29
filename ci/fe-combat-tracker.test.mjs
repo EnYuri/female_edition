@@ -341,7 +341,10 @@ test("the bar's roll follows the dial's contract, and locks left to right", () =
   assert.match(ENTRY, /feDbpApplyBarRoll\(root, nowMs\)/);
   // The end of the animation has to come back through a rerender: that is what drops
   // the marker and hands the caption back to the template.
-  assert.match(DBP, /if \(anim\.hidden \|\| anim\.bar\) needRender = true;/);
+  // `secret` is the LIVE mask OR-ed with the captured `anim.hidden`, so an actor masked
+  // mid-spin also gets the closing rerender that brings its "?" reading back.
+  assert.match(DBP, /if \(secret \|\| anim\.bar\) needRender = true;/);
+  assert.match(DBP, /const secret = anim\.hidden === true\s*\|\| !feDbpRevealed\(/);
   // The fill's hold may not be written into the property the TEMPLATE owns: they share
   // one style attribute, so the hold would destroy the resting value it falls back to.
   assert.ok(
