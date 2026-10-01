@@ -597,6 +597,42 @@ Hooks.on("clientSettingChanged", (fullKey, value) => {
   }
 });
 
+// Core rebuilds and measures the entire chat formatting menu on every v14
+// ProseMirror text edit, even when none of its active items changed.
+function feInstallChatMenuTypingFastPath() {
+  if (game.release?.generation !== 14) return;
+  const proto = foundry.prosemirror?.ProseMirrorMenu?.prototype;
+  if (typeof proto?.update !== "function" || proto.update._feChatTypingFastPath) return;
+  const original = proto.update;
+  function update(view, prevState) {
+    if (!view?.dom?.closest?.("prose-mirror#chat-message") ||
+        view.state.doc === prevState?.doc ||
+        !Array.isArray(this.dropdowns) || !Array.isArray(this.items)) {
+      return original.call(this, view, prevState);
+    }
+    const menu = view.dom.ownerDocument.getElementById(this.id);
+    const button = menu?.querySelector("button");
+    if (!button || button.disabled !== !view.editable ||
+        menu.querySelector(".concurrent-users")?.childElementCount) {
+      return original.call(this, view, prevState);
+    }
+
+    let changed = false;
+    const sync = item => {
+      const active = this._isItemActive(item);
+      if (item.active !== active) {
+        item.active = active;
+        changed = true;
+      }
+    };
+    this.dropdowns.forEach(dropdown => dropdown.forEachItem(sync));
+    this.items.forEach(sync);
+    if (changed) this.render();
+  }
+  update._feChatTypingFastPath = true;
+  proto.update = update;
+}
+
 // Paint the UI from settings as soon as the settings store is populated, without
 // waiting for the canvas. `setup` fires after world documents are prepared and
 // BEFORE the canvas is drawn, so this survives a canvas that never finishes
@@ -606,6 +642,7 @@ Hooks.on("clientSettingChanged", (fullKey, value) => {
 // them. Every apply is an idempotent classList/style write, so running twice is
 // free.
 Hooks.once("setup", () => {
+  feInstallChatMenuTypingFastPath();
   try { feApplyVisualSettingsToDocument(document); } catch { /* no-op */ }
 });
 

@@ -106,6 +106,7 @@ function _fetRegisterSettings() {
         document.getElementById("fe-stage-dock")?.remove();
         _fetDockEl = null;
         _fetRefreshSheetHeaders();
+        if (game.ready) void _fetRestoreVanillaChatMode();
       } else {
         _fetInjectUI();
         void _fetRestoreUserState();
@@ -167,6 +168,20 @@ function _fetLoadSettings() {
   _fetBoxBottom      = game.settings.get(_FET_MODULE, "stageBoxBottom");
   _fetBoxLeft        = game.settings.get(_FET_MODULE, "stageBoxLeft");
   _fetTextSize       = game.settings.get(_FET_MODULE, "stageTextSize");
+}
+
+// Stage can supply the only IC speaker; without it v14 rejects the next message
+// before preCreateChatMessage can run. Preserve IC if core still finds a speaker.
+async function _fetRestoreVanillaChatMode() {
+  try {
+    if (_fetEnabled || game.settings.get("core", "messageMode") !== "ic") return;
+    if (game.settings.get(_FET_MODULE, "stageEnabled")) return;
+    const speaker = ChatMessage.getSpeaker();
+    if (speaker?.actor || speaker?.token) return;
+    await game.settings.set("core", "messageMode", "public");
+  } catch (err) {
+    console.warn("female_edition: Could not restore public chat mode after disabling stage", err);
+  }
 }
 
 // ── Per-user persistence ──────────────────────────────────────────────────
@@ -1724,6 +1739,7 @@ Hooks.on("ready", () => {
   _fetLoadSettings();   // re-read: `setup` ran before GM priority was synced
   _fetInjectUI();
   void _fetRestoreUserState();
+  void _fetRestoreVanillaChatMode();
 });
 
 Hooks.on("renderChatLog", (app, html) => {
