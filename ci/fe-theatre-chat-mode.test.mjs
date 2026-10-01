@@ -16,7 +16,7 @@ const modeCode = [
   source.match(/^Hooks.on\("controlToken"[\s\S]*?^\}\);/m)?.[0],
 ].join("\n");
 
-function harness({ generation = 14, enabled = false, ready = true, mode = "ic",
+function harness({ generation = 14, enabled = false, ready = true, canvasReady = ready, mode = "ic",
   speaker = {}, configured = enabled, speakingAs = "__none__" } = {}) {
   const writes = [];
   const state = { enabled, ready, mode, speaker, configured, selected: [] };
@@ -48,7 +48,7 @@ function harness({ generation = 14, enabled = false, ready = true, mode = "ic",
         },
       },
     },
-    canvas: { tokens: { controlled: state.selected } },
+    canvas: { ready: canvasReady, tokens: { controlled: state.selected } },
     ChatMessage: { getSpeaker: () => state.speaker },
     Hooks: {
       handlers: {},
@@ -179,12 +179,18 @@ test("manually chosen public yields to a newly selected NPC, then returns on rel
   }
 });
 
-test("non-v14 clients and incomplete boot never switch modes", async () => {
-  for (const options of [{ generation: 13 }, { ready: false }]) {
-    const h = harness(options);
-    await h.sync();
-    assert.deepEqual(h.writes, []);
-  }
+test("v13 clients remain unchanged; pre-ready chat repairs IC without adopting unready tokens", async () => {
+  const older = harness({ generation: 13 });
+  await older.sync();
+  assert.deepEqual(older.writes, []);
+
+  const early = harness({ ready: false });
+  await early.sync();
+  assert.deepEqual(early.writes, ["public"]);
+  const token = harness({ ready: false, mode: "public", speaker: { actor: "npc" } });
+  token.state.selected.push({ actor: "npc" });
+  await token.sync(true);
+  assert.deepEqual(token.writes, []);
 });
 
 test("theatre routing leaves vanilla and narrator messages alone, but styles its own speech", () => {
@@ -232,6 +238,7 @@ test("theatre routing leaves vanilla and narrator messages alone, but styles its
 test("chat mode sync runs on stage settings, speaker selection, token changes and ready", () => {
   assert.match(source, /feRegisterSetting\("stageEnabled"[\s\S]*?if \(game\.ready\) _fetSyncChatMode\(\)/);
   assert.match(source, /Hooks\.on\("ready",[\s\S]*?_fetSyncChatMode\(\)/);
+  assert.match(source, /Hooks\.on\("renderChatLog",[\s\S]*?_fetInjectUI\(\);\s*_fetSyncChatMode\(\)/);
   assert.match(source, /Hooks\.on\("controlToken", \(_token, selected\) => _fetSyncChatMode\(\{ tokenSelected: selected \}\)\)/);
   assert.doesNotMatch(source, /chatData\.(?:style|type) = CONST\.CHAT_MESSAGE_(?:STYLES|TYPES)\.OOC/);
 });

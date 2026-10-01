@@ -32,6 +32,7 @@ import { feRegisterTemplates, feRenderTemplate } from "./fe-template.js";
 
 import { feMarkdownToHTML } from "./fe-markdown.js";
 import { FE_CONFLICT_FEATURE, feIsConflictFeatureSuppressed } from "./fe-conflict-state.js";
+import { feCgMode } from "./fe-conflict-guard.js";
 
 const _FN_MODULE   = "female_edition";
 const _FN_MD_ENABLED_KEY = "ceMarkdownEnabled";  // shared markdown toggle (fe-chat-enhance)
@@ -80,6 +81,7 @@ function _fnRegisterSettings() {
   feRegisterSetting("narratorEnabled", (v) => {
       _fnEnabled = !!v && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR);
       if (!_fnEnabled) _fnForceClose();
+      else _fnOrderChatCommandsWithCgmp();
     });
   feRegisterSetting("narratorDurationMult", (v) => { _fnDurationMult = v; });
   feRegisterSetting("narratorAllowCopy", (v) => { _fnAllowCopy = v; });
@@ -488,11 +490,39 @@ function _fnOnChatMessage(_log, message, chatData) {
 
 Hooks.on("chatMessage", _fnOnChatMessage);
 
+let _fnCgmpOrdered = false;
+let _fnCgmpSpeakersProtected = false;
+
+function _fnProtectCgmpSpeakers() {
+  if (_fnCgmpSpeakersProtected) return true;
+  if (feCgMode() !== "auto" || !game.modules.get("CautiousGamemastersPack")?.active) return false;
+  const preCreate = Hooks.events?.preCreateChatMessage;
+  const getFn = entry => typeof entry === "function" ? entry : entry?.fn;
+  const cgmpPreCreate = preCreate?.find(entry => getFn(entry)?.name === "onPreCreateChatMessage"
+    && Function.prototype.toString.call(getFn(entry)).includes("ChatResolver._resolvePCToken"));
+  if (!cgmpPreCreate) {
+    console.warn("female_edition: Cannot protect narrator messages from CGMP: pre-create handler was not found");
+    return false;
+  }
+  const original = getFn(cgmpPreCreate);
+  const wrappedPreCreate = (message, ...args) => {
+    const flags = message?.flags?.[_FN_MODULE];
+    if (flags?.isNarrator || flags?.plainAlias || flags?.stageId) return;
+    return original(message, ...args);
+  };
+  if (typeof cgmpPreCreate === "function") preCreate[preCreate.indexOf(cgmpPreCreate)] = wrappedPreCreate;
+  else cgmpPreCreate.fn = wrappedPreCreate;
+  _fnCgmpSpeakersProtected = true;
+  return true;
+}
+
 function _fnOrderChatCommandsWithCgmp() {
+  if (_fnCgmpOrdered || feCgMode() !== "auto") return;
   if (!game.modules.get("CautiousGamemastersPack")?.active) return;
   const narratorTools = game.modules.get("narrator-tools")?.active
     && !!CONFIG.ui.chat?.CHAT_COMMANDS?.["narrator-description"];
   if (!_fnEnabled && !narratorTools) return;
+  if (!_fnProtectCgmpSpeakers()) return;
   const entries = Hooks.events?.chatMessage;
   if (!Array.isArray(entries)) {
     console.warn("female_edition: Cannot order narrator commands with CGMP: chat hooks are unavailable");
@@ -525,22 +555,7 @@ function _fnOrderChatCommandsWithCgmp() {
   };
   if (typeof cgmp === "function") entries[entries.indexOf(cgmp)] = wrappedChatMessage;
   else cgmp.fn = wrappedChatMessage;
-
-  const preCreate = Hooks.events?.preCreateChatMessage;
-  const cgmpPreCreate = preCreate?.find(entry => getFn(entry)?.name === "onPreCreateChatMessage"
-    && Function.prototype.toString.call(getFn(entry)).includes("ChatResolver._resolvePCToken"));
-  if (!cgmpPreCreate) {
-    console.warn("female_edition: Cannot protect narrator messages from CGMP: pre-create handler was not found");
-    return;
-  }
-  const original = getFn(cgmpPreCreate);
-  const wrappedPreCreate = (message, ...args) => {
-    const flags = message?.flags?.[_FN_MODULE];
-    if (flags?.isNarrator || flags?.plainAlias || flags?.stageId) return;
-    return original(message, ...args);
-  };
-  if (typeof cgmpPreCreate === "function") preCreate[preCreate.indexOf(cgmpPreCreate)] = wrappedPreCreate;
-  else cgmpPreCreate.fn = wrappedPreCreate;
+  _fnCgmpOrdered = true;
 }
 
 // Tag rendered narrator messages with style classes.
@@ -563,6 +578,7 @@ Hooks.once("setup", () => {
   queueMicrotask(() => {
     try {
       _fnLoadSettings();
+      _fnProtectCgmpSpeakers();
       _fnOrderChatCommandsWithCgmp();
     } catch (err) {
       console.warn("female_edition: Could not prepare narrator chat commands", err);

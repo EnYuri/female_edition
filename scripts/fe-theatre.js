@@ -185,7 +185,7 @@ async function _fetSetChatMode(mode) {
 
 function _fetSyncChatMode({ tokenSelected = false } = {}) {
   _fetChatModeUpdate = _fetChatModeUpdate.then(async () => {
-    if (game.release?.generation !== 14 || !game.ready) return;
+    if (game.release?.generation !== 14) return;
     const insert = _fetEnabled && _fet.inserts.get(_fet.speakingAs);
     const stageSpeaking = insert && _fetIsUserStageInsert(insert) && _fetCanSpeakAs(insert.actorId);
     if (stageSpeaking) return;
@@ -194,7 +194,7 @@ function _fetSyncChatMode({ tokenSelected = false } = {}) {
     const hasSpeaker = !!(speaker?.actor || speaker?.token);
     const speakingAsSelf = _fetEnabled && _fet.speakingAs === null;
     if ((!_fetManualChatMode || tokenSelected) && !speakingAsSelf &&
-        canvas.tokens.controlled.length && hasSpeaker && mode === "public") {
+        canvas?.ready && canvas.tokens.controlled.length && hasSpeaker && mode === "public") {
       await _fetSetChatMode("ic");
     } else if (!hasSpeaker && mode === "ic") {
       await _fetSetChatMode("public");
@@ -1753,6 +1753,7 @@ Hooks.on("renderChatLog", (app, html) => {
   _fetRootEl = raw instanceof HTMLElement ? raw : null;
 
   _fetInjectUI();
+  _fetSyncChatMode();
 });
 
 Hooks.on("closeSettingsConfig", () => { _fetLoadSettings(); _fetApplyBoxVars(); });

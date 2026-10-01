@@ -220,7 +220,10 @@ const FE_CG_CONFLICTS = [
     // fe-typing-indicator ALREADY fully yields to CGMP's typing notifier:
     // feTypingFeatureEnabled() returns false when CGMP is active (no injection,
     // socket display, or listeners), so there is no double indicator. This entry
-    // is purely informational — same yield pattern as chatlog-prune.
+    // is purely informational — same yield pattern as chatlog-prune. CGMP's
+    // overlapping /desc and /as commands are coordinated separately by
+    // fe-narrator.js in auto mode; yielding our narrator here would hand those
+    // commands back to CGMP instead.
     id: "CautiousGamemastersPack",
     get feature() { return feLocalize("FE.ConflictGuard.feature7"); },
     mode: "yield",

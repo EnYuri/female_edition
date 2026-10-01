@@ -11,7 +11,7 @@ const extract = (source, name) => {
   return fn;
 };
 
-function cgmpHarness({ enabled = true, narratorTools = false, bareHooks = false } = {}) {
+function cgmpHarness({ enabled = true, narratorTools = false, bareHooks = false, guardMode = "auto" } = {}) {
   const handled = [];
   const ChatResolver = {
     _parseChatMessage: () => {},
@@ -54,6 +54,9 @@ function cgmpHarness({ enabled = true, narratorTools = false, bareHooks = false 
   const context = vm.createContext({
     Hooks, console: { warn: text => assert.fail(text) },
     _fnEnabled: enabled,
+    _fnCgmpOrdered: false,
+    _fnCgmpSpeakersProtected: false,
+    feCgMode: () => guardMode,
     _fnPermAs: 4, _fnPermDescribe: 4, _fnPermNarrate: 4,
     _fn: { character: "" },
     _FN_MODULE: "female_edition",
@@ -70,11 +73,19 @@ function cgmpHarness({ enabled = true, narratorTools = false, bareHooks = false 
   });
   vm.runInContext([
     extract(narratorSource, "_fnOnChatMessage"),
+    extract(narratorSource, "_fnProtectCgmpSpeakers"),
     extract(narratorSource, "_fnOrderChatCommandsWithCgmp"),
     'Hooks.on("chatMessage", _fnOnChatMessage);',
+    "_fnProtectCgmpSpeakers();",
     "_fnOrderChatCommandsWithCgmp();",
   ].join("\n"), context);
-  return { Hooks, handled };
+  return {
+    Hooks, handled,
+    enable() {
+      context._fnEnabled = true;
+      vm.runInContext("_fnOrderChatCommandsWithCgmp()", context);
+    },
+  };
 }
 
 test("our /desc and /as win before CGMP, while CGMP /ooc remains available", () => {
@@ -103,6 +114,29 @@ test("without either narrator, CGMP keeps /desc", () => {
   const h = cgmpHarness({ enabled: false });
   assert.equal(h.Hooks.call("chatMessage", {}, "/desc test", {}), false);
   assert.deepEqual(h.handled, ["cgmp"]);
+  h.Hooks.call("preCreateChatMessage", { flags: { female_edition: { stageId: "actor" } } });
+  assert.deepEqual(h.handled, ["cgmp"]);
+});
+
+test("guard warn, yield and off do not override CGMP hooks", () => {
+  for (const guardMode of ["warn", "yield", "off"]) {
+    const h = cgmpHarness({ guardMode });
+    assert.equal(h.Hooks.call("chatMessage", {}, "/desc test", {}), false);
+    assert.deepEqual(h.handled, ["cgmp"]);
+    h.Hooks.call("preCreateChatMessage", { flags: { female_edition: { isNarrator: true } } });
+    assert.deepEqual(h.handled, ["cgmp", "cgmp-precreate"]);
+  }
+});
+
+test("enabling narrator after setup yields CGMP /desc without wrapping it twice", () => {
+  const h = cgmpHarness({ enabled: false });
+  h.enable();
+  h.enable();
+  assert.equal(h.Hooks.call("chatMessage", {}, "/desc later", {}), false);
+  assert.equal(h.Hooks.call("chatMessage", {}, "/ooc later", {}), false);
+  h.Hooks.call("preCreateChatMessage", { flags: {} });
+  assert.deepEqual(h.handled, [["description", "later"], "cgmp", "cgmp-precreate"]);
+  assert.match(narratorSource, /feRegisterSetting\("narratorEnabled"[\s\S]*?else _fnOrderChatCommandsWithCgmp\(\)/);
 });
 
 test("v13 bare-function hook entries keep the same command ownership", () => {
