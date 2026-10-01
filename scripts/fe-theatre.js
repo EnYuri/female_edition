@@ -89,7 +89,7 @@ let _fetSaveTimer = null;
 let _fetSuppressLocalSave = 0;
 const _fetPreloadedImages = new Map();
 const _FET_PRELOAD_MAX = 256;
-let _fetAutoIcMode = false;
+let _fetManualChatMode = false;
 let _fetWritingChatMode = false;
 let _fetChatModeUpdate = Promise.resolve();
 
@@ -109,11 +109,12 @@ function _fetRegisterSettings() {
         document.getElementById("fe-stage-dock")?.remove();
         _fetDockEl = null;
         _fetRefreshSheetHeaders();
-        if (game.ready) void _fetRestoreVanillaChatMode();
+        if (game.ready) _fetSyncChatMode();
       } else {
         _fetInjectUI();
         void _fetRestoreUserState();
         _fetRefreshSheetHeaders();
+        if (game.ready) _fetSyncChatMode();
       }
     });
 
@@ -173,20 +174,6 @@ function _fetLoadSettings() {
   _fetTextSize       = game.settings.get(_FET_MODULE, "stageTextSize");
 }
 
-// Stage can supply the only IC speaker; without it v14 rejects the next message
-// before preCreateChatMessage can run. Preserve IC if core still finds a speaker.
-async function _fetRestoreVanillaChatMode() {
-  try {
-    if (_fetEnabled || game.settings.get("core", "messageMode") !== "ic") return;
-    if (game.settings.get(_FET_MODULE, "stageEnabled")) return;
-    const speaker = ChatMessage.getSpeaker();
-    if (speaker?.actor || speaker?.token) return;
-    await _fetSetChatMode("public");
-  } catch (err) {
-    console.warn("female_edition: Could not restore public chat mode after disabling stage", err);
-  }
-}
-
 async function _fetSetChatMode(mode) {
   _fetWritingChatMode = true;
   try {
@@ -196,25 +183,31 @@ async function _fetSetChatMode(mode) {
   }
 }
 
-function _fetSyncChatModeForToken() {
+function _fetSyncChatMode() {
   _fetChatModeUpdate = _fetChatModeUpdate.then(async () => {
-    if (game.release?.generation !== 14 || !game.ready ||
-        game.settings.get(_FET_MODULE, "stageEnabled")) return;
+    if (game.release?.generation !== 14 || !game.ready) return;
+    const insert = _fetEnabled && _fet.inserts.get(_fet.speakingAs);
+    const stageSpeaking = insert && _fetIsUserStageInsert(insert) && _fetCanSpeakAs(insert.actorId);
+    if (stageSpeaking) return;
     const mode = game.settings.get("core", "messageMode");
     const speaker = ChatMessage.getSpeaker();
-    if (canvas.tokens.controlled.length && (speaker?.actor || speaker?.token) && mode === "public") {
+    const hasSpeaker = !!(speaker?.actor || speaker?.token);
+    const speakingAsSelf = _fetEnabled && _fet.speakingAs === null;
+    if (!_fetManualChatMode && !speakingAsSelf &&
+        canvas.tokens.controlled.length && hasSpeaker && mode === "public") {
       await _fetSetChatMode("ic");
-      _fetAutoIcMode = true;
-    } else if (_fetAutoIcMode && !speaker?.actor && !speaker?.token && mode === "ic") {
+    } else if (!hasSpeaker && mode === "ic") {
       await _fetSetChatMode("public");
-      _fetAutoIcMode = false;
+      _fetManualChatMode = false;
     }
   }).catch(err => console.warn("female_edition: Could not sync chat mode with token selection", err));
 }
 
-Hooks.on("controlToken", _fetSyncChatModeForToken);
+Hooks.on("controlToken", _fetSyncChatMode);
 Hooks.on("clientSettingChanged", (key) => {
-  if (key === "core.messageMode" && !_fetWritingChatMode) _fetAutoIcMode = false;
+  if (key !== "core.messageMode" || _fetWritingChatMode) return;
+  _fetManualChatMode = true;
+  _fetSyncChatMode();
 });
 
 // ── Per-user persistence ──────────────────────────────────────────────────
@@ -857,6 +850,7 @@ function _fetSetSpeakingAs(theatreId) {
   _fet.speakingAs = theatreId ?? null;
   _fetUpdateActiveStates();
   _fetScheduleSaveUserState();
+  if (game.ready) _fetSyncChatMode();
 }
 
 function _fetUpdateActiveStates() {
@@ -1351,22 +1345,7 @@ function _fetTypewriter(el, frag) {
 Hooks.on("chatMessage", (_log, _message, chatData) => {
   if (!_fetEnabled) return;
 
-  // "없음" (none) mode: theatre does not modify the message, but GM needs IC-mode bypass.
-  // v14 PaC validates speaker.actor in #processChatCommand before preCreateChatMessage.
-  // GMs without a canvas token selected have no actor → force OOC to bypass validation.
-  if (_fet.speakingAs === _FET_NONE) {
-    if (game.user.isGM && _fetNavEl) {
-      try {
-        if (game.settings.get("core", "messageMode") === "ic") {
-          if (!chatData.speaker?.actor && !chatData.speaker?.token) {
-            if (CONST.CHAT_MESSAGE_STYLES) chatData.style = CONST.CHAT_MESSAGE_STYLES.OOC;
-            else chatData.type = CONST.CHAT_MESSAGE_TYPES.OOC;
-          }
-        }
-      } catch { /* messageMode not registered on v13 — no-op */ }
-    }
-    return;
-  }
+  if (_fet.speakingAs === _FET_NONE) return;
 
   if (!_fet.speakingAs) {
     // "자신으로 말하기" (speak as self): Foundry v14 PaC (ic mode) validates speaker.actor in
@@ -1383,16 +1362,6 @@ Hooks.on("chatMessage", (_log, _message, chatData) => {
           }
         } catch { /* messageMode not registered on v13 — no-op */ }
       }
-    } else if (game.user.isGM && _fetNavEl) {
-      // GM "자신으로 말하기" (speak as self): no character assigned → force OOC to bypass IC validation.
-      try {
-        if (game.settings.get("core", "messageMode") === "ic") {
-          if (!chatData.speaker?.actor && !chatData.speaker?.token) {
-            if (CONST.CHAT_MESSAGE_STYLES) chatData.style = CONST.CHAT_MESSAGE_STYLES.OOC;
-            else chatData.type = CONST.CHAT_MESSAGE_TYPES.OOC;
-          }
-        }
-      } catch { /* messageMode not registered on v13 — no-op */ }
     }
     return;
   }
@@ -1772,7 +1741,7 @@ Hooks.on("ready", () => {
   _fetLoadSettings();   // re-read: `setup` ran before GM priority was synced
   _fetInjectUI();
   void _fetRestoreUserState();
-  void _fetRestoreVanillaChatMode();
+  _fetSyncChatMode();
 });
 
 Hooks.on("renderChatLog", (app, html) => {

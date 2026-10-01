@@ -403,7 +403,7 @@ const FENarrator = {
 // Slash-command parsing. Returning false swallows the raw message. The narrator
 // message is then created programmatically with the isNarrator flag, which makes
 // fe-theatre.js bail (no stage hijack) and fe-render-state.js skip merge.
-Hooks.on("chatMessage", (_log, message, chatData) => {
+function _fnOnChatMessage(_log, message, chatData) {
   if (!_fnEnabled) return;
   // The v14 chat input is ProseMirror and serializes to HTML before
   // processMessage runs (chat-input-plugin.mjs:151), so a typed "/narrate x"
@@ -484,7 +484,64 @@ Hooks.on("chatMessage", (_log, message, chatData) => {
       return false;
     }
   }
-});
+}
+
+Hooks.on("chatMessage", _fnOnChatMessage);
+
+function _fnOrderChatCommandsWithCgmp() {
+  if (!game.modules.get("CautiousGamemastersPack")?.active) return;
+  const narratorTools = game.modules.get("narrator-tools")?.active
+    && !!CONFIG.ui.chat?.CHAT_COMMANDS?.["narrator-description"];
+  if (!_fnEnabled && !narratorTools) return;
+  const entries = Hooks.events?.chatMessage;
+  if (!Array.isArray(entries)) {
+    console.warn("female_edition: Cannot order narrator commands with CGMP: chat hooks are unavailable");
+    return;
+  }
+  const getFn = entry => typeof entry === "function" ? entry : entry?.fn;
+  const cgmp = entries.find(entry => getFn(entry)?.name === "onChatMessage"
+    && Function.prototype.toString.call(getFn(entry)).includes("ChatResolver._parseChatMessage")
+    && Function.prototype.toString.call(getFn(entry)).includes("CHAT_MESSAGE_SUB_TYPES.DESC"));
+  if (!cgmp) {
+    console.warn("female_edition: Cannot order narrator commands with CGMP: handler was not found");
+    return;
+  }
+  const ownIndex = entries.findIndex(entry => getFn(entry) === _fnOnChatMessage);
+  if (ownIndex < 0) {
+    console.warn("female_edition: Cannot order narrator commands with CGMP: narrator handler was not found");
+    return;
+  }
+  const cgmpIndex = entries.indexOf(cgmp);
+  if (cgmpIndex < ownIndex) {
+    entries.splice(cgmpIndex, 1);
+    entries.splice(ownIndex, 0, cgmp);
+  }
+  const onChatMessage = getFn(cgmp);
+  const wrappedChatMessage = (...args) => {
+    if (!_fnEnabled && narratorTools && /^(?:<p>)?\/(?:desc(?:ribe|ription)?|as)(?:\s|<\/p>|$)/i.test(args[1])) {
+      return true;
+    }
+    return onChatMessage(...args);
+  };
+  if (typeof cgmp === "function") entries[entries.indexOf(cgmp)] = wrappedChatMessage;
+  else cgmp.fn = wrappedChatMessage;
+
+  const preCreate = Hooks.events?.preCreateChatMessage;
+  const cgmpPreCreate = preCreate?.find(entry => getFn(entry)?.name === "onPreCreateChatMessage"
+    && Function.prototype.toString.call(getFn(entry)).includes("ChatResolver._resolvePCToken"));
+  if (!cgmpPreCreate) {
+    console.warn("female_edition: Cannot protect narrator messages from CGMP: pre-create handler was not found");
+    return;
+  }
+  const original = getFn(cgmpPreCreate);
+  const wrappedPreCreate = (message, ...args) => {
+    const flags = message?.flags?.[_FN_MODULE];
+    if (flags?.isNarrator || flags?.plainAlias || flags?.stageId) return;
+    return original(message, ...args);
+  };
+  if (typeof cgmpPreCreate === "function") preCreate[preCreate.indexOf(cgmpPreCreate)] = wrappedPreCreate;
+  else cgmpPreCreate.fn = wrappedPreCreate;
+}
 
 // Tag rendered narrator messages with style classes.
 Hooks.on("renderChatMessageHTML", (message, html) => {
@@ -500,6 +557,17 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 
 Hooks.on("init", () => {
   _fnRegisterSettings();
+});
+
+Hooks.once("setup", () => {
+  queueMicrotask(() => {
+    try {
+      _fnLoadSettings();
+      _fnOrderChatCommandsWithCgmp();
+    } catch (err) {
+      console.warn("female_edition: Could not prepare narrator chat commands", err);
+    }
+  });
 });
 
 Hooks.on("ready", () => {

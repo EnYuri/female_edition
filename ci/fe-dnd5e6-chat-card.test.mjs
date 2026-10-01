@@ -319,8 +319,8 @@ test("GM speak-as-self leaves midi-qol cards' speaker alone", () => {
   // `preferredActiveGM()`. Nulling the speaker made midi fall through to the
   // message author instead — the GM — so every midi card the GM triggered for a
   // player-owned actor was drawn in the GM's color.
-  assert.match(CHAT_ENHANCE_JS, /const isMidiCard = .*"midi-qol"/);
-  assert.match(CHAT_ENHANCE_JS, /if \(!isMidiCard && !\(msgRolls\.length > 0 && speaker\?\.actor\)\)/);
+  assert.match(CHAT_ENHANCE_JS, /if \(data\?\.flags\?\.\["midi-qol"\] \?\? message\?\.flags\?\.\["midi-qol"\]\) return/);
+  assert.match(CHAT_ENHANCE_JS, /if \(msgRolls\.length > 0 && speaker\?\.actor\) return/);
 });
 
 /** CSS comments, removed so an assertion about DECLARATIONS is not tripped by prose. */
