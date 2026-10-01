@@ -183,7 +183,7 @@ async function _fetSetChatMode(mode) {
   }
 }
 
-function _fetSyncChatMode() {
+function _fetSyncChatMode({ tokenSelected = false } = {}) {
   _fetChatModeUpdate = _fetChatModeUpdate.then(async () => {
     if (game.release?.generation !== 14 || !game.ready) return;
     const insert = _fetEnabled && _fet.inserts.get(_fet.speakingAs);
@@ -193,7 +193,7 @@ function _fetSyncChatMode() {
     const speaker = ChatMessage.getSpeaker();
     const hasSpeaker = !!(speaker?.actor || speaker?.token);
     const speakingAsSelf = _fetEnabled && _fet.speakingAs === null;
-    if (!_fetManualChatMode && !speakingAsSelf &&
+    if ((!_fetManualChatMode || tokenSelected) && !speakingAsSelf &&
         canvas.tokens.controlled.length && hasSpeaker && mode === "public") {
       await _fetSetChatMode("ic");
     } else if (!hasSpeaker && mode === "ic") {
@@ -203,7 +203,7 @@ function _fetSyncChatMode() {
   }).catch(err => console.warn("female_edition: Could not sync chat mode with token selection", err));
 }
 
-Hooks.on("controlToken", _fetSyncChatMode);
+Hooks.on("controlToken", (_token, selected) => _fetSyncChatMode({ tokenSelected: selected }));
 Hooks.on("clientSettingChanged", (key) => {
   if (key !== "core.messageMode" || _fetWritingChatMode) return;
   _fetManualChatMode = true;

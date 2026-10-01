@@ -61,8 +61,8 @@ let _fetChatModeUpdate = Promise.resolve();
 ${modeCode}`, context);
   return {
     state, writes,
-    sync: async () => {
-      context.Hooks.handlers.controlToken();
+    sync: async (tokenSelected = false) => {
+      context.Hooks.handlers.controlToken(null, tokenSelected);
       await vm.runInContext("_fetChatModeUpdate", context);
     },
     select: async value => {
@@ -164,6 +164,21 @@ test("manual mode choices and non-public modes are preserved", async () => {
   assert.deepEqual(h.writes, ["public", "ic"]);
 });
 
+test("manually chosen public yields to a newly selected NPC, then returns on release", async () => {
+  for (const enabled of [false, true]) {
+    const h = harness({ enabled, mode: "public" });
+    await h.setManually("public");
+    h.state.selected.push({ actor: "npc" });
+    h.state.speaker = { actor: "npc", token: "token" };
+    await h.sync(true);
+    assert.equal(h.state.mode, "ic");
+    h.state.selected.pop();
+    h.state.speaker = {};
+    await h.sync(false);
+    assert.deepEqual(h.writes, ["ic", "public"]);
+  }
+});
+
 test("non-v14 clients and incomplete boot never switch modes", async () => {
   for (const options of [{ generation: 13 }, { ready: false }]) {
     const h = harness(options);
@@ -217,6 +232,6 @@ test("theatre routing leaves vanilla and narrator messages alone, but styles its
 test("chat mode sync runs on stage settings, speaker selection, token changes and ready", () => {
   assert.match(source, /feRegisterSetting\("stageEnabled"[\s\S]*?if \(game\.ready\) _fetSyncChatMode\(\)/);
   assert.match(source, /Hooks\.on\("ready",[\s\S]*?_fetSyncChatMode\(\)/);
-  assert.match(source, /Hooks\.on\("controlToken", _fetSyncChatMode\)/);
+  assert.match(source, /Hooks\.on\("controlToken", \(_token, selected\) => _fetSyncChatMode\(\{ tokenSelected: selected \}\)\)/);
   assert.doesNotMatch(source, /chatData\.(?:style|type) = CONST\.CHAT_MESSAGE_(?:STYLES|TYPES)\.OOC/);
 });
