@@ -89,6 +89,9 @@ let _fetSaveTimer = null;
 let _fetSuppressLocalSave = 0;
 const _fetPreloadedImages = new Map();
 const _FET_PRELOAD_MAX = 256;
+let _fetAutoIcMode = false;
+let _fetWritingChatMode = false;
+let _fetChatModeUpdate = Promise.resolve();
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
@@ -178,11 +181,41 @@ async function _fetRestoreVanillaChatMode() {
     if (game.settings.get(_FET_MODULE, "stageEnabled")) return;
     const speaker = ChatMessage.getSpeaker();
     if (speaker?.actor || speaker?.token) return;
-    await game.settings.set("core", "messageMode", "public");
+    await _fetSetChatMode("public");
   } catch (err) {
     console.warn("female_edition: Could not restore public chat mode after disabling stage", err);
   }
 }
+
+async function _fetSetChatMode(mode) {
+  _fetWritingChatMode = true;
+  try {
+    await game.settings.set("core", "messageMode", mode);
+  } finally {
+    _fetWritingChatMode = false;
+  }
+}
+
+function _fetSyncChatModeForToken() {
+  _fetChatModeUpdate = _fetChatModeUpdate.then(async () => {
+    if (game.release?.generation !== 14 || !game.ready ||
+        game.settings.get(_FET_MODULE, "stageEnabled")) return;
+    const mode = game.settings.get("core", "messageMode");
+    const speaker = ChatMessage.getSpeaker();
+    if (canvas.tokens.controlled.length && (speaker?.actor || speaker?.token) && mode === "public") {
+      await _fetSetChatMode("ic");
+      _fetAutoIcMode = true;
+    } else if (_fetAutoIcMode && !speaker?.actor && !speaker?.token && mode === "ic") {
+      await _fetSetChatMode("public");
+      _fetAutoIcMode = false;
+    }
+  }).catch(err => console.warn("female_edition: Could not sync chat mode with token selection", err));
+}
+
+Hooks.on("controlToken", _fetSyncChatModeForToken);
+Hooks.on("clientSettingChanged", (key) => {
+  if (key === "core.messageMode" && !_fetWritingChatMode) _fetAutoIcMode = false;
+});
 
 // ── Per-user persistence ──────────────────────────────────────────────────
 
