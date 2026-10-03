@@ -308,6 +308,21 @@ function feCtEnsureRoot() {
   return root;
 }
 
+function feCtSyncLayout(root) {
+  if (!root?.isConnected) return;
+  const tabs = document.getElementById("sidebar-tabs");
+  const sidebar = document.getElementById("sidebar");
+  const edge = [tabs, sidebar]
+    .map((el) => el?.getBoundingClientRect())
+    .filter((rect) => rect?.width > 0)
+    .map((rect) => rect.left)
+    .filter((left) => left > window.innerWidth / 2);
+  const clearance = edge.length
+    ? Math.max(8, window.innerWidth - Math.min(...edge) + 16)
+    : 392;
+  root.style.setProperty("--fe-ct-right-clearance", `${clearance}px`);
+}
+
 // One combatant's template context. Everything that used to be concatenated into an
 // HTML string is now plain data; templates/fe-combat-tracker.hbs owns the markup.
 function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = null) {
@@ -576,6 +591,7 @@ function feCtRender() {
   const align = String(feCtSetting(S.COMBAT_TRACKER_ALIGNMENT) || "center");
   root.classList.remove("fe-ct-align-left", "fe-ct-align-center", "fe-ct-align-right");
   root.classList.add(`fe-ct-align-${["left", "center", "right"].includes(align) ? align : "center"}`);
+  feCtSyncLayout(root);
 
   const hideDefeated = !!feCtSetting(S.COMBAT_TRACKER_HIDE_DEFEATED);
   const combatants = combat.turns.filter(
@@ -1329,6 +1345,12 @@ Hooks.once("ready", () => {
   }
   feCtEnsureRoot();
   feCtRender();
+  window.addEventListener("resize", () => feCtSyncLayout(document.getElementById(TRACKER_DOM_ID)));
+  Hooks.on("collapseSidebar", () => {
+    const sync = () => feCtSyncLayout(document.getElementById(TRACKER_DOM_ID));
+    requestAnimationFrame(sync);
+    setTimeout(sync, 260);
+  });
   game.socket.on(SOCKET_CHANNEL, feCtOnSocket);
 
   const rerender = () => feCtScheduleRender();

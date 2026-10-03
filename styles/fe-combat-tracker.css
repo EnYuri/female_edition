@@ -15,7 +15,7 @@
   pointer-events: none;    /* only the inner panels capture clicks */
   display: none;
   width: max-content;
-  max-width: min(92vw, calc(100vw - 784px));
+  max-width: min(92vw, calc(100vw - var(--fe-ct-right-clearance, 392px) - var(--fe-ct-right-clearance, 392px)));
   --fe-ct-size: 90px;
   --fe-ct-h: 90px;
   --fe-ct-round: 8px;
@@ -32,7 +32,7 @@
   left: 8px;
 }
 #fe-combat-tracker.fe-ct-align-right {
-  right: 8px;
+  right: var(--fe-ct-right-clearance, 392px);
 }
 #fe-combat-tracker.fe-ct-align-left .fe-ct-inner {
   align-items: flex-start;
@@ -65,6 +65,7 @@
 #fe-combat-tracker .fe-ct-combatants-wrap {
   position: relative;
   display: flex;
+  box-sizing: border-box;
   max-width: 100%;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -81,6 +82,7 @@
   /* The fixed root carries the viewport limit; this flex child must shrink
      inside it so extra portraits stay in the horizontal scroller. */
   min-width: 0;
+  box-sizing: border-box;
   max-width: 100%;
 
   /* THE BOTTOM SPILL. The active card is scale(1.1) and wears a 26px glow, and

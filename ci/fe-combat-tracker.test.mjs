@@ -23,8 +23,13 @@ test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
     return CSS.slice(i, CSS.indexOf("}", i));
   };
   assert.match(block("#fe-combat-tracker {"), /width:\s*max-content/);
-  assert.match(block("#fe-combat-tracker {"), /max-width:\s*min\(92vw,\s*calc\(100vw - 784px\)\)/);
+  assert.match(block("#fe-combat-tracker {"), /max-width:\s*min\(92vw,\s*calc\(100vw - var\(--fe-ct-right-clearance[^;]+- var\(--fe-ct-right-clearance/);
+  assert.match(block("#fe-combat-tracker.fe-ct-align-right {"), /right:\s*var\(--fe-ct-right-clearance/);
+  assert.match(ENTRY, /document\.getElementById\("sidebar-tabs"\)/);
+  assert.match(ENTRY, /feCtSyncLayout\(root\)/);
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /min-width:\s*0/);
+  assert.match(block("#fe-combat-tracker .fe-ct-combatants-wrap {"), /box-sizing:\s*border-box/);
+  assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /box-sizing:\s*border-box/);
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /max-width:\s*100%/);
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /overflow-x:\s*auto/);
 });
