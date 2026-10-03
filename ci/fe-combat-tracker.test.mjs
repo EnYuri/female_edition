@@ -23,7 +23,8 @@ test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
     return CSS.slice(i, CSS.indexOf("}", i));
   };
   assert.match(block("#fe-combat-tracker {"), /width:\s*max-content/);
-  assert.match(block("#fe-combat-tracker {"), /max-width:\s*min\(92vw,\s*calc\(100vw - var\(--fe-ct-right-clearance[^;]+- var\(--fe-ct-right-clearance/);
+  assert.match(block("#fe-combat-tracker {"), /max-width:\s*min\(1020px,\s*92vw,\s*calc\(100vw - var\(--fe-ct-right-clearance[^;]+- var\(--fe-ct-right-clearance/);
+  assert.equal(8 * 120 + 7 * 6 + 2 * 8 + 2, 1020, "eight default-size portraits fit including gaps, padding and border");
   assert.match(block("#fe-combat-tracker.fe-ct-align-right {"), /right:\s*var\(--fe-ct-right-clearance/);
   assert.match(ENTRY, /document\.getElementById\("sidebar-tabs"\)/);
   assert.match(ENTRY, /feCtSyncLayout\(root\)/);

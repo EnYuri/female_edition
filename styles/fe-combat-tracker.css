@@ -15,7 +15,8 @@
   pointer-events: none;    /* only the inner panels capture clicks */
   display: none;
   width: max-content;
-  max-width: min(92vw, calc(100vw - var(--fe-ct-right-clearance, 392px) - var(--fe-ct-right-clearance, 392px)));
+  /* Eight 120px portraits + seven 6px gaps + 16px padding + 2px border. */
+  max-width: min(1020px, 92vw, calc(100vw - var(--fe-ct-right-clearance, 392px) - var(--fe-ct-right-clearance, 392px)));
   --fe-ct-size: 90px;
   --fe-ct-h: 90px;
   --fe-ct-round: 8px;
