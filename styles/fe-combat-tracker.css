@@ -14,6 +14,8 @@
   z-index: 70;             /* above canvas, below app windows/dialogs */
   pointer-events: none;    /* only the inner panels capture clicks */
   display: none;
+  width: max-content;
+  max-width: min(92vw, calc(100vw - 784px));
   --fe-ct-size: 90px;
   --fe-ct-h: 90px;
   --fe-ct-round: 8px;
@@ -76,10 +78,10 @@
   flex-direction: row;
   gap: 6px;
   align-items: flex-start;        /* flipped (see transform) → visually bottom-aligned */
-  /* clear the right sidebar + the top-left scene-controls dropdown when centered,
-     plus 72px extra breathing room on each side (640 + 144) so it never touches
-     the sidebar panels */
-  max-width: min(92vw, calc(100vw - 784px));
+  /* The fixed root carries the viewport limit; this flex child must shrink
+     inside it so extra portraits stay in the horizontal scroller. */
+  min-width: 0;
+  max-width: 100%;
 
   /* THE BOTTOM SPILL. The active card is scale(1.1) and wears a 26px glow, and
      overflow-y had been cutting both off at the panel's bottom edge. There is no

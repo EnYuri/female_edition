@@ -16,6 +16,19 @@ const HPMASK = read("scripts/fe-hp-mask.js");
 const RUI = read("scripts/fe-dx3rd-resource-ui.js");
 const HBS = read("templates/fe-combat-tracker.hbs");
 
+test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
+  const block = (sel) => {
+    const i = CSS.indexOf(sel);
+    assert.notEqual(i, -1, `${sel} rule not found`);
+    return CSS.slice(i, CSS.indexOf("}", i));
+  };
+  assert.match(block("#fe-combat-tracker {"), /width:\s*max-content/);
+  assert.match(block("#fe-combat-tracker {"), /max-width:\s*min\(92vw,\s*calc\(100vw - 784px\)\)/);
+  assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /min-width:\s*0/);
+  assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /max-width:\s*100%/);
+  assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /overflow-x:\s*auto/);
+});
+
 // The entry is the only file that knows the renderer, and core's scheduler is what
 // the dbp module and every hook call. Lose the registration and the tracker renders
 // once (the direct feCtRender at install) and then never again — no error anywhere.
