@@ -1,5 +1,7 @@
 {
   "TIDY5E.ModuleName": "Tidy 5e Sheets",
+  "TIDY5E.ClassicMoveSourceChanged": "Advancement completed, but the source item changed in the meantime and was not deleted.",
+  "TIDY5E.ClassicMoveDeleteFailed": "Advancement completed, but the source item could not be deleted. Please check the source.",
   "TIDY5E.Tidy5eCharacterSheetClassic": "Tidy 5e Classic Character Sheet",
   "TIDY5E.Tidy5eNpcSheetClassic": "Tidy 5e Classic NPC Sheet",
   "TIDY5E.Tidy5eItemSheetClassic": "Tidy 5e Classic Item Sheet",

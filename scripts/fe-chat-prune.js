@@ -352,25 +352,31 @@ export function feInstallChatLogPrune() {
         }
 
         const fragments = [];
-        for (let i = start; i < end; i++) {
+        let firstRenderedId;
+        // Render from the existing boundary toward older messages. If one fails,
+        // stop there so the DOM stays contiguous and the next batch retries it.
+        for (let i = end - 1; i >= start; i--) {
           const msg = all[i];
           if (!msg.visible || this.#renderedIds.has(msg.id)) continue;
-          this.#renderedIds.add(msg.id);
           if (!this.isPopout) msg.logged = true;
           try {
             const el = await this.constructor.renderMessage(msg);
             this.#stampMessageOrder(el, i);
-            fragments.push(el);
+            fragments.unshift(el);
+            firstRenderedId = msg.id;
+            this.#renderedIds.add(msg.id);
           } catch (err) {
+            if (!this.isPopout) msg.logged = false;
             Hooks.onError("FeChatLogPrune.renderBatch", err, {
               msg: `Chat message ${msg.id} failed to render`, log: "error",
             });
+            break;
           }
         }
 
         if (fragments.length) {
           log.prepend(...fragments);
-          this.#firstId = all[start]?.id ?? this.#firstId;
+          this.#firstId = firstRenderedId;
           this.#settleMergeClasses(log);
         }
 
@@ -402,29 +408,31 @@ export function feInstallChatLogPrune() {
         if (idx >= all.length) { this.#fwdPruned = false; return; }
 
         const fragments = [];
-        let lastIdx = idx - 1;
+        let lastRenderedId;
         let visible = 0;
         for (let i = idx; i < all.length && visible < count; i++) {
           const msg = all[i];
           if (!msg.visible || this.#renderedIds.has(msg.id)) continue;
-          this.#renderedIds.add(msg.id);
           if (!this.isPopout) msg.logged = true;
-          lastIdx = i;
-          visible++;
           try {
             const el = await this.constructor.renderMessage(msg);
             this.#stampMessageOrder(el, i);
             fragments.push(el);
+            lastRenderedId = msg.id;
+            this.#renderedIds.add(msg.id);
+            visible++;
           } catch (err) {
+            if (!this.isPopout) msg.logged = false;
             Hooks.onError("FeChatLogPrune.renderBatchForward", err, {
               msg: `Chat message ${msg.id} failed to render`, log: "error",
             });
+            break;
           }
         }
 
         if (fragments.length) {
           log.append(...fragments);
-          this.#newestId = all[lastIdx]?.id ?? this.#newestId;
+          this.#newestId = lastRenderedId;
           // Same reason as the backward path — this was missing here, and the
           // asymmetry was not deliberate (nothing in the file or docs/chat.md ever
           // justified it). Two distinct costs:

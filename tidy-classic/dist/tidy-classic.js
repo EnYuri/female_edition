@@ -113578,6 +113578,63 @@ class ClassicTabSelectionFormApplication extends SvelteApplicationMixin(foundry.
     applyThemeToApplication(this.element, this.actor);
   }
 }
+async function createMovedItems(items, createOne, deleteSource) {
+  const created = [];
+  for (const item of items) {
+    const { documents = [], transferred = false } = await createOne(item);
+    if (!documents.length && !transferred) continue;
+    created.push(...documents);
+    await deleteSource(item);
+  }
+  return created;
+}
+function watchAdvancementMove(manager, source2, {
+  hooks,
+  resolveSource,
+  onSourceChanged,
+  onError
+}) {
+  const uuid = source2.uuid;
+  const modifiedTime = source2._stats?.modifiedTime;
+  const hook = "dnd5e.advancementManagerComplete";
+  let active = true;
+  function cleanup() {
+    if (!active) return;
+    active = false;
+    hooks.off(hook, onComplete);
+    if (typeof manager.removeEventListener === "function") {
+      manager.removeEventListener("close", onClose);
+    } else {
+      hooks.off("closeAdvancementManager", onLegacyClose);
+    }
+  }
+  function onClose() {
+    cleanup();
+  }
+  function onLegacyClose(closedManager) {
+    if (closedManager === manager) cleanup();
+  }
+  function onComplete(completedManager) {
+    if (completedManager !== manager || !active) return;
+    cleanup();
+    void (async () => {
+      const current = await resolveSource(uuid);
+      if (!current) return;
+      if (modifiedTime != null && current._stats?.modifiedTime !== modifiedTime) {
+        onSourceChanged?.(current);
+        return;
+      }
+      await current.delete({ deleteContents: true });
+    })().catch((error2) => onError?.(error2));
+  }
+  hooks.on(hook, onComplete);
+  if (typeof manager.addEventListener === "function") {
+    manager.addEventListener("close", onClose, { once: true });
+  } else {
+    hooks.on("closeAdvancementManager", onLegacyClose);
+  }
+  return cleanup;
+}
 const cardWidthRem = 17.5;
 const cardHeightRem = 28.75;
 function getInfoCardDimensions() {
@@ -115140,6 +115197,25 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
       super._onDragStart(event2);
     }
     #dropBehavior = null;
+    #completedMoveWithoutCreation = false;
+    #pendingMoveSource = null;
+    _markCompletedMoveWithoutCreation() {
+      if (this.#dropBehavior === "move") {
+        this.#completedMoveWithoutCreation = true;
+      }
+    }
+    _watchAdvancementMove(manager) {
+      if (this.#dropBehavior !== "move" || !this.#pendingMoveSource) return;
+      return watchAdvancementMove(manager, this.#pendingMoveSource, {
+        hooks: Hooks,
+        resolveSource: fromUuid,
+        onSourceChanged: () => ui.notifications.warn(game.i18n.localize("TIDY5E.ClassicMoveSourceChanged")),
+        onError: (error2) => {
+          console.error("female_edition | Classic advancement move", error2);
+          ui.notifications.error(game.i18n.localize("TIDY5E.ClassicMoveDeleteFailed"));
+        }
+      });
+    }
     /** The tab which can house sheet pins from other tabs. `null` when the sheet has none. */
     aggregatePinTab = null;
     async _onDrop(event2) {
@@ -115259,14 +115335,40 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
       }
       const containers = new Set(items.filter((i) => i.type === "container").map((i) => i._id));
       items = items.filter((i) => !containers.has(i.system.container));
+      if (behavior === "move") {
+        return createMovedItems(
+          items,
+          async (item) => {
+            this.#completedMoveWithoutCreation = false;
+            this.#pendingMoveSource = item;
+            let toCreate2;
+            try {
+              toCreate2 = await dnd5e.documents.Item5e.createWithContents([item], {
+                transformFirst: (source2) => this._onDropSingleItem(source2.toObject(), event2)
+              });
+            } finally {
+              this.#pendingMoveSource = null;
+            }
+            if (!toCreate2?.length) {
+              return {
+                documents: [],
+                transferred: this.#completedMoveWithoutCreation
+              };
+            }
+            const documents = await dnd5e.documents.Item5e.createDocuments(toCreate2, { pack: this.actor.pack, parent: this.actor, keepId: true });
+            return { documents };
+          },
+          async (item) => {
+            const source2 = await fromUuid(item.uuid);
+            await source2?.delete({ deleteContents: true });
+          }
+        );
+      }
       const toCreate = await dnd5e.documents.Item5e.createWithContents(items, {
         transformFirst: (item) => this._onDropSingleItem(item.toObject(), event2)
       });
-      const created = await dnd5e.documents.Item5e.createDocuments(toCreate, { pack: this.actor.pack, parent: this.actor, keepId: true });
-      if (behavior === "move") {
-        items.forEach((i) => fromUuid(i.uuid).then((d) => d?.delete({ deleteContents: true })));
-      }
-      return created;
+      if (!toCreate?.length) return [];
+      return dnd5e.documents.Item5e.createDocuments(toCreate, { pack: this.actor.pack, parent: this.actor, keepId: true });
     }
     /**
      * Handles dropping of a single item onto this character sheet.
@@ -115296,6 +115398,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
       this._onDropResetData(itemData);
       const stacked = this._onDropStackConsumables(itemData, {});
       if (stacked) {
+        if (await stacked) this._markCompletedMoveWithoutCreation();
         return false;
       }
       if (this.actor.system.metadata?.supportsAdvancement && hasAdvancement(itemData.system.advancement) && !game.settings.get("dnd5e", "disableAdvancements")) {
@@ -115310,7 +115413,13 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
         }
         const manager = dnd5e.applications.advancement.AdvancementManager.forNewItem(this.actor, itemData);
         if (manager.steps.length) {
-          manager.render(true);
+          const unwatch = this._watchAdvancementMove(manager);
+          try {
+            await manager.render(true);
+          } catch (error2) {
+            unwatch?.();
+            throw error2;
+          }
           return false;
         }
       }
@@ -116294,7 +116403,7 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
         options2.flags = itemData.flags;
       }
       const scroll = await dnd5e.documents.Item5e.createScrollFromSpell(itemData, options2);
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
     if (itemData.type === "class") {
       const charLevel = this.actor.system.details.level;
@@ -116309,11 +116418,18 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
         if (!game.settings.get("dnd5e", "disableAdvancements")) {
           const manager = dnd5e.applications.advancement.AdvancementManager.forLevelChange(this.actor, cls.id, itemData.system.levels);
           if (manager.steps.length) {
-            manager.render(true);
+            const unwatch = this._watchAdvancementMove(manager);
+            try {
+              await manager.render(true);
+            } catch (error2) {
+              unwatch?.();
+              throw error2;
+            }
             return false;
           }
         }
-        await cls.update({ "system.levels": priorLevel + itemData.system.levels });
+        const updated = await cls.update({ "system.levels": priorLevel + itemData.system.levels });
+        if (updated) this._markCompletedMoveWithoutCreation();
         return false;
       }
     } else if (itemData.type === "subclass") {
@@ -116520,6 +116636,30 @@ function TypeNotFoundSheet($$anchor, $$props) {
   );
   append($$anchor, fragment);
   pop();
+}
+async function resolveDroppedActivity(transfer, Activity, fromUuid2) {
+  if (typeof Activity?.fromDropData === "function") {
+    return Activity.fromDropData(transfer);
+  }
+  return transfer?.uuid ? fromUuid2(transfer.uuid) : null;
+}
+function canCopyActivity(config, item) {
+  if (!config || config.configurable === false) return false;
+  const available = config.documentClass?.availableForItem;
+  return typeof available !== "function" || available.call(config.documentClass, item);
+}
+function matchesEffectOrigin(effect2, uuid) {
+  return typeof effect2.matchesOrigin === "function" ? effect2.matchesOrigin(uuid) : effect2.origin === uuid;
+}
+function prepareDroppedEnchantment(effect2, effectData, activityId) {
+  if (effectData.system?.origin && typeof effectData.system.origin === "object") {
+    effectData.system.origin.item ??= effect2.parent?.uuid;
+    if (effect2.system?.isOnActivity) effectData.transfer = true;
+    activityId ??= effect2.parent?.system?.activities?.getByType?.("enchant")?.find?.((activity) => activity.effects?.some((e) => e._id === effect2.id))?.id;
+  } else {
+    effectData.origin ??= effect2.parent?.uuid;
+  }
+  return { enchantmentProfile: effect2.id, activityId };
 }
 class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.SHEET_TYPE_ITEM, SvelteApplicationMixin(foundry.applications.sheets.ItemSheetV2)) {
   currentTabId = void 0;
@@ -117021,13 +117161,12 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
    */
   async _onDropActiveEffect(event2, data) {
     const effect2 = await ActiveEffect.implementation.fromDropData(data);
-    if (!this.item.isOwner || !effect2 || this.item.uuid === effect2.parent?.uuid || this.item.uuid === effect2.origin) return false;
+    if (!this.item.isOwner || !effect2 || this.item.uuid === effect2.parent?.uuid || matchesEffectOrigin(effect2, this.item.uuid)) return false;
     const effectData = effect2.toObject();
     const options2 = { parent: this.item, keepOrigin: false };
     if (effect2.type === "enchantment") {
-      effectData.origin ??= effect2.parent.uuid;
       options2.keepOrigin = true;
-      options2.dnd5e = { enchantmentProfile: effect2.id, activityId: data.activityId };
+      options2.dnd5e = prepareDroppedEnchantment(effect2, effectData, data.activityId);
     }
     return ActiveEffect.create(effectData, options2);
   }
@@ -117035,28 +117174,30 @@ class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(CONSTANTS.
   /**
    * Handle dropping an Activity onto the sheet.
    * @param {DragEvent} event       The drag event.
-   * @param {object} transfer       The dropped data.
-   * @param {object} transfer.data  The Activity data.
+   * @param {object} transfer       UUID or inline Activity drag data.
    * @protected
    */
-  async _onDropActivity(event2, { data, uuid }) {
-    const { _id: id, type: type2 } = data;
-    const droppedActivityDocument = await fromUuid(uuid);
-    if (this.item.uuid === droppedActivityDocument.item?.uuid) {
-      const source2 = this.item.system.activities.get(id);
+  async _onDropActivity(event2, transfer) {
+    const Activity = dnd5e.documents.activity?.UtilityActivity;
+    const activity = await resolveDroppedActivity(transfer, Activity, fromUuid);
+    if (!activity || !this.item.isOwner) return false;
+    const source2 = this.item.system.activities.get(activity.id);
+    if (activity.parent === source2?.parent) {
       const targetId = event2.target.closest(".activity[data-activity-id]")?.dataset.activityId;
       const target = this.item.system.activities.get(targetId);
       if (!target || target === source2) return;
-      const siblings = this.item.system.activities.filter((a) => a._id !== id);
+      const siblings = this.item.system.activities.filter((a) => a._id !== activity.id);
       const sortUpdates = foundry.utils.performIntegerSort(source2, { target, siblings });
       const updateData = Object.fromEntries(sortUpdates.map(({ target: target2, update: update2 }) => {
         return [target2._id, { sort: update2.sort }];
       }));
-      this.item.update({ "system.activities": updateData });
-    } else {
-      delete data._id;
-      this.item.createActivity(type2, data, { renderSheet: false });
+      return await this.item.update({ "system.activities": updateData });
     }
+    const config = CONFIG.DND5E.activityTypes[activity.type];
+    if (!canCopyActivity(config, this.item)) return false;
+    const copy = activity.toObject();
+    delete copy._id;
+    return await this.item.createActivity(activity.type, copy, { renderSheet: false });
   }
   /* -------------------------------------------- */
   /**
@@ -118957,7 +119098,7 @@ class Tidy5eNpcSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET_TYPE_
         options2.flags = itemData.flags;
       }
       const scroll = await dnd5e.documents.Item5e.createScrollFromSpell(itemData, options2);
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
     return await super._onDropSingleItem(itemData, event2);
   }
@@ -119966,7 +120107,7 @@ class Tidy5eVehicleSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET_T
         options2.flags = itemData.flags;
       }
       const scroll = await dnd5e.documents.Item5e.createScrollFromSpell(itemData, options2);
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
     return await super._onDropSingleItem.call(this, itemData, event2);
   }

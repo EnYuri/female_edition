@@ -1595,7 +1595,7 @@ export class Tidy5eCharacterSheet
         options
       );
 
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
 
     // Mirrors dnd5e's CharacterActorSheet#_onDropSingleItem: dropping a class the
@@ -1628,13 +1628,20 @@ export class Tidy5eCharacterSheet
               itemData.system.levels
             );
           if (manager.steps.length) {
-            manager.render(true);
+            const unwatch = this._watchAdvancementMove(manager);
+            try {
+              await manager.render(true);
+            } catch (error) {
+              unwatch?.();
+              throw error;
+            }
             return false;
           }
         }
-        await cls.update({
+        const updated = await cls.update({
           'system.levels': priorLevel + itemData.system.levels,
         });
+        if (updated) this._markCompletedMoveWithoutCreation();
         return false;
       }
     }

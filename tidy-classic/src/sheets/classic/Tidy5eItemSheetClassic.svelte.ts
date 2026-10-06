@@ -18,6 +18,14 @@ import { mount } from 'svelte';
 import { TidyHooks } from 'src/foundry/TidyHooks';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import {
+  canCopyActivity,
+  resolveDroppedActivity,
+} from 'src/foundry/activity-drop-compat';
+import {
+  matchesEffectOrigin,
+  prepareDroppedEnchantment,
+} from 'src/foundry/enchantment-drop-compat';
+import {
   localizedActivationLabel,
   localizedActivationTypeLabel,
 } from 'src/foundry/dnd5e-compat';
@@ -864,7 +872,7 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
       !this.item.isOwner ||
       !effect ||
       this.item.uuid === effect.parent?.uuid ||
-      this.item.uuid === effect.origin
+      matchesEffectOrigin(effect, this.item.uuid)
     )
       return false;
     const effectData = effect.toObject();
@@ -874,12 +882,12 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
     };
 
     if (effect.type === 'enchantment') {
-      effectData.origin ??= effect.parent.uuid;
       options.keepOrigin = true;
-      options.dnd5e = {
-        enchantmentProfile: effect.id,
-        activityId: data.activityId,
-      };
+      options.dnd5e = prepareDroppedEnchantment(
+        effect,
+        effectData,
+        data.activityId
+      );
     }
 
     return ActiveEffect.create(effectData, options);
@@ -890,28 +898,27 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
   /**
    * Handle dropping an Activity onto the sheet.
    * @param {DragEvent} event       The drag event.
-   * @param {object} transfer       The dropped data.
-   * @param {object} transfer.data  The Activity data.
+   * @param {object} transfer       UUID or inline Activity drag data.
    * @protected
    */
   async _onDropActivity(
     event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement },
-    { data, uuid }: any
+    transfer: any
   ) {
-    const { _id: id, type } = data;
-
-    const droppedActivityDocument = await fromUuid(uuid);
+    const Activity = dnd5e.documents.activity?.UtilityActivity;
+    const activity = await resolveDroppedActivity(transfer, Activity, fromUuid);
+    if (!activity || !this.item.isOwner) return false;
+    const source = this.item.system.activities.get(activity.id);
 
     // Reordering
-    if (this.item.uuid === droppedActivityDocument.item?.uuid) {
-      const source = this.item.system.activities.get(id);
+    if (activity.parent === source?.parent) {
       const targetId = event.target.closest<HTMLElement>(
         '.activity[data-activity-id]'
       )?.dataset.activityId;
       const target = this.item.system.activities.get(targetId);
       if (!target || target === source) return;
       const siblings = this.item.system.activities.filter(
-        (a: any) => a._id !== id
+        (a: any) => a._id !== activity.id
       );
       const sortUpdates = foundry.utils.performIntegerSort(
         source,
@@ -925,14 +932,17 @@ export class Tidy5eItemSheetClassic extends TidyExtensibleDocumentSheetMixin(
           return [target._id, { sort: update.sort }];
         })
       );
-      this.item.update({ 'system.activities': updateData });
+      return await this.item.update({ 'system.activities': updateData });
     }
 
     // Copying
-    else {
-      delete data._id;
-      this.item.createActivity(type, data, { renderSheet: false });
-    }
+    const config = CONFIG.DND5E.activityTypes[activity.type];
+    if (!canCopyActivity(config, this.item)) return false;
+    const copy = activity.toObject();
+    delete copy._id;
+    return await this.item.createActivity(activity.type, copy, {
+      renderSheet: false,
+    });
   }
 
   /* -------------------------------------------- */

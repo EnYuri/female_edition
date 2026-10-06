@@ -38,6 +38,8 @@ import { splitSemicolons } from 'src/utils/array';
 import { hasAdvancement, isNil } from 'src/utils/data';
 import { debug, error, warn } from 'src/utils/logging';
 import { firstOfSet } from 'src/utils/set';
+import { createMovedItems } from 'src/utils/move-items';
+import { watchAdvancementMove } from 'src/utils/advancement-move';
 import { mount } from 'svelte';
 import AttachedInfoCard from 'src/components/info-card/AttachedInfoCard.svelte';
 import SheetHeaderModeToggleV2 from './shared/SheetHeaderModeToggleV2.svelte';
@@ -935,6 +937,31 @@ export function Tidy5eActorSheetClassicV2Base<
     }
 
     #dropBehavior: DropEffectValue | null = null;
+    #completedMoveWithoutCreation = false;
+    #pendingMoveSource: Item5e | null = null;
+
+    _markCompletedMoveWithoutCreation() {
+      if (this.#dropBehavior === 'move') {
+        this.#completedMoveWithoutCreation = true;
+      }
+    }
+
+    _watchAdvancementMove(manager: any) {
+      if (this.#dropBehavior !== 'move' || !this.#pendingMoveSource) return;
+      return watchAdvancementMove(manager, this.#pendingMoveSource, {
+        hooks: Hooks,
+        resolveSource: fromUuid,
+        onSourceChanged: () => ui.notifications.warn(
+          game.i18n.localize('TIDY5E.ClassicMoveSourceChanged')
+        ),
+        onError: (error: unknown) => {
+          console.error('female_edition | Classic advancement move', error);
+          ui.notifications.error(
+            game.i18n.localize('TIDY5E.ClassicMoveDeleteFailed')
+          );
+        },
+      });
+    }
 
     /** The tab which can house sheet pins from other tabs. `null` when the sheet has none. */
     aggregatePinTab: AggregatePinTabInfo | null = null;
@@ -1167,27 +1194,60 @@ export function Tidy5eActorSheetClassicV2Base<
 
       items = items.filter((i) => !containers.has(i.system.container));
 
-      // Create the owned items & contents as normal
+      if (behavior === 'move') {
+        // A transform can decline one source (for example, advancement opens a
+        // manager instead). Keep that source even when other items were created.
+        return createMovedItems(
+          items,
+          async (item: Item5e) => {
+            this.#completedMoveWithoutCreation = false;
+            this.#pendingMoveSource = item;
+            let toCreate;
+            try {
+              toCreate = await dnd5e.documents.Item5e.createWithContents(
+                [item],
+                {
+                  transformFirst: (source: Item5e) =>
+                    this._onDropSingleItem(source.toObject(), event),
+                }
+              );
+            } finally {
+              this.#pendingMoveSource = null;
+            }
+            if (!toCreate?.length) {
+              return {
+                documents: [],
+                transferred: this.#completedMoveWithoutCreation,
+              };
+            }
+            const documents = await dnd5e.documents.Item5e.createDocuments(
+              toCreate,
+              {
+                pack: this.actor.pack,
+                parent: this.actor,
+                keepId: true,
+              }
+            );
+            return { documents };
+          },
+          async (item: Item5e) => {
+            const source = await fromUuid(item.uuid);
+            await source?.delete({ deleteContents: true });
+          }
+        );
+      }
+
+      // Copy retains the original batch creation behavior.
       const toCreate = await dnd5e.documents.Item5e.createWithContents(items, {
         transformFirst: (item: Item5e) =>
           this._onDropSingleItem(item.toObject(), event),
       });
-
-      const created = await dnd5e.documents.Item5e.createDocuments(toCreate, {
+      if (!toCreate?.length) return [];
+      return dnd5e.documents.Item5e.createDocuments(toCreate, {
         pack: this.actor.pack,
         parent: this.actor,
         keepId: true,
       });
-
-      if (behavior === 'move') {
-        items.forEach((i) =>
-          fromUuid(i.uuid).then((d: Item5e) =>
-            d?.delete({ deleteContents: true })
-          )
-        );
-      }
-
-      return created;
     }
 
     /**
@@ -1249,6 +1309,7 @@ export function Tidy5eActorSheetClassicV2Base<
       const stacked = this._onDropStackConsumables(itemData, {});
 
       if (stacked) {
+        if (await stacked) this._markCompletedMoveWithoutCreation();
         return false;
       }
 
@@ -1285,7 +1346,13 @@ export function Tidy5eActorSheetClassicV2Base<
           );
 
         if (manager.steps.length) {
-          manager.render(true);
+          const unwatch = this._watchAdvancementMove(manager);
+          try {
+            await manager.render(true);
+          } catch (error) {
+            unwatch?.();
+            throw error;
+          }
           return false;
         }
       }

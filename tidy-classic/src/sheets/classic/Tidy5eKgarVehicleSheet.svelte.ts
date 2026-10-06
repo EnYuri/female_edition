@@ -548,7 +548,7 @@ export class Tidy5eVehicleSheet
         options
       );
 
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
 
     return await super._onDropSingleItem.call(this, itemData, event);

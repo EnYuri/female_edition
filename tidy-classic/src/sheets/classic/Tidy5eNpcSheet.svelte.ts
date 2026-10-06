@@ -1208,7 +1208,7 @@ export class Tidy5eNpcSheet
         options
       );
 
-      return scroll.toObject();
+      return scroll?.toObject?.() ?? false;
     }
 
     return await super._onDropSingleItem(itemData, event);

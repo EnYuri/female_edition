@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 
 const PREVIEW_JS = readFileSync(new URL("../scripts/fe-filepicker-preview.js", import.meta.url), "utf8");
 
@@ -24,6 +25,31 @@ test("FilePicker captures image paste and drop without swallowing other transfer
   assert.match(PREVIEW_JS, /const files = _transferImageFiles\(event\.clipboardData, activeApp\);/);
   assert.match(PREVIEW_JS, /if \(!files\.length && !urls\.length && !_hasImageTransfer/);
   assert.match(PREVIEW_JS, /_stopExternalTransfer\(event\);/);
+});
+
+test("external files remain droppable when dragover hides their MIME and File objects", () => {
+  const start = PREVIEW_JS.indexOf("function _bindExternalImages(");
+  const end = PREVIEW_JS.indexOf("// ─── Preview rendering", start);
+  assert.ok(start >= 0 && end > start);
+  const handlers = new Map();
+  const classes = new Set();
+  const aside = { classList: {
+    add: name => classes.add(name),
+    remove: name => classes.delete(name),
+  } };
+  const el = { addEventListener: (name, handler) => handlers.set(name, handler) };
+  runInNewContext(`${PREVIEW_JS.slice(start, end)}; _bindExternalImages(aside, el, app);`, {
+    aside, el, app: {},
+    _hasImageTransfer: () => false,
+  });
+
+  let prevented = false;
+  handlers.get("dragover")({
+    dataTransfer: { types: ["Files"], items: [{ kind: "file", type: "" }] },
+    preventDefault: () => { prevented = true; },
+  });
+  assert.equal(prevented, true);
+  assert.equal(classes.has("fe-fp-dragover"), true);
 });
 
 test("FilePicker recovers clipboard images which are exposed as blobs or HTML URLs", () => {

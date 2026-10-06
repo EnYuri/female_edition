@@ -344,7 +344,10 @@ function _bindExternalImages(aside, el, app) {
 
   el.addEventListener("dragover", event => {
     const types = Array.from(event.dataTransfer?.types || []);
-    if (!_hasImageTransfer(event.dataTransfer, app) && !types.includes("text/html") && !types.includes("text/uri-list")) return;
+    // During dragover browsers may expose only the "Files" type, with no MIME
+    // or File object until drop. Accept the drag now; validate images on drop.
+    if (!_hasImageTransfer(event.dataTransfer, app) && !types.includes("Files")
+      && !types.includes("text/html") && !types.includes("text/uri-list")) return;
     event.preventDefault();
     aside.classList.add("fe-fp-dragover");
   }, true);
