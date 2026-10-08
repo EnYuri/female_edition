@@ -211,12 +211,13 @@ export async function ciEnsureUploadDirectory(path) {
   return target;
 }
 
-export async function ciUploadImageDirect(file, uploadDirectory) {
+export async function ciUploadImageDirect(file, uploadDirectory, { source = "data", bucket, ensureDirectory = true } = {}) {
   if (!ciResolveImageExtension(file?.name, file?.type)) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect"));
   const Picker = ciGetFilePicker();
   if (!Picker) throw new Error("FilePicker API unavailable");
 
-  const target = await ciEnsureUploadDirectory(uploadDirectory);
+  // A browsed picker target already exists and must retain its exact spelling.
+  const target = ensureDirectory ? await ciEnsureUploadDirectory(uploadDirectory) : uploadDirectory;
   const safeFile = new File([file], ciBuildUploadFileName(file.name, file.type), {
     type: file.type || "",
     lastModified: Number(file.lastModified) || Date.now(),
@@ -227,7 +228,7 @@ export async function ciUploadImageDirect(file, uploadDirectory) {
       ? Picker.implementation.upload.bind(Picker.implementation)
       : null);
   if (!upload) throw new Error("FilePicker upload API unavailable");
-  const result = await upload("data", target, safeFile, {}, { notify: false });
+  const result = await upload(source, target, safeFile, bucket ? { bucket } : {}, { notify: false });
   if (!result?.path) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect2"));
   return String(result.path);
 }

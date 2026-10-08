@@ -48,8 +48,8 @@ Female-cupwhi는 Foundry Virtual Tabletop v13·v14용 모듈입니다. 채팅, �
 
 ### 이미지, 토큰, 스크린 패널
 
-- **이미지 호버:** 이미지 탭에서 켜면 토큰에 마우스를 올렸을 때 캐릭터 아트를 크게 표시합니다. 표시 위치·크기·지연 시간, 사용할 이미지와 최소 권한을 설정할 수 있습니다.
-- **파일 선택기:** 인터페이스 탭의 확장을 켜면 선택한 파일의 미리보기와 이름·날짜·크기 정렬을 사용할 수 있습니다. 업로드 권한이 있는 사용자가 이미지 파일을 파일 선택기에 드롭하거나 붙여넣으면, **현재 열어 둔 폴더와 관계없이** 인터페이스 탭의 **파일 픽커 외부 이미지 업로드 경로**에 저장하고 업로드한 이미지를 선택합니다. 기본 경로는 `uploaded-filepicker-images`입니다. 채팅 이미지 업로드 경로와는 별개입니다.
+- **이미지 호버:** 이미지 탭에서 켜면 토큰에 마우스를 올렸을 때 캐릭터 아트를 크게 표시합니다(x키를 누르고 있는 동안). 표시 위치·크기·지연 시간, 사용할 이미지와 최소 권한을 설정할 수 있습니다.
+- **파일 선택기:** 인터페이스 탭의 확장을 켜면 선택한 파일의 미리보기와 이름·날짜·크기 정렬을 사용할 수 있습니다. 업로드 권한이 있는 사용자가 이미지 파일을 드롭하거나 붙여넣으면, **파일 픽커: 현재 폴더에 이미지 업로드** 설정(기본 ON)에 따라 **현재 열어 둔 폴더**에 저장하고 업로드한 이미지를 선택합니다. 업로드 불가능한 폴더에서는 오류를 표시합니다. GM이 이 설정을 OFF로 바꾸면 기존처럼 **파일 픽커 외부 이미지 업로드 경로**(기본 `uploaded-filepicker-images`)에 모아 저장합니다. 채팅 이미지 업로드 경로와는 별개입니다.
 - **토큰 설정 미리보기:** 인터페이스 탭에서 켜면 프로토타입 토큰 설정 창에서 이미지·크기·앵커를 격자 위에 미리 보여 줍니다. 같은 탭에서 나머지 토큰 설정 탭의 2열 배치도 선택할 수 있습니다.
 - **토큰 표시:** 토큰·패널 탭에서 선택·호버·타겟 글로우, 타겟 조준선, 액터 이름의 토큰 동기화 등을 설정합니다. 배치 토큰 이름까지 동기화하는 옵션을 켜면 다음 액터 개명 시 개별 토큰의 별도 이름도 바뀔 수 있습니다.
 - **스크린 패널:** 액터 디렉터리에서 새 액터의 유형을 **스크린 패널**로 만들고, 패널 시트에서 **면 추가**를 눌러 각 면의 이미지를 지정합니다. 시트의 **현재 씬에 올리기**, 액터 디렉터리 메뉴, 또는 캔버스로 드래그하여 배치합니다. 캔버스에서 우클릭하면 면 전환·표시/숨김·위치 고정 등을 조작할 수 있습니다. 시트에서 더블클릭 면 전환을 켰다면 더블클릭으로 다음 면을 보여 줍니다. 각 면에는 연결 액터의 값, 고정 텍스트, 값 바를 오버레이로 얹을 수 있습니다. GM은 우클릭 메뉴에서 플레이어에게 조작권을 줄 수 있습니다. **토큰화**를 켜면 타일 대신 토큰으로 배치되며, 이미 배치한 패널도 전환됩니다. 토큰화된 패널은 면마다 토큰 설정을 따로 지정할 수 있습니다.
@@ -91,3 +91,145 @@ consolidated in [`font/LICENSES.txt`](font/LICENSES.txt).
 ## Licenses
 
 The bundled Tidy 5e Sheet-Classic layout is maintained by **EnYuri** as part of female_edition. It is a fork of the MIT-licensed Tidy 5e Sheets v12.5.5, originally created by **kgar**. The upstream source is available at [kgar/foundry-vtt-tidy-5e-sheets](https://github.com/kgar/foundry-vtt-tidy-5e-sheets). Report issues with this fork at [female_edition/issues](https://github.com/EnYuri/female_edition/issues).
+
+## 日本語 — 使用ガイド
+
+### インストールと初期設定
+
+Female-cupwhiはFoundry Virtual Tabletop v13・v14向けのモジュールです。チャット、画面表示、戦闘、画像、音楽の機能を一つの設定画面から調整できます。複数のゲームシステムに対応していますが、D&D 5eやDX3rd専用の機能は対象システムでのみ動作します。
+
+1. Foundryのアドオンモジュールのインストール画面で、[最新リリースのマニフェストURL](https://github.com/EnYuri/female_edition/releases/latest/download/module.json)を指定してインストールします。手動の場合は、このリポジトリを`Data/modules/`に配置します。
+2. ワールドのモジュール管理で**Female-cupwhi**を有効にして、ワールドに接続します。
+3. **ゲーム設定 → モジュール設定 → Female-cupwhiの統合設定パネル**を開き、設定を変更して保存します。一般、チャット機能・外観・結合、ポートレート、アーカイブ、インターフェース、画像、音楽、コンバットトラッカー、ステージチャット、トークン・パネルのタブがあります。
+
+一部の設定は保存後に再読み込みが必要です。インストールや更新の直後は、ワールドを一度終了して再度開き、新しいマニフェストとスクリプトを読み込んでください。
+
+### フォントと画面テーマ
+
+**一般 → フォント**でカスタムフォントを有効にすると、同梱フォントを選択できます。PCにインストールされたフォントやモジュールの`font/`フォルダに追加したフォントを使う場合は、ユーザー（ローカル）フォントを有効にして、一覧から選ぶかフォント名を入力します。システムフォントの読み込み時には、ブラウザがローカルフォントへのアクセス許可を求める場合があります。トークン名、カーソル、描画、マップノートへのフォント適用も個別に設定できます。
+
+**一般 → レトロテーマ**はウィンドウとUIを角張ったピクセル風の外観に変更します。フォントとテーマはそれぞれ独立して切り替えられます。
+
+### チャット
+
+- **Markdownと編集:** チャット機能タブで有効にします。`**太字**`などの書式を使用できます。編集権限のあるメッセージの鉛筆アイコンやメニューから編集画面を開きます。Markdown原文とHTML原文を切り替えられ、`Enter`で保存、`Shift+Enter`で改行、`Esc`でキャンセルします。
+- **連続メッセージの結合:** 同じ話者の連続メッセージをまとめて表示します。トークン・アクター・プレイヤーのどれを基準にするか、ダイスやチャットカードを含めるか、名前とポートレートをどう表示するかを設定できます。
+- **ポートレートと外観:** ポートレートタブでサイズ・形状・表示対象を、チャット外観タブで背景テクスチャ、ユーザーカラー、文字サイズ、間隔などを調整します。
+- **画像の送信:** チャット入力欄の画像アップロードボタンを使うか、画像を入力欄に貼り付け・ドロップします。ボタンが見えない場合はチャットコントロールのメニューを確認してください。サーバー上の画像は`!ci|画像/パス.webp!`の形式でも挿入できます。チャット内の画像をクリックすると拡大表示します。直接アップロードする権限がないプレイヤーはオンラインGM経由でアップロードし、失敗時には画像をメッセージに直接埋め込む方式が使われる場合があります。
+- **入力中表示とチャット整理:** チャット機能タブで設定します。DOM整理は画面上に保持するメッセージ数を制限する機能で、ワールドに保存された古いメッセージを削除するものではありません。
+
+### チャットアーカイブ
+
+1. チャットコントロールのメニューからチャットログのPDF/HTMLエクスポートを選びます。
+2. 全ログまたはメッセージ範囲を指定します。最も古いメッセージが1番です。
+3. ブラウザでは開いたアーカイブからHTML保存または印刷/PDFを選びます。FoundryデスクトップアプリではHTMLを保存し、ChromeまたはEdgeで開いてPDFに印刷してください。
+
+アーカイブタブでは画像・フォントの埋め込み、PDF用の画像品質、ささやきの除外などを設定できます。GMがささやきの除外を無効にすると、GMに見える非公開会話も保存される場合があるため、出力前に確認してください。
+
+### ステージチャットとナレーター
+
+**ステージチャット:** アクターシートのヘッダーやアクターディレクトリのメニューからキャラクターをステージに追加します。チャットのステージ選択メニューで話者を選び、通常どおり送信するとポートレートと台詞ウィンドウに表示されます。表情の選択、過去の台詞の呼び出し、台詞ウィンドウの閉じるボタンを利用できます。アクターのステージ設定で表示名、基本ポートレート、表情ごとの画像を指定します。
+
+**ナレーター:** `/narrate 本文`はシネマティックなナレーションとチャットメッセージを表示し、設定変更権限が必要です。`/describe 本文`は描写、`/note 本文`はGMへの通知を送ります。`/as 名前`は以後の通常チャットの別名を指定し、`/as`だけで解除します。コマンド名は英語のままで、各コマンドの最低ユーザーロールはGMがステージチャットタブで設定します。ステージ話者を選択している間は、通常の別名よりステージ話者が優先されます。
+
+### 画像、トークン、スクリーンパネル
+
+- **画像ホバー:** 画像タブで有効にすると、`X`キーを押しながらトークンにマウスを重ねたときにキャラクター画像を拡大表示します。位置、サイズ、遅延、使用画像、最低権限を設定できます。
+- **ファイルピッカー:** インターフェースタブの拡張を有効にすると、プレビューと名前・日付・サイズの並べ替えが使えます。**現在のフォルダに画像をアップロード**は既定で**ON**です。アップロード権限のあるユーザーが画像を貼り付け・ドロップすると、現在開いているフォルダに保存して画像を選択します。アップロードできないフォルダではエラーを表示します。GMがこの設定を**OFF**にすると、指定の外部画像アップロード先（既定`uploaded-filepicker-images`）にまとめて保存します。チャット画像の保存先とは別です。
+- **トークン設定プレビュー:** インターフェースタブで有効にすると、プロトタイプトークン設定で画像・サイズ・アンカーをグリッド上にプレビューできます。ほかのトークン設定タブを2列にするオプションもあります。
+- **トークン表示:** トークン・パネルタブで選択・ホバー・ターゲットのグロー、照準線、アクター名との同期を設定します。配置済みトークン名の同期も有効にすると、次回のアクター名変更時に個別のトークン名も変更される場合があります。
+- **スクリーンパネル:** アクターディレクトリでスクリーンパネル型のアクターを作成し、シートに面を追加して画像を指定します。シート、ディレクトリのメニュー、またはキャンバスへのドラッグで配置できます。右クリックで面の切り替え、表示・非表示、位置固定などを操作します。シートで有効にすればダブルクリックでも次の面に切り替わります。各面にはリンクしたアクターの値、固定テキスト、値バーを重ねられます。GMは右クリックメニューからプレイヤーに操作権限を渡せます。トークン化を有効にするとタイルではなくトークンとして配置され、配置済みパネルも変換されます。トークン化したパネルでは面ごとにトークン設定を指定できます。
+- **シーンツールと設定:** インターフェースタブで左上のレイヤー・ツールバーを折りたためます。選択中のボタンをクリックして展開・折りたたみを切り替えます。シーン設定のタブを1行に表示するオプションもあります。
+- **属性パスのヘルパー:** シートやチャットの値にマウスを重ねると、`system.attributes.hp.value`などのデータパスを表示します。値そのものは表示しません。
+- **タイルアニメーション:** トークン・パネルタブで、タイルに使うGIF・WebP・APNGのフレーム再生を切り替えられます。
+
+### 戦闘とシステム固有の機能
+
+- **コンバットトラッカー:** 戦闘中は画面上部に戦闘参加者のポートレートとターン操作を表示します。クリックでトークンへ移動・選択し、ダブルクリックでアクターシートを開きます。GMは右クリックから非表示、死亡状態、HP、イニシアチブ、順番などを管理できます。数値の非公開・公開はアクターのステータスUIと共通です。専用タブでサイズ、配置、HP表示、動的ポートレートを設定します。
+- **ターン通知:** コンバットトラッカーとは別の設定で、ターン変更時に現在の参加者のポートレートを大きなバナーで表示します。次の参加者を表示するかも指定できます。
+- **DX3rd:** アクターシートのヘッダーやトークンメニューからステータスに追加すると、HP・リソースのカードを表示します。インターフェースタブで表示を切り替えられ、戦闘中は設定に応じて上部トラッカーに表示を譲ります。
+- **D&D 5e:** カスタム状態・ダメージタイプ、アイテムシートの表示オプション、同梱の**Tidy 5e Sheet-Classic**を利用できます。Classicはアクター・アイテムのシート設定で選択します。カスタム状態・ダメージタイプはGMが必要なものだけ有効にし、変更後にワールドを再読み込みしてください。
+- **その他のシステム:** 共通のチャット、フォント、レトロテーマはシステムを問わず利用できます。Dungeon WorldやLANCERなどには専用の外観調整があります。
+
+### 音楽
+
+GMが音楽タブで機能を有効にしてワールドを再読み込みすると、プレイリストサイドバーのヘッダーにある音符ボタンから**Emanim Music**を開けます。ファイルを選択またはドロップすると共有プレイリストに追加されます。全プレイヤーが再生・停止と選択曲のみの再生を利用でき、削除はGMのみ可能です。サイドバーのトラックスライダーで再生位置を変更し、音量は別のボタンで調整します。直接アップロード権限のないプレイヤーにはオンラインGMが必要です。ファイルごとの上限と保存先はGMが音楽タブで設定します。
+
+### GM設定と個人設定
+
+**GM設定の強制**が有効な間は、チャット外観、ステージ、画像ホバー、コンバットトラッカーなど、ほとんどのモジュール設定がGMの値に統一されます。フォントの使用・ローカルフォント、チャットアーカイブ、シーンツールバーの折りたたみは個人設定のままです。強制を解除すると以前の個人設定が復元されます。別項目のFoundry本体のクライアント設定の強制は、言語・性能・アクセシビリティにも影響するため、適用範囲を確認してください。
+
+GMがPCトークンを選択しても自分の名前で発言する設定を有効にすると、通常チャットはキャラクター名ではなくGM名で表示されます。システムが生成するダイスメッセージはアクターの話者情報を維持します。
+
+他のモジュールと機能が重複する場合は、**一般 → 競合モジュールガード**を確認してください。重複機能の自動引き継ぎや警告を設定できます。新バージョンの通知はGMに表示されますが、更新操作はFoundryのアドオンモジュール管理画面で行います。
+
+## English — User Guide
+
+### Installation and First Setup
+
+Female-cupwhi is a module for Foundry Virtual Tabletop v13 and v14. It brings chat, display, combat, image, and music options into one settings panel. It supports multiple game systems; system-specific features for D&D 5e, DX3rd, and others only operate in their respective systems.
+
+1. Install it through Foundry's **Install Module** dialog using the [latest release manifest URL](https://github.com/EnYuri/female_edition/releases/latest/download/module.json). For manual installation, place this repository under `Data/modules/`.
+2. Enable **Female-cupwhi** in your world's **Manage Modules** dialog and enter the world.
+3. Open **Game Settings → Module Settings → Female-cupwhi's unified settings panel**, adjust the options, and save. Tabs cover general settings, chat features/appearance/merging, portraits, archives, interface, images, music, combat tracker, stage chat, and tokens/panels.
+
+Some settings require a refresh or reconnect after saving. After installing or updating the module, close and reopen the world to load the new manifest and scripts.
+
+### Fonts and Display Theme
+
+Enable custom fonts under **General → Fonts** to choose a bundled font. To use a font installed on your computer or added to the module's `font/` directory, enable user/local fonts and select a font or enter its family name. Loading system fonts may request browser permission to access local fonts. Font application to token names, cursors, drawings, and map notes can also be configured separately.
+
+**General → Retro Theme** gives windows and UI a square, pixel-style appearance. Fonts and the theme can be enabled independently.
+
+### Chat
+
+- **Markdown and editing:** Enable these in the chat features tab. Use syntax such as `**bold**` for formatting. Open the editor through the pencil icon or menu on a message you can edit. Switch between Markdown and HTML source; `Enter` saves, `Shift+Enter` inserts a line break, and `Esc` cancels.
+- **Consecutive message merging:** Group consecutive messages from the same speaker. Choose token, actor, or player as the grouping basis, whether to include rolls and chat cards, and how names and portraits appear.
+- **Portraits and appearance:** Configure portrait size, shape, and eligible messages in the portraits tab. Adjust background textures, user colors, text size, spacing, and more in the chat appearance tab.
+- **Sending images:** Use the chat input's upload button or paste/drop an image into the input. If the button is not visible, check the chat controls menu. Images already on the server can also be inserted with `!ci|image/path.webp!`. Click a chat image to enlarge it. Players without direct upload permission upload through an online GM; if that fails, an image may instead be embedded directly in the message.
+- **Typing notifications and chat cleanup:** Configure these in the chat features tab. DOM cleanup limits how many messages remain rendered to reduce the cost of long histories; it does not delete older messages from world data.
+
+### Saving Chat Archives
+
+1. Choose the PDF/HTML chat export action from the chat controls menu.
+2. Select the entire log or a message range. Message 1 is the oldest message.
+3. In a web browser, choose HTML save or Print/PDF in the archive window. In the Foundry desktop app, save the HTML archive, open it in Chrome or Edge, and print it to PDF.
+
+The archive tab controls embedded images/fonts, PDF image quality, whisper exclusion, and other options. If a GM disables whisper exclusion, private conversations visible to that GM may be included. Check this before saving or sharing an archive.
+
+### Stage Chat and Narrator
+
+**Stage chat:** Add a character through the actor sheet header or actor directory menu. Select a speaker from the chat's stage menu and send a message normally to display it with a portrait and dialogue box. Controls let you choose expressions, recall earlier dialogue, and close the dialogue box. Configure display names, default portraits, and expression images in the actor's stage settings.
+
+**Narrator:** `/narrate text` displays cinematic narration and a chat message; it requires permission to modify settings. `/describe text` sends a descriptive message, and `/note text` sends a notification to the GM. `/as name` sets an alias for subsequent ordinary chat; `/as` alone clears it. Command names remain English, and the GM configures their minimum user roles in the stage chat tab. A selected stage speaker takes precedence over an ordinary chat alias.
+
+### Images, Tokens, and Screen Panels
+
+- **Image hover:** Enable this in the images tab to enlarge character art while hovering over a token and holding `X`. Configure position, size, delay, image source, and minimum permission.
+- **File picker:** Enable the interface enhancement for previews and sorting by name, date, or size. **Upload images to current folder** is **ON by default**: users with upload permission can paste/drop images into the picker to save them in the currently browsed folder and select the uploaded image. Folders that do not allow uploads report an error. If the GM switches this setting **OFF**, images are collected in the configured external-image upload directory, defaulting to `uploaded-filepicker-images`. This directory is separate from chat image uploads.
+- **Token configuration preview:** Enable this in the interface tab to preview the prototype token's image, size, and anchor on a grid. A two-column layout for other token configuration tabs is also available.
+- **Token display:** Configure selection/hover/target glow, targeting lines, and actor-name synchronization in the tokens/panels tab. Enabling synchronization for placed token names may replace individual token names when the actor is next renamed.
+- **Screen panels:** Create an actor of the screen panel type, add faces in its sheet, and assign their images. Place it through the sheet, the actor directory menu, or by dragging it onto the canvas. Right-click to change faces, show/hide the panel, or lock its position. Enable double-click face switching in the sheet if desired. Each face can display linked actor values, fixed text, and value bars as overlays. The GM can grant players control through the context menu. Tokenization places the panel as a token instead of a tile and also converts existing placements. Tokenized panels support separate token settings for each face.
+- **Scene tools and configuration:** Collapse the upper-left layer/tool controls from the interface tab, then click the selected control to expand or collapse them. An option also keeps scene configuration tabs on one line.
+- **Attribute path helper:** Hover over values in sheets or chat to see data paths such as `system.attributes.hp.value`. The tooltip shows the path, not the value itself.
+- **Animated tiles:** Toggle frame playback for GIF, WebP, and APNG tiles in the tokens/panels tab.
+
+### Combat and System-Specific Features
+
+- **Combat tracker:** During combat, a strip at the top of the screen shows combatant portraits and turn controls. Click a portrait to navigate to/select its token; double-click to open its actor sheet. GMs can right-click to manage visibility, defeated status, HP, initiative, and order. Hiding/revealing resource numbers shares state with the actor's status UI. Configure portrait size, layout, HP display, and dynamic portraits in the combat tracker tab.
+- **Turn notice:** A separate combat tracker setting displays the current combatant's portrait in a large banner when the turn changes. You can also choose whether to show the next combatant.
+- **DX3rd:** Add an actor to the status display through its sheet header or token menu to show an HP/resource card. Toggle the display in the interface tab; during combat it can yield to the top tracker according to your settings.
+- **D&D 5e:** Includes custom conditions/damage types, item sheet display options, and the bundled **Tidy 5e Sheet-Classic** layout. Select Classic in the actor/item sheet configuration. GMs should only enable custom conditions and damage types they need, then reload the world after changing them.
+- **Other systems:** Shared chat, font, and retro theme features work across systems. Dungeon World, LANCER, and others also receive system-specific appearance adjustments.
+
+### Music
+
+After the GM enables music and reloads the world, open **Emanim Music** through the musical-note button in the playlist sidebar header. Selecting or dropping files adds tracks to a shared playlist. All players can play, stop, or play only the selected track; only GMs can delete tracks. Use the sidebar's track slider to seek and the separate volume control to adjust volume. Players without direct upload permission need an online GM. The GM sets the per-file upload limit and destination directory in the music tab.
+
+### GM and Personal Settings
+
+When **GM setting enforcement** is enabled, most module settings—including chat appearance, stage chat, image hover, and combat tracker—follow the GM's values. Font enablement/local fonts, chat archive preferences, and scene toolbar collapsing remain personal. Disabling enforcement restores players' previous preferences. The separate option for enforcing Foundry's own client settings also affects language, performance, and accessibility; review its scope before enabling it.
+
+Enable the GM speak-as-self option to keep ordinary chat under the GM's name even while a player character's token is selected. System-generated roll messages retain their actor speaker information.
+
+If features overlap with another module, check **General → Conflict Module Guard**. It can automatically hand off overlapping features or warn about them. GMs receive notifications of new module versions; perform the actual update through Foundry's add-on module management screen.

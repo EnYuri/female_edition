@@ -4,8 +4,8 @@ import { feRegisterSetting } from "./fe-settings-data.js";
 // Adds a preview sidebar to the right of core's FilePicker.
 //
 // Previews either the file selected in the list (.picked) or a local image pasted/dropped
-// onto the FilePicker. External images are uploaded into the module-managed FilePicker
-// directory, then the picker changes to that directory and marks the upload as selected.
+// onto the FilePicker. External images go to the browsed folder by default, or the
+// module-managed directory when that setting is off, then become selected.
 //
 // Non-invasive by design: the renderFilePicker hook makes .window-content a grid and
 // appends ONE <aside>. Core's application parts (tabs/subheader/body/subfooter/footer) keep
@@ -37,6 +37,7 @@ let _globalPasteBound = false;
 function _enabled() { try { return !!game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_ENHANCEMENTS); } catch { return !!FE_DEFAULTS[S.CORE_UI_FILEPICKER_ENHANCEMENTS]; } }
 Hooks.once("init", () => {
   feRegisterSetting(S.CORE_UI_FILEPICKER_ENHANCEMENTS);
+  feRegisterSetting(S.CORE_UI_FILEPICKER_UPLOAD_CURRENT);
   feRegisterSetting(S.CORE_UI_FILEPICKER_UPLOAD_LOCATION, async value => {
       const cleaned = ciNormalizeUploadDirectory(value) || EXTERNAL_UPLOAD_DEFAULT;
       // World-setting callbacks run on every connected client. Only the active GM may
@@ -135,7 +136,7 @@ function _ensureSidebar(el, app) {
   return aside;
 }
 
-// ─── Paste / external drop: upload to the module folder and select ─────────
+// ─── Paste / external drop: upload and select ──────────────────────────────
 function _uploadDirectory() {
   try {
     return ciNormalizeUploadDirectory(game.settings.get(MODULE_ID, EXTERNAL_UPLOAD_SETTING))
@@ -143,6 +144,18 @@ function _uploadDirectory() {
   } catch {
     return EXTERNAL_UPLOAD_DEFAULT;
   }
+}
+
+function _uploadDestination(app) {
+  const useCurrent = game.settings.get(MODULE_ID, S.CORE_UI_FILEPICKER_UPLOAD_CURRENT);
+  if (!useCurrent) return { source: "data", directory: _uploadDirectory(), ensureDirectory: true };
+  if (!app.canUpload) throw new Error(feLocalize("FE.FilepickerPreview.uploadCurrentUnavailable"));
+  return {
+    source: app.activeSource,
+    directory: app.source.target,
+    bucket: app.source.bucket,
+    ensureDirectory: false,
+  };
 }
 
 function _pickerAcceptsImage(app, file) {
@@ -271,10 +284,11 @@ function _syncUploadedPick(app, path) {
   if (aside && picked) _previewPicked(aside, path, picked.dataset.name || path.split("/").pop());
 }
 
-async function _selectUploadedImage(app, path) {
+async function _selectUploadedImage(app, path, destination) {
   app.request = path;
-  if (app.sources?.data) app.activeSource = "data";
-  await app.browse(_uploadedDirectory(path));
+  app.activeSource = destination.source;
+  if (destination.bucket) app.source.bucket = destination.bucket;
+  await app.browse(destination.ensureDirectory ? _uploadedDirectory(path) : destination.directory);
   _syncUploadedPick(app, path);
   // ApplicationV2 may settle a part render after browse() has resolved. The
   // request value makes core select it too; this pass covers legacy/v13 DOM.
@@ -291,6 +305,8 @@ async function _uploadExternalImages(files, aside, app, { clipboardFallback = fa
   app._feFpExternalUploadBusy = true;
   aside.classList.add("fe-fp-uploading");
   try {
+    // Capture before clipboard/network awaits so navigation cannot redirect a batch.
+    const destination = _uploadDestination(app);
     let uploadFiles = files;
     if (!uploadFiles.length && clipboardFallback) uploadFiles = await _readClipboardApiImages(app);
     if (!uploadFiles.length && urls.length) uploadFiles = await _downloadImageUrls(urls, app);
@@ -300,10 +316,10 @@ async function _uploadExternalImages(files, aside, app, { clipboardFallback = fa
 
     _previewLocal(aside, uploadFiles[0]);
     let selectedPath = "";
-    const directory = _uploadDirectory();
-    for (const file of uploadFiles) selectedPath = await ciUploadImageDirect(file, directory);
+    for (const file of uploadFiles)
+      selectedPath = await ciUploadImageDirect(file, destination.directory, destination);
     if (!selectedPath) throw new Error(feLocalize("FE.ChatImageUpload.ciUploadImageDirect2"));
-    await _selectUploadedImage(app, selectedPath);
+    await _selectUploadedImage(app, selectedPath, destination);
     ui.notifications?.info?.(feLocalize("FE.FilepickerPreview._uploadExternalImages3"));
   } catch (err) {
     ui.notifications?.error(err, { console: true });

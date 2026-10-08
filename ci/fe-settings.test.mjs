@@ -29,7 +29,7 @@ test("settings entry and its transitive imports exist and have no circular depen
 });
 
 test("every setting key and menu reset value has a central registration definition", () => {
-  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 185);
+  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 186);
   assert.deepEqual(Object.keys(FE_DEFAULTS).sort(), Object.keys(FE_SETTING_DEFINITIONS).sort());
   for (const key of [...Object.values(S), ...Object.values(CP), ...FE_RELOAD_REQUIRED_KEYS]) {
     assert.ok(FE_SETTING_DEFINITIONS[key], key);
@@ -41,6 +41,11 @@ test("every setting key and menu reset value has a central registration definiti
   assert.equal(FE_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
   assert.equal(FE_MENU_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
   assert.equal(FE_SETTING_DEFINITIONS[S.CHAT_CARD_ICON_CROP].scope, "client");
+  assert.equal(FE_DEFAULTS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT], true);
+  assert.equal(FE_MENU_DEFAULTS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT], true);
+  assert.equal(FE_SETTING_DEFINITIONS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT].scope, "world");
+  assert.equal(FE_SETTING_DEFINITIONS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT].restricted, true);
+  assert.ok(!FE_RELOAD_REQUIRED_KEYS.includes(S.CORE_UI_FILEPICKER_UPLOAD_CURRENT));
   assert.ok(!constants.FE_GM_PRIORITY_EXCLUDED_KEYS.has(S.CHAT_CARD_ICON_CROP));
   for (const key of ["feGmPriorityOverrides", "feGmPriorityBackup", "feWorldSettings", "narratorState", "ceMusicAutoInitDone"]) {
     assert.equal(Object.hasOwn(FE_MENU_DEFAULTS, key), false, key);

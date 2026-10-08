@@ -202,6 +202,12 @@
 
     {{#if isGM}}
     <div class="form-group">
+      <label>{{localize "FE.SettingsData.ceCoreUiFilepickerUploadCurrent.name"}}</label>
+      <div class="form-fields"><input type="checkbox" name="ceCoreUiFilepickerUploadCurrent" data-dtype="Boolean" {{checked values.ceCoreUiFilepickerUploadCurrent}} /></div>
+      <p class="notes">{{localize "FE.SettingsData.ceCoreUiFilepickerUploadCurrent.hint"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsMenu.ceCoreUiFilepickerUploadLocation.Text"}}</label>
       <div class="form-fields"><input type="text" name="ceCoreUiFilepickerUploadLocation" value="{{values.ceCoreUiFilepickerUploadLocation}}" /></div>
       <p class="notes">{{{localize "FE.SettingsMenu.ceCoreUiFilepickerUploadLocation.Hint"}}}</p>

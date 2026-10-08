@@ -12,10 +12,49 @@ import {
   ciEnsureUploadDirectory,
   ciNormalizeUploadDirectory,
   ciResolveImageExtension,
+  ciUploadImageDirect,
 } from "../scripts/fe-chat-image-upload.js";
 
 test("chat-image upload messages are isolated on their own socket namespace", () => {
   for (const type of Object.values(CI_UPLOAD_MSG)) assert.match(type, /^chat-image:/);
+});
+
+test("direct uploads preserve browsed targets and S3 buckets while default uploads still prepare data folders", async () => {
+  const previousConfig = globalThis.CONFIG;
+  const calls = [], browses = [];
+  globalThis.CONFIG = { ux: { FilePicker: {
+    async browse(source, target) {
+      browses.push({ source, target });
+      return { target };
+    },
+    async createDirectory() { assert.fail("existing folder must not be created"); },
+    async upload(source, target, file, body, options) {
+      calls.push({ source, target, file, body, options });
+      return { path: `${target}/${file.name}` };
+    },
+  } } };
+  try {
+    const file = new File(["image"], "portrait.png", { type: "image/png" });
+    await ciUploadImageDirect(file, "worlds/test/My Images", { ensureDirectory: false });
+    await ciUploadImageDirect(file, "art/My Images", { source: "s3", bucket: "art-bucket", ensureDirectory: false });
+    assert.equal(browses.length, 0);
+    assert.equal(calls[0].target, "worlds/test/My Images");
+    assert.equal(calls[0].source, "data");
+    assert.equal(calls[1].source, "s3");
+    assert.equal(calls[1].target, "art/My Images");
+    assert.deepEqual(calls[1].body, { bucket: "art-bucket" });
+    await ciUploadImageDirect(file, "uploaded chat images");
+    assert.deepEqual(browses, [{ source: "data", target: "uploaded-chat-images" }]);
+    assert.equal(calls[2].source, "data");
+    assert.equal(calls[2].target, "uploaded-chat-images");
+    for (const call of calls) {
+      assert.match(call.file.name, /^portrait-[a-z0-9_-]+\.png$/i);
+      assert.equal(call.options.notify, false);
+    }
+  } finally {
+    if (previousConfig === undefined) delete globalThis.CONFIG;
+    else globalThis.CONFIG = previousConfig;
+  }
 });
 
 // The size ceiling is a world setting now. Every read of it is a size check on a
