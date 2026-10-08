@@ -323,6 +323,24 @@ function feCtSyncLayout(root) {
   root.style.setProperty("--fe-ct-right-clearance", `${clearance}px`);
 }
 
+function feCtRevealActiveCombatant(root) {
+  if (!root?.isConnected || root.classList.contains("fe-ct-collapsed")) return;
+  const strip = root.querySelector(".fe-ct-combatants");
+  const active = strip?.querySelector(".fe-ct-portrait.is-active");
+  if (!strip || !active || strip.clientWidth <= 0) return;
+
+  const stripRect = strip.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  const margin = 6;
+  let delta = 0;
+  if (activeRect.left < stripRect.left + margin) {
+    delta = activeRect.left - stripRect.left - margin;
+  } else if (activeRect.right > stripRect.right - margin) {
+    delta = activeRect.right - stripRect.right + margin;
+  }
+  if (delta) strip.scrollLeft += delta;
+}
+
 // One combatant's template context. Everything that used to be concatenated into an
 // HTML string is now plain data; templates/fe-combat-tracker.hbs owns the markup.
 function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = null) {
@@ -445,6 +463,7 @@ function feCtControlButtons(combat) {
 // The last markup handed to root.innerHTML. feCtRender compares against it and
 // leaves the DOM alone when nothing changed — see there.
 let _ctLastHtml = "";
+let _ctLastActiveKey = "";
 /**
  * Remove every trace of the tracker from the screen.
  *
@@ -471,6 +490,7 @@ function feCtTeardown() {
   feDbpReset();
   document.getElementById(TRACKER_DOM_ID)?.remove();
   _ctLastHtml = ""; // the root is gone; the next render must rebuild from scratch
+  _ctLastActiveKey = "";
 }
 
 // Interval between two neighbours' animations, squeezed so `count` of them finish
@@ -490,6 +510,7 @@ function feCtClearTracker(root) {
   root.classList.remove("fe-ct-active");
   root.innerHTML = "";
   _ctLastHtml = ""; // the DOM no longer matches the cached markup
+  _ctLastActiveKey = "";
 }
 
 function feCtCancelExit() {
@@ -598,6 +619,8 @@ function feCtRender() {
     (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
   );
   const activeId = combat.combatant?.id;
+  const activeKey = `${combat.id ?? ""}:${activeId ?? ""}`;
+  const activeChanged = activeKey !== _ctLastActiveKey;
   // Entrance animation timing. A combatant seen for the first time gets a start stamp
   // staggered behind the other newcomers in this same pass (so a whole encounter cascades
   // in), and every render passes the REMAINING delay: positive = not started yet,
@@ -695,8 +718,11 @@ function feCtRender() {
    * same string every time and the DOM is left completely untouched.
    */
   if (html !== _ctLastHtml) {
+    const previousScrollLeft = root.querySelector(".fe-ct-combatants")?.scrollLeft ?? 0;
     _ctLastHtml = html;
     root.innerHTML = html;
+    const strip = root.querySelector(".fe-ct-combatants");
+    if (strip) strip.scrollLeft = previousScrollLeft;
     // HQ downscale to the display size (size x size*aspect). These are display-only
     // images, so the src swap is safe; a cache hit applies synchronously with no
     // flicker. Only the rebuild can introduce new <img> elements, so this belongs
@@ -710,6 +736,12 @@ function feCtRender() {
   root.classList.add("fe-ct-active");
   root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   root.classList.toggle("fe-ct-paused", combat.active === false);
+  // A turn that advances while collapsed is still pending: expanding the tracker
+  // must reveal that combatant rather than consuming the change while the strip is hidden.
+  if (activeChanged && !_ctCollapsed) {
+    feCtRevealActiveCombatant(root);
+    _ctLastActiveKey = activeKey;
+  }
 
   // Every dial's position, written straight into the DOM — a dial this render just
   // built would otherwise paint one frame at offset 0. The bar style's caption is the

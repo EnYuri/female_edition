@@ -5,6 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -33,6 +34,59 @@ test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /box-sizing:\s*border-box/);
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /max-width:\s*100%/);
   assert.match(block("#fe-combat-tracker .fe-ct-combatants {"), /overflow-x:\s*auto/);
+});
+
+// A turn can advance to a portrait beyond the fixed-width strip. The reveal must be
+// immediate and must run only when the active combatant changes; otherwise any actor
+// update would yank a user who deliberately scrolled elsewhere. Rebuilding innerHTML
+// replaces the scroller itself, so its old position also has to be restored first.
+test("turn changes immediately reveal the active portrait without resetting manual scroll", () => {
+  assert.match(ENTRY, /const activeChanged = activeKey !== _ctLastActiveKey/);
+  assert.match(ENTRY, /if \(activeChanged && !_ctCollapsed\) \{\s*feCtRevealActiveCombatant\(root\);\s*_ctLastActiveKey = activeKey;/);
+  assert.match(ENTRY, /const previousScrollLeft = root\.querySelector\("\.fe-ct-combatants"\)\?\.scrollLeft \?\? 0/);
+  assert.match(ENTRY, /if \(strip\) strip\.scrollLeft = previousScrollLeft/);
+
+  const fn = ENTRY.slice(ENTRY.indexOf("function feCtRevealActiveCombatant("));
+  const body = fn.slice(0, fn.indexOf("\n}"));
+  assert.match(body, /\.fe-ct-portrait\.is-active/);
+  assert.match(body, /getBoundingClientRect\(\)/, "the active zoom must count toward visibility");
+  assert.match(body, /strip\.scrollLeft \+= delta/, "direct assignment keeps turn following immediate");
+  assert.ok(!/scrollIntoView|behavior:\s*["']smooth/.test(body), "turn following must not animate or move the page");
+});
+
+test("turn following only moves a clipped active card into view", () => {
+  const fn = ENTRY.slice(
+    ENTRY.indexOf("function feCtRevealActiveCombatant("),
+    ENTRY.indexOf("\n}\n", ENTRY.indexOf("function feCtRevealActiveCombatant(")) + 2
+  );
+  const reveal = runInNewContext(`${fn}\nfeCtRevealActiveCombatant`);
+  const viewport = { left: 100, right: 600 };
+  const card = { left: 750, right: 870 };
+  const strip = {
+    clientWidth: 500,
+    scrollLeft: 20,
+    getBoundingClientRect: () => viewport,
+    querySelector: () => ({ getBoundingClientRect: () => card }),
+  };
+  const root = {
+    isConnected: true,
+    classList: { contains: () => false },
+    querySelector: () => strip,
+  };
+
+  reveal(root);
+  assert.equal(strip.scrollLeft, 296, "a card beyond the right edge scrolls into view with margin");
+  card.left = 250;
+  card.right = 370;
+  reveal(root);
+  assert.equal(strip.scrollLeft, 296, "an already-visible card does not move the user's scroll");
+  card.left = -50;
+  card.right = 70;
+  reveal(root);
+  assert.equal(strip.scrollLeft, 140, "a card beyond the left edge scrolls back into view");
+  root.classList.contains = () => true;
+  reveal(root);
+  assert.equal(strip.scrollLeft, 140, "the hidden strip cannot consume a turn change");
 });
 
 // The entry is the only file that knows the renderer, and core's scheduler is what
