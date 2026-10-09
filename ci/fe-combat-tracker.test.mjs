@@ -54,7 +54,7 @@ test("turn changes immediately reveal the active portrait without resetting manu
   assert.ok(!/scrollIntoView|behavior:\s*["']smooth/.test(body), "turn following must not animate or move the page");
 });
 
-test("turn following only moves a clipped active card into view", () => {
+test("turn following reveals the next card without losing the active card", () => {
   const fn = ENTRY.slice(
     ENTRY.indexOf("function feCtRevealActiveCombatant("),
     ENTRY.indexOf("\n}\n", ENTRY.indexOf("function feCtRevealActiveCombatant(")) + 2
@@ -62,11 +62,16 @@ test("turn following only moves a clipped active card into view", () => {
   const reveal = runInNewContext(`${fn}\nfeCtRevealActiveCombatant`);
   const viewport = { left: 100, right: 600 };
   const card = { left: 750, right: 870 };
+  const next = { left: 876, right: 996 };
+  const active = {
+    getBoundingClientRect: () => card,
+    nextElementSibling: { getBoundingClientRect: () => next },
+  };
   const strip = {
     clientWidth: 500,
     scrollLeft: 20,
     getBoundingClientRect: () => viewport,
-    querySelector: () => ({ getBoundingClientRect: () => card }),
+    querySelector: () => active,
   };
   const root = {
     isConnected: true,
@@ -75,18 +80,32 @@ test("turn following only moves a clipped active card into view", () => {
   };
 
   reveal(root);
-  assert.equal(strip.scrollLeft, 296, "a card beyond the right edge scrolls into view with margin");
+  assert.equal(strip.scrollLeft, 422, "the next card beyond the right edge scrolls into view with margin");
   card.left = 250;
   card.right = 370;
+  next.left = 376;
+  next.right = 496;
   reveal(root);
-  assert.equal(strip.scrollLeft, 296, "an already-visible card does not move the user's scroll");
+  assert.equal(strip.scrollLeft, 422, "both visible cards leave the user's scroll alone");
+  next.left = 576;
+  next.right = 696;
+  reveal(root);
+  assert.equal(strip.scrollLeft, 524, "a visible active card reveals its clipped successor");
   card.left = -50;
   card.right = 70;
+  next.left = 76;
+  next.right = 196;
   reveal(root);
-  assert.equal(strip.scrollLeft, 140, "a card beyond the left edge scrolls back into view");
+  assert.equal(strip.scrollLeft, 368, "a card beyond the left edge scrolls back into view");
+  card.left = 450;
+  card.right = 570;
+  next.left = 900;
+  next.right = 1020;
+  reveal(root);
+  assert.equal(strip.scrollLeft, 368, "a distant successor cannot push the active card out");
   root.classList.contains = () => true;
   reveal(root);
-  assert.equal(strip.scrollLeft, 140, "the hidden strip cannot consume a turn change");
+  assert.equal(strip.scrollLeft, 368, "the hidden strip cannot consume a turn change");
 });
 
 // The entry is the only file that knows the renderer, and core's scheduler is what

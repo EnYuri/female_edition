@@ -331,12 +331,15 @@ function feCtRevealActiveCombatant(root) {
 
   const stripRect = strip.getBoundingClientRect();
   const activeRect = active.getBoundingClientRect();
+  const nextRect = active.nextElementSibling?.getBoundingClientRect();
   const margin = 6;
   let delta = 0;
   if (activeRect.left < stripRect.left + margin) {
     delta = activeRect.left - stripRect.left - margin;
-  } else if (activeRect.right > stripRect.right - margin) {
-    delta = activeRect.right - stripRect.right + margin;
+  } else {
+    const right = nextRect && nextRect.right - activeRect.left + 2 * margin <= strip.clientWidth
+      ? nextRect.right : activeRect.right;
+    if (right > stripRect.right - margin) delta = right - stripRect.right + margin;
   }
   if (delta) strip.scrollLeft += delta;
 }
