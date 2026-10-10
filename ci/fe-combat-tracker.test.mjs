@@ -108,6 +108,54 @@ test("turn following reveals the next card without losing the active card", () =
   assert.equal(strip.scrollLeft, 368, "the hidden strip cannot consume a turn change");
 });
 
+test("center-turn mode aligns the active card's center with the strip", () => {
+  const start = ENTRY.indexOf("function feCtRevealActiveCombatant(");
+  const fn = ENTRY.slice(start, ENTRY.indexOf("\n}\n", start) + 2);
+  const reveal = runInNewContext(`${fn}\nfeCtRevealActiveCombatant`);
+  const strip = {
+    clientWidth: 500,
+    scrollLeft: 0,
+    classList: { contains: (name) => name === "fe-ct-center-turn" },
+    getBoundingClientRect: () => ({ left: 100, right: 600 }),
+    querySelector: () => ({ getBoundingClientRect: () => ({ left: 200, right: 320 }) }),
+  };
+  const root = {
+    isConnected: true,
+    classList: { contains: () => false },
+    querySelector: () => strip,
+  };
+  reveal(root);
+  assert.equal(strip.scrollLeft, -90);
+});
+
+test("center-turn end spacers allow edge combatants to reach the midpoint", () => {
+  const start = ENTRY.indexOf("function feCtPrepareCentering(");
+  const fn = ENTRY.slice(start, ENTRY.indexOf("\n}\n", start) + 2);
+  const styles = new Map();
+  const classes = new Set();
+  const strip = {
+    clientWidth: 500,
+    classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) },
+    style: { setProperty: (key, value) => styles.set(key, value), removeProperty: (key) => styles.delete(key) },
+    querySelector: () => ({ offsetWidth: 120 }),
+  };
+  const root = {
+    querySelector: () => strip,
+    classList: { contains: () => false },
+  };
+  const prepare = runInNewContext(`${fn}\nfeCtPrepareCentering`, {
+    feCtSetting: () => true,
+    S: { COMBAT_TRACKER_CENTER_TURN: "center" },
+    getComputedStyle: () => ({ paddingLeft: "8px", columnGap: "6px" }),
+  });
+  prepare(root);
+  assert.equal(strip.style.width, "500px");
+  assert.equal(styles.get("--fe-ct-edge-space"), "176px");
+  assert.equal(8 + 176 + 6 + 120 / 2, 250);
+  assert.ok(classes.has("fe-ct-center-turn"));
+  assert.match(CSS, /\.fe-ct-combatants\.fe-ct-center-turn::before,[\s\S]*::after/);
+});
+
 // The entry is the only file that knows the renderer, and core's scheduler is what
 // the dbp module and every hook call. Lose the registration and the tracker renders
 // once (the direct feCtRender at install) and then never again — no error anywhere.

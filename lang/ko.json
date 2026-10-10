@@ -31,6 +31,8 @@
 	"FECT.Settings.Alignment.Left": "왼쪽",
 	"FECT.Settings.Alignment.Center": "가운데",
 	"FECT.Settings.Alignment.Right": "오른쪽",
+	"FECT.Settings.CenterTurnName": "배틀 트래커: 현재 턴 중앙 정렬",
+	"FECT.Settings.CenterTurnHint": "턴이 바뀔 때 현재 전투원을 트래커의 가로 중앙으로 스크롤합니다. 첫 번째와 마지막 전투원도 중앙에 놓입니다.",
 	"FECT.Settings.ImageName": "컴뱃 트래커: 표시 이미지",
 	"FECT.Settings.ImageHint": "포트레이트로 액터 이미지와 토큰 이미지 중 어느 것을 쓸지 정합니다.",
 	"FECT.Settings.Image.Actor": "액터 이미지",

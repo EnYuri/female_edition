@@ -1261,6 +1261,14 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "FECT.Settings.CenterTurnName"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceCombatTrackerCenterTurn" data-dtype="Boolean" {{checked values.ceCombatTrackerCenterTurn}} />
+      </div>
+      <p class="notes">{{localize "FECT.Settings.CenterTurnHint"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsMenu.ceCombatTrackerShowInitiative.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceCombatTrackerShowInitiative" data-dtype="Boolean" {{checked values.ceCombatTrackerShowInitiative}} />

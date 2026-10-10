@@ -152,6 +152,15 @@
   transform: scaleY(-1) scale(var(--fe-ct-zoom)) translateY(var(--fe-ct-zoom-anchor));
 }
 
+/* Give the first and last cards enough scroll range to reach the viewport center. */
+#fe-combat-tracker .fe-ct-combatants.fe-ct-center-turn::before,
+#fe-combat-tracker .fe-ct-combatants.fe-ct-center-turn::after {
+  content: "";
+  flex: 0 0 var(--fe-ct-edge-space);
+  align-self: stretch;
+  pointer-events: none;
+}
+
 /* thin scrollbar for overflow when many combatants */
 #fe-combat-tracker .fe-ct-combatants::-webkit-scrollbar {
   height: 6px;

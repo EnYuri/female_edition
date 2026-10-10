@@ -323,6 +323,33 @@ function feCtSyncLayout(root) {
   root.style.setProperty("--fe-ct-right-clearance", `${clearance}px`);
 }
 
+// Freeze the strip's natural viewport width before adding flexible scroll space.
+// Otherwise the end spacers would enlarge the max-content tracker itself.
+function feCtPrepareCentering(root) {
+  const strip = root?.querySelector(".fe-ct-combatants");
+  if (!strip) return;
+  strip.classList.remove("fe-ct-center-turn");
+  strip.style.removeProperty("width");
+  strip.style.removeProperty("--fe-ct-edge-space");
+  if (!feCtSetting(S.COMBAT_TRACKER_CENTER_TURN) || root.classList.contains("fe-ct-collapsed")) return;
+  const card = strip.querySelector(".fe-ct-portrait");
+  const width = strip.clientWidth;
+  if (!card || !width) return;
+  const padding = parseFloat(getComputedStyle(strip).paddingLeft) || 0;
+  const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
+  const space = Math.max(0, (width - card.offsetWidth) / 2 - padding - gap);
+  strip.style.width = `${width}px`;
+  strip.style.setProperty("--fe-ct-edge-space", `${space}px`);
+  strip.classList.add("fe-ct-center-turn");
+}
+
+function feCtSyncLayoutAndTurn(root) {
+  feCtSyncLayout(root);
+  if (!root?.isConnected || !feCtSetting(S.COMBAT_TRACKER_CENTER_TURN)) return;
+  feCtPrepareCentering(root);
+  feCtRevealActiveCombatant(root);
+}
+
 function feCtRevealActiveCombatant(root) {
   if (!root?.isConnected || root.classList.contains("fe-ct-collapsed")) return;
   const strip = root.querySelector(".fe-ct-combatants");
@@ -331,6 +358,10 @@ function feCtRevealActiveCombatant(root) {
 
   const stripRect = strip.getBoundingClientRect();
   const activeRect = active.getBoundingClientRect();
+  if (strip.classList?.contains("fe-ct-center-turn")) {
+    strip.scrollLeft += (activeRect.left + activeRect.right - stripRect.left - stripRect.right) / 2;
+    return;
+  }
   const nextRect = active.nextElementSibling?.getBoundingClientRect();
   const margin = 6;
   let delta = 0;
@@ -467,6 +498,7 @@ function feCtControlButtons(combat) {
 // leaves the DOM alone when nothing changed — see there.
 let _ctLastHtml = "";
 let _ctLastActiveKey = "";
+let _ctLastFollowLayoutKey = "";
 /**
  * Remove every trace of the tracker from the screen.
  *
@@ -494,6 +526,7 @@ function feCtTeardown() {
   document.getElementById(TRACKER_DOM_ID)?.remove();
   _ctLastHtml = ""; // the root is gone; the next render must rebuild from scratch
   _ctLastActiveKey = "";
+  _ctLastFollowLayoutKey = "";
 }
 
 // Interval between two neighbours' animations, squeezed so `count` of them finish
@@ -514,6 +547,7 @@ function feCtClearTracker(root) {
   root.innerHTML = "";
   _ctLastHtml = ""; // the DOM no longer matches the cached markup
   _ctLastActiveKey = "";
+  _ctLastFollowLayoutKey = "";
 }
 
 function feCtCancelExit() {
@@ -623,7 +657,10 @@ function feCtRender() {
   );
   const activeId = combat.combatant?.id;
   const activeKey = `${combat.id ?? ""}:${activeId ?? ""}`;
-  const activeChanged = activeKey !== _ctLastActiveKey;
+  const enterOrder = JSON.stringify(combatants.map((c) => c.id));
+  const followLayoutKey = `${enterOrder}:${size}`;
+  const activeChanged = activeKey !== _ctLastActiveKey ||
+    (feCtSetting(S.COMBAT_TRACKER_CENTER_TURN) && followLayoutKey !== _ctLastFollowLayoutKey);
   // Entrance animation timing. A combatant seen for the first time gets a start stamp
   // staggered behind the other newcomers in this same pass (so a whole encounter cascades
   // in), and every render passes the REMAINING delay: positive = not started yet,
@@ -637,7 +674,6 @@ function feCtRender() {
   // reorder turns before the entrance finishes. Rebuild that cascade from the live
   // left-to-right order only when its membership/order changes. Ordinary renders
   // keep the timestamps, so animation progress survives actor/token updates.
-  const enterOrder = JSON.stringify(combatants.map((c) => c.id));
   if (nowMs < _ctInitialEnterUntil && enterOrder !== _ctInitialEnterOrder) {
     _ctInitialEnterOrder = enterOrder;
     const cascadeStart = Math.max(nowMs, _ctBarEnterStart + CT_BAR_ENTER_MS);
@@ -725,6 +761,7 @@ function feCtRender() {
     _ctLastHtml = html;
     root.innerHTML = html;
     const strip = root.querySelector(".fe-ct-combatants");
+    feCtPrepareCentering(root);
     if (strip) strip.scrollLeft = previousScrollLeft;
     // HQ downscale to the display size (size x size*aspect). These are display-only
     // images, so the src swap is safe; a cache hit applies synchronously with no
@@ -738,12 +775,16 @@ function feCtRender() {
   }
   root.classList.add("fe-ct-active");
   root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
+  const strip = root.querySelector(".fe-ct-combatants");
+  if (strip && strip.classList.contains("fe-ct-center-turn") !==
+      (feCtSetting(S.COMBAT_TRACKER_CENTER_TURN) && !_ctCollapsed)) feCtPrepareCentering(root);
   root.classList.toggle("fe-ct-paused", combat.active === false);
   // A turn that advances while collapsed is still pending: expanding the tracker
   // must reveal that combatant rather than consuming the change while the strip is hidden.
   if (activeChanged && !_ctCollapsed) {
     feCtRevealActiveCombatant(root);
     _ctLastActiveKey = activeKey;
+    _ctLastFollowLayoutKey = followLayoutKey;
   }
 
   // Every dial's position, written straight into the DOM — a dial this render just
@@ -1350,6 +1391,10 @@ Hooks.once("init", () => {
   feRegisterSetting(S.COMBAT_TRACKER_ASPECT, feCtHpDisplayChanged);
   feRegisterSetting(S.COMBAT_TRACKER_ROUNDNESS, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_ALIGNMENT, () => feCtScheduleRender());
+  feRegisterSetting(S.COMBAT_TRACKER_CENTER_TURN, () => {
+    _ctLastActiveKey = "";
+    feCtScheduleRender();
+  });
   feRegisterSetting(S.COMBAT_TRACKER_PORTRAIT_IMAGE, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_SHOW_INITIATIVE, () => feCtScheduleRender());
   feRegisterSetting(S.COMBAT_TRACKER_SHOW_DISPOSITION, () => feCtScheduleRender());
@@ -1380,9 +1425,9 @@ Hooks.once("ready", () => {
   }
   feCtEnsureRoot();
   feCtRender();
-  window.addEventListener("resize", () => feCtSyncLayout(document.getElementById(TRACKER_DOM_ID)));
+  window.addEventListener("resize", () => feCtSyncLayoutAndTurn(document.getElementById(TRACKER_DOM_ID)));
   Hooks.on("collapseSidebar", () => {
-    const sync = () => feCtSyncLayout(document.getElementById(TRACKER_DOM_ID));
+    const sync = () => feCtSyncLayoutAndTurn(document.getElementById(TRACKER_DOM_ID));
     requestAnimationFrame(sync);
     setTimeout(sync, 260);
   });
