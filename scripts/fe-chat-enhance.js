@@ -24,6 +24,7 @@ import {
   feGetChatLogs, feGetChatLogsInDocument, feDedupeChatMessagesInLog,
   feGetMessageIdFromElement, feNormalizeChatMessageId, feCssEscape,
   feDeferTask, feWindowRequestFrame, feSnapshotAndRestoreStickyScroll,
+  feInstallChatImageWaitGuard,
   feFollowIncomingChatMessage, feRepinFollowingChatLogs,
   feGetMessageFromElementOrCollection,
 } from "./fe-util.js";
@@ -269,6 +270,7 @@ Hooks.once("init", () => {
   feRegisterSetting(S.PRUNE_ENABLED);
   feRegisterSetting(S.PRUNE_MAX_MESSAGES);
   feInstallChatLogPrune();
+  feInstallChatImageWaitGuard();
   feInstallFutureTimestampClamp();
 
   feRegisterSetting(FE_GM_PRIORITY_OVERRIDES_KEY, () => {

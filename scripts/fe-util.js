@@ -342,6 +342,38 @@ function feFindScrollContainer(el) {
   return el;
 }
 
+// Core ChatLog.waitForImages waits for every incomplete <img> before scrollBottom.
+// A lazy image outside the viewport cannot finish loading until scrolling brings
+// it into view, so that order can deadlock both initial render and new messages.
+// Skip only deferred images in the wait; scrolling starts their original loads.
+// Eager images retain the full load wait, with no timeout or quality change.
+function feInstallChatImageWaitGuard() {
+  const ChatLog = CONFIG?.ui?.chat;
+  if (!ChatLog || Object.hasOwn(ChatLog, "_feImageWaitGuard")) return;
+  const original = ChatLog.waitForImages;
+  if (typeof original !== "function") return;
+
+  ChatLog.waitForImages = function(element) {
+    if (!element?.querySelectorAll) return original.call(this, element);
+    const pending = Array.from(element.querySelectorAll("img")).filter(img => !img.complete);
+    if (!pending.some(img => img.loading === "lazy")) return original.call(this, element);
+
+    const eager = pending.filter(img => img.loading !== "lazy");
+    return Promise.all(eager.map(img => new Promise(resolve => {
+      if (img.complete) return resolve();
+      const done = () => {
+        img.removeEventListener("load", done);
+        img.removeEventListener("error", done);
+        resolve();
+      };
+      img.addEventListener("load", done, { once: true });
+      img.addEventListener("error", done, { once: true });
+      if (img.complete) done();
+    })));
+  };
+  Object.defineProperty(ChatLog, "_feImageWaitGuard", { value: true });
+}
+
 // Follow-lock state. Foundry's app.isAtBottom is unreliable during rapid message
 // bursts: content grows faster than the scroll catches up, so a scroll event mid-burst
 // computes pct < 0.99 and flips #isAtBottom false even though the user never moved.
@@ -724,6 +756,7 @@ export {
   feWindowRequestFrame,
   feWindowCancelFrame,
   feSnapshotAndRestoreStickyScroll,
+  feInstallChatImageWaitGuard,
   feFollowIncomingChatMessage,
   feRepinFollowingChatLogs,
   feGetRoundMarkerFlagValue,
