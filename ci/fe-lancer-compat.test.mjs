@@ -105,8 +105,8 @@ test("the battle tracker adapts to LANCER activations", () => {
   assert.match(TRACKER_HBS, /\{\{#if canActivate\}\}[\s\S]*data-ct-activate="1"/);
   assert.match(TRACKER, /closest\?\.\("\[data-ct-activate\]"\)[\s\S]{0,200}feCtActivateFor/);
   assert.match(TRACKER, /if \(ev\.target\.closest\?\.\("\[data-ct-activate\]"\)\) return;/);
-  // It shares ">>"'s spot, so it must be excluded whenever ">>" is drawn.
-  assert.match(TRACKER, /canActivate: !canEndTurn && feCtCanActivate\(/);
+  // It shares ">>"'s spot and belongs only to the current-round card.
+  assert.match(TRACKER, /canActivate: !roundOffset && !canEndTurn && feCtCanActivate\(/);
   // Only while nobody is active — the system's own `turn: null` state.
   assert.match(TRACKER, /if \(combat\.turn !== null && combat\.turn !== undefined\) return false;/);
   // Initiative is forced to 0 there, so its menu entries are withheld.
