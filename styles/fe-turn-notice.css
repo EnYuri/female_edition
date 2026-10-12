@@ -205,3 +205,9 @@ body.fe-retro-theme.fe-accent-text-override .fe-tn-band {
 body.fe-yourturn-up #ui-middle {
   z-index: 71;
 }
+
+/* The original your-turn cleanup removes its banner but leaves the separately
+   appended main image in place. Hide that stale image until its next banner. */
+body.fe-yourturn-ended #yourTurnCurrentImg {
+  visibility: hidden;
+}

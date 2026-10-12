@@ -50,6 +50,7 @@ const TN_FALLBACK_COLOR = "#5f9ea0"; // your-turn's own default band colour
 // your-turn: banner fade 3s after `.removing`, portrait fade 1.5s delay + 3s.
 const YT_LEAVE_MS = 4600;
 const YT_UP_CLASS = "fe-yourturn-up";
+const YT_ENDED_CLASS = "fe-yourturn-ended";
 
 let _tnLastKey = null;
 let _tnCombatId = null;
@@ -223,11 +224,31 @@ function feTnOnUpdateCombat(combat, changes) {
 /* ── your-turn compat: keep its banner above the battle tracker ─────────── */
 
 let _ytLeaveTimer = null;
+let _ytCombatId = null;
+
+function feTnEndYourTurnCombat(combat) {
+  if (!game.modules?.get?.(YOUR_TURN_ID)?.active || combat?.id !== _ytCombatId) return;
+  document.body.classList.add(YT_ENDED_CLASS);
+  document.body.classList.remove(YT_UP_CLASS);
+  _ytCombatId = null;
+}
+
+function feTnTrackYourTurnCombat(combat, changes) {
+  if (!game.modules?.get?.(YOUR_TURN_ID)?.active || !combat) return;
+  if (_ytCombatId === combat.id && (!combat.started || !combat.active)) {
+    feTnEndYourTurnCombat(combat);
+    return;
+  }
+  if (combat.started && combat.active && changes && ("turn" in changes || "round" in changes)) {
+    _ytCombatId = combat.id;
+  }
+}
 
 function feTnSyncYourTurn(container) {
   const banner = container.querySelector(".yourTurnBanner");
   const body = document.body;
   if (banner && !banner.classList.contains("removing")) {
+    body.classList.remove(YT_ENDED_CLASS);
     clearTimeout(_ytLeaveTimer);
     _ytLeaveTimer = null;
     body.classList.add(YT_UP_CLASS);
@@ -277,10 +298,12 @@ Hooks.once("init", () => {
   });
 
   Hooks.on("updateCombat", feTnOnUpdateCombat);
+  Hooks.on("updateCombat", feTnTrackYourTurnCombat);
   // Only the encounter the notice belongs to — deleting some other, idle
   // encounter must not cut a live banner short.
   Hooks.on("deleteCombat", (combat) => {
     if (!_tnCombatId || combat?.id === _tnCombatId) feTnTeardown();
+    feTnEndYourTurnCombat(combat);
   });
 });
 

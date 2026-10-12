@@ -69,6 +69,7 @@ const [CT_TPL_ROOT, CT_TPL_MENU, CT_TPL_DIALOG, CT_TPL_REMOVE] = feRegisterTempl
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 const CT_SOCKET_END_TURN = "feCombatTrackerEndTurn";
+const CT_ADJACENT_ROUND_CARDS = 4;
 
 // Collapsed (minimized) state — a client runtime flag, reset on reload.
 let _ctCollapsed = false;
@@ -362,7 +363,9 @@ function feCtRevealActiveCombatant(root) {
     strip.scrollLeft += (activeRect.left + activeRect.right - stripRect.left - stripRect.right) / 2;
     return;
   }
-  const nextRect = active.nextElementSibling?.getBoundingClientRect();
+  let next = active.nextElementSibling;
+  if (next?.classList?.contains("fe-ct-round-divider")) next = next.nextElementSibling;
+  const nextRect = next?.getBoundingClientRect();
   const margin = 6;
   let delta = 0;
   if (activeRect.left < stripRect.left + margin) {
@@ -377,7 +380,7 @@ function feCtRevealActiveCombatant(root) {
 
 // One combatant's template context. Everything that used to be concatenated into an
 // HTML string is now plain data; templates/fe-combat-tracker.hbs owns the markup.
-function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = null) {
+function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = null, roundOffset = 0) {
   const img = feCtPortraitImage(c);
   const init = c.initiative;
 
@@ -399,13 +402,15 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = nu
     feCtIsLancer() ? lancerAct != null : (init != null && init !== "")
   );
 
-  const hitDelay = dbpOpts ? feDbpHitDelay(c.id, dbpOpts.now) : null;
+  const hitDelay = dbpOpts && !roundOffset ? feDbpHitDelay(c.id, dbpOpts.now) : null;
 
   return {
     id: c.id,
     name: c.name,
     img,
     active,
+    roundOffset,
+    adjacentRound: roundOffset !== 0,
     defeated: !!c.isDefeated,
     hidden: !!c.hidden,
     entering: enterDelay != null,
@@ -419,10 +424,10 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = nu
     // ">>" end-turn and the roll-initiative d20 both sit dead-centre on the frame, so
     // only one of them is ever drawn (see docs/combat-tracker.md).
     canEndTurn,
-    canRollInit: !canEndTurn && feCtCanRollInitiative(c),
+    canRollInit: !roundOffset && !canEndTurn && feCtCanRollInitiative(c),
     // LANCER's activate button takes the same centre spot. `initiative ??= 0` there
     // already keeps canRollInit false, so the three are mutually exclusive.
-    canActivate: !canEndTurn && feCtCanActivate(c.parent, c),
+    canActivate: !roundOffset && !canEndTurn && feCtCanActivate(c.parent, c),
     // Dynamic battle portrait. dbpOpts only arrives for the vertical aspects, and
     // when it does the name caption is hidden in CSS (.has-dbp .fe-ct-name).
     dbp: dbpOpts ? feDbpData(c, dbpOpts.size, dbpOpts.now, dbpOpts.insert) : null,
@@ -499,6 +504,8 @@ function feCtControlButtons(combat) {
 let _ctLastHtml = "";
 let _ctLastActiveKey = "";
 let _ctLastFollowLayoutKey = "";
+let _ctLastCombatRound = null;
+let _ctLastCombatId = null;
 /**
  * Remove every trace of the tracker from the screen.
  *
@@ -527,6 +534,8 @@ function feCtTeardown() {
   _ctLastHtml = ""; // the root is gone; the next render must rebuild from scratch
   _ctLastActiveKey = "";
   _ctLastFollowLayoutKey = "";
+  _ctLastCombatRound = null;
+  _ctLastCombatId = null;
 }
 
 // Interval between two neighbours' animations, squeezed so `count` of them finish
@@ -542,12 +551,26 @@ function feCtPrefersReducedMotion() {
   catch { return false; }
 }
 
+function feCtBuildRoundStrip(combatants, portraits, round, adjacent) {
+  if (round < 1 || !combatants.length) return portraits;
+  return [
+    { roundDivider: `R${round - 1}` },
+    ...combatants.slice(-CT_ADJACENT_ROUND_CARDS).map((c) => adjacent(c, -1)),
+    { roundDivider: `R${round}` },
+    ...portraits,
+    { roundDivider: `R${round + 1}` },
+    ...combatants.slice(0, CT_ADJACENT_ROUND_CARDS).map((c) => adjacent(c, 1)),
+  ];
+}
+
 function feCtClearTracker(root) {
   root.classList.remove("fe-ct-active");
   root.innerHTML = "";
   _ctLastHtml = ""; // the DOM no longer matches the cached markup
   _ctLastActiveKey = "";
   _ctLastFollowLayoutKey = "";
+  _ctLastCombatRound = null;
+  _ctLastCombatId = null;
 }
 
 function feCtCancelExit() {
@@ -656,7 +679,8 @@ function feCtRender() {
     (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
   );
   const activeId = combat.combatant?.id;
-  const activeKey = `${combat.id ?? ""}:${activeId ?? ""}`;
+  const combatRound = Number(combat.round) || 0;
+  const activeKey = `${combat.id ?? ""}:${combatRound}:${activeId ?? ""}`;
   const enterOrder = JSON.stringify(combatants.map((c) => c.id));
   const followLayoutKey = `${enterOrder}:${size}`;
   const activeChanged = activeKey !== _ctLastActiveKey ||
@@ -720,6 +744,16 @@ function feCtRender() {
       dbpOn ? { size, now: nowMs, insert: dbpInsert } : null
     );
   });
+  // Keep the current round in full, with a short preview of the turn order on
+  // either side. Round zero is a useful predecessor of round one; there is no
+  // predecessor while combat itself is still at round zero.
+  const dbpOpts = dbpOn ? { size, now: nowMs, insert: dbpInsert } : null;
+  const adjacent = (c, offset) => {
+    const start = _ctEnterStart.get(c.id);
+    const delay = start == null ? null : start - nowMs;
+    return feCtPortraitData(c, false, false, delay != null && delay > -CT_ENTER_MS ? delay : null, dbpOpts, offset);
+  };
+  const stripCards = feCtBuildRoundStrip(combatants, portraits, combatRound, adjacent);
   // Drop stamps for combatants that are gone, so a re-added one animates in again.
   const liveIds = new Set(combatants.map((c) => c.id));
   for (const id of [..._ctEnterStart.keys()]) if (!liveIds.has(id)) _ctEnterStart.delete(id);
@@ -731,7 +765,7 @@ function feCtRender() {
     isGM,
     barEntering,
     barDelay: Math.round(barDelay),
-    combatants: portraits,
+    combatants: stripCards,
     // The control panel is GM-only; the collapse button alone is also shown to players.
     buttons: isGM ? feCtControlButtons(combat) : [feCtCollapseBtn()],
     labels: {
@@ -757,12 +791,27 @@ function feCtRender() {
    * same string every time and the DOM is left completely untouched.
    */
   if (html !== _ctLastHtml) {
-    const previousScrollLeft = root.querySelector(".fe-ct-combatants")?.scrollLeft ?? 0;
+    const oldStrip = root.querySelector(".fe-ct-combatants");
+    const previousScrollLeft = oldStrip?.scrollLeft ?? 0;
+    const roundStep = _ctLastCombatId === combat.id ? combatRound - _ctLastCombatRound : 0;
+    // The next/previous round's first/last card already exists at the edge of
+    // the old strip. Keep that card at the same screen coordinate while the
+    // three-round window moves, then let ordinary turn-follow reveal it.
+    const preview = Math.abs(roundStep) === 1 && activeId
+      ? oldStrip?.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(activeId)}"][data-ct-round-offset="${roundStep}"]`)
+      : null;
+    const previewLeft = preview?.getBoundingClientRect().left;
     _ctLastHtml = html;
     root.innerHTML = html;
     const strip = root.querySelector(".fe-ct-combatants");
     feCtPrepareCentering(root);
-    if (strip) strip.scrollLeft = previousScrollLeft;
+    if (strip) {
+      strip.scrollLeft = previousScrollLeft;
+      if (previewLeft !== undefined) {
+        const current = strip.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(activeId)}"]:not([data-ct-round-offset])`);
+        if (current) strip.scrollLeft += current.getBoundingClientRect().left - previewLeft;
+      }
+    }
     // HQ downscale to the display size (size x size*aspect). These are display-only
     // images, so the src swap is safe; a cache hit applies synchronously with no
     // flicker. Only the rebuild can introduce new <img> elements, so this belongs
@@ -786,6 +835,8 @@ function feCtRender() {
     _ctLastActiveKey = activeKey;
     _ctLastFollowLayoutKey = followLayoutKey;
   }
+  _ctLastCombatRound = combatRound;
+  _ctLastCombatId = combat.id;
 
   // Every dial's position, written straight into the DOM — a dial this render just
   // built would otherwise paint one frame at offset 0. The bar style's caption is the
@@ -857,6 +908,10 @@ function feCtBindRootEvents(root) {
   root.addEventListener("contextmenu", (ev) => {
     const port = ev.target.closest?.("[data-combatant-id]");
     if (!port) return;
+    if (port.hasAttribute("data-ct-round-offset")) {
+      ev.preventDefault();
+      return;
+    }
     const combat = feCtGetCombat();
     const c = combat?.combatants?.get(port.dataset.combatantId);
     if (!c || (!game.user?.isGM && !feCtUserOwnsCombatant(c))) return;

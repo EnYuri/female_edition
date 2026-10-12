@@ -174,6 +174,6 @@ body.fe-force-normal-msg-color:not(.fe-retro-theme) #chat-notifications .message
  * crlngn-only exception that stays inert elsewhere (keeping ui-font.css's clean
  * variable-based approach intact). The sender name (.name-stacked .title) is NOT
  * here — ui-font.css already pins it with !important. */
-body.crlngn-ui.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log) .chat-message :is(h1, h2, h3, h4, h5, h6) {
+body.crlngn-ui.fe-fonts-enabled :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log) .chat-message :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--fe-font-primary) !important;
 }

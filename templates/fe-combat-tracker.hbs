@@ -14,6 +14,9 @@
           non-scrolling wrapper above carries that border instead. --}}
     <div class="fe-ct-combatants">
       {{#each combatants}}
+      {{#if roundDivider}}
+      <div class="fe-ct-round-divider" aria-label="{{roundDivider}}"><span>{{roundDivider}}</span></div>
+      {{else}}
       {{!-- The status panel is the same markup in both layouts, only its PLACE
             differs — inside the frame when it overlays the artwork, after the
             frame when it is appended below it (the frame clips its overflow, so
@@ -100,8 +103,8 @@
             </div>
           </div>
       {{/inline}}
-      <div class="fe-ct-portrait{{#if active}} is-active{{/if}}{{#if entering}} is-entering{{/if}}{{#if defeated}} is-defeated{{/if}}{{#if hidden}} is-hidden{{/if}}{{#if disposition}} has-disposition{{/if}}{{#if dbp}} has-dbp{{#if dbp.insert}} is-dbp-insert{{/if}}{{/if}}{{#if hit}} is-hit{{/if}}"
-        data-combatant-id="{{id}}" data-tooltip="{{name}}"
+      <div class="fe-ct-portrait{{#if active}} is-active{{/if}}{{#if adjacentRound}} is-adjacent-round{{/if}}{{#if entering}} is-entering{{/if}}{{#if defeated}} is-defeated{{/if}}{{#if hidden}} is-hidden{{/if}}{{#if disposition}} has-disposition{{/if}}{{#if dbp}} has-dbp{{#if dbp.insert}} is-dbp-insert{{/if}}{{/if}}{{#if hit}} is-hit{{/if}}"
+        data-combatant-id="{{id}}"{{#if adjacentRound}} data-ct-round-offset="{{roundOffset}}"{{/if}} data-tooltip="{{name}}"
         style="{{#if entering}}--fe-ct-enter-delay:{{delay}}ms;{{/if}}{{#if disposition}}--fe-ct-disposition:{{disposition}};{{/if}}{{#if hit}}--fe-dbp-hit-delay:{{hitDelay}}ms;{{/if}}">
         <div class="fe-ct-frame"><img src="{{img}}" data-fe-src="{{img}}" alt="">
           {{#if dbp}}
@@ -160,6 +163,7 @@
         </div>
         {{/if}}
       </div>
+      {{/if}}
       {{/each}}
     </div>
   </div>

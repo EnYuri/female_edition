@@ -293,7 +293,7 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
    no declaration here. */
 
 /* Chat sidebar panel + scroll container + log area */
-body.fe-retro-theme.fe-retro-system-dx3rd :is(#sidebar #chat, .tab.chat, .chat-sidebar, chat-sidebar),
+body.fe-retro-theme.fe-retro-system-dx3rd :is(#sidebar #chat, #chat-popout, .tab.chat, .chat-sidebar, chat-sidebar),
 body.fe-retro-theme.fe-retro-system-dx3rd .chat-scroll,
 body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log) {
   background:       #000000 !important;

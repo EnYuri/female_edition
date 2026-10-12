@@ -202,7 +202,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * text on a bright card" and vanish when retro is OFF. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card {
   color: var(--fe-ac-90) !important;
 }
@@ -223,7 +223,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * unchanged). */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-card
   :is(p, i, em, b, strong, u, s, small, li, td, th, dt, dd, label,
       h1, h2, h3, h4, h5, h6,
@@ -340,7 +340,7 @@ body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*)) input.resource-va
  *   color/background transitions at their start value so the change
  *   never paints (same cause as the chat tint). */
 
-body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, .chat-popout #chat)
+body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout))
   :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total,
       .dice-total.critical, .dice-total.fumble,
       .dice-roll .dice-total.critical, .dice-roll .dice-total.fumble) {
@@ -364,7 +364,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * A layouts-layer !important wins decisively over the system-layer dnd5e
  * rules. */
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.dice-result .dice-total, .dice-roll .dice-total, .dice-total) {
   white-space: nowrap !important;
   word-break: keep-all !important;
@@ -377,7 +377,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * attack total. Take the icon out of line flow and park it immediately before
  * dnd5e's 32px expand-caret compartment. */
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .dice-total
   > dnd5e-icon.midi-damage-type-icon {
   position: absolute !important;
@@ -395,7 +395,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * placeholder whose tooltip-part contains no rendered element; the real dice
  * tooltip lives in the separate `.dice-tooltip-collapser` that follows it. */
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .dice-result
   > .midi-dice-tooltip:not(:has(> .tooltip-part > *)) {
   display: none !important;
@@ -408,34 +408,34 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
  * put the totals on different Y coordinates. Normalize visual order without
  * moving DOM or changing the expanded tooltip contents. */
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
   > .dice-formula {
   order: 0 !important;
 }
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
   > :is(.dice-tooltip-collapser, .midi-dice-tooltip) {
   order: 1 !important;
 }
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.midi-attack-roll, .midi-damage-roll, .midi-bonus-damage-roll, .midi-other-damage-roll)
   > .dice-result
   > .dice-total {
   order: 2 !important;
 }
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.dice-result .dice-formula, .dice-roll .dice-formula, .dice-formula) {
   word-break: keep-all !important;
   overflow-wrap: normal !important;
 }
 
-:is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+:is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .chat-message a.inline-roll {
   white-space: nowrap !important;
   word-break: keep-all !important;
@@ -457,7 +457,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notification
 
 body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
   :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*),
-      #sidebar #chat, #chat-notifications, .chat-popout #chat, .chat-message, .chat-card)
+      #sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), .chat-message, .chat-card)
   :is(span, div, p, a, button, label, td, th, dt, dd, li, small, em, strong, b,
       h1, h2, h3, h4, h5, h6, .label, .name, .title, .value, .mod,
       .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link):not(.key):not(:where(#context-menu, .context-menu, .tidy5e-sheet.context) *) {
@@ -1648,7 +1648,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2.application.sheet.item.standar
  * ---------------------------------------------------------------- */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) {
   --dnd5e-color-gold: var(--fe-ac-80) !important;
@@ -1676,7 +1676,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * palette like any themed field — ac-08 surface + ac-33 line + ac-90 ink. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) :is(input, select, textarea) {
   --input-background-color: var(--fe-ac-08) !important;
@@ -1691,14 +1691,14 @@ body.fe-retro-theme.fe-retro-system-dnd5e
    selector exception, deliberately ending in two lines here. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .midi-qol-hits-display {
   border-color: var(--fe-ac-33) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .midi-qol-ac {
   background: var(--fe-ac-08) !important;
@@ -1727,7 +1727,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * ---------------------------------------------------------------- */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) {
   --dnd5e-color-success: var(--fe-ac-90) !important;
@@ -1752,14 +1752,14 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .midi-results .target.success {
   border-color: var(--fe-ac-45) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .midi-results .target.failure {
   border-color: var(--fe-ac-22) !important;
@@ -1780,7 +1780,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
    boundary is one hard line), so it flattens to solid along with it. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .pills {
   --pill-colored-text-color: var(--fe-ac-90) !important;
@@ -1789,14 +1789,14 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .pills target-pill.pill[data-hit] {
   background-color: var(--fe-ac-22) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message) .pills target-pill.pill[data-miss] {
   background-color: var(--fe-ac-06) !important;
@@ -1853,7 +1853,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card button:hover
  */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card.midi-chat-card
   :is(i, dnd5e-icon, svg):not(:where(#context-menu) *) {
@@ -1869,7 +1869,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .chat-card.midi-chat-card
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card.midi-chat-card :is(.card-header, .card-header.description) {
   /* No surface fill — the card itself is already a --fe-ac-08 panel; laying
@@ -1949,7 +1949,7 @@ body.fe-retro-theme
  * the same layouts layer. */
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message)
   .card-description:not(.collapsed) {
@@ -1964,7 +1964,7 @@ body.fe-retro-theme
    (transparent surface + thin solid rule line). */
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message)
   .card-header.description.collapsible:not(.collapsed) {
@@ -2047,7 +2047,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e .dnd5e2 {
    keep their own colors. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card
   :is(.card-flavor, .card-description, .card-description .wrapper,
@@ -2062,7 +2062,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
    stay weaker than the body or the original hierarchy is lost. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card
   :is(.card-flavor, .supplement, .name-stacked .subtitle):not(:where(#context-menu) *) {
@@ -2074,7 +2074,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
    icon — turned to accent. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card .icon-row > i {
   color: var(--fe-ac-80) !important;
@@ -2083,7 +2083,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 /* Icon buttons (successor to the old `.card-buttons > button`). */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card .icon-row button.icon {
   background: var(--fe-ac-06) !important;
@@ -2094,7 +2094,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card .icon-row button.icon:is(:hover, :focus-visible) {
   background: var(--fe-ac-22) !important;
@@ -2104,7 +2104,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 /* Pills — same treatment as the old `.card-footer.pills`. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-card .icon-row .pill {
   background: var(--fe-ac-06) !important;
@@ -2159,7 +2159,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
  * ---------------------------------------------------------------- */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message)
   :is(dnd5e-icon, svg, .chat-card svg, img[src$=".svg" i]) {
@@ -2168,7 +2168,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message)
   svg :is(path, rect, circle, ellipse, line, polyline, polygon, use, g) {
@@ -2179,7 +2179,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
    svg rule above plus every image not ending in .svg. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat,
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout),
       #chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   :is(.chat-message, .message)
   :is(img:not([src$=".svg" i]), img.fe-chat-portrait, video) {

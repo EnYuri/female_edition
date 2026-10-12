@@ -888,17 +888,17 @@ body.fe-strip-chat-textures :is(#chat-log, .chat-log, ol.chat-log, #chat-notific
  * Enabled when <body> has class "fe-hide-portraits"
  */
 
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender .name-stacked {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
   justify-content: flex-start !important;
   /* text-align intentionally not forced; portrait-name alignment setting should win. */
 }
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .title,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .subtitle {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender .name-stacked,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .title,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender .name-stacked .subtitle {
   text-shadow: none !important;
 }
 
@@ -911,16 +911,16 @@ body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .m
   padding: 0 !important;
 }
 /* Avatar/portrait hiding */
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender .avatar,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > img,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender > video {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender .avatar,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender > img,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender > video {
   display: none !important;
 }
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) .chat-message .message-header .message-sender { gap: 0 !important; }
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) .chat-message .message-header .message-sender { gap: 0 !important; }
 
 /* Hide Chat Portrait skill/roll icons */
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img.chat-portrait-image-size-name-dnd5e,
-body.fe-hide-portraits :is(#sidebar #chat, #chat-notifications) img[class*="chat-portrait-image-size"] {
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) img.chat-portrait-image-size-name-dnd5e,
+body.fe-hide-portraits :is(#sidebar #chat, #chat-popout, .chat-popout, #chat-notifications) img[class*="chat-portrait-image-size"] {
   display: none !important;
 }
 

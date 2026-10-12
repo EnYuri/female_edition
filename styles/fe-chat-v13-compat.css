@@ -21,7 +21,7 @@
 }
 
 body.fe-fonts-enabled:not(.fe-chatcard-custom-font)
-  :is(#chat-notifications, .chat-popout #chat)
+  :is(#chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout))
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
   --font-primary: var(--fe-chat-card-system-font-family) !important;
   --font-sans: var(--fe-chat-card-system-font-family) !important;
@@ -42,7 +42,7 @@ body.fe-fonts-enabled:not(.fe-chatcard-custom-font)
 }
 
 body.fe-fonts-enabled.fe-chatcard-custom-font
-  :is(#chat-notifications, .chat-popout #chat)
+  :is(#chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout))
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
   --font-primary: var(--fe-font-secondary) !important;
   --font-sans: var(--fe-font-secondary) !important;
@@ -62,14 +62,14 @@ body.fe-fonts-enabled.fe-chatcard-custom-font
   font-family: var(--fe-font-secondary) !important;
 }
 
-:is(#sidebar #chat, .chat-popout #chat, #chat-notifications)
+:is(#sidebar #chat, :is(.chat-popout #chat, #chat-popout, .chat-popout), #chat-notifications)
   :is(.chat-message, .message)
   :is(.message-sender .name-stacked .title, .message-sender .title, .name-stacked .title) {
   font-size: var(--fe-chat-title-size) !important;
   line-height: 1.05 !important;
 }
 
-:is(#sidebar #chat, .chat-popout #chat, #chat-notifications)
+:is(#sidebar #chat, :is(.chat-popout #chat, #chat-popout, .chat-popout), #chat-notifications)
   :is(.chat-message, .message)
   :is(.message-sender .name-stacked .subtitle, .message-sender .subtitle, .name-stacked .subtitle) {
   font-size: var(--fe-chat-subtitle-size) !important;

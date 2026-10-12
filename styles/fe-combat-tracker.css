@@ -152,6 +152,34 @@
   transform: scaleY(-1) scale(var(--fe-ct-zoom)) translateY(var(--fe-ct-zoom-anchor));
 }
 
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-adjacent-round {
+  --fe-ct-rest-opacity: 0.65;
+  opacity: var(--fe-ct-rest-opacity);
+}
+
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-adjacent-round:hover:not(.is-hidden) {
+  --fe-ct-rest-opacity: 1;
+}
+
+#fe-combat-tracker .fe-ct-combatants > .fe-ct-portrait.is-adjacent-round.is-hidden {
+  --fe-ct-rest-opacity: 0.5;
+}
+
+#fe-combat-tracker .fe-ct-round-divider {
+  flex: 0 0 28px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scaleY(-1);
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  pointer-events: none;
+}
+
 /* Give the first and last cards enough scroll range to reach the viewport center. */
 #fe-combat-tracker .fe-ct-combatants.fe-ct-center-turn::before,
 #fe-combat-tracker .fe-ct-combatants.fe-ct-center-turn::after {
@@ -298,7 +326,8 @@
   filter: grayscale(1) brightness(0.5);
 }
 .fe-ct-portrait.is-hidden {
-  opacity: 0.5;
+  --fe-ct-rest-opacity: 0.5;
+  opacity: var(--fe-ct-rest-opacity);
 }
 
 /* The hover-revealed 「턴 종료」(end turn) >> marker — rendered by JS only on
@@ -416,7 +445,7 @@
     transform: scaleY(-1) translateY(-140%);
   }
   to {
-    opacity: 1;
+    opacity: var(--fe-ct-rest-opacity, 1);
     transform: scaleY(-1) translateY(0);
   }
 }
@@ -429,7 +458,7 @@
 
 @keyframes fe-ct-portrait-out {
   from {
-    opacity: 1;
+    opacity: var(--fe-ct-rest-opacity, 1);
     transform: scaleY(-1) translateY(0);
   }
   to {

@@ -574,7 +574,7 @@ function feDbpDialFor(id) {
   const root = document.getElementById(TRACKER_DOM_ID);
   if (!root) return null;
   try {
-    return root.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(id)}"] .fe-dbp-dial[data-dbp-dial]`);
+    return root.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(id)}"]:not([data-ct-round-offset]) .fe-dbp-dial[data-dbp-dial]`);
   } catch { return null; }
 }
 

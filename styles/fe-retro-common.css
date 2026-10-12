@@ -744,7 +744,7 @@ body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
  * (including popouts and notifications), not to .expanded: Foundry can create
  * a dice-tooltip directly for an inline roll before its display state updates. */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .dice-tooltip {
   box-sizing: border-box;
   border: 1px solid var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
@@ -755,13 +755,13 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .dice-tooltip .part-header {
   border-color: var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .dice-tooltip .part-total {
   border-color: var(--fe-dice-outline, var(--fe-dx3rd-accent, #ffffff)) !important;
   background-color: #000000 !important;
@@ -769,7 +769,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) {
   /* Default outline for messages without a user color. It was a literal
      #ffffff, but once the accent picks up a hue this alone stayed white and
@@ -778,19 +778,19 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message).fe-has-user-color {
   --fe-dice-outline: rgb(var(--fe-user-color-rgb));
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message).fe-has-user-color .dice-tooltip {
   border-color: rgb(var(--fe-user-color-rgb)) !important;
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li:not(.clear), li:not(.clear) > span) {
   text-shadow:
@@ -818,7 +818,7 @@ body.fe-retro-theme
  * (.discarded/.rerolled get color:inherit + an opacity filter from core, so
  *  they inherit this and dim as intended.) */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li:not(.clear), li:not(.clear) > span) {
   color: var(--fe-ac-90, #e6e6e6) !important;
@@ -838,7 +838,7 @@ body.fe-retro-theme
  * The sepia/hue-rotate filters that recolor are disabled (those filters
  * would tint our outline text-shadow along with the text). */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.success, li.max, li.success > span, li.max > span) {
   color: var(--fe-ac-96, #ffffff) !important;
@@ -846,7 +846,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.failure, li.min, li.failure > span, li.min > span) {
   color: var(--fe-ac-t22, #d1d1d1) !important;
@@ -854,7 +854,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.exploded, li.exploded > span) {
   color: var(--fe-ac-12, #1f1f1f) !important;
@@ -866,7 +866,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) :is(.dice-roll ol.dice-rolls, .dice-tooltip .dice-rolls)
   :is(li.fumble, li.fumble > span) {
   color: var(--fe-ac-12, #1f1f1f) !important;
@@ -878,7 +878,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) a.inline-roll {
   color: var(--fe-ac-90) !important;
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.08) !important;
@@ -886,7 +886,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) a.inline-roll:hover {
   background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.16) !important;
   border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.70) !important;
@@ -898,13 +898,13 @@ body.fe-retro-theme
  * either — same situation as monks' .item-image (§ below). A faint hard
  * line on both the row and the icon matches the texture. */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) .table-results > li {
   border: 1px solid var(--fe-ac-33) !important;
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   :is(.chat-message, .message) .table-results > li > img {
   border: 1px solid var(--fe-ac-33) !important;
 }
@@ -922,7 +922,7 @@ body.fe-retro-theme
  * directly — kept here (common) because the module is dnd5e-agnostic.
  * groove → solid: retro draws every boundary as one hard line (§7·§16). */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .monks-tokenbar :is(.card-header, .items-list .items-header, .items-list .item,
                       .card-footer span) {
   border-color: var(--fe-ac-33) !important;
@@ -944,7 +944,7 @@ body.fe-retro-theme
  * and what stays green here is exactly that excluded icon and its parent.
  * Hence a dedicated rule. */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .monks-tokenbar :is(
     li.item .dice-roll .dice-total a.result-passed.selected,
     li.item .dice-roll .dice-total a.result-passed.selected i,
@@ -956,7 +956,7 @@ body.fe-retro-theme
 }
 
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .monks-tokenbar :is(
     li.item .dice-roll .dice-total a.result-failed.selected,
     li.item .dice-roll .dice-total a.result-failed.selected i,
@@ -970,7 +970,7 @@ body.fe-retro-theme
 /* Only the XP-grant button had its surface painted here. Green surface →
    dark surface + bright outline (§7 idiom). */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .monks-tokenbar li.item .dice-roll a.add-xp {
   background-color: var(--fe-ac-22) !important;
   border: 1px solid var(--fe-ac-45) !important;
@@ -985,7 +985,7 @@ body.fe-retro-theme
  * the texture. Core's `*{box-sizing:border-box}` keeps the 30px fixed
  * width (flex: 0 0 30px) — only the art moves 2px inward. */
 body.fe-retro-theme
-  :is(#sidebar #chat, #chat-notifications, .chat-popout #chat, #fe-chat-export-log)
+  :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), #fe-chat-export-log)
   .monks-tokenbar .item .item-image {
   border: 1px solid var(--fe-ac-80) !important;
 }

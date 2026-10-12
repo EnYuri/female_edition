@@ -43,8 +43,8 @@ test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
 test("turn changes immediately reveal the active portrait without resetting manual scroll", () => {
   assert.match(ENTRY, /const activeChanged = activeKey !== _ctLastActiveKey/);
   assert.match(ENTRY, /if \(activeChanged && !_ctCollapsed\) \{\s*feCtRevealActiveCombatant\(root\);\s*_ctLastActiveKey = activeKey;/);
-  assert.match(ENTRY, /const previousScrollLeft = root\.querySelector\("\.fe-ct-combatants"\)\?\.scrollLeft \?\? 0/);
-  assert.match(ENTRY, /if \(strip\) strip\.scrollLeft = previousScrollLeft/);
+  assert.match(ENTRY, /const previousScrollLeft = oldStrip\?\.scrollLeft \?\? 0/);
+  assert.match(ENTRY, /if \(strip\) \{\s*strip\.scrollLeft = previousScrollLeft/);
 
   const fn = ENTRY.slice(ENTRY.indexOf("function feCtRevealActiveCombatant("));
   const body = fn.slice(0, fn.indexOf("\n}"));
@@ -52,6 +52,23 @@ test("turn changes immediately reveal the active portrait without resetting manu
   assert.match(body, /getBoundingClientRect\(\)/, "the active zoom must count toward visibility");
   assert.match(body, /strip\.scrollLeft \+= delta/, "direct assignment keeps turn following immediate");
   assert.ok(!/scrollIntoView|behavior:\s*["']smooth/.test(body), "turn following must not animate or move the page");
+});
+
+test("round previews use the visible turn order, with round zero before round one", () => {
+  const start = ENTRY.indexOf("function feCtBuildRoundStrip(");
+  const fn = ENTRY.slice(start, ENTRY.indexOf("\n}\n", start) + 2);
+  const build = runInNewContext(`${fn}\nfeCtBuildRoundStrip`, { CT_ADJACENT_ROUND_CARDS: 4 });
+  const turns = "ABCDEFG".split("").map((id) => ({ id }));
+  const portraits = turns.map(({ id }) => ({ id, current: true }));
+  const adjacent = (c, offset) => ({ id: c.id, offset });
+  const result = build(turns, portraits, 1, adjacent);
+  assert.deepEqual(Array.from(result, (card) => card.roundDivider ?? `${card.id}:${card.offset ?? 0}`), [
+    "R0", "D:-1", "E:-1", "F:-1", "G:-1",
+    "R1", "A:0", "B:0", "C:0", "D:0", "E:0", "F:0", "G:0",
+    "R2", "A:1", "B:1", "C:1", "D:1",
+  ]);
+  assert.equal(build(turns, portraits, 0, adjacent), portraits);
+  assert.match(DBP, /:not\(\[data-ct-round-offset\]\) \.fe-dbp-dial/, "the animated dial targets the current-round card");
 });
 
 test("turn following reveals the next card without losing the active card", () => {
