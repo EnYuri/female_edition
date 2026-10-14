@@ -54,7 +54,7 @@
                   machinery. --fe-dbp-cells is their total count and is what sizes
                   the type (styles/fe-combat-tracker.css). --}}
             <div class="fe-dbp-hp" style="--fe-dbp-cells:{{dbp.hp.cells}}">
-              <span class="fe-dbp-dial{{#if dbp.hp.unknown}} is-unknown{{/if}}"{{#unless dbp.hp.unknown}} data-dbp-dial="1"{{/unless}}>
+              <span class="fe-dbp-dial{{#if dbp.hp.unknown}} is-unknown{{/if}}{{#if dbp.hp.secret}} is-secret{{/if}}"{{#unless dbp.hp.unknown}} data-dbp-dial="1"{{/unless}}>
                 {{#if dbp.hp.unknown}}
                 {{!-- Hidden HP parks every drum on one character — same furniture,
                       different reading. All "?" by default; with the partial-disclosure
@@ -71,9 +71,11 @@
                       rebuild instead, which keeps this markup byte-identical
                       between renders and lets feCtRender skip the rebuild
                       entirely. The 11th cell being another 0 hides the seam when a
-                      reel wraps 9.x → 0. --}}
+                      reel wraps 9.x → 0. A secret dial (a masked actor mid-spin) gets
+                      a "?" face before that trailing 0, so its masked drums can roll
+                      from "?" and land back on it (feDbpSecretSpinReels). --}}
                 {{#each dbp.hp.reels}}
-                <span class="fe-dbp-reel" data-dbp-roll="1"><span class="fe-dbp-strip"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span></span></span>
+                <span class="fe-dbp-reel" data-dbp-roll="1"><span class="fe-dbp-strip"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>{{#if ../dbp.hp.secret}}<span>?</span>{{/if}}<span>0</span></span></span>
                 {{/each}}
                 {{/if}}
                 {{!-- The separator drum. Its cell is deliberately EMPTY: the solidus is

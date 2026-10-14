@@ -1139,6 +1139,12 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
      paint a spin costs is a handful of 1em strips. */
 }
 
+/* A secret dial's rolling strips carry a 12th cell — the "?" face before the seam
+   0 (feDbpSecretSpinReels) — so the same cell-edge arithmetic divides by 12. */
+.fe-dbp-dial.is-secret [data-dbp-roll] > .fe-dbp-strip {
+  transform: translateY(calc(var(--fe-dbp-d, 0) * -100% / 12));
+}
+
 /* THE SEAM, and nothing else. This is the only part of the dial that belongs to
    the drum's SURFACE rather than to the window, so it is the only part that travels:
    the physical edge where one digit's face meets the next, a near-black hairline
