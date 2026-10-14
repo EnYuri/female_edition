@@ -796,6 +796,16 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
     "FontAwesome" !important;
 }
 
+/* Same for RPG Awesome: `.ra`'s family is a normal declaration, so the
+ * `.chat-message *` rule above took it and the glyph painted CookieRun's boxed-X
+ * .notdef (measured). compcon / MDI need nothing here — compcon's own
+ * declaration is !important in layer(system), which outranks this layer, and
+ * MDI declares its family on ::before, which `*` does not match. Equal
+ * specificity to the `*` rule, so source order decides. */
+#fe-chat-export-container .ra {
+  font-family: "RPGAwesome" !important;
+}
+
 
 
 /* Export view: remove text shadow for readability in PDF (print only).

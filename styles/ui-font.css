@@ -1166,6 +1166,75 @@ body.fe-fonts-enabled button.clear-remaining.icon.fa-solid::after {
 }
 
 /* ===================================================
+ * 6b) Non-FA icon fonts (LANCER compcon + Material Design Icons)
+ * ===================================================
+ * LANCER's icons are PUA codepoints (compcon U+E900.., MDI U+F0000..) that
+ * exist in NO text face, so whenever one of our rules wins the family the
+ * glyph falls through every fallback and paints the primary face's .notdef —
+ * CookieRun's is a boxed X, which is what shows up on screen.
+ *
+ * LANCER declares `font-family: "compcon" !important`, but in layer(system);
+ * for !important the layer order reverses, so ANY !important of ours in
+ * layouts beats it. Measured paths that did (live screenshot + local repro):
+ *   - token-tooltip-alt renders `<i class="fas {{icon}}">`, so a LANCER icon
+ *     arrives as `fas cci cci-structure` and §6's FA rule (host + ::before)
+ *     takes it — the coloured boxes in the token tooltip;
+ *   - LANCER's combat tracker emits `<button class="icon cci cci-…">`, which
+ *     §3's `.application :is(button, …) { font-family: inherit !important }`
+ *     takes — the box on the active combatant's row.
+ * MDI's own `.mdi:before` is a normal declaration, so §6's ::before rule
+ * beats it the same way on any `fas mdi mdi-…` element.
+ *
+ * Restoring the owner's font on the icon classes themselves covers every such
+ * path, including ones not found yet. The doubled [class] lifts specificity
+ * to (0,4,1) — above §3's button rule (0,2,2) and §6's FA rule (0,2,1) — and
+ * the weight reset undoes §6's 900 (both fonts ship one weight, so 900 would
+ * only synthesise a smeared bold). Ungated by system: the classes are the
+ * fonts' own, and without LANCER loaded the families simply do not exist. */
+body.fe-fonts-enabled :is([class^="cci-"], [class*=" cci-"])[class][class],
+body.fe-fonts-enabled :is([class^="cci-"], [class*=" cci-"])[class][class]::before,
+body.fe-fonts-enabled :is([class^="cci-"], [class*=" cci-"])[class][class]::after {
+  font-family: "compcon" !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+}
+
+body.fe-fonts-enabled :is(.mdi, .mdi-set)[class][class]::before,
+body.fe-fonts-enabled .mdi-set[class][class] {
+  font-family: "Material Design Icons" !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+}
+
+/* RPG Awesome (tidy-classic, betternpcsheet5e) has the same host-only shape as
+   compcon — `.ra { font-family: RPGAwesome }`, a NORMAL declaration in
+   layer(modules) — so the same two paths take it: `fas ra …` and a `.ra` on a
+   button. Measured broken on both before this rule. */
+body.fe-fonts-enabled .ra[class][class],
+body.fe-fonts-enabled .ra[class][class]::before,
+body.fe-fonts-enabled .ra[class][class]::after {
+  font-family: "RPGAwesome" !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+}
+
+/* Font Awesome Duotone: §6 folds .fa-duotone/.fad into the CLASSIC family,
+   which keeps the glyph but loses the duotone face — the secondary layer
+   (::after, opacity .4) then paints the classic shape at full weight and the
+   icon reads as one flat tone. Core uses it on every sidebar directory's
+   collapse-all button and the controls-conflict warning. Same version-agnostic
+   variable chain as --fe-fa-classic (v14 renamed --fa-style-family-* to
+   --fa-family-*). (0,3,1) outranks §6's (0,2,1). */
+body.fe-fonts-enabled :is(.fa-duotone, .fad)[class],
+body.fe-fonts-enabled :is(.fa-duotone, .fad)[class]::before,
+body.fe-fonts-enabled :is(.fa-duotone, .fad)[class]::after {
+  font-family:
+    var(--fa-family-duotone,
+      var(--fa-style-family-duotone,
+        "Font Awesome 7 Duotone", "Font Awesome 6 Duotone", "Font Awesome 5 Duotone")) !important;
+}
+
+/* ===================================================
  * 7) Exceptions / patches
  * =================================================== */
 

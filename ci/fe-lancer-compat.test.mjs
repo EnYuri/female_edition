@@ -91,6 +91,23 @@ test("the LANCER font variables are re-pointed with !important and honour the ca
   assert.match(FONT_CSS, /\.fe-system-lancer\.fe-chatcard-custom-font[\s\S]{0,200}\.message-content > \.card:is\(\.clipped, \.clipped-bot, \.clipped-top\)/);
 });
 
+// LANCER's compcon `!important` lives in layer(system), which every layouts-layer
+// `!important` of ours outranks. Without §6b, `fas cci …` (token-tooltip-alt) and
+// `<button class="icon cci …">` (LANCER's tracker) paint CookieRun's boxed-X .notdef.
+test("LANCER icon fonts are restored after the FA rule, above the button-inherit rule", () => {
+  const sec = FONT_CSS.indexOf("6b) Non-FA icon fonts");
+  assert.ok(sec > FONT_CSS.indexOf("6) Font Awesome icon fixes"), "§6b must come after §6 (equal-tier ties go to the later rule)");
+  const body = FONT_CSS.slice(sec);
+  assert.match(body, /:is\(\[class\^="cci-"\], \[class\*=" cci-"\]\)\[class\]\[class\]::before[\s\S]{0,200}font-family: "compcon" !important;/);
+  assert.match(body, /:is\(\.mdi, \.mdi-set\)\[class\]\[class\]::before[\s\S]{0,120}font-family: "Material Design Icons" !important;/);
+  // Same host-only shape, same two paths (tidy-classic / betternpcsheet5e).
+  assert.match(body, /\.ra\[class\]\[class\]::before[\s\S]{0,120}font-family: "RPGAwesome" !important;/);
+  // §6 folds duotone into classic, which flattens core's two-tone icons.
+  assert.match(body, /:is\(\.fa-duotone, \.fad\)\[class\]::after[\s\S]{0,80}var\(--fa-family-duotone,/);
+  // The archive's ungated `.chat-message *` rule takes `.ra` too.
+  assert.match(read("styles/fe-chat-archive.css"), /#fe-chat-export-container \.ra \{\s*font-family: "RPGAwesome" !important;/);
+});
+
 // Every templates/chat/*.hbs root in LANCER 3.x is one of these three.
 test("LANCER card roots classify as chat cards; a bare .card does not", () => {
   for (const cls of ["card clipped", "card clipped-bot", "card clipped-top"]) {
