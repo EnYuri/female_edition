@@ -54,8 +54,11 @@
   margin-block: 0;
 }
 
-.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset,
-.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) fieldset {
+/* Child combinator is load-bearing: v13's vision tab renders each detection-mode ROW as a nested
+   `<fieldset class="detection-mode">` (core's grid rule for it resets fieldset border/padding).
+   A descendant `fieldset` selector out-specified that grid and stacked every row into a column. */
+.prototype-token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) > fieldset,
+.token-config.fe-tp-active.fe-tp-two-column .tab.scrollable:not([data-tab="appearance"]) > fieldset {
   display: flex;
   flex-direction: column;
   gap: 8px;

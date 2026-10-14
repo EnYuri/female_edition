@@ -551,8 +551,16 @@ function feCtPrefersReducedMotion() {
   catch { return false; }
 }
 
+// The strip a not-yet-started encounter (round 0) shows IS round one's turn order, so it
+// is labelled and padded exactly like round one: without the R0/R2 previews, centering
+// left empty spacer beside the first and last combatant until combat began.
+function feCtDisplayRound(round) {
+  return Math.max(1, Number(round) || 0);
+}
+
 function feCtBuildRoundStrip(combatants, portraits, round, adjacent) {
-  if (round < 1 || !combatants.length) return portraits;
+  if (!combatants.length) return portraits;
+  round = feCtDisplayRound(round);
   return [
     { roundDivider: `R${round - 1}` },
     ...combatants.slice(-CT_ADJACENT_ROUND_CARDS).map((c) => adjacent(c, -1)),
@@ -793,7 +801,11 @@ function feCtRender() {
   if (html !== _ctLastHtml) {
     const oldStrip = root.querySelector(".fe-ct-combatants");
     const previousScrollLeft = oldStrip?.scrollLeft ?? 0;
-    const roundStep = _ctLastCombatId === combat.id ? combatRound - _ctLastCombatRound : 0;
+    // Compared on DISPLAYED rounds: starting combat (0 → 1) keeps the same window, so
+    // it must not be anchored to the old strip's next-round preview.
+    const roundStep = _ctLastCombatId === combat.id
+      ? feCtDisplayRound(combatRound) - feCtDisplayRound(_ctLastCombatRound)
+      : 0;
     // The next/previous round's first/last card already exists at the edge of
     // the old strip. Keep that card at the same screen coordinate while the
     // three-round window moves, then let ordinary turn-follow reveal it.

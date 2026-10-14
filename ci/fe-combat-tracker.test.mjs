@@ -57,17 +57,25 @@ test("turn changes immediately reveal the active portrait without resetting manu
 test("round previews use the visible turn order, with round zero before round one", () => {
   const start = ENTRY.indexOf("function feCtBuildRoundStrip(");
   const fn = ENTRY.slice(start, ENTRY.indexOf("\n}\n", start) + 2);
-  const build = runInNewContext(`${fn}\nfeCtBuildRoundStrip`, { CT_ADJACENT_ROUND_CARDS: 4 });
+  const display = ENTRY.slice(
+    ENTRY.indexOf("function feCtDisplayRound("),
+    ENTRY.indexOf("\n}\n", ENTRY.indexOf("function feCtDisplayRound(")) + 2
+  );
+  const build = runInNewContext(`${display}\n${fn}\nfeCtBuildRoundStrip`, { CT_ADJACENT_ROUND_CARDS: 4 });
   const turns = "ABCDEFG".split("").map((id) => ({ id }));
   const portraits = turns.map(({ id }) => ({ id, current: true }));
   const adjacent = (c, offset) => ({ id: c.id, offset });
-  const result = build(turns, portraits, 1, adjacent);
-  assert.deepEqual(Array.from(result, (card) => card.roundDivider ?? `${card.id}:${card.offset ?? 0}`), [
+  const layout = (round) => Array.from(build(turns, portraits, round, adjacent),
+    (card) => card.roundDivider ?? `${card.id}:${card.offset ?? 0}`);
+  const roundOne = [
     "R0", "D:-1", "E:-1", "F:-1", "G:-1",
     "R1", "A:0", "B:0", "C:0", "D:0", "E:0", "F:0", "G:0",
     "R2", "A:1", "B:1", "C:1", "D:1",
-  ]);
-  assert.equal(build(turns, portraits, 0, adjacent), portraits);
+  ];
+  assert.deepEqual(layout(1), roundOne);
+  // An unstarted encounter previews round one, so centering has cards on both sides.
+  assert.deepEqual(layout(0), roundOne);
+  assert.deepEqual(build([], [], 0, adjacent), []);
   assert.match(DBP, /:not\(\[data-ct-round-offset\]\) \.fe-dbp-dial/, "the animated dial targets the current-round card");
 });
 
