@@ -29,7 +29,7 @@ test("settings entry and its transitive imports exist and have no circular depen
 });
 
 test("every setting key and menu reset value has a central registration definition", () => {
-  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 187);
+  assert.equal(Object.keys(FE_SETTING_DEFINITIONS).length, 188);
   assert.deepEqual(Object.keys(FE_DEFAULTS).sort(), Object.keys(FE_SETTING_DEFINITIONS).sort());
   for (const key of [...Object.values(S), ...Object.values(CP), ...FE_RELOAD_REQUIRED_KEYS]) {
     assert.ok(FE_SETTING_DEFINITIONS[key], key);
@@ -124,6 +124,7 @@ test("centralized settings window registers synchronously and supplies shared de
     let captures = 0;
     const SaveMenu = feRegisterSettingsMenu({
       MODULE_ID: "female_edition", feIsDx3rdSystemId: id => id === "dx3rd-emanim",
+      feIsLancerSystemId: id => id === "lancer",
       feSetting: key => stored.get(key), feCaptureWorldSettings: async () => { captures++; },
       feRegisterModuleFolderFonts: async () => [], feQueryLocalFonts: async () => [],
       feLocalFontsSupported: () => false, feListCorePriorityKeys: () => [],
@@ -151,6 +152,9 @@ test("centralized settings window registers synchronously and supplies shared de
     game.system.id = "dx3rd-emanim";
     await SaveMenu.DEFAULT_OPTIONS.actions.feSave.call(menu, { preventDefault() {} });
     assert.equal(captures, 2);
+    game.system.id = "lancer";
+    await SaveMenu.DEFAULT_OPTIONS.actions.feSave.call(menu, { preventDefault() {} });
+    assert.equal(captures, 3);
     for (const key of inputNames.filter(key => !key.includes("{{"))) {
       assert.ok(writes.includes(key), `template save: ${key}`);
     }
@@ -162,7 +166,7 @@ test("centralized settings window registers synchronously and supplies shared de
     }
     writes.length = 0;
     await SaveMenu.DEFAULT_OPTIONS.actions.feSave.call(menu, { preventDefault() {} });
-    assert.equal(captures, 3);
+    assert.equal(captures, 4);
     assert.ok(writes.length > 0);
     assert.ok(writes.every(key => FE_SETTING_DEFINITIONS[key].scope === "client"));
   } finally {

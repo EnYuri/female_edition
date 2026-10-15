@@ -97,6 +97,7 @@ const S = {
   CORE_UI_SCENE_CONFIG_TABS: "ceCoreUiSceneConfigTabs",
   DND5E_ITEM_RARITY_SELECT: "ceDnd5eItemRaritySelect",
   DND5E_ITEM_SHEET_FLAT: "ceDnd5eItemSheetFlat",
+  LANCER_CHAT_HEADER_USER_COLOR: "ceLancerChatHeaderUserColor",
   SCREEN_PANEL_ENABLED: "ceScreenPanelEnabled",
   SCREEN_PANEL_GRID_SNAP: "ceScreenPanelGridSnap",
   ATTR_PATH_HELPER: "ceAttrPathHelper",
@@ -343,6 +344,7 @@ const FE_DEFAULTS = {
   "ceCoreUiSceneConfigTabs": true,
   "ceDnd5eItemRaritySelect": false,
   "ceDnd5eItemSheetFlat": false,
+  "ceLancerChatHeaderUserColor": false,
   "ceSceneControlsCollapse": false,
   "ceScreenPanelEnabled": true,
   "ceScreenPanelGridSnap": false,
@@ -616,6 +618,7 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "ceCoreUiSceneConfigTabs",
   "ceDnd5eItemRaritySelect",
   "ceDnd5eItemSheetFlat",
+  "ceLancerChatHeaderUserColor",
   "ceTokenSyncName",
   "ceTokenSyncPlacedName",
   "ceAnimatedTileEnabled",
@@ -1779,6 +1782,15 @@ const FE_SETTING_DEFINITIONS = {
   "ceDnd5eItemSheetFlat": {
     name: "FE.SettingsData.ceDnd5eItemSheetFlat.name",
     hint: "FE.SettingsData.ceDnd5eItemSheetFlat.hint",
+    scope: "client",
+    config: false,
+    type: Boolean,
+  },
+
+  // fe-render-state.js + fe-lancer-compat.css §D
+  "ceLancerChatHeaderUserColor": {
+    name: "FE.SettingsData.ceLancerChatHeaderUserColor.name",
+    hint: "FE.SettingsData.ceLancerChatHeaderUserColor.hint",
     scope: "client",
     config: false,
     type: Boolean,

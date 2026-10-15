@@ -6,6 +6,8 @@
  *   · § A  retro palette           → body.fe-retro-theme.fe-retro-system-lancer
  *   · § B  chat ink vs our base    → body.fe-system-lancer, retro OFF
  *   · § C  archive header mirror   → body.fe-system-lancer (any theme)
+ *   · § D  header in user color    → body.fe-lancer-header-user-color,
+ *                                    retro OFF (ceLancerChatHeaderUserColor)
  *   (fe-style.js feSetRetroThemeClass toggles both classes via
  *    feIsLancerSystemId)
  *
@@ -230,4 +232,57 @@ body.fe-system-lancer #fe-chat-export-log .chat-message.message > .message-conte
 body.fe-system-lancer #fe-chat-export-log .chat-message.message > .message-content .strikethrough {
   opacity: 0.5;
   text-decoration: line-through;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § D  Header band in the speaker's user color (opt-in, retro OFF)
+ * ══════════════════════════════════════════════════════════════
+ * LANCER paints every message header with --primary-color, i.e. one
+ * band colour per UI theme (GMS Red #991e2a by default) for everyone. With
+ * ceLancerChatHeaderUserColor the band follows the speaker's user color
+ * instead, so it agrees with the user-color body tint underneath.
+ *
+ *   body.fe-lancer-header-user-color  fe-style.js (LANCER + setting on)
+ *   li.fe-has-author-color             fe-render-state.js
+ *     --fe-author-rgb  "r g b"         the speaker's color
+ *     --fe-author-ink  #111 / #f5f5f5  picked from its luma
+ *
+ * Messages without a player color (GM NPCs, narration, system) carry no
+ * class and keep LANCER's own band, mirroring the tint's suppression.
+ *
+ * background needs !important: LANCER's band is a NORMAL declaration in
+ * layer(system), which beats layouts. The ink goes through --light-text
+ * because LANCER colours `.message-header *` with var(--light-text) — a
+ * custom property LANCER never declares on the header itself, so the plain
+ * declaration here wins and every descendant follows.
+ *
+ * Retro is excluded: § A1 already repaints the band into the accent
+ * family, and per-user colours would break that monochrome palette.
+ *
+ * Merged messages are excluded too. fe-chat-enhance.css strips the header
+ * band to transparent on merged groups (standard mode: start/mid/end;
+ * simple mode: follows) — but that is a layer(modules) !important, which
+ * this layer(layouts) !important would beat, re-painting a band the merge
+ * deliberately removed. The :not() mirrors exactly those two selectors. */
+body.fe-lancer-header-user-color:not(.fe-retro-theme)
+  :is(#chat, #chat-popout, .chat-popout, #chat-log, .chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message.fe-has-author-color:not(
+    body.fe-chat-merge.fe-merge-mode-standard :is(.fe-merge-start, .fe-merge-mid, .fe-merge-end),
+    body.fe-chat-merge.fe-merge-mode-simple .fe-merge-follow
+  ) > .message-header {
+  --light-text: var(--fe-author-ink);
+  background: rgb(var(--fe-author-rgb)) !important;
+  color: var(--fe-author-ink) !important;
+}
+
+/* Whispers keep LANCER's two-tone cue: the user color fading into the
+   theme's secondary color, same 60deg / 30% geometry as LANCER's rule. */
+body.fe-lancer-header-user-color:not(.fe-retro-theme)
+  :is(#chat, #chat-popout, .chat-popout, #chat-log, .chat-log, #chat-notifications, #fe-chat-export-log)
+  .chat-message.whisper.fe-has-author-color:not(
+    body.fe-chat-merge.fe-merge-mode-standard :is(.fe-merge-start, .fe-merge-mid, .fe-merge-end),
+    body.fe-chat-merge.fe-merge-mode-simple .fe-merge-follow
+  ) > .message-header {
+  background: linear-gradient(60deg, rgb(var(--fe-author-rgb)) 30%, var(--secondary-color)) !important;
 }

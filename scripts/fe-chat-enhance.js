@@ -419,6 +419,11 @@ Hooks.once("init", () => {
   // Hidden from the user-facing settings panel.
   feRegisterSetting(LEGACY_UI_FONT_KEY);
 
+  feRegisterSetting(S.LANCER_CHAT_HEADER_USER_COLOR, () => {
+      feSetRetroThemeClass(document);
+      feApplyUserColorBgToAllLogs(document);
+    });
+
   feRegisterSetting(S.USE_USER_COLOR_BG, () => {
       feSetUserColorBgClass(document);
       feApplyUserColorBgToAllLogs(document);

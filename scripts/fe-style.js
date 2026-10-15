@@ -208,6 +208,13 @@ function feSetRetroThemeClass(doc = document) {
     // §5c), the chat-ink re-pointing and the archive mirror of its `#chat`-scoped
     // header rules (fe-lancer-compat.css §B/§C) all apply with retro OFF.
     body.classList.toggle("fe-system-lancer", feIsLancerSystemId(systemId));
+    // Opt-in repaint of LANCER's chat header band with the speaker's user color
+    // (fe-lancer-compat.css §D). The per-message color is stamped by
+    // fe-render-state.js; this class only arms the CSS.
+    body.classList.toggle(
+      "fe-lancer-header-user-color",
+      feIsLancerSystemId(systemId) && !!feSetting(S.LANCER_CHAT_HEADER_USER_COLOR),
+    );
 
     // double-cross-3rd's legacy token-adjacent combat buttons are PIXI.Graphics,
     // not DOM nodes, so the CSS theme cannot reach them. Repaint any live button

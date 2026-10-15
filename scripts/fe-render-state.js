@@ -2,7 +2,7 @@ import { FE_DEFAULTS } from "./fe-settings-data.js";
 import {
   MODULE_ID, S,
   FE_RENDER_STATE_FLAG, FE_RENDER_SPECIAL_KIND_FLAG, FE_RENDER_MERGE_HINT_FLAG, FE_RENDER_STATE_VERSION,
-  FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR,
+  FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR, feIsLancerSystemId,
 } from "./fe-constants.js";
 import {
   feExtractHTMLElement, feNormalizeChatMessageId,
@@ -501,6 +501,56 @@ function feUserColorBgFeatureActive() {
   }
 }
 
+// LANCER paints every message header with its theme's --primary-color (GMS Red
+// by default). ceLancerChatHeaderUserColor repaints it with the speaker's user
+// color instead (fe-lancer-compat.css §D). That needs the color on the element
+// REGARDLESS of the tint/base toggles, which only publish --fe-user-color-rgb
+// while the tint is on - so it rides on its own var + class pair. The ink is
+// picked here from the color's luma: LANCER's --light-text is near-white, and a
+// light user color (yellow, pale pink) would leave the name unreadable.
+function feLancerHeaderUserColorActive() {
+  try {
+    return feIsLancerSystemId(game?.system?.id) && !!feSetting(S.LANCER_CHAT_HEADER_USER_COLOR);
+  } catch {
+    return false;
+  }
+}
+
+function feClearAuthorHeaderColor(el0) {
+  el0.classList.remove("fe-has-author-color");
+  el0.style.removeProperty("--fe-author-rgb");
+  el0.style.removeProperty("--fe-author-ink");
+}
+
+function feApplyAuthorHeaderColor(el0, message, state, charColor) {
+  // charColor == null is a system message (GM NPC / narration / author-less):
+  // it keeps LANCER's own theme band, exactly like the tint suppresses it.
+  if (!feLancerHeaderUserColorActive() || charColor == null) {
+    feClearAuthorHeaderColor(el0);
+    return;
+  }
+  let parsed = null;
+  const rgbString = state?.userColorRgb || message?.flags?.[MODULE_ID]?.userColorRgb || null;
+  if (rgbString) {
+    const parts = String(rgbString).trim().split(/[\s,]+/).map(Number);
+    if (parts.length >= 3 && parts.slice(0, 3).every((n) => Number.isFinite(n))) {
+      parsed = { r: parts[0], g: parts[1], b: parts[2] };
+    }
+  }
+  if (!parsed) {
+    parsed = feParseHexColorToRgb(state?.userColorHex || message?.flags?.[MODULE_ID]?.userColorHex || charColor);
+  }
+  if (!parsed) {
+    feClearAuthorHeaderColor(el0);
+    return;
+  }
+  // Rec. 709 luma on 0-255; above ~150 white text stops reading.
+  const luma = 0.2126 * parsed.r + 0.7152 * parsed.g + 0.0722 * parsed.b;
+  el0.classList.add("fe-has-author-color");
+  el0.style.setProperty("--fe-author-rgb", `${parsed.r} ${parsed.g} ${parsed.b}`);
+  el0.style.setProperty("--fe-author-ink", luma > 150 ? "#111111" : "#f5f5f5");
+}
+
 function feApplyUserColorBgToMessageElement(message, messageEl) {
   try {
     const tintEnabled = !!feSetting(S.USE_USER_COLOR_BG);
@@ -527,12 +577,14 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
       el0.classList.remove("fe-system-msg", "fe-has-user-color", "fe-system-gm-tint");
       el0.style.removeProperty("--fe-user-color-rgb");
       el0.style.removeProperty("--fe-user-color-alpha");
+      feClearAuthorHeaderColor(el0);
       return;
     }
 
     // Resolve the character (author/owner) color once. null identifies a system
     // message (GM NPC/narration, author-less, Foundry system).
     const charColor = feGetMessageUserColor(message);
+    feApplyAuthorHeaderColor(el0, message, state, charColor);
     const isSystemMessage = charColor == null;
     el0.classList.toggle("fe-system-msg", isSystemMessage);
     el0.classList.remove("fe-system-gm-tint");
@@ -602,6 +654,9 @@ function feApplyUserColorBgToMessageElement(message, messageEl) {
 function feApplyUserColorBgToAllLogs(doc = document) {
   try {
     const enabled = feUserColorBgFeatureActive();
+    // The LANCER header color is stamped by the same per-message pass, so it
+    // keeps that pass alive even while both tint features are off.
+    const lancerHeader = feLancerHeaderUserColorActive();
     const queryRoot = doc?.querySelectorAll ? doc : document;
     const roots = Array.from(queryRoot.querySelectorAll?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications") ?? []);
     if (queryRoot?.matches?.("#chat-log, ol.chat-log, #fe-chat-export-log, #chat-notifications")) roots.unshift(queryRoot);
@@ -609,9 +664,11 @@ function feApplyUserColorBgToAllLogs(doc = document) {
     for (const root of roots) {
       const nodes = root.querySelectorAll(":scope > li.chat-message, :scope > .message");
       for (const li of nodes) {
-        if (!enabled) {
-          li.classList.remove("fe-has-user-color");
+        if (!enabled && !lancerHeader) {
+          li.classList.remove("fe-has-user-color", "fe-has-author-color");
           li.style?.removeProperty?.("--fe-user-color-rgb");
+          li.style?.removeProperty?.("--fe-author-rgb");
+          li.style?.removeProperty?.("--fe-author-ink");
           continue;
         }
         const msgId = feGetMessageIdFromElement(li);
@@ -629,7 +686,7 @@ function feApplyUserColorBgToAllLogs(doc = document) {
 function feApplyUserColorBgToLog(logEl, doc = document) {
   try {
     const enabled = feUserColorBgFeatureActive();
-    if (!enabled) return;
+    if (!enabled && !feLancerHeaderUserColorActive()) return;
     if (!logEl?.querySelectorAll) return;
 
     const nodes = logEl.querySelectorAll(":scope > li.chat-message, :scope > .message");

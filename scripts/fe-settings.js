@@ -1,7 +1,7 @@
 import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 // Unified settings window and initialization. Static data lives separately to avoid cycles.
 import { S, CP, FE_MENU_DEFAULTS, FE_MENU_RANGES, CHOICES, FE_RELOAD_REQUIRED_KEYS } from "./fe-settings-data.js";
-import { MODULE_ID, feIsDx3rdSystemId } from "./fe-constants.js";
+import { MODULE_ID, feIsDx3rdSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings } from "./fe-gm-priority.js";
 import { feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported } from "./fe-user-font.js";
 import { feListCorePriorityKeys } from "./fe-core-priority.js";
@@ -9,7 +9,7 @@ import { feListCorePriorityKeys } from "./fe-core-priority.js";
 export * from "./fe-settings-data.js";
 
 const FE_SETTINGS_SERVICES = {
-  MODULE_ID, feIsDx3rdSystemId, feSetting, feCaptureWorldSettings,
+  MODULE_ID, feIsDx3rdSystemId, feIsLancerSystemId, feSetting, feCaptureWorldSettings,
   feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported, feListCorePriorityKeys,
 };
 
@@ -18,6 +18,7 @@ const FE_SETTINGS_SERVICES = {
 function feRegisterSettingsMenu({
   MODULE_ID,
   feIsDx3rdSystemId,
+  feIsLancerSystemId = () => false,
   feSetting,
   feCaptureWorldSettings,
   feRegisterModuleFolderFonts,
@@ -42,6 +43,10 @@ function feRegisterSettingsMenu({
 
   function feIsDnd5eSystem() {
     try { return game?.system?.id === "dnd5e"; } catch { return false; }
+  }
+
+  function feIsLancerSystem() {
+    try { return feIsLancerSystemId(game?.system?.id); } catch { return false; }
   }
 
   const FE_SM_TAB_STORE = `${MODULE_ID}:settings-menu:active-tab`;
@@ -90,6 +95,7 @@ function feRegisterSettingsMenu({
         [S.CORE_UI_SCENE_CONFIG_TABS]: feRead(S.CORE_UI_SCENE_CONFIG_TABS),
         [S.DND5E_ITEM_RARITY_SELECT]: feRead(S.DND5E_ITEM_RARITY_SELECT),
         [S.DND5E_ITEM_SHEET_FLAT]: feRead(S.DND5E_ITEM_SHEET_FLAT),
+        [S.LANCER_CHAT_HEADER_USER_COLOR]: feRead(S.LANCER_CHAT_HEADER_USER_COLOR),
         [S.TOKEN_CONFIG_TWO_COLUMN]: feRead(S.TOKEN_CONFIG_TWO_COLUMN),
         [S.TOKEN_SYNC_NAME]: feRead(S.TOKEN_SYNC_NAME),
         [S.TOKEN_SYNC_PLACED_NAME]: feRead(S.TOKEN_SYNC_PLACED_NAME),
@@ -318,6 +324,7 @@ function feRegisterSettingsMenu({
         corePriorityKeys: feListCorePriorityKeys(),
         isDx3rd:  feIsDx3rdSystem(),
         isDnd5e:  feIsDnd5eSystem(),
+        isLancer: feIsLancerSystem(),
         // Status UI (fe-dx3rd-resource-ui) works on both dx3rd and dnd5e.
         ruiSupported: feIsDx3rdSystem() || feIsDnd5eSystem(),
       };
@@ -627,6 +634,7 @@ function feRegisterSettingsMenu({
           ...(feIsDnd5eSystem() ? [
             bool(S.DND5E_ITEM_RARITY_SELECT), bool(S.DND5E_ITEM_SHEET_FLAT),
           ] : []),
+          ...(feIsLancerSystem() ? [bool(S.LANCER_CHAT_HEADER_USER_COLOR)] : []),
           bool(S.TOKEN_CONFIG_TWO_COLUMN),
           ...(game.user?.isGM ? [
             bool(S.TOKEN_SYNC_NAME),

@@ -687,6 +687,20 @@
   </section>
   {{/if}}
 
+  {{#if isLancer}}
+  <section class="fe-settings__section" data-fe-settings-tab="system">
+    <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.Lancer.Title"}}</h3>
+
+    <div class="form-group">
+      <label>{{localize "FE.SettingsMenu.ceLancerChatHeaderUserColor.Text"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceLancerChatHeaderUserColor" data-dtype="Boolean" {{checked values.ceLancerChatHeaderUserColor}} />
+      </div>
+      <p class="notes">{{{localize "FE.SettingsMenu.ceLancerChatHeaderUserColor.Hint"}}}</p>
+    </div>
+  </section>
+  {{/if}}
+
   {{#if isDnd5e}}{{#if isGM}}
   <section class="fe-settings__section" data-fe-settings-tab="system">
     <h3 class="fe-settings__section-title">{{localize "FE.SettingsMenu.system.Text"}}</h3>
