@@ -42,8 +42,16 @@ test("the fixed tracker stays viewport-clamped while combatants scroll", () => {
 // replaces the scroller itself, so its old position also has to be restored first.
 test("turn changes immediately reveal the active portrait without resetting manual scroll", () => {
   assert.match(ENTRY, /const activeChanged = activeKey !== _ctLastActiveKey/);
-  assert.match(ENTRY, /if \(activeChanged && !_ctCollapsed\) \{\s*feCtRevealActiveCombatant\(root\);\s*_ctLastActiveKey = activeKey;/);
-  assert.match(ENTRY, /const previousScrollLeft = oldStrip\?\.scrollLeft \?\? 0/);
+  assert.match(ENTRY, /if \(activeChanged && !_ctCollapsed\) \{[\s\S]*?feCtRevealActiveCombatant\(root, alignStart\);\s*_ctLastActiveKey = activeKey;/);
+  // A collapsed (display:none) strip has no scroll position, so the last VISIBLE one is
+  // remembered; otherwise minimize -> expand dropped the user on the leftmost previews.
+  assert.match(ENTRY, /if \(stripWasShown && oldStrip\) _ctScrollLeft = oldStrip\.scrollLeft;\s*const previousScrollLeft = _ctScrollLeft;/);
+  // Visibility classes go on BEFORE the rebuild, so its measurements see a laid-out strip.
+  const add = ENTRY.indexOf('root.classList.add("fe-ct-active")');
+  assert.ok(add > 0 && add < ENTRY.indexOf("root.innerHTML = html"), "fe-ct-active is applied before the rebuild");
+  assert.ok(ENTRY.indexOf('root.classList.toggle("fe-ct-collapsed", _ctCollapsed)') < ENTRY.indexOf("root.innerHTML = html"));
+  assert.match(ENTRY, /const preview = stripWasShown && /, "no preview anchor off a hidden strip");
+  assert.match(ENTRY, /if \(feCtSetting\(S\.COMBAT_TRACKER_CENTER_TURN\)\) feCtPrepareCentering\(root\);\s*feCtRevealActiveCombatant\(root, alignStart\)/, "centring re-measures on every follow");
   assert.match(ENTRY, /if \(strip\) \{\s*strip\.scrollLeft = previousScrollLeft/);
 
   const fn = ENTRY.slice(ENTRY.indexOf("function feCtRevealActiveCombatant("));
@@ -76,7 +84,10 @@ test("round previews use the visible turn order, with round zero before round on
   // An unstarted encounter previews round one, so centering has cards on both sides.
   assert.deepEqual(layout(0), roundOne);
   assert.deepEqual(build([], [], 0, adjacent), []);
-  assert.match(DBP, /:not\(\[data-ct-round-offset\]\) \.fe-dbp-dial/, "the animated dial targets the current-round card");
+  // The previews must spin too: a preview left at the last render's offset froze
+  // mid-spin, and on a secret dial that parked a digit in a masked window.
+  assert.ok(!/:not\(\[data-ct-round-offset\]\) \.fe-dbp-dial/.test(DBP), "the ticker drives every copy of a dial, previews included");
+  assert.match(DBP, /function feDbpDialsFor\(/);
 });
 
 test("before combat starts, the first sorted turn is the displayed active card", () => {
@@ -148,6 +159,31 @@ test("turn following reveals the next card without losing the active card", () =
   root.classList.contains = () => true;
   reveal(root);
   assert.equal(strip.scrollLeft, 368, "the hidden strip cannot consume a turn change");
+});
+
+// Combat start / first view: the minimal follow left scrollLeft alone whenever the active
+// card already fit, so the strip opened on the previous-round PREVIEW cards.
+test("starting an encounter opens on the current round, not on its previews", () => {
+  const start = ENTRY.indexOf("function feCtRevealActiveCombatant(");
+  const fn = ENTRY.slice(start, ENTRY.indexOf("\n}\n", start) + 2);
+  const reveal = runInNewContext(`${fn}\nfeCtRevealActiveCombatant`);
+  const viewport = { left: 100, right: 700 };
+  // Everything is laid out in content coordinates and shifted by scrollLeft.
+  const at = (x, w) => () => ({ left: x - strip.scrollLeft, right: x + w - strip.scrollLeft });
+  const divider = { classList: { contains: (c) => c === "fe-ct-round-divider" }, getBoundingClientRect: at(380, 20) };
+  const preview = { classList: { contains: () => false }, previousElementSibling: null, getBoundingClientRect: at(254, 120) };
+  divider.previousElementSibling = preview;
+  const next = { classList: { contains: () => false }, getBoundingClientRect: at(532, 120) };
+  const active = { previousElementSibling: divider, nextElementSibling: next, getBoundingClientRect: at(406, 120) };
+  const strip = { clientWidth: 600, scrollLeft: 0, getBoundingClientRect: () => viewport, querySelector: () => active };
+  const root = { isConnected: true, classList: { contains: () => false }, querySelector: () => strip };
+
+  reveal(root);
+  assert.equal(strip.scrollLeft, 0, "an ordinary follow leaves a fully visible card alone");
+  reveal(root, true);
+  assert.equal(strip.scrollLeft, 274, "the current round's divider lands on the left edge");
+  assert.match(ENTRY, /feCtRevealActiveCombatant\(root, alignStart\)/);
+  assert.match(ENTRY, /!\(Number\(lastRound\) > 0\) && combatRound > 0/, "round 0 -> 1 counts as a start");
 });
 
 test("center-turn mode aligns the active card's center with the strip", () => {
@@ -315,6 +351,21 @@ test("the hidden dial's glyphs come from the data", () => {
   const body = fn.slice(0, fn.indexOf("\n}"));
   assert.deepEqual([...body.matchAll(/cells\[[^\]]+\]\s*=\s*([^;]+);/g)].map((m) => m[1]), ['"0"', "s[0]"]);
   assert.match(body, /s\.length > 1/, "the leading digit opens only when it is not the ones place");
+  // Run it: the ones place stays "?" for EVERY value, zero included, partial mode on.
+  const clamp = DBP.slice(DBP.indexOf("function feDbpClampValue"));
+  const cellsOf = runInNewContext(
+    `${clamp.slice(0, clamp.indexOf("\n}") + 2)}\n${body}\n}\nfeDbpHiddenCells`,
+    { feCtSetting: () => true, S: { COMBAT_TRACKER_HIDDEN_PARTIAL: "p" } }
+  );
+  for (const digits of [3, 4, 5]) {
+    for (const v of [0, 1, 9, 10, 85, 99, 100, 999, 1000, 12345, 999999]) {
+      const cells = cellsOf(v, digits);
+      assert.equal(cells.length, digits);
+      assert.equal(cells[digits - 1], "?", `ones place of ${v} on ${digits} drums`);
+    }
+  }
+  assert.deepEqual([...cellsOf(0, 3)], ["0", "0", "?"], "zero reads like a one-digit value");
+  assert.deepEqual([...cellsOf(85, 3)], ["0", "8", "?"]);
 });
 
 // A counter reads 027/027, never 027/27 — the max drums pad to the dial's width
@@ -629,4 +680,63 @@ test("the combatant menu can toggle the actor's HP mask, GM only", () => {
   assert.match(ENTRY, /case "toggle-hp-mask":\s*await feToggleHpMask\(c\.actor\);/);
   // One flag, one writer — the menu may not grow its own.
   assert.match(HPMASK, /export async function feToggleHpMask\(/);
+});
+
+// Slice one top-level function (or const) out of a source file by name.
+const fnSrc = (src, name) => {
+  const i = src.indexOf(`function ${name}(`);
+  assert.notEqual(i, -1, `${name} not found`);
+  return src.slice(i, src.indexOf("\n}\n", i) + 2);
+};
+
+// The entrance cascade is keyed per CARD in display order. Previews used to borrow
+// their combatant's stamp, so the leftmost R0 previews dropped in after the current
+// round's cards to their right.
+test("the entrance cascade runs left to right across previews too", () => {
+  const ctx = { CT_ADJACENT_ROUND_CARDS: 4 };
+  const keysOf = runInNewContext(`${fnSrc(ENTRY, "feCtCardKey")}\n${fnSrc(ENTRY, "feCtCardKeys")}\nfeCtCardKeys`, ctx);
+  const build = runInNewContext(
+    `${fnSrc(ENTRY, "feCtDisplayRound")}\n${fnSrc(ENTRY, "feCtCardKey")}\n${fnSrc(ENTRY, "feCtBuildRoundStrip")}\nfeCtBuildRoundStrip`, ctx);
+  const turns = "ABCDEF".split("").map((id) => ({ id }));
+  const strip = build(turns, turns.map((c) => ({ key: c.id })), 1,
+    (c, o) => ({ key: o ? `${c.id}:${o}` : c.id })).filter((x) => !x.roundDivider).map((x) => x.key);
+  assert.deepEqual([...keysOf(turns)], [...strip], "card keys follow the strip's own layout");
+  assert.match(ENTRY, /keys\.forEach\(\(key, i\) => _ctEnterStart\.set\(key, cascadeStart \+ i \* stagger\)\)/);
+  assert.match(ENTRY, /_ctEnterStart\.get\(feCtCardKey\(c\.id, offset\)\) \?\? _ctEnterStart\.get\(c\.id\)/);
+  assert.match(ENTRY, /liveIds\.has\(key\.split\(":"\)\[0\]\)/, "preview stamps are pruned with their combatant");
+});
+
+// The floating delta belongs to the card that took the hit, like the shake.
+test("floating damage numbers ride only on the current-round card", () => {
+  assert.match(DBP, /function feDbpData\(c, size, now, insert, withPops = true\)/);
+  assert.match(DBP, /for \(const pop of withPops \? _dbpPops\.get\(c\.id\) \?\? \[\] : \[\]\)/);
+  assert.match(ENTRY, /feDbpData\(c, dbpOpts\.size, dbpOpts\.now, dbpOpts\.insert, !roundOffset\)/);
+});
+
+// A second hit mid-spin restarts the spin from where the reels ARE. Starting from the
+// previous HP's faces jumped every reel to that number in one frame.
+test("a restarted spin leaves from the reels' momentary position", () => {
+  const names = ["feDbpClampValue", "feDbpReelOffset", "feDbpSpinEase", "feDbpRollReels",
+    "feDbpRestartReels", "feDbpSpinReels"];
+  const spin = runInNewContext(`${names.map((n) => fnSrc(DBP, n)).join("\n")}\nfeDbpSpinReels`,
+    { DBP_SPIN_CRUISE: 0.55, DBP_SPIN_LEAD_MS: 120, DBP_SPIN_TURNS: 12, DBP_SPIN_STAGGER: 0.06 });
+  const anim = { from: 40, to: 25, start: 0, dur: 3000, lead: 0, fromReels: { secret: false, reels: [3.4, 7.7] } };
+  assert.deepEqual([...spin(anim, 0, 2)], [3.4, 7.7], "first frame = the snapshot");
+  assert.deepEqual([...spin(anim, 3000, 2)], [2, 5], "still lands on the new value");
+  anim.fromReels.secret = true;
+  assert.deepEqual([...spin(anim, 0, 2)], [4, 0], "a snapshot from the other kind of strip is ignored");
+  assert.match(DBP, /fromReels,\n\s*dur: feDbpSpinDuration\(\)/);
+});
+
+// With "hide defeated" on, combat.turns still holds the defeated, so a move crossed an
+// invisible neighbour and the card appeared not to move.
+test("move up/down crosses the neighbour on screen", () => {
+  const body = fnSrc(ENTRY, "feCtMoveCombatant");
+  assert.match(body, /S\.COMBAT_TRACKER_HIDE_DEFEATED/);
+  assert.match(body, /\.filter\(\(t\) => t\.id === c\.id \|\| !\(hideDefeated && t\.isDefeated\)\)/);
+});
+
+test("updateToken rerenders only for tokens in the encounter", () => {
+  assert.ok(!ENTRY.includes('Hooks.on("updateToken", () => feCtScheduleRender())'));
+  assert.match(ENTRY, /Hooks\.on\("updateToken", \(token\) => \{\s*if \(feCtGetCombat\(\)\?\.combatants\?\.some\(\(c\) => c\.tokenId === token\?\.id\)\) feCtScheduleRender\(\);/);
 });

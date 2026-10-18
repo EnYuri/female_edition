@@ -94,7 +94,11 @@ const CT_ENTER_MS = 455;
 const CT_ENTER_STAGGER_MS = 83;
 const CT_ENTER_STAGGER_TOTAL_MS = 500;
 const CT_BAR_ENTER_MS = 333;
-const _ctEnterStart = new Map(); // combatantId -> performance.now() timestamp
+// Keyed per CARD, not per combatant: the current-round card is keyed by its combatant id,
+// a preview by `${id}:${offset}` (feCtCardKey). Previews used to borrow their combatant's
+// stamp, so the R0 previews at the far left dropped in only after the current round's
+// cards to their right had — the cascade ran out of order.
+const _ctEnterStart = new Map(); // card key -> performance.now() timestamp
 let _ctInitialEnterUntil = 0;
 let _ctInitialEnterOrder = "";
 let _ctBarEnterStart = 0;        // 0 = tracker is not on screen; set when it appears
@@ -351,22 +355,41 @@ function feCtSyncLayoutAndTurn(root) {
   feCtRevealActiveCombatant(root);
 }
 
-function feCtRevealActiveCombatant(root) {
+// `alignStart`: put the current round's divider at the strip's left edge instead of
+// scrolling only as far as needed. Used when an encounter first appears and when it
+// starts (round 0 -> 1): the minimal follow leaves scrollLeft at 0 whenever the active
+// card already fits, so the strip opened on the previous-round PREVIEW cards rather
+// than on the current turn.
+function feCtRevealActiveCombatant(root, alignStart = false) {
   if (!root?.isConnected || root.classList.contains("fe-ct-collapsed")) return;
   const strip = root.querySelector(".fe-ct-combatants");
   const active = strip?.querySelector(".fe-ct-portrait.is-active");
   if (!strip || !active || strip.clientWidth <= 0) return;
 
   const stripRect = strip.getBoundingClientRect();
-  const activeRect = active.getBoundingClientRect();
+  let activeRect = active.getBoundingClientRect();
   if (strip.classList?.contains("fe-ct-center-turn")) {
     strip.scrollLeft += (activeRect.left + activeRect.right - stripRect.left - stripRect.right) / 2;
     return;
   }
+  const margin = 6;
+  if (alignStart) {
+    // Anchor on the divider that opens the active card's round, so its "Rn" label
+    // stays readable; the active card itself is the fallback.
+    let lead = active;
+    for (let el = active.previousElementSibling; el; el = el.previousElementSibling) {
+      if (el.classList?.contains("fe-ct-round-divider")) { lead = el; break; }
+    }
+    const delta = lead.getBoundingClientRect().left - stripRect.left - margin;
+    if (delta) strip.scrollLeft += delta;
+    // If that pushed the active card off the right edge, fall through so the
+    // ordinary follow brings it back.
+    activeRect = active.getBoundingClientRect();
+    if (activeRect.right <= stripRect.right - margin) return;
+  }
   let next = active.nextElementSibling;
   if (next?.classList?.contains("fe-ct-round-divider")) next = next.nextElementSibling;
   const nextRect = next?.getBoundingClientRect();
-  const margin = 6;
   let delta = 0;
   if (activeRect.left < stripRect.left + margin) {
     delta = activeRect.left - stripRect.left - margin;
@@ -430,7 +453,7 @@ function feCtPortraitData(c, active, canEndTurn, enterDelay = null, dbpOpts = nu
     canActivate: !roundOffset && !canEndTurn && feCtCanActivate(c.parent, c),
     // Dynamic battle portrait. dbpOpts only arrives for the vertical aspects, and
     // when it does the name caption is hidden in CSS (.has-dbp .fe-ct-name).
-    dbp: dbpOpts ? feDbpData(c, dbpOpts.size, dbpOpts.now, dbpOpts.insert) : null,
+    dbp: dbpOpts ? feDbpData(c, dbpOpts.size, dbpOpts.now, dbpOpts.insert, !roundOffset) : null,
     // The hit shake uses the same stamp scheme as the entrance: the REMAINING time
     // goes out as a negative delay, so an innerHTML rebuild never rewinds a shake
     // that is already playing.
@@ -506,6 +529,12 @@ let _ctLastActiveKey = "";
 let _ctLastFollowLayoutKey = "";
 let _ctLastCombatRound = null;
 let _ctLastCombatId = null;
+// The strip's scroll position as of the last time it was VISIBLE. A collapsed strip
+// (or a root that is not shown yet) is display:none, and a display:none scroller has no
+// scroll position at all: it reads 0 and ignores writes. Without this, minimizing and
+// expanding the tracker dropped the user back on the leftmost (previous-round preview)
+// cards.
+let _ctScrollLeft = 0;
 /**
  * Remove every trace of the tracker from the screen.
  *
@@ -536,6 +565,7 @@ function feCtTeardown() {
   _ctLastFollowLayoutKey = "";
   _ctLastCombatRound = null;
   _ctLastCombatId = null;
+  _ctScrollLeft = 0;
 }
 
 // Interval between two neighbours' animations, squeezed so `count` of them finish
@@ -567,6 +597,20 @@ function feCtDisplayActiveId(combat) {
   return combat.combatant?.id ?? null;
 }
 
+function feCtCardKey(id, offset = 0) {
+  return offset ? `${id}:${offset}` : id;
+}
+
+// Every card's key, left to right, in exactly feCtBuildRoundStrip's layout.
+function feCtCardKeys(combatants) {
+  if (!combatants.length) return [];
+  return [
+    ...combatants.slice(-CT_ADJACENT_ROUND_CARDS).map((c) => feCtCardKey(c.id, -1)),
+    ...combatants.map((c) => feCtCardKey(c.id)),
+    ...combatants.slice(0, CT_ADJACENT_ROUND_CARDS).map((c) => feCtCardKey(c.id, 1)),
+  ];
+}
+
 function feCtBuildRoundStrip(combatants, portraits, round, adjacent) {
   if (!combatants.length) return portraits;
   round = feCtDisplayRound(round);
@@ -588,6 +632,7 @@ function feCtClearTracker(root) {
   _ctLastFollowLayoutKey = "";
   _ctLastCombatRound = null;
   _ctLastCombatId = null;
+  _ctScrollLeft = 0;
 }
 
 function feCtCancelExit() {
@@ -718,9 +763,10 @@ function feCtRender() {
   if (nowMs < _ctInitialEnterUntil && enterOrder !== _ctInitialEnterOrder) {
     _ctInitialEnterOrder = enterOrder;
     const cascadeStart = Math.max(nowMs, _ctBarEnterStart + CT_BAR_ENTER_MS);
-    const stagger = feCtStagger(combatants.length, CT_ENTER_STAGGER_MS, CT_ENTER_STAGGER_TOTAL_MS);
-    combatants.forEach((c, i) => _ctEnterStart.set(c.id, cascadeStart + i * stagger));
-    _ctInitialEnterUntil = cascadeStart + Math.max(0, combatants.length - 1) * stagger + CT_ENTER_MS;
+    const keys = feCtCardKeys(combatants);
+    const stagger = feCtStagger(keys.length, CT_ENTER_STAGGER_MS, CT_ENTER_STAGGER_TOTAL_MS);
+    keys.forEach((key, i) => _ctEnterStart.set(key, cascadeStart + i * stagger));
+    _ctInitialEnterUntil = cascadeStart + Math.max(0, keys.length - 1) * stagger + CT_ENTER_MS;
   }
   const barDelay = _ctBarEnterStart - nowMs;
   const barEntering = barDelay > -CT_BAR_ENTER_MS;
@@ -766,14 +812,18 @@ function feCtRender() {
   // predecessor while combat itself is still at round zero.
   const dbpOpts = dbpOn ? { size, now: nowMs, insert: dbpInsert } : null;
   const adjacent = (c, offset) => {
-    const start = _ctEnterStart.get(c.id);
+    // A combatant that joined after the initial cascade has no preview stamp; its
+    // previews arrive with its current-round card.
+    const start = _ctEnterStart.get(feCtCardKey(c.id, offset)) ?? _ctEnterStart.get(c.id);
     const delay = start == null ? null : start - nowMs;
     return feCtPortraitData(c, false, false, delay != null && delay > -CT_ENTER_MS ? delay : null, dbpOpts, offset);
   };
   const stripCards = feCtBuildRoundStrip(combatants, portraits, combatRound, adjacent);
   // Drop stamps for combatants that are gone, so a re-added one animates in again.
   const liveIds = new Set(combatants.map((c) => c.id));
-  for (const id of [..._ctEnterStart.keys()]) if (!liveIds.has(id)) _ctEnterStart.delete(id);
+  for (const key of [..._ctEnterStart.keys()]) {
+    if (!liveIds.has(key.split(":")[0])) _ctEnterStart.delete(key);
+  }
   // Same reason for the dynamic portrait's state: a combatant that left must not
   // keep its old HP baseline, or rejoining would replay a phantom hit against it.
   feDbpPruneState(liveIds);
@@ -807,9 +857,21 @@ function feCtRender() {
    * only while that animation is actually alive, so a steady tracker renders the
    * same string every time and the DOM is left completely untouched.
    */
+  // Whether the strip on screen right now can be scrolled at all. Read BEFORE the
+  // classes below change it: an expand makes the old strip visible again, but its
+  // scroll position was already lost while it was hidden.
+  const stripWasShown = root.classList.contains("fe-ct-active") &&
+    !root.classList.contains("fe-ct-collapsed");
+  // Visibility goes on BEFORE the rebuild so that everything measured or written inside
+  // it (centering width, restored scroll, preview anchor) hits a laid-out strip. Applied
+  // after, a first appearance or an expand measured a display:none strip as 0 wide and
+  // its restored scrollLeft was silently dropped.
+  root.classList.add("fe-ct-active");
+  root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   if (html !== _ctLastHtml) {
     const oldStrip = root.querySelector(".fe-ct-combatants");
-    const previousScrollLeft = oldStrip?.scrollLeft ?? 0;
+    if (stripWasShown && oldStrip) _ctScrollLeft = oldStrip.scrollLeft;
+    const previousScrollLeft = _ctScrollLeft;
     // Compared on DISPLAYED rounds: starting combat (0 → 1) keeps the same window, so
     // it must not be anchored to the old strip's next-round preview.
     const roundStep = _ctLastCombatId === combat.id
@@ -818,7 +880,8 @@ function feCtRender() {
     // The next/previous round's first/last card already exists at the edge of
     // the old strip. Keep that card at the same screen coordinate while the
     // three-round window moves, then let ordinary turn-follow reveal it.
-    const preview = Math.abs(roundStep) === 1 && activeId
+    // A hidden old strip has no geometry to anchor against.
+    const preview = stripWasShown && Math.abs(roundStep) === 1 && activeId
       ? oldStrip?.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(activeId)}"][data-ct-round-offset="${roundStep}"]`)
       : null;
     const previewLeft = preview?.getBoundingClientRect().left;
@@ -843,8 +906,6 @@ function feCtRender() {
       if (src) feApplyHQPortrait(im, src, size, hpx);
     });
   }
-  root.classList.add("fe-ct-active");
-  root.classList.toggle("fe-ct-collapsed", _ctCollapsed);
   const strip = root.querySelector(".fe-ct-combatants");
   if (strip && strip.classList.contains("fe-ct-center-turn") !==
       (feCtSetting(S.COMBAT_TRACKER_CENTER_TURN) && !_ctCollapsed)) feCtPrepareCentering(root);
@@ -852,7 +913,18 @@ function feCtRender() {
   // A turn that advances while collapsed is still pending: expanding the tracker
   // must reveal that combatant rather than consuming the change while the strip is hidden.
   if (activeChanged && !_ctCollapsed) {
-    feCtRevealActiveCombatant(root);
+    // First view of this encounter, or its start (round 0 -> 1): open on the current
+    // round rather than on the previous-round previews (see feCtRevealActiveCombatant).
+    // Read off the last CONSUMED key, so a start that happened while collapsed still
+    // aligns on expand.
+    const [lastCombatId, lastRound] = _ctLastActiveKey.split(":");
+    const alignStart = lastCombatId !== String(combat.id ?? "") ||
+      (!(Number(lastRound) > 0) && combatRound > 0);
+    // Centering freezes the strip's width and end spacers, which only a rebuild used to
+    // re-measure; a portrait-size change can leave the markup byte-identical, so the
+    // follow would centre against stale geometry. Re-measure on every follow.
+    if (feCtSetting(S.COMBAT_TRACKER_CENTER_TURN)) feCtPrepareCentering(root);
+    feCtRevealActiveCombatant(root, alignStart);
     _ctLastActiveKey = activeKey;
     _ctLastFollowLayoutKey = followLayoutKey;
   }
@@ -1392,7 +1464,12 @@ async function feCtOpenInitiativeDialog(combat, c) {
 // a swap keeps the same numbers in the same slots, which reads as "position only").
 // turns is sorted by initiative DESC, so dir<0 = move up = higher initiative.
 async function feCtMoveCombatant(combat, c, dir) {
-  const turns = combat.turns ?? [];
+  // The neighbours are the ones on SCREEN. With "hide defeated" on, combat.turns still
+  // holds the defeated, so a move used to cross an invisible combatant and the card
+  // appeared not to move at all. Same filter as feCtRender (the menu is GM-only, so
+  // hidden combatants are always on screen here).
+  const hideDefeated = !!feCtSetting(S.COMBAT_TRACKER_HIDE_DEFEATED);
+  const turns = (combat.turns ?? []).filter((t) => t.id === c.id || !(hideDefeated && t.isDefeated));
   const idx = turns.findIndex((t) => t.id === c.id);
   if (idx < 0) return;
   const j = idx + dir;
@@ -1531,7 +1608,11 @@ Hooks.once("ready", () => {
     feDbpObserveActorHp(actor);
     if (feCtCombatHasActor(actor)) feCtScheduleRender();
   });
-  Hooks.on("updateToken", () => feCtScheduleRender());
+  // Only tokens in the encounter: this fires for every token move on the scene, and a
+  // render for an unrelated one is wasted work (the markup comes out identical).
+  Hooks.on("updateToken", (token) => {
+    if (feCtGetCombat()?.combatants?.some((c) => c.tokenId === token?.id)) feCtScheduleRender();
+  });
   // Old HP baselines mean nothing once the encounter is gone.
   Hooks.on("deleteCombat", () => feDbpReset());
 });

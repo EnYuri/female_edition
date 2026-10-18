@@ -118,7 +118,7 @@ const DBP_SHAKE_TIER_GAIN = [1, 1.28, 1.55, 1.85];
 const DBP_EFF_ROWS = 2;  // status icon rows; the overflow folds into a "…"
 const DBP_POP_MAX = 4;   // floating numbers alive at once
 
-const _dbpAnim = new Map();   // combatantId → {from, to, start, dur, hidden, bar, lead}
+const _dbpAnim = new Map();   // combatantId → {from, to, start, dur, hidden, bar, lead, fromReels}
 const _dbpPops = new Map();   // combatantId → [{text, heal, start}]
 const _dbpHit = new Map();    // combatantId → {start, shake}
 const _dbpLastHp = new Map(); // combatantId → last observed HP (the delta baseline)
@@ -157,16 +157,17 @@ function feDbpDigits(max) {
 //   123   → "001??"
 //   12    → "0001?"
 //   1-9   → "0000?"   the leading digit IS the ones place, which stays masked
-//   0     → "00000"   zero still reads outright: a downed combatant is not the
-//                     secret this feature protects
+//   0     → "0000?"   same: the ones place is NEVER opened, not even for zero,
+//                     so a downed combatant reads exactly like one on 1-9 HP
 function feDbpHiddenCells(value, digits) {
   const cells = new Array(digits).fill("?");
   if (feCtSetting(S.COMBAT_TRACKER_HIDDEN_PARTIAL) === true) {
-    // Clamped, so `used` is at most `digits` and the writes never run off the dial.
+    // Clamped, so `s.length` is at most `digits` and the writes never run off the dial.
+    // "0" has length 1 like any one-digit value, so zero gets no special case and its
+    // ones drum stays "?" - the last cell is never written by either loop below.
     const v = feDbpClampValue(Math.round(Number(value) || 0), digits);
     const s = String(v);
-    const used = v === 0 ? 0 : s.length;
-    for (let i = 0; i < digits - used; i++) cells[i] = "0";
+    for (let i = 0; i < digits - s.length; i++) cells[i] = "0";
     if (s.length > 1) cells[digits - s.length] = s[0];
   }
   return cells;
@@ -252,6 +253,17 @@ function feDbpRollReels(anim, now, from, to, mod) {
   return out;
 }
 
+// A spin restarted mid-flight (a second hit) starts from where the reels ARE, not
+// from the previous HP: feDbpBeginHpAnim snapshots the momentary offsets into
+// `anim.fromReels`. Starting from the previous HP's faces instead made every reel
+// jump from its in-flight position to that number in one frame. The snapshot is only
+// usable when it was taken on the same kind of strip (secret strips have an extra
+// "?" face, so their offsets live modulo 11) and at the same width.
+function feDbpRestartReels(anim, digits, secret) {
+  const snap = anim.fromReels;
+  return snap && snap.secret === secret && snap.reels.length === digits ? snap.reels : null;
+}
+
 function feDbpSpinReels(anim, now, digits) {
   const to = feDbpClampValue(anim.to, digits);
   const from = feDbpClampValue(anim.from, digits);
@@ -261,7 +273,7 @@ function feDbpSpinReels(anim, now, digits) {
     f.push(feDbpReelOffset(from, j));
     t.push(feDbpReelOffset(to, j));
   }
-  return feDbpRollReels(anim, now, f, t, 10);
+  return feDbpRollReels(anim, now, feDbpRestartReels(anim, digits, false) ?? f, t, 10);
 }
 
 // The "?" face's cell on a secret strip (0-9, ?, 0 — the trailing 0 hides the seam).
@@ -282,7 +294,8 @@ const DBP_SECRET_CELL = 10;
 function feDbpSecretSpinReels(anim, now, digits) {
   const faces = (value) => feDbpHiddenCells(value, digits)
     .map((c) => (c === "?" ? DBP_SECRET_CELL : Number(c)));
-  return feDbpRollReels(anim, now, faces(anim.from), faces(anim.to), DBP_SECRET_CELL + 1);
+  return feDbpRollReels(anim, now, feDbpRestartReels(anim, digits, true) ?? faces(anim.from),
+    faces(anim.to), DBP_SECRET_CELL + 1);
 }
 
 // Status / AE icons: conditions (effects carrying a status id) first, plain active
@@ -427,7 +440,10 @@ function feDbpBarHp(raw, revealed, anim) {
   };
 }
 
-function feDbpData(c, size, now, insert) {
+// `withPops` is false for the previous/next-round PREVIEW copies: the floating delta
+// belongs to the card that takes the hit, like the shake does, and three copies of the
+// same "-12" rising at once across the strip read as three hits.
+function feDbpData(c, size, now, insert, withPops = true) {
   const actor = c.actor;
   const anim = _dbpAnim.get(c.id);
   const raw = feCtResolveHp(actor);
@@ -487,7 +503,7 @@ function feDbpData(c, size, now, insert) {
   }
 
   const pops = [];
-  for (const pop of _dbpPops.get(c.id) ?? []) {
+  for (const pop of withPops ? _dbpPops.get(c.id) ?? [] : []) {
     const delay = pop.start - now;
     if (delay > -DBP_POP_MS) pops.push({ text: pop.text, heal: pop.heal, delay: Math.round(delay) });
   }
@@ -516,7 +532,19 @@ function feDbpBeginHpAnim(c, prev, next) {
   // No lead hold when a spin is already running: the reels are in mid-flight, and
   // parking them on a real number for 120ms there would be both a visible cut and
   // a pointless reading of an already-stale HP.
-  const lead = _dbpAnim.has(c.id) ? 0 : DBP_SPIN_LEAD_MS;
+  const running = _dbpAnim.get(c.id);
+  const lead = running ? 0 : DBP_SPIN_LEAD_MS;
+  // Snapshot where a running dial's reels are right now, so the new spin leaves from
+  // there (feDbpRestartReels). Secret is decided exactly as the appliers decide it.
+  let fromReels = null;
+  if (running && !running.bar) {
+    const digits = feDbpDigits(feCtResolveHp(c.actor)?.max ?? 0);
+    const secret = running.hidden === true || hidden;
+    fromReels = {
+      secret,
+      reels: secret ? feDbpSecretSpinReels(running, now, digits) : feDbpSpinReels(running, now, digits),
+    };
+  }
   // `bar` picks the animation, not just the drawing: the dial rolls drums through
   // feDbpApplyOffsets, the bar scrambles digits through feDbpApplyBarRoll, and the
   // ticker has to know which of the two this entry belongs to. It is captured HERE
@@ -527,6 +555,7 @@ function feDbpBeginHpAnim(c, prev, next) {
     to: next,
     start: now,
     lead,
+    fromReels,
     dur: feDbpSpinDuration(),
     hidden,
     bar: feCtDbpHpStyle() === "bar",
@@ -573,12 +602,16 @@ function feDbpWriteOffsets(strips, offsets) {
   }
 }
 
-function feDbpDialFor(id) {
+// EVERY copy of the combatant's dial: the current-round card AND its previous/next
+// round previews. Targeting only the current card left the previews frozen at whatever
+// offset the last render happened to write - mid-spin that is an arbitrary face, which
+// on a secret dial is a digit sitting in a masked window.
+function feDbpDialsFor(id) {
   const root = document.getElementById(TRACKER_DOM_ID);
-  if (!root) return null;
+  if (!root) return [];
   try {
-    return root.querySelector(`.fe-ct-portrait[data-combatant-id="${CSS.escape(id)}"]:not([data-ct-round-offset]) .fe-dbp-dial[data-dbp-dial]`);
-  } catch { return null; }
+    return [...root.querySelectorAll(`.fe-ct-portrait[data-combatant-id="${CSS.escape(id)}"] .fe-dbp-dial[data-dbp-dial]`)];
+  } catch { return []; }
 }
 
 /**
@@ -809,7 +842,7 @@ function feDbpTick() {
   let bars = false;
   for (const [id, anim] of [..._dbpAnim]) {
     const done = now - anim.start >= anim.dur;
-    const dial = anim.bar ? null : feDbpDialFor(id);
+    const dials = anim.bar ? [] : feDbpDialsFor(id);
     // Secret is LIVE, not just the captured flag: an actor masked mid-spin scrambles
     // onto "?" for the rest of it instead of landing on the real number.
     const secret = anim.hidden === true
@@ -821,20 +854,24 @@ function feDbpTick() {
       // A bar always needs the rerender: the resting markup is what drops the
       // [data-dbp-bar-roll] marker and hands the caption back to the template.
       if (secret || anim.bar) needRender = true;
-      else if (dial) {
-        const strips = feDbpRollStrips(dial);
-        feDbpWriteOffsets(strips, feDbpReelSet(anim.to, strips.length));
+      else {
+        for (const dial of dials) {
+          const strips = feDbpRollStrips(dial);
+          feDbpWriteOffsets(strips, feDbpReelSet(anim.to, strips.length));
+        }
       }
       continue;
     }
     // One pass for every rolling bar rather than a lookup per animation — they all
     // live under the same root and the applier already re-derives everything it needs.
     if (anim.bar) { bars = true; continue; }
-    if (!dial) continue; // panel off or combatant gone — the clock still runs out
-    const strips = feDbpRollStrips(dial);
-    feDbpWriteOffsets(strips, secret
-      ? feDbpSecretSpinReels(anim, now, strips.length)
-      : feDbpSpinReels(anim, now, strips.length));
+    // No dial = panel off or combatant gone; the clock still runs out.
+    for (const dial of dials) {
+      const strips = feDbpRollStrips(dial);
+      feDbpWriteOffsets(strips, secret
+        ? feDbpSecretSpinReels(anim, now, strips.length)
+        : feDbpSpinReels(anim, now, strips.length));
+    }
   }
   if (bars) {
     const root = document.getElementById(TRACKER_DOM_ID);
