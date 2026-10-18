@@ -558,6 +558,15 @@ function feCtDisplayRound(round) {
   return Math.max(1, Number(round) || 0);
 }
 
+// Core leaves turn null until startCombat() sets round 1, turn 0. Preview that
+// first sorted turn in the round-one strip so it can be highlighted and followed
+// before the GM starts combat. LANCER has no fixed first turn: a combatant is
+// chosen by activation, so its pre-combat order must not imply an active actor.
+function feCtDisplayActiveId(combat) {
+  if (Number(combat.round) <= 0 && !feCtIsLancer()) return combat.turns?.[0]?.id ?? null;
+  return combat.combatant?.id ?? null;
+}
+
 function feCtBuildRoundStrip(combatants, portraits, round, adjacent) {
   if (!combatants.length) return portraits;
   round = feCtDisplayRound(round);
@@ -686,7 +695,7 @@ function feCtRender() {
   const combatants = combat.turns.filter(
     (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
   );
-  const activeId = combat.combatant?.id;
+  const activeId = feCtDisplayActiveId(combat);
   const combatRound = Number(combat.round) || 0;
   const activeKey = `${combat.id ?? ""}:${combatRound}:${activeId ?? ""}`;
   const enterOrder = JSON.stringify(combatants.map((c) => c.id));

@@ -79,6 +79,23 @@ test("round previews use the visible turn order, with round zero before round on
   assert.match(DBP, /:not\(\[data-ct-round-offset\]\) \.fe-dbp-dial/, "the animated dial targets the current-round card");
 });
 
+test("before combat starts, the first sorted turn is the displayed active card", () => {
+  const start = ENTRY.indexOf("function feCtDisplayActiveId(");
+  const fn = ENTRY.slice(start, ENTRY.indexOf("\n}", start) + 2);
+  const activeId = (combat, lancer = false) => runInNewContext(
+    `${fn}\nfeCtDisplayActiveId`, { feCtIsLancer: () => lancer }
+  )(combat);
+  const combat = { round: 0, turns: [{ id: "first" }, { id: "second" }], combatant: null };
+  assert.equal(activeId(combat), "first");
+  combat.turns.reverse();
+  assert.equal(activeId(combat), "second", "initiative changes update the preview");
+  assert.equal(activeId(combat, true), null, "LANCER chooses its turn by activation");
+  combat.round = 1;
+  combat.combatant = { id: "first" };
+  assert.equal(activeId(combat), "first", "started combat follows core's current turn");
+  assert.match(ENTRY, /const activeId = feCtDisplayActiveId\(combat\)/);
+});
+
 test("turn following reveals the next card without losing the active card", () => {
   const fn = ENTRY.slice(
     ENTRY.indexOf("function feCtRevealActiveCombatant("),
