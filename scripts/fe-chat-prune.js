@@ -181,26 +181,55 @@ export function feInstallChatLogPrune() {
     _attachLogListeners(scrollEl, opts) {
       super._attachLogListeners(scrollEl, opts);
       let fwdThrottle = false;
-      scrollEl.addEventListener("scroll", () => {
-        if (!this.rendered || fwdThrottle) return;
+      // A genuine bottom arrival that landed inside the throttle window. Replayed
+      // once the throttle ends, so a scrollbar drag or End/PageDown (which emit no
+      // wheel event) is not lost either.
+      let fwdMissed = false;
+      const atBottom = () => {
+        const denom = scrollEl.scrollHeight - scrollEl.clientHeight;
+        return denom <= 0 || (scrollEl.scrollTop / denom) > 0.99;
+      };
+      const tryForward = () => {
+        if (!this.rendered) return;
+        if (fwdThrottle) { fwdMissed = true; return; }
         if (!this.element?.querySelector(".chat-log")) return;
+        if (!this.#fwdPruned || !this.#hasForwardMessages()) return;
+        fwdThrottle = true;
+        fwdMissed = false;
+        this.renderBatchForward(bs())
+          .catch(() => { /* no-op */ })
+          .finally(() => setTimeout(() => {
+            fwdThrottle = false;
+            if (!fwdMissed) return;
+            fwdMissed = false;
+            // Still parked at the bottom → the reader is waiting on more.
+            if (atBottom()) tryForward();
+          }, 100));
+      };
+      scrollEl.addEventListener("scroll", () => {
+        // Track scrollTop on EVERY event, throttled or not. Returning before this
+        // update (the old order) left #lastScrollTop stale-high whenever
+        // #pruneOldest's anchoring shift landed inside the throttle window, so the
+        // next arrival at the bottom read as an upward move and was ignored.
         const prevTop = this.#lastScrollTop;
         const curTop = scrollEl.scrollTop;
         this.#lastScrollTop = curTop;
         const denom = scrollEl.scrollHeight - scrollEl.clientHeight;
-        const pct = curTop / denom;
         // Only forward-render on a GENUINE downward scroll that reaches the bottom.
         // Excluding the isNaN/at-bottom auto-trigger (and requiring curTop >= prevTop)
         // prevents the programmatic scrollTop clamp left by #pruneNewest from
-        // instantly bouncing the reader back to the newest message. To go live from
-        // a window that fully fits on screen (denom === 0), the jump-to-bottom button
-        // calls scrollBottom() → #goLive().
-        const reachedBottom = denom > 0 && pct > 0.99 && curTop >= prevTop;
-        if (reachedBottom && this.#fwdPruned && this.#hasForwardMessages()) {
-          fwdThrottle = true;
-          this.renderBatchForward(bs())
-            .then(() => setTimeout(() => { fwdThrottle = false; }, 100));
-        }
+        // instantly bouncing the reader back to the newest message.
+        if (denom > 0 && (curTop / denom) > 0.99 && curTop >= prevTop) tryForward();
+      }, { passive: true });
+      // A reader already AT the bottom produces no further scroll events — scrollTop
+      // cannot grow — so an arrival that was missed (throttle still running, a
+      // backward render holding the semaphore, the stale-prevTop case above) used to
+      // strand them at the end of the older window for good: "can't get back to the
+      // recent messages". A downward wheel IS a genuine gesture and still fires at
+      // max scroll, so it re-arms the forward load. Also covers a window that fits
+      // on screen (denom <= 0), which never scrolls at all.
+      scrollEl.addEventListener("wheel", (event) => {
+        if (event.deltaY > 0 && atBottom()) tryForward();
       }, { passive: true });
     }
 
@@ -543,10 +572,17 @@ export function feInstallChatLogPrune() {
 
     // True when there are visible messages after #newestId that are not in DOM
     #hasForwardMessages() {
-      if (!this.#newestId) return false;
       const all = game.messages?.contents;
       if (!all?.length) return false;
-      const idx = all.findIndex(m => m.id === this.#newestId);
+      // Same recovery #doRenderBatchFwd does: a #newestId whose message was
+      // deleted would otherwise answer "nothing newer" forever, and since the
+      // forward render (where the recovery lives) is gated on this check, it
+      // could never repair itself.
+      let idx = this.#newestId ? all.findIndex(m => m.id === this.#newestId) : -1;
+      if (idx === -1) {
+        const tailId = this.element?.querySelector(".chat-log")?.lastElementChild?.dataset?.messageId;
+        if (tailId) idx = all.findIndex(m => m.id === tailId);
+      }
       if (idx === -1) return false;
       for (let i = idx + 1; i < all.length; i++) {
         if (all[i].visible) return true;
