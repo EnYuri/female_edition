@@ -1212,6 +1212,7 @@
 	"FE.Diagnostics.ChatPrune.feInstallChatLogPrune2": "female_edition | DOM pruning enabled (extending {value1})",
 	"FE.Diagnostics.CombatTracker.feCtHandleAction": "[female_edition] combat-tracker action failed",
 	"FE.Diagnostics.CombatTracker.feCtHandlePortraitClick": "[female_edition] combat-tracker pan failed",
+	"FE.Diagnostics.CombatTracker.feCtHoverCombatant": "[female_edition] combat-tracker token hover failed",
 	"FE.Diagnostics.CombatTracker.feCtHandleEndTurnClick": "[female_edition] combat-tracker end-turn (>>) failed",
 	"FE.Diagnostics.CombatTracker.feCtRollInitiativeFor": "[female_edition] combat-tracker roll initiative failed",
 	"FE.Diagnostics.CombatTracker.feCtActivateFor": "[female_edition] combat-tracker LANCER activation failed",

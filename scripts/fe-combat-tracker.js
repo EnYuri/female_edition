@@ -559,6 +559,7 @@ function feCtTeardown() {
   // Stop the dynamic battle portrait ticker too — left running after the DOM is
   // gone it would keep firing a pointless querySelector every frame.
   feDbpReset();
+  feCtHoverOutToken();
   document.getElementById(TRACKER_DOM_ID)?.remove();
   _ctLastHtml = ""; // the root is gone; the next render must rebuild from scratch
   _ctLastActiveKey = "";
@@ -705,9 +706,12 @@ function feCtRender() {
   if (!feCtEnabled() || feCtOriginalActive()) return;
   const root = document.getElementById(TRACKER_DOM_ID);
   if (!root) return;
-  feCtCloseContextMenu(); // drop any open menu — its combatant may have changed
-
   const combat = feCtGetCombat();
+  // An open menu survives the rerender unless its combatant is gone. This runs on every
+  // token move and actor update in the encounter, so closing unconditionally dropped the
+  // GM's menu whenever anyone moved; every action re-checks permissions when it runs.
+  const menuFor = document.getElementById(CTX_MENU_ID)?.dataset.combatantId;
+  if (menuFor && !combat?.combatants?.get(menuFor)) feCtCloseContextMenu();
   if (!combat || !combat.turns?.length) {
     feCtBeginExit(root);
     return;
@@ -738,7 +742,7 @@ function feCtRender() {
 
   const hideDefeated = !!feCtSetting(S.COMBAT_TRACKER_HIDE_DEFEATED);
   const combatants = combat.turns.filter(
-    (c) => (isGM || !c.hidden) && !(hideDefeated && c.isDefeated)
+    (c) => (!c.hidden || feCtUserOwnsCombatant(c)) && !(hideDefeated && c.isDefeated)
   );
   const activeId = feCtDisplayActiveId(combat);
   const combatRound = Number(combat.round) || 0;
@@ -1011,6 +1015,17 @@ function feCtBindRootEvents(root) {
     ev.preventDefault();
     feCtOpenContextMenu(port.dataset.combatantId, ev.clientX, ev.clientY);
   });
+  // Hovering a card hovers its token on the canvas, the way core's own tracker does.
+  // Keyed on the combatant id, not the element: pointerover/out also fire between a
+  // card's children, and a rerender replaces the card under a cursor that never moved.
+  root.addEventListener("pointerover", (ev) => {
+    const id = ev.target.closest?.("[data-combatant-id]")?.dataset.combatantId ?? null;
+    if (id !== _ctHoverCombatantId) feCtHoverCombatant(id, ev);
+  }, { passive: true });
+  root.addEventListener("pointerout", (ev) => {
+    const to = ev.relatedTarget?.closest?.("[data-combatant-id]")?.dataset.combatantId ?? null;
+    if (to !== _ctHoverCombatantId) feCtHoverCombatant(to, ev);
+  }, { passive: true });
   // Wheel scrolls the portrait strip horizontally (vertical wheel → horizontal move).
   root.addEventListener("wheel", (ev) => {
     const strip = ev.target.closest?.(".fe-ct-combatants");
@@ -1068,11 +1083,46 @@ async function feCtHandleAction(action) {
   }
 }
 
+// Token hovered on behalf of the card under the cursor (core's #highlighted).
+let _ctHoverCombatantId = null;
+let _ctHoverToken = null;
+
+function feCtHoverOutToken(event) {
+  const token = _ctHoverToken;
+  _ctHoverToken = null;
+  _ctHoverCombatantId = null;
+  if (!token || token.destroyed) return;
+  try { token._onHoverOut(event ?? new PointerEvent("pointerout")); } catch {}
+}
+
+// Same gate as core's CombatTracker#_onCombatantHoverIn: a token this user cannot see
+// (hidden, out of vision, secret) is never highlighted, so the tracker cannot be used
+// to locate it. A held left/right button is rejected inside _onHoverIn itself.
+// The id is recorded only on success, so a card whose token could not be hovered (canvas
+// still drawing, token out of sight) retries on the next pointerover instead of being
+// treated as done until the cursor leaves it.
+function feCtHoverCombatant(id, event) {
+  feCtHoverOutToken(event);
+  if (!id || !canvas?.ready) return;
+  const token = feCtGetCombat()?.combatants?.get(id)?.token?.object;
+  if (!token || token.destroyed || !token.visible) return;
+  if (token._canHover && !token._canHover(game.user, event)) return;
+  try {
+    token._onHoverIn(event, { hoverOutOthers: true });
+    _ctHoverToken = token;
+    _ctHoverCombatantId = id;
+  } catch (e) {
+    console.warn(feLocalize("FE.Diagnostics.CombatTracker.feCtHoverCombatant"), e);
+  }
+}
+
 function feCtHandlePortraitClick(id) {
   const combat = feCtGetCombat();
   const c = combat?.combatants?.get(id);
   const token = c?.token?.object;
-  if (!token) return;
+  // Panning to a token out of this user's sight would reveal where it is — the same
+  // gate as the hover above and core's own pan (CombatTracker#_onPanToCombatant).
+  if (!token || token.destroyed || !token.visible) return;
   try {
     if (token.isOwner) token.control({ releaseOthers: true });
     canvas?.animatePan?.({ x: token.center.x, y: token.center.y, duration: 250 });
@@ -1235,6 +1285,7 @@ function feCtOpenContextMenu(id, x, y) {
   const menu = document.createElement("div");
   menu.id = CTX_MENU_ID;
   menu.className = "fe-ct-context-menu";
+  menu.dataset.combatantId = id;
   if (document.body.classList.contains("fe-retro-theme")) menu.classList.add("fe-retro-theme");
   menu.innerHTML = feRenderTemplate(CT_TPL_MENU, { items });
   document.body.appendChild(menu);
@@ -1470,29 +1521,61 @@ async function feCtMoveCombatant(combat, c, dir) {
   // hidden combatants are always on screen here).
   const hideDefeated = !!feCtSetting(S.COMBAT_TRACKER_HIDE_DEFEATED);
   const turns = (combat.turns ?? []).filter((t) => t.id === c.id || !(hideDefeated && t.isDefeated));
-  const idx = turns.findIndex((t) => t.id === c.id);
-  if (idx < 0) return;
-  const j = idx + dir;
-  if (j < 0 || j >= turns.length) return; // already at the edge
-
-  const neighbor = turns[j];          // the combatant we're crossing
-  const beyond = turns[j + dir];      // the one just past it (for a midpoint), may be undefined
-  const nInit = Number(neighbor.initiative);
-  if (!Number.isFinite(nInit)) {
+  const plan = feCtPlanMove(turns.map((t) => ({ id: t.id, init: t.initiative })), c.id, dir);
+  if (plan === "need-init") {
     ui.notifications?.warn(feLocalize("FECT.Ctx.NeedInit"));
     return;
   }
+  if (!plan?.length) return;
+  if (plan.length === 1) await c.update({ initiative: plan[0].initiative });
+  else await combat.updateEmbeddedDocuments("Combatant", plan);
+}
 
-  let newInit;
-  const bInit = beyond != null ? Number(beyond.initiative) : NaN;
-  if (Number.isFinite(bInit)) {
-    // land strictly between the neighbor and the one beyond it
-    newInit = (nInit + bInit) / 2;
-  } else {
-    // neighbor sits at the list edge → step past it (dir<0 = up = +1 higher)
-    newInit = dir < 0 ? nInit + 1 : nInit - 1;
-  }
-  await c.update({ initiative: newInit });
+// Pure planner for feCtMoveCombatant: `list` is the on-screen order as {id, init}.
+// Returns the Combatant updates, "need-init" when the crossed neighbour has no
+// initiative, or null at the edge.
+//
+// The moved combatant lands strictly between its new neighbours. When those two are
+// TIED there is no value between them, and the midpoint used to land on the tie, so
+// core's tie-break (name, then id) decided the order and the card often did not move.
+// Then the tied run, mover included, is renumbered in its new order inside
+// (v - 0.5, v + 0.5) — still bounded by the distinct values around it — so the rounded
+// badge every one of them shows stays v and nobody outside the run is touched.
+function feCtPlanMove(list, id, dir) {
+  const idx = list.findIndex((t) => t.id === id);
+  if (idx < 0) return null;
+  const j = idx + dir;
+  if (j < 0 || j >= list.length) return null; // already at the edge
+  // `init == null` first: Number(null) is 0, so an unrolled neighbour used to pass as 0.
+  const num = (t) => (t && t.init != null && Number.isFinite(Number(t.init)) ? Number(t.init) : null);
+  if (num(list[j]) === null) return "need-init";
+
+  // Where the mover is inserted once it is taken out: before the neighbour when moving
+  // up, after it when moving down. Removing the mover shifts the neighbour to j-1 on the
+  // way down, so both directions resolve to index j.
+  const order = list.filter((t) => t.id !== id);
+  const at = j;
+  order.splice(at, 0, list[idx]);
+  const prev = num(order[at - 1]);
+  const next = num(order[at + 1]);
+
+  if (prev === null) return [{ _id: id, initiative: next + 1 }];
+  if (next === null) return [{ _id: id, initiative: prev - 1 }];
+  if (prev > next) return [{ _id: id, initiative: (prev + next) / 2 }];
+
+  // prev === next: renumber the run of entries tied at v around the insertion point.
+  const v = prev;
+  let lo = at;
+  let hi = at;
+  while (lo - 1 >= 0 && num(order[lo - 1]) === v) lo--;
+  while (hi + 1 < order.length && num(order[hi + 1]) === v) hi++;
+  const above = lo > 0 ? num(order[lo - 1]) : null;
+  const below = hi + 1 < order.length ? num(order[hi + 1]) : null;
+  const top = Math.min(above ?? Infinity, v + 0.5);
+  const bottom = Math.max(below ?? -Infinity, v - 0.5);
+  const run = order.slice(lo, hi + 1);
+  const step = (top - bottom) / (run.length + 1);
+  return run.map((t, i) => ({ _id: t.id, initiative: top - (i + 1) * step }));
 }
 
 // Remove a combatant from the encounter (the native tracker's own entry). Deleting the

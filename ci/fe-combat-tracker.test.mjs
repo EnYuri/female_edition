@@ -740,3 +740,50 @@ test("updateToken rerenders only for tokens in the encounter", () => {
   assert.ok(!ENTRY.includes('Hooks.on("updateToken", () => feCtScheduleRender())'));
   assert.match(ENTRY, /Hooks\.on\("updateToken", \(token\) => \{\s*if \(feCtGetCombat\(\)\?\.combatants\?\.some\(\(c\) => c\.tokenId === token\?\.id\)\) feCtScheduleRender\(\);/);
 });
+
+// A tie between the two new neighbours has no value strictly between them, so the
+// midpoint landed ON the tie and core's name/id tie-break decided whether the card moved.
+test("move up/down breaks a tie instead of landing on it", () => {
+  const planVm = runInNewContext(`${fnSrc(ENTRY, "feCtPlanMove")}\nfeCtPlanMove`);
+  // Results come back from another realm; JSON drops the foreign prototypes deepEqual compares.
+  const plan = (...a) => JSON.parse(JSON.stringify(planVm(...a)));
+  const apply = (list, updates) => {
+    const init = new Map(list.map((t) => [t.id, t.init]));
+    for (const u of updates) init.set(u._id, u.initiative);
+    return [...init].sort((a, b) => b[1] - a[1]).map(([id]) => id).join("");
+  };
+  const gap = [{ id: "A", init: 20 }, { id: "B", init: 15 }, { id: "C", init: 10 }];
+  assert.deepEqual(plan(gap, "C", -1), [{ _id: "C", initiative: 17.5 }], "a gap needs one write");
+  assert.deepEqual(plan(gap, "A", -1), null, "top edge");
+  assert.deepEqual(plan(gap, "A", 1), [{ _id: "A", initiative: 12.5 }]);
+  assert.deepEqual(plan(gap, "B", 1), [{ _id: "B", initiative: 9 }], "past the bottom edge");
+
+  const tied = [{ id: "A", init: 15 }, { id: "B", init: 15 }, { id: "C", init: 15 }, { id: "D", init: 10 }];
+  for (const [id, dir, want] of [["C", -1, "ACBD"], ["A", 1, "BACD"], ["B", -1, "BACD"], ["D", -1, "ABDC"]]) {
+    const updates = plan(tied, id, dir);
+    assert.equal(apply(tied, updates), want, `${id} ${dir}`);
+    // Only the mover's own number may change; everyone renumbered around it keeps its badge.
+    for (const u of updates) if (u._id !== id) assert.equal(Math.round(u.initiative), 15, `${u._id} keeps its badge`);
+  }
+  // The run stays inside the distinct values around it.
+  const fenced = [{ id: "X", init: 15.2 }, { id: "A", init: 15 }, { id: "B", init: 15 }, { id: "C", init: 15 }];
+  const u = plan(fenced, "C", -1);
+  assert.equal(apply(fenced, u), "XACB");
+  assert.ok(u.every((x) => x.initiative < 15.2 && x.initiative > 14.5));
+  assert.equal(plan([{ id: "A", init: null }, { id: "B", init: 3 }], "B", -1), "need-init");
+});
+
+test("tracker cards never reveal a token the user cannot see", () => {
+  assert.match(fnSrc(ENTRY, "feCtHandlePortraitClick"), /!token\.visible\) return;[\s\S]*animatePan/);
+  const hover = fnSrc(ENTRY, "feCtHoverCombatant");
+  assert.match(hover, /!token\.visible\) return;[\s\S]*_onHoverIn/);
+  assert.ok(hover.indexOf("_ctHoverCombatantId = id") > hover.indexOf("_onHoverIn"), "the id is recorded only after a successful hover");
+});
+
+test("a rerender keeps the context menu unless its combatant is gone", () => {
+  const render = fnSrc(ENTRY, "feCtRender");
+  assert.match(render, /if \(menuFor && !combat\?\.combatants\?\.get\(menuFor\)\) feCtCloseContextMenu\(\);/);
+  assert.ok(!/^\s*feCtCloseContextMenu\(\);/m.test(render), "no unconditional close");
+  assert.match(ENTRY, /menu\.dataset\.combatantId = id;/);
+  assert.match(render, /\(c\) => \(!c\.hidden \|\| feCtUserOwnsCombatant\(c\)\)/, "owners see their own hidden combatants");
+});
