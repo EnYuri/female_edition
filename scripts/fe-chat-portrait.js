@@ -309,12 +309,18 @@ function cpGetRoundMarkerFlagValue(source) {
 // DX3rd-family combat progress notices. double-cross-3rd uses sibling classes
 // for combat start/end. Duplicated from feIsSystemCombatNoticeContent — this
 // script is deliberately import-free.
+// dx3rd-fvtt's `.dx3rd-system` / `.dx3rd-open-scene-msg` notices are included —
+// see FE_SYSTEM_COMBAT_NOTICE_CLASSES in fe-util.js for why.
 const CP_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
 const CP_SYSTEM_COMBAT_NOTICE_SELECTOR = [
   CP_SYSTEM_COMBAT_NOTICE_CLASS,
   "dx3rd-combat-start-msg",
   "dx3rd-combat-end-msg",
+  "dx3rd-system",
+  "dx3rd-open-scene-msg",
 ].map((className) => `.${className}`).join(", ");
+const CP_SYSTEM_COMBAT_NOTICE_CONTENT_RE =
+  /<[^>]*\b(?:dx3rd-combat-(?:msg|start-msg|end-msg)|dx3rd-system|dx3rd-open-scene-msg)(?=["'\s])/i;
 
 function cpIsLegacyDx3rdCombatNoticeContent(content) {
   try {
@@ -355,12 +361,25 @@ function cpIsSystemCombatNoticeMessage(message, messageEl) {
   }
   try {
     const content = String(message?.content ?? "");
-    if (/<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(content)) return true;
+    if (CP_SYSTEM_COMBAT_NOTICE_CONTENT_RE.test(content)) return true;
     if (cpIsLegacyDx3rdCombatNoticeContent(content)) return true;
   } catch {
     /* no-op */
   }
   return false;
+}
+
+// Import-free copy of feIsActorCombatNoticeMessage (fe-util.js): a combat notice
+// whose speaker is the acting actor (the "main process" line) keeps its header and
+// gets our portrait; GM-spoken notices (`actor: null`) keep the hidden header.
+const CP_ACTOR_COMBAT_NOTICE_CLASS = "fe-actor-combat-notice";
+
+function cpIsActorCombatNotice(message, isCombatNotice) {
+  try {
+    return !!isCombatNotice && !!String(message?.speaker?.actor ?? "").trim();
+  } catch {
+    return false;
+  }
 }
 
 function cpIsRoundMarkerMessage(message, messageEl) {
@@ -388,7 +407,7 @@ function cpIsRoundMarkerMessage(message, messageEl) {
     const content = String(message?.content ?? "");
     if (/\bround-marker\b/i.test(content)) return true;
     if (cpLooksLikeRoundMarkerFlavor(message?.flavor ?? "", content)) return true;
-    if (/<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(content)) return true;
+    if (CP_SYSTEM_COMBAT_NOTICE_CONTENT_RE.test(content)) return true;
   } catch {
     /* ignore */
   }
@@ -820,17 +839,24 @@ function cpUpsertPortrait(message, messageEl) {
   // it is just the GM's (or the acting actor's) name on a "라운드 3" (round 3) /
   // "메인 프로세스" (main process) line.
   // dnd5e's own combat notices have no header; match that and hide it like a narrator line.
+  // EXCEPT the actor-spoken one ("메인 프로세스" (main process)): it keeps the round-marker
+  // classes (dark surface, no tint, no merge) but its header stays, and it falls through
+  // to the normal injection below so it carries our portrait of the acting actor.
   const isNarratorSpecial = cpIsNarratorToolsMessage(message, messageEl);
   const isRoundMarkerSpecial = cpIsRoundMarkerMessage(message, messageEl);
   const isCombatNoticeSpecial = cpIsSystemCombatNoticeMessage(message, messageEl);
+  const isActorCombatNotice = !isNarratorSpecial && cpIsActorCombatNotice(message, isCombatNoticeSpecial);
+  messageEl.classList.toggle(CP_ACTOR_COMBAT_NOTICE_CLASS, isActorCombatNotice);
   if (isNarratorSpecial || isRoundMarkerSpecial || isCombatNoticeSpecial) {
-    cpRemovePortrait(messageEl);
     messageEl.classList.toggle("fe-narrator-chat", isNarratorSpecial);
     messageEl.classList.toggle("fe-round-marker-chat", isRoundMarkerSpecial || isCombatNoticeSpecial);
     messageEl.classList.toggle("fe-system-combat-notice", isCombatNoticeSpecial);
-    if (isNarratorSpecial || isCombatNoticeSpecial) cpHideHeaderForSpecial(messageEl);
-    else cpRestoreHeaderForSpecial(messageEl);
-    return;
+    if (!isActorCombatNotice) {
+      cpRemovePortrait(messageEl);
+      if (isNarratorSpecial || isCombatNoticeSpecial) cpHideHeaderForSpecial(messageEl);
+      else cpRestoreHeaderForSpecial(messageEl);
+      return;
+    }
   }
 
   cpRestoreHeaderForSpecial(messageEl);

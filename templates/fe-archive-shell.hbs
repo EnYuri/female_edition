@@ -226,6 +226,12 @@
         height: auto !important;
         overflow: visible !important;
       }
+      /* dx3rd-fvtt `.dx3rd-box`: feExpandCollapsedArchiveSections adds
+       * `dx3rd-box--expanded`; this covers a saved file whose system CSS
+       * was not inlined. An empty description stays hidden, as live. */
+      #fe-chat-export-log .dx3rd-box .item-description:not(:empty) {
+        display: block !important;
+      }
 
       /* dnd5e SVG icons grafted in by feInlineDnd5eIcons. Reproduces
        * IconElement.CSS from dnd5e.mjs, whose :host / svg rules live in a closed
@@ -403,7 +409,7 @@
       }
       #fe-chat-export-log .chat-message :is(
         .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
-        .dx3rd-item-chat, .dx3rd-item-info
+        .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box
       ) {
         background: #000000 !important;
         background-color: #000000 !important;
@@ -414,7 +420,7 @@
       }
       #fe-chat-export-log .chat-message :is(
         .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
-        .dx3rd-item-chat, .dx3rd-item-info
+        .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box
       ) :is(header, section, footer, .card-header, .card-content, .collapsible-content,
             .details, .wrapper) {
         background: transparent !important;

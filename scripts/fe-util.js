@@ -665,12 +665,25 @@ function feGetRoundMarkerFlagValue(source) {
 // their own sibling classes. They are system notices, not anybody's utterance,
 // so they are classified as round markers: no user tint, no merge, no portrait —
 // and the sender header is hidden outright (fe-chat-portrait.js).
+// dx3rd-fvtt adds two more notice kinds of the same nature: `.dx3rd-system`
+// (HP/encroachment/condition announcements — speaker alias " ", the system hides
+// their header itself and draws the actor portrait INSIDE the box) and
+// `.dx3rd-open-scene-msg` (scene open / session end, GM speaker, styled like the
+// combat notices). Keep this list, the content regex below and the import-free
+// copy in fe-chat-portrait.js in sync.
 const FE_SYSTEM_COMBAT_NOTICE_CLASS = "dx3rd-combat-msg";
 const FE_SYSTEM_COMBAT_NOTICE_CLASSES = Object.freeze([
   FE_SYSTEM_COMBAT_NOTICE_CLASS,
   "dx3rd-combat-start-msg",
   "dx3rd-combat-end-msg",
+  "dx3rd-system",
+  "dx3rd-open-scene-msg",
 ]);
+// Root classes only: the lookahead rejects BEM children (`dx3rd-system__body`,
+// `dx3rd-open-scene-msg__title`) but accepts a modifier sitting beside the root
+// (`dx3rd-system dx3rd-system--hp-damage`).
+const FE_SYSTEM_COMBAT_NOTICE_CONTENT_RE =
+  /<[^>]*\b(?:dx3rd-combat-(?:msg|start-msg|end-msg)|dx3rd-system|dx3rd-open-scene-msg)(?=["'\s])/i;
 const FE_SYSTEM_COMBAT_NOTICE_SELECTOR = FE_SYSTEM_COMBAT_NOTICE_CLASSES
   .map((className) => `.${className}`)
   .join(", ");
@@ -708,8 +721,26 @@ function _feIsLegacyDx3rdCombatNoticeContent(content) {
 
 function feIsSystemCombatNoticeContent(content = "") {
   try {
-    return /<[^>]*\bdx3rd-combat-(?:msg|start-msg|end-msg)\b/i.test(String(content ?? ""))
+    return FE_SYSTEM_COMBAT_NOTICE_CONTENT_RE.test(String(content ?? ""))
       || _feIsLegacyDx3rdCombatNoticeContent(content);
+  } catch {
+    return false;
+  }
+}
+
+// The "main process" notice — a combat notice whose speaker is the acting ACTOR
+// rather than the GM. Both the emanim lineage (announceCombatProcess with the
+// combatant's actor) and dx3rd-fvtt (speakerForActorOnly) post it that way, while
+// every other notice uses a GM speaker with `actor: null`. It stays a round
+// marker (dark surface, no tint, no merge) but keeps its header and gets our
+// portrait — user decision 2026-11-07, applied to every DX3rd-style system.
+// fe-chat-portrait.js keeps an import-free copy (cpIsActorCombatNotice).
+const FE_ACTOR_COMBAT_NOTICE_CLASS = "fe-actor-combat-notice";
+
+function feIsActorCombatNoticeMessage(message) {
+  try {
+    if (!feIsSystemCombatNoticeContent(message?.content ?? "")) return false;
+    return !!String(message?.speaker?.actor ?? "").trim();
   } catch {
     return false;
   }
@@ -762,6 +793,8 @@ export {
   feGetRoundMarkerFlagValue,
   feLooksLikeRoundMarkerFlavor,
   feIsSystemCombatNoticeContent,
+  FE_ACTOR_COMBAT_NOTICE_CLASS,
+  feIsActorCombatNoticeMessage,
   FE_SYSTEM_COMBAT_NOTICE_CLASS,
   FE_SYSTEM_COMBAT_NOTICE_CLASSES,
   FE_SYSTEM_COMBAT_NOTICE_SELECTOR,

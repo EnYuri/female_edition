@@ -1,7 +1,7 @@
 import { feLocalize, feFormat, feLocalizeHTML } from "./fe-i18n.js";
 // Unified settings window and initialization. Static data lives separately to avoid cycles.
 import { S, CP, FE_MENU_DEFAULTS, FE_MENU_RANGES, CHOICES, FE_RELOAD_REQUIRED_KEYS } from "./fe-settings-data.js";
-import { MODULE_ID, feIsDx3rdSystemId, feIsLancerSystemId } from "./fe-constants.js";
+import { MODULE_ID, feIsDx3rdSystemId, feIsDx3rdFvttSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings } from "./fe-gm-priority.js";
 import { feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported } from "./fe-user-font.js";
 import { feListCorePriorityKeys } from "./fe-core-priority.js";
@@ -9,7 +9,7 @@ import { feListCorePriorityKeys } from "./fe-core-priority.js";
 export * from "./fe-settings-data.js";
 
 const FE_SETTINGS_SERVICES = {
-  MODULE_ID, feIsDx3rdSystemId, feIsLancerSystemId, feSetting, feCaptureWorldSettings,
+  MODULE_ID, feIsDx3rdSystemId, feIsDx3rdFvttSystemId, feIsLancerSystemId, feSetting, feCaptureWorldSettings,
   feRegisterModuleFolderFonts, feQueryLocalFonts, feLocalFontsSupported, feListCorePriorityKeys,
 };
 
@@ -18,6 +18,7 @@ const FE_SETTINGS_SERVICES = {
 function feRegisterSettingsMenu({
   MODULE_ID,
   feIsDx3rdSystemId,
+  feIsDx3rdFvttSystemId = () => false,
   feIsLancerSystemId = () => false,
   feSetting,
   feCaptureWorldSettings,
@@ -39,6 +40,13 @@ function feRegisterSettingsMenu({
 
   function feIsDx3rdSystem() {
     try { return feIsDx3rdSystemId(game?.system?.id); } catch { return false; }
+  }
+
+  // dx3rd-fvtt is a separate system (see fe-constants.js), opted into the status
+  // panel and the retro DX3rd chat skin individually — so it also gets the two
+  // settings blocks those features read, without joining the family gate.
+  function feIsDx3rdFvttSystem() {
+    try { return feIsDx3rdFvttSystemId(game?.system?.id); } catch { return false; }
   }
 
   function feIsDnd5eSystem() {
@@ -322,11 +330,11 @@ function feRegisterSettingsMenu({
         // settings registry rather than hardcoded in the template, so a Foundry
         // update that adds or drops a client setting cannot make the note lie.
         corePriorityKeys: feListCorePriorityKeys(),
-        isDx3rd:  feIsDx3rdSystem(),
+        isDx3rd:  feIsDx3rdSystem() || feIsDx3rdFvttSystem(),
         isDnd5e:  feIsDnd5eSystem(),
         isLancer: feIsLancerSystem(),
         // Status UI (fe-dx3rd-resource-ui) works on both dx3rd and dnd5e.
-        ruiSupported: feIsDx3rdSystem() || feIsDnd5eSystem(),
+        ruiSupported: feIsDx3rdSystem() || feIsDx3rdFvttSystem() || feIsDnd5eSystem(),
       };
     }
 
@@ -703,7 +711,7 @@ function feRegisterSettingsMenu({
 
           // Status UI (dx3rd + dnd5e) — only when its fields are shown (ruiSupported),
           // else d[key] would be undefined and overwrite existing preferences.
-          ...((feIsDx3rdSystem() || feIsDnd5eSystem()) ? [
+          ...((feIsDx3rdSystem() || feIsDx3rdFvttSystem() || feIsDnd5eSystem()) ? [
             bool(S.DX3RD_RUI_ENABLED), bool(S.DX3RD_RUI_VISIBLE),
             bool(S.DX3RD_RUI_YIELD_TO_TRACKER),
             num(S.DX3RD_RUI_PORTRAIT_WIDTH), num(S.DX3RD_RUI_PANEL_WIDTH),
@@ -711,7 +719,7 @@ function feRegisterSettingsMenu({
           ] : []),
 
           // DX3rd-only (hidden on other systems).
-          ...(feIsDx3rdSystem() ? [
+          ...((feIsDx3rdSystem() || feIsDx3rdFvttSystem()) ? [
             num(S.DX3RD_CARD_BORDER_ALPHA),
           ] : []),
 

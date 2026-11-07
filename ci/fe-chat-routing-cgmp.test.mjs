@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
+import { feIsSystemCombatNoticeContent } from "../scripts/fe-util.js";
+
 const narratorSource = readFileSync(new URL("../scripts/fe-narrator.js", import.meta.url), "utf8");
 const chatSource = readFileSync(new URL("../scripts/fe-chat-enhance.js", import.meta.url), "utf8");
 const extract = (source, name) => {
@@ -151,9 +153,13 @@ test("GM speak-as-self detects the selected token actor and excludes staged and 
   const context = vm.createContext({
     S: { GM_SPEAK_AS_SELF: "ceGmSpeakAsSelf" },
     MODULE_ID: "female_edition",
+    FE_DX3RD_FVTT_SYSTEM_ID: "dx3rd-fvtt",
+    feIsDx3rdFvttSystemId: (id) => id === "dx3rd-fvtt",
+    feIsSystemCombatNoticeContent,
     feSetting: () => true,
     document: { querySelector: () => ({ value: "__none__" }) },
     game: {
+      system: { id: "dnd5e" },
       user: { id: "gm", isGM: true, name: "GM" },
       actors: new Map([["pc", { hasPlayerOwner: false }]]),
       scenes: new Map([["scene", { tokens: new Map([["token", { actor: { hasPlayerOwner: true } }]]) }]]),
@@ -183,6 +189,30 @@ test("GM speak-as-self detects the selected token actor and excludes staged and 
   const roll = create();
   apply(roll, { speaker: roll.speaker, rolls: [{}], flags: {} }, "gm");
   assert.equal(roll.speaker.alias, "PC");
+
+  // dx3rd-fvtt: a roll-less system message (pseudo-roll judgment) keeps its actor
+  // speaker — the system fills its buttons' actor id from it. The skip is gated on
+  // the system, so the same flag block elsewhere changes nothing.
+  const fvttFlags = { "dx3rd-fvtt": { sheetPseudoRollTotal: 12 } };
+  const otherSystem = create();
+  apply(otherSystem, { speaker: otherSystem.speaker, flags: fvttFlags }, "gm");
+  assert.equal(otherSystem.speaker.alias, "GM");
+  context.game.system = { id: "dx3rd-fvtt" };
+  const pseudo = create();
+  apply(pseudo, { speaker: pseudo.speaker, flags: fvttFlags }, "gm");
+  assert.equal(pseudo.speaker.alias, "PC");
+  assert.equal(pseudo.speaker.actor, "pc");
+  const typed = create();
+  apply(typed, { speaker: typed.speaker, flags: {} }, "gm");
+  assert.equal(typed.speaker.alias, "GM");
+  context.game.system = { id: "dnd5e" };
+
+  // A DX3rd-style "main process" notice names the acting actor on purpose (and
+  // gets that actor's portrait); the GM's client posts it with no rolls.
+  const notice = create();
+  apply(notice, { speaker: notice.speaker, content: '<h3 class="dx3rd-combat-msg">Main Process</h3>', flags: {} }, "gm");
+  assert.equal(notice.speaker.alias, "PC");
+  assert.equal(notice.speaker.actor, "pc");
 
   const overwritten = create();
   apply(overwritten, { speaker: overwritten.speaker, flags: {} }, "gm");

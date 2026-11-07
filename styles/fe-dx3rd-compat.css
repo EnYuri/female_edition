@@ -284,6 +284,14 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
  *  --fe-dx3rd-accent : default text/border color (default white).
  *  Live-change mid-session via:
  *    document.documentElement.style.setProperty('--fe-dx3rd-accent','red')
+ *
+ *  §13 and §14 are written against Foundry's CORE chat DOM only
+ *  (#chat-log, .chat-message, .message-header/-content/-sender), so they
+ *  are the one place shared with the separate dx3rd-fvtt system
+ *  (body.fe-retro-system-dx3rd-fvtt, see fe-style.js). Keep both classes
+ *  in every selector here, and do NOT add the fvtt class anywhere that
+ *  reads emanim-lineage markup — that system's own cards are styled in
+ *  fe-dx3rd-fvtt-compat.css.
  * ══════════════════════════════════════════════════════════════ */
 
 /* --fe-dx3rd-accent and --fe-dx3rd-card-border-alpha are set by JS
@@ -293,9 +301,9 @@ body.fe-retro-theme :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd)
    no declaration here. */
 
 /* Chat sidebar panel + scroll container + log area */
-body.fe-retro-theme.fe-retro-system-dx3rd :is(#sidebar #chat, #chat-popout, .tab.chat, .chat-sidebar, chat-sidebar),
-body.fe-retro-theme.fe-retro-system-dx3rd .chat-scroll,
-body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log) {
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt) :is(#sidebar #chat, #chat-popout, .tab.chat, .chat-sidebar, chat-sidebar),
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt) .chat-scroll,
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt) :is(#chat-log, .chat-log, ol.chat-log) {
   background:       #000000 !important;
   background-image: none    !important;
 }
@@ -336,7 +344,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd :is(#chat-log, .chat-log, ol.chat-log)
  *  place for one (mistaken once too).
  * ══════════════════════════════════════════════════════════════ */
 
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background:       #000000 !important;
@@ -348,14 +356,14 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 /* Messages with a user color → only the outline overrides to the user
    color (alpha same as above).
    Fallback 230 230 230 = --fe-ac-90's lightness — see header comment. */
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   border-color: rgb(var(--fe-user-color-rgb, 230 230 230) / 0.82) !important;
 }
 
 /* Message header · content sub-areas — transparent (inherit black) */
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   > :is(.message-header, .message-content) {
@@ -369,14 +377,14 @@ body.fe-retro-theme.fe-retro-system-dx3rd
  * feApplyStyleVarsFromSettings().
  * Primary text: --fe-ac-90 (alpha 0.82 — visibility softening).
  * Secondary text: same lightness/hue at alpha 0.6 for hierarchy. */
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   :is(.message-sender, .message-content) {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat)
   :is(.message-metadata, .message-flavor, .flavor-text) {
@@ -384,10 +392,10 @@ body.fe-retro-theme.fe-retro-system-dx3rd
 }
 
 /* Message-texture pseudo-element fully removed */
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message::before,
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message::after {
   background:       transparent none !important;
@@ -408,24 +416,24 @@ body.fe-retro-theme.fe-retro-system-dx3rd
    pixel and the seam disappears. Being in the layouts layer it beats
    fe-chat-enhance.css's (modules) margin !important. Scoped to standard
    mode so simple mode's intended spacing is untouched. */
-body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt).fe-chat-merge.fe-merge-mode-standard
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
   margin-top: 0 !important;
 }
-body.fe-retro-theme.fe-retro-system-dx3rd.fe-chat-merge.fe-merge-mode-standard
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt).fe-chat-merge.fe-merge-mode-standard
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
   margin-bottom: 0 !important;
 }
 /* Internal-boundary borders also to 0 (simple mode + defensive —
    standard is already collapsed) */
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-start, .fe-merge-mid, .fe-merge-follow) {
   border-bottom-width: 0 !important;
 }
-body.fe-retro-theme.fe-retro-system-dx3rd
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) {
   border-top-width: 0 !important;

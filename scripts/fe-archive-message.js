@@ -22,6 +22,7 @@ import {
   feIsRoundMarkerMessage,
 } from "./fe-chat-enhance.js";
 import { FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR } from "./fe-constants.js";
+import { FE_ACTOR_COMBAT_NOTICE_CLASS, feIsActorCombatNoticeMessage } from "./fe-util.js";
 import { feChatPortraitUpsert } from "./fe-chat-portrait.js";
 import { cpMaybeApplyHQResample } from "./fe-chat-portrait-image.js";
 import {
@@ -246,7 +247,7 @@ export function feArchiveMessageContentLooksEmpty(node) {
   try {
     const content = node?.querySelector?.(':scope > .message-content');
     if (!content) return true;
-    if (content.querySelector?.('.round-marker, img, video, audio, canvas, svg, table, iframe, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dice-roll, .dice-result, blockquote, pre, hr, ul, ol')) {
+    if (content.querySelector?.('.round-marker, img, video, audio, canvas, svg, table, iframe, .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box, .dx3rd-info, .dx3rd-system, .dice-roll, .dice-result, blockquote, pre, hr, ul, ol')) {
       return false;
     }
     const text = String(content.textContent ?? '').replace(/ /g, ' ').trim();
@@ -364,6 +365,20 @@ export function feExpandCollapsedArchiveSections(node) {
         if (el.style?.display === "none") el.style.removeProperty("display");
         el.style?.removeProperty?.("height");
         el.style?.removeProperty?.("overflow");
+      } catch {}
+    }
+    // dx3rd-fvtt: a FIFTH mechanism. `.dx3rd-box` hides its `.item-description`
+    // until the box carries `dx3rd-box--expanded`, which the system's
+    // renderChatMessageHTML restores per box from a message flag — so whatever
+    // the reader left closed arrives here closed. Paper has no toggle: open the
+    // box, and drop the hide the computed-style mirror may have baked inline.
+    // (`.item-description:empty` stays hidden by the system's own rule.)
+    for (const box of node.querySelectorAll?.(".dx3rd-box[data-dx3rd-box-id]") ?? []) {
+      try {
+        box.classList.add("dx3rd-box--expanded");
+        for (const desc of box.querySelectorAll?.(":scope > .item-description") ?? []) {
+          feClearCollapsibleHideStyles(desc);
+        }
       } catch {}
     }
   } catch {}
@@ -774,12 +789,28 @@ export function feFinalizeArchiveSpecialMessageState(node, msg, liveEl = null) {
       node.style?.removeProperty?.('--fe-user-color-alpha');
     }
 
+    // The actor-spoken combat notice ("main process") keeps its sender and our
+    // portrait (fe-util.js feIsActorCombatNoticeMessage). Re-derived from the
+    // message as well as read off the live clone, so the rebuilt / system-render
+    // paths agree with it.
+    const isActorNotice = isRoundMarker && !isNarrator && !!(
+      node.classList.contains(FE_ACTOR_COMBAT_NOTICE_CLASS) ||
+      liveEl?.classList?.contains?.(FE_ACTOR_COMBAT_NOTICE_CLASS) ||
+      feIsActorCombatNoticeMessage(msg)
+    );
+    node.classList.toggle(FE_ACTOR_COMBAT_NOTICE_CLASS, isActorNotice);
+
     if (!isRoundMarker) {
       node.classList.remove('fe-round-marker-empty-content');
       return;
     }
 
     const header = node.querySelector?.(':scope > .message-header');
+    if (isActorNotice) {
+      try { header?.style?.removeProperty?.('display'); } catch {}
+      node.classList.toggle('fe-round-marker-empty-content', feArchiveMessageContentLooksEmpty(node));
+      return;
+    }
     const sender = header?.querySelector?.('.message-sender');
     const metadata = header?.querySelector?.('.message-metadata');
     const portrait = header?.querySelector?.('img.fe-chat-portrait, .fe-chat-portrait-wrap');
@@ -1239,7 +1270,10 @@ export function feFallbackRenderChatMessage(doc, msg) {
   if (isNarratorMessage) li.classList.add("narrator-chat", "fe-narrator-chat");
   if (isRoundMarkerMessage) li.classList.add("round-marker", "fe-round-marker-chat");
 
-  const hideSender = isRoundMarkerMessage;
+  const isActorNotice = isRoundMarkerMessage && !isNarratorMessage && feIsActorCombatNoticeMessage(msg);
+  if (isActorNotice) li.classList.add(FE_ACTOR_COMBAT_NOTICE_CLASS);
+
+  const hideSender = isRoundMarkerMessage && !isActorNotice;
   if (hideSender) sender.style.setProperty("display", "none", "important");
 
   const meta = doc.createElement("span");

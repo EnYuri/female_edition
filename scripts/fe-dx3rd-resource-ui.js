@@ -13,7 +13,7 @@ import { feRegisterSetting } from "./fe-settings-data.js";
 // their position in localStorage. The NPC container's default top sits just below the PC
 // container (_npcDefaultTop), falling back to below the nav when there are no PC cards.
 
-import { MODULE_ID, S, feIsDx3rdSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsDx3rdFvttSystemId } from "./fe-constants.js";
 import { feSetting, feCaptureWorldSettings, feMirrorGmPrioritySetting } from "./fe-gm-priority.js";
 import { feApplyHQPortrait } from "./fe-portrait-hq.js";
 import { feHpMasked, feToggleHpMask } from "./fe-hp-mask.js";
@@ -45,11 +45,17 @@ const POS_OWN_KEY      = `${MODULE_ID}.ruiOwnPos`;
 // ─── guards ────────────────────────────────────────────────────────────────
 
 function _isDx3rd()      { return feIsDx3rdSystemId(game.system?.id); }
+// dx3rd-fvtt: a separate system, opted in on its own. It keeps HP and
+// encroachment at the same paths, PCs are `character` (no system.actorType, so
+// _isPC's document-type fallback applies) and `npc`/`focus` go to the left
+// container. Its encroachment carries a nominal `max` the system documents as
+// "used by resource UIs", which _enc honours.
+function _isDx3rdFvtt()  { return feIsDx3rdFvttSystemId(game.system?.id); }
 function _isDnd5e()      { return game.system?.id === "dnd5e"; }
 // Systems where this status panel is available. DX3rd shows HP + encroachment;
 // dnd5e has no encroachment, so cards render the HP bar only (enc group hidden per-card
 // in _updateCard). Both expose system.attributes.hp.{value,max}, which _hp() reads.
-function _isSupported()  { return _isDx3rd() || _isDnd5e(); }
+function _isSupported()  { return _isDx3rd() || _isDx3rdFvtt() || _isDnd5e(); }
 // The user-facing feature flag alone. Yield only stands the CARD CONTAINER
 // down — every affordance that controls the feature (sheet header entries,
 // context menu, token HUD) stays live during a combat, because the mask flag
@@ -121,7 +127,8 @@ function _hp(actor) {
 function _enc(actor) {
   const e = actor?.system?.attributes?.encroachment;
   if (e == null) return null;
-  return { value: Math.max(Number(e.value ?? e) || 0, 0), cap: 100 };
+  const max = _isDx3rdFvtt() ? Number(e.max) : NaN;
+  return { value: Math.max(Number(e.value ?? e) || 0, 0), cap: Number.isFinite(max) && max > 0 ? max : 100 };
 }
 
 // ─── actor type ────────────────────────────────────────────────────────────

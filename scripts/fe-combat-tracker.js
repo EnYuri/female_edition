@@ -21,7 +21,7 @@ import { feRegisterSetting } from "./fe-settings-data.js";
  * Self-contained except for constants. Own DOM (`#fe-combat-tracker` on <body>) +
  * own CSS (styles/fe-combat-tracker.css, unlayered — no system-layer conflict).
  */
-import { MODULE_ID, S, feIsDx3rdSystemId, feIsLancerSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsDx3rdFvttSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feHpMasked, feToggleHpMask } from "./fe-hp-mask.js";
 import { feResolveSocketSender } from "./fe-socket-auth.js";
 // Tracker portraits shrink huge sources, which CSS image-rendering cannot do well (see
@@ -119,8 +119,12 @@ let _ctExitTimer = 0;            // 0 = not leaving
 // choice dialog, updates their owned Actor, then asks DX3rd's own GM socket
 // handler to continue the initiative process. Running it through our GM proxy
 // would put the choice dialog on the GM's screen instead.
+// dx3rd-fvtt is a separate system, opted in on its own: its DX3rdCombat#nextTurn
+// (combats/dx3rd-combat.js) likewise opens promptEndOrDelayFromNextTurn on the
+// calling client during the main process.
 function feCtUsesLocalPlayerTurnEndWorkflow() {
-  return feIsDx3rdSystemId(game.system?.id);
+  const systemId = game.system?.id;
+  return feIsDx3rdSystemId(systemId) || feIsDx3rdFvttSystemId(systemId);
 }
 
 // ── data helpers ────────────────────────────────────────────────────────────

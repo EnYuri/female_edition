@@ -1,7 +1,7 @@
 {
   "id": "female_edition",
   "title": "Female-cupwhi",
-  "version": "2.15.3",
+  "version": "2.15.4",
   "authors": [
     {
       "name": "nayuri",
@@ -63,6 +63,7 @@
     "styles/fe-chat-v13-compat.css",
     { "src": "styles/fe-retro-theme.css", "layer": "layouts" },
     { "src": "styles/fe-dx3rd-compat.css", "layer": "layouts" },
+    { "src": "styles/fe-dx3rd-fvtt-compat.css", "layer": "layouts" },
     { "src": "styles/fe-retro-common.css", "layer": "layouts" },
     { "src": "styles/fe-retro-forms.css", "layer": "layouts" },
     { "src": "styles/fe-dnd5e-compat.css", "layer": "layouts" },
@@ -128,7 +129,7 @@
   ],
   "compatibility": {
     "minimum": "13",
-    "verified": "14.368",
+    "verified": "14.370",
     "maximum": "14"
   },
   "description": "Female-cupwhi's female edition for FVTT v13.x, v14.x , and system for dx3rd, dnd5e and Dungeon World, also Lancer. 「부레옥잠-!」",

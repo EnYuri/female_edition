@@ -314,11 +314,11 @@ body.fe-print-chatlog :is(#fe-chat-export-log, #chat-log) > li.fe-export-message
    of specificity — so the geurimilgi rule can only win by sitting in the SAME layer and
    out-specifying it (this selector is (1,5,1) vs the cookie rule's (1,1,0)). ui-font.css's
    card rule is in the earlier `layer(layouts)` and covers the card CONTAINER only, so it
-   already makes `:is(.dx3rd-item-chat, .dx3rd-item-info)` itself geurimilgi but leaves the descendants to fall
+   already makes `:is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box)` itself geurimilgi but leaves the descendants to fall
    through — this rule catches them. Names/titles live in `.message-header` (outside these
    card selectors) so they keep the primary font. */
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) * {
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-message :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) * {
   font-family: var(--fe-font-secondary) !important;
 }
 
@@ -738,7 +738,9 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   box-shadow: none !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header {
+/* The actor-spoken combat notice ("main process") keeps a normal header with its
+ * actor name and portrait in the archive too — see fe-chat-portrait.css. */
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)):not(.fe-actor-combat-notice) > .message-header {
   display: block !important;
   min-height: 0 !important;
   margin: 0 0 2px 0 !important;
@@ -757,7 +759,7 @@ body.fe-chat-portrait-name-align-left #fe-chat-export-container .chat-message.fe
   margin: 0 !important;
 }
 
-#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) :is(.message-sender, .message-sender .name-stacked, .message-sender .title, .message-sender .subtitle, .message-metadata, img.fe-chat-portrait, .fe-chat-portrait-wrap) {
+#fe-chat-export-container .chat-message:is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)):not(.fe-actor-combat-notice) :is(.message-sender, .message-sender .name-stacked, .message-sender .title, .message-sender .subtitle, .message-metadata, img.fe-chat-portrait, .fe-chat-portrait-wrap) {
   display: none !important;
 }
 
@@ -1053,9 +1055,9 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message :i
 
 /* Chat cards (dnd5e, dx3rd, midi) */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) {
   background:       #000000 !important;
   background-color: #000000 !important;
   background-image: none    !important;
@@ -1064,10 +1066,10 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
 
 /* Card sub-sections: header/content/description */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info)
+  :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box)
   :is(header, section, footer, .card-header, .card-content, .collapsible-content) {
   background:       transparent !important;
   background-color: transparent !important;
@@ -1076,9 +1078,9 @@ body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
 
 /* Text colours inside cards / sender areas */
 body.fe-retro-theme.fe-chat-archive #fe-chat-export-container .chat-message
-  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info),
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
 body.fe-retro-theme.fe-print-chatlog  #fe-chat-export-container .chat-message
-  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
+  :is(.message-sender, .message-content, .chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) {
   color: var(--fe-ac-90) !important;
 }
 

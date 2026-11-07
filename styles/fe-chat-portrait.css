@@ -252,15 +252,18 @@ body.fe-hide-chat-portrait-wrap :is(li.chat-message, #chat-notifications .messag
   display: none !important;
 }
 
-/* Round-marker messages: only the flavor/marker line survives. */
-:is(li.chat-message, #chat-notifications .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header {
+/* Round-marker messages: only the flavor/marker line survives.
+ * EXCEPT the actor-spoken combat notice (`fe-actor-combat-notice`, the
+ * "main process" line — fe-chat-portrait.js cpIsActorCombatNotice): it keeps a
+ * normal header with the acting actor's name and our portrait. */
+:is(li.chat-message, #chat-notifications .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)):not(.fe-actor-combat-notice) > .message-header {
   display: block !important;
   min-height: 0 !important;
   padding: 0 !important;
   margin: 0 0 2px 0 !important;
 }
 
-:is(li.chat-message, #chat-notifications .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)) > .message-header :is(.message-metadata, .message-sender, img.fe-chat-portrait, .fe-chat-portrait-wrap) {
+:is(li.chat-message, #chat-notifications .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)):not(.fe-actor-combat-notice) > .message-header :is(.message-metadata, .message-sender, img.fe-chat-portrait, .fe-chat-portrait-wrap) {
   display: none !important;
 }
 
@@ -273,7 +276,7 @@ body.fe-hide-chat-portrait-wrap :is(li.chat-message, #chat-notifications .messag
 
 /* CSS-only normalization for lazy-loaded/older messages in any chat surface */
 :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
-  :is(li.chat-message, .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))
+  :is(li.chat-message, .message):is(.round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker)):not(.fe-actor-combat-notice)
   > .message-header :is(img.fe-chat-portrait, .fe-chat-portrait-wrap) {
   display: none !important;
 }

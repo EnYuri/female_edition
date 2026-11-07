@@ -571,10 +571,10 @@ body.fe-fonts-enabled #fe-chat-export-log :is(.chat-message, .message-header, .m
    Item/spell cards · midi-qol · dx3rd chips — overrides the body font of
    .message-content.
    (#fe-chat-export-log included for the same reason as above) */
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) {
   --font-primary: var(--fe-chat-card-system-font-family) !important;
   --font-sans: var(--fe-chat-card-system-font-family) !important;
   --font-serif: var(--fe-chat-card-system-font-family) !important;
@@ -596,7 +596,7 @@ body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.cha
 /* Only the form controls (button/input/select/textarea) inside dx3rd
    cards are forced to inherit.
    dx3rd cards are pure HTML using no variables (--font-*), so most of the
-   container's (:is(.dx3rd-item-chat, .dx3rd-item-info)) font-family
+   container's (:is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box)) font-family
    descends by inheritance — but form controls do not inherit because of
    the UA default font-family, dropping the card font. `inherit` hands
    them the container's card font.
@@ -604,10 +604,10 @@ body.fe-fonts-enabled:not(.fe-chatcard-custom-font) #fe-chat-export-log :is(.cha
     dice fonts, possibly breaking icons.
     `inherit` tracks the container font of BOTH OFF and ON modes, so one
     rule suffices.) */
-body.fe-fonts-enabled #sidebar #chat :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
-body.fe-fonts-enabled #chat-notifications :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
-body.fe-fonts-enabled :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea),
-body.fe-fonts-enabled #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info) :is(button, input, select, textarea) {
+body.fe-fonts-enabled #sidebar #chat :is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) :is(button, input, select, textarea),
+body.fe-fonts-enabled #chat-notifications :is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) :is(button, input, select, textarea),
+body.fe-fonts-enabled :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) :is(button, input, select, textarea),
+body.fe-fonts-enabled #fe-chat-export-log :is(.dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) :is(button, input, select, textarea) {
   font-family: inherit !important;
 }
 
@@ -628,10 +628,10 @@ body.fe-fonts-enabled #assignexperience .sheet-navigation {
   font-family: inherit !important;
 }
 
-body.fe-fonts-enabled.fe-chatcard-custom-font #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled.fe-chatcard-custom-font #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled.fe-chatcard-custom-font :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info),
-body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
+body.fe-fonts-enabled.fe-chatcard-custom-font #sidebar #chat :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled.fe-chatcard-custom-font #chat-notifications :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled.fe-chatcard-custom-font :is(.chat-popout #chat, #chat-popout, .chat-popout) :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box),
+body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-log :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box) {
   --font-primary: var(--fe-font-secondary) !important;
   --font-sans: var(--fe-font-secondary) !important;
   --font-serif: var(--fe-font-secondary) !important;

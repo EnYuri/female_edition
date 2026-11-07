@@ -13,7 +13,8 @@ import { feRegisterSetting } from "./fe-settings-data.js";
  */
 
 import {
-  MODULE_ID, FE_DX3RD_SYSTEM_IDS, feIsDx3rdSystemId, LEGACY_UI_FONT_KEY, S,
+  MODULE_ID, FE_DX3RD_SYSTEM_IDS, feIsDx3rdSystemId,
+  FE_DX3RD_FVTT_SYSTEM_ID, feIsDx3rdFvttSystemId, LEGACY_UI_FONT_KEY, S,
   FE_DEFAULTS, FE_EXPORT_PRINT_IMAGE_MODE_CHOICES,
   FE_GM_PRIORITY_OVERRIDES_KEY, FE_GM_PRIORITY_BACKUP_KEY, FE_WORLD_SETTINGS_KEY,
   FE_CORE_PRIORITY_OVERRIDES_KEY, FE_CORE_PRIORITY_BACKUP_KEY,
@@ -27,6 +28,7 @@ import {
   feInstallChatImageWaitGuard,
   feFollowIncomingChatMessage, feRepinFollowingChatLogs,
   feGetMessageFromElementOrCollection,
+  feIsSystemCombatNoticeContent,
 } from "./fe-util.js";
 
 import {
@@ -1176,6 +1178,22 @@ function feApplyGmSpeakAsSelf(message, data, userId) {
   const msgRolls = Array.isArray(data?.rolls) ? data.rolls
     : (Array.isArray(message?.rolls) ? message.rolls : []);
   if (data?.flags?.["midi-qol"] ?? message?.flags?.["midi-qol"]) return;
+  // A DX3rd-style combat notice is the system speaking, never the GM: the "main
+  // process" line names the acting actor on purpose and gets that actor's
+  // portrait (fe-chat-portrait.js cpIsActorCombatNotice). The GM's client posts
+  // it with no rolls, so without this skip a GM with this setting on would turn
+  // every main-process notice into a GM-named line.
+  if (feIsSystemCombatNoticeContent(data?.content ?? message?.content ?? "")) return;
+  // dx3rd-fvtt reads `speaker.actor` back off its OWN roll-less messages: a
+  // fixed-achievement ("pseudo roll") judgment is created with no rolls, and its
+  // renderChatMessageHTML fills the damage / spell / item-judge buttons'
+  // `data-actor-id` from the speaker (dx3rd-fvtt-sheet-roll.js), while
+  // findLastJudgmentOutcome matches on it. Every such message carries a
+  // `flags["dx3rd-fvtt"]` block — same reason as the midi-qol skip above.
+  if (feIsDx3rdFvttSystemId(game.system?.id)) {
+    const fvttFlags = data?.flags?.[FE_DX3RD_FVTT_SYSTEM_ID] ?? message?.flags?.[FE_DX3RD_FVTT_SYSTEM_ID];
+    if (fvttFlags && typeof fvttFlags === "object" && Object.keys(fvttFlags).length) return;
+  }
   if (msgRolls.length > 0 && speaker?.actor) return;
 
   let actor = null;

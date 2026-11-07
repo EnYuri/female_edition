@@ -448,8 +448,9 @@ function feAtSyncTileConfig(app, root) {
   const legend = fieldset.querySelector("legend");
   if (legend && !("feAtLegend" in legend.dataset)) legend.dataset.feAtLegend = legend.textContent;
 
-  // Volume has no meaning without an audio track; hide only the group, never disable the input,
-  // so the existing value still round-trips through the form.
+  // Volume has no meaning without an audio track, so its group is hidden. Core (14.370+) also
+  // renders it disabled when the src is not a video; we leave that alone — `video` is a plain
+  // SchemaField, so a submit without `video.volume` keeps the stored value.
   const volume = fieldset.querySelector('[name="video.volume"]');
   const volumeGroup = volume?.closest(".form-group");
 

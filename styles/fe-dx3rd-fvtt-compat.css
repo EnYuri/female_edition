@@ -1,0 +1,481 @@
+/* ================================================================
+ * fe-dx3rd-fvtt-compat.css — dx3rd-fvtt (LichSOMA) chat compatibility
+ *
+ * dx3rd-fvtt is a SEPARATE system from the emanim lineage that
+ * fe-dx3rd-compat.css serves; the two only share the game's roots.
+ * Nothing here reads emanim markup, and nothing in fe-dx3rd-compat.css
+ * reads this system's markup — the single shared surface is §13/§14 of
+ * that file, which only touches Foundry's core chat DOM.
+ *
+ * Scope classes (fe-style.js feSetRetroThemeClass):
+ *   body.fe-system-dx3rd-fvtt        — always, retro or not (§A)
+ *   body.fe-retro-system-dx3rd-fvtt  — retro theme ON (§B)
+ *
+ * Registered in module.json as { "layer": "layouts" }. The system's
+ * own sheets land in layer(system), which beats `layouts` for NORMAL
+ * declarations — so every override here is `!important`, where the
+ * layer order reverses and `layouts` wins (CLAUDE.md, CSS Cascade
+ * Layers). Two of the system's chat rules are `!important` themselves
+ * (`.dx3rd-box` and the sheet-roll `.message-content` background);
+ * only a `layouts` !important can reach those.
+ *
+ * Markup sources (systems/dx3rd-fvtt):
+ *   .dx3rd-box               scripts/chat-item-box.js   styles/chats/chat-item.css
+ *   .dx3rd-info              scripts/dx3rd-fvtt-system-chat.js  styles/chats/chat-info.css
+ *   .dx3rd-sheet-roll-*      scripts/dx3rd-fvtt-sheet-roll.js   styles/dice-term.css
+ *   .dx3rd-system / .dx3rd-combat-msg / .dx3rd-open-scene-msg
+ *                            styles/chats/chat-system.css
+ * ================================================================ */
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § A  Light painted base — re-ink the system's dark-chat colours
+ *
+ *  Every chat surface of this system hard-codes ink for a DARK chat:
+ *  `.item-name` / table cells `white`, buttons `#eee` on a white 8%
+ *  wash, separators white 8-20%, hover `#ffbb00`. chat-bg-stripper.css
+ *  §1f paints OUR opaque base under each message instead, so with the
+ *  default white base every card title and table reads white-on-white.
+ *  Same problem chat-bg-stripper §1i solves for core's text aliases and
+ *  fe-lancer-compat.css §B for LANCER — but this system writes literal
+ *  colours, not variables, so each declaration has to be re-taken.
+ *
+ *  A1 decides, PER MESSAGE, whether the painted base under it is light
+ *  and publishes --fe-dxf-* there. The arms copy exactly what §1f
+ *  paints: a `.fe-has-user-color` message that is not a round marker
+ *  takes the chat base (fe-chat-bg-light); a system message takes the
+ *  system base (fe-sysmsg-bg-light). Round markers never get that base —
+ *  fe-chat-enhance.css paints them its own DARK round-marker surface
+ *  (--fe-round-marker-bg #4b4843, light ink) — which is why
+ *  `.dx3rd-system`, `.dx3rd-combat-msg` and `.dx3rd-open-scene-msg`
+ *  (all classified as notices → round markers, fe-util.js) are
+ *  deliberately absent below: on a dark surface the system's own
+ *  dark-chat ink (gold / red / green, white rules) is already right.
+ *
+ *  A2.. read the variables with the system's ORIGINAL value as the
+ *  fallback, so a message A1 did not mark renders exactly as the
+ *  system drew it. The A2.. rules are additionally gated on the body
+ *  carrying a light lean at all, so a world with no light base never
+ *  has the system's colours pinned by this sheet.
+ *
+ *  Retro is excluded: §B owns every surface there, and retro paints the
+ *  chat black regardless of the configured base.
+ * ══════════════════════════════════════════════════════════════ */
+
+/* A1 — which messages sit on a light painted base */
+body.fe-system-dx3rd-fvtt.fe-chat-bg-light:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color:not(.fe-system-msg):not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]),
+body.fe-system-dx3rd-fvtt.fe-sysmsg-bg-light:not(.fe-retro-theme)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]) {
+  --fe-dxf-ink:        #191813;               /* titles, table cells, dice   */
+  --fe-dxf-ink-muted:  #5a5850;               /* description / notice gray   */
+  --fe-dxf-ruby:       #6b6758;               /* furigana (`rt`)             */
+  --fe-dxf-line:       rgb(0 0 0 / 0.2);      /* box outlines                */
+  --fe-dxf-line-soft:  rgb(0 0 0 / 0.1);      /* separators, table grid      */
+  --fe-dxf-surface:    rgb(0 0 0 / 0.04);     /* box fill (was black 20%)    */
+  --fe-dxf-th-bg:      rgb(0 0 0 / 0.07);
+  --fe-dxf-btn-bg:     rgb(0 0 0 / 0.05);
+  --fe-dxf-btn-line:   rgb(0 0 0 / 0.28);
+  --fe-dxf-hover:      #9a6700;               /* #ffbb00 is ~1.6:1 on white  */
+  --fe-dxf-hover-line: rgb(154 103 0 / 0.6);
+  --fe-dxf-green:      #15803d;               /* rgb(34 197 94) is ~2.3:1    */
+  --fe-dxf-green-line: rgb(21 128 61 / 0.65);
+  --fe-dxf-red:        #b91c1c;
+  --fe-dxf-red-line:   rgb(185 28 28 / 0.7);
+  --fe-dxf-blue:       #2563eb;               /* lois emotion, positive      */
+  --fe-dxf-pink:       #c62828;               /* lois emotion, negative      */
+}
+
+/* A2 — item card `.dx3rd-box` */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box {
+  border-color: var(--fe-dxf-line, rgb(255 255 255 / 0.12)) !important;
+  background:   var(--fe-dxf-surface, rgb(0 0 0 / 0.2)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .dx3rd-box__item-icon {
+  border-color: var(--fe-dxf-line, rgb(255 255 255 / 0.18)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-name {
+  color: var(--fe-dxf-ink, white) !important;
+}
+
+/* The static (non-collapsible) name keeps its ink on hover, like the system. */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-name:not(.item-name--static):hover {
+  color: var(--fe-dxf-hover, #ffbb00) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-name rt {
+  color: var(--fe-dxf-ruby, #c9c7b8) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table :is(th, td) {
+  border-color: var(--fe-dxf-line-soft, rgb(255 255 255 / 0.1)) !important;
+  color:        var(--fe-dxf-ink, white) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table th {
+  background: var(--fe-dxf-th-bg, rgb(0 0 0 / 0.25)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table.item-table--lois td .dx3rd-chat-lois-emotion--positive {
+  color: var(--fe-dxf-blue, #73aae6) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table.item-table--lois td .dx3rd-chat-lois-emotion--negative {
+  color: var(--fe-dxf-pink, #f16060) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box :is(.dx3rd-box__actions, .item-description) {
+  border-top-color: var(--fe-dxf-line-soft, rgb(255 255 255 / 0.08)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-description {
+  color: var(--fe-dxf-ink-muted, gray) !important;
+}
+
+/* A3 — action buttons: the item card's `.dx3rd-box__btn` and the sheet-roll
+ * card's eight `.dx3rd-sheet-roll__*-btn` share one look in the system. */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .dx3rd-box__btn,
+      .dx3rd-sheet-roll__damage-btn, .dx3rd-sheet-roll__damage-miss-btn,
+      .dx3rd-sheet-roll__spell-invoke-btn, .dx3rd-sheet-roll__spell-disaster-btn,
+      .dx3rd-sheet-roll__apply-damage-btn, .dx3rd-sheet-roll__apply-heal-btn,
+      .dx3rd-sheet-roll__item-judge-success-btn, .dx3rd-sheet-roll__item-judge-failure-btn) {
+  color:        var(--fe-dxf-ink, #eee) !important;
+  background:   var(--fe-dxf-btn-bg, rgb(255 255 255 / 0.08)) !important;
+  border-color: var(--fe-dxf-btn-line, rgb(255 255 255 / 0.2)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .dx3rd-box__btn,
+      .dx3rd-sheet-roll__damage-btn, .dx3rd-sheet-roll__damage-miss-btn,
+      .dx3rd-sheet-roll__spell-invoke-btn, .dx3rd-sheet-roll__spell-disaster-btn,
+      .dx3rd-sheet-roll__apply-damage-btn, .dx3rd-sheet-roll__apply-heal-btn,
+      .dx3rd-sheet-roll__item-judge-success-btn, .dx3rd-sheet-roll__item-judge-failure-btn):hover {
+  color:        var(--fe-dxf-ink, #fff) !important;
+  background:   rgb(255 187 0 / 0.2) !important;
+  border-color: var(--fe-dxf-hover-line, rgb(255 187 0 / 0.45)) !important;
+}
+
+/* Applied / failed states come after the hover rule on purpose: the system
+ * pins them through :hover as well. */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--applied, .dx3rd-judge-btn--success-applied),
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--applied, .dx3rd-judge-btn--success-applied):hover {
+  color:        var(--fe-dxf-green, rgb(34 197 94 / 0.95)) !important;
+  border-color: var(--fe-dxf-green-line, rgb(34 197 94 / 0.65)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--failed, .dx3rd-judge-btn--failure-applied),
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--failed, .dx3rd-judge-btn--failure-applied):hover {
+  color:        var(--fe-dxf-red, rgb(220 38 38 / 0.98)) !important;
+  border-color: var(--fe-dxf-red-line, rgb(220 38 38 / 0.75)) !important;
+}
+
+/* A4 — boxed actor notice `.dx3rd-info` (+ error / success variants) */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-info {
+  border-color: var(--fe-dxf-line, rgb(255 255 255 / 0.12)) !important;
+  background:   var(--fe-dxf-surface, rgb(0 0 0 / 0.2)) !important;
+  color:        var(--fe-dxf-ink-muted, gray) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-info.dx3rd-info--error,
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-info.dx3rd-info--error :is(a, a:visited) {
+  border-color: var(--fe-dxf-red-line, rgb(220 38 38 / 0.75)) !important;
+  color:        var(--fe-dxf-red, rgb(220 38 38 / 0.98)) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-info.dx3rd-info--success,
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-info.dx3rd-info--success :is(a, a:visited) {
+  border-color: var(--fe-dxf-green-line, rgb(34 197 94 / 0.65)) !important;
+  color:        var(--fe-dxf-green, rgb(34 197 94 / 0.95)) !important;
+}
+
+/* A5 — sheet-roll card (`li.dx3rd-sheet-roll-message`): the framed
+ * `.message-content`, the dice inside info boxes, the pseudo-roll box and the
+ * separator between the spell invoke / disaster rows. Judgment and damage
+ * summaries use `gray` / `green` / `red`, which already read on white. */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).dx3rd-sheet-roll-message > .message-content {
+  border-color: var(--fe-dxf-line, rgb(255 255 255 / 0.12)) !important;
+  background:   var(--fe-dxf-surface, rgb(0 0 0 / 0.2)) !important;
+}
+
+/* The info-wrapped sheet roll drops the inner box on purpose (system rule). */
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).dx3rd-info-message.dx3rd-sheet-roll-message .message-content .dx3rd-info {
+  border-color: transparent !important;
+  background:   transparent !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-info .dice-roll, .dx3rd-info .dice-roll .dice-formula, .dx3rd-info .dice-roll .dice-total,
+      .dx3rd-sheet-pseudo-roll__box) {
+  color: var(--fe-dxf-ink, #eee) !important;
+}
+
+body.fe-system-dx3rd-fvtt:not(.fe-retro-theme):is(.fe-chat-bg-light, .fe-sysmsg-bg-light)
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-sheet-roll__spell-invoke + .dx3rd-sheet-roll__spell-disaster {
+  border-top-color: var(--fe-dxf-line-soft, rgb(255 255 255 / 0.14)) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+ * § B  Retro theme — this system's cards on the black DX3rd chat
+ *
+ *  fe-dx3rd-compat.css §13/§14 (shared, core DOM only) paints the log
+ *  and every message black with accent ink. Here the system's own boxes
+ *  follow, modelled on that file's §15 for emanim cards: black interior,
+ *  accent ink, border = the speaker's user colour (or the accent when
+ *  there is none) at --fe-dx3rd-card-border-alpha, which is the
+ *  "카드 테두리 투명도" setting this system is opted into.
+ *  Corners are already squared by fe-retro-theme.css §2.
+ *
+ *  Semantic colours stay: success/failure badges, applied/failed button
+ *  states and the red/green system-notice variants keep the system's
+ *  red and green — they carry meaning, not decoration.
+ * ══════════════════════════════════════════════════════════════ */
+
+/* B1 — card surfaces. Only the background here: `.dx3rd-info`'s error /
+ * success variants carry their red / green as `color`, which B2 leaves alone. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box, .dx3rd-info) {
+  background: #000000 !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).dx3rd-sheet-roll-message > .message-content {
+  background: #000000 !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color
+  :is(.dx3rd-box, .dx3rd-info:not(.dx3rd-info--error):not(.dx3rd-info--success)),
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-has-user-color.dx3rd-sheet-roll-message > .message-content {
+  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-has-user-color)
+  :is(.dx3rd-box, .dx3rd-info:not(.dx3rd-info--error):not(.dx3rd-info--success)),
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-has-user-color).dx3rd-sheet-roll-message > .message-content {
+  border: 1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / var(--fe-dx3rd-card-border-alpha, 1)) !important;
+}
+
+/* The info-wrapped sheet roll keeps the system's single frame. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).dx3rd-info-message.dx3rd-sheet-roll-message .message-content .dx3rd-info {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+/* B2 — card text: titles and table cells on the bright accent tone,
+ * secondary text (description, info line, furigana) one step down. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .item-name, .dx3rd-box .item-table :is(th, td),
+      .dx3rd-info .dice-roll, .dx3rd-info .dice-roll .dice-formula, .dx3rd-info .dice-roll .dice-total,
+      .dx3rd-sheet-pseudo-roll__box) {
+  color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .item-description, .dx3rd-box .item-name rt,
+      .dx3rd-info:not(.dx3rd-info--error):not(.dx3rd-info--success),
+      .dx3rd-roll-judgment-label, .dx3rd-roll-damage-summary__text) {
+  color: var(--fe-ac-70) !important;
+}
+
+/* Collapsible item name: system #ffbb00 → accent highlight, the same
+ * treatment fe-dx3rd-compat.css gives emanim's `.item-name-toggle`. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-name:not(.item-name--static):hover {
+  color: var(--fe-ac-96) !important;
+}
+
+/* B3 — grid lines and separators on the accent ladder */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table :is(th, td) {
+  border-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .item-table th {
+  background: var(--fe-ac-12) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .dx3rd-box__actions, .dx3rd-box .item-description,
+      .dx3rd-sheet-roll__spell-invoke + .dx3rd-sheet-roll__spell-disaster) {
+  border-top-color: var(--fe-ac-22) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-box .dx3rd-box__item-icon {
+  border-color: var(--fe-ac-33) !important;
+}
+
+/* B4 — action buttons: outline style on the accent, as emanim's chat
+ * buttons are under retro. Hover fills with a faint accent wash. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .dx3rd-box__btn,
+      .dx3rd-sheet-roll__damage-btn, .dx3rd-sheet-roll__damage-miss-btn,
+      .dx3rd-sheet-roll__spell-invoke-btn, .dx3rd-sheet-roll__spell-disaster-btn,
+      .dx3rd-sheet-roll__apply-damage-btn, .dx3rd-sheet-roll__apply-heal-btn,
+      .dx3rd-sheet-roll__item-judge-success-btn, .dx3rd-sheet-roll__item-judge-failure-btn) {
+  background: transparent !important;
+  color:      var(--fe-dx3rd-accent, #ffffff) !important;
+  border:     1px solid var(--fe-dx3rd-accent, #ffffff) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-box .dx3rd-box__btn,
+      .dx3rd-sheet-roll__damage-btn, .dx3rd-sheet-roll__damage-miss-btn,
+      .dx3rd-sheet-roll__spell-invoke-btn, .dx3rd-sheet-roll__spell-disaster-btn,
+      .dx3rd-sheet-roll__apply-damage-btn, .dx3rd-sheet-roll__apply-heal-btn,
+      .dx3rd-sheet-roll__item-judge-success-btn, .dx3rd-sheet-roll__item-judge-failure-btn):hover {
+  background: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.15) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--applied, .dx3rd-judge-btn--success-applied),
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--applied, .dx3rd-judge-btn--success-applied):hover {
+  color:        rgb(34 197 94) !important;
+  border-color: rgb(34 197 94) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--failed, .dx3rd-judge-btn--failure-applied),
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-btn--failed, .dx3rd-judge-btn--failure-applied):hover {
+  color:        rgb(239 68 68) !important;
+  border-color: rgb(239 68 68) !important;
+}
+
+/* B5 — notices. `.dx3rd-system` without a variant is the system's gold
+ * announcement and becomes the accent; the red/green variants keep their
+ * meaning. The combat / scene notices' white rules follow the accent. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .dx3rd-system:not([class*="dx3rd-system--"]),
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .dx3rd-system:not([class*="dx3rd-system--"]) :is(a, a:visited) {
+  border-color: var(--fe-ac-70) !important;
+  color:        var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  .dx3rd-system:not([class*="dx3rd-system--"]) .dx3rd-system__portrait {
+  border-color: var(--fe-ac-33) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message)
+  :is(.dx3rd-combat-msg, .dx3rd-open-scene-msg__title) {
+  border-bottom-color: var(--fe-ac-90) !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message) .dx3rd-open-scene-msg__appear {
+  color: var(--fe-ac-70) !important;
+}

@@ -1,6 +1,6 @@
 import { feLocalize } from "./fe-i18n.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
-import { MODULE_ID, S, feIsDx3rdSystemId, feIsDungeonWorldSystemId, feIsLancerSystemId } from "./fe-constants.js";
+import { MODULE_ID, S, feIsDx3rdSystemId, feIsDx3rdFvttSystemId, feIsDungeonWorldSystemId, feIsLancerSystemId } from "./fe-constants.js";
 import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { feSetting } from "./fe-gm-priority.js";
 
@@ -187,6 +187,15 @@ function feSetRetroThemeClass(doc = document) {
       "fe-retro-system-dx3rd",
       enabled && feIsDx3rdSystemId(systemId),
     );
+    // dx3rd-fvtt is a separate system with its own scope class, NOT
+    // fe-retro-system-dx3rd: only the rules written against Foundry's core chat
+    // DOM (fe-dx3rd-compat.css §13/§14) list both classes; everything keyed on
+    // emanim-lineage markup stays emanim-only, and this system's own markup is
+    // styled in fe-dx3rd-fvtt-compat.css.
+    body.classList.toggle(
+      "fe-retro-system-dx3rd-fvtt",
+      enabled && feIsDx3rdFvttSystemId(systemId),
+    );
     body.classList.toggle(
       "fe-retro-system-dw",
       enabled && feIsDungeonWorldSystemId(systemId),
@@ -203,6 +212,11 @@ function feSetRetroThemeClass(doc = document) {
     // in ui-font.css and must apply with the retro theme OFF, so this class is
     // NOT gated on `enabled`.
     body.classList.toggle("fe-system-dw", feIsDungeonWorldSystemId(systemId));
+
+    // Retro-independent marker for dx3rd-fvtt: its chat cards hard-code light ink
+    // for a dark chat, which must be re-inked when OUR painted base is light
+    // (fe-dx3rd-fvtt-compat.css §A) whether or not retro is on.
+    body.classList.toggle("fe-system-dx3rd-fvtt", feIsDx3rdFvttSystemId(systemId));
 
     // Same retro-independent marker for LANCER: the font variables (ui-font.css
     // §5c), the chat-ink re-pointing and the archive mirror of its `#chat`-scoped

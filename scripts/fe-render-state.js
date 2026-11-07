@@ -181,9 +181,12 @@ function feGetMessageUserColorForData(message, data = {}, userId = null) {
 function feMessageHasChatCardContent(content, el = null) {
   try {
     const src = String(content ?? "");
-    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b)[^"']*["']/i.test(src)) return true;
+    // dx3rd-fvtt: `.dx3rd-box` is its item card, `.dx3rd-info` its boxed actor
+    // notice (both carry their own border/background). `\b` stops at `_`, so the
+    // BEM children (`dx3rd-box__head`, `dx3rd-info__text`) never match alone.
+    if (/class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b|\bdx3rd-box\b|\bdx3rd-info\b)[^"']*["']/i.test(src)) return true;
     if (FE_LANCER_CARD_CONTENT_RE.test(src)) return true;
-    if (el?.querySelector?.(`.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, ${FE_LANCER_CARD_SELECTOR}`)) return true;
+    if (el?.querySelector?.(`.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info, .dx3rd-box, .dx3rd-info, ${FE_LANCER_CARD_SELECTOR}`)) return true;
     return false;
   } catch {
     return false;

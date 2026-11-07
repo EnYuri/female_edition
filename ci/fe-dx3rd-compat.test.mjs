@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { FE_DX3RD_SYSTEM_IDS, S, feIsDx3rdSystemId } from "../scripts/fe-constants.js";
 import { feMessageHasChatCardContent } from "../scripts/fe-render-state.js";
 import { feApplyDoubleCrossLegacyPixiTheme, feSetRetroThemeClass } from "../scripts/fe-style.js";
-import { feIsSystemCombatNoticeContent } from "../scripts/fe-util.js";
+import { FE_ACTOR_COMBAT_NOTICE_CLASS, feIsActorCombatNoticeMessage, feIsSystemCombatNoticeContent } from "../scripts/fe-util.js";
 
 const ORIGINAL_GAME = globalThis.game;
 const ORIGINAL_CANVAS = globalThis.canvas;
@@ -181,4 +181,44 @@ test("the original dx3rd notice heuristic is package-gated", () => {
     i18n: { localize: (key) => ({ "DX3rd.Round": "Round" })[key] ?? key },
   };
   assert.equal(feIsSystemCombatNoticeContent('<div class="dx3rd-roll"><h2>Round 7</h2></div>'), false);
+});
+
+const PORTRAIT_JS = readFileSync(new URL("../scripts/fe-chat-portrait.js", import.meta.url), "utf8");
+const PORTRAIT_CSS = readFileSync(new URL("../styles/fe-chat-portrait.css", import.meta.url), "utf8");
+const ARCHIVE_CSS = readFileSync(new URL("../styles/fe-chat-archive.css", import.meta.url), "utf8");
+const ARCHIVE_MESSAGE_JS = readFileSync(new URL("../scripts/fe-archive-message.js", import.meta.url), "utf8");
+
+test("the actor-spoken combat notice (main process) keeps its header and our portrait", () => {
+  globalThis.game = { system: { id: "dx3rd-emanim" } };
+  const main = { content: '<h3 class="dx3rd-combat-msg">Main Process</h3>', speaker: { actor: "pc", alias: "PC" } };
+  const round = { content: '<h3 class="dx3rd-combat-msg">Round 2</h3>', speaker: { actor: null, alias: "GM" } };
+  const fvttMain = { content: '<div class="dx3rd-combat-msg">메인 프로세스</div>', speaker: { actor: "pc" } };
+  const fvttSystem = { content: '<div class="dx3rd-system"><div class="dx3rd-system__body"></div></div>', speaker: { alias: " " } };
+  const plain = { content: "<p>hello</p>", speaker: { actor: "pc" } };
+  assert.equal(FE_ACTOR_COMBAT_NOTICE_CLASS, "fe-actor-combat-notice");
+  assert.equal(feIsActorCombatNoticeMessage(main), true);
+  assert.equal(feIsActorCombatNoticeMessage(fvttMain), true);
+  assert.equal(feIsActorCombatNoticeMessage(round), false);
+  assert.equal(feIsActorCombatNoticeMessage(fvttSystem), false);
+  assert.equal(feIsActorCombatNoticeMessage(plain), false);
+
+  // Live upsert: the class is decided before the special branch, and only the
+  // non-actor notices return early (portrait removed, header hidden).
+  const upsert = PORTRAIT_JS.slice(PORTRAIT_JS.indexOf("function cpUpsertPortrait"));
+  assert.match(upsert, /const isActorCombatNotice = !isNarratorSpecial && cpIsActorCombatNotice\(message, isCombatNoticeSpecial\);/);
+  assert.match(upsert, /if \(!isActorCombatNotice\) \{\s*cpRemovePortrait\(messageEl\);/);
+  assert.match(PORTRAIT_JS, /const CP_ACTOR_COMBAT_NOTICE_CLASS = "fe-actor-combat-notice";/);
+
+  // Every round-marker rule that hides the sender / portrait exempts it, live and archive.
+  const rm = String.raw`:is\(\.round-marker, \.fe-round-marker-chat, \[data-fe-is-round-marker="1"\], :has\(\.round-marker\)\)`;
+  for (const [name, css, expected] of [["portrait", PORTRAIT_CSS, 2], ["archive", ARCHIVE_CSS, 2]]) {
+    const hiding = [...css.matchAll(new RegExp(`[^\n]*${rm}[^{]*(?:> \.message-header \{|img\.fe-chat-portrait)`, "g"))]
+      .map((m) => m[0])
+      // `.fe-round-marker-empty-content > .message-header` only zeroes a margin.
+      .filter((sel) => !sel.includes("fe-round-marker-empty-content"));
+    assert.ok(hiding.length >= expected, name);
+    for (const sel of hiding) assert.match(sel, /:not\(\.fe-actor-combat-notice\)/, `${name}: ${sel}`);
+  }
+  assert.match(ARCHIVE_MESSAGE_JS, /const hideSender = isRoundMarkerMessage && !isActorNotice;/);
+  assert.match(ARCHIVE_MESSAGE_JS, /feIsActorCombatNoticeMessage\(msg\)/);
 });

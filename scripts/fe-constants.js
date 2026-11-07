@@ -27,6 +27,23 @@ function feIsDx3rdSystemId(systemId) {
   return FE_DX3RD_SYSTEM_IDS.includes(String(systemId ?? ""));
 }
 
+// `dx3rd-fvtt` (LichSOMA, v14-only) is a SEPARATE system that only shares the
+// game's roots with the family above — it is deliberately NOT a member of
+// FE_DX3RD_SYSTEM_IDS, because that gate switches on everything tuned for the
+// emanim lineage (retro DX3rd skin, status panel, DX3rd-only settings, the
+// emanim attribute extractor). Each feature opts this system in on its own,
+// and only where the system's source was checked to match:
+//   - nextTurn is a player-local action-end dialog (combats/dx3rd-combat.js),
+//     same reason the tracker routes turn-end locally for the family;
+// What differs: sheet root `.dx3rd-fvtt`, enemy type `npc` (not `enemy`),
+// abilities/skills expose `.value` (not `.total`), and its own chat markup
+// (`.dx3rd-box` / `.dx3rd-info` / `.dx3rd-system` / `.dx3rd-open-scene-msg`).
+const FE_DX3RD_FVTT_SYSTEM_ID = "dx3rd-fvtt";
+
+function feIsDx3rdFvttSystemId(systemId) {
+  return String(systemId ?? "") === FE_DX3RD_FVTT_SYSTEM_ID;
+}
+
 // Dungeon World family. `Emmanim-Dungeonworld` is the maintained fork installed
 // alongside this module; `dungeonworld` is Asacolips' upstream. Both share the
 // actor schema (`system.attributes.hp`), the `.dungeonworld` sheet root, and the
@@ -82,6 +99,8 @@ export {
   MODULE_ID,
   FE_DX3RD_SYSTEM_IDS,
   feIsDx3rdSystemId,
+  FE_DX3RD_FVTT_SYSTEM_ID,
+  feIsDx3rdFvttSystemId,
   FE_DW_SYSTEM_IDS,
   feIsDungeonWorldSystemId,
   FE_LANCER_SYSTEM_IDS,

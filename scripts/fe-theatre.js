@@ -1389,7 +1389,7 @@ function _fetIsSystemMessage(chatMessage, data) {
   }
   const content = data?.content ?? chatMessage.content ?? "";
   if (typeof content === "string" && content &&
-      /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b|\bdnd5e2\b)[^"']*["']/i.test(content)) {
+      /class=["'][^"']*(?:\bchat-card\b|\bmidi-chat-card\b|\bdx3rd-item-chat\b|\bdx3rd-item-info\b|\bdx3rd-box\b|\bdnd5e2\b)[^"']*["']/i.test(content)) {
     return true;
   }
   return false;
