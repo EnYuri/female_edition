@@ -9,8 +9,8 @@
  *      are independent (see fe-narrator.js header).
  *
  * NOTE: the overlay scroll uses the Web Animations API (JS), NOT CSS
- * transitions, so the retro theme's global `* { transition: all 1ms }` cannot
- * freeze it. We still null out transitions on the moving element to be safe.
+ * transitions, so no retro-theme transition override can freeze it (the
+ * former global `* { transition: all 1ms }` is gone, but the reason stands). We still null out transitions on the moving element to be safe.
  * ================================================================ */
 
 /* ── Overlay ─────────────────────────────────────────────────────────────── */

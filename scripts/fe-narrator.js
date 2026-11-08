@@ -68,9 +68,9 @@ const _fn = {
   visible: false,
 };
 
-// Fade via the Web Animations API rather than a CSS transition — the retro
-// theme's `* { transition: all 1ms !important }` collapses CSS transitions, but
-// WAAPI animations are unaffected (same reason the scroll uses WAAPI).
+// Fade via the Web Animations API rather than a CSS transition. It was chosen
+// when the retro theme forced `* { transition: all 1ms !important }` (since
+// removed); WAAPI stays immune to any CSS transition override either way.
 function _fnAnimate(el, keyframes, duration, easing = "ease-in-out") {
   if (!el) return;
   try { el.animate(keyframes, { duration, easing, fill: "forwards" }); } catch { /* no-op */ }

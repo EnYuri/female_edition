@@ -281,8 +281,9 @@ body.fe-chat-merge :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
  *   alpha 0.6. Do NOT use the lightness-clipped --fe-ac-90-* family here
  *   (fe-dx3rd-compat.css §14 header comment: only the master border
  *   darkens).
- * transition:none — avoids retro's `* { transition: all 1ms }` pinning a
- *   border change to its start value (same cause as the chat-tint case). */
+ * transition:none — the border switches instantly instead of fading. (It was
+ *   added against a former retro-wide `transition: all 1ms` that pinned the
+ *   change to its start value; that blanket is gone, the rule is kept.) */
 body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message {
   --fe-group-outline-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.6);
   border: 3px solid var(--fe-group-outline-color) !important;
@@ -328,10 +329,9 @@ body.fe-hide-msg-border-usercolor:not(.fe-chat-group-outline)
 /* Under retro, the retro accent instead of core grey — same selector as
  * the rule above plus one body class (.fe-retro-theme), so it wins on
  * specificity naturally.
- * transition:none — avoids retro's global
- * `transition-duration:1ms !important` (§1) pinning a border-color change
- * (settings save / live retro toggle) to its start value (same cause,
- * same cure as the user-color tint exception above). */
+ * transition:none — the border-color switches instantly (settings save /
+ * live retro toggle). Added against a former retro-wide 1ms transition that
+ * pinned the change to its start value; that blanket is gone, the rule is kept. */
 body.fe-retro-theme.fe-hide-msg-border-usercolor:not(.fe-chat-group-outline)
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   .chat-message {
@@ -378,15 +378,23 @@ body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #
    whose content lives only in the flavor (roll flavors etc.) would lose
    all its text if the header were hidden wholesale.
    So in hide mode, instead of removing the header, only its non-flavor
-   children are removed. */
-body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text:not(:empty)) {
+   children are removed.
+
+   NEVER put :empty / :not(:empty) inside this :has(). Measured live on
+   v14.370 / Chrome: any :empty inside a :has() argument makes EVERY
+   keystroke in the ProseMirror chat input restyle a large part of the
+   document — 78 ms per key (retro off), 155 ms (retro on), vs 1 ms
+   without it. Dropping it changes nothing: core's chat-message.hbs only
+   emits span.flavor-text under {{#if message.flavor}}, so the span is
+   never empty when present. Tripwire: ci/fe-has-empty.test.mjs. */
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text) {
   display: block !important;
   padding: 0 !important;
   margin: 0 !important;
   min-height: 0 !important;
 }
 
-body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text:not(:empty)) > *:not(.flavor-text) {
+body.fe-chat-merge.fe-merge-follow-hide :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message:is(.fe-merge-mid, .fe-merge-end, .fe-merge-follow) .message-header:has(> .flavor-text) > *:not(.flavor-text) {
   display: none !important;
 }
 

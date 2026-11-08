@@ -336,9 +336,9 @@ body.fe-retro-theme :is(.dnd5e, .dnd5e2, .tidy5e-sheet:not(*)) input.resource-va
  * → leaving dark text in place gives "black on black". The branch is
  * gone and a single bright ink unifies both. Critical/fumble stays
  * distinct via the surface lightness (22 vs 06) and the border.
- * transition:none — dodges retro's `* { transition: all 1ms }` freezing
- *   color/background transitions at their start value so the change
- *   never paints (same cause as the chat tint). */
+ * transition:none — colour/background switch instantly. Added against a
+ *   former retro-wide `transition: all 1ms` that froze them at their start
+ *   value; that blanket is gone (fe-retro-theme.css §3), the rule is kept. */
 
 body.fe-retro-theme.fe-retro-system-dnd5e :is(#sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout))
   :is(.dice-roll .dice-total, .dice-total, .dice-result .dice-total,

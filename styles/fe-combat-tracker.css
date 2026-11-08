@@ -1291,9 +1291,9 @@ body.fe-retro-theme #fe-combat-tracker .fe-ct-combatants-wrap::after {
 }
 
 /* An element rather than a background-size on the track: the fill's own width is
-   what animates, the track's border and radius stay put, and the retro theme's
-   global 1ms transition-duration lands on it for free (a background-size ramp would
-   need its own exception to be crushed). --fe-dbp-bar-pct comes from the template on
+   what animates, the track's border and radius stay put, and the retro theme can
+   step it with a plain transition-duration (see the retro block below; a
+   background-size ramp would need more than that). --fe-dbp-bar-pct comes from the template on
    the TRACK and inherits down. */
 .fe-dbp-bar-fill {
   position: absolute;
@@ -1573,6 +1573,12 @@ body.fe-retro-theme .fe-dbp-bar {
 }
 body.fe-retro-theme .fe-dbp-bar-fill {
   background: var(--fe-ac-96, #f2f2f2);
+  /* Retro steps the fill instead of ramping it. This used to come for free from a
+     global `* { transition-duration: 1ms }` in fe-retro-theme.css; that blanket was
+     dropped (it made every restyle of every element diff all animatable properties),
+     so the one transition that relied on it states it here. 1ms, not 0, keeps
+     transitionend firing. */
+  transition-duration: 1ms;
 }
 body.fe-retro-theme .fe-dbp-eff {
   image-rendering: pixelated;

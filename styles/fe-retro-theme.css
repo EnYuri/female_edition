@@ -16,8 +16,8 @@
  * Contains:
  *   · § 1  antialiasing OFF
  *   · § 2  global border-radius removal
- *   · § 3  transitions · animations made instant (+ #pause / spinner
- *          exceptions)
+ *   · § 3  animations made instant (+ #pause / spinner exceptions);
+ *          transitions are deliberately left alone — see § 3
  *   · § 4  global soft-shadow removal (+ user-color tint restore
  *          exception)
  *   · § 5  pixel rendering for SVG icons (excludes <img>)
@@ -37,7 +37,7 @@
  * Principles:
  *   · every border-radius → 0 (angular pixel shape)
  *   · -webkit-font-smoothing: none (antialiasing OFF)
- *   · transition / animation → instant (pixel-UI feel)
+ *   · animation → instant (pixel-UI feel); transitions keep their speed
  *   · box-shadow / text-shadow removed globally → hard outlines instead
  * ================================================================ */
 
@@ -67,21 +67,32 @@ body.fe-retro-theme *::after {
 
 
 /* ══════════════════════════════════════════════════════════════
- * § 3  transitions · animations made instant
- *       duration is set to 1ms, NOT 0ms — 0ms transitions/animations never
- *       fire transitionend / animationend. ApplicationV2's
- *       close()/minimize() waits for the max-height transition's
- *       transitionend (_awaitTransition), so at 0ms the event never arrives
- *       and the window takes the 1000ms fallback timeout to close. 1ms is
- *       visually instant (indistinguishable from 0ms) while still firing
- *       the event, so close/minimize completes immediately.
+ * § 3  animations made instant
+ *       duration is set to 1ms, NOT 0ms — a 0ms animation never fires
+ *       animationend. 1ms is visually instant while still firing it.
+ *
+ *       TRANSITIONS ARE NOT TOUCHED HERE, and must not be again. This rule
+ *       used to also set `transition-duration: 1ms !important` on every
+ *       element. `transition-property` defaults to `all`, so that turned
+ *       every element in the document into `transition: all 1ms`, and on
+ *       every restyle Chrome then diffed every animatable property of every
+ *       restyled element to decide whether to start a transition. Measured
+ *       2026-11-08 (full core + module CSS, interface-subtree restyle): retro
+ *       off 98 ms, retro on 275 ms, retro on without the transition half
+ *       ~190 ms; the animation half costs almost nothing. Live, it doubled
+ *       the per-keystroke restyle in the chat input (78 → 155 ms).
+ *       Going to 0s instead is not an option either: core awaits
+ *       transitionend on .application roots (close/minimize), the journal
+ *       collapse, #tooltip (hidePopover only runs on transitionend) and
+ *       #menu (10 s timeout), and several modules do the same.
+ *       A feature that wants a stepped transition under retro states its
+ *       own `transition-duration: 1ms` (e.g. .fe-dbp-bar-fill in
+ *       fe-combat-tracker.css).
  * ══════════════════════════════════════════════════════════════ */
 
 body.fe-retro-theme *,
 body.fe-retro-theme *::before,
 body.fe-retro-theme *::after {
-  transition-duration:  1ms !important;
-  transition-delay:     0ms !important;
   animation-duration:   1ms !important;
   animation-delay:      0ms !important;
 }
@@ -199,9 +210,10 @@ body.fe-retro-theme * {
  * with the user's color in chat-bg-stripper.css (as a giant 9999px inset
  * box-shadow on white/black bases). Retro kills that tint two ways:
  *   1) the global `* { box-shadow: none }` above → removes the inset tint.
- *   2) the global `* { transition: all 1ms }` → the message background
- *      freezes at its transition "start value" (black), so painting
- *      background-color still stops at black.
+ *   2) (historical) a former global `* { transition: all 1ms }` froze the
+ *      message background at its transition start value (black). That
+ *      blanket is gone (§3); `transition: none` below is kept so the tint
+ *      still switches instantly.
  * → For chat messages only, transition is disabled and the tint is laid
  *   directly via background-color, dodging both traps. Per-user color
  *   distinction is restored.

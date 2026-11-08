@@ -496,6 +496,13 @@ body.fe-sysmsg-bg-light
   --dnd5e-background-alt-2: var(--dnd5e-color-iron-gray);
   --dnd5e-background-5: rgb(0 0 0 / 0.05);
   --dnd5e-gold-icon-background: var(--dnd5e-color-light-gray);
+  /* PHB `.fvtt.quest` / `.advice` / `.notable` boxes inside an item description
+   * (dnd5e.css:14352). Missed by the original scan because no sampled card carried one:
+   * on a light base in a theme-dark world the box stayed blue-gray-4 while
+   * the PHB-callout `color: inherit` rule further down this file handed
+   * it our dark ink — measured 1.49:1. Border colour is gold in both themes, so it is
+   * not a theme variable and is left alone. */
+  --dnd5e-block-background: var(--dnd5e-color-card);
   --dnd5e-chat-description-background: transparent;
   /* Ours, not dnd5e's: the 약간의 회색 (light gray) box §the description rule further up
    paints with
@@ -554,6 +561,7 @@ body.fe-sysmsg-bg-dark
   --dnd5e-background-alt-2: var(--dnd5e-color-blue-gray-2);
   --dnd5e-background-5: var(--dnd5e-highlight-10);
   --dnd5e-gold-icon-background: var(--dnd5e-color-dark-gray);
+  --dnd5e-block-background: var(--dnd5e-color-blue-gray-4);
   --dnd5e-chat-description-background: rgb(255 255 255 / 0.03);
   --fe-chat-desc-bg: rgb(255 255 255 / 0.06);
   --dnd5e-chat-button-background: var(--dnd5e-color-blue-gray-1);
