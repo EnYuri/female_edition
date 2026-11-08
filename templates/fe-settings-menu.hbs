@@ -42,6 +42,14 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "FE.SettingsData.ceChatPastePlainText.name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ceChatPastePlainText" data-dtype="Boolean" {{checked values.ceChatPastePlainText}} />
+      </div>
+      <p class="notes">{{localize "FE.SettingsData.ceChatPastePlainText.hint"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "FE.SettingsMenu.ceEditEnabled.Text"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="ceEditEnabled" data-dtype="Boolean" {{checked values.ceEditEnabled}} />

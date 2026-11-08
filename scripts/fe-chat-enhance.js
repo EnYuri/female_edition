@@ -494,6 +494,8 @@ Hooks.once("init", () => {
 
   feRegisterSetting(S.MARKDOWN_ENABLED);
 
+  feRegisterSetting(S.CHAT_PASTE_PLAIN_TEXT);
+
   feRegisterSetting(S.EDIT_ENABLED, () => feFireChatUiUpdated({ reason: "edit-settings", document }));
 
   feRegisterSetting(S.GM_PRIORITY_ENABLED, (value) => {
@@ -642,6 +644,44 @@ function feInstallChatMenuTypingFastPath() {
   proto.update = update;
 }
 
+// v14's chat input is a full ProseMirror editor on core's defaultSchema, and core's
+// only paste hook (ProseMirrorPasteTransformer) just re-keys secret blocks, so a
+// paste from a web page or a journal keeps its bold/colour/links. With
+// ceChatPastePlainText on we take the same path ProseMirror itself takes for
+// Ctrl+Shift+V: view.pasteText() parses the clipboard's text/plain through the
+// editor's clipboardTextParser.
+// - Added through core's bubbling `plugins` event, which every <prose-mirror>
+//   dispatches each time it (re)activates its editor; filtering on #chat-message
+//   keeps journals and every other editor untouched. v13's chat input is a
+//   <textarea>, so it never fires there.
+// - Pastes with no text/html, with files, or with an empty text/plain are left to
+//   core, so image pastes (core's image plugin, fe-chat-images.js) are unaffected.
+// - pasteText() re-enters handlePaste with the same event, hence the guard.
+// - The setting is read per paste, so toggling it needs no reload.
+let _fePlainPasteActive = false;
+function feInstallChatPlainTextPaste() {
+  if (game.release?.generation < 14) return;
+  const Plugin = foundry.prosemirror?.state?.Plugin ?? foundry.prosemirror?.Plugin;
+  if (typeof Plugin !== "function") return;
+  document.addEventListener("plugins", event => {
+    if (!event.target?.closest?.("prose-mirror#chat-message") || !event.plugins) return;
+    event.plugins.fePlainTextPaste = new Plugin({
+      props: {
+        handlePaste(view, pasteEvent) {
+          if (_fePlainPasteActive || !feSetting(S.CHAT_PASTE_PLAIN_TEXT)) return false;
+          const data = pasteEvent?.clipboardData;
+          if (!data || data.files?.length || !data.types?.includes?.("text/html")) return false;
+          const text = data.getData("text/plain");
+          if (!text) return false;
+          _fePlainPasteActive = true;
+          try { view.pasteText(text, pasteEvent); } finally { _fePlainPasteActive = false; }
+          return true;
+        },
+      },
+    });
+  });
+}
+
 // Paint the UI from settings as soon as the settings store is populated, without
 // waiting for the canvas. `setup` fires after world documents are prepared and
 // BEFORE the canvas is drawn, so this survives a canvas that never finishes
@@ -652,6 +692,7 @@ function feInstallChatMenuTypingFastPath() {
 // free.
 Hooks.once("setup", () => {
   feInstallChatMenuTypingFastPath();
+  feInstallChatPlainTextPaste();
   try { feApplyVisualSettingsToDocument(document); } catch { /* no-op */ }
 });
 

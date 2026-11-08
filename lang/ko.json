@@ -598,6 +598,8 @@
 	"FE.SettingsData.ceMessageBgSaturation.hint": "페이퍼 톤 오버레이를 켰을 때 적용되는 미색층의 알파 값입니다. 값이 높을수록 더 밝고 채도가 약해집니다.",
 	"FE.SettingsData.ceMarkdownEnabled.name": "채팅 입력 마크다운 지원",
 	"FE.SettingsData.ceMarkdownEnabled.hint": "채팅 입력 텍스트를 마크다운으로 처리합니다(이미지/링크/제목/굵게/기울임/취소선/인용구).",
+	"FE.SettingsData.ceChatPastePlainText.name": "채팅 입력 붙여넣기 시 서식 제거",
+	"FE.SettingsData.ceChatPastePlainText.hint": "채팅 입력창에 붙여넣을 때 굵게·색·링크 같은 서식을 버리고 텍스트만 넣습니다. 끄면 Foundry 기본처럼 서식째 들어갑니다. 꺼져 있어도 Ctrl+Shift+V는 항상 텍스트만 붙여넣습니다.",
 	"FE.SettingsData.ceEditEnabled.name": "채팅 수정(편집) 다이얼로그",
 	"FE.SettingsData.ceEditEnabled.hint": "메시지 수정 버튼 클릭 시 마크다운 기반 편집 다이얼로그를 사용합니다.",
 	"FE.SettingsData.ceGmPriorityEnabled.name": "GM 설정 전역 강제",

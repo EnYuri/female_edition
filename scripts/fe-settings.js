@@ -164,6 +164,7 @@ function feRegisterSettingsMenu({
 
         // Markdown / Edit
         [S.MARKDOWN_ENABLED]: feRead(S.MARKDOWN_ENABLED),
+        [S.CHAT_PASTE_PLAIN_TEXT]: feRead(S.CHAT_PASTE_PLAIN_TEXT),
         [S.EDIT_ENABLED]:     feRead(S.EDIT_ENABLED),
 
         // GM priority
@@ -656,7 +657,7 @@ function feRegisterSettingsMenu({
           str(S.MERGE_MODE), str(S.MERGE_FOLLOW_HEADER_STYLE), str(S.MERGE_SPEAKER_BASIS),
 
           // Markdown / Edit
-          bool(S.MARKDOWN_ENABLED), bool(S.EDIT_ENABLED),
+          bool(S.MARKDOWN_ENABLED), bool(S.CHAT_PASTE_PLAIN_TEXT), bool(S.EDIT_ENABLED),
 
           // GM priority (world-scoped — non-GMs lack write permission)
           ...(game.user?.isGM ? [

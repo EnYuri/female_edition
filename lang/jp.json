@@ -595,6 +595,8 @@
 	"FE.SettingsData.ceMessageBgSaturation.hint": "ペーパートーンオーバーレイをオンにしたとき適用されるオフホワイト層のアルファ値です。値が高いほど明るく彩度が弱まります。",
 	"FE.SettingsData.ceMarkdownEnabled.name": "チャット入力のMarkdownサポート",
 	"FE.SettingsData.ceMarkdownEnabled.hint": "チャット入力テキストをMarkdownとして処理します（画像/リンク/見出し/太字/斜体/取り消し線/引用）。",
+	"FE.SettingsData.ceChatPastePlainText.name": "チャット入力の貼り付け時に書式を除去",
+	"FE.SettingsData.ceChatPastePlainText.hint": "チャット入力欄に貼り付けるとき、太字・色・リンクなどの書式を捨ててテキストのみを入れます。オフにするとFoundry標準どおり書式ごと入ります。オフでもCtrl+Shift+Vは常にテキストのみを貼り付けます。",
 	"FE.SettingsData.ceEditEnabled.name": "チャット編集ダイアログ",
 	"FE.SettingsData.ceEditEnabled.hint": "メッセージ編集ボタンをクリックしたときMarkdownベースの編集ダイアログを使います。",
 	"FE.SettingsData.ceGmPriorityEnabled.name": "GM設定の全体強制",

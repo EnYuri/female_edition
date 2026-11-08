@@ -595,6 +595,8 @@
 	"FE.SettingsData.ceMessageBgSaturation.hint": "Alpha value of the off-white layer applied when the paper tone overlay is on. Higher values are brighter and less saturated.",
 	"FE.SettingsData.ceMarkdownEnabled.name": "Chat input Markdown support",
 	"FE.SettingsData.ceMarkdownEnabled.hint": "Processes chat input text as Markdown (images/links/headings/bold/italic/strikethrough/quotes).",
+	"FE.SettingsData.ceChatPastePlainText.name": "Strip formatting when pasting into chat",
+	"FE.SettingsData.ceChatPastePlainText.hint": "Pastes only the text into the chat input, dropping formatting such as bold, colors and links. When off, Foundry keeps the formatting as usual. Ctrl+Shift+V always pastes plain text either way.",
 	"FE.SettingsData.ceEditEnabled.name": "Chat edit dialog",
 	"FE.SettingsData.ceEditEnabled.hint": "Uses a Markdown-based edit dialog when the message edit button is clicked.",
 	"FE.SettingsData.ceGmPriorityEnabled.name": "GM settings global enforcement",
