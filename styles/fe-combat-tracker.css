@@ -685,6 +685,11 @@ body.fe-retro-theme .fe-ct-init {
 body.fe-retro-theme .fe-ct-hp {
   border: 1px solid var(--fe-ac-33, rgba(255, 255, 255, 0.3));
 }
+/* Steps instead of ramping, same as .fe-dbp-bar-fill's retro rule — the two HP
+   readings must behave alike. Used to come from the removed global 1ms. */
+body.fe-retro-theme .fe-ct-hp-fill {
+  transition-duration: 1ms;
+}
 /* In retro the emphasis also ends at the single ::after ring above. An extra
    outline used to be drawn on the frame here, but once the ring existed it
    became two concentric lines — messy. Do not restore it. */

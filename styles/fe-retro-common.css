@@ -80,8 +80,28 @@ body.fe-retro-theme :is(.window-app, .application) {
   transition-property: none !important;
 }
 
+/* Window minimize / restore / close stay INSTANT under retro. Core gives these
+   states `transition: max-height 0.25s, max-width 0.25s` and awaits transitionend
+   (ApplicationV2#_awaitTransition, 1 s fallback). 1ms, not 0: a 0s transition never
+   fires transitionend. This used to come from a global `* { transition-duration: 1ms }`
+   in fe-retro-theme.css §3, which was removed for performance; the duration is now
+   stated only on the elements that need it, and only while they are in the state. */
 body.fe-retro-theme :is(.application.minimizing, .application.maximizing) {
   transition-property: max-height, max-width !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0s !important;
+}
+
+/* Journal sidebar collapse. Core puts `.collapsing` on the WINDOW root
+   (`.sheet.journal-entry.collapsing { transition: all 250ms }`), and both the V2
+   sheet (_awaitTransition, checks event.target === root) and the V1 sheet
+   (`transitionend` once) wait for it with pointer-events disabled. The window rule
+   above sets `transition-property: none` on every window root, so no transitionend
+   ever came and the window ignored clicks until the 1 s fallback (V2). */
+body.fe-retro-theme :is(.application, .window-app).collapsing {
+  transition-property: all !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0s !important;
 }
 
 body.fe-retro-theme :is(.window-app, .application) :is(.window-header, header.window-header) {

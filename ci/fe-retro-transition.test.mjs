@@ -34,3 +34,27 @@ test("the retro HP bar still steps instead of ramping", () => {
   const css = read("styles/fe-combat-tracker.css");
   assert.match(css, /body\.fe-retro-theme \.fe-dbp-bar-fill \{[^}]*transition-duration:\s*1ms;/);
 });
+
+// With the global 1ms gone, every retro surface that should stay instant (or that
+// core awaits transitionend on) has to state its own 1ms.
+test("retro window minimize/restore/close stay instant and still fire transitionend", () => {
+  const css = read("styles/fe-retro-common.css");
+  const hit = rules(css).find(({ sel, body }) =>
+    /\.application\.minimizing/.test(sel) && /\.application\.maximizing/.test(sel)
+    && /transition-duration:\s*1ms !important/.test(body));
+  assert.ok(hit, ".application.minimizing/.maximizing must carry transition-duration: 1ms");
+});
+
+test("retro journal collapse is not blocked by the window transition-property: none", () => {
+  const css = read("styles/fe-retro-common.css");
+  const hit = rules(css).find(({ sel, body }) =>
+    /\.collapsing/.test(sel) && /\.application/.test(sel) && /\.window-app/.test(sel)
+    && /transition-property:\s*all !important/.test(body)
+    && /transition-duration:\s*1ms !important/.test(body));
+  assert.ok(hit, ":is(.application, .window-app).collapsing must re-enable a 1ms transition");
+});
+
+test("both tracker HP readings step under retro", () => {
+  const css = read("styles/fe-combat-tracker.css");
+  assert.match(css, /body\.fe-retro-theme \.fe-ct-hp-fill \{[^}]*transition-duration:\s*1ms;/);
+});
