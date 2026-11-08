@@ -1093,6 +1093,17 @@ function _fetTryRenderRichContent(insert, messageId) {
   return true;
 }
 
+// The stage is a SHARED surface: every client receives every ChatMessage document,
+// whispers included, and core hides a whisper from non-recipients only in its own
+// chat-log render. So the stage must apply the same gate itself, or a whisper sent
+// with a stage speaker shows up as a speech bubble on everyone's screen.
+// `isContentVisible` (client/documents/chat-message.mjs) is core's own "may this user
+// read the content" test: author + whisper recipients, and blind messages stay hidden
+// even from a non-GM author.
+function _fetMessageVisibleToUser(message) {
+  return (message?.isContentVisible ?? message?.visible ?? true) !== false;
+}
+
 function _fetMessageHasStageRecallContent(message) {
   const content = String(message?.content ?? "");
   return _fetPlainTextFromContent(content).length > 0 || /<(?:img|video|picture|table)\b/i.test(content);
@@ -1142,34 +1153,45 @@ function _fetRecallTargetForMessage(message) {
 // One timeline spanning stage lines and ordinary actor lines. Ordinary lines only get a
 // receive-only display stage when recalled. Depending on the setting, actor-less plain/OOC
 // messages share the same cursor. Roll-only and empty messages are excluded.
-function _fetRecallMessages() {
-  return (game.messages?.contents ?? [])
-    .filter((message) =>
-      !message.rolls?.length &&
-      !String(message.content ?? "").startsWith("/") &&
-      _fetMessageHasStageRecallContent(message))
-    .map((message) => ({ message, target: _fetRecallTargetForMessage(message) }))
-    .filter(({ target }) => target)
-    .sort((a, b) => {
-      const dt = (a.message.timestamp ?? 0) - (b.message.timestamp ?? 0);
-      if (dt) return dt;
-      return String(a.message.id ?? "").localeCompare(String(b.message.id ?? ""));
-    });
+//
+// Eligibility is split by cost on purpose. The timeline below is only a cheap timestamp
+// sort; the expensive test (a DOMParser pass over the content, plus the speaker lookup,
+// whose non-actor branch even creates a display insert) runs lazily, walking back from
+// the anchor and stopping at the first hit. The old code ran it over EVERY message in
+// the world on every "<" click just to step back one line.
+function _fetRecallRow(message) {
+  if (!_fetMessageVisibleToUser(message) ||
+      message.rolls?.length ||
+      String(message.content ?? "").startsWith("/") ||
+      !_fetMessageHasStageRecallContent(message)) return null;
+  const target = _fetRecallTargetForMessage(message);
+  return target ? { message, target } : null;
+}
+
+function _fetRecallTimeline() {
+  // game.messages is already in creation order, so this sort is close to linear.
+  return (game.messages?.contents ?? []).slice().sort((a, b) => {
+    const dt = (a.timestamp ?? 0) - (b.timestamp ?? 0);
+    if (dt) return dt;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+  });
 }
 
 // The "<" button: load the line one step older than the one currently shown.
+// With an anchor, the nearest older eligible line; at the oldest one it stays put.
+// Without an anchor (or one since deleted), the newest eligible line.
 function _fetRecallPrev(theatreId) {
   const insert = _fetGetDisplayInsert(theatreId);
   if (!insert) return;
-  const rows = _fetRecallMessages();
-  if (!rows.length) return;
+  const timeline = _fetRecallTimeline();
 
   const anchorId = _fet.recallMessageId || insert.currentMessageId;
-  const anchorIndex = anchorId ? rows.findIndex((row) => row.message.id === anchorId) : -1;
-  const nextIndex = anchorIndex >= 0
-    ? Math.max(0, anchorIndex - 1)
-    : rows.length - 1;
-  const row = rows[nextIndex];
+  const anchorIndex = anchorId ? timeline.findIndex((m) => m.id === anchorId) : -1;
+  let row = null;
+  for (let i = (anchorIndex >= 0 ? anchorIndex : timeline.length) - 1; i >= 0 && !row; i--) {
+    row = _fetRecallRow(timeline[i]);
+  }
+  if (!row && anchorIndex >= 0) row = _fetRecallRow(timeline[anchorIndex]);
   if (!row) return;
 
   const msg = row.message;
@@ -1464,6 +1486,8 @@ Hooks.on("createChatMessage", (chatMessage) => {
 
   // Skip roll messages and slash commands; markdown-wrapped HTML is handled by text extraction below
   if (chatMessage.rolls?.length || chatMessage.content?.startsWith("/")) return;
+  // Whispers: only the author and recipients may see the bubble (see helper).
+  if (!_fetMessageVisibleToUser(chatMessage)) return;
 
   // Strip HTML → plain text for the speech bubble (DOMParser = inert, no resource
   // load / no onerror execution).
