@@ -160,7 +160,10 @@ class QuickSheetSwitchKeybind {
       switchKeyInvocationCount = 0;
     }, debounceDelay);
 
-    game.keybindings.register(CONSTANTS.MODULE_ID, registrationKey, {
+    // Same namespace + prefix as every other Classic keybinding. Under the official
+    // `tidy5e-sheet` namespace, tidyQssQuadrone/tidyQssDefault collided with tidy 14's
+    // own registrations, and core's register() is a Map.set: the later one silently won.
+    game.keybindings.register(CONSTANTS.SETTINGS_NAMESPACE, `tidyClassic-${registrationKey}`, {
       name: name,
       hint: `Press this keybind combination ${invocationCountToTrigger} times in a row to switch the indicated sheet type.`,
       onDown: async () => {

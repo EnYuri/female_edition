@@ -187,7 +187,16 @@ export class ThemeQuadrone {
       .join('; ')} }`;
   }
 
-  static readonly tagId = 'tidy5e-sheets-quadrone-theme-settings';
+  // NOT tidy 14's id ('tidy5e-sheets-quadrone-theme-settings'). With both modules
+  // active, two tags shared that id and getTidyStyleSheet() in BOTH bundles resolved
+  // the first one; the world-rule identifier (--tidy5e-sheet-world-setting) is also
+  // shared, so applying this fork's world theme deleted and replaced the official
+  // module's world rules, wiping the GM's Quadrone theme from official sheets.
+  static readonly tagId = 'fe-tidy-classic-quadrone-theme-settings';
+
+  static officialTidyOwnsWorldTheme(): boolean {
+    return !!FoundryAdapter.getModule(CONSTANTS.MODULE_ID)?.active;
+  }
 
   static insertTidyThemeStyleTag() {
     const tag = document.createElement('style');
@@ -198,6 +207,13 @@ export class ThemeQuadrone {
   static applyCurrentThemeSettingsToStylesheet(
     options: ThemeSettingsConfigurationOptions = {}
   ) {
+    // World-scope rules target '.tidy5e-sheet.application.quadrone', which no Classic
+    // sheet carries. While official Tidy is active those are ITS sheets and its own
+    // world theme must be the only one painting them. Per-sheet rules (#<sheet id>)
+    // only ever match this fork's own windows and always apply.
+    if (!options.doc && !options.idOverride && this.officialTidyOwnsWorldTheme()) {
+      return;
+    }
     const themeSettings =
       options.settingsOverride ??
       (options.doc

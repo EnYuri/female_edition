@@ -1,6 +1,7 @@
 import type { Tidy5eSheetsApi } from 'src/api/Tidy5eSheetsApi';
 import { type HeaderControlRegistrationParams } from 'src/api/api.types';
 import { settings } from 'src/settings/settings.svelte';
+import { ThemeQuadrone } from 'src/theme/theme-quadrone.svelte';
 
 export class DebugTools {
   static onReady(api: Tidy5eSheetsApi) {
@@ -41,7 +42,7 @@ export class DebugTools {
               const stylesheet = Array.from(document.styleSheets).find(
                 (s) =>
                   // @ts-expect-error
-                  s.ownerNode.id === 'tidy5e-sheets-quadrone-theme-settings'
+                  s.ownerNode.id === ThemeQuadrone.tagId
               )!;
 
               console.log(stylesheet);

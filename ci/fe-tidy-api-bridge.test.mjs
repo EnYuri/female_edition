@@ -62,3 +62,44 @@ test('a Classic registration failure does not change the official API result', (
   assert.equal(module.api.registerItemHeaderControls({ controls: [] }), 42);
   assert.equal(warnings.length, 1);
 });
+
+// midi-qol registers item-summary commands on whichever API is published; with official
+// Tidy active, Classic used to miss them. The singular actor-trait helper must reach
+// Classic exactly once (upstream routes it through the plural method).
+test('layout-agnostic config registrations reach Classic, each exactly once', () => {
+  const calls = [];
+  const module = { active: true };
+  const classicApi = { config: {
+    itemSummary: { registerCommands(c) { calls.push(['classic-summary', c]); } },
+    actorPortrait: { registerMenuCommands(c) { calls.push(['classic-portrait', c]); } },
+    actorTraits: {
+      registerActorTraits(t) { calls.push(['classic-traits', t]); },
+      registerActorTrait(t) { this.registerActorTraits([t]); },
+    },
+    item: { registerCustomEquipmentTypeGroup(g) { calls.push(['classic-equip', g]); } },
+  } };
+  installTidyApiBridge(module, classicApi);
+  const officialApi = { config: {
+    itemSummary: { registerCommands(c) { calls.push(['official-summary', c]); } },
+    actorPortrait: { registerMenuCommands() { calls.push(['official-portrait-noop']); } },
+    actorTraits: {
+      registerActorTraits(t) { calls.push(['official-traits', t]); },
+      registerActorTrait(t) { this.registerActorTraits([t]); },
+    },
+    item: { registerCustomEquipmentTypeGroup(g) { calls.push(['official-equip', g]); } },
+  } };
+  module.api = officialApi;
+
+  const midi = [{ label: 'midi-qol.buttons.roll' }];
+  module.api.config.itemSummary.registerCommands(midi);
+  module.api.config.actorPortrait.registerMenuCommands(['p']);
+  module.api.config.actorTraits.registerActorTrait({ title: 't' });
+  module.api.config.item.registerCustomEquipmentTypeGroup({ label: 'g' });
+
+  assert.deepEqual(calls, [
+    ['official-summary', midi], ['classic-summary', midi],
+    ['official-portrait-noop'], ['classic-portrait', ['p']],
+    ['official-traits', [{ title: 't' }]], ['classic-traits', [{ title: 't' }]],
+    ['official-equip', { label: 'g' }], ['classic-equip', { label: 'g' }],
+  ]);
+});

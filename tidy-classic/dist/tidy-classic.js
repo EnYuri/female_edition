@@ -12000,7 +12000,12 @@ class TidyHooks {
       config
     );
   }
-  static tidy5eSheetsThemeSettingsChangedHook = "tidy5e-sheet.themeSettingsChanged";
+  // Private to this fork, NOT tidy 14's 'tidy5e-sheet.themeSettingsChanged'. It is
+  // the only runtime hook both bundles fire AND subscribe to: every fork window
+  // subscribes in _attachFrameListeners, and tidy 14 fires it from its Quadrone theme
+  // dialog, so previewing a Quadrone theme repainted any open Classic sheet of the same
+  // actor. No installed integration listens to it, so nothing third-party loses it.
+  static tidy5eSheetsThemeSettingsChangedHook = "female_edition.tidyClassicThemeSettingsChanged";
   /**
    * Theme settings, whether at world or sheet scope, have changed.
    * Alternatively, themes are being previewed, and relevant subscribers need to refresh their settings.
@@ -12336,13 +12341,24 @@ class ThemeQuadrone {
   static toRuleString(declaration) {
     return `${declaration.selector} { ${declaration.ruleset.map((r2) => `${r2.property}: ${r2.value}`).join("; ")} }`;
   }
-  static tagId = "tidy5e-sheets-quadrone-theme-settings";
+  // NOT tidy 14's id ('tidy5e-sheets-quadrone-theme-settings'). With both modules
+  // active, two tags shared that id and getTidyStyleSheet() in BOTH bundles resolved
+  // the first one; the world-rule identifier (--tidy5e-sheet-world-setting) is also
+  // shared, so applying this fork's world theme deleted and replaced the official
+  // module's world rules, wiping the GM's Quadrone theme from official sheets.
+  static tagId = "fe-tidy-classic-quadrone-theme-settings";
+  static officialTidyOwnsWorldTheme() {
+    return !!FoundryAdapter.getModule(CONSTANTS.MODULE_ID)?.active;
+  }
   static insertTidyThemeStyleTag() {
     const tag = document.createElement("style");
     tag.id = this.tagId;
     document.head.insertAdjacentElement("beforeend", tag);
   }
   static applyCurrentThemeSettingsToStylesheet(options2 = {}) {
+    if (!options2.doc && !options2.idOverride && this.officialTidyOwnsWorldTheme()) {
+      return;
+    }
     const themeSettings = options2.settingsOverride ?? (options2.doc ? this.getSheetThemeSettings(options2) : this.getWorldThemeSettings());
     const declarations = ThemeStylesProvider.create(themeSettings, options2);
     this.applyStyleDeclarations(declarations, options2.doc, options2.idOverride);
@@ -121635,7 +121651,7 @@ class QuickSheetSwitchKeybind {
     let debouncedInovationCountReset = FoundryAdapter.debounce(() => {
       switchKeyInvocationCount = 0;
     }, debounceDelay);
-    game.keybindings.register(CONSTANTS.MODULE_ID, registrationKey, {
+    game.keybindings.register(CONSTANTS.SETTINGS_NAMESPACE, `tidyClassic-${registrationKey}`, {
       name,
       hint: `Press this keybind combination ${invocationCountToTrigger} times in a row to switch the indicated sheet type.`,
       onDown: async () => {
@@ -123518,7 +123534,7 @@ class DebugTools {
               const stylesheet = Array.from(document.styleSheets).find(
                 (s) => (
                   // @ts-expect-error
-                  s.ownerNode.id === "tidy5e-sheets-quadrone-theme-settings"
+                  s.ownerNode.id === ThemeQuadrone.tagId
                 )
               );
               console.log(stylesheet);
@@ -124682,6 +124698,14 @@ const CLASSIC_CONTENT_REGISTRATIONS = Object.freeze([
   "registerNpcContent",
   "registerVehicleContent"
 ]);
+const CLASSIC_CONFIG_REGISTRATIONS = Object.freeze([
+  ["actorItem", "registerSectionCommands"],
+  ["actorItem", "registerSectionFooterCommands"],
+  ["itemSummary", "registerCommands"],
+  ["actorPortrait", "registerMenuCommands"],
+  ["actorTraits", "registerActorTraits"],
+  ["item", "registerCustomEquipmentTypeGroup"]
+]);
 const wrappedApis = /* @__PURE__ */ new WeakSet();
 function mirrorRegistration(owner, name, classicOwner, warn2) {
   const original = owner?.[name];
@@ -124710,10 +124734,9 @@ function mirrorTidyRegistrations(officialApi, classicApi, warn2 = console.warn) 
   for (const name of CLASSIC_CONTENT_REGISTRATIONS) {
     mirrorRegistration(officialApi, name, classicApi, warn2);
   }
-  const officialActorItem = officialApi.config?.actorItem;
-  const classicActorItem = classicApi.config?.actorItem;
-  mirrorRegistration(officialActorItem, "registerSectionCommands", classicActorItem, warn2);
-  mirrorRegistration(officialActorItem, "registerSectionFooterCommands", classicActorItem, warn2);
+  for (const [section, name] of CLASSIC_CONFIG_REGISTRATIONS) {
+    mirrorRegistration(officialApi.config?.[section], name, classicApi.config?.[section], warn2);
+  }
 }
 function installTidyApiBridge(tidyModule, classicApi, warn2 = console.warn) {
   if (!tidyModule?.active || !classicApi) return false;
@@ -124748,6 +124771,43 @@ function installTidyApiBridge(tidyModule, classicApi, warn2 = console.warn) {
   } catch (error2) {
     warn2("female_edition | cannot install Tidy API mirror", error2);
     return false;
+  }
+}
+const QUADRONE_READY_ALIAS_KEYS = Object.freeze({
+  character: "dnd5e.Tidy5eCharacterSheetQuadrone",
+  npc: "dnd5e.Tidy5eNpcSheetQuadrone",
+  group: "dnd5e.Tidy5eGroupSheetQuadrone",
+  encounter: "dnd5e.Tidy5eEncounterSheetQuadrone"
+});
+function createAlias(key2, ClassicSheet) {
+  const cls = Object.create(ClassicSheet);
+  Object.defineProperty(cls, "prototype", {
+    value: { async findItem() {
+    } }
+  });
+  return { id: key2, cls };
+}
+function withQuadroneReadyAliases(sheetClasses, classicByType, dispatch) {
+  const installed = [];
+  for (const [type2, key2] of Object.entries(QUADRONE_READY_ALIAS_KEYS)) {
+    const bucket = sheetClasses?.[type2];
+    const ClassicSheet = classicByType?.[type2];
+    if (!bucket || typeof ClassicSheet !== "function" || Object.hasOwn(bucket, key2)) continue;
+    try {
+      Object.defineProperty(bucket, key2, {
+        value: createAlias(key2, ClassicSheet),
+        configurable: true,
+        enumerable: false
+      });
+      installed.push([bucket, key2]);
+    } catch (error2) {
+      console.warn(`female_edition | cannot alias ${key2} for tidy5e-sheet.ready`, error2);
+    }
+  }
+  try {
+    return dispatch();
+  } finally {
+    for (const [bucket, key2] of installed) delete bucket[key2];
   }
 }
 const CLASSIC_SHEET_LABEL = "Tidy 5e Sheet-Classic";
@@ -124808,7 +124868,16 @@ Hooks.once("ready", async () => {
   const upstreamTidy = FoundryAdapter.getModule(CONSTANTS.MODULE_ID);
   if (!upstreamTidy?.active) {
     if (upstreamTidy) upstreamTidy.api = api;
-    TidyHooks.tidy5eSheetsReady(api);
+    withQuadroneReadyAliases(
+      CONFIG.Actor.sheetClasses,
+      {
+        [CONSTANTS.SHEET_TYPE_CHARACTER]: Tidy5eCharacterSheet,
+        [CONSTANTS.SHEET_TYPE_NPC]: Tidy5eNpcSheet,
+        [CONSTANTS.SHEET_TYPE_GROUP]: Tidy5eGroupSheetClassic,
+        [CONSTANTS.SHEET_TYPE_ENCOUNTER]: Tidy5eEncounterSheetClassic
+      },
+      () => TidyHooks.tidy5eSheetsReady(api)
+    );
   }
   Hooks.callAll("female_edition.tidyClassicReady", api);
   setupIntegrations(api);

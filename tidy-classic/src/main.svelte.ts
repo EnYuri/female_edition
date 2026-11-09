@@ -29,6 +29,7 @@ import { Tidy5eEncounterSheetClassic } from './sheets/classic/Tidy5eEncounterShe
 import { ThemeQuadrone } from './theme/theme-quadrone.svelte';
 import { formatResourcePathForCss } from './utils/path';
 import { installTidyApiBridge } from './integration/tidy-api-bridge.js';
+import { withQuadroneReadyAliases } from './integration/quadrone-ready-aliases.js';
 
 /**
  * Classic-only fork of Tidy 5e Sheets 12.5.5.
@@ -156,7 +157,18 @@ Hooks.once('ready', async () => {
     // In this mode no upstream script can overwrite the compatibility alias.
     // Direct API readers such as Quick Insert can still find the sole provider.
     if (upstreamTidy) upstreamTidy.api = api;
-    TidyHooks.tidy5eSheetsReady(api);
+    // Listeners written for Tidy 14 (Plutonium) libWrapper-patch Quadrone classes
+    // here; see quadrone-ready-aliases.js for why they must resolve during this call.
+    withQuadroneReadyAliases(
+      CONFIG.Actor.sheetClasses,
+      {
+        [CONSTANTS.SHEET_TYPE_CHARACTER]: Tidy5eCharacterSheet,
+        [CONSTANTS.SHEET_TYPE_NPC]: Tidy5eNpcSheet,
+        [CONSTANTS.SHEET_TYPE_GROUP]: Tidy5eGroupSheetClassic,
+        [CONSTANTS.SHEET_TYPE_ENCOUNTER]: Tidy5eEncounterSheetClassic,
+      },
+      () => TidyHooks.tidy5eSheetsReady(api)
+    );
   }
   Hooks.callAll('female_edition.tidyClassicReady', api);
 

@@ -30,6 +30,26 @@ export const CLASSIC_CONTENT_REGISTRATIONS = Object.freeze([
   'registerVehicleContent',
 ]);
 
+/**
+ * Layout-agnostic `api.config.*` registrations Classic renders. Each pair is
+ * [config section, method]. Without these, a module that registers while official
+ * Tidy is active reaches only Quadrone: midi-qol's item-summary commands (chat info /
+ * roll / attack / damage) were missing from every Classic item summary.
+ * - actorPortrait.registerMenuCommands is a no-op warning in tidy 14 (Quadrone dropped
+ *   the portrait menu); Classic still has the menu, so mirroring revives it there.
+ * - actorTraits: only the PLURAL form. Upstream registerActorTrait(trait) calls
+ *   `this.registerActorTraits([trait])`, which resolves to the mirrored own property,
+ *   so wrapping both would register every single trait twice.
+ */
+export const CLASSIC_CONFIG_REGISTRATIONS = Object.freeze([
+  ['actorItem', 'registerSectionCommands'],
+  ['actorItem', 'registerSectionFooterCommands'],
+  ['itemSummary', 'registerCommands'],
+  ['actorPortrait', 'registerMenuCommands'],
+  ['actorTraits', 'registerActorTraits'],
+  ['item', 'registerCustomEquipmentTypeGroup'],
+]);
+
 const wrappedApis = new WeakSet();
 
 function mirrorRegistration(owner, name, classicOwner, warn) {
@@ -63,12 +83,9 @@ export function mirrorTidyRegistrations(officialApi, classicApi, warn = console.
     mirrorRegistration(officialApi, name, classicApi, warn);
   }
 
-  // Both versions render section commands on actor-owned item lists. Tidy 14 exposes
-  // this on config.actorItem; the fork retains the same method and legacy alias.
-  const officialActorItem = officialApi.config?.actorItem;
-  const classicActorItem = classicApi.config?.actorItem;
-  mirrorRegistration(officialActorItem, 'registerSectionCommands', classicActorItem, warn);
-  mirrorRegistration(officialActorItem, 'registerSectionFooterCommands', classicActorItem, warn);
+  for (const [section, name] of CLASSIC_CONFIG_REGISTRATIONS) {
+    mirrorRegistration(officialApi.config?.[section], name, classicApi.config?.[section], warn);
+  }
 }
 
 /**

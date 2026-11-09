@@ -691,8 +691,13 @@ export class TidyHooks {
     );
   }
 
+  // Private to this fork, NOT tidy 14's 'tidy5e-sheet.themeSettingsChanged'. It is
+  // the only runtime hook both bundles fire AND subscribe to: every fork window
+  // subscribes in _attachFrameListeners, and tidy 14 fires it from its Quadrone theme
+  // dialog, so previewing a Quadrone theme repainted any open Classic sheet of the same
+  // actor. No installed integration listens to it, so nothing third-party loses it.
   static tidy5eSheetsThemeSettingsChangedHook =
-    'tidy5e-sheet.themeSettingsChanged';
+    'female_edition.tidyClassicThemeSettingsChanged';
 
   /**
    * Theme settings, whether at world or sheet scope, have changed.
