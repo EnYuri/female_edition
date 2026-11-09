@@ -11,6 +11,7 @@
     VehicleSheetContext,
   } from 'src/types/types';
   import { getContext } from 'svelte';
+  import { getSpellSourceClass } from 'src/foundry/dnd5e-compat';
   import ItemName from 'src/components/item-list/ItemName.svelte';
   import { CONSTANTS } from 'src/constants';
   import ItemUseButton from 'src/components/item-list/ItemUseButton.svelte';
@@ -189,7 +190,7 @@
                   >
                     {@const sourceClassText =
                       context.actor.spellcastingClasses?.[
-                        actionItem.item.system.sourceClass
+                        getSpellSourceClass(actionItem.item)
                       ]?.name ?? ''}
                     <div class="flex-1 min-width-0">
                       <div

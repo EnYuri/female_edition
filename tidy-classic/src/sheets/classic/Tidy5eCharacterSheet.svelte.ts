@@ -1907,6 +1907,11 @@ function getActorClassesToImages(actor: Actor5e): Record<string, string> {
       let className = item.name.toLowerCase();
       let classImg = item.img;
       actorClassesToImages[className] = classImg;
+      // Spells are matched by class IDENTIFIER (getSpellSourceClass). The lowercased
+      // name only ever equalled it for one-word English names, so a localized world
+      // ("위저드") never got its class icons.
+      const identifier = item.identifier ?? item.system?.identifier;
+      if (identifier) actorClassesToImages[identifier] = classImg;
     }
   }
   return actorClassesToImages;

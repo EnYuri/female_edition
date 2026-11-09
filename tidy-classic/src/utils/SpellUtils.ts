@@ -6,6 +6,7 @@ import { TidyFlags } from 'src/foundry/TidyFlags';
 import type { Actor5e } from 'src/types/types';
 import { isNil } from './data';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+import { getSpellSourceClass } from 'src/foundry/dnd5e-compat';
 
 export class SpellUtils {
   /** Is a cantrip. */
@@ -143,7 +144,7 @@ export class SpellUtils {
 
     return spells.filter(
       (spell) =>
-        spell.system.sourceClass?.trim() === selectedClassFilter?.trim(),
+        getSpellSourceClass(spell) === selectedClassFilter?.trim(),
     );
   }
 }

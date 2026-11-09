@@ -13,6 +13,11 @@
   import TidyTableRow from 'src/components/table-quadrone/TidyTableRow.svelte';
   import TidyTableCell from 'src/components/table-quadrone/TidyTableCell.svelte';
   import FieldToggle from 'src/components/toggles/FieldToggle.svelte';
+  import {
+    buildSpellSourceClassUpdate,
+    getSpellSourceClass,
+    getSpellSourceField,
+  } from 'src/foundry/dnd5e-compat';
 
   let context = $derived(
     getContext<CoarseReactivityProvider<SpellSourceClassAssignmentsContext>>(
@@ -44,9 +49,7 @@
   );
 
   async function setItemSourceClass(item: Item5e, sourceClass: string) {
-    await item.update({
-      'system.sourceClass': sourceClass,
-    });
+    await item.update(buildSpellSourceClassUpdate(item, sourceClass));
   }
 
   const localize = FoundryAdapter.localize;
@@ -100,8 +103,8 @@
       {/snippet}
       {#snippet body()}
         {#each context.assignments as assignment (assignment.item.id)}
-          {@const sourceClassIsUnassigned =
-            (assignment.item.system.sourceClass?.trim() ?? '') === ''}
+          {@const sourceField = getSpellSourceField(assignment.item)}
+          {@const sourceClassIsUnassigned = sourceField.value.trim() === ''}
           {@const hideRow =
             !visibleSelectablesIdSubset.has(assignment.item.id) ||
             (showUnassignedOnly && !sourceClassIsUnassigned)}
@@ -118,7 +121,7 @@
             </TidyTableCell>
             {#each classColumns as classColumn}
               {@const selected =
-                assignment.item.system.sourceClass === classColumn.key}
+                getSpellSourceClass(assignment.item) === classColumn.key}
               <TidyTableCell columnWidth="8rem">
                 <FieldToggle
                   checked={selected}
@@ -134,9 +137,9 @@
               <TextInput
                 document={assignment.item}
                 disabled={!assignment.item.isOwner}
-                field="system.sourceClass"
+                field={sourceField.field}
                 selectOnFocus={true}
-                value={assignment.item.system.sourceClass}
+                value={sourceField.value}
               />
             </TidyTableCell>
           </TidyTableRow>

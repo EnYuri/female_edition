@@ -14,6 +14,20 @@ import type {
 } from 'src/types/types';
 
 export class Activities {
+  /**
+   * Whether an activity belongs in a list at all (ported from tidy5e-sheet 14).
+   *
+   * dnd5e 6.0 separates display (`isHidden`: rider, hidden item, visibility rules for
+   * attunement / magic / identification / level) from usability (`canUse`, which is
+   * `item.canUse && !isHidden`). Filtering on `canUse` therefore also dropped activities
+   * the system itself still shows — a facility order already in progress or disabled by
+   * an attack, anything on an actor inside a compendium. Pre-6.0 activities have no
+   * `isHidden`, so they keep the old `canUse` test.
+   */
+  static isActivityVisible(activity: Activity5e): boolean {
+    return 'isHidden' in activity ? !activity.isHidden : activity.canUse;
+  }
+
   static isConfigurable(activity: Activity5e) {
     return activity.canConfigure;
   }
@@ -29,7 +43,7 @@ export class Activities {
         activities?.filter(
           (a: Activity5e) =>
             !item.getFlag('dnd5e', 'riders.activity')?.includes(a.id) &&
-            a.canUse
+            Activities.isActivityVisible(a)
         ) ?? [],
     };
 

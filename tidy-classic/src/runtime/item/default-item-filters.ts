@@ -6,6 +6,7 @@ import { ItemUtils } from 'src/utils/ItemUtils';
 import type { Actor5e } from 'src/types/types';
 import type { Item5e } from 'src/types/item.types';
 import { Activities } from 'src/features/activities/activities';
+import { getSpellSourceClass } from 'src/foundry/dnd5e-compat';
 
 export const defaultItemFilters: Record<string, ItemFilter> = {
   [CONSTANTS.FILTER_ACTIVATION_COST_ACTION]: {
@@ -181,7 +182,7 @@ export function getSourceClassFilters(actor: Actor5e): ItemFilter[] {
     ([key, item]) => {
       return {
         name: getSourceClassFilterName(key),
-        predicate: (item) => item.system.sourceClass === key,
+        predicate: (item) => getSpellSourceClass(item) === key,
         text:
           item.system.spellcasting.progression === item.spellcasting.progression
             ? item.name

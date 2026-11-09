@@ -24,7 +24,10 @@ import { calculateSpellAttackAndDc } from 'src/utils/formula';
 import type { Activity5e } from './dnd5e.types';
 import type { ClassValue } from 'svelte/elements';
 import type { TidyExtensibleDocumentSheetMixin } from 'src/mixins/TidyDocumentSheetMixin.svelte';
-import { getActorAttackBonus } from 'src/foundry/dnd5e-compat';
+import {
+  getActorAttackBonus,
+  getSpellSourceClass,
+} from 'src/foundry/dnd5e-compat';
 import { buildDeletion, buildRelativeUuid } from 'src/foundry/core-compat';
 import {
   getMovementSpeed,
@@ -543,7 +546,7 @@ export const FoundryAdapter = {
       return spell.img;
     }
 
-    const sourceClass = spell.system.sourceClass;
+    const sourceClass = getSpellSourceClass(spell);
 
     const classImage =
       sourceClass && 'actorClassesToImages' in context

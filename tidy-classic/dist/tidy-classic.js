@@ -17126,6 +17126,41 @@ function getItemRarity(item) {
   const rarity = system.rarity ?? system.rarities?.first?.();
   return typeof rarity === "string" ? rarity : "";
 }
+function spellUsesSourceItem(spell) {
+  return !!spell?.system?.schema?.fields?.sourceItem;
+}
+function getSpellSourceClass(spell) {
+  const system = spell?.system;
+  if (!system) return "";
+  if (!spellUsesSourceItem(spell)) {
+    return typeof system.sourceClass === "string" ? system.sourceClass.trim() : "";
+  }
+  const resolved = system.classIdentifier;
+  if (typeof resolved === "string" && resolved !== "") return resolved;
+  const sourceItem = typeof system.sourceItem === "string" ? system.sourceItem.trim() : "";
+  if (sourceItem.startsWith("class:")) return sourceItem.slice("class:".length);
+  return sourceItem.includes(":") ? "" : sourceItem;
+}
+function spellSourceIsSystemGrant(spell) {
+  if (foundry.utils.getProperty(spell ?? {}, "flags.dnd5e.advancementOrigin")) {
+    return true;
+  }
+  if (!spellUsesSourceItem(spell)) return false;
+  const sourceItem = typeof spell.system.sourceItem === "string" ? spell.system.sourceItem.trim() : "";
+  return sourceItem.includes(":") && !sourceItem.startsWith("class:");
+}
+function getSpellSourceField(spell) {
+  const field = spellUsesSourceItem(spell) ? "system.sourceItem" : "system.sourceClass";
+  const value = foundry.utils.getProperty(spell ?? {}, field);
+  return { field, value: typeof value === "string" ? value : "" };
+}
+function buildSpellSourceClassUpdate(spell, classIdentifier) {
+  const id = classIdentifier?.trim() ?? "";
+  if (spellUsesSourceItem(spell)) {
+    return { "system.sourceItem": id ? `class:${id}` : "" };
+  }
+  return { "system.sourceClass": id };
+}
 function getMovementSpeed(movement, key2) {
   return movement?.speeds ? movement.speeds[key2] : movement?.[key2];
 }
@@ -19013,13 +19048,26 @@ function ItemImage($$anchor, $$props) {
   append($$anchor, img);
 }
 class Activities {
+  /**
+   * Whether an activity belongs in a list at all (ported from tidy5e-sheet 14).
+   *
+   * dnd5e 6.0 separates display (`isHidden`: rider, hidden item, visibility rules for
+   * attunement / magic / identification / level) from usability (`canUse`, which is
+   * `item.canUse && !isHidden`). Filtering on `canUse` therefore also dropped activities
+   * the system itself still shows — a facility order already in progress or disabled by
+   * an attack, anything on an actor inside a compendium. Pre-6.0 activities have no
+   * `isHidden`, so they keep the old `canUse` test.
+   */
+  static isActivityVisible(activity) {
+    return "isHidden" in activity ? !activity.isHidden : activity.canUse;
+  }
   static isConfigurable(activity) {
     return activity.canConfigure;
   }
   static getVisibleActivities(item, activities, forItemSheet = false) {
     const visibleActivities = {
       activities: activities?.filter(
-        (a) => !item.getFlag("dnd5e", "riders.activity")?.includes(a.id) && a.canUse
+        (a) => !item.getFlag("dnd5e", "riders.activity")?.includes(a.id) && Activities.isActivityVisible(a)
       ) ?? []
     };
     if (!forItemSheet) {
@@ -21260,7 +21308,7 @@ class SpellUtils {
       return spells;
     }
     return spells.filter(
-      (spell) => spell.system.sourceClass?.trim() === selectedClassFilter?.trim()
+      (spell) => getSpellSourceClass(spell) === selectedClassFilter?.trim()
     );
   }
 }
@@ -25715,7 +25763,7 @@ function getSourceClassFilters(actor) {
     ([key2, item]) => {
       return {
         name: getSourceClassFilterName(key2),
-        predicate: (item2) => item2.system.sourceClass === key2,
+        predicate: (item2) => getSpellSourceClass(item2) === key2,
         text: item.system.spellcasting.progression === item.spellcasting.progression ? item.name : item.subclass?.name
       };
     }
@@ -56256,7 +56304,7 @@ function SpellSourceClassAssignments($$anchor, $$props) {
   let visibleSelectablesIdSubset = /* @__PURE__ */ user_derived(() => new Set(get(context).assignments.filter((s) => get(searchCriteria).trim() === "" || s.item.name?.toLowerCase().includes(get(searchCriteria).toLowerCase())).map((d) => d.item.id)));
   let classColumns = /* @__PURE__ */ user_derived(() => Object.entries(get(context).actor.spellcastingClasses).map(([key2, value]) => ({ key: key2, item: value })));
   async function setItemSourceClass(item, sourceClass) {
-    await item.update({ "system.sourceClass": sourceClass });
+    await item.update(buildSpellSourceClassUpdate(item, sourceClass));
   }
   const localize = FoundryAdapter.localize;
   var showUnassignedOnly = /* @__PURE__ */ state(false);
@@ -56347,7 +56395,8 @@ function SpellSourceClassAssignments($$anchor, $$props) {
       var fragment_4 = comment();
       var node_5 = first_child(fragment_4);
       each$1(node_5, 17, () => get(context).assignments, (assignment) => assignment.item.id, ($$anchor3, assignment) => {
-        const sourceClassIsUnassigned = /* @__PURE__ */ user_derived(() => (get(assignment).item.system.sourceClass?.trim() ?? "") === "");
+        const sourceField = /* @__PURE__ */ user_derived(() => getSpellSourceField(get(assignment).item));
+        const sourceClassIsUnassigned = /* @__PURE__ */ user_derived(() => get(sourceField).value.trim() === "");
         const hideRow = /* @__PURE__ */ user_derived(() => !get(visibleSelectablesIdSubset).has(get(assignment).item.id) || safe_get(showUnassignedOnly) && !get(sourceClassIsUnassigned));
         TidyTableRow($$anchor3, {
           get hidden() {
@@ -56371,7 +56420,7 @@ function SpellSourceClassAssignments($$anchor, $$props) {
             });
             var node_7 = sibling(node_6, 2);
             each$1(node_7, 17, () => get(classColumns), index$1, ($$anchor5, classColumn) => {
-              const selected = /* @__PURE__ */ user_derived(() => get(assignment).item.system.sourceClass === get(classColumn).key);
+              const selected = /* @__PURE__ */ user_derived(() => getSpellSourceClass(get(assignment).item) === get(classColumn).key);
               TidyTableCell($$anchor5, {
                 columnWidth: "8rem",
                 children: ($$anchor6, $$slotProps2) => {
@@ -56398,10 +56447,12 @@ function SpellSourceClassAssignments($$anchor, $$props) {
                     get disabled() {
                       return get($0);
                     },
-                    field: "system.sourceClass",
+                    get field() {
+                      return get(sourceField).field;
+                    },
                     selectOnFocus: true,
                     get value() {
-                      return get(assignment).item.system.sourceClass;
+                      return get(sourceField).value;
                     }
                   });
                 }
@@ -93941,7 +93992,7 @@ function ActorActionsTab($$anchor, $$props) {
                         onToggle: () => toggleSummary()(get(context).actor),
                         useActiveEffectsMarker: false,
                         children: ($$anchor8, $$slotProps2) => {
-                          const sourceClassText = /* @__PURE__ */ user_derived(() => get(context).actor.spellcastingClasses?.[get(actionItem).item.system.sourceClass]?.name ?? "");
+                          const sourceClassText = /* @__PURE__ */ user_derived(() => get(context).actor.spellcastingClasses?.[getSpellSourceClass(get(actionItem).item)]?.name ?? "");
                           var div_1 = root_18$6();
                           var div_2 = child(div_1);
                           var text_4 = child(div_2, true);
@@ -110119,7 +110170,7 @@ const FoundryAdapter = {
     if (!settings.value.useSpellClassFilterIcons) {
       return spell.img;
     }
-    const sourceClass = spell.system.sourceClass;
+    const sourceClass = getSpellSourceClass(spell);
     const classImage = sourceClass && "actorClassesToImages" in context ? context.actorClassesToImages[sourceClass] : void 0;
     return classImage ?? spell.img;
   },
@@ -116609,6 +116660,8 @@ function getActorClassesToImages(actor) {
       let className = item.name.toLowerCase();
       let classImg = item.img;
       actorClassesToImages[className] = classImg;
+      const identifier = item.identifier ?? item.system?.identifier;
+      if (identifier) actorClassesToImages[identifier] = classImg;
     }
   }
   return actorClassesToImages;
@@ -123918,7 +123971,10 @@ function initReadyHooks() {
   assignDroppedSpellsToClassFilter();
 }
 function assignDroppedSpellsToClassFilter() {
-  Hooks.on("createItem", (item) => {
+  Hooks.on("createItem", (item, _options, userId) => {
+    if (userId !== game.user?.id) {
+      return;
+    }
     const parent2 = item.parent;
     const api = Tidy5eSheetsApi._getApi();
     if (!parent2?.sheet?.element || !api.isTidy5eSheet(parent2.sheet)) {
@@ -123927,10 +123983,9 @@ function assignDroppedSpellsToClassFilter() {
     if (item.type !== CONSTANTS.ITEM_TYPE_SPELL) {
       return;
     }
-    if (!isNil(parent2.sheet?.classSpellbookFilter, "")) {
-      item.update({
-        [`system.sourceClass`]: parent2.sheet.classSpellbookFilter
-      });
+    const filter = parent2.sheet?.classSpellbookFilter;
+    if (!isNil(filter, "") && !spellSourceIsSystemGrant(item) && getSpellSourceClass(item) !== filter) {
+      item.update(buildSpellSourceClassUpdate(item, filter));
     }
   });
 }
