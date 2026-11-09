@@ -17097,35 +17097,6 @@ function SkillsList($$anchor, $$props) {
   pop();
 }
 delegate(["click", "contextmenu"]);
-function readFirstDefined(root2, ...paths) {
-  for (const path of paths) {
-    const value = foundry.utils.getProperty(root2 ?? {}, path);
-    if (value !== void 0) return value;
-  }
-  return void 0;
-}
-function getActorAttackBonus(actor, actionType) {
-  const bonus = readFirstDefined(
-    actor?.system,
-    `rolls.attack.${actionType}.bonus`,
-    // dnd5e >= 6.0
-    `bonuses.${actionType}.attack`
-    // dnd5e <= 5.x
-  );
-  return typeof bonus === "string" ? bonus : "";
-}
-function buildItemRarityUpdate(item, rarity) {
-  if (item?.system?.schema?.fields?.rarities) {
-    return { "system.rarities": rarity ? [rarity] : [] };
-  }
-  return { "system.rarity": rarity ?? "" };
-}
-function getItemRarity(item) {
-  const system = item?.system;
-  if (!system) return "";
-  const rarity = system.rarity ?? system.rarities?.first?.();
-  return typeof rarity === "string" ? rarity : "";
-}
 function spellUsesSourceItem(spell) {
   return !!spell?.system?.schema?.fields?.sourceItem;
 }
@@ -17160,6 +17131,35 @@ function buildSpellSourceClassUpdate(spell, classIdentifier) {
     return { "system.sourceItem": id ? `class:${id}` : "" };
   }
   return { "system.sourceClass": id };
+}
+function readFirstDefined(root2, ...paths) {
+  for (const path of paths) {
+    const value = foundry.utils.getProperty(root2 ?? {}, path);
+    if (value !== void 0) return value;
+  }
+  return void 0;
+}
+function getActorAttackBonus(actor, actionType) {
+  const bonus = readFirstDefined(
+    actor?.system,
+    `rolls.attack.${actionType}.bonus`,
+    // dnd5e >= 6.0
+    `bonuses.${actionType}.attack`
+    // dnd5e <= 5.x
+  );
+  return typeof bonus === "string" ? bonus : "";
+}
+function buildItemRarityUpdate(item, rarity) {
+  if (item?.system?.schema?.fields?.rarities) {
+    return { "system.rarities": rarity ? [rarity] : [] };
+  }
+  return { "system.rarity": rarity ?? "" };
+}
+function getItemRarity(item) {
+  const system = item?.system;
+  if (!system) return "";
+  const rarity = system.rarity ?? system.rarities?.first?.();
+  return typeof rarity === "string" ? rarity : "";
 }
 function getMovementSpeed(movement, key2) {
   return movement?.speeds ? movement.speeds[key2] : movement?.[key2];

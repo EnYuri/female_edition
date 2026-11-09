@@ -13,7 +13,7 @@ globalThis.foundry ??= {
   },
 };
 
-const compat = await import('../tidy-classic/src/foundry/dnd5e-compat.ts');
+const compat = await import('../tidy-classic/src/foundry/spell-source-compat.js');
 
 function spell5x(sourceClass) {
   return { system: { schema: { fields: { sourceClass: {} } }, sourceClass } };
@@ -103,7 +103,7 @@ function walk(dirUrl, out = []) {
 test('no Classic code reads or writes sourceClass outside the shim', () => {
   // The item sheet's spell tab branches on the schema itself (its own `usesSourceItem`),
   // so its 5.x-only branch is the one legitimate direct use.
-  const allowed = new Set(['foundry/dnd5e-compat.ts', 'sheets/classic/item/tabs/ItemSpellDetailsTab.svelte']);
+  const allowed = new Set(['sheets/classic/item/tabs/ItemSpellDetailsTab.svelte']);
   const offenders = [];
   for (const url of walk(SRC)) {
     const rel = url.pathname.slice(SRC.pathname.length);
