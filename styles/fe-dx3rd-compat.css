@@ -68,7 +68,6 @@ body.fe-retro-theme :is(
 
 /* active condition state — hard color border, no glow */
 body.fe-retro-theme .dx3rd-sub-action-ui-condition-btn.dx3rd-condition-active {
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
   outline:      1px solid rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.65) !important;
   outline-offset: 0 !important;
 }

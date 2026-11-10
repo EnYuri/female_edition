@@ -180,8 +180,13 @@ span.flex-row.align-items-center.extra-small-gap {
   line-height: 1.1 !important;
 }
 
-/* Prevent Geurimilgi glyphs from visually overflowing in tight pills/buttons */
-:is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge, .chip) {
+/* Prevent Geurimilgi glyphs from visually overflowing in tight pills/buttons.
+   .ac-badge is excluded: dnd5e centers its number with `display: block` +
+   `line-height: 48px` (62px on the character sheet) inside the shield, so
+   forcing a 1em line-height here pins the AC value to the top edge. Every
+   other dnd5e .badge is grid/flex-centered and unaffected by line-height.
+   The retro theme styles .ac-badge itself from layer(layouts). */
+:is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge:not(.ac-badge), .chip) {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }

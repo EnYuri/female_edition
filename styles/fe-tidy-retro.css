@@ -646,9 +646,7 @@ body.fe-retro-theme .tidy5e-sheet.application
 }
 
 body.fe-retro-theme .tidy5e-sheet.application a.tab-option[role="tab"] {
-  border: 1px solid var(--fe-tidy-rule-faint, rgba(255, 255, 255, 0.09)) !important;
   outline: none !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -1307,9 +1305,6 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .actor-stats
   .ability-score-container
   > button.transparent-button {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
   color: var(--fe-tidy-mono-text) !important;
   padding-block: 1px !important;
 }
@@ -1373,9 +1368,6 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .ability-score-container
   > .ability-modifiers
   :is(.proficiency-toggle, .proficiency-toggle-readonly, .config-button) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
   border-color: transparent !important;
   color: var(--fe-tidy-mono-muted) !important;
   min-height: 1rem !important;
@@ -1392,28 +1384,14 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  :where(.window-content)
-  .actor-stats
-  .ability-score-container:is(:hover, :focus-within) {
-  box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .window-header
   .header-sheet-edit-mode-toggle
   .tidy-switch {
   align-items: center !important;
-  background: transparent !important;
-  border: 1px solid var(--fe-tidy-rule-strong) !important;
   box-sizing: border-box !important;
   display: inline-flex !important;
-  height: 18px !important;
   justify-content: center !important;
   outline: none !important;
-  padding: 0 !important;
-  position: relative !important;
-  top: -1px !important;
-  width: 38px !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
@@ -1421,13 +1399,9 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .header-sheet-edit-mode-toggle
   .tidy-switch
   > div {
-  background: transparent !important;
-  border: 0 !important;
   box-sizing: border-box !important;
-  height: 16px !important;
   margin: 0 !important;
   outline: none !important;
-  width: 36px !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
@@ -2075,8 +2049,6 @@ body.fe-retro-theme .tidy5e-sheet .tidy-info-card::after {
   border: 10px solid transparent !important;
   border-image: url("./assets/pixel-border.png") 10 / 10px / 0 repeat !important;
   image-rendering: pixelated !important;
-  mix-blend-mode: normal !important;
-  opacity: 1 !important;
   background: none !important;
   background-color: transparent !important;
 }
@@ -2382,27 +2354,14 @@ body.fe-retro-theme .tidy5e-sheet.application.actor
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .window-header
   .header-sheet-edit-mode-toggle {
-  align-items: center !important;
-  display: inline-flex !important;
-  height: 18px !important;
   line-height: 1 !important;
-  margin: 0 !important;
-  padding: 1px !important;
-  width: 38px !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .window-header
   .header-sheet-edit-mode-toggle
   .tidy-switch {
-  border: 0 !important;
-  height: 16px !important;
   min-height: 16px !important;
-  margin: 0 !important;
-  overflow: visible !important;
-  position: relative !important;
-  top: 0 !important;
-  width: 36px !important;
 }
 
 body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
@@ -2433,14 +2392,6 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   .tidy-switch:is(:hover, :focus-within)::after {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;
   box-shadow: 0 0 0 1px rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.35) !important;
-}
-
-body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
-  .window-header
-  .header-sheet-edit-mode-toggle
-  .tidy-switch > div {
-  height: 100% !important;
-  width: 100% !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
@@ -2491,20 +2442,6 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container {
-  background: transparent !important;
-  box-shadow:
-    inset 0 1px 0 var(--fe-dnd5e-mono-line-faint),
-    inset 0 -1px 0 var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
-  .ability-bonus-container
-  > :is(button.ability-roll-button, .ability-score, .ability-score-input, .ability-label-container, .config-container) {
-  border-top: 1px solid var(--fe-dnd5e-mono-line-faint) !important;
-}
-
-body.fe-retro-theme .tidy5e-sheet.application.quadrone
   .ability-bonus-container
   > :is(button.ability-roll-button, .ability-score):first-child {
   border-top-color: transparent !important;
@@ -2541,12 +2478,10 @@ body.fe-retro-theme .tidy5e-sheet.application.quadrone
 body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
   > .window-content {
   box-sizing: border-box !important;
-  padding-top: 32px !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.tidy-info-card-application
   > .window-header {
-  background: rgb(0 0 0 / 0.92) !important;
   box-shadow: inset 0 -1px 0 var(--fe-tidy-rule, var(--fe-dnd5e-tab-line)) !important;
 }
 

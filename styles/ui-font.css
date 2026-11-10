@@ -844,6 +844,16 @@ body.fe-fonts-enabled :is(.dnd5e, .dnd5e2) .sheet.actor :is(
   font-family: var(--fe-dnd5e-label-font-family) !important;
 }
 
+/* dnd5e leaves the ability label/modifier at `line-height: normal`, sized
+   for Roboto (~1.2). CookieRun's `normal` line box is 2px taller at both
+   sizes, which pushed the character sheet's score tab 4px further below the
+   pentagon. 1.2 restores dnd5e's own geometry exactly (measured live,
+   dnd5e 6.0.6: label 13px, mod 25px, score tab at the same y as without
+   this module). */
+body.fe-fonts-enabled .dnd5e2.sheet.actor .ability-scores .ability-score :is(.label, .mod) {
+  line-height: 1.2 !important;
+}
+
 /* Tidy Quadrone uses its own utility classes for compact labels/data
    (font-label-*, font-data-*) which can bypass the broader Tidy remap. */
 body.fe-fonts-enabled .tidy5e-sheet.application.quadrone

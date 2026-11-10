@@ -334,12 +334,6 @@ body.fe-retro-theme :is(button, input:not([type="checkbox"]):not([type="radio"])
    § 2's `border-radius: 0` has no effect on checkboxes — the rounding is
    in the Font Awesome glyph's shape itself, not a border. */
 
-/* Stronger Foundry window borders */
-body.fe-retro-theme .window-app,
-body.fe-retro-theme .application {
-  border: 1px solid var(--fe-dx3rd-accent, #ffffff) !important;
-}
-
 
 /* ══════════════════════════════════════════════════════════════
  * § 16  pixel diagonal-slash borders (JRPG dialogue-box style)
@@ -372,7 +366,7 @@ body.fe-retro-theme {
   --fe-dx3rd-border-width: 10px;
 }
 
-/* Replace the old solid window border (§7) with the pixel border
+/* No solid window border — the frame is the pixel border
    (§16 pseudo)
    .application included — removes the solid border of v14 ApplicationV2
    windows too */

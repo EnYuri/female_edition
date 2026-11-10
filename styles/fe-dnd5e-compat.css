@@ -973,43 +973,10 @@ body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
   nav.tabs.tabs-right {
-  background: var(--fe-dnd5e-mono-surface-2) !important;
-  border: 0 !important;
-  box-shadow: none !important;
   gap: 8px !important;
   isolation: isolate !important;
   overflow: visible !important;
-  padding: 7px 6px !important;
   position: absolute !important;
-  translate: 10px 0 !important;
-}
-
-body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
-  nav.tabs.tabs-right::before,
-body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
-  nav.tabs.tabs-right::after {
-  box-sizing: border-box !important;
-  content: "" !important;
-  inset: -6px !important;
-  pointer-events: none !important;
-  position: absolute !important;
-}
-
-body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
-  nav.tabs.tabs-right::before {
-  background: transparent !important;
-  border: 6px solid var(--fe-dx3rd-accent, #ffffff) !important;
-  z-index: -2 !important;
-}
-
-body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form
-  nav.tabs.tabs-right::after {
-  background: transparent !important;
-  border: 6px solid transparent !important;
-  border-image: url("./assets/pixel-border.png") 10 / 6px / 0 repeat !important;
-  image-rendering: pixelated !important;
-  mix-blend-mode: multiply !important;
-  z-index: -1 !important;
 }
 
 body.fe-retro-theme .dnd5e2.application.sheet.actor.standard-form

@@ -1,9 +1,5 @@
 /* female_edition: Token Visual Preview — appearance tab grid preview + anchor crosshair */
 
-/* Width set dynamically by JS based on preview size */
-.prototype-token-config.fe-tp-active,
-.token-config.fe-tp-active {}
-
 /* Two-column layout inside the appearance tab */
 .fe-tp-layout {
   display: flex;
