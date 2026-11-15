@@ -62,6 +62,11 @@ test("the pixel-theme fallback stylesheet is gated on pixelTheme", () => {
   assert.match(render({ pixelTheme: true }), /<style data-fe-pixel-archive="1">/);
 });
 
+test("the archive sidebar preserves dnd5e's GM-only description CSS scope", () => {
+  assert.match(render({ isGM: true }), /class="sidebar chat-sidebar" data-gm-user/);
+  assert.doesNotMatch(render({ isGM: false }), /data-gm-user/);
+});
+
 test("archiveBg reaches every surface that used to interpolate it", () => {
   // html/body + the sidebar, the chat tab and the log: four sites in the old literal.
   // A sentinel colour keeps the count clear of the pixel-theme block's own literals.

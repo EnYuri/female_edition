@@ -20,6 +20,11 @@ import { feBlobToDataURL } from "./fe-archive-image.js";
 export const FE_EXPORT_EMBED_CONCURRENCY = 6;
 export const FE_EXPORT_RESOURCE_FETCH_TIMEOUT = 12000;
 
+// Shared by the HTML pre-downscale and embedding passes. Binary bytes, before
+// base64 expansion. Raised to 1 GB at the user's request (2026-11-15).
+export const FE_EXPORT_IMAGE_TOTAL_BYTES = 1_000_000_000;
+export const FE_EXPORT_IMAGE_MAX_COUNT = 32_000;
+
 export const FE_EXPORT_FONT_CDN_HOSTS = new Set(["cdn.jsdelivr.net"]);
 
 export async function feFetchWithTimeout(url, options = {}, timeoutMs = FE_EXPORT_RESOURCE_FETCH_TIMEOUT, consume = null) {

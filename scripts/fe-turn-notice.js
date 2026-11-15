@@ -41,7 +41,7 @@ const [TN_TPL] = feRegisterTemplates("fe-turn-notice.hbs");
 // Timing is owned HERE and published to CSS as custom properties, so the removal
 // timers below and the keyframes can never drift apart.
 const TN_IN_MS = 1200;   // band sweep / portrait pop
-const TN_HOLD_MS = 4000; // on screen before leaving (your-turn's unload timer)
+const TN_HOLD_MS = 3000; // on screen before leaving (your-turn's 4000ms unload timer x 0.75)
 const TN_OUT_MS = 900;   // leave animation, then the node is removed
 
 const TN_FALLBACK_IMG = "icons/svg/mystery-man.svg";
@@ -57,6 +57,7 @@ let _tnCombatId = null;
 let _tnHiddenRound = null;
 let _tnHoldTimer = null;
 let _tnOutTimer = null;
+let _tnShownAt = 0; // performance.now() of the current banner's feTnShow
 
 function feTnEnabled() {
   if (!feSetting(S.TURN_NOTICE_ENABLED)) return false;
@@ -99,6 +100,17 @@ function feTnLeave() {
   _tnHoldTimer = null;
   const banner = document.querySelector(`#${TN_ROOT_ID} .fe-tn-banner`);
   if (!banner || banner.classList.contains("is-out")) return;
+  // A leave can arrive mid-entrance (combat ended, the turn moved to a
+  // defeated/hidden combatant). The exit keyframes all start from the FULL
+  // state, so starting them over a half-drawn entrance snaps the band, text
+  // and portrait to full for a beat before they go. Let the entrance finish
+  // first; TN_IN_MS bounds it in both themes (retro's ends earlier). Riding
+  // _tnHoldTimer means a newer feTnShow / teardown cancels the wait for free.
+  const entranceLeft = TN_IN_MS - (performance.now() - _tnShownAt);
+  if (entranceLeft > 0) {
+    _tnHoldTimer = setTimeout(feTnLeave, entranceLeft);
+    return;
+  }
   banner.classList.add("is-out");
   clearTimeout(_tnOutTimer);
   _tnOutTimer = setTimeout(() => banner.remove(), TN_OUT_MS);
@@ -108,6 +120,7 @@ function feTnShow(data) {
   const root = feTnRoot();
   feTnClearTimers();
   root.replaceChildren(feRenderTemplateFragment(TN_TPL, data));
+  _tnShownAt = performance.now();
   // HQ-downscale the portraits (same path as the battle tracker): a
   // full-resolution image shrunk to banner size in one GPU-composited step
   // sparkles. Display-only imgs, so the src swap is safe; the original path

@@ -93,11 +93,12 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 }
 
 /* Resource text sits over a light accent fill — hard 1px black outline in
-   all 8 directions keeps it readable without touching the bar colour. */
+   all 8 directions keeps it readable without touching the bar colour.
+   Read-only sheets render resource-value as a span instead of an input. */
 body.fe-retro-theme :is(.dnd5e:not(*), .dnd5e2:not(*), .tidy5e-sheet)
   :is(.portrait-hp, .meter, .progress, .resource) input,
 body.fe-retro-theme :is(.dnd5e:not(*), .dnd5e2:not(*), .tidy5e-sheet)
-  :is(input.resource-value, .resource-max, .resource-separator, .encumbrance-label) {
+  :is(input.resource-value, span.resource-value, .resource-max, .resource-separator, .encumbrance-label) {
   background: transparent !important;
   text-shadow:
     1px 0 0 #000000,
@@ -1184,6 +1185,23 @@ body.fe-retro-theme
   width: 6.375rem !important;
 }
 
+/* Editable HP uses inputs, while locked/non-owned values use spans. Core's
+   input height/line-height and transparent border otherwise shift its glyphs
+   relative to the text. Give all three labels the same borderless line box. */
+body.fe-retro-theme .tidy5e-sheet.application.classic.actor
+  .portrait-hp .resource-container > :is(.resource-value, .resource-max, .resource-separator) {
+  box-sizing: border-box !important;
+  height: 1.25rem !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: 1.25rem !important;
+}
+
 /* ----------------------------------------------------------------
  * Tidy5e Classic: rest icon backdrop.
  *
@@ -1581,8 +1599,11 @@ body.fe-retro-theme .tidy5e-sheet.application
 }
 
 /* Upstream paints the state fill as a smooth left→right fade; retro renders
-   the same fade as an ordered screentone — checker tone masked to thin out
-   toward the right edge, painted under the row text. */
+   it as an ordered screentone — checker tone painted under the row text.
+   The tone is anchored on the RIGHT and thins out toward the left (mask `to
+   left`), the reverse of upstream's fade: the item name sits at the row's
+   left, and a dense dither under it made the text hard to read. The solid
+   state bar on the left edge stays — it is a narrow marker, not under text. */
 body.fe-retro-theme .tidy5e-sheet.application
   :is(
     .item-table-row,
@@ -1598,8 +1619,8 @@ body.fe-retro-theme .tidy5e-sheet.application
   pointer-events: none;
   background: var(--fe-tidy-tone-check);
   background-size: 4px 4px;
-  -webkit-mask-image: linear-gradient(to right, #000 0 34%, transparent 88%);
-  mask-image: linear-gradient(to right, #000 0 34%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to left, #000 0 34%, transparent 88%);
+  mask-image: linear-gradient(to left, #000 0 34%, transparent 88%);
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
@@ -1696,8 +1717,8 @@ body.fe-retro-theme .tidy5e-sheet.application
   pointer-events: none;
   background: var(--fe-tidy-tone-check);
   background-size: 4px 4px;
-  -webkit-mask-image: linear-gradient(to right, #000 0 34%, transparent 88%);
-  mask-image: linear-gradient(to right, #000 0 34%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to left, #000 0 34%, transparent 88%);
+  mask-image: linear-gradient(to left, #000 0 34%, transparent 88%);
 }
 
 body.fe-retro-theme .tidy5e-sheet.application

@@ -69,13 +69,30 @@ export function feRewriteSnapshotCSSURLs(cssText, stylesheetURL) {
  *
  * Pure.
  */
+function feCssCodePositions(text) {
+  // Preserve indices while hiding comments and quoted strings. An @import in
+  // documentation or generated content is not a dependency to fetch or replace.
+  const code = text.replace(/\/\*[\s\S]*?\*\/|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'/g,
+    token => " ".repeat(token.length));
+  const topLevel = new Set();
+  let depth = 0;
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === "{") depth++;
+    else if (code[i] === "}") depth = Math.max(0, depth - 1);
+    else if (code[i] === "@" && depth === 0) topLevel.add(i);
+  }
+  return { code, topLevel };
+}
+
 export function feParseCssImports(cssText) {
   const text = String(cssText ?? "");
+  const { topLevel } = feCssCodePositions(text);
   // URL is either url( "x" ) / url( x )  OR  a bare quoted string. Then any
   // trailing tokens (layer(...) and/or a media query) up to the terminating `;`.
   const re = /@import\s+(?:url\(\s*(["']?)([^"')]+)\1\s*\)|(["'])([^"']+)\3)\s*([^;]*);/gi;
   const out = [];
   for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+    if (!topLevel.has(m.index)) continue;
     const url = String(m[2] ?? m[4] ?? "").trim();
     const trailing = String(m[5] ?? "").trim();
     const layerMatch = /\blayer\(\s*([\w-]+)\s*\)/i.exec(trailing);
@@ -96,12 +113,29 @@ function feFormatImportStatement(url, layer, media) {
   return `@import "${url}"${layerPart}${mediaPart};`;
 }
 
-// `String#replace` with a STRING pattern treats `$&`, `$1`, `` $` `` etc. in the
-// REPLACEMENT specially. A stylesheet body is arbitrary text and does contain `$`
-// (e.g. `content: "$"`), so every substitution here goes through a function
-// replacer, which is exempt from that expansion.
-function feReplaceOnce(haystack, needle, replacement) {
-  return haystack.replace(needle, () => replacement);
+// Replace by original offsets, never by matched text: the same text can occur
+// earlier in a comment, or inside an already-inlined body. Slicing also keeps
+// replacement strings containing $&/$1 literal.
+function feReplaceCssImports(text, parsed, replace) {
+  const parts = [];
+  let cursor = 0;
+  for (const imp of parsed) {
+    parts.push(text.slice(cursor, imp.index), replace(imp));
+    cursor = imp.index + imp.raw.length;
+  }
+  parts.push(text.slice(cursor));
+  return parts.join("");
+}
+
+function feSnapshotLayerOrder(text, parsed) {
+  const { code, topLevel } = feCssCodePositions(text);
+  const events = parsed.filter(imp => imp.layer).map(imp => ({ index: imp.index, names: [imp.layer] }));
+  const re = /@layer\s+([\w.-]+(?:\s*,\s*[\w.-]+)*)\s*[;{]/gi;
+  for (const match of code.matchAll(re)) {
+    if (topLevel.has(match.index)) events.push({ index: match.index, names: match[1].split(/\s*,\s*/) });
+  }
+  events.sort((a, b) => a.index - b.index);
+  return [...new Set(events.flatMap(event => event.names))];
 }
 
 /**
@@ -110,18 +144,16 @@ function feReplaceOnce(haystack, needle, replacement) {
  * Shared by the pure-import rebuild and the in-place mixed-block path.
  */
 function feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports }) {
-  let body = String(inlined ?? "");
-  for (const n of feParseCssImports(body)) {
+  const body = String(inlined ?? "");
+  return feReplaceCssImports(body, feParseCssImports(body), n => {
     const nestedAbs = resolve(n.url);
     const nestedCss = n.media || n.layer ? null : inlineNested(nestedAbs);
     if (nestedCss != null) {
-      body = feReplaceOnce(body, n.raw, nestedCss);
-      continue;
+      return nestedCss;
     }
-    body = feReplaceOnce(body, n.raw, "");
     hoistImports.push(feFormatImportStatement(nestedAbs, n.layer, n.media));
-  }
-  return body.trim();
+    return "";
+  }).trim();
 }
 
 /**
@@ -142,27 +174,29 @@ function feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports
  */
 function feAssembleMixedStyleBlock(src, parsed, { resolve, inline, inlineNested }) {
   const hoistImports = [];
-  let out = src;
   let inlinedAny = false;
 
-  for (const imp of parsed) {
+  const out = feReplaceCssImports(src, parsed, imp => {
     const abs = resolve(imp.url);
     const inlined = imp.media ? null : inline(abs);
     if (inlined == null) {
-      out = feReplaceOnce(out, imp.raw, "");
       hoistImports.push(feFormatImportStatement(abs, imp.layer, imp.media));
-      continue;
+      return "";
     }
     const body = feBuildInlinedImportBody(inlined, { resolve, inlineNested, hoistImports });
-    out = feReplaceOnce(out, imp.raw, imp.layer ? `@layer ${imp.layer} {\n${body}\n}` : body);
     inlinedAny = true;
-  }
+    return imp.layer ? `@layer ${imp.layer} {\n${body}\n}` : body;
+  });
 
   // Nothing could be inlined — hand the block back untouched rather than rewriting
   // it for no gain. The caller's absolutize-only path is exactly the old behaviour.
   if (!inlinedAny) return { text: src, rebuilt: false };
 
-  const text = hoistImports.length ? `${hoistImports.join("\n")}\n${out}` : out;
+  // A hoisted fallback must not establish its layer before the original prelude
+  // or before an earlier successful import's layer. First appearance fixes order.
+  const layerOrder = feSnapshotLayerOrder(src, parsed);
+  const prelude = layerOrder.length ? `@layer ${layerOrder.join(", ")};\n` : "";
+  const text = hoistImports.length ? `${prelude}${hoistImports.join("\n")}\n${out}` : out;
   return { text, rebuilt: true, mixed: true };
 }
 
@@ -198,8 +232,7 @@ export function feAssembleInlinedStyleBlock(originalText, { resolveAbs, getInlin
   // A "pure import block" is one whose only content is @import statements (plus
   // whitespace/comments). The full rebuild below reorders freely, so it is only
   // valid for those.
-  let residual = src;
-  for (const imp of parsed) residual = residual.replace(imp.raw, "");
+  let residual = feReplaceCssImports(src, parsed, () => "");
   residual = residual.replace(/\/\*[\s\S]*?\*\//g, "").trim();
   // MIXED block — real rules live here too, so a rebuild could reorder or lose
   // them. This used to bail out entirely, which meant the block's @imports stayed

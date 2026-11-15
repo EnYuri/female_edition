@@ -21,7 +21,7 @@ import {
   feIsNarratorToolsMessage,
   feIsRoundMarkerMessage,
 } from "./fe-chat-enhance.js";
-import { FE_LANCER_CARD_CONTENT_RE, FE_LANCER_CARD_SELECTOR } from "./fe-constants.js";
+import { feMessageHasChatCardContent } from "./fe-render-state.js";
 import { FE_ACTOR_COMBAT_NOTICE_CLASS, feIsActorCombatNoticeMessage } from "./fe-util.js";
 import { feChatPortraitUpsert } from "./fe-chat-portrait.js";
 import { cpMaybeApplyHQResample } from "./fe-chat-portrait-image.js";
@@ -326,7 +326,29 @@ function feClearCollapsibleHideStyles(el) {
 export function feExpandCollapsedArchiveSections(node) {
   try {
     if (!feIsElement(node)) return;
-    for (const el of node.querySelectorAll?.(".collapsible.collapsed") ?? []) {
+    for (const el of node.querySelectorAll?.("details") ?? []) {
+      el.setAttribute("open", "");
+      feClearCollapsibleHideStyles(el);
+    }
+    // dnd5e 6 compact rolls put their breakdown in a native popover, outside
+    // .dice-roll. Adding .expanded to the roll cannot reveal that sibling.
+    // Export it in normal flow, clearing the live mirror's fixed positioning.
+    for (const el of node.querySelectorAll?.(".roll-breakdown[popover]") ?? []) {
+      el.removeAttribute("popover");
+      feClearCollapsibleHideStyles(el);
+      for (const p of ["top", "right", "bottom", "left", "transform", "translate"]) el.style.removeProperty(p);
+      for (const [p, value] of Object.entries({
+        display: "block", position: "static", inset: "auto",
+        width: "auto", "inline-size": "auto", "min-width": "0",
+        "box-sizing": "border-box", flex: "0 0 100%",
+      })) el.style.setProperty(p, value, "important");
+      // Compact attack/check/damage cards share an icon + total flex row.
+      // Keep that row and place the full breakdown on the following line.
+      if (el.parentElement?.classList?.contains("icon-row")) {
+        el.parentElement.style.setProperty("flex-wrap", "wrap", "important");
+      }
+    }
+    for (const el of node.querySelectorAll?.(".collapsible.collapsed, .card-header.collapsed") ?? []) {
       try { el.classList.remove("collapsed"); } catch {}
     }
     for (const el of node.querySelectorAll?.(".dice-roll") ?? []) {
@@ -1139,9 +1161,18 @@ export async function feRenderExportMessageNode(targetDoc, msg, { liveEl = null,
 // force `display:block` + `margin:0` onto every `.message-content > div` — i.e.
 // onto the card root itself, flattening its flex layout.
 export function feArchiveMessageLooksComplex(msg, liveEl = null) {
+  // Use the same card signatures as live merge classification, including both
+  // DX3rd families and LANCER. Their image-free / roll-less cards still need
+  // system render hooks (DX3rd fixed judgments fill an initially empty box).
+  if (feMessageHasChatCardContent(msg?.content, liveEl)) return true;
+  try {
+    // dnd5e 6 stores item/rest/usage cards in its data model, with empty content.
+    // Detect the rendering contract rather than maintaining a list of subtypes.
+    if (typeof msg?.system?.getHTML === "function") return true;
+  } catch {}
   try {
     const el = liveEl;
-    if (el?.querySelector?.(`.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dice-roll, .dice-result, .round-marker, .chat-images-container, .ci-message-image, img, video, table, blockquote, pre, iframe, ${FE_LANCER_CARD_SELECTOR}`)) return true;
+    if (el?.querySelector?.(".dice-roll, .dice-result, .round-marker, .chat-images-container, .ci-message-image, img, video, table, blockquote, pre, iframe, details")) return true;
   } catch {}
   try {
     // Roll messages store the dice total in content, not the .dice-roll card HTML.
@@ -1152,8 +1183,7 @@ export function feArchiveMessageLooksComplex(msg, liveEl = null) {
   try {
     const content = String(msg?.content ?? '');
     if (!content) return false;
-    if (FE_LANCER_CARD_CONTENT_RE.test(content)) return true;
-    return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img\b|<video\b|<table\b|<blockquote\b|<pre\b|<iframe\b)/i.test(content);
+    return /(?:chat-card|midi-chat-card|dice-roll|dice-result|round-marker|chat-images-container|ci-message-image|<img\b|<video\b|<table\b|<blockquote\b|<pre\b|<iframe\b|<details\b)/i.test(content);
   } catch {
     return false;
   }

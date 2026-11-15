@@ -11,6 +11,7 @@ import { feLocalize } from "./fe-i18n.js";
 // and the entry module import them from there — avoiding a circular import.
 import { MODULE_ID, S } from "./fe-constants.js";
 import { feSetting } from "./fe-gm-priority.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import {
   feFreezeMessageBackgroundsForPrint,
   feDownscaleImagesForPrint,
@@ -39,6 +40,7 @@ import {
 } from "./fe-archive-assets.js";
 import {
   FE_EXPORT_EMBED_CONCURRENCY,
+  FE_EXPORT_IMAGE_TOTAL_BYTES,
   feFetchAsDataURLCapped,
   feFetchWithTimeout,
   feSnapshotAssetIsSameOrigin,
@@ -644,10 +646,22 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
   const snapshotRoot = feIsElement(bodyRoot) ? bodyRoot : doc.body;
   const scopedBody = snapshotRoot !== doc.body;
   const bodyAttrs = feSerializeElementAttributes(doc.body);
+  const metaEl = doc.getElementById("fe-chat-export-meta");
+  const archiveMetaText = metaEl?.textContent ?? "";
   const serializeSnapshotRoot = () => {
-    const parts = feSerializeBodyToParts(snapshotRoot);
-    return scopedBody ? [`<body${bodyAttrs}>`, ...parts, "</body>"] : parts;
+    const progressText = metaEl?.textContent;
+    const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+    try {
+      // Progress belongs to the live window, not to the saved archive's range/count.
+      if (metaEl) metaEl.textContent = archiveMetaText;
+      const parts = feSerializeBodyToParts(snapshotRoot);
+      return scopedBody ? [`<body${bodyAttrs}>`, ...parts, "</body>"] : parts;
+    } finally {
+      try { if (metaEl) metaEl.textContent = progressText; }
+      finally { restoreStickyScroll(); }
+    }
   };
+  setMeta(feLocalize("FE.ChatArchive.Status.PreparingHtml"));
 
   // IMPORTANT (memory):
   // Do NOT deep-clone the full <html> tree for large logs.
@@ -781,101 +795,93 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
       // the DOM tree in V8 heap right when we're about to allocate a giant outerHTML
       // string and a Blob).
       //
-      // Declared OUT here, not inside the try: the fallback below runs on the LIVE
-      // archive document, so an exception thrown anywhere between the upgrade and the
-      // inner finally would otherwise leave every portrait permanently swapped to its
-      // export bitmap (and marked data-fe-export-portrait) in the window the user is
-      // still looking at, with no reference left to undo it.
+      // Every completed preparation step must unwind, including when a later step
+      // fails before serialization. The fallback then starts from the original DOM.
       let portraitRestore = () => {};
+      let prepRestore = () => {};
+      let downscaleRestore = () => {};
+      let embedRestore = () => {};
       try {
-        // Portraits first: re-resample each one from its ORIGINAL file at export
-        // resolution. The data: URL currently on the element is sized for THIS screen
-        // (size × dpr — 64px on a dpr-1 machine) and turns blocky the moment the saved
-        // file is printed or zoomed. See feUpgradePortraitsForExport.
-        portraitRestore = await feUpgradePortraitsForExport(snapshotRoot, { meta: setMeta }) || (() => {});
-        setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingImages"));
-        // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade above,
-        // or — only when the upgrade could not run at all, e.g. a dead source or a spent
-        // budget — the live HQ result) stays as-is. A source the upgrade merely could not
-        // IMPROVE on no longer lands here: it is pinned to its original file and marked, so
-        // this keeps its hands off it entirely.
-        // Restoring the original file path would push a full-resolution
-        // image into the embed budget (and past its per-image cap), which is how
-        // portraits ended up as absolute Foundry URLs — broken for every reader
-        // but the exporter.
-        const prepRestore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts, keepSelfContainedSrc: true });
-        // P4: downscale images to small data: URLs BEFORE embedding. feEmbedImagesInNode
-        // skips anything already `data:`, so this both shrinks the embedded payload
-        // (far more images fit under the byte budget → better offline fidelity) and
-        // cuts the saved-file size. maxTotalBytes guards against ballooning the HTML;
-        // groups beyond the budget keep their original src and fall through to the
-        // remote/embed path below. useBlobURL:false → real data: URLs that serialize.
-        // Shared image-byte budget for the saved HTML. Pre-embed downscaling
-        // spends part of it (dsStats.bytesUsed); feEmbedImagesInNode gets only
-        // what's left so downscaled + leftover-embedded images never exceed it.
-        // Shared ceiling for downscaled + embedded bytes. Overflowing it is not "a
-        // smaller file", it is images that only load on this machine (the saved HTML
-        // falls back to an absolute http://<foundry-host>/ src).
-        // 12MB → 24MB → 250MB. The last raise is an explicit user decision
-        // (2026-08-12): size does not matter, offline completeness does. Sized to
-        // carry 4-5x the 1900-message log measured that day — see the matching note
-        // on MAX_TOTAL_BYTES in feEmbedImagesInNode for the measurement.
-        const HTML_EMBED_TOTAL_BYTES = 250_000_000;
-        const dsStats = {};
-        let downscaleRestore = () => {};
         try {
-          const embedLogEl = snapshotRoot.matches?.("#fe-chat-export-log, #chat-log, ol.chat-log")
-            ? snapshotRoot
-            : snapshotRoot.querySelector?.("#fe-chat-export-log, #chat-log, ol.chat-log");
-          if (embedLogEl) {
-            downscaleRestore = await feDownscaleImagesForPrint(win, embedLogEl, {
-              meta: setMeta,
-              useBlobURL: false,
-              maxTotalBytes: HTML_EMBED_TOTAL_BYTES,
-              stats: dsStats,
-              dprCap: 1.5,
-              minDpr: 1.0,
-              webpQuality: 0.85,
-              jpegQuality: 0.88,
-              avatarDprCap: 1.5,
-              avatarWebpQuality: 0.82,
-              avatarJpegQuality: 0.84,
-              maxSide: 1600,
-              concurrency: 4,
-              // Portraits restored to their original file path are mid-load here;
-              // the grouping loop skips `!complete` images, so they would escape
-              // downscaling entirely and reach the embed pass at full resolution.
-              waitForPendingMs: 8000,
-            });
+          // Portraits first: re-resample each one from its ORIGINAL file at export
+          // resolution. The data: URL currently on the element is sized for THIS screen
+          // (size × dpr — 64px on a dpr-1 machine) and turns blocky the moment the saved
+          // file is printed or zoomed. See feUpgradePortraitsForExport.
+          portraitRestore = await feUpgradePortraitsForExport(snapshotRoot, { meta: setMeta }) || (() => {});
+          setMeta(feLocalize("FE.ChatArchive.Status.EmbeddingImages"));
+          // keepSelfContainedSrc: a portrait already showing a data: URL (the upgrade above,
+          // or — only when the upgrade could not run at all, e.g. a dead source or a spent
+          // budget — the live HQ result) stays as-is. A source the upgrade merely could not
+          // IMPROVE on no longer lands here: it is pinned to its original file and marked, so
+          // this keeps its hands off it entirely.
+          // Restoring the original file path would push a full-resolution
+          // image into the embed budget (and past its per-image cap), which is how
+          // portraits ended up as absolute Foundry URLs — broken for every reader
+          // but the exporter.
+          prepRestore = fePrepareBodyForHTMLSnapshot(snapshotRoot, { embedFonts, keepSelfContainedSrc: true });
+          // P4: downscale images to small data: URLs BEFORE embedding. feEmbedImagesInNode
+          // skips anything already `data:`, so this both shrinks the embedded payload
+          // (far more images fit under the byte budget → better offline fidelity) and
+          // cuts the saved-file size. maxTotalBytes guards against ballooning the HTML;
+          // groups beyond the budget keep their original src and fall through to the
+          // remote/embed path below. useBlobURL:false → real data: URLs that serialize.
+          // Shared image-byte budget for the saved HTML. Pre-embed downscaling
+          // spends part of it (dsStats.bytesUsed); feEmbedImagesInNode gets only
+          // what's left. The embedder retains its bounded compression-overflow
+          // allowance beyond that soft budget.
+          // Shared ceiling for downscaled + embedded bytes. Overflowing it is not "a
+          // smaller file", it is images that only load on this machine (the saved HTML
+          // falls back to an absolute http://<foundry-host>/ src).
+          // 12MB → 24MB → 250MB → 1GB (2026-11-15, explicit user request).
+          // Keep one shared constant with the embedder so the two paths agree.
+          const HTML_EMBED_TOTAL_BYTES = FE_EXPORT_IMAGE_TOTAL_BYTES;
+          const dsStats = {};
+          try {
+            const embedLogEl = snapshotRoot.matches?.("#fe-chat-export-log, #chat-log, ol.chat-log")
+              ? snapshotRoot
+              : snapshotRoot.querySelector?.("#fe-chat-export-log, #chat-log, ol.chat-log");
+            if (embedLogEl) {
+              downscaleRestore = await feDownscaleImagesForPrint(win, embedLogEl, {
+                meta: setMeta,
+                useBlobURL: false,
+                maxTotalBytes: HTML_EMBED_TOTAL_BYTES,
+                stats: dsStats,
+                dprCap: 1.5,
+                minDpr: 1.0,
+                webpQuality: 0.85,
+                jpegQuality: 0.88,
+                avatarDprCap: 1.5,
+                avatarWebpQuality: 0.82,
+                avatarJpegQuality: 0.84,
+                maxSide: 1600,
+                concurrency: 4,
+                // Portraits restored to their original file path are mid-load here;
+                // the grouping loop skips `!complete` images, so they would escape
+                // downscaling entirely and reach the embed pass at full resolution.
+                waitForPendingMs: 8000,
+              });
+            }
+          } catch (e) {
+            console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob2"), e);
           }
-        } catch (e) {
-          console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob2"), e);
-        }
-        const embedRestore = await feEmbedImagesInNode(snapshotRoot, {
-          meta: setMeta,
-          maxTotalBytes: Math.max(0, HTML_EMBED_TOTAL_BYTES - (dsStats.bytesUsed || 0)),
-        });
-        // Duplicated portrait bitmaps are NOT a problem left to solve here: the embed
-        // pass ends in feDeduplicateInlineDataUrlsInNode, which keeps one copy of each
-        // distinct data: URL and strips `src` from the rest, restoring them on open via
-        // a tiny data-fe-img-ref bootstrap. VERIFIED 2026-08-05 on a 137-message export:
-        // 134 portraits, 7 distinct bitmaps, "Deduplicated 127 inline image(s) (~3.0MB
-        // saved)", and the saved file renders 134/134. A second sharing mechanism was
-        // written here (one CSS background rule per bitmap) and removed — running after
-        // the dedup pass it saw seven groups of one and never emitted a single rule.
-        try {
+          embedRestore = await feEmbedImagesInNode(snapshotRoot, {
+            meta: setMeta,
+            maxTotalBytes: Math.max(0, HTML_EMBED_TOTAL_BYTES - (dsStats.bytesUsed || 0)),
+          });
+          // Duplicated portrait bitmaps are NOT a problem left to solve here: the embed
+          // pass ends in feDeduplicateInlineDataUrlsInNode, which keeps one copy of each
+          // distinct data: URL and strips `src` from the rest, restoring them on open via
+          // a tiny data-fe-img-ref bootstrap. VERIFIED 2026-08-05 on a 137-message export:
+          // 134 portraits, 7 distinct bitmaps, "Deduplicated 127 inline image(s) (~3.0MB
+          // saved)", and the saved file renders 134/134. A second sharing mechanism was
+          // written here (one CSS background rule per bitmap) and removed — running after
+          // the dedup pass it saw seven groups of one and never emitted a single rule.
           bodyParts = serializeSnapshotRoot();
         } finally {
           try { embedRestore?.(); } catch {}
           try { downscaleRestore?.(); } catch {}
           try { prepRestore?.(); } catch {}
           try { portraitRestore?.(); } catch {}
-          // Consumed. A throw from serializeSnapshotRoot() runs this finally AND
-          // then the fallback branch below, which owns the same closure — without
-          // this the undo ran twice. It is idempotent today (the second pass
-          // re-writes already-restored srcs over an emptied blob-URL set), so this
-          // is not a live bug; it is removing the reliance on that.
-          portraitRestore = () => {};
         }
       } catch (err) {
         console.warn(feLocalize("FE.Diagnostics.ArchiveSnapshot.feBuildArchiveHTMLSnapshotBlob3"), err);
@@ -886,7 +892,6 @@ async function feBuildArchiveHTMLSnapshotBlob(win, titleText = "Chat Log", { met
           bodyParts = serializeSnapshotRoot();
         } finally {
           try { restore(); } catch {}
-          try { portraitRestore?.(); } catch {}
         }
       }
     } else {
@@ -952,7 +957,6 @@ async function feDownloadArchiveHTMLUnlocked(win, titleText = "Chat Log", { body
   try {
     const doc = win.document;
 
-    setMeta(feLocalize("FE.ChatArchive.Status.PreparingHtml"));
     const blob = await feBuildArchiveHTMLSnapshotBlob(win, titleText, { meta: setMeta, bodyRoot });
 
     setMeta(feLocalize("FE.ChatArchive.Status.Downloading"));

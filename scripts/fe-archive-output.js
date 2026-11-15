@@ -239,6 +239,12 @@ export function feCanUserSeeChatMessage(msg, user) {
   try {
     if (!msg) return false;
 
+    // Core shows the author a blind-roll placeholder, not its content
+    // (ChatMessage#isContentVisible). The archive can rebuild from raw content,
+    // so author access alone must not admit that result. Check plain fields too:
+    // DB rows are filtered before lazy ChatMessage materialization.
+    if (msg.blind && !user?.isGM && feMessageAuthorId(msg) === user?.id) return false;
+
     // Whispers: visible to GM and recipients (and the author).
     const whisper = msg.whisper ?? [];
     if (Array.isArray(whisper) && whisper.length) {
@@ -505,8 +511,15 @@ export function feNormalizeArchiveMessageLayout(root, { restore = false } = {}) 
             // Keep header/card display modes from CSS (grid/flex/none). Overwriting display here breaks
             // merge follow-hides, portrait header grids, and round-marker headers.
             if (!isMedia) {
-              el.style.setProperty("width", "100%", "important");
-              el.style.setProperty("inline-size", "100%", "important");
+              // LANCER charge cards keep 10px side margins. A full-width border
+              // box plus those margins overflows; auto width includes the margins
+              // in available-space sizing. Do not touch nested inline charge chips.
+              const isLancerRoot = el.parentElement?.classList?.contains("message-content")
+                && el.classList?.contains("card")
+                && ["clipped", "clipped-bot", "clipped-top"].some(c => el.classList.contains(c));
+              const width = isLancerRoot ? "auto" : "100%";
+              el.style.setProperty("width", width, "important");
+              el.style.setProperty("inline-size", width, "important");
               el.style.setProperty("min-width", "0", "important");
               el.style.setProperty("min-inline-size", "0", "important");
               el.style.setProperty("max-width", "none", "important");

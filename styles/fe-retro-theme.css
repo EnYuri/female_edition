@@ -191,6 +191,22 @@ body.fe-retro-theme :is(.fa-spin, .fa-spin-pulse, .fa-pulse, .fa-spinner, .loadi
   animation-duration: 1.5s !important;
 }
 
+/* Editing carets are input feedback, not decorative motion. The blanket
+   above also reaches CodeMirror's cursor layer and ProseMirror's gap cursor
+   pseudo-element, turning their native blink into a 1ms flicker. Revert just
+   this layer's timing so core/editor settings keep their original cadence. */
+body.fe-retro-theme .cm-cursorLayer,
+body.fe-retro-theme .ProseMirror-gapcursor::after {
+  animation-duration: revert-layer !important;
+  animation-delay: revert-layer !important;
+}
+
+/* Core hardcodes this horizontal insertion marker black. Retro's editor
+   surface is black too, independently of the Foundry light/dark setting. */
+body.fe-retro-theme .ProseMirror-gapcursor::after {
+  border-top-color: var(--fe-ac-90, #e6e6e6) !important;
+}
+
 
 /* ══════════════════════════════════════════════════════════════
  * § 4  global soft-shadow removal
@@ -440,57 +456,19 @@ body.fe-retro-theme .application::after {
           mask-border: none !important;
 }
 
-/* ── Minimized windows: content clipping + inner pixel frame ──
-   [Root cause — measured live on v14.363]
-   Foundry v14 does not display:none the window-content like AppV1 did;
-   it clamps the window to max-height:header-height and hides the body via
-   `.application { overflow:hidden }` clipping (v14 foundry2.css has no
-   `.minimized … display` rule at all — CSS clipping). But §16 above set
-   `.application/.window-app { overflow:visible }` so the pixel frame
-   (::after inset:-10px) is not clipped — which defeats that clipping.
-   Result: minimizing a V2 sheet left the body (window-content, still
-   display:flex) sticking out under the header as a "wide black band"
-   (user report).
-   (AppV1 sheets display:none the window-content on minimize, so they are
-   unaffected.)
-
-   [Fix]
-   ① Restore overflow:hidden only while minimized → body clipping works
-      again (band gone). .minimized raises specificity to (0,3,1) vs §16's
-      overflow:visible at (0,2,1) in the same layouts layer — a clear win.
-   ② The outer (inset:-10px) frame is now clipped, so while minimized the
-      same 9-slice is redrawn 6px INSIDE the window. The decoration
-      survives even on the 36px AppV2 title bar and does not interfere
-      with body clipping. The header is kept one level up so the ornament
-      does not overlap the title/close buttons. */
-body.fe-retro-theme .application.minimized,
-body.fe-retro-theme .window-app.minimized {
-  overflow: hidden !important;
-  border: none !important;
-  border-radius: 0 !important;
-}
-
-body.fe-retro-theme :is(.application, .window-app).minimized > .window-header {
-  position: relative !important;
-  z-index: 4 !important;
-}
-
-body.fe-retro-theme .application.minimized::before,
-body.fe-retro-theme .window-app.minimized::before {
-  content: '' !important;
-  display: block !important;
-  inset: 0 !important;
-  border-width: 6px !important;
-}
-
-body.fe-retro-theme .application.minimized::after,
-body.fe-retro-theme .window-app.minimized::after {
-  content: '' !important;
-  display: block !important;
-  inset: 0 !important;
-  z-index: 3 !important;
-  border-width: 6px !important;
-  border-image-width: 6px !important;
+/* ── Minimized windows: keep the outer pixel frame, hide only the body ──
+   Clipping the root also clips its outer frame. Moving the frame inside
+   instead lets the opaque header cover it (and scales the 10px pixel art).
+   Keep the same overflow:visible and 1:1 outer decoration in every state.
+   Hide non-header children explicitly so older AppV2 builds that rely on
+   root clipping cannot leak the body below the collapsed title bar. This
+   also covers system-injected siblings and AppV2's transition states.
+   Pseudo-elements are not children matched by > *, so the frame survives.
+   All child display values return to their normal cascade on restore.
+   AppV1 keeps core's normal display rule: its jQuery slideDown must be
+   able to show the body BEFORE maximize removes the minimized class. */
+body.fe-retro-theme .application:is(.minimizing, .minimized, .maximizing) > :not(.window-header) {
+  display: none !important;
 }
 
 /* #sidebar-content: accent backdrop — supplies accent color to the left

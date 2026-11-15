@@ -367,7 +367,8 @@ body.fe-fonts-enabled.fe-chatcard-custom-font #fe-chat-export-container .chat-me
   .chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card,
   .card-header, .card-content, .details.card-content, .details.collapsible-content.card-content,
   .dice-roll, .dice-result, .dice-formula, .dice-tooltip, .roll-request, .roll-request-card) {
-  display: block !important;
+  /* Preserve system flex/grid/table display. The dedicated expansion rules
+     below reveal collapsed content without flattening the card itself. */
   width: 100% !important;
   inline-size: 100% !important;
   max-width: none !important;
@@ -1200,22 +1201,19 @@ body.fe-chat-archive #fe-chat-export-container :is(#chat-log, #fe-chat-export-lo
  *   dnd5e2 .collapsible .collapsible-content   { display:grid; grid-template-rows:1fr }
  *          .collapsible.collapsed …            { grid-template-rows:0fr }
  *
- * The export pipeline breaks that clipping in two places — the print rule
- * `.collapsible-content > .wrapper { overflow: visible }` further up, and the
- * `display: block !important` this file forces onto
- * `.details.collapsible-content.card-content` (which destroys the grid, so
- * `grid-template-rows: 0fr` no longer constrains anything). A collapsed
- * breakdown then lays out at full height with nothing hiding it.
+ * The print rule `.collapsible-content > .wrapper { overflow: visible }`
+ * breaks that clipping. Historically a broad `display: block !important`
+ * also destroyed the grid; direct card children now keep their native display.
+ * The explicit expanded grid below still owns the export state.
  *
  * Rather than restore the clipping, force everything OPEN — explicit user
  * decision: a printed log should show every die result, not hide it behind a
  * caret that cannot be clicked on paper. This also makes the whole class of
  * "collapsed content leaks" bugs unreachable instead of re-tuning the clip.
  *
- * SPECIFICITY: the `display: block !important` rule above is (1,5,0)
- * (`#fe-chat-export-container … > :is(… .details.collapsible-content.card-content)`).
- * The id/class is doubled here so these land at (2,x,0) / (0,x+1,0) and win
- * regardless of source order. Do NOT "simplify" the doubled selectors away.
+ * The doubled id/class retains priority over other same-layer archive rules.
+ * Layered system !important declarations still require clearing the collapsed
+ * state itself in JS; specificity alone cannot override a stronger layer.
  */
 #fe-chat-export-container#fe-chat-export-container .chat-message .dice-roll .dice-tooltip,
 #fe-chat-export-container#fe-chat-export-container .chat-message .dice-result .dice-tooltip-collapser,

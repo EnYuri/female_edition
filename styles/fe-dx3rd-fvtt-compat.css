@@ -1,5 +1,5 @@
 /* ================================================================
- * fe-dx3rd-fvtt-compat.css — dx3rd-fvtt (LichSOMA) chat compatibility
+ * fe-dx3rd-fvtt-compat.css — dx3rd-fvtt (LichSOMA) chat/sheet compatibility
  *
  * dx3rd-fvtt is a SEPARATE system from the emanim lineage that
  * fe-dx3rd-compat.css serves; the two only share the game's roots.
@@ -9,7 +9,7 @@
  *
  * Scope classes (fe-style.js feSetRetroThemeClass):
  *   body.fe-system-dx3rd-fvtt        — always, retro or not (§A)
- *   body.fe-retro-system-dx3rd-fvtt  — retro theme ON (§B)
+ *   body.fe-retro-system-dx3rd-fvtt  — retro theme ON (§B/§C)
  *
  * Registered in module.json as { "layer": "layouts" }. The system's
  * own sheets land in layer(system), which beats `layouts` for NORMAL
@@ -478,4 +478,22 @@ body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   :is(.chat-message, .message) .dx3rd-open-scene-msg__appear {
   color: var(--fe-ac-70) !important;
+}
+/* C — actor-sheet gauge overlays. The system's transparent inputs sit over
+ * the encroachment fill; the shared retro form rule otherwise paints opaque
+ * black boxes over it and removes the system's text shadow. Keep the mono
+ * palette, restore transparency, and use a hard stroke over the light fill.
+ * Root/field specificity must beat fe-retro-forms.css F1 in layouts. */
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.application, .window-app).sheet.actor.dx3rd-fvtt
+  .encroachment-bar :is(.encroachment-value-text, .dice-addon) {
+  -webkit-text-stroke: 2px #000000 !important;
+  paint-order: stroke fill !important;
+}
+
+body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
+  :is(.application, .window-app).sheet.actor.dx3rd-fvtt
+  .encroachment-bar :is(.encroachment-value-input, .dice-addon input) {
+  background: transparent !important;
+  border: none !important;
 }

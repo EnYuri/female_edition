@@ -11,6 +11,7 @@
 
 
 import { feLocalize, feFormat } from "./fe-i18n.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { FE_DEFAULTS } from "./fe-settings-data.js";
 import { S, feSetting } from "./fe-chat-enhance.js";
 import {
@@ -264,6 +265,15 @@ export function fePrepareImagesForPageBreaks(doc, logEl) {
 
 export async function feArchivePrint(win) {
   if (!win || win.closed) return;
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+  try {
+    return await feArchivePrintPrepared(win);
+  } finally {
+    restoreStickyScroll();
+  }
+}
+
+async function feArchivePrintPrepared(win) {
   const doc = win.document;
   const metaEl = doc.getElementById("fe-chat-export-meta");
   const logEl =
@@ -356,6 +366,8 @@ export async function feArchivePrint(win) {
   };
 
   // Apply print image mode classes.
+  const modeClasses = ["fe-print-hide-avatars", "fe-print-hide-all", "fe-print-downscale", "fe-print-downscale-lite"];
+  const previousModeClasses = modeClasses.map(cls => doc.body.classList.contains(cls));
   try {
     doc.body.classList.toggle("fe-print-hide-avatars", mode === "hideAvatars");
     doc.body.classList.toggle("fe-print-hide-all", mode === "hideAll");
@@ -377,7 +389,6 @@ export async function feArchivePrint(win) {
   let restoreBg = () => {};
   try {
     restoreBg = feFreezeMessageBackgroundsForPrint(win, logEl);
-    win.addEventListener("afterprint", restoreBg, { once: true });
   } catch (err) {
     console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint"), err);
   }
@@ -395,6 +406,7 @@ export async function feArchivePrint(win) {
   let restorePageBreaks = () => {};
   let restorePortraitUpgrade = () => {};
   let restorePrepImages = () => {};
+  let restoreDownscaledImages = () => {};
 
   // Both hide modes are implemented ENTIRELY by blanking `src` (tempDisableImages
   // above) — there is no `display:none` anywhere in styles/ for them, only a
@@ -408,218 +420,233 @@ export async function feArchivePrint(win) {
   // a print-preview killer.
   const portraitsAreBlanked = mode === "hideAll" || mode === "hideAvatars";
 
+  let restored = false;
   const restoreOnce = () => {
-    try {
-      restorePortraitUpgrade();
-    } catch {}
+    if (restored) return;
+    restored = true;
+    try { win.removeEventListener("afterprint", restoreOnce); } catch {}
+    // Unwind in reverse mutation order. A later snapshot can contain an upgraded
+    // portrait or a temporary source, so it must never overwrite the final undo.
     try {
       restorePageBreaks();
-    } catch {}
-    try {
-      restoreDownscaledImages();
     } catch {}
     try {
       restoreStragglers();
     } catch {}
     try {
-      restoreImages();
+      restoreDownscaledImages();
     } catch {}
-    // LAST of the src-restoring undos, and that position is load-bearing. This one
-    // rewrites the portrait `src` it replaced; every undo above replays a value it
-    // snapshotted LATER in the pass (the downscaler's `prev` for a portrait is the
-    // original path this pass just installed, the straggler/blank undos likewise),
-    // so running it any earlier would let one of them overwrite the restored value
-    // with a stale one.
     try {
       restorePrepImages();
     } catch {}
     try {
+      restorePortraitUpgrade();
+    } catch {}
+    try {
+      restoreImages();
+    } catch {}
+    try {
       restoreBg();
     } catch {}
+    try {
+      modeClasses.forEach((cls, index) => doc.body.classList.toggle(cls, previousModeClasses[index]));
+    } catch {}
+    setMeta(originalMeta);
   };
 
   try {
     win.addEventListener("afterprint", restoreOnce, { once: true });
   } catch {}
 
-  // Portraits get an EXPORT-resolution bitmap before anything else touches them.
-  //
-  // What is on the element right now is the live HQ resample — `portraitSize × dpr`,
-  // i.e. a 64x64 PNG on a dpr-1 machine. That is correct on screen and far too small on
-  // paper: `win.print()` rasterizes well above CSS pixels, so the portrait is the one
-  // element in the whole page that gets visibly enlarged. The downscale pass below would
-  // not have fixed it either — it caps avatars at `cssBox × avatarDpr` (~96px) — which is
-  // why it now skips anything this marks. A portrait it cannot upgrade because the source
-  // is ALREADY at/below the export target (small token art, a vector) is marked too, with
-  // its original file pinned: that source is the best answer available, and the ~96px cap
-  // would otherwise throw away resolution we already had.
-  if (logEl && mode !== "hideAll" && mode !== "hideAvatars") {
-    try {
-      restorePortraitUpgrade = await feUpgradePortraitsForExport(logEl, {
-        meta: setMeta,
-        // blob: URLs, not data:. Revoked by restoreOnce on afterprint.
-        useBlobURL: true,
-        win,
-      });
-    } catch (err) {
-      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint2"), err);
-    }
-  }
-
-  // Downscale images for stability:
-  // - always when mode === "downscale"
-  // - in Electron, also when images are not fully hidden
-  const shouldDownscale = !!logEl && (mode === "downscale" || mode === "downscaleLite" || (isElectron && mode !== "hideAll"));
-  let restoreDownscaledImages = () => {};
-  if (shouldDownscale && logEl) {
-    try {
-      const mildDownscale = mode === "downscaleLite";
-      setMeta(mildDownscale ? feLocalize("FE.ChatArchive.feArchivePrint") : feLocalize("FE.ChatArchive.Status.LoadingImages"));
-      // Originals are about to be replaced by downscaled blobs — skip the
-      // sync-decode storm (async lets Chromium decode off-thread).
-      restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
-        decoding: "async",
-        restorePortraits: !portraitsAreBlanked,
-      }) || (() => {});
-      // Wait for ALL images to finish loading (bytes) — not a small initial
-      // slice. The downscaler skips images that aren't `complete`, so anything
-      // unloaded by now would slip through to print at full resolution. The
-      // `load` wait only pulls encoded bytes (decode stays lazy → no decode
-      // storm); the per-group canvas pass below decodes them under the
-      // concurrency cap. The 20 s timeout bounds genuinely slow/dead images,
-      // which the straggler-blank pass then neutralizes.
-      const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
-      const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount) });
-      if (printImgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feArchivePrint3", { printImgTimeout: printImgTimeout }));
-      // Large/huge logs: shrink resolution caps so the pixels Chromium must
-      // rasterize into the PDF (and the decoded bitmaps it holds during
-      // win.print()) stay within memory. Print-time OOM scales with total
-      // pixel count, so we scale dimensions — never encoder quality.
-      const sizeFactor = renderProfile.huge ? 0.55 : renderProfile.large ? 0.78 : 1.0;
-      const capSide = (n) => Math.max(640, Math.round(n * sizeFactor));
-      const capDpr  = (n) => renderProfile.huge ? Math.min(n, 1.25)
-                           : renderProfile.large ? Math.min(n, 1.5)
-                           : n;
-      restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
-        meta: setMeta,
-        excludeAvatars: mode === "hideAvatars",
-        // downscaleLite: visually-lossless WebP/JPEG (~q0.95) sized for print.
-        // PNG forcing was causing 5–10× PDF bloat with no perceivable benefit
-        // for photo-like chat content (portraits, item icons).
-        dprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.35 : 1.65)),
-        minDpr: mildDownscale ? 1.25 : (isElectron ? 1.1 : 1.25),
-        webpQuality: mildDownscale ? 0.95 : (isElectron ? 0.85 : 0.88),
-        jpegQuality: mildDownscale ? 0.95 : (isElectron ? 0.88 : 0.90),
-        avatarDprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.5 : 1.6)),
-        avatarMinDpr: mildDownscale ? 1.25 : 1.0,
-        avatarWebpQuality: mildDownscale ? 0.92 : (isElectron ? 0.82 : 0.84),
-        avatarJpegQuality: mildDownscale ? 0.92 : (isElectron ? 0.84 : 0.86),
-        maxSide: capSide(mildDownscale ? 2560 : (isElectron ? 1792 : 2048)),
-        // Fewer simultaneous canvases on big logs → lower peak memory.
-        concurrency: renderProfile.huge ? 3 : renderProfile.large ? 4 : 6,
-        intermediateCap: renderProfile.huge ? 1536 : renderProfile.large ? 2048 : 0,
-        forceLossless: false,
-        minOutSide: mildDownscale ? 256 : 1,
-        // Print path only — restore() revokes blob URLs on afterprint.
-        // Saves ~33% memory plus V8 string overhead vs data: URLs.
-        useBlobURL: true,
-      });
-    } catch (err) {
-      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint4"), err);
-    }
-  }
-
-  if (!shouldDownscale && logEl) {
-    try {
-      restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
-        restorePortraits: !portraitsAreBlanked,
-      }) || (() => {});
-    } catch {}
-  }
-
-  // P2: blank any image that STILL hasn't loaded so the print engine can't
-  // decode it at full resolution mid-rasterization. Downscaled images carry
-  // small blob:/data: sources (and may be transiently !complete right after the
-  // swap), so they are explicitly excluded — only unresolved remote sources are
-  // neutralized. Restored on afterprint via restoreStragglers.
-  if (logEl && mode !== "hideAll") {
-    try {
-      restoreStragglers = tempDisableImages((img) => {
-        if (img.complete && (img.naturalWidth || 0) > 0) return false;
-        const s = img.getAttribute("src") || "";
-        return !(s.startsWith("blob:") || s.startsWith("data:"));
-      });
-    } catch {}
-  }
-
   try {
-    setMeta(feLocalize("FE.ChatArchive.Status.LoadingFonts"));
-    // The embedded data: URL faces are injected at RENDER time (feEnsureArchiveEmbeddedFonts,
-    // in feRenderChatArchiveWindow) — NOT here. Reasons they must not be injected at print
-    // time: the !important font overrides trigger a full text re-layout, so injecting right
-    // before win.print() risks Chromium capturing the document mid-reflow. The earlier
-    // objections that kept them out entirely are resolved: --fe-font-geurimilgi now routes to
-    // the embedded Geurimilgi face (mixed preset works), and Font Awesome is re-asserted in the
-    // embedded CSS so icons never fall back to □. So by the time we reach print, the popup
-    // already carries self-contained faces; we only wait for them to finish loading.
-    await feEnsureArchiveEmbeddedFonts(win);
-    await feWaitForFonts(doc, FE_EXPORT_WAIT_FONTS_TIMEOUT);
-  } catch {}
-
-  try {
-    win.focus();
-  } catch {}
-  try {
-    void doc.body.offsetHeight;
-  } catch {}
-
-  // Wait for two paint frames so any pending layout/style changes (background
-  // freeze, image src swaps) are fully composited before the print engine
-  // captures the document. A single offsetHeight reflow is not enough when
-  // style mutations queue micro-task paint work.
-  //
-  // THE TIMEOUT IS NOT OPTIONAL. MEASURED 2026-08-05, live, 2936-message log: this
-  // await was the single largest cost of the whole print path — 3.1 s to reach it,
-  // then 73 s sitting here. The archive popup opens BEHIND the Foundry window, so
-  // its `document.visibilityState` is "hidden" (verified) and Chromium does not run
-  // rAF for a hidden window at all. `win.focus()` two lines up does not help: focus
-  // stealing is blocked. The old `catch` never fired either — a rAF that is simply
-  // never serviced does not throw. So the user pressed "인쇄" (print) and waited a minute-plus
-  // for a frame that only arrived when the compositor happened to wake the window,
-  // which is why the delay looked random.
-  //
-  // Racing it is safe: `void doc.body.offsetHeight` above already forced a
-  // synchronous layout, and a hidden window has no composited frame to wait for in
-  // the first place. When the popup IS in front, two frames land in ~33 ms and the
-  // timeout is never reached — behaviour there is unchanged.
-  try {
-    await new Promise((resolve) => {
-      let settled = false;
-      const done = () => { if (!settled) { settled = true; resolve(); } };
-      const timer = setTimeout(done, FE_EXPORT_PAINT_FRAME_TIMEOUT);
+    // Portraits get an EXPORT-resolution bitmap before anything else touches them.
+    //
+    // What is on the element right now is the live HQ resample — `portraitSize × dpr`,
+    // i.e. a 64x64 PNG on a dpr-1 machine. That is correct on screen and far too small on
+    // paper: `win.print()` rasterizes well above CSS pixels, so the portrait is the one
+    // element in the whole page that gets visibly enlarged. The downscale pass below would
+    // not have fixed it either — it caps avatars at `cssBox × avatarDpr` (~96px) — which is
+    // why it now skips anything this marks. A portrait it cannot upgrade because the source
+    // is ALREADY at/below the export target (small token art, a vector) is marked too, with
+    // its original file pinned: that source is the best answer available, and the ~96px cap
+    // would otherwise throw away resolution we already had.
+    if (logEl && mode !== "hideAll" && mode !== "hideAvatars") {
       try {
-        win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
-          clearTimeout(timer);
-          done();
-        }));
-      } catch {
-        clearTimeout(timer);
-        setTimeout(done, 50);
+        restorePortraitUpgrade = await feUpgradePortraitsForExport(logEl, {
+          meta: setMeta,
+          // blob: URLs, not data:. Revoked by restoreOnce on afterprint.
+          useBlobURL: true,
+          win,
+        });
+      } catch (err) {
+        console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint2"), err);
       }
-    });
-  } catch {}
+    }
 
-  try {
-    restorePageBreaks = fePrepareImagesForPageBreaks(doc, logEl);
-  } catch (err) {
-    console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint5"), err);
-  }
+    // Downscale images for stability:
+    // - always when mode === "downscale"
+    // - in Electron, also when images are not fully hidden
+    const shouldDownscale = !!logEl && (mode === "downscale" || mode === "downscaleLite" || (isElectron && mode !== "hideAll"));
+    if (shouldDownscale && logEl) {
+      try {
+        const mildDownscale = mode === "downscaleLite";
+        setMeta(mildDownscale ? feLocalize("FE.ChatArchive.feArchivePrint") : feLocalize("FE.ChatArchive.Status.LoadingImages"));
+        // Originals are about to be replaced by downscaled blobs — skip the
+        // sync-decode storm (async lets Chromium decode off-thread).
+        restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
+          decoding: "async",
+          restorePortraits: !portraitsAreBlanked,
+        }) || (() => {});
+        // Wait for ALL images to finish loading (bytes) — not a small initial
+        // slice. The downscaler skips images that aren't `complete`, so anything
+        // unloaded by now would slip through to print at full resolution. The
+        // `load` wait only pulls encoded bytes (decode stays lazy → no decode
+        // storm); the per-group canvas pass below decodes them under the
+        // concurrency cap. The 20 s timeout bounds genuinely slow/dead images,
+        // which the straggler-blank pass then neutralizes.
+        const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
+        const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, { maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount) });
+        if (printImgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feArchivePrint3", { printImgTimeout: printImgTimeout }));
+        // Large/huge logs: shrink resolution caps so the pixels Chromium must
+        // rasterize into the PDF (and the decoded bitmaps it holds during
+        // win.print()) stay within memory. Print-time OOM scales with total
+        // pixel count, so we scale dimensions — never encoder quality.
+        const sizeFactor = renderProfile.huge ? 0.55 : renderProfile.large ? 0.78 : 1.0;
+        const capSide = (n) => Math.max(640, Math.round(n * sizeFactor));
+        const capDpr  = (n) => renderProfile.huge ? Math.min(n, 1.25)
+                             : renderProfile.large ? Math.min(n, 1.5)
+                             : n;
+        restoreDownscaledImages = await feDownscaleImagesForPrint(win, logEl, {
+          meta: setMeta,
+          excludeAvatars: mode === "hideAvatars",
+          // downscaleLite: visually-lossless WebP/JPEG (~q0.95) sized for print.
+          // PNG forcing was causing 5–10× PDF bloat with no perceivable benefit
+          // for photo-like chat content (portraits, item icons).
+          dprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.35 : 1.65)),
+          minDpr: mildDownscale ? 1.25 : (isElectron ? 1.1 : 1.25),
+          webpQuality: mildDownscale ? 0.95 : (isElectron ? 0.85 : 0.88),
+          jpegQuality: mildDownscale ? 0.95 : (isElectron ? 0.88 : 0.90),
+          avatarDprCap: capDpr(mildDownscale ? 2.0 : (isElectron ? 1.5 : 1.6)),
+          avatarMinDpr: mildDownscale ? 1.25 : 1.0,
+          avatarWebpQuality: mildDownscale ? 0.92 : (isElectron ? 0.82 : 0.84),
+          avatarJpegQuality: mildDownscale ? 0.92 : (isElectron ? 0.84 : 0.86),
+          maxSide: capSide(mildDownscale ? 2560 : (isElectron ? 1792 : 2048)),
+          // Fewer simultaneous canvases on big logs → lower peak memory.
+          concurrency: renderProfile.huge ? 3 : renderProfile.large ? 4 : 6,
+          intermediateCap: renderProfile.huge ? 1536 : renderProfile.large ? 2048 : 0,
+          forceLossless: false,
+          minOutSide: mildDownscale ? 256 : 1,
+          // Print path only — restore() revokes blob URLs on afterprint.
+          // Saves ~33% memory plus V8 string overhead vs data: URLs.
+          useBlobURL: true,
+        });
+      } catch (err) {
+        console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint4"), err);
+      }
+    }
 
-  try {
+    if (!shouldDownscale && logEl) {
+      try {
+        restorePrepImages = fePrepareArchiveImagesForOutput(logEl, {
+          restorePortraits: !portraitsAreBlanked,
+        }) || (() => {});
+        if (mode !== "hideAll") {
+          // Full-resolution and hide-avatars modes also contain lazy images. Give
+          // them the same load opportunity before the straggler pass blanks them.
+          setMeta(feLocalize("FE.ChatArchive.Status.LoadingImages"));
+          const printImgCount = logEl.querySelectorAll?.("img")?.length || 0;
+          const printImgTimeout = await feWaitForImages(logEl, FE_EXPORT_WAIT_IMAGES_TIMEOUT, {
+            maxImages: Math.max(FE_EXPORT_WAIT_IMAGES_MAX, printImgCount),
+          });
+          if (printImgTimeout > 0) console.warn(feFormat("FE.Diagnostics.ChatArchive.feArchivePrint3", { printImgTimeout }));
+        }
+      } catch {}
+    }
+
+    // P2: blank any image that STILL hasn't loaded so the print engine can't
+    // decode it at full resolution mid-rasterization. Downscaled images carry
+    // small blob:/data: sources (and may be transiently !complete right after the
+    // swap), so they are explicitly excluded — only unresolved remote sources are
+    // neutralized. Restored on afterprint via restoreStragglers.
+    if (logEl && mode !== "hideAll") {
+      try {
+        restoreStragglers = tempDisableImages((img) => {
+          if (img.complete && (img.naturalWidth || 0) > 0) return false;
+          const s = img.getAttribute("src") || "";
+          return !(s.startsWith("blob:") || s.startsWith("data:"));
+        });
+      } catch {}
+    }
+
+    try {
+      setMeta(feLocalize("FE.ChatArchive.Status.LoadingFonts"));
+      // The embedded data: URL faces are injected at RENDER time (feEnsureArchiveEmbeddedFonts,
+      // in feRenderChatArchiveWindow) — NOT here. Reasons they must not be injected at print
+      // time: the !important font overrides trigger a full text re-layout, so injecting right
+      // before win.print() risks Chromium capturing the document mid-reflow. The earlier
+      // objections that kept them out entirely are resolved: --fe-font-geurimilgi now routes to
+      // the embedded Geurimilgi face (mixed preset works), and Font Awesome is re-asserted in the
+      // embedded CSS so icons never fall back to □. So by the time we reach print, the popup
+      // already carries self-contained faces; we only wait for them to finish loading.
+      await feEnsureArchiveEmbeddedFonts(win);
+      await feWaitForFonts(doc, FE_EXPORT_WAIT_FONTS_TIMEOUT);
+    } catch {}
+
+    try {
+      win.focus();
+    } catch {}
+    try {
+      void doc.body.offsetHeight;
+    } catch {}
+
+    // Wait for two paint frames so any pending layout/style changes (background
+    // freeze, image src swaps) are fully composited before the print engine
+    // captures the document. A single offsetHeight reflow is not enough when
+    // style mutations queue micro-task paint work.
+    //
+    // THE TIMEOUT IS NOT OPTIONAL. MEASURED 2026-08-05, live, 2936-message log: this
+    // await was the single largest cost of the whole print path — 3.1 s to reach it,
+    // then 73 s sitting here. The archive popup opens BEHIND the Foundry window, so
+    // its `document.visibilityState` is "hidden" (verified) and Chromium does not run
+    // rAF for a hidden window at all. `win.focus()` two lines up does not help: focus
+    // stealing is blocked. The old `catch` never fired either — a rAF that is simply
+    // never serviced does not throw. So the user pressed "인쇄" (print) and waited a minute-plus
+    // for a frame that only arrived when the compositor happened to wake the window,
+    // which is why the delay looked random.
+    //
+    // Racing it is safe: `void doc.body.offsetHeight` above already forced a
+    // synchronous layout, and a hidden window has no composited frame to wait for in
+    // the first place. When the popup IS in front, two frames land in ~33 ms and the
+    // timeout is never reached — behaviour there is unchanged.
+    try {
+      await new Promise((resolve) => {
+        let settled = false;
+        const done = () => { if (!settled) { settled = true; resolve(); } };
+        const timer = setTimeout(done, FE_EXPORT_PAINT_FRAME_TIMEOUT);
+        try {
+          win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+            clearTimeout(timer);
+            done();
+          }));
+        } catch {
+          clearTimeout(timer);
+          setTimeout(done, 50);
+        }
+      });
+    } catch {}
+
+    try {
+      restorePageBreaks = fePrepareImagesForPageBreaks(doc, logEl);
+    } catch (err) {
+      console.warn(feLocalize("FE.Diagnostics.ChatArchive.feArchivePrint5"), err);
+    }
+
+    // The page header must describe the archive, not the last preparation step.
+    setMeta(originalMeta);
     win.print();
   } finally {
-    setMeta(originalMeta);
-    // Fallback restore in case afterprint doesn't fire (some Electron builds)
-    setTimeout(restoreOnce, 0);
+    // Also handles a thrown print() or a missing afterprint. Remove the listener
+    // before another print can begin, and never replay an old restore twice.
+    restoreOnce();
   }
 }

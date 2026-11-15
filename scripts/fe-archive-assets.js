@@ -18,6 +18,7 @@
 // ===========================================================================
 
 import { feLocalize, feFormat } from "./fe-i18n.js";
+import { feSnapshotAndRestoreStickyScroll } from "./fe-util.js";
 import { feSetting } from "./fe-chat-enhance.js";
 import { cpBuildExportPortrait, cpClearExportPortraitCache } from "./fe-chat-portrait-image.js";
 import { feBlobToDataURL, feCompressImageBlobForEmbed } from "./fe-archive-image.js";
@@ -30,6 +31,8 @@ import {
 } from "./fe-archive-output.js";
 import {
   FE_EXPORT_EMBED_CONCURRENCY,
+  FE_EXPORT_IMAGE_TOTAL_BYTES,
+  FE_EXPORT_IMAGE_MAX_COUNT,
   FE_EXPORT_RESOURCE_FETCH_TIMEOUT,
   feFetchWithTimeout,
 } from "./fe-archive-fetch.js";
@@ -90,18 +93,20 @@ export async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
   // (1900 messages): 2096 <img> elements, of which ~1980 kept a Foundry-origin src.
   // With the old 600 the pass stopped after the first 600 elements no matter how
   // much byte budget was left — a log this size could never finish embedding.
-  // 8000 covers ~4x this log; it is a runaway guard, not a tuning knob.
-  const MAX_IMAGES = 8000;
+  // Raised from 8000 to 32000 on 2026-11-15 at the user's request. This counts
+  // distinct admitted sources; reuse of an existing bitmap is always allowed.
+  const MAX_IMAGES = FE_EXPORT_IMAGE_MAX_COUNT;
   // Binary bytes before base64/string expansion. Caller may pass a smaller cap
   // (shared budget) — e.g. after pre-embed downscaling already spent part of it.
   // Explicit user decision (2026-08-12): file size does not matter, offline
   // completeness does. Measured demand for the 1900-message log above is ~50MB
   // post-downscale (24.5MB actually embedded before the budget ran dry, plus 42
   // distinct source files totalling 71.7MB on disk that downscale to ~25MB), so
-  // 250MB carries 4-5x that log. The saved HTML is assembled as an ARRAY of
+  // The original 250MB budget carried 4-5x that log; the shared limit is now 1GB.
+  // The saved HTML is assembled as an ARRAY of
   // per-message strings passed to new Blob() (feSerializeBodyToParts), never one
   // giant string, so V8's ~512MB max string length is not a ceiling here.
-  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : 250_000_000;
+  const MAX_TOTAL_BYTES = Number.isFinite(maxTotalBytes) ? Math.max(0, maxTotalBytes) : FE_EXPORT_IMAGE_TOTAL_BYTES;
   // Over this, the image is compressed (never dropped). Raised 4MB → 16MB so that
   // full-resolution art escaping the downscale pass is embedded as-is instead of
   // being re-encoded; at 4MB the largest character portraits in the world above
@@ -215,12 +220,23 @@ export async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
     let embeddedBytes = 0;
 
     for (let i = 0; i < imgs.length; i += 1) {
-      pumpPrefetch();
-
       const entry = entryAt(i);
       if (!entry) continue;
 
-      // Stop when reaching limits.
+      const { img, abs } = entry;
+      if (cache.has(abs)) {
+        // Reusing admitted bytes costs nothing, even after the budget is spent.
+        // Keep walking past skipped new sources to repair every later duplicate.
+        try {
+          recordBeforeMutate(img);
+          img.setAttribute("src", cache.get(abs));
+          img.removeAttribute("srcset");
+          img.removeAttribute("loading");
+        } catch {}
+        continue;
+      }
+
+      // Stop admitting new sources when reaching limits, but keep reusing cache.
       //
       // NOT at MAX_TOTAL_BYTES: past the budget, images go through the compressor
       // below instead of being abandoned on a server-only URL. HARD_TOTAL_CEILING is
@@ -234,27 +250,10 @@ export async function feEmbedImagesInNode(root, { meta, maxTotalBytes } = {}) {
             1024
           ).toFixed(1) })
         );
-        break;
-      }
-
-      const { img, abs } = entry;
-
-      if (cache.has(abs)) {
-        // Every duplicate — including one collapsed by feOptimizeArchiveNodeImages
-        // (`data-fe-archive-shared-image`) — gets the cached data: URL. Leaving a
-        // shared duplicate on its absolute Foundry-origin src used to be the
-        // size optimization, but it makes that image load ONLY for a viewer who can
-        // reach this server. `feDeduplicateInlineDataUrlsInNode` below already
-        // removes the repeat cost: identical data: srcs collapse to one copy plus a
-        // marker attribute, restored at view time by the bootstrap script.
-        try {
-          recordBeforeMutate(img);
-          img.setAttribute("src", cache.get(abs));
-          img.removeAttribute("srcset");
-          img.removeAttribute("loading");
-        } catch {}
         continue;
       }
+
+      pumpPrefetch();
 
       setMeta(feFormat("FE.ChatArchive.Status.EmbeddingImageProgress", { embeddedCount: embeddedCount, MAX_IMAGES: MAX_IMAGES, value3: i + 1, value4: imgs.length }));
 
@@ -403,22 +402,27 @@ export function feDeduplicateInlineDataUrlsInNode(root, setMeta = () => {}) {
 // one giant outerHTML and then re-copying it into the Blob. Avoids the V8 peak-memory hit
 // for large logs (~50MB single string → many small strings).
 export function feSerializeBodyToParts(body) {
+  const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
   try {
-    const log = body?.querySelector?.("#fe-chat-export-log, ol.chat-log");
-    if (!log?.children?.length) return [body?.outerHTML || ""];
+    const log = body?.matches?.("#fe-chat-export-log, ol.chat-log")
+      ? body : body?.querySelector?.("#fe-chat-export-log, ol.chat-log");
+    if (!log?.childNodes?.length) return [body?.outerHTML || ""];
 
     // Detach messages, snapshot the now-empty shell, re-attach. This narrows the
     // body.outerHTML allocation to "everything except the messages", which is small.
-    const messages = Array.from(log.children);
-    for (const m of messages) m.remove();
+    const messages = Array.from(log.childNodes);
+    const doc = log.ownerDocument;
+    const detached = doc.createDocumentFragment();
     let shellHTML;
     let emptyLogHTML;
     try {
+      for (const node of messages) detached.appendChild(node);
       emptyLogHTML = log.outerHTML;
       shellHTML = body.outerHTML;
     } finally {
-      // Always re-insert in original order, even if a serialization step throws.
-      log.append(...messages);
+      // One argument regardless of log size. append(...messages) hits V8's
+      // argument limit on large logs and leaves the live archive empty.
+      log.appendChild(detached);
     }
 
     const logIdx = shellHTML.indexOf(emptyLogHTML);
@@ -430,13 +434,26 @@ export function feSerializeBodyToParts(body) {
 
     const parts = [];
     parts.push(shellHTML.slice(0, splitAt));
+    let textWrapper;
     for (const m of messages) {
-      try { parts.push(m.outerHTML); } catch {}
+      const html = m.outerHTML;
+      if (html != null) parts.push(html);
+      else {
+        // Keep text/comments in their original positions, escaped by the HTML
+        // serializer rather than treated as message markup.
+        textWrapper ??= doc.createElement("div");
+        textWrapper.replaceChildren(m.cloneNode(true));
+        parts.push(textWrapper.innerHTML);
+      }
     }
     parts.push(shellHTML.slice(splitAt));
     return parts;
   } catch {
-    try { return [body?.outerHTML || ""]; } catch { return [""]; }
+    // Fall back to whole-body serialization, but propagate failure if that also
+    // fails. A missing message or empty successful file is not a valid archive.
+    return [body?.outerHTML || ""];
+  } finally {
+    restoreStickyScroll();
   }
 }
 

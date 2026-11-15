@@ -360,38 +360,53 @@ async function feResampleViaImageBitmap(win, img, spec, outW, outH) {
 // Image downscale  (main export — called by feArchivePrint)
 // ===========================================================================
 
-// Bounded wait until every given <img> settles (load or error). Local to this
-// module by design — fe-archive-image.js imports nothing.
+// Bounded wait until every given <img> settles (load or error).
+// `complete` includes broken images: their error event has already happened,
+// so waiting for another one only burns the timeout. This is NOT a permanent
+// source blacklist; the embed pass may still fetch the original URL later.
 function feAwaitImageElements(imgs, timeoutMs = 8000) {
   return new Promise((resolve) => {
-    let remaining = 0;
+    const pending = new Set();
+    let collecting = true;
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      for (const cleanup of pending) cleanup();
+      pending.clear();
       resolve();
     };
     const timer = setTimeout(finish, Math.max(0, Number(timeoutMs) || 0));
 
     for (const img of imgs) {
+      let cleanup;
       try {
-        if (img.complete && img.naturalWidth > 0) continue;
-        remaining += 1;
-        const onSettled = () => {
+        if (img.complete) continue;
+        cleanup = () => {
           try {
             img.removeEventListener("load", onSettled);
             img.removeEventListener("error", onSettled);
           } catch {}
-          remaining -= 1;
-          if (remaining <= 0) finish();
         };
+        const onSettled = () => {
+          cleanup();
+          pending.delete(cleanup);
+          if (!collecting && !pending.size) finish();
+        };
+        pending.add(cleanup);
         img.addEventListener("load", onSettled);
         img.addEventListener("error", onSettled);
-      } catch {}
+        // Cover completion between the first check and listener registration.
+        if (img.complete) onSettled();
+      } catch {
+        cleanup?.();
+        pending.delete(cleanup);
+      }
     }
 
-    if (remaining <= 0) finish();
+    collecting = false;
+    if (!pending.size) finish();
   });
 }
 
@@ -468,7 +483,7 @@ export async function feDownscaleImagesForPrint(
     const pending = imgs.filter((img) => {
       try {
         if (!img.getAttribute("src")) return false;
-        if (img.complete && img.naturalWidth > 0) return false;
+        if (img.complete) return false;
         return String(img.getAttribute("loading") || "").toLowerCase() !== "lazy";
       } catch {
         return false;

@@ -503,6 +503,20 @@ body.fe-sysmsg-bg-light
    * it our dark ink — measured 1.49:1. Border colour is gold in both themes, so it is
    * not a theme variable and is left alone. */
   --dnd5e-block-background: var(--dnd5e-color-card);
+  /* Tables inside an item description (a spell's d10 behaviour table, a class feature's
+   * level table). Missed by the original scan for the same reason as the block above: no
+   * sampled card carried one. The rows are painted by the GLOBAL
+   * `:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table tr:nth-child(...)` rules (dnd5e.css:1951)
+   * from these journal-section variables, which dnd5e declares on the `.dnd5e2` li itself —
+   * so on a light base in a theme-dark world the rows stayed blue-gray-2 under our dark
+   * ink, near-invisible. Values verbatim from dnd5e's theme-light block (dnd5e.css:250).
+   * `--table-background-color` is declared on the TABLE element, not the li, so it needs
+   * the separate table rule right after this block. */
+  --dnd5e-color-table-border: var(--dnd5e-color-gold);
+  --dnd5e-color-table-row-even: var(--dnd5e-color-parchment);
+  --dnd5e-color-table-row-odd: var(--dnd5e-color-card);
+  --dnd5e-color-table-header-1: var(--dnd5e-color-hd-1);
+  --dnd5e-color-table-header-2: var(--dnd5e-color-hd-2);
   --dnd5e-chat-description-background: transparent;
   /* Ours, not dnd5e's: the 약간의 회색 (light gray) box §the description rule further up
    paints with
@@ -562,6 +576,12 @@ body.fe-sysmsg-bg-dark
   --dnd5e-background-5: var(--dnd5e-highlight-10);
   --dnd5e-gold-icon-background: var(--dnd5e-color-dark-gray);
   --dnd5e-block-background: var(--dnd5e-color-blue-gray-4);
+  /* Verbatim from dnd5e's theme-dark block (dnd5e.css:558). */
+  --dnd5e-color-table-border: color-mix(in oklab, var(--dnd5e-color-table-row-even), black 10%);
+  --dnd5e-color-table-row-even: color-mix(in oklab, var(--dnd5e-color-table-row-odd), black 10%);
+  --dnd5e-color-table-row-odd: var(--dnd5e-color-blue-gray-2);
+  --dnd5e-color-table-header-1: #491d25;
+  --dnd5e-color-table-header-2: #311b1f;
   --dnd5e-chat-description-background: rgb(255 255 255 / 0.03);
   --fe-chat-desc-bg: rgb(255 255 255 / 0.06);
   --dnd5e-chat-button-background: var(--dnd5e-color-blue-gray-1);
@@ -578,6 +598,39 @@ body.fe-sysmsg-bg-dark
   --control-border-color: var(--dnd5e-color-blue-gray-3);
   --pill-border: 1px solid var(--dnd5e-color-blue-gray-3);
   --pill-border-dotted: 1px solid var(--dnd5e-color-blue-gray-3);
+}
+
+/* The table's own surface. dnd5e declares `--table-background-color` on the `table`
+ * element itself (`.dnd5e2 table` inside each @scope, dnd5e.css:439 / :750), and an own
+ * declaration beats an inherited one, so re-pointing it on the li above would do nothing.
+ * It shows through wherever a row does not cover the table (cell gaps, an empty caption
+ * row). Normal declaration — `modules` is a later layer than `system`.
+ *
+ * Scoped to the tables dnd5e itself styles — the `table:is(…)` arm is dnd5e's own
+ * `:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table` (dnd5e.css:1911), and in 6.0 the li itself
+ * carries `.dnd5e2`. Core's `table` rule reads the same variable, and the dnd5e values
+ * below do not exist in other systems, so an unscoped rule turned every chat table in a
+ * dx3rd/other world transparent (invalid var -> `background` unset). */
+body.fe-chat-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  table:is(:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table),
+body.fe-sysmsg-bg-light
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  table:is(:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table) {
+  --table-background-color: var(--dnd5e-color-card);
+}
+
+body.fe-chat-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message):not(.fe-system-msg)
+  table:is(:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table),
+body.fe-sysmsg-bg-dark
+  :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
+  :is(.chat-message, .message).fe-system-msg
+  table:is(:is(.dnd5e, .dnd5e2, .dnd5e2-journal) table) {
+  --table-background-color: var(--dnd5e-color-blue-gray-1);
 }
 
 /* dnd5e draws the description box's top/bottom rules at 1px dashed, sized against ITS

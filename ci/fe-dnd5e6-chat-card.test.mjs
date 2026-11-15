@@ -384,6 +384,16 @@ test("our painted chat base re-points dnd5e 6.0's themed CARD-INTERIOR variables
     "--dnd5e-border-gold",
     "--dnd5e-chat-breakdown-border",
     "--pill-border",
+    // Tables inside an item description (e.g. Confusion's d10 table). The rows are painted
+    // from these by a GLOBAL dnd5e rule, so a light base in a theme-dark world left
+    // blue-gray rows under our dark ink.
+    "--dnd5e-color-table-row-odd",
+    "--dnd5e-color-table-row-even",
+    "--dnd5e-color-table-border",
+    "--dnd5e-color-table-header-1",
+    "--dnd5e-color-table-header-2",
+    // Declared on the TABLE element by dnd5e, so it needs its own selector rule.
+    "--table-background-color",
   ];
 
   // NOTE: `[^}]*` means a `}` written inside a COMMENT in the block truncates the match
@@ -415,6 +425,23 @@ test("our painted chat base re-points dnd5e 6.0's themed CARD-INTERIOR variables
     [...varsIn("fe-chat-bg-dark")].sort(),
     "the light and dark branches must repoint the same variable set",
   );
+
+  // `--table-background-color` needs its own `table` rule (dnd5e declares it on the
+  // table element), and that rule must stay scoped to dnd5e's own tables: core's
+  // `table` rule reads the same variable, and in a non-dnd5e world the dnd5e values
+  // do not exist, so an unscoped rule would turn every chat table transparent.
+  const tableRules = [...BG_STRIPPER.matchAll(/^body\.fe-(?:chat|sysmsg)-bg-(?:light|dark)[^{]*\{\s*--table-background-color:/gms)]
+    .map((m) => m[0]);
+  assert.equal(tableRules.length, 2, "one table rule per lean");
+  for (const r of tableRules) {
+    // Split on the comma that ENDS a line: the commas inside `:is(...)` are not
+    // selector-list separators.
+    const tableSelectors = r.split(/,\s*\n/).filter((part) => /\btable\b/.test(part));
+    assert.ok(tableSelectors.length >= 2, "both the chat-card and the system arm");
+    for (const sel of tableSelectors) {
+      assert.match(sel, /table:is\(:is\(\.dnd5e, \.dnd5e2, \.dnd5e2-journal\) table\)/, `unscoped table selector: ${sel.trim()}`);
+    }
+  }
 
   // `.roll-breakdown` is a `popover`, so its ink comes from the UA stylesheet's
   // `color: CanvasText` (resolved from `color-scheme`, not from its parent). Repainting

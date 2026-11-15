@@ -18,6 +18,9 @@
   --fe-tn-in: 1200ms;
   --fe-tn-out: 900ms;
   --fe-tn-left: max(16px, 8vw);
+  /* The text box's viewport x. Shared by .fe-tn-text's `left` and the retro
+     text wipe, which pins its clip to the band edge in viewport terms. */
+  --fe-tn-text-x: calc(var(--fe-tn-left) + var(--fe-tn-size) + 24px);
 }
 
 .fe-tn-banner {
@@ -58,7 +61,7 @@
 
 .fe-tn-text {
   position: absolute;
-  left: calc(var(--fe-tn-left) + var(--fe-tn-size) + 24px);
+  left: var(--fe-tn-text-x);
   right: 24px;
   top: 50%;
   transform: translateY(-50%);
@@ -107,9 +110,10 @@
 }
 
 /* ── Retro theme: black pixel-screentone band, colour only on the borders ──
-   The player colour lives ONLY on the band's top/bottom borders — the base
-   rule already paints those from --fe-tn-color, so nothing extra is needed
-   there. The fill becomes the same black screentone the pause screen and the
+   The player colour lives ONLY on the band's top/bottom 5px borders, as a
+   solid line at a QUARTER of the player colour's saturation
+   (--fe-tn-edge-color; hue and lightness kept). A dithered version of those
+   edges was tried and dropped at the user's request. The fill becomes the same black screentone the pause screen and the
    /narrate overlay wear, at a tighter 4px pitch (repeating-conic-gradient
    dither — the trick is documented in fe-narrator.css). The shared
    fe-tn-band-in keyframes animate background-color up to the player colour,
@@ -119,8 +123,38 @@
    Retro also strips every text-shadow (fe-retro-theme.css §4, !important in
    layouts — unreachable from here), so the text carries the same hard pixel
    outline the tracker captions wear, in the accent-family ink. */
+/* ── Retro entrance: stepped, never interpolated ──
+   Nothing glides under retro. The entrance is one sequence on a shared TICK,
+   each step an instant jump:
+     1. band + text — the band appears in --fe-tn-retro-band-blocks blocks,
+                   left to right, one block per tick, and the text is revealed
+                   WITH it: its clip edge is pinned to the band's leading edge
+                   (fe-tn-text-wipe-in-retro), so each band block uncovers the
+                   text lying over it and no text ever shows ahead of the band;
+     2. portrait — once the band is complete, wipes in left to right in
+                   --fe-tn-retro-portrait-blocks column blocks, one per tick
+                   (no scale, no fade).
+   With the defaults (tick = --fe-tn-in / 24 = 50ms, 12 + 8 blocks) band and
+   text land at 50..600ms and the portrait at 650..1000ms, all inside
+   --fe-tn-in. Every duration/delay goes out through --fe-tn-anim-dur /
+   --fe-tn-anim-delay, because fe-retro-theme.css's crush exception re-asserts
+   exactly those two with !important — a literal animation-duration here would
+   lose to it.
+   steps(n, jump-end): the start value holds for the first tick and the end
+   value only lands at the end, so block k appears at tick k. The portrait uses
+   `backwards` fill, not `both`: during its delay it holds the hidden first
+   keyframe, and once done it falls back to clip-path:none — a forwards-held
+   inset(0) would keep clipping the drop-shadow outside the img box. */
 body.fe-retro-theme #fe-turn-notice {
   font-family: var(--fe-font-primary, monospace);
+  --fe-tn-retro-tick: calc(var(--fe-tn-in) / 24);
+  --fe-tn-retro-band-blocks: 12;
+  --fe-tn-retro-portrait-blocks: 8;
+  /* The exit's tick is derived from --fe-tn-out so the whole stepped exit ends
+     exactly when fe-turn-notice.js removes the node (TN_OUT_MS) — see the
+     retro exit block further down. */
+  --fe-tn-retro-out-tick: calc(var(--fe-tn-out)
+    / (var(--fe-tn-retro-band-blocks) + var(--fe-tn-retro-portrait-blocks)));
 }
 body.fe-retro-theme .fe-tn-band {
   background-color: transparent;
@@ -130,12 +164,29 @@ body.fe-retro-theme .fe-tn-band {
   );
   background-size: 4px 4px;
   image-rendering: pixelated;
+  --fe-tn-edge-color: hsl(from var(--fe-tn-color) h calc(s / 4) l);
+  border-color: var(--fe-tn-edge-color);
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-tick) * var(--fe-tn-retro-band-blocks));
   animation-name: fe-tn-band-in-retro;
+  animation-timing-function: steps(var(--fe-tn-retro-band-blocks), jump-end);
+}
+body.fe-retro-theme .fe-tn-portrait {
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-tick) * var(--fe-tn-retro-portrait-blocks));
+  --fe-tn-anim-delay: calc(var(--fe-tn-retro-tick) * var(--fe-tn-retro-band-blocks));
+  animation: fe-tn-wipe-retro var(--fe-tn-anim-dur)
+    steps(var(--fe-tn-retro-portrait-blocks), jump-end) var(--fe-tn-anim-delay) backwards;
 }
 body.fe-retro-theme .fe-tn-text {
   color: var(--fe-ac-90, #f2f2f2);
   /* !important to survive §4's global text-shadow:none → hard pixel outline */
   text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important;
+  /* Same duration, delay and step count as the band, so step k of the text
+     clip and step k of the band width land on the same frame. `backwards`:
+     once done the clip falls back to none, so nothing trims the outline. */
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-tick) * var(--fe-tn-retro-band-blocks));
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-text-wipe-in-retro var(--fe-tn-anim-dur)
+    steps(var(--fe-tn-retro-band-blocks), jump-end) var(--fe-tn-anim-delay) backwards;
 }
 
 /* Accent-tint override ON — the same accent-hued dots pause/narrate switch to.
@@ -160,6 +211,41 @@ body.fe-retro-theme.fe-accent-text-override .fe-tn-band {
   animation: fe-tn-band-out var(--fe-tn-anim-dur) ease-in var(--fe-tn-anim-delay) forwards;
 }
 
+/* ── Retro exit: the entrance played backwards, stepped ──
+   No fade. On the exit tick (--fe-tn-retro-out-tick):
+     1. portrait    — columns vanish right to left, one per tick (shadow goes
+                      with the first one, mirroring how the entrance brings
+                      it back with the last);
+     2. band + text — LAST: band blocks vanish right to left, one per tick,
+                      and the text goes with the block it sits on (its clip
+                      edge is pinned to the band's trailing edge, same timing
+                      and step count). The text stays whole until this phase.
+   The tick is --fe-tn-out divided by the total block count, so the last band
+   block lands exactly at TN_OUT_MS, when the JS removes the node. The banner's
+   own opacity fade is switched off; the selectors outrank the base .is-out
+   rules above by the body.fe-retro-theme prefix. */
+body.fe-retro-theme .fe-tn-banner.is-out {
+  animation: none;
+}
+body.fe-retro-theme .fe-tn-banner.is-out .fe-tn-text {
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-out-tick) * var(--fe-tn-retro-band-blocks));
+  --fe-tn-anim-delay: calc(var(--fe-tn-retro-out-tick) * var(--fe-tn-retro-portrait-blocks));
+  animation: fe-tn-text-wipe-out-retro var(--fe-tn-anim-dur)
+    steps(var(--fe-tn-retro-band-blocks), jump-end) var(--fe-tn-anim-delay) both;
+}
+body.fe-retro-theme .fe-tn-banner.is-out .fe-tn-portrait {
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-out-tick) * var(--fe-tn-retro-portrait-blocks));
+  --fe-tn-anim-delay: 0ms;
+  animation: fe-tn-wipe-out-retro var(--fe-tn-anim-dur)
+    steps(var(--fe-tn-retro-portrait-blocks), jump-end) var(--fe-tn-anim-delay) forwards;
+}
+body.fe-retro-theme .fe-tn-banner.is-out .fe-tn-band {
+  --fe-tn-anim-dur: calc(var(--fe-tn-retro-out-tick) * var(--fe-tn-retro-band-blocks));
+  --fe-tn-anim-delay: calc(var(--fe-tn-retro-out-tick) * var(--fe-tn-retro-portrait-blocks));
+  animation: fe-tn-band-out var(--fe-tn-anim-dur)
+    steps(var(--fe-tn-retro-band-blocks), jump-end) var(--fe-tn-anim-delay) both;
+}
+
 @keyframes fe-tn-band-in {
   0%   { width: 0; background-color: transparent; }
   60%  { background-color: var(--fe-tn-color); }
@@ -171,11 +257,42 @@ body.fe-retro-theme.fe-accent-text-override .fe-tn-band {
   to   { width: 0; }
 }
 
-/* Retro's entrance: width wipe only — the colour flash of fe-tn-band-in would
-   show through the screentone voids; see the retro block above. */
+/* Retro's entrance: width only — the colour flash of fe-tn-band-in would
+   show through the screentone voids. Stepped into blocks by the retro rule's
+   steps() timing; see the retro block above. */
 @keyframes fe-tn-band-in-retro {
   from { width: 0; }
   to   { width: 100%; }
+}
+
+/* Retro portrait entrance: a left-to-right column wipe, stepped by the retro
+   rule. Clip only — no scale, no opacity. */
+@keyframes fe-tn-wipe-retro {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+/* Retro portrait exit: the same wipe reversed — columns leave right to left. */
+@keyframes fe-tn-wipe-out-retro {
+  from { clip-path: inset(0 0 0 0); }
+  to   { clip-path: inset(0 100% 0 0); }
+}
+
+/* Retro text wipe, pinned to the BAND's edge rather than the text's own box.
+   The band spans the viewport from x = 0 and the text box starts at
+   x = --fe-tn-text-x, so a band edge at viewport x = p * 100vw sits at
+   (p * 100vw - text-x) inside the text box, i.e. a right inset of
+   100% + text-x - p * 100vw. p = 0 hides everything (the insets overlap and
+   the region collapses to nothing); p = 1 leaves a negative right inset, i.e.
+   the whole text. The -4px top/bottom/left insets keep the 1px pixel outline
+   from being trimmed while the clip is active. */
+@keyframes fe-tn-text-wipe-in-retro {
+  from { clip-path: inset(-4px calc(100% + var(--fe-tn-text-x)) -4px -4px); }
+  to   { clip-path: inset(-4px calc(100% + var(--fe-tn-text-x) - 100vw) -4px -4px); }
+}
+@keyframes fe-tn-text-wipe-out-retro {
+  from { clip-path: inset(-4px calc(100% + var(--fe-tn-text-x) - 100vw) -4px -4px); }
+  to   { clip-path: inset(-4px calc(100% + var(--fe-tn-text-x)) -4px -4px); }
 }
 
 @keyframes fe-tn-pop {

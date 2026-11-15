@@ -464,7 +464,7 @@
           <a class="fe-chat-export-action fe-chat-export-close" id="fe-archive-close" data-tooltip="{{labels.close}}">{{labels.close}}</a>
         </div>
       </div>
-      <div id="fe-chat-export-sidebar" class="sidebar chat-sidebar">
+      <div id="fe-chat-export-sidebar" class="sidebar chat-sidebar"{{#if isGM}} data-gm-user{{/if}}>
         <section id="fe-chat-export-chat" class="sidebar-tab tab active" data-tab="chat">
           <div id="fe-chat-export-status" class="fe-chat-export-status">{{labels.collecting}}</div>
           <ol id="fe-chat-export-log" class="chat-log"></ol>

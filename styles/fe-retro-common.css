@@ -406,7 +406,7 @@ body.fe-retro-theme chat-message-input textarea {
   border: 1px solid var(--fe-ac-45) !important;
 }
 
-body.fe-retro-theme :is(#chat-message::placeholder, textarea[name="content"]::placeholder, chat-message-input textarea::placeholder) {
+body.fe-retro-theme :is(#chat-message, textarea[name="content"], chat-message-input textarea)::placeholder {
   color: var(--fe-ac-t33) !important;
   opacity: 1 !important;
 }

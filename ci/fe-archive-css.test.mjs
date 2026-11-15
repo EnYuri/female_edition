@@ -44,6 +44,37 @@ test("feParseCssImports: no imports returns empty", () => {
   assert.deepEqual(feParseCssImports(".foo { color: red }"), []);
 });
 
+test("imports inside comments, strings and nested rules are not stylesheet dependencies", () => {
+  const text = `/* @import "comment.css"; */
+@import "real.css" layer(modules);
+.example::after { content: '@import "example.css";'; }
+@media screen { @import "invalid.css"; }`;
+  assert.deepEqual(feParseCssImports(text).map(imp => imp.url), ["real.css"]);
+});
+
+test("assembly replaces the actual import when identical text occurs in a comment", () => {
+  const text = '/* @import "a.css" layer(modules); */\n@import "a.css" layer(modules);\n.real{}';
+  const result = feAssembleInlinedStyleBlock(text, { getInlinedCss: () => ".a{color:red}" });
+  assert.ok(result.text.startsWith('/* @import "a.css" layer(modules); */'));
+  assert.ok(result.text.includes("*/\n@layer modules {\n.a{color:red}\n}"));
+});
+
+test("mixed-block fallbacks cannot establish layers ahead of the original order declaration", () => {
+  const text = '@layer system, layouts, modules;\n@import "a.css" layer(system);\n@import "b.css" layer(modules);\n.real{}';
+  const result = feAssembleInlinedStyleBlock(text, {
+    getInlinedCss: url => url === "a.css" ? ".a{}" : null,
+  });
+  assert.ok(result.text.indexOf("@layer system, layouts, modules;") < result.text.indexOf('@import "b.css"'));
+});
+
+test("mixed-block fallbacks preserve implicit first-seen layer order too", () => {
+  const text = '@import "a.css" layer(system);\n@import "b.css" layer(modules);\n.real{}';
+  const result = feAssembleInlinedStyleBlock(text, {
+    getInlinedCss: url => url === "a.css" ? ".a{}" : null,
+  });
+  assert.ok(result.text.startsWith("@layer system, modules;\n"));
+});
+
 // ---------------------------------------------------------------------------
 // feRewriteSnapshotCSSURLs
 // ---------------------------------------------------------------------------
@@ -224,7 +255,7 @@ test("assemble: mixed block hoists non-inlinable imports above the inlined ones"
     getInlinedCss: (abs) => (abs.endsWith("a.css") ? "x{}" : null),
   });
   assert.equal(rebuilt, true);
-  assert.ok(text.startsWith('@import "http://localhost:30000/b.css" layer(modules);'));
+  assert.ok(text.startsWith('@layer modules;\n@import "http://localhost:30000/b.css" layer(modules);'));
   assert.ok(text.indexOf("@layer modules {") > text.indexOf("b.css"));
   assert.ok(text.endsWith(".real{color:blue}"));
 });

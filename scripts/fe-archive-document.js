@@ -71,6 +71,7 @@ export function feBuildArchiveDocument(win, { titleText = "", optimized = false 
     headStyles: feCollectHeadStylesHTML(),
     bodyClass,
     pixelTheme,
+    isGM: game.user?.isGM === true,
     archiveBg: pixelTheme ? "#000000" : "#ffffff",
     labels: {
       collecting: feLocalize("FE.ChatArchive.feCollectVisibleChatMessages"),

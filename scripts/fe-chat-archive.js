@@ -420,6 +420,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    try { window.removeEventListener("afterprint", cleanup); } catch {}
     try { restorePageBreaks(); } catch {}
     try { container.remove(); } catch {}
     document.body.classList.remove("fe-print-chatlog");
@@ -469,7 +470,8 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     // Header/meta
     const sceneName = canvas?.scene?.name ?? "";
     titleEl.textContent = feBuildArchiveTitleText();
-    metaEl.textContent = feFormat("FE.ChatArchive.MessageCount", { count: messages.length }) + (sceneName ? ` • ${sceneName}` : "");
+    const metaText = feFormat("FE.ChatArchive.MessageCount", { count: messages.length }) + (sceneName ? ` • ${sceneName}` : "");
+    metaEl.textContent = metaText;
 
     // Prefer cloning from the already-rendered live chat log DOM when possible.
 
@@ -553,6 +555,7 @@ async function feExportChatLogToPDFInline({ preCollectedMessages = null, preRang
     }
 
     window.addEventListener("afterprint", cleanup, { once: true });
+    metaEl.textContent = metaText;
     window.print();
     // window.print() blocks in browsers until the dialog closes; some Electron
     // builds return immediately and don't fire afterprint reliably. cleanup is

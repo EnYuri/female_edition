@@ -647,18 +647,17 @@ function feInstallChatMenuTypingFastPath() {
 // v14's chat input is a full ProseMirror editor on core's defaultSchema, and core's
 // only paste hook (ProseMirrorPasteTransformer) just re-keys secret blocks, so a
 // paste from a web page or a journal keeps its bold/colour/links. With
-// ceChatPastePlainText on we take the same path ProseMirror itself takes for
-// Ctrl+Shift+V: view.pasteText() parses the clipboard's text/plain through the
-// editor's clipboardTextParser.
+// ceChatPastePlainText on we insert fresh, unmarked text nodes directly.
+// view.pasteText() is NOT a formatting reset: it inherits cursor marks and
+// runs clipboard parsers/transformers again, which can restore formatting.
 // - Added through core's bubbling `plugins` event, which every <prose-mirror>
 //   dispatches each time it (re)activates its editor; filtering on #chat-message
 //   keeps journals and every other editor untouched. v13's chat input is a
 //   <textarea>, so it never fires there.
-// - Pastes with no text/html, with files, or with an empty text/plain are left to
-//   core, so image pastes (core's image plugin, fe-chat-images.js) are unaffected.
-// - pasteText() re-enters handlePaste with the same event, hence the guard.
+// - Handle text-only clipboard payloads too. HTML-only sources fall back to the
+//   already-parsed slice's text, never its marks, styles or block attributes.
+// - File/image-only pastes stay with core/fe-chat-images.js.
 // - The setting is read per paste, so toggling it needs no reload.
-let _fePlainPasteActive = false;
 function feInstallChatPlainTextPaste() {
   if (game.release?.generation < 14) return;
   const Plugin = foundry.prosemirror?.state?.Plugin ?? foundry.prosemirror?.Plugin;
@@ -667,14 +666,26 @@ function feInstallChatPlainTextPaste() {
     if (!event.target?.closest?.("prose-mirror#chat-message") || !event.plugins) return;
     event.plugins.fePlainTextPaste = new Plugin({
       props: {
-        handlePaste(view, pasteEvent) {
-          if (_fePlainPasteActive || !feSetting(S.CHAT_PASTE_PLAIN_TEXT)) return false;
+        handlePaste(view, pasteEvent, parsedSlice) {
+          if (!feSetting(S.CHAT_PASTE_PLAIN_TEXT)) return false;
           const data = pasteEvent?.clipboardData;
-          if (!data || data.files?.length || !data.types?.includes?.("text/html")) return false;
-          const text = data.getData("text/plain");
+          if (!data || data.files?.length) return false;
+          const text = data.getData("text/plain") || (data.getData("text/html")
+            ? parsedSlice?.content?.textBetween(0, parsedSlice.content.size, "\n",
+              node => node.type.name === "hard_break" ? "\n" : "")
+            : "");
           if (!text) return false;
-          _fePlainPasteActive = true;
-          try { view.pasteText(text, pasteEvent); } finally { _fePlainPasteActive = false; }
+          const { schema } = view.state;
+          const paragraphs = text.replace(/\r\n?/g, "\n").split("\n").map(line =>
+            schema.nodes.paragraph.create(null, line ? schema.text(line) : null));
+          const doc = schema.topNodeType.create(null, paragraphs);
+          // Open the outer paragraphs so inline pastes do not split the current
+          // line. replaceSelection (unlike replaceSelectionWith) keeps no marks.
+          const slice = doc.slice(1, doc.content.size - 1);
+          const tr = view.state.tr.replaceSelection(slice).setStoredMarks([])
+            .setMeta("paste", true).setMeta("uiEvent", "paste").scrollIntoView();
+          const restoreStickyScroll = feSnapshotAndRestoreStickyScroll();
+          try { view.dispatch(tr); } finally { restoreStickyScroll(); }
           return true;
         },
       },
