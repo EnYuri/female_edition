@@ -710,6 +710,11 @@ body.fe-retro-theme .tidy5e-sheet {
   --fe-tidy-state-fill-hover: rgba(255, 255, 255, 0.26);
   --fe-tidy-state-line: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.72);
   --fe-tidy-state-line-strong: var(--fe-dx3rd-accent, #ffffff);
+  /* Ink of an OFF toggle (unattuned, unequipped, unprepared, unfavourited).
+     Tidy's own off ink is --t5e-light-color, which retro maps to a 0.16
+     line tint — too faint to read as an icon at all. */
+  --fe-tidy-toggle-off: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28);
+  --fe-tidy-toggle-off-hover: var(--fe-tidy-mono-muted);
 
   /* Screentone dithers — retro tone is an ordered 1px pattern, never a
      smooth gradient. `check` tiles 4px at 50% coverage; `hatch` is a 45deg
@@ -1860,6 +1865,45 @@ body.fe-retro-theme form.tidy5e-sheet.application.classic.actor
   border-color: transparent !important;
   box-shadow: inset 0 0 0 1px var(--fe-tidy-mono-line-soft) !important;
   color: var(--fe-tidy-mono-text) !important;
+}
+
+/* Item-row state toggles (attune / equip / favourite / prepare / action
+   filter) are one `button.item-list-button` whose OFF state is only the
+   `.inactive` class, dimmed by tidy through `color: var(--t5e-light-color)`.
+   Retro's global `button { color: --fe-ac-90 !important }` (and, with the
+   accent-text override on, the dnd5e text stamp) is layered `!important`
+   and wins over that normal declaration, so ON and OFF rendered identically
+   bright. The ink is pinned on the GLYPH rather than the button: neither
+   competitor matches a `fa-*` element or an svg, so this only has to
+   outrank the `:is(.active, …) :is(i, svg, …) { color: inherit }` rule
+   above, which an attuned row can sit inside. */
+body.fe-retro-theme .tidy5e-sheet.application.classic
+  button.item-list-button.inactive
+  > :is(i, svg, dnd5e-icon) {
+  --icon-fill: var(--fe-tidy-toggle-off) !important;
+  color: var(--fe-tidy-toggle-off) !important;
+  fill: currentColor !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.classic
+  button.item-list-button.inactive:is(:hover, :focus-visible)
+  > :is(i, svg, dnd5e-icon) {
+  --icon-fill: var(--fe-tidy-toggle-off-hover) !important;
+  color: var(--fe-tidy-toggle-off-hover) !important;
+}
+
+/* Condition / property toggles (`label.tidy-switch.inactive`) dim their
+   label + icon the same way, and the accent-text override stamps the name
+   `span` bright regardless. That stamp's `:is()` carries a two-id arm
+   (`#sidebar #chat:not(*)`), so three never-matching ids are needed to
+   outrank it — same trick as `.spell-tag:not(#fe-ink)` above. */
+body.fe-retro-theme .tidy5e-sheet.application.classic
+  :is(.tidy-condition-toggle, .tidy-property-toggle).inactive:not(#fe-ink):not(#fe-ink-2):not(#fe-ink-3),
+body.fe-retro-theme .tidy5e-sheet.application.classic
+  :is(.tidy-condition-toggle, .tidy-property-toggle).inactive
+  :is(span, i, svg, dnd5e-icon):not(#fe-ink):not(#fe-ink-2):not(#fe-ink-3) {
+  --icon-fill: var(--fe-tidy-toggle-off-hover) !important;
+  color: var(--fe-tidy-toggle-off-hover) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application
