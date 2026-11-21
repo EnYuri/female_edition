@@ -1053,7 +1053,7 @@ export class Tidy5eNpcSheet
         );
       }
       // Handle custom section, if present
-      if (TidyFlags.section.get(item)) {
+      if (TidyFlags.getItemSectionForDisplay(item)) {
         NpcSheetSections.applyAbilityToSection(features, item, {
           canCreate: true,
         });

@@ -1,3 +1,4 @@
+import { openClassicQuickInsert } from 'src/integration/quick-insert.js';
 import type { ActorItemSectionCommand } from 'src/api/api.types';
 import type {
   RegisteredSectionCommand,
@@ -18,11 +19,14 @@ export class ActorItemRuntime {
           ? (params: RegisteredSectionCommandEnabledParams) =>
               command.enabled?.({ ...params, actor: params.document }) ?? true
           : undefined,
-        execute: (params: RegisteredSectionCommandExecuteParams) =>
-          command.execute?.({
-            ...params,
-            actor: params.document,
-          }),
+        execute: (params: RegisteredSectionCommandExecuteParams) => {
+          const args = { ...params, actor: params.document };
+          if (command.tooltip === 'Quick Insert' && command.iconClass === 'fas fa-search' &&
+              (globalThis as any).QuickInsert?.systemIntegration?.Dnd5eSheetContext) {
+            return openClassicQuickInsert(args);
+          }
+          return command.execute?.(args);
+        },
       })
     );
 

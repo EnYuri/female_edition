@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CatHiddenActivityBadge from 'src/components/item-list/CatHiddenActivityBadge.svelte';
   import type { Item5e } from 'src/types/item.types';
   import TidyTable, { type TidyTableColumns } from '../table/TidyTable.svelte';
   import TidyTableRow from '../table/TidyTableRow.svelte';
@@ -100,6 +101,7 @@
                   alt={ctx.activity.name}
                 />
               {/if}
+              <CatHiddenActivityBadge activity={ctx.activity} />
               {ctx.activity.name}
             </a>
           </TidyTableCell>

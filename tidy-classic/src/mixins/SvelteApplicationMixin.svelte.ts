@@ -147,6 +147,18 @@ export function SvelteApplicationMixin<
 
       this.#trackApplicationWindowDrag(element);
 
+      if (game.modules.get('cat')?.active && this.document?.documentName === 'Actor' &&
+          element.classList.contains('classic')) {
+        for (const name of ['createSetting', 'updateSetting', 'deleteSetting']) {
+          this._hookSubscriptions.push({
+            name,
+            id: Hooks.on(name, (setting: any) => {
+              if (setting.key === 'cat.hideActivitiesOnActorSheet') this.#debouncedRerenderForSettings();
+            }),
+          });
+        }
+      }
+
       this._hookSubscriptions.push({
         name: 'updateSetting',
         id: Hooks.on('updateSetting', (setting: any) => {

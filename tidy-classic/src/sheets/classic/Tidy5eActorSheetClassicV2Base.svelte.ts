@@ -1,3 +1,5 @@
+import { classicActorDropBehavior } from 'src/integration/quick-insert.js';
+import { handlePlutoniumSheetDrop, isPlutoniumSheetDrop } from 'src/integration/plutonium-drop.js';
 import ClassicTabSelectionFormApplication from 'src/applications/tab-selection/ClassicTabSelectionFormApplication.svelte';
 import { ThemeSettingsFormApplication } from 'src/applications/theme/ThemeSettingsFormApplication.svelte';
 import { CONSTANTS } from 'src/constants';
@@ -969,18 +971,22 @@ export function Tidy5eActorSheetClassicV2Base<
     async _onDrop(
       event: DragEvent & { currentTarget: HTMLElement; target: HTMLElement }
     ): Promise<any> {
-      this.#dropBehavior = this._dropBehavior(event);
+      const data = foundry.applications.ux.TextEditor.getDragEventData(event);
+      this.#dropBehavior = classicActorDropBehavior(this, event, data);
 
       try {
         this._currentDragEvent = event;
-        const data = foundry.applications.ux.TextEditor.getDragEventData(event);
         const actor = this.actor;
         // TODO: Extract hook call
         const allowed = Hooks.call('dropActorSheetData', actor, this, data);
         if (allowed === false) return;
 
         // Sheet Pins
+        if (isPlutoniumSheetDrop(data)) return await handlePlutoniumSheetDrop(this, event, data);
         const sheetPinDoc = data.uuid ? await fromUuid(data.uuid) : null;
+        if (data.type === 'JournalEntryPage' && isPlutoniumSheetDrop(data, sheetPinDoc)) {
+          return await handlePlutoniumSheetDrop(this, event, data, sheetPinDoc);
+        }
 
         if (
           sheetPinDoc?.actor === this.actor &&
@@ -1169,12 +1175,21 @@ export function Tidy5eActorSheetClassicV2Base<
     async _onDropItemCreate(
       itemData: Item5e[] | Item5e,
       event: DragEvent & { _behavior?: DropEffectValue },
-      behavior?: DropEffectValue
+      behavior?: DropEffectValue,
+      importOriginal?: () => Promise<Item5e | undefined>
     ): Promise<Item5e[]> {
       let items = Array.isArray(itemData) ? itemData : [itemData];
       const options = { event, behavior: behavior ?? event?._behavior ?? 'copy' };
+      const original = importOriginal && !Array.isArray(itemData) ? itemData.toObject() : null;
       if (TidyHooks.dnd5eDropCreateItems(this, items, options) === false) return [];
       behavior = options.behavior;
+      if (importOriginal && behavior === 'copy' && !Array.isArray(itemData) &&
+          items.length === 1 && items[0] === itemData &&
+          (foundry.utils.equals ?? foundry.utils.objectsEqual)(original, itemData.toObject()) &&
+          !(this.constructor as typeof Tidy5eActorSheetClassicV2Base).unsupportedItemTypes.has(itemData.type)) {
+        const imported = await importOriginal();
+        return imported ? [imported] : [];
+      }
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );

@@ -70,3 +70,34 @@ test('rider tooltips use activity metadata when present and the enchant type on 
   item.system.activities = [{ type: 'enchant', effects }];
   assert.deepEqual(Helper.getRiderEffectParentNames(item), { child: ['Source'] });
 });
+
+test('both bundled Classic handlers apply a veto and sheet type restrictions before forced import', async () => {
+  const handlers = [...bundle.matchAll(/^ {4}async _onDropItemCreate\([^\n]+\n[\s\S]*?^ {4}\}/gm)]
+    .map(match => match[0]).filter(body => body.includes('TidyHooks.dnd5eDropCreateItems'));
+  assert.equal(handlers.length, 2);
+  for (const handler of handlers) {
+    let allow = false;
+    let hooks = 0;
+    const Sheet = Function('TidyHooks', 'hasAdvancement', 'foundry', 'dnd5e', `return class {
+      #pendingMoveSource;
+      #completedMoveWithoutCreation;
+      actor = {};
+      static unsupportedItemTypes = new Set(['class']);
+      _supportedItemTypes = new Set(['spell']);
+      ${handler}
+    }`)({ dnd5eDropCreateItems() { hooks++; return allow; } }, () => false,
+      { utils: { equals: (a,b) => a.type === b.type } },
+      { documents: { Item5e: { createWithContents: () => [], createDocuments: docs => docs } } });
+    const sheet = new Sheet();
+    let imports = 0;
+    const drop = type => sheet._onDropItemCreate({
+      type, system: {}, toObject: () => ({ type }),
+    }, {}, 'copy', () => { imports++; return 'imported'; });
+    assert.deepEqual(await drop('spell'), []);
+    allow = true;
+    assert.deepEqual(await drop('class'), []);
+    assert.deepEqual(await drop('spell'), ['imported']);
+    assert.equal(imports, 1);
+    assert.equal(hooks, 3);
+  }
+});

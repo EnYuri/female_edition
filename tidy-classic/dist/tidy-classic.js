@@ -6458,6 +6458,122 @@ function create_custom_element(Component, props_definition, slots, exports, shad
   Class;
   return Class;
 }
+const REQUEST = "female_edition.classicLootRequest";
+const GRANT = "female_edition.classicLootGrant";
+const GRANT_TIMEOUT = 12e4;
+const REVISION = "classicLootRevision";
+function authority(actor) {
+  return game.users.activeGM ?? [...game.users].filter((user) => user.active && actor.testUserPermission(user, "OWNER")).sort((a, b) => a.id.localeCompare(b.id, "en"))[0];
+}
+function revision(actor) {
+  return actor.getFlag("female_edition", REVISION) ?? null;
+}
+async function waitForRevision(actor, expected) {
+  const deadline = Date.now() + 1e4;
+  while (revision(actor) !== expected) {
+    if (Date.now() >= deadline) throw new Error("액터의 전리품 변경을 동기화하지 못했습니다.");
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+function createLootTurns(currentUser = () => game.user, select = authority, resolve = (uuid) => fromUuid(uuid)) {
+  const pending2 = /* @__PURE__ */ new Map();
+  const queues = /* @__PURE__ */ new Map();
+  async function enqueue(actor, run) {
+    const previous = queues.get(actor.uuid) ?? Promise.resolve();
+    const turn = previous.catch(() => {
+    }).then(async () => {
+      if (select(actor)?.id !== currentUser().id) throw new Error("전리품 지급 담당자가 변경되었습니다.");
+      const committed = await run(revision(actor));
+      if (committed) await waitForRevision(actor, committed);
+    });
+    queues.set(actor.uuid, turn);
+    try {
+      await turn;
+    } finally {
+      if (queues.get(actor.uuid) === turn) queues.delete(actor.uuid);
+    }
+  }
+  return {
+    register(queries) {
+      queries[REQUEST] = async ({ uuid, id }, { user }) => {
+        const actor = await resolve(uuid);
+        if (actor?.documentName !== "Actor" || !actor.testUserPermission(user, "OWNER"))
+          throw new Error("액터 소유 권한이 필요합니다.");
+        await enqueue(actor, (expected) => user.query(GRANT, { id, expected, expires: game.time.serverTime + GRANT_TIMEOUT }, { timeout: GRANT_TIMEOUT }));
+        return true;
+      };
+      queries[GRANT] = async ({ id, expected, expires }, { user }) => {
+        const request = pending2.get(id);
+        if (!request || user.id !== request.coordinator || select(request.actor)?.id !== user.id)
+          throw new Error("유효하지 않은 전리품 지급 요청입니다.");
+        pending2.delete(id);
+        await waitForRevision(request.actor, expected);
+        return request.run(expires);
+      };
+    },
+    async run(actor, commit) {
+      const coordinator = select(actor);
+      if (!coordinator) throw new Error("접속 중인 액터 소유자가 없습니다.");
+      const id = foundry.utils.randomID();
+      const run = (expires = Infinity) => commit(id, () => {
+        if (Number.isFinite(expires) && game.time.serverTime >= expires - 5e3)
+          throw new Error("전리품 지급 요청 시간이 만료되었습니다.");
+        if (!actor.isOwner || select(actor)?.id !== coordinator.id)
+          throw new Error("전리품 지급 중 액터 권한 또는 담당자가 변경되었습니다.");
+      });
+      if (coordinator.id === currentUser().id) return enqueue(actor, () => run());
+      pending2.set(id, { actor, coordinator: coordinator.id, run });
+      try {
+        await coordinator.query(REQUEST, { uuid: actor.uuid, id }, { timeout: GRANT_TIMEOUT * 2 });
+      } finally {
+        pending2.delete(id);
+      }
+    }
+  };
+}
+const lootTurns = createLootTurns();
+const lootRevisionPath = "flags.female_edition." + REVISION;
+function registerClassicQuickInsert(api) {
+  if (!game.modules.get("quick-insert")?.active || game.modules.has("tidy5e-sheet") || game.modules.get("tidy5e-sheet-kgar")?.api) return;
+  api.config.actorItem.registerSectionCommands([{
+    tooltip: "Quick Insert",
+    iconClass: "fas fa-search",
+    enabled: ({ actor }) => actor.isOwner && ["character", "npc", "vehicle"].includes(actor.type) && Boolean(globalThis.QuickInsert?.systemIntegration?.Dnd5eSheetContext) && game.settings.get("quick-insert", "filtersSheetsEnabled"),
+    execute: openClassicQuickInsert
+  }]);
+}
+function openClassicQuickInsert({ actor, event: event2, section }) {
+  const quickInsert = globalThis.QuickInsert;
+  const Context = quickInsert?.systemIntegration?.Dnd5eSheetContext;
+  const anchor = event2.currentTarget;
+  const sheet = foundry.applications.instances.get(anchor.closest(".application")?.id);
+  if (!Context || !sheet?.isEditable || sheet.document !== actor) return;
+  const { type: type2, system } = quickInsertSection(section, actor).dataset ?? {};
+  const customTypes = section.custom?.creationItemTypes;
+  const types = customTypes?.length ? customTypes : type2 ? [type2] : void 0;
+  const position = globalThis.jQuery?.(anchor) ?? { 0: anchor, get: () => [anchor] };
+  quickInsert.open(new Context(sheet, position, types, system));
+}
+function classicActorDropBehavior(sheet, event2, data) {
+  if (event2.type || !event2.dataTransfer || data?.type !== "Item" || !data.uuid || !game.modules.get("quick-insert")?.active || !event2.target?.matches?.('[data-tooltip="Quick Insert"], [title="Quick Insert"], .quick-insert-link')) {
+    return sheet._dropBehavior(event2);
+  }
+  return sheet._allowedDropBehaviors(event2, data).has("copy") ? "copy" : "none";
+}
+function quickInsertSection(section, actor) {
+  const data = section.dataset ?? {};
+  const type2 = data.type ?? (section.custom?.creationItemTypes?.length === 1 ? section.custom.creationItemTypes[0] : void 0);
+  if (type2 !== "spell") return section;
+  const level = data["system.level"];
+  let system = data.system;
+  if (!system && /^spell[0-9]+$/.test(section.slot) && Number.isInteger(level)) {
+    system = { level };
+  } else if (!system && section.slot === "pact") {
+    const max2 = actor.system?.spells?.pact?.level;
+    if (max2 > 0) system = { level: { min: 1, max: max2 } };
+  }
+  return { ...section, dataset: { ...data, type: type2, system } };
+}
 const CONSTANTS = {
   /**
    * Stays `tidy5e-sheet` on purpose, and is used for exactly two things now: document
@@ -9994,6 +10110,13 @@ function applySheetAttributesToWindow(documentName, documentUuid, type2, element
   element2?.setAttribute("data-document-type", type2);
   element2?.setAttribute("data-document-uuid", documentUuid);
 }
+function bg3CommonActionSection(item) {
+  if (!item.actor || game.modules.get("tidy5e-sheet")?.active || !game.modules.get("bg3-inspired-hotbar")?.active || !game.modules.get("chris-premades")?.active || item.getFlag("chris-premades", "info")?.source !== "chris-premades") return;
+  const slots = item.actor.getFlag("bg3-inspired-hotbar", "containersConfig")?.combat?.[0]?.items;
+  if (slots && Object.values(slots).some((slot2) => slot2?.uuid === item.uuid)) {
+    return "CHRISPREMADES.Generic.Actions";
+  }
+}
 const TabConfigurationSchema = new foundry.data.fields.SchemaField(
   {
     selected: new foundry.data.fields.ArrayField(
@@ -11020,6 +11143,11 @@ class TidyFlags {
       return TidyFlags.unsetFlag(item, TidyFlags.section.key);
     }
   };
+  /** Resolve placement without changing the user's saved section or the source item. */
+  static getItemSectionForDisplay(item, key2 = "section") {
+    const saved = TidyFlags[key2].get(item);
+    return saved ?? (key2 === "section" ? bg3CommonActionSection(item) : void 0);
+  }
   /** Determines the order of item table sections for a given document sheet. */
   static sectionConfig = {
     key: "sheet-section-config",
@@ -12512,6 +12640,16 @@ function SvelteApplicationMixin(BaseApplication) {
       });
       this.applyTidyTheming(element2);
       this.#trackApplicationWindowDrag(element2);
+      if (game.modules.get("cat")?.active && this.document?.documentName === "Actor" && element2.classList.contains("classic")) {
+        for (const name of ["createSetting", "updateSetting", "deleteSetting"]) {
+          this._hookSubscriptions.push({
+            name,
+            id: Hooks.on(name, (setting) => {
+              if (setting.key === "cat.hideActivitiesOnActorSheet") this.#debouncedRerenderForSettings();
+            })
+          });
+        }
+      }
       this._hookSubscriptions.push({
         name: "updateSetting",
         id: Hooks.on("updateSetting", (setting) => {
@@ -12977,7 +13115,7 @@ class SvelteMap extends Map {
     return super.size;
   }
 }
-var root_1$4B = /* @__PURE__ */ from_html(`<div class="classic-antimagic-notice" role="status"><i class="fa-solid fa-ban" aria-hidden="true"></i> </div>`);
+var root_1$4C = /* @__PURE__ */ from_html(`<div class="classic-antimagic-notice" role="status"><i class="fa-solid fa-ban" aria-hidden="true"></i> </div>`);
 var root_4$24 = /* @__PURE__ */ from_html(`<i></i>`);
 var root_5$1y = /* @__PURE__ */ from_html(`<span class="tab-title-count font-label-medium theme-dark"> </span>`);
 var root_3$2t = /* @__PURE__ */ from_html(`<a role="tab"><!> <span class="tab-title"> </span> <!></a>`);
@@ -13051,7 +13189,7 @@ function Tabs($$anchor, $$props) {
   var node = first_child(fragment);
   {
     var consequent = ($$anchor2) => {
-      var div = root_1$4B();
+      var div = root_1$4C();
       var text2 = sibling(child(div));
       reset(div);
       template_effect(($0) => set_text(text2, ` ${$0 ?? ""}`), [() => localize("TIDY5E.ClassicAntimagicWarning")]);
@@ -13878,7 +14016,7 @@ function ActionsListSettingsTab($$anchor, $$props) {
   append($$anchor, fragment);
   pop();
 }
-var root_1$4A = /* @__PURE__ */ from_html(`<option> </option>`);
+var root_1$4B = /* @__PURE__ */ from_html(`<option> </option>`);
 var root_2$3G = /* @__PURE__ */ from_html(`<option> </option>`);
 var root_6$1q = /* @__PURE__ */ from_html(`<hr/>`);
 var optgroup_content$1 = /* @__PURE__ */ from_html(`<!>`, 1);
@@ -13887,7 +14025,7 @@ var root$7f = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 function SelectOptions($$anchor, $$props) {
   push($$props, true);
   const optionElement = ($$anchor2, key2 = noop, value = noop) => {
-    var option = root_1$4A();
+    var option = root_1$4B();
     var text2 = child(option, true);
     reset(option);
     var option_value = {};
@@ -14649,7 +14787,7 @@ function crossfade({ fallback: fallback2, ...defaults }) {
   return [transition2(to_send, to_receive, false), transition2(to_receive, to_send, true)];
 }
 var root_2$3F = /* @__PURE__ */ from_html(`<i class="drag-grip fa-solid fa-grip-lines fa-fw"></i>`);
-var root_1$4z = /* @__PURE__ */ from_html(`<li role="option"><!> <!></li>`);
+var root_1$4A = /* @__PURE__ */ from_html(`<li role="option"><!> <!></li>`);
 var root$7a = /* @__PURE__ */ from_html(`<ul role="listbox" tabindex="0"></ul>`);
 function Listbox($$anchor, $$props) {
   push($$props, true);
@@ -14685,7 +14823,7 @@ function Listbox($$anchor, $$props) {
   var ul = root$7a();
   each$1(ul, 31, items, (item) => item[$$props.valueProp], ($$anchor2, item, i) => {
     const isSelected = /* @__PURE__ */ user_derived(() => selectedItemIndex() === get(i));
-    var li = root_1$4z();
+    var li = root_1$4A();
     var node = child(li);
     {
       var consequent = ($$anchor3) => {
@@ -15180,7 +15318,7 @@ function SelectionListbox($$anchor, $$props) {
   append($$anchor, div);
   pop();
 }
-var root_1$4y = /* @__PURE__ */ from_html(`<h3> </h3>`);
+var root_1$4z = /* @__PURE__ */ from_html(`<h3> </h3>`);
 var root_2$3E = /* @__PURE__ */ from_html(`<h3> </h3>`);
 var root$77 = /* @__PURE__ */ from_html(`<article class="setting group"><div class="description flex-1"><b> </b> <p> </p> <div class="flex-column small-gap"><!> <!></div></div></article>`);
 function ListboxSetting($$anchor, $$props) {
@@ -15199,7 +15337,7 @@ function ListboxSetting($$anchor, $$props) {
   var node = child(div_1);
   {
     const leftHeader = ($$anchor2) => {
-      var h3 = root_1$4y();
+      var h3 = root_1$4z();
       var text_2 = child(h3, true);
       reset(h3);
       template_effect(($0) => set_text(text_2, $0), [() => localize(leftHeaderText())]);
@@ -15251,7 +15389,7 @@ function ListboxSetting($$anchor, $$props) {
   append($$anchor, article);
   pop();
 }
-var root_1$4x = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
+var root_1$4y = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
 var root$76 = /* @__PURE__ */ from_html(`<div class="settings-form"><!> <!> <!> <!> <!> <!></div>`);
 function CharacterWorldSettingsTab($$anchor, $$props) {
   push($$props, true);
@@ -15284,7 +15422,7 @@ function CharacterWorldSettingsTab($$anchor, $$props) {
   var node_1 = sibling(node, 2);
   {
     const belowListbox = ($$anchor2) => {
-      var div_1 = root_1$4x();
+      var div_1 = root_1$4y();
       var button = child(div_1);
       var text2 = sibling(child(button));
       reset(button);
@@ -15377,7 +15515,7 @@ function CharacterWorldSettingsTab($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
-var root_1$4w = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
+var root_1$4x = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
 var root$75 = /* @__PURE__ */ from_html(`<div class="settings-form"><!> <!> <!> <!> <!></div>`);
 function NpcWorldSettingsTab($$anchor, $$props) {
   push($$props, true);
@@ -15410,7 +15548,7 @@ function NpcWorldSettingsTab($$anchor, $$props) {
   var node_1 = sibling(node, 2);
   {
     const belowListbox = ($$anchor2) => {
-      var div_1 = root_1$4w();
+      var div_1 = root_1$4x();
       var button = child(div_1);
       var text2 = sibling(child(button));
       reset(button);
@@ -15496,7 +15634,7 @@ function NpcWorldSettingsTab($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
-var root_1$4v = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
+var root_1$4w = /* @__PURE__ */ from_html(`<div><button type="button"><i class="fas fa-rotate-right"></i> </button></div>`);
 var root$74 = /* @__PURE__ */ from_html(`<div class="settings-form"><!> <!> <!> <!></div>`);
 function VehicleWorldSettingsTab($$anchor, $$props) {
   push($$props, true);
@@ -15529,7 +15667,7 @@ function VehicleWorldSettingsTab($$anchor, $$props) {
   var node_1 = sibling(node, 2);
   {
     const belowListbox = ($$anchor2) => {
-      var div_1 = root_1$4v();
+      var div_1 = root_1$4w();
       var button = child(div_1);
       var text2 = sibling(child(button));
       reset(button);
@@ -15643,7 +15781,7 @@ function ItemWorldSettingsTab($$anchor, $$props) {
   pop();
 }
 var select_content$3 = /* @__PURE__ */ from_html(`<!>`, 1);
-var root_1$4u = /* @__PURE__ */ from_html(`<p class="tidy5e-notes"> </p>`);
+var root_1$4v = /* @__PURE__ */ from_html(`<p class="tidy5e-notes"> </p>`);
 var root_4$22 = /* @__PURE__ */ from_html(`<article class="setting group"><section><div class="description"><label class="flex-row small-gap align-items-center"> <i class="fas fa-info-circle"></i></label> <p class="tidy5e-notes"> </p></div> <div class="settings-group"><input type="text"/></div></section></article>`);
 var root_2$3D = /* @__PURE__ */ from_html(`<article class="setting group"><section><div class="description"><label> </label> <p class="tidy5e-notes"> </p></div> <div class="settings-group"><input type="number" min="1"/></div></section></article> <!>`, 1);
 var root$72 = /* @__PURE__ */ from_html(`<article class="setting group"><section><div class="description"><label> </label> <p class="tidy5e-notes"> </p></div> <div class="settings-group"><select><!></select> <!></div></section></article> <!>`, 1);
@@ -15681,7 +15819,7 @@ function ExhaustionSetting($$anchor, $$props) {
   var node_1 = sibling(select, 2);
   {
     var consequent = ($$anchor2) => {
-      var p_1 = root_1$4u();
+      var p_1 = root_1$4v();
       var text_2 = child(p_1, true);
       reset(p_1);
       template_effect(($0) => set_text(text_2, $0), [
@@ -16616,7 +16754,7 @@ function getGapTransform(position, gap) {
   }
   return null;
 }
-var root_1$4t = /* @__PURE__ */ from_html(`<i></i>`);
+var root_1$4u = /* @__PURE__ */ from_html(`<i></i>`);
 var root$6_ = /* @__PURE__ */ from_html(`<div><button type="button"><!> </button> <!></div>`);
 function ButtonMenu($$anchor, $$props) {
   push($$props, true);
@@ -16648,7 +16786,7 @@ function ButtonMenu($$anchor, $$props) {
   var node = child(button);
   {
     var consequent = ($$anchor2) => {
-      var i = root_1$4t();
+      var i = root_1$4u();
       template_effect(() => set_class(i, 1, clsx(get(actualIconClass))));
       append($$anchor2, i);
     };
@@ -16709,7 +16847,7 @@ function ButtonMenuItem($$anchor, $$props) {
 }
 var root_3$2s = /* @__PURE__ */ from_html(`<i role="presentation"></i>`);
 var root_2$3C = /* @__PURE__ */ from_html(`<span class="icon-container"><!></span>`);
-var root_1$4s = /* @__PURE__ */ from_html(`<button type="button"><!> <span class="command-text"><!></span></button>`);
+var root_1$4t = /* @__PURE__ */ from_html(`<button type="button"><!> <span class="command-text"><!></span></button>`);
 function ButtonMenuCommand($$anchor, $$props) {
   push($$props, true);
   let iconClass = prop($$props, "iconClass", 3, ""), useIconColumn = prop($$props, "useIconColumn", 3, true), title = prop($$props, "title", 3, null), size = prop($$props, "size", 3, "standard"), disabled = prop($$props, "disabled", 3, false);
@@ -16721,7 +16859,7 @@ function ButtonMenuCommand($$anchor, $$props) {
   ButtonMenuItem($$anchor, {
     cssClass: "button-menu-command-li",
     children: ($$anchor2, $$slotProps) => {
-      var button = root_1$4s();
+      var button = root_1$4t();
       var node = child(button);
       {
         var consequent_1 = ($$anchor3) => {
@@ -17331,7 +17469,7 @@ async function promptSplitStack(item) {
 var root_2$3A = /* @__PURE__ */ from_html(`<i></i>`);
 var root_3$2q = /* @__PURE__ */ from_html(`<span class="trait-label"> </span>`);
 var root_4$20 = /* @__PURE__ */ from_html(`<button type="button" class="trait-editor inline-icon-button flex-row align-items-flex-start justify-content-center"><i class="fas fa-pencil-alt"></i></button>`);
-var root_1$4r = /* @__PURE__ */ from_html(`<div><span class="trait-icon"><!> <!></span> <div class="trait-label-and-list"><!> <!></div> <!></div>`);
+var root_1$4s = /* @__PURE__ */ from_html(`<div><span class="trait-icon"><!> <!></span> <div class="trait-label-and-list"><!> <!></div> <!></div>`);
 function TraitSection($$anchor, $$props) {
   push($$props, true);
   let context = /* @__PURE__ */ user_derived(getSheetContext);
@@ -17340,7 +17478,7 @@ function TraitSection($$anchor, $$props) {
   var node = first_child(fragment);
   {
     var consequent_3 = ($$anchor2) => {
-      var div = root_1$4r();
+      var div = root_1$4s();
       var span = child(div);
       var node_1 = child(span);
       {
@@ -17416,7 +17554,7 @@ var root_3$2p = /* @__PURE__ */ from_html(`<span class="tool-proficiency-readonl
 var root_4$1$ = /* @__PURE__ */ from_html(`<button type="button" class="tool-check-roller inline-transparent-button rollable"> </button>`);
 var root_5$1w = /* @__PURE__ */ from_html(`<span class="tool-check-roller"> </span>`);
 var root_6$1o = /* @__PURE__ */ from_html(`<button type="button" class="tool-proficiency-editor inline-icon-button"><i class="fas fa-cog"></i></button>`);
-var root_1$4q = /* @__PURE__ */ from_html(`<li class="tool" data-tooltip-direction="RIGHT"><!> <!> <!></li>`);
+var root_1$4r = /* @__PURE__ */ from_html(`<li class="tool" data-tooltip-direction="RIGHT"><!> <!> <!></li>`);
 var root$6X = /* @__PURE__ */ from_html(`<ul class="trait-list tools"></ul>`);
 function TraitSectionTools($$anchor, $$props) {
   push($$props, true);
@@ -17439,7 +17577,7 @@ function TraitSectionTools($$anchor, $$props) {
     let key2 = () => get($$array)[0];
     let tool = () => get($$array)[1];
     const reference = /* @__PURE__ */ user_derived(() => settings.value.referenceTooltipTool ? getToolReference(key2()) : void 0);
-    var li = root_1$4q();
+    var li = root_1$4r();
     var node = child(li);
     {
       var consequent = ($$anchor3) => {
@@ -17546,7 +17684,7 @@ function TraitSectionTools($$anchor, $$props) {
   pop();
 }
 delegate(["click", "contextmenu"]);
-var root_1$4p = /* @__PURE__ */ from_html(`<li><!></li>`);
+var root_1$4q = /* @__PURE__ */ from_html(`<li><!></li>`);
 var root$6W = /* @__PURE__ */ from_html(`<ul class="trait-list"></ul>`);
 function TraitSectionTags($$anchor, $$props) {
   push($$props, true);
@@ -17557,7 +17695,7 @@ function TraitSectionTags($$anchor, $$props) {
     var $$array = /* @__PURE__ */ user_derived(() => to_array(get($$item), 2));
     let key2 = () => get($$array)[0];
     let value = () => get($$array)[1];
-    var li = root_1$4p();
+    var li = root_1$4q();
     var node = child(li);
     {
       var consequent = ($$anchor3) => {
@@ -17585,7 +17723,7 @@ function TraitSectionTags($$anchor, $$props) {
   pop();
 }
 var root_2$3y = /* @__PURE__ */ from_html(`<i></i>`);
-var root_1$4o = /* @__PURE__ */ from_html(`<li><!> </li>`);
+var root_1$4p = /* @__PURE__ */ from_html(`<li><!> </li>`);
 var root$6V = /* @__PURE__ */ from_html(`<ul class="damage-modifications"></ul>`);
 function TraitSectionModifications($$anchor, $$props) {
   push($$props, true);
@@ -17593,7 +17731,7 @@ function TraitSectionModifications($$anchor, $$props) {
   const localize = FoundryAdapter.localize;
   var ul = root$6V();
   each$1(ul, 21, () => $$props.modifications, index$1, ($$anchor2, modification) => {
-    var li = root_1$4o();
+    var li = root_1$4p();
     var node = child(li);
     each$1(node, 17, () => get(modification).icons ?? [], index$1, ($$anchor3, icon) => {
       const propertyLabel = /* @__PURE__ */ user_derived(() => get(context).config.itemProperties[get(icon)]?.label ?? "");
@@ -18417,7 +18555,7 @@ function Traits($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
-var root_1$4n = /* @__PURE__ */ from_html(`<div role="presentation" class="expandable-child-animation-wrapper"><!></div>`);
+var root_1$4o = /* @__PURE__ */ from_html(`<div role="presentation" class="expandable-child-animation-wrapper"><!></div>`);
 var root$6T = /* @__PURE__ */ from_html(`<div><!></div>`);
 function ExpandableContainer($$anchor, $$props) {
   push($$props, true);
@@ -18479,7 +18617,7 @@ function ExpandableContainer($$anchor, $$props) {
   var node = child(div);
   {
     var consequent = ($$anchor2) => {
-      var div_1 = root_1$4n();
+      var div_1 = root_1$4o();
       var node_1 = child(div_1);
       snippet(node_1, () => $$props.children ?? noop);
       reset(div_1);
@@ -18648,7 +18786,7 @@ class ExpansionTracker {
     return tracker;
   }
 }
-var root_1$4m = /* @__PURE__ */ from_html(`<div class="item-table-body"><!></div>`);
+var root_1$4n = /* @__PURE__ */ from_html(`<div class="item-table-body"><!></div>`);
 var root$6S = /* @__PURE__ */ from_html(`<section><!> <!></section>`);
 function ItemTable($$anchor, $$props) {
   push($$props, true);
@@ -18691,7 +18829,7 @@ function ItemTable($$anchor, $$props) {
       return get(expanded);
     },
     children: ($$anchor2, $$slotProps) => {
-      var div = root_1$4m();
+      var div = root_1$4n();
       var node_2 = child(div);
       snippet(node_2, () => $$props.body ?? noop);
       reset(div);
@@ -18734,7 +18872,7 @@ function getTabIdFromEvent(event2) {
     event2.target
   );
 }
-var root_1$4l = /* @__PURE__ */ from_html(`<i></i>`);
+var root_1$4m = /* @__PURE__ */ from_html(`<i></i>`);
 var root$6R = /* @__PURE__ */ from_html(`<header><!> <!></header>`);
 function ItemTableHeaderRow($$anchor, $$props) {
   push($$props, true);
@@ -18754,7 +18892,7 @@ function ItemTableHeaderRow($$anchor, $$props) {
   var node = child(header);
   {
     var consequent = ($$anchor2) => {
-      var i = root_1$4l();
+      var i = root_1$4m();
       let classes_1;
       template_effect(
         ($0) => {
@@ -18811,7 +18949,7 @@ class ItemSummaryRuntime {
     );
   }
 }
-var root_1$4k = /* @__PURE__ */ from_html(`<i></i>`);
+var root_1$4l = /* @__PURE__ */ from_html(`<i></i>`);
 var root$6Q = /* @__PURE__ */ from_html(`<button type="button" class="button button-borderless"><!> </button>`);
 function ItemSummaryCommandButton($$anchor, $$props) {
   push($$props, true);
@@ -18819,7 +18957,7 @@ function ItemSummaryCommandButton($$anchor, $$props) {
   var node = child(button);
   {
     var consequent = ($$anchor2) => {
-      var i = root_1$4k();
+      var i = root_1$4l();
       template_effect(() => set_class(i, 1, clsx($$props.command.iconClass)));
       append($$anchor2, i);
     };
@@ -18876,6 +19014,63 @@ class Enrichers {
   static reference(uuid, text2) {
     return `@UUID[${uuid}]{${text2}}`;
   }
+}
+function isCatHiddenActivity(activity) {
+  return Boolean(activity?.flags?.cat?.hidden && game.modules.get("cat")?.active);
+}
+function hideCatActivityOnActor(activity) {
+  return isCatHiddenActivity(activity) && game.settings.get("cat", "hideActivitiesOnActorSheet");
+}
+function updateCatKitStatus(document2, element2) {
+  if (!game.modules.get("cat")?.active || !element2?.classList.contains("classic")) return;
+  const item = document2.documentName === "Item";
+  if (!item && !(document2.documentName === "Actor" && document2.type === "character")) return;
+  const button = element2.querySelector(item ? ".window-header .cat-medkit-item" : ".window-header .cat-medkit-actor");
+  const cat = globalThis.cat;
+  const codes = cat?.lib?.constants?.automationStatus;
+  const colors = cat?.lib?.constants?.MEDKIT_STATUSES;
+  if (!button || !codes || !colors || !cat.utils?.automationUtils?.getAutomationStatus) return;
+  const code = cat.utils.automationUtils.getAutomationStatus(document2);
+  let status;
+  switch (code) {
+    case codes.UNAVAILABLE:
+      if (!item || (cat.utils.documentUtils.getSource(document2) ?? "none") !== "none") status = colors.UNKNOWN;
+      break;
+    case codes.AVAILABLE:
+      status = colors.AVAILABLE;
+      break;
+    case codes.OUTDATED:
+      status = colors.OUTDATED;
+      break;
+    case codes.UP_TO_DATE:
+      status = colors.UP_TO_DATE;
+      break;
+    case codes.CONFIGURABLE:
+    case codes.GENERIC:
+      status = colors.CONFIGURABLE;
+      break;
+  }
+  if (status) button.dataset.medkitStatus = status;
+  else delete button.dataset.medkitStatus;
+}
+var root_1$4k = /* @__PURE__ */ from_html(`<i class="fa-solid fa-shield-cat cat-activity-badge svelte-stzz25" role="img" data-tooltip="CAT.MEDKIT.Activity.Hidden.Badge"></i>`);
+function CatHiddenActivityBadge($$anchor, $$props) {
+  push($$props, true);
+  var fragment = comment();
+  var node = first_child(fragment);
+  {
+    var consequent = ($$anchor2) => {
+      var i = root_1$4k();
+      set_attribute(i, "aria-label", game.i18n.localize("CAT.MEDKIT.Activity.Hidden.Badge"));
+      append($$anchor2, i);
+    };
+    var d = /* @__PURE__ */ user_derived(() => game.user.isGM && isCatHiddenActivity($$props.activity));
+    if_block(node, ($$render) => {
+      if (get(d)) $$render(consequent);
+    });
+  }
+  append($$anchor, fragment);
+  pop();
 }
 var root_1$4j = /* @__PURE__ */ from_html(`<div class="item-table-body"><!></div>`);
 var root$6O = /* @__PURE__ */ from_html(`<section><!> <!></section>`);
@@ -19188,7 +19383,7 @@ function RechargeControl($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
-var root_4$1Z = /* @__PURE__ */ from_html(`<span class="inline-activity-arrow"><i class="fa-solid fa-turn-up fa-fw"></i></span> <a class="inline-activity-roll-button highlight-on-hover"><!> </a>`, 1);
+var root_4$1Z = /* @__PURE__ */ from_html(`<span class="inline-activity-arrow"><i class="fa-solid fa-turn-up fa-fw"></i></span> <a class="inline-activity-roll-button highlight-on-hover"><!> <!> </a>`, 1);
 var root_11$F = /* @__PURE__ */ from_html(`<span> </span>`);
 var root_10$J = /* @__PURE__ */ from_html(`<!> <i class="fas fa-bolt"></i>`, 1);
 var root_13$r = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
@@ -19266,7 +19461,13 @@ function InlineActivitiesList($$anchor, $$props) {
                       else $$render(alternate, -1);
                     });
                   }
-                  var text2 = sibling(node_3);
+                  var node_4 = sibling(node_3, 2);
+                  CatHiddenActivityBadge(node_4, {
+                    get activity() {
+                      return get(ctx).activity;
+                    }
+                  });
+                  var text2 = sibling(node_4);
                   reset(a);
                   template_effect(() => {
                     set_attribute(a, "tabindex", settings.value.useAccessibleKeyboardSupport ? 0 : -1);
@@ -19277,15 +19478,15 @@ function InlineActivitiesList($$anchor, $$props) {
                 },
                 $$slots: { default: true }
               });
-              var node_4 = sibling(node_2, 2);
-              TidyTableCell$1(node_4, {
+              var node_5 = sibling(node_2, 2);
+              TidyTableCell$1(node_5, {
                 children: ($$anchor5, $$slotProps2) => {
                   var fragment_6 = comment();
-                  var node_5 = first_child(fragment_6);
+                  var node_6 = first_child(fragment_6);
                   {
                     var consequent_5 = ($$anchor6) => {
                       var fragment_7 = comment();
-                      var node_6 = first_child(fragment_7);
+                      var node_7 = first_child(fragment_7);
                       {
                         var consequent_1 = ($$anchor7) => {
                           RechargeControl($$anchor7, {
@@ -19301,7 +19502,7 @@ function InlineActivitiesList($$anchor, $$props) {
                         var consequent_3 = ($$anchor7) => {
                           const remaining = /* @__PURE__ */ user_derived(() => get(ctx).activity.uses.max - get(ctx).activity.uses.spent);
                           var fragment_9 = root_10$J();
-                          var node_7 = first_child(fragment_9);
+                          var node_8 = first_child(fragment_9);
                           {
                             var consequent_2 = ($$anchor8) => {
                               var span = root_11$F();
@@ -19310,11 +19511,11 @@ function InlineActivitiesList($$anchor, $$props) {
                               template_effect(() => set_text(text_1, get(remaining)));
                               append($$anchor8, span);
                             };
-                            if_block(node_7, ($$render) => {
+                            if_block(node_8, ($$render) => {
                               if (get(remaining) > 1) $$render(consequent_2);
                             });
                           }
-                          var i = sibling(node_7, 2);
+                          var i = sibling(node_8, 2);
                           template_effect(($02) => set_attribute(i, "title", $02), [() => localize("DND5E.Charged")]);
                           append($$anchor7, fragment_9);
                         };
@@ -19329,7 +19530,7 @@ function InlineActivitiesList($$anchor, $$props) {
                           var span_1 = root_13$r();
                           append($$anchor7, span_1);
                         };
-                        if_block(node_6, ($$render) => {
+                        if_block(node_7, ($$render) => {
                           if (get(ctx).isOnCooldown) $$render(consequent_1);
                           else if (get(ctx).hasRecharge) $$render(consequent_3, 1);
                           else if (!!get(ctx).activity.uses?.max) $$render(consequent_4, 2);
@@ -19338,7 +19539,7 @@ function InlineActivitiesList($$anchor, $$props) {
                       }
                       append($$anchor6, fragment_7);
                     };
-                    if_block(node_5, ($$render) => {
+                    if_block(node_6, ($$render) => {
                       if (get(configurable)) $$render(consequent_5);
                     });
                   }
@@ -19346,8 +19547,8 @@ function InlineActivitiesList($$anchor, $$props) {
                 },
                 $$slots: { default: true }
               });
-              var node_8 = sibling(node_4, 2);
-              TidyTableCell$1(node_8, {
+              var node_9 = sibling(node_5, 2);
+              TidyTableCell$1(node_9, {
                 children: ($$anchor5, $$slotProps2) => {
                   next();
                   var text_2 = text();
@@ -20289,10 +20490,13 @@ class ActorItemRuntime {
       (command) => ({
         ...command,
         enabled: command.enabled ? (params) => command.enabled?.({ ...params, actor: params.document }) ?? true : void 0,
-        execute: (params) => command.execute?.({
-          ...params,
-          actor: params.document
-        })
+        execute: (params) => {
+          const args = { ...params, actor: params.document };
+          if (command.tooltip === "Quick Insert" && command.iconClass === "fas fa-search" && globalThis.QuickInsert?.systemIntegration?.Dnd5eSheetContext) {
+            return openClassicQuickInsert(args);
+          }
+          return command.execute?.(args);
+        }
       })
     );
     ActorItemRuntime._actorItemSectionCommands.push(...sectionCommands);
@@ -21378,7 +21582,7 @@ class Inventory {
   }
   // TODO: switch to object param 
   static applyInventoryItemToSection(inventory, item, defaultInventoryTypes, customSectionOptions, fallbackInventoryKey = "", customSectionFlag = "section") {
-    const customSectionName = TidyFlags[customSectionFlag].get(item);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(item, customSectionFlag);
     if (!customSectionName) {
       let partition = inventory[item.type] ?? inventory[fallbackInventoryKey];
       partition?.items.push(item);
@@ -26677,19 +26881,11 @@ class SheetSections {
   static itemSupportsCustomSections(itemType) {
     return !this._itemCustomSectionDenylist.has(itemType);
   }
-  static applySpellToSection(spellbook, spell, options2) {
-    const customSectionName = TidyFlags.section.get(spell);
-    if (!customSectionName) {
-      return;
-    }
-    const section = spellbook[customSectionName] ??= SheetSections.createSpellbookSection(customSectionName, options2);
-    section.items.push(spell);
-  }
-  static createSpellbookSection(customSectionName, options2) {
+  static createSpellbookSection(customSectionName, options2, customSectionFlag = "section") {
     return {
       type: CONSTANTS.SECTION_TYPE_SPELLBOOK,
       dataset: {
-        [TidyFlags.section.prop]: customSectionName
+        [TidyFlags[customSectionFlag].prop]: customSectionName
       },
       items: [],
       label: customSectionName,
@@ -26739,13 +26935,16 @@ class SheetSections {
   }
   // TODO: Fold into legacy?
   static prepareTidySpellbook(context, tabId, spells, options2 = {}, customSectionFlag = "section") {
-    const customSectionSpells = spells.filter(
-      (s) => TidyFlags[customSectionFlag].get(s)
-    );
-    spells = spells.filter((s) => !TidyFlags.section.get(s));
+    const standardSpells = [];
+    const customSpells = [];
+    for (const spell of spells) {
+      const name = TidyFlags.getItemSectionForDisplay(spell, customSectionFlag);
+      if (name) customSpells.push({ name, spell });
+      else standardSpells.push(spell);
+    }
     const spellbook = this._prepareSpellbookLegacy(
       context,
-      spells
+      standardSpells
     ).map(
       (s) => ({
         ...s,
@@ -26768,11 +26967,16 @@ class SheetSections {
         prev[key2] = curr;
         return prev;
       },
-      {}
+      /* @__PURE__ */ Object.create(null)
     );
-    customSectionSpells.forEach((spell) => {
-      SheetSections.applySpellToSection(spellbookMap, spell, options2);
-    });
+    for (const { name, spell } of customSpells) {
+      const section = spellbookMap[name] ??= SheetSections.createSpellbookSection(
+        name,
+        options2,
+        customSectionFlag
+      );
+      section.items.push(spell);
+    }
     SheetSections.getFilteredGlobalSectionsToShowWhenEmpty(
       context.actor,
       tabId
@@ -26780,7 +26984,7 @@ class SheetSections {
       spellbookMap[s] ??= SheetSections.createSpellbookSection(s, {
         canCreate: true,
         ...options2
-      });
+      }, customSectionFlag);
     });
     return Object.values(spellbookMap);
   }
@@ -34119,7 +34323,7 @@ function ItemWeaponDetailsTab$1($$anchor, $$props) {
 var root_1$3s = /* @__PURE__ */ from_html(`<button type="button" class="add-activity-button w-100 svelte-57ypnl"><i class="fas fa-plus"></i> </button>`);
 var root_4$1B = /* @__PURE__ */ from_html(`<img class="activity-icon svelte-57ypnl"/>`);
 var root_5$1g = /* @__PURE__ */ from_html(`<button type="button" class="inline-icon-button"><i class="fas fa-trash"></i></button>`);
-var root_2$2$ = /* @__PURE__ */ from_html(`<div class="activity card svelte-57ypnl" data-tidy-always-draggable="" data-info-card="activity"><div><!></div> <button type="button" class="transparent-button highlight-on-hover name svelte-57ypnl"> </button> <!></div>`);
+var root_2$2$ = /* @__PURE__ */ from_html(`<div class="activity card svelte-57ypnl" data-tidy-always-draggable="" data-info-card="activity"><div><!></div> <button type="button" class="transparent-button highlight-on-hover name svelte-57ypnl"><!> </button> <!></div>`);
 var root$5z = /* @__PURE__ */ from_html(`<section class="flex-1 flex-column extra-small-gap"><header class="header"><!></header> <div class="scroll-container activities svelte-57ypnl"></div></section>`);
 function ItemActivitiesTab$1($$anchor, $$props) {
   push($$props, true);
@@ -34184,9 +34388,18 @@ function ItemActivitiesTab$1($$anchor, $$props) {
     }
     reset(div_2);
     var button_1 = sibling(div_2, 2);
-    var text_1 = child(button_1, true);
+    var node_2 = child(button_1);
+    {
+      let $0 = /* @__PURE__ */ user_derived(() => get(context).item.system.activities?.get(get(activity).id));
+      CatHiddenActivityBadge(node_2, {
+        get activity() {
+          return get($0);
+        }
+      });
+    }
+    var text_1 = sibling(node_2);
     reset(button_1);
-    var node_2 = sibling(button_1, 2);
+    var node_3 = sibling(button_1, 2);
     {
       var consequent_2 = ($$anchor3) => {
         var button_2 = root_5$1g();
@@ -34200,7 +34413,7 @@ function ItemActivitiesTab$1($$anchor, $$props) {
         delegated("click", button_2, () => get(context).system.activities?.get(get(activity).id)?.deleteDialog());
         append($$anchor3, button_2);
       };
-      if_block(node_2, ($$render) => {
+      if_block(node_3, ($$render) => {
         if (get(context).editable) $$render(consequent_2);
       });
     }
@@ -34214,7 +34427,7 @@ function ItemActivitiesTab$1($$anchor, $$props) {
         classes = set_class(div_2, 1, "icon svelte-57ypnl", null, classes, { svg: get(activity).img.svg });
         button_1.disabled = !get(context).editable;
         set_attribute(button_1, "tabindex", settings.value.useAccessibleKeyboardSupport ? 0 : -1);
-        set_text(text_1, get(activity).name);
+        set_text(text_1, ` ${get(activity).name ?? ""}`);
       },
       [() => Activities.isConfigurable(get(activity))]
     );
@@ -48186,6 +48399,7 @@ function TidyExtensibleDocumentSheetMixin(sheetType, BaseApplication) {
       }
       FoundryAdapter.mergeObject(options2, { window: { title: this.title, controls: true } });
       super._updateFrame(options2);
+      updateCatKitStatus(this.document, this.element);
     }
     async _onEmbeddedDocumentInputChange(event2) {
       const itemId = event2.target.closest("[data-item-id]")?.dataset.itemId;
@@ -69317,8 +69531,8 @@ class ConditionsAndEffects {
 }
 class CharacterSheetSections {
   static buildClassicFeaturesSections(actor, tabId, races, backgrounds, classes, feats, options2, customSectionFlag = "section") {
-    const customFeats = feats.filter((f) => TidyFlags[customSectionFlag].get(f));
-    feats = feats.filter((f) => !TidyFlags[customSectionFlag].get(f));
+    const customFeats = feats.filter((f) => TidyFlags.getItemSectionForDisplay(f, customSectionFlag));
+    feats = feats.filter((f) => !TidyFlags.getItemSectionForDisplay(f, customSectionFlag));
     const features = {
       race: {
         type: CONSTANTS.SECTION_TYPE_FEATURE,
@@ -69429,7 +69643,7 @@ class CharacterSheetSections {
     return features;
   }
   static applyCharacterFeatureToSection(features, feat, customSectionOptions, customSectionFlag = "section") {
-    const customSectionName = TidyFlags[customSectionFlag].get(feat);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(feat, customSectionFlag);
     if (!customSectionName) {
       return;
     }
@@ -69494,7 +69708,7 @@ class CharacterSheetSections {
       options: options2
     });
     for (let feat of feats) {
-      let customSection = TidyFlags[customSectionFlag].get(feat);
+      let customSection = TidyFlags.getItemSectionForDisplay(feat, customSectionFlag);
       if (!isNil(customSection)) {
         let section2 = featuresMap[customSection] ??= this.createQuadroneFeatureSection({
           key: customSection,
@@ -84983,6 +85197,9 @@ const ItemSheetQuadroneRuntime = new ItemSheetQuadroneRuntimeImpl(
     ]
   ]
 );
+function hideActivityShortcut(activity) {
+  return hideCatActivityOnActor(activity) || Boolean(activity?.midiProperties?.automationOnly && game.modules.get("midi-qol")?.active);
+}
 var root_2$Z = /* @__PURE__ */ from_html(`<span class="inline-uses"><span class="uses-value"> </span> <span class="divider">/</span> <span class="uses-max"> </span></span>`);
 var root_3$G = /* @__PURE__ */ from_html(`<div class="pips spell-pips"></div>`);
 var root_6$s = /* @__PURE__ */ from_html(`<i class="fa-solid fa-pencil"></i>`);
@@ -85374,7 +85591,7 @@ var root_6$r = /* @__PURE__ */ from_html(`<span class="charged-text"><!> <i clas
 var root_8$j = /* @__PURE__ */ from_html(`<!> <span class="divider">/</span> <span class="max"> </span>`, 1);
 var root_4$u = /* @__PURE__ */ from_html(`<div><!></div>`);
 var root_9$e = /* @__PURE__ */ from_html(`<a class="attribute-pins-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a>`);
-var root$28 = /* @__PURE__ */ from_html(`<div class="sheet-pin attribute-pin" data-tidy-draggable="" data-configurable="true"><div class="attribute-document-image"><!></div> <div class="attribute-pin-details"><div class="attribute-pin-name-container"><!></div> <!></div> <!></div>`);
+var root$28 = /* @__PURE__ */ from_html(`<div class="sheet-pin attribute-pin" data-tidy-draggable="" data-configurable="true"><div class="attribute-document-image"><!></div> <div class="attribute-pin-details"><div class="attribute-pin-name-container"><!> <!></div> <!></div> <!></div>`);
 function SheetPinActivity($$anchor, $$props) {
   push($$props, true);
   const tabId = getContext(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
@@ -85422,11 +85639,17 @@ function SheetPinActivity($$anchor, $$props) {
   var div_2 = sibling(div_1, 2);
   var div_3 = child(div_2);
   var node_1 = child(div_3);
+  CatHiddenActivityBadge(node_1, {
+    get activity() {
+      return $$props.ctx.document;
+    }
+  });
+  var node_2 = sibling(node_1, 2);
   {
     var consequent_1 = ($$anchor2) => {
       var fragment = root_1$1e();
-      var node_2 = first_child(fragment);
-      TextInput(node_2, {
+      var node_3 = first_child(fragment);
+      TextInput(node_3, {
         class: "attribute-pin-name",
         get document() {
           return $$props.ctx.document;
@@ -85446,14 +85669,14 @@ function SheetPinActivity($$anchor, $$props) {
           return false;
         }
       });
-      var node_3 = sibling(node_2, 2);
+      var node_4 = sibling(node_3, 2);
       {
         var consequent = ($$anchor3) => {
           var i = root_2$Y();
           append($$anchor3, i);
         };
         var d = /* @__PURE__ */ user_derived(() => !isNil($$props.ctx.alias?.trim(), ""));
-        if_block(node_3, ($$render) => {
+        if_block(node_4, ($$render) => {
           if (get(d)) $$render(consequent);
         });
       }
@@ -85473,17 +85696,17 @@ function SheetPinActivity($$anchor, $$props) {
       delegated("click", button, () => $$props.ctx.document.sheet?.render({ force: true, mode: CONSTANTS.SHEET_MODE_PLAY }));
       append($$anchor2, button);
     };
-    if_block(node_1, ($$render) => {
+    if_block(node_2, ($$render) => {
       if (get(context).unlocked) $$render(consequent_1);
       else $$render(alternate, -1);
     });
   }
   reset(div_3);
-  var node_4 = sibling(div_3, 2);
+  var node_5 = sibling(div_3, 2);
   {
     var consequent_5 = ($$anchor2) => {
       var div_4 = root_4$u();
-      var node_5 = child(div_4);
+      var node_6 = child(div_4);
       {
         var consequent_2 = ($$anchor3) => {
           RechargeControl($$anchor3, {
@@ -85498,7 +85721,7 @@ function SheetPinActivity($$anchor, $$props) {
         };
         var consequent_4 = ($$anchor3) => {
           var span = root_6$r();
-          var node_6 = child(span);
+          var node_7 = child(span);
           {
             var consequent_3 = ($$anchor4) => {
               var span_1 = root_7$k();
@@ -85507,19 +85730,19 @@ function SheetPinActivity($$anchor, $$props) {
               template_effect(() => set_text(text_1, get(value)));
               append($$anchor4, span_1);
             };
-            if_block(node_6, ($$render) => {
+            if_block(node_7, ($$render) => {
               if (get(value) > 1) $$render(consequent_3);
             });
           }
-          var i_1 = sibling(node_6, 2);
+          var i_1 = sibling(node_7, 2);
           reset(span);
           template_effect(($0) => set_attribute(i_1, "title", $0), [() => localize("DND5E.Charged")]);
           append($$anchor3, span);
         };
         var alternate_1 = ($$anchor3) => {
           var fragment_2 = root_8$j();
-          var node_7 = first_child(fragment_2);
-          TextInput(node_7, {
+          var node_8 = first_child(fragment_2);
+          TextInput(node_8, {
             get document() {
               return get(usesDocument);
             },
@@ -85530,13 +85753,13 @@ function SheetPinActivity($$anchor, $$props) {
             onSaveChange: (ev) => saveValueChange(ev),
             selectOnFocus: true
           });
-          var span_2 = sibling(node_7, 4);
+          var span_2 = sibling(node_8, 4);
           var text_2 = child(span_2, true);
           reset(span_2);
           template_effect(() => set_text(text_2, get(maxText)));
           append($$anchor3, fragment_2);
         };
-        if_block(node_5, ($$render) => {
+        if_block(node_6, ($$render) => {
           if ($$props.ctx.document.isOnCooldown) $$render(consequent_2);
           else if ($$props.ctx.document.hasRecharge) $$render(consequent_4, 1);
           else $$render(alternate_1, -1);
@@ -85546,19 +85769,19 @@ function SheetPinActivity($$anchor, $$props) {
       template_effect(() => set_class(div_4, 1, `attribute-counter ${$$props.ctx.resource ?? ""}`));
       append($$anchor2, div_4);
     };
-    if_block(node_4, ($$render) => {
+    if_block(node_5, ($$render) => {
       if ($$props.ctx.presentation !== "none") $$render(consequent_5);
     });
   }
   reset(div_2);
-  var node_8 = sibling(div_2, 2);
+  var node_9 = sibling(div_2, 2);
   {
     var consequent_6 = ($$anchor2) => {
       var a = root_9$e();
       delegated("click", a, (ev) => EventHelper.triggerContextMenu(ev, "[data-activity-id]"));
       append($$anchor2, a);
     };
-    if_block(node_8, ($$render) => {
+    if_block(node_9, ($$render) => {
       if (get(context).unlocked) $$render(consequent_6);
     });
   }
@@ -85584,7 +85807,7 @@ function SheetPins($$anchor, $$props) {
   const tabId = getContext(CONSTANTS.SVELTE_CONTEXT.TAB_ID);
   const searchResults = getSearchResultsContext();
   const sheetPins = /* @__PURE__ */ user_derived(() => SheetPinsProvider.getSheetPinContextsToDisplay(get(context).document, get(context).tabSheetPins, tabId));
-  const visiblePins = /* @__PURE__ */ user_derived(() => SheetPinsProvider.filterSheetPinsFromSearch(get(sheetPins), searchResults.criteria));
+  const visiblePins = /* @__PURE__ */ user_derived(() => SheetPinsProvider.filterSheetPinsFromSearch(get(sheetPins), searchResults.criteria).filter((pin) => pin.type !== "activity" || !hideActivityShortcut(pin.document)));
   var fragment = comment();
   var node = first_child(fragment);
   {
@@ -101432,7 +101655,7 @@ delegate(["mouseover"]);
 var root_5$d = /* @__PURE__ */ from_html(`<i class="fas fa-bolt"></i>`);
 var root_7$6 = /* @__PURE__ */ from_html(`<i class="fas fa-wand-sparkles"></i> <i class="fas fa-shield"></i>`, 1);
 var root_2$u = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_11$4 = /* @__PURE__ */ from_html(`<a class="item-table-image-button"><img/> <i class="fa fa-dice-d20 roll-indicator"></i></a> <span class="truncate"> </span>`, 1);
+var root_11$4 = /* @__PURE__ */ from_html(`<a class="item-table-image-button"><img/> <i class="fa fa-dice-d20 roll-indicator"></i></a> <span class="truncate"><!> </span>`, 1);
 var root_12$5 = /* @__PURE__ */ from_html(`<a> </a>`);
 var root_15$3 = /* @__PURE__ */ from_html(`<span>—</span>`);
 var root_17$1 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
@@ -101547,21 +101770,27 @@ function FavoriteActivitiesList($$anchor, $$props) {
                   next(2);
                   reset(a);
                   var span = sibling(a, 2);
-                  var text_3 = child(span, true);
+                  var node_7 = child(span);
+                  CatHiddenActivityBadge(node_7, {
+                    get activity() {
+                      return activity();
+                    }
+                  });
+                  var text_3 = sibling(node_7);
                   reset(span);
                   template_effect(() => {
                     set_attribute(img, "src", activity().img);
                     set_attribute(span, "data-tidy-activity-name", activity().name);
                     set_attribute(span, "data-tidy-sheet-part", CONSTANTS.SHEET_PARTS.ITEM_NAME);
-                    set_text(text_3, activity().name);
+                    set_text(text_3, ` ${activity().name ?? ""}`);
                   });
                   delegated("click", a, (event2) => get(context).editable && activity().use({ event: event2 }));
                   append($$anchor5, fragment_10);
                 },
                 $$slots: { default: true }
               });
-              var node_7 = sibling(node_6, 2);
-              TidyTableCell$1(node_7, {
+              var node_8 = sibling(node_6, 2);
+              TidyTableCell$1(node_8, {
                 children: ($$anchor5, $$slotProps2) => {
                   var a_1 = root_12$5();
                   let classes;
@@ -101577,12 +101806,12 @@ function FavoriteActivitiesList($$anchor, $$props) {
                 },
                 $$slots: { default: true }
               });
-              var node_8 = sibling(node_7, 2);
-              TidyTableCell$1(node_8, {
+              var node_9 = sibling(node_8, 2);
+              TidyTableCell$1(node_9, {
                 children: ($$anchor5, $$slotProps2) => {
                   const hasActivityUses = /* @__PURE__ */ user_derived(() => activityHasUses(activity()));
                   var fragment_11 = comment();
-                  var node_9 = first_child(fragment_11);
+                  var node_10 = first_child(fragment_11);
                   {
                     var consequent = ($$anchor6) => {
                       ActivityUses($$anchor6, {
@@ -101595,7 +101824,7 @@ function FavoriteActivitiesList($$anchor, $$props) {
                       var span_1 = root_15$3();
                       append($$anchor6, span_1);
                     };
-                    if_block(node_9, ($$render) => {
+                    if_block(node_10, ($$render) => {
                       if (get(hasActivityUses)) $$render(consequent);
                       else $$render(alternate, -1);
                     });
@@ -101604,11 +101833,11 @@ function FavoriteActivitiesList($$anchor, $$props) {
                 },
                 $$slots: { default: true }
               });
-              var node_10 = sibling(node_8, 2);
-              TidyTableCell$1(node_10, {
+              var node_11 = sibling(node_9, 2);
+              TidyTableCell$1(node_11, {
                 children: ($$anchor5, $$slotProps2) => {
                   var fragment_13 = comment();
-                  var node_11 = first_child(fragment_13);
+                  var node_12 = first_child(fragment_13);
                   {
                     var consequent_1 = ($$anchor6) => {
                       var span_2 = root_17$1();
@@ -101619,7 +101848,7 @@ function FavoriteActivitiesList($$anchor, $$props) {
                       ]);
                       append($$anchor6, span_2);
                     };
-                    if_block(node_11, ($$render) => {
+                    if_block(node_12, ($$render) => {
                       if (activity().activation?.type) $$render(consequent_1);
                     });
                   }
@@ -101627,8 +101856,8 @@ function FavoriteActivitiesList($$anchor, $$props) {
                 },
                 $$slots: { default: true }
               });
-              var node_12 = sibling(node_10, 2);
-              TidyTableCell$1(node_12, {
+              var node_13 = sibling(node_11, 2);
+              TidyTableCell$1(node_13, {
                 children: ($$anchor5, $$slotProps2) => {
                   const label = /* @__PURE__ */ user_derived(() => activity().labels.toHit ? activity().labels.toHit : activity().save?.ability && activity().save?.dc?.value ? `${FoundryAdapter.getSaveAbilityAbbreviation(activity().save)} ${activity().save.dc.value}`.toLocaleUpperCase() : "—");
                   var span_3 = root_18$2();
@@ -111222,6 +111451,105 @@ const FoundryAdapter = {
     return result;
   }
 };
+function isPlutoniumSheetDrop(data, document2 = null) {
+  if (data?.type === "JournalEntryPage" && document2?.flags?.plutonium?.type !== "loot") return false;
+  if (!game.modules.get("tidy5e-sheet")?.active || !game.modules.get("plutonium")?.active) return false;
+  return data?.type === "JournalEntryPage" || data?.type === "ve-Loot" || data?.type === "Item" && ["srd5e.Import", "srd5e.Hover"].includes(data.subType) && Boolean(data.page && data.source && data.hash);
+}
+function checkImport(summary) {
+  if (summary?.isFailed?.() || summary?.status?.description === "taskExitCancelled") {
+    throw new Error(summary.getNotificationMeta?.().message ?? "전리품 임포트가 중단되었습니다.");
+  }
+}
+async function stageLoot(api, actor, loot, id, checkAuthority) {
+  const staged = actor.clone({}, { parent: null, pack: null });
+  const before = staged.toObject();
+  const importers = /* @__PURE__ */ new Map();
+  for (const { page, entity, options: options2 } of loot.entityInfos ?? []) {
+    let importer = importers.get(page);
+    if (!importer) {
+      importer = await api.importer.pGetImporter({ page });
+      if (importer?.constructor.FOLDER_TYPE !== "Item") throw new Error("지원하지 않는 전리품 종류입니다.");
+      importers.set(page, importer);
+    }
+    const opts = new api.importer.ImportOpts({ actor: staged, isSpellScroll: options2?.isSpellScroll });
+    checkImport(await importer.pImportEntry(entity, opts, { quantity: options2?.quantity }));
+  }
+  const currency = Object.fromEntries(Object.entries(loot.currency ?? {}).filter(([key2, value]) => Object.hasOwn(CONFIG.DND5E.currencies, key2) && Number.isFinite(value) && value > 0));
+  const update2 = {};
+  if (Object.keys(currency).length && actor.type === "npc" && api.config.getValue("currency", "isNpcUseCurrencySheetItems")) {
+    const importer = await api.importer.pGetImporter({ page: "items.html" });
+    checkImport(await importer.pImportCurrency(currency, new api.importer.ImportOpts({ actor: staged })));
+  } else {
+    for (const [key2, amount] of Object.entries(currency)) {
+      update2["system.currency." + key2] = (actor.system.currency?.[key2] ?? 0) + amount;
+    }
+  }
+  const equals2 = foundry.utils.equals ?? foundry.utils.objectsEqual;
+  const legacySource = game.release?.generation < 14 ? actor.toObject() : null;
+  for (const field of ["items", "effects"]) {
+    const originals = new Map(before[field].map((data) => [data._id, data]));
+    const changes = [];
+    const legacyRecords = legacySource && new Map(legacySource[field].map((data) => [data._id, data]));
+    for (const doc of staged[field].values()) {
+      if (doc.parent !== staged) continue;
+      const original = originals.get(doc.id);
+      const data = doc.toObject();
+      const delta = original ? foundry.utils.diffObject(original, data, { bidirectional: true }) : data;
+      if (!Object.keys(delta).length) continue;
+      const live = actor[field].get(doc.id);
+      if (original ? !live || !equals2(original, live.toObject()) : live) {
+        throw new Error("전리품을 준비하는 동안 액터의 아이템 또는 효과가 변경되었습니다.");
+      }
+      changes.push({ ...delta, _id: doc.id });
+      legacyRecords?.set(doc.id, data);
+    }
+    if (changes.length) update2[field] = legacyRecords ? [...legacyRecords.values()] : changes;
+  }
+  if (!Object.keys(update2).length) return null;
+  checkAuthority();
+  update2[lootRevisionPath] = id;
+  if (!await actor.update(update2)) {
+    throw new Error("액터의 전리품 저장이 취소되었습니다.");
+  }
+  return id;
+}
+async function handlePlutoniumSheetDrop(sheet, event2, data, document2 = null) {
+  const journalLoot = data.type === "JournalEntryPage";
+  if (!sheet.isEditable || !sheet.actor.isOwner) return true;
+  const api = game.modules.get("plutonium").api;
+  try {
+    if (journalLoot || data.type === "ve-Loot") {
+      const loot = journalLoot ? document2.flags.plutonium.loot : data.data;
+      await lootTurns.run(sheet.actor, (id, checkAuthority) => stageLoot(api, sheet.actor, loot, id, checkAuthority));
+    } else if (data.isDragDropForcePlutoniumImport) {
+      const redirect = (api.config.getValue("text", "isForceRedirectImports") || data.isAllowRedirect && api.config.getValue("text", "isAllowRedirectImports")) && globalThis.VetoolsConfig.get("styleSwitcher", "style") === "one" ? await globalThis.Renderer.redirect.pGetRedirectByHash(data.page, data.hash) : null;
+      const { page, source: source2, hash } = redirect || data;
+      const entity = await globalThis.DataLoader.pCacheAndGet(page, source2, hash, { isCopy: true });
+      const importer = await api.importer.pGetImporter({ prop: entity?.__prop || page });
+      if (!entity || importer?.constructor.FOLDER_TYPE !== "Item") throw new Error("아이템을 찾을 수 없습니다.");
+      const preview = await importer.pImportEntry(entity, new api.importer.ImportOpts({ isTemp: true }));
+      checkImport(preview);
+      const temporary = preview?.getPrimaryDocument?.();
+      if (temporary?.documentName !== "Item") throw new Error("아이템을 찾을 수 없습니다.");
+      const item = temporary.clone({ "flags.plutonium.isStandardDragDrop": true }, { keepId: true });
+      await sheet._onDropItemCreate(item, event2, "copy", async () => {
+        const result = await importer.pImportEntry(entity, new api.importer.ImportOpts({ actor: sheet.actor }));
+        checkImport(result);
+        return result?.getPrimaryDocument?.();
+      });
+    } else {
+      const item = await Item.implementation.fromDropData(data);
+      if (item?.documentName !== "Item") throw new Error("아이템을 찾을 수 없습니다.");
+      const copy = item.getFlag("plutonium", "propDroppable") ? item.clone({ "flags.plutonium.isStandardDragDrop": true }, { keepId: true }) : item;
+      await sheet._onDropItemCreate(copy, event2, "copy");
+    }
+  } catch (error2) {
+    console.error("female_edition | Plutonium drop", error2);
+    ui.notifications.error("Plutonium 드롭을 처리하지 못했습니다. 콘솔에서 상세 오류를 확인하세요.");
+  }
+  return true;
+}
 var root_1$q = /* @__PURE__ */ from_html(`<li class="svelte-6jq17x"><button type="button"></button></li>`);
 var root$K = /* @__PURE__ */ from_html(`<div><div><div class="exhaustion-icon colorized svelte-6jq17x"><i></i></div> <ul class="exhaustion-levels svelte-6jq17x"></ul></div> <div> </div></div>`);
 function ExhaustionTracker($$anchor, $$props) {
@@ -115426,14 +115754,18 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
     /** The tab which can house sheet pins from other tabs. `null` when the sheet has none. */
     aggregatePinTab = null;
     async _onDrop(event2) {
-      this.#dropBehavior = this._dropBehavior(event2);
+      const data = foundry.applications.ux.TextEditor.getDragEventData(event2);
+      this.#dropBehavior = classicActorDropBehavior(this, event2, data);
       try {
         this._currentDragEvent = event2;
-        const data = foundry.applications.ux.TextEditor.getDragEventData(event2);
         const actor = this.actor;
         const allowed = Hooks.call("dropActorSheetData", actor, this, data);
         if (allowed === false) return;
+        if (isPlutoniumSheetDrop(data)) return await handlePlutoniumSheetDrop(this, event2, data);
         const sheetPinDoc = data.uuid ? await fromUuid(data.uuid) : null;
+        if (data.type === "JournalEntryPage" && isPlutoniumSheetDrop(data, sheetPinDoc)) {
+          return await handlePlutoniumSheetDrop(this, event2, data, sheetPinDoc);
+        }
         if (sheetPinDoc?.actor === this.actor && event2.target.closest('[data-tidy-sheet-part="sheet-pins"]')) {
           return await this._onDropSheetPin(event2, {
             id: SheetPinsProvider.getRelativeUUID(sheetPinDoc),
@@ -115532,11 +115864,16 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
     /**
      * Handle the final creation of dropped Item data on the Actor.
      */
-    async _onDropItemCreate(itemData, event2, behavior) {
+    async _onDropItemCreate(itemData, event2, behavior, importOriginal) {
       let items = Array.isArray(itemData) ? itemData : [itemData];
       const options2 = { event: event2, behavior: behavior ?? event2?._behavior ?? "copy" };
+      const original = importOriginal && !Array.isArray(itemData) ? itemData.toObject() : null;
       if (TidyHooks.dnd5eDropCreateItems(this, items, options2) === false) return [];
       behavior = options2.behavior;
+      if (importOriginal && behavior === "copy" && !Array.isArray(itemData) && items.length === 1 && items[0] === itemData && (foundry.utils.equals ?? foundry.utils.objectsEqual)(original, itemData.toObject()) && !this.constructor.unsupportedItemTypes.has(itemData.type)) {
+        const imported = await importOriginal();
+        return imported ? [imported] : [];
+      }
       const itemsWithoutAdvancement = items.filter((i) => !hasAdvancement(i.system.advancement));
       const multipleAdvancements = items.length - itemsWithoutAdvancement.length > 1;
       if (multipleAdvancements && !game.settings.get("dnd5e", "disableAdvancements")) {
@@ -116350,7 +116687,7 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
     const favoriteActivities = this.actor.system.favorites.filter((f) => f.type === "activity");
     for (const favoriteActivity of favoriteActivities) {
       const activity = await fromUuid(favoriteActivity.id, { relative: this.actor });
-      if (!activity) {
+      if (!activity || hideActivityShortcut(activity)) {
         continue;
       }
       activitiesSection.activities.push(activity);
@@ -116681,10 +117018,14 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
       console.error(e);
       return;
     }
-    if (data.type === CONSTANTS.DOCUMENT_NAME_ACTOR) {
+    if (data.type === CONSTANTS.DOCUMENT_NAME_ACTOR || isPlutoniumSheetDrop(data)) {
       return await super._onDrop(event2);
     }
     const doc = await fromUuid(data.uuid);
+    if (data.type === "JournalEntryPage" && isPlutoniumSheetDrop(data, doc)) {
+      if (Hooks.call("dropActorSheetData", this.actor, this, data) === false) return;
+      return await handlePlutoniumSheetDrop(this, event2, data, doc);
+    }
     let relativeUuid = SheetPinsProvider.getRelativeUUID(doc);
     if (event2.target.closest('[data-tidy-sheet-part="sheet-pins"]')) {
       return await this._onDropSheetPin(event2, { id: relativeUuid, doc });
@@ -118512,7 +118853,7 @@ class NpcSheetSections {
     ];
   }
   static applyAbilityToSection(abilities, feat, customSectionOptions) {
-    const customSectionName = TidyFlags.section.get(feat);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(feat);
     if (!customSectionName) {
       return;
     }
@@ -119212,7 +119553,7 @@ class Tidy5eNpcSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET_TYPE_
       if (inventoryTypes.has(item.type)) {
         Inventory.applyInventoryItemToSection(inventory, item, inventoryTypesArray, { canCreate: true });
       }
-      if (TidyFlags.section.get(item)) {
+      if (TidyFlags.getItemSectionForDisplay(item)) {
         NpcSheetSections.applyAbilityToSection(features, item, { canCreate: true });
       } else if (item.type === CONSTANTS.ITEM_TYPE_WEAPON) features.weapons.items.push(item);
       else if ([
@@ -122253,7 +122594,11 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
       const actor = this.actor;
       const allowed = Hooks.call("dropActorSheetData", actor, this, data);
       if (allowed === false) return;
+      if (isPlutoniumSheetDrop(data)) return await handlePlutoniumSheetDrop(this, event2, data);
       const sheetPinDoc = data.uuid ? await fromUuid(data.uuid) : null;
+      if (data.type === "JournalEntryPage" && isPlutoniumSheetDrop(data, sheetPinDoc)) {
+        return await handlePlutoniumSheetDrop(this, event2, data, sheetPinDoc);
+      }
       if (sheetPinDoc?.actor === this.actor && event2.target?.closest('[data-tidy-sheet-part="sheet-pins"]')) {
         return await this._onDropSheetPin(event2, {
           id: SheetPinsProvider.getRelativeUUID(sheetPinDoc),
@@ -122377,11 +122722,16 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
     /**
      * Handle the final creation of dropped Item data on the Actor.
      */
-    async _onDropItemCreate(itemData, event2, behavior) {
+    async _onDropItemCreate(itemData, event2, behavior, importOriginal) {
       let items = Array.isArray(itemData) ? itemData : [itemData];
       const options2 = { event: event2, behavior: behavior ?? event2?._behavior ?? "copy" };
+      const original = importOriginal && !Array.isArray(itemData) ? itemData.toObject() : null;
       if (TidyHooks.dnd5eDropCreateItems(this, items, options2) === false) return [];
       behavior = options2.behavior;
+      if (importOriginal && behavior === "copy" && !Array.isArray(itemData) && items.length === 1 && items[0] === itemData && (foundry.utils.equals ?? foundry.utils.objectsEqual)(original, itemData.toObject()) && (!this._supportedItemTypes.size || this._supportedItemTypes.has(itemData.type))) {
+        const imported = await importOriginal();
+        return imported ? [imported] : [];
+      }
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );
@@ -125026,6 +125376,7 @@ function withQuadroneReadyAliases(sheetClasses, classicByType, dispatch) {
 const CLASSIC_SHEET_LABEL = "Tidy 5e Sheet-Classic";
 Hooks.once("init", () => {
   if (game.system.id !== CONSTANTS.DND5E_SYSTEM_ID) return;
+  if (game.modules.get("plutonium")?.active && game.modules.get("tidy5e-sheet")?.active) lootTurns.register(CONFIG.queries);
   const documentSheetConfig = foundry.applications.apps.DocumentSheetConfig;
   documentSheetConfig.registerSheet(Actor, CONSTANTS.DND5E_SYSTEM_ID, Tidy5eCharacterSheet, {
     types: [CONSTANTS.SHEET_TYPE_CHARACTER],
@@ -125093,6 +125444,7 @@ Hooks.once("ready", async () => {
     );
   }
   Hooks.callAll("female_edition.tidyClassicReady", api);
+  registerClassicQuickInsert(api);
   setupIntegrations(api);
   initReadyHooks();
   DebugTools.onReady(api);

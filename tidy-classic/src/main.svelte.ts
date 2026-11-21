@@ -1,3 +1,5 @@
+import { lootTurns } from './integration/plutonium-loot-turns.js';
+import { registerClassicQuickInsert } from './integration/quick-insert.js';
 import { FoundryAdapter } from './foundry/foundry-adapter';
 import { Tidy5eCharacterSheet } from './sheets/classic/Tidy5eCharacterSheet.svelte';
 // Upstream imported `./less/tidy5e.less` here. The LESS sources are NOT recoverable —
@@ -48,6 +50,7 @@ const CLASSIC_SHEET_LABEL = 'Tidy 5e Sheet-Classic';
 
 Hooks.once('init', () => {
   if (game.system.id !== CONSTANTS.DND5E_SYSTEM_ID) return;
+  if (game.modules.get('plutonium')?.active && game.modules.get('tidy5e-sheet')?.active) lootTurns.register(CONFIG.queries);
   const documentSheetConfig = foundry.applications.apps.DocumentSheetConfig;
 
   documentSheetConfig.registerSheet(
@@ -172,6 +175,7 @@ Hooks.once('ready', async () => {
   }
   Hooks.callAll('female_edition.tidyClassicReady', api);
 
+  registerClassicQuickInsert(api);
   setupIntegrations(api);
 
   initReadyHooks();

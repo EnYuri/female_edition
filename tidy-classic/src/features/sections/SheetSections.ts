@@ -64,32 +64,15 @@ export class SheetSections {
     return !this._itemCustomSectionDenylist.has(itemType);
   }
 
-  static applySpellToSection(
-    spellbook: Record<string, SpellbookSection>,
-    spell: Item5e,
-    options: Partial<SpellbookSection>
-  ) {
-    const customSectionName = TidyFlags.section.get(spell);
-
-    if (!customSectionName) {
-      // TODO: Eventually absorb core spellbook section prep to this service
-      return;
-    }
-
-    const section: SpellbookSection = (spellbook[customSectionName] ??=
-      SheetSections.createSpellbookSection(customSectionName, options));
-
-    section.items.push(spell);
-  }
-
   static createSpellbookSection(
     customSectionName: string,
-    options: Partial<SpellbookSection>
+    options: Partial<SpellbookSection>,
+    customSectionFlag: 'section' | 'actionSection' = 'section'
   ): SpellbookSection {
     return {
       type: CONSTANTS.SECTION_TYPE_SPELLBOOK,
       dataset: {
-        [TidyFlags.section.prop]: customSectionName,
+        [TidyFlags[customSectionFlag].prop]: customSectionName,
       },
       items: [],
       label: customSectionName,
@@ -165,15 +148,18 @@ export class SheetSections {
     options: Partial<SpellbookSection> = {},
     customSectionFlag: 'section' | 'actionSection' = 'section',
   ): SpellbookSection[] {
-    const customSectionSpells = spells.filter((s) =>
-      TidyFlags[customSectionFlag].get(s),
-    );
-    spells = spells.filter((s) => !TidyFlags.section.get(s));
+    const standardSpells: Item5e[] = [];
+    const customSpells: { name: string; spell: Item5e }[] = [];
+    for (const spell of spells) {
+      const name = TidyFlags.getItemSectionForDisplay(spell, customSectionFlag);
+      if (name) customSpells.push({ name, spell });
+      else standardSpells.push(spell);
+    }
 
     // TODO: Absorb _prepareSpellbookLegacy
     const spellbook: SpellbookSection[] = this._prepareSpellbookLegacy(
       context,
-      spells
+      standardSpells
     ).map(
       (s: SpellbookSectionLegacy) =>
         ({
@@ -196,12 +182,15 @@ export class SheetSections {
         prev[key] = curr;
         return prev;
       },
-      {}
+      Object.create(null)
     );
 
-    customSectionSpells.forEach((spell) => {
-      SheetSections.applySpellToSection(spellbookMap, spell, options);
-    });
+    for (const { name, spell } of customSpells) {
+      const section = spellbookMap[name] ??= SheetSections.createSpellbookSection(
+        name, options, customSectionFlag
+      );
+      section.items.push(spell);
+    }
 
     SheetSections.getFilteredGlobalSectionsToShowWhenEmpty(
       context.actor,
@@ -210,7 +199,7 @@ export class SheetSections {
       spellbookMap[s] ??= SheetSections.createSpellbookSection(s, {
         canCreate: true,
         ...options,
-      });
+      }, customSectionFlag);
     });
 
     return Object.values(spellbookMap);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CatHiddenActivityBadge from 'src/components/item-list/CatHiddenActivityBadge.svelte';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import ActivityUseButton from 'src/components/item-list/ActivityUseButton.svelte';
   import RechargeControl from 'src/components/item-list/controls/RechargeControl.svelte';
@@ -89,6 +90,7 @@
       class="attribute-pin-name-container"
       title="{ctx.document.name} | {ctx.document.item.name}"
     >
+      <CatHiddenActivityBadge activity={ctx.document} />
       {#if context.unlocked}
         <TextInput
           class="attribute-pin-name"

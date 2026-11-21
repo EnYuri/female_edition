@@ -226,6 +226,11 @@
 .separator.svelte-vgdas {
   background: var(--t5e-separator-color);
 }
+
+  .cat-activity-badge.svelte-stzz25 {
+    color: var(--cat-status-blue);
+    flex-shrink: 0;
+  }
 .activity-uses.svelte-seiqg2 {
   justify-self: center;
   text-align: center;

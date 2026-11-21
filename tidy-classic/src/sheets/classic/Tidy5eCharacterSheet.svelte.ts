@@ -1,3 +1,5 @@
+import { hideActivityShortcut } from 'src/integration/activity-shortcuts.js';
+import { isPlutoniumSheetDrop, handlePlutoniumSheetDrop } from 'src/integration/plutonium-drop.js';
 import { FoundryAdapter } from '../../foundry/foundry-adapter';
 import CharacterSheet from './character/CharacterSheet.svelte';
 import { debug } from 'src/utils/logging';
@@ -1052,7 +1054,7 @@ export class Tidy5eCharacterSheet
         relative: this.actor,
       });
 
-      if (!activity) {
+      if (!activity || hideActivityShortcut(activity)) {
         continue;
       }
 
@@ -1716,11 +1718,15 @@ export class Tidy5eCharacterSheet
       return;
     }
 
-    if (data.type === CONSTANTS.DOCUMENT_NAME_ACTOR) {
+    if (data.type === CONSTANTS.DOCUMENT_NAME_ACTOR || isPlutoniumSheetDrop(data)) {
       return await super._onDrop(event);
     }
 
     const doc = await fromUuid(data.uuid);
+    if (data.type === 'JournalEntryPage' && isPlutoniumSheetDrop(data, doc)) {
+      if (Hooks.call('dropActorSheetData', this.actor, this, data) === false) return;
+      return await handlePlutoniumSheetDrop(this, event, data, doc);
+    }
     let relativeUuid = SheetPinsProvider.getRelativeUUID(doc);
 
     if (event.target.closest('[data-tidy-sheet-part="sheet-pins"]')) {

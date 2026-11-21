@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CatHiddenActivityBadge from 'src/components/item-list/CatHiddenActivityBadge.svelte';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import Dnd5eIcon from 'src/components/icon/Dnd5eIcon.svelte';
   import { settings } from 'src/settings/settings.svelte';
@@ -72,6 +73,7 @@
           disabled={!context.editable}
           tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
         >
+          <CatHiddenActivityBadge activity={context.item.system.activities?.get(activity.id)} />
           {activity.name}
         </button>
         {#if context.editable}

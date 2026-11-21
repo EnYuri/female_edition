@@ -20,7 +20,7 @@ export class NpcSheetSections {
     feat: Item5e,
     customSectionOptions: Partial<NpcAbilitySection>
   ) {
-    const customSectionName = TidyFlags.section.get(feat);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(feat);
 
     if (!customSectionName) {
       return;

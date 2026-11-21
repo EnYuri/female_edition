@@ -1,3 +1,4 @@
+import { updateCatKitStatus } from 'src/integration/cat.js';
 import { UserSheetPreferencesService } from 'src/features/user-preferences/SheetPreferencesService';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import type {
@@ -527,6 +528,7 @@ export function TidyExtensibleDocumentSheetMixin<
       });
 
       super._updateFrame(options);
+      updateCatKitStatus(this.document, this.element);
     }
 
     async _onEmbeddedDocumentInputChange(

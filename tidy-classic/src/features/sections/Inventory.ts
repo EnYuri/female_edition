@@ -70,7 +70,7 @@ export class Inventory {
     fallbackInventoryKey: string = '',
     customSectionFlag: 'section' | 'actionSection' = 'section',
   ) {
-    const customSectionName = TidyFlags[customSectionFlag].get(item);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(item, customSectionFlag);
 
     if (!customSectionName) {
       let partition = inventory[item.type] ?? inventory[fallbackInventoryKey];

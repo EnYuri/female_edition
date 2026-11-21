@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hideActivityShortcut } from 'src/integration/activity-shortcuts.js';
   import { getSheetContext } from 'src/sheets/sheet-context.svelte';
   import type { TabSheetPinsContext } from 'src/types/types';
   import SheetPinItem from './SheetPinItem.svelte';
@@ -29,7 +30,7 @@
     SheetPinsProvider.filterSheetPinsFromSearch(
       sheetPins,
       searchResults.criteria,
-    ),
+    ).filter(pin => pin.type !== 'activity' || !hideActivityShortcut(pin.document)),
   );
 </script>
 

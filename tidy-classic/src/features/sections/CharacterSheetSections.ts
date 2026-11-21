@@ -28,8 +28,8 @@ export class CharacterSheetSections {
     options: Partial<CharacterFeatureSection>,
     customSectionFlag: 'section' | 'actionSection' = 'section'
   ): Record<string, CharacterFeatureSection> {
-    const customFeats = feats.filter((f) => TidyFlags[customSectionFlag].get(f));
-    feats = feats.filter((f) => !TidyFlags[customSectionFlag].get(f));
+    const customFeats = feats.filter((f) => TidyFlags.getItemSectionForDisplay(f, customSectionFlag));
+    feats = feats.filter((f) => !TidyFlags.getItemSectionForDisplay(f, customSectionFlag));
 
     const features: Record<string, CharacterFeatureSection> = {
       race: {
@@ -140,7 +140,7 @@ export class CharacterSheetSections {
     customSectionOptions: Partial<CharacterFeatureSection>,
     customSectionFlag: 'section' | 'actionSection' = 'section'
   ) {
-    const customSectionName = TidyFlags[customSectionFlag].get(feat);
+    const customSectionName = TidyFlags.getItemSectionForDisplay(feat, customSectionFlag);
 
     if (!customSectionName) {
       return;
@@ -230,7 +230,7 @@ export class CharacterSheetSections {
 
     for (let feat of feats) {
       // custom section
-      let customSection = TidyFlags[customSectionFlag].get(feat);
+      let customSection = TidyFlags.getItemSectionForDisplay(feat, customSectionFlag);
 
       if (!isNil(customSection)) {
         // Partition/Create Custom Section and add item

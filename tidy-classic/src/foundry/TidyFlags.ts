@@ -1,3 +1,4 @@
+import { bg3CommonActionSection } from 'src/integration/bg3-common-actions.js';
 import type { Item5e } from 'src/types/item.types';
 import type {
   DocumentSectionAssignments,
@@ -1156,6 +1157,12 @@ export class TidyFlags {
       return TidyFlags.unsetFlag(item, TidyFlags.section.key);
     },
   };
+
+  /** Resolve placement without changing the user's saved section or the source item. */
+  static getItemSectionForDisplay(item: Item5e, key: 'section' | 'actionSection' = 'section') {
+    const saved = TidyFlags[key].get(item);
+    return saved ?? (key === 'section' ? bg3CommonActionSection(item) : undefined);
+  }
 
   /** Determines the order of item table sections for a given document sheet. */
   static sectionConfig = {

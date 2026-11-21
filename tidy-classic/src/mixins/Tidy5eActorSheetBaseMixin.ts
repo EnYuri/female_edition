@@ -1,3 +1,4 @@
+import { handlePlutoniumSheetDrop, isPlutoniumSheetDrop } from 'src/integration/plutonium-drop.js';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import { TidyHooks } from 'src/foundry/TidyHooks';
 import { type DropEffectValue } from './DragAndDropBaseMixin';
@@ -121,7 +122,11 @@ export function Tidy5eActorSheetBaseMixin(BaseApplication: any) {
       if (allowed === false) return;
 
       // Sheet Pins
+      if (isPlutoniumSheetDrop(data)) return await handlePlutoniumSheetDrop(this, event, data);
       const sheetPinDoc = data.uuid ? await fromUuid(data.uuid) : null;
+      if (data.type === 'JournalEntryPage' && isPlutoniumSheetDrop(data, sheetPinDoc)) {
+        return await handlePlutoniumSheetDrop(this, event, data, sheetPinDoc);
+      }
 
       if (
         sheetPinDoc?.actor === this.actor &&
@@ -315,12 +320,21 @@ export function Tidy5eActorSheetBaseMixin(BaseApplication: any) {
     async _onDropItemCreate(
       itemData: Item5e[] | Item5e,
       event: DragEvent & { _behavior?: DropEffectValue },
-      behavior?: DropEffectValue
+      behavior?: DropEffectValue,
+      importOriginal?: () => Promise<Item5e | undefined>
     ): Promise<Item5e[]> {
       let items = Array.isArray(itemData) ? itemData : [itemData];
       const options = { event, behavior: behavior ?? event?._behavior ?? 'copy' };
+      const original = importOriginal && !Array.isArray(itemData) ? itemData.toObject() : null;
       if (TidyHooks.dnd5eDropCreateItems(this, items, options) === false) return [];
       behavior = options.behavior;
+      if (importOriginal && behavior === 'copy' && !Array.isArray(itemData) &&
+          items.length === 1 && items[0] === itemData &&
+          (foundry.utils.equals ?? foundry.utils.objectsEqual)(original, itemData.toObject()) &&
+          (!this._supportedItemTypes.size || this._supportedItemTypes.has(itemData.type))) {
+        const imported = await importOriginal();
+        return imported ? [imported] : [];
+      }
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );

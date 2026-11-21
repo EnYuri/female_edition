@@ -3605,3 +3605,20 @@ body.fe-retro-theme :is(#context-menu.tidy5e-sheet.classic, .tidy5e-sheet.classi
   --icon-fill: #000000 !important;
   --icon-stroke: #000000 !important;
 }
+
+/* Retro sheet surfaces stay dark even when Foundry supplies CAT's light-theme
+   palette. Preserve each status hue and give the icon enough lightness. */
+body.fe-retro-theme.fe-retro-system-dnd5e .tidy5e-sheet.application:is(.classic, .quadrone) > .window-header
+  button.header-control:is(.cat-medkit-item, .cat-medkit-actor)[data-medkit-status] {
+  &[data-medkit-status="unknown"] { --fe-cat-icon-color: var(--cat-status-pink); }
+  &[data-medkit-status="available"] { --fe-cat-icon-color: var(--cat-status-yellow); }
+  &[data-medkit-status="outdated"] { --fe-cat-icon-color: var(--cat-status-red); }
+  &[data-medkit-status="up-to-date"] { --fe-cat-icon-color: var(--cat-status-green); }
+  &[data-medkit-status="configurable"] { --fe-cat-icon-color: var(--cat-status-blue); }
+  color: oklch(from var(--fe-cat-icon-color, currentColor) max(l, 0.75) c h) !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application:is(.classic, .quadrone)
+  i:is(.cat-activity-badge, .cat-hidden-activity-icon) {
+  color: oklch(from var(--cat-status-blue) max(l, 0.75) c h) !important;
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CatHiddenActivityBadge from 'src/components/item-list/CatHiddenActivityBadge.svelte';
   import { CONSTANTS } from 'src/constants';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
   import { type ActivitySection } from 'src/types/types';
@@ -113,6 +114,7 @@
             data-tidy-activity-name={activity.name}
             data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEM_NAME}
           >
+            <CatHiddenActivityBadge {activity} />
             {activity.name}
           </span>
         </TidyTableCell>
