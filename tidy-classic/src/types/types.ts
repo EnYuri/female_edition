@@ -803,6 +803,8 @@ export type SpecialTraits = {
 };
 
 export type DocumentSheetV2Context = {
+  antimagic: boolean;
+  showAntimagicNotice: boolean;
   document: any;
   /**
    * Whether or not the sheet can be edited, regardless of lock/sensitive field settings.
@@ -1063,6 +1065,7 @@ export type ActorV2 = {
 
 // TODO: Deprecate
 export type ActorSheetClassicContextV2<TActor = ActorV2> = {
+  showAntimagicNotice: boolean;
   actor: TActor;
   actorPortraitCommands: RegisteredPortraitMenuCommand[];
   allowEffectsManagement: boolean;

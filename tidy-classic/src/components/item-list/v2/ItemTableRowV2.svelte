@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tryGetSheetContext } from 'src/sheets/sheet-context.svelte';
+  import { isAntimagicItem } from 'src/features/item/antimagic';
   import TidyTableRow from 'src/components/table/TidyTableRow.svelte';
   import { CONSTANTS } from 'src/constants';
   import type { Item5e, ItemChatData } from 'src/types/item.types';
@@ -29,6 +31,8 @@
     hidden = false,
     children,
   }: Props = $props();
+
+  let suppressed = $derived(tryGetSheetContext()?.antimagic && isAntimagicItem(item));
 
   const emptyChatData: ItemChatData = {
     description: '',
@@ -128,6 +132,7 @@
     ['data-item-id']: item?.id,
   }}
   rowAttributes={{
+    ['data-magic-suppressed']: suppressed || undefined,
     ['data-context-menu']: contextMenu?.type,
     ['data-tidy-table-row']: '',
     ['data-tidy-draggable']: '',

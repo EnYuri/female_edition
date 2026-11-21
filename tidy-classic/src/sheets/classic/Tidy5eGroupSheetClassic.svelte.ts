@@ -1494,7 +1494,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
 
     const { value, max } = facility.system.progress;
 
-    if (Number.isNaN(toAdjust) || !max) {
+    if (facility.system.disabled || Number.isNaN(toAdjust) || !max) {
       return;
     }
 

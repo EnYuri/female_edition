@@ -1,4 +1,5 @@
 {
+  "TIDY5E.ClassicAntimagicWarning": "반마법 효과로 마법이 억제됩니다.",
   "TIDY5E.ModuleName": "Tidy 5e 시트",
   "TIDY5E.ClassicMoveSourceChanged": "진행도를 완료했지만 원본 아이템이 그동안 변경되어 자동 삭제하지 않았습니다.",
   "TIDY5E.ClassicMoveDeleteFailed": "진행도는 완료됐지만 원본 아이템을 삭제하지 못했습니다. 원본을 확인해 주세요.",

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cancelFacilityOrder } from 'src/features/facility/Bastion';
   import TextInput from 'src/components/inputs/TextInput.svelte';
   import { CONSTANTS } from 'src/constants';
   import { FoundryAdapter } from 'src/foundry/foundry-adapter';
@@ -62,6 +63,18 @@
     return basicSvgFilePathRegex.test(iconPath?.trim());
   }
 
+  async function cancelPendingTrade(facility: Item5e, uuid: string) {
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: 'DND5E.Bastion.Trade.Cancel' },
+      content: FoundryAdapter.localize('DND5E.Bastion.Trade.Invalid'),
+      rejectClose: false,
+    });
+    if (confirmed && context.unlocked && context.editable &&
+        facility.system.trade.pending?.creatures.includes(uuid)) {
+      await cancelFacilityOrder(facility, 'trade');
+    }
+  }
+
   async function addFacility(ev: Event, type: string) {
     if (!TidyHooks.tidy5eSheetsAddFacilityClicked(ev, context.actor, type)) {
       return;
@@ -85,7 +98,7 @@
     });
 
     if (result) {
-      context.actor.sheet._onDropItemCreate(await fromUuid(result));
+      context.actor.sheet._onDropItemCreate(await fromUuid(result), ev, 'copy');
     }
   }
 
@@ -235,7 +248,7 @@
                 </ul>
               </div>
             {/if}
-            {#if chosen.creatures.length}
+            {#if chosen.creatures.length || chosen.facility.system.trade.pending?.creatures?.length}
               <div
                 class="facility-occupants"
                 data-prop="system.trade.creatures"
@@ -245,6 +258,18 @@
                   {localize('TIDY5E.Facilities.Creatures.Label')}
                 </div>
                 <ul class="slots creatures">
+                  {#each chosen.facility.system.trade.pending?.creatures ?? [] as uuid}
+                    <li class="slot occupant-slot creature pending" data-tooltip={localize('DND5E.Bastion.Trade.Pending')}>
+                      {#if context.editable && context.unlocked}
+                        <button type="button" class="unbuttoned" aria-label={localize('DND5E.Bastion.Trade.Cancel')}
+                          onclick={() => cancelPendingTrade(chosen.facility, uuid)}>
+                          <i class="fa-solid fa-hourglass-half"></i>
+                        </button>
+                      {:else}
+                        <i class="fa-solid fa-hourglass-half" aria-label={localize('DND5E.Bastion.Trade.Pending')}></i>
+                      {/if}
+                    </li>
+                  {/each}
                   {#each chosen.creatures as { actor, uuid }, index}
                     <FacilityOccupant
                       occupant={actor}

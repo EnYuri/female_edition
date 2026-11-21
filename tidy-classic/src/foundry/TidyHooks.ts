@@ -24,6 +24,10 @@ import type { ThemeSettingsV3 } from 'src/theme/theme-quadrone.types';
 
 /** Manages all Hook usage in Tidy 5e Sheets */
 export class TidyHooks {
+  static dnd5eDropCreateItems(app: any, items: Item5e[], options: { event: Event; behavior?: string }) {
+    return Hooks.call('dnd5e.dropCreateItems', app, items, options);
+  }
+
   /**
    * The active effect context menu has established its options and is about to show.
    * @param {ActiveEffect5e} effect The active effect document instance.

@@ -12,13 +12,14 @@
       pct: number;
       order: string;
     };
+    disabled: boolean;
     craft?: Item5e | null;
     /** Present when the row can identify a member-owned facility. */
     memberUuid?: string;
     facilityId?: string;
   }
 
-  let { progress, craft = null, memberUuid, facilityId }: Props = $props();
+  let { progress, disabled, craft = null, memberUuid, facilityId }: Props = $props();
 
   let context = $derived(getGroupSheetClassicContext());
 
@@ -36,6 +37,7 @@
   let canAdjustProgress = $derived(
     FoundryAdapter.userIsGm() &&
       context.unlocked &&
+      !disabled &&
       progress.max > 0 &&
       !!memberUuid &&
       !!facilityId,

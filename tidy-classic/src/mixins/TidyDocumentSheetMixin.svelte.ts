@@ -21,6 +21,7 @@ import {
   CustomContentRendererV2,
   type RenderedSheetPart,
 } from 'src/sheets/CustomContentRendererV2';
+import { isAntimagicItem } from 'src/features/item/antimagic';
 import { tick } from 'svelte';
 import { applySheetAttributesToWindow } from 'src/utils/applications.svelte';
 import { isNil } from 'src/utils/data';
@@ -399,8 +400,15 @@ export function TidyExtensibleDocumentSheetMixin<
         sheetModeConfig
       );
 
+      const doc = this.document;
+      const isActor = doc.documentName === 'Actor';
+      const actor = isActor ? doc : doc.actor;
+      const antimagic = actor?.statuses?.has('antimagic') === true;
+
       return {
         ...context,
+        antimagic,
+        showAntimagicNotice: antimagic && (isActor || isAntimagicItem(doc)),
         unlocked: sheetModeConfig.unlocked,
       } as DocumentSheetV2Context;
     }

@@ -1,3 +1,4 @@
+import { cancelFacilityOrder } from 'src/features/facility/Bastion';
 import { CONSTANTS } from 'src/constants';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import type { ContextMenuEntry } from 'src/foundry/foundry.types';
@@ -119,6 +120,7 @@ export function configureGroupBastionFacilityContextMenu(
       condition: () =>
         FoundryAdapter.userIsGm() &&
         canModify() &&
+        !facility.system.disabled &&
         !isNil(facility.system.progress?.order, ''),
       group: 'common',
       callback: () => app.completeMemberFacilityOrder(facility),
@@ -132,9 +134,7 @@ export function configureGroupBastionFacilityContextMenu(
         canModify() && !isNil(facility.system.progress?.order, ''),
       group: 'common',
       callback: () =>
-        facility.update({
-          'system.progress': { value: 0, max: null, order: '' },
-        }),
+        cancelFacilityOrder(facility, facility.system.progress.order),
     },
     {
       name: 'TIDY5E.ContextMenuActionDelete',

@@ -35,10 +35,10 @@ export class ActiveEffectsHelper {
   static getRiderEffectParentNames(item: Item5e): Record<string, string[]> {
     const result: Record<string, string[]> = {};
 
-    const enchantmentEffects =
-      item.system?.activities
-        ?.getByType?.('enchant')
-        ?.flatMap((activity: any) => activity.effects) ?? [];
+    const activities = Array.from<any>(item.system?.activities?.values() ?? []);
+    const enchantmentEffects = activities
+      .filter(activity => activity.metadata?.hasRiders ?? (activity.type === 'enchant'))
+      .flatMap(activity => activity.effects ?? []);
 
     for (const enchantmentEffect of enchantmentEffects) {
       const parentName = item.effects.get(enchantmentEffect._id)?.name;

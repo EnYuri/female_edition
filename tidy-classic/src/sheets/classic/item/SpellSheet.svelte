@@ -59,7 +59,7 @@
     <span class="spell-classes">{context.labels?.classes ?? ''}</span>
   </div>
 </header>
-<Tabs bind:selectedTabId tabs={context.tabs} sheet={context.sheet} />
+<Tabs magicSuppressed={context.showAntimagicNotice} bind:selectedTabId tabs={context.tabs} sheet={context.sheet} />
 <section class="tidy-sheet-body">
   <TabContents tabs={context.tabs} {selectedTabId} />
 </section>

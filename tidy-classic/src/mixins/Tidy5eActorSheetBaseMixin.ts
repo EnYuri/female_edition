@@ -1,4 +1,5 @@
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
+import { TidyHooks } from 'src/foundry/TidyHooks';
 import { type DropEffectValue } from './DragAndDropBaseMixin';
 import type { Item5e } from 'src/types/item.types';
 import { firstOfSet } from 'src/utils/set';
@@ -313,10 +314,13 @@ export function Tidy5eActorSheetBaseMixin(BaseApplication: any) {
      */
     async _onDropItemCreate(
       itemData: Item5e[] | Item5e,
-      event: DragEvent,
+      event: DragEvent & { _behavior?: DropEffectValue },
       behavior?: DropEffectValue
     ): Promise<Item5e[]> {
-      let items = itemData instanceof Array ? itemData : [itemData];
+      let items = Array.isArray(itemData) ? itemData : [itemData];
+      const options = { event, behavior: behavior ?? event?._behavior ?? 'copy' };
+      if (TidyHooks.dnd5eDropCreateItems(this, items, options) === false) return [];
+      behavior = options.behavior;
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );

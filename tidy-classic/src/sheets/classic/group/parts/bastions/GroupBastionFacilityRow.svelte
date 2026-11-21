@@ -94,6 +94,7 @@
 
   <TidyTableCell class="bastion-facility-progress" baseWidth="10rem">
     <GroupBastionProgress
+      disabled={chosen.disabled}
       progress={chosen.progress}
       craft={chosen.craft}
       {memberUuid}

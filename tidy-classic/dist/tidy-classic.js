@@ -11471,6 +11471,9 @@ class TidyFlags {
   }
 }
 class TidyHooks {
+  static dnd5eDropCreateItems(app, items, options2) {
+    return Hooks.call("dnd5e.dropCreateItems", app, items, options2);
+  }
   /**
    * The active effect context menu has established its options and is about to show.
    * @param {ActiveEffect5e} effect The active effect document instance.
@@ -12974,13 +12977,14 @@ class SvelteMap extends Map {
     return super.size;
   }
 }
-var root_3$2t = /* @__PURE__ */ from_html(`<i></i>`);
-var root_4$24 = /* @__PURE__ */ from_html(`<span class="tab-title-count font-label-medium theme-dark"> </span>`);
-var root_2$3H = /* @__PURE__ */ from_html(`<a role="tab"><!> <span class="tab-title"> </span> <!></a>`);
-var root$7m = /* @__PURE__ */ from_html(`<div role="tablist"><!> <!></div>`);
+var root_1$4B = /* @__PURE__ */ from_html(`<div class="classic-antimagic-notice" role="status"><i class="fa-solid fa-ban" aria-hidden="true"></i> </div>`);
+var root_4$24 = /* @__PURE__ */ from_html(`<i></i>`);
+var root_5$1y = /* @__PURE__ */ from_html(`<span class="tab-title-count font-label-medium theme-dark"> </span>`);
+var root_3$2t = /* @__PURE__ */ from_html(`<a role="tab"><!> <span class="tab-title"> </span> <!></a>`);
+var root$7m = /* @__PURE__ */ from_html(`<!> <div role="tablist"><!> <!></div>`, 1);
 function Tabs($$anchor, $$props) {
   push($$props, true);
-  let selectedTabId = prop($$props, "selectedTabId", 15), orientation = prop($$props, "orientation", 3, "horizontal"), sheet = prop($$props, "sheet", 7), tabContext = prop($$props, "tabContext", 19, () => ({}));
+  let magicSuppressed = prop($$props, "magicSuppressed", 3, false), selectedTabId = prop($$props, "selectedTabId", 15), orientation = prop($$props, "orientation", 3, "horizontal"), sheet = prop($$props, "sheet", 7), tabContext = prop($$props, "tabContext", 19, () => ({}));
   const onTabSelectedContextFn = getContext(CONSTANTS.SVELTE_CONTEXT.ON_TAB_SELECTED);
   let nav;
   function onTabClicked(event2, tab) {
@@ -13043,14 +13047,28 @@ function Tabs($$anchor, $$props) {
     }
   });
   let itemCountContext = /* @__PURE__ */ user_derived(() => ({ ...tabContext(), document: sheet().document }));
-  var div = root$7m();
-  var node = child(div);
-  each$1(node, 19, () => $$props.tabs, (tab) => tab.id, ($$anchor2, tab, i) => {
+  var fragment = root$7m();
+  var node = first_child(fragment);
+  {
+    var consequent = ($$anchor2) => {
+      var div = root_1$4B();
+      var text2 = sibling(child(div));
+      reset(div);
+      template_effect(($0) => set_text(text2, ` ${$0 ?? ""}`), [() => localize("TIDY5E.ClassicAntimagicWarning")]);
+      append($$anchor2, div);
+    };
+    if_block(node, ($$render) => {
+      if (magicSuppressed()) $$render(consequent);
+    });
+  }
+  var div_1 = sibling(node, 2);
+  var node_1 = child(div_1);
+  each$1(node_1, 19, () => $$props.tabs, (tab) => tab.id, ($$anchor2, tab, i) => {
     const title = /* @__PURE__ */ user_derived(() => localize(get(tab).title));
-    var fragment = comment();
-    var node_1 = first_child(fragment);
+    var fragment_1 = comment();
+    var node_2 = first_child(fragment_1);
     boundary(
-      node_1,
+      node_2,
       {
         onerror: (e) => {
           error("An error occurred while rendering a tab", false, { tab: get(tab), error: e });
@@ -13060,32 +13078,32 @@ function Tabs($$anchor, $$props) {
         const tabIsSelected = /* @__PURE__ */ user_derived(() => get(tab).id === selectedTabId() || $$props.extraTabs?.has(get(tab).id));
         const tabindex = /* @__PURE__ */ user_derived(() => get(tabIsSelected) ? 0 : -1);
         const itemCount = /* @__PURE__ */ user_derived(() => get(tab).itemCount?.(get(itemCountContext)) ?? 0);
-        var a = root_2$3H();
-        var node_2 = child(a);
+        var a = root_3$2t();
+        var node_3 = child(a);
         {
-          var consequent = ($$anchor4) => {
-            var i_1 = root_3$2t();
+          var consequent_1 = ($$anchor4) => {
+            var i_1 = root_4$24();
             template_effect(() => set_class(i_1, 1, clsx(["tab-icon", get(tab).iconClass])));
             append($$anchor4, i_1);
           };
-          if_block(node_2, ($$render) => {
-            if (get(tab).iconClass) $$render(consequent);
+          if_block(node_3, ($$render) => {
+            if (get(tab).iconClass) $$render(consequent_1);
           });
         }
-        var span = sibling(node_2, 2);
-        var text2 = child(span, true);
+        var span = sibling(node_3, 2);
+        var text_1 = child(span, true);
         reset(span);
-        var node_3 = sibling(span, 2);
+        var node_4 = sibling(span, 2);
         {
-          var consequent_1 = ($$anchor4) => {
-            var span_1 = root_4$24();
-            var text_1 = child(span_1, true);
+          var consequent_2 = ($$anchor4) => {
+            var span_1 = root_5$1y();
+            var text_2 = child(span_1, true);
             reset(span_1);
-            template_effect(() => set_text(text_1, get(itemCount)));
+            template_effect(() => set_text(text_2, get(itemCount)));
             append($$anchor4, span_1);
           };
-          if_block(node_3, ($$render) => {
-            if (get(itemCount) > 0) $$render(consequent_1);
+          if_block(node_4, ($$render) => {
+            if (get(itemCount) > 0) $$render(consequent_2);
           });
         }
         reset(a);
@@ -13103,25 +13121,25 @@ function Tabs($$anchor, $$props) {
           set_attribute(a, "aria-selected", get(tabIsSelected));
           set_attribute(a, "tabindex", get(tabindex));
           set_attribute(a, "title", get(title));
-          set_text(text2, get(title));
+          set_text(text_1, get(title));
         });
         delegated("click", a, (ev) => onTabClicked(ev, get(tab)));
         delegated("keydown", a, (ev) => onKeyDown(ev, get(i)));
         append($$anchor3, a);
       }
     );
-    append($$anchor2, fragment);
+    append($$anchor2, fragment_1);
   });
-  var node_4 = sibling(node, 2);
-  snippet(node_4, () => $$props.tabEnd ?? noop);
-  reset(div);
-  bind_this(div, ($$value) => nav = $$value, () => nav);
-  template_effect(() => set_class(div, 1, clsx([
+  var node_5 = sibling(node_1, 2);
+  snippet(node_5, () => $$props.tabEnd ?? noop);
+  reset(div_1);
+  bind_this(div_1, ($$value) => nav = $$value, () => nav);
+  template_effect(() => set_class(div_1, 1, clsx([
     "tidy-tabs",
     $$props.cssClass,
     { vertical: orientation() === "vertical" }
   ])));
-  append($$anchor, div);
+  append($$anchor, fragment);
   pop();
 }
 delegate(["click", "keydown"]);
@@ -16811,7 +16829,8 @@ class ActiveEffectsHelper {
    */
   static getRiderEffectParentNames(item) {
     const result = {};
-    const enchantmentEffects = item.system?.activities?.getByType?.("enchant")?.flatMap((activity) => activity.effects) ?? [];
+    const activities = Array.from(item.system?.activities?.values() ?? []);
+    const enchantmentEffects = activities.filter((activity) => activity.metadata?.hasRiders ?? activity.type === "enchant").flatMap((activity) => activity.effects ?? []);
     for (const enchantmentEffect of enchantmentEffects) {
       const parentName = item.effects.get(enchantmentEffect._id)?.name;
       if (!parentName) {
@@ -17604,16 +17623,16 @@ function TraitSectionModifications($$anchor, $$props) {
 }
 var root_3$2o = /* @__PURE__ */ from_html(`<button type="button" class="hit-dice-counter transparent-button"> </button>`);
 var root_4$1_ = /* @__PURE__ */ from_html(`<span class="hit-dice-counter"> </span>`);
-var root_11$F = /* @__PURE__ */ from_html(`<span class="text-secondary svelte-zixfuy">|</span> `, 1);
+var root_11$G = /* @__PURE__ */ from_html(`<span class="text-secondary svelte-zixfuy">|</span> `, 1);
 var root_10$K = /* @__PURE__ */ from_html(`<li class="trait-tag"> <!></li>`);
 var root_9$U = /* @__PURE__ */ from_html(`<ul class="trait-list"></ul>`);
-var root_23$6 = /* @__PURE__ */ from_svg(`<svg x="0px" y="0px" viewBox="0 0 512 512" xml:space="preserve" class="svelte-zixfuy"><path d="M443.7,2.6c-2.2-2.5-5.8-3.3-8.8-1.8C417.9,9,358.8,36.1,304.4,43.5c-4.1,0.6-8-0.3-11.3-2.1c-1.5-0.8-2.4-2.5-2.4-4.2v0
+var root_23$5 = /* @__PURE__ */ from_svg(`<svg x="0px" y="0px" viewBox="0 0 512 512" xml:space="preserve" class="svelte-zixfuy"><path d="M443.7,2.6c-2.2-2.5-5.8-3.3-8.8-1.8C417.9,9,358.8,36.1,304.4,43.5c-4.1,0.6-8-0.3-11.3-2.1c-1.5-0.8-2.4-2.5-2.4-4.2v0
           c0-10.7-8.7-19.4-19.5-19.4h-30.5c-10.7,0-19.5,8.7-19.5,19.4v0c0,1.7-0.9,3.4-2.4,4.2c-3.3,1.8-7.2,2.7-11.3,2.1
           C153.2,36.1,94.2,9,77.1,0.7c-3-1.5-6.6-0.7-8.8,1.8C56.3,16.4,21,64.9,21,154.9c0,83.4,30.3,143.6,44.3,166.9
           c2.9,4.9,10,4.7,12.8-0.2c10.5-19,34-59.1,62-91.7c0.4-0.5,0.9-1,1.3-1.5c28.3-30.7,79.9-9.8,79.9,32v232.2
           c0,10.7,8.7,19.4,19.5,19.4h30.5c10.7,0,19.5-8.7,19.5-19.4V260.4c0-41.8,51.5-62.7,79.9-32c0.4,0.5,0.9,1,1.3,1.5
           c28,32.6,51.5,72.7,62,91.7c2.8,5,9.9,5.1,12.8,0.2c14-23.3,44.3-83.4,44.3-166.9C491,64.9,455.7,16.4,443.7,2.6z" class="svelte-zixfuy"></path></svg>`);
-var root_26$5 = /* @__PURE__ */ from_html(`<i class="fas fa-medal"></i>`);
+var root_26$6 = /* @__PURE__ */ from_html(`<i class="fas fa-medal"></i>`);
 var root_25$8 = /* @__PURE__ */ from_html(`<!> `, 1);
 var root_28$3 = /* @__PURE__ */ from_svg(`<svg x="0px" y="0px" viewBox="0 0 512 512" xml:space="preserve" class="svelte-zixfuy"><path d="M471.7,198.8c0-56.6-37.8-107.3-81.7-147.1c-76-68.9-191.9-68.9-268,0c-43.9,39.8-81.7,90.5-81.7,147.1
         c0,93-3.2,163.9-12.5,203c-3.9,16.2,4,33,18.3,39.6l113.6,66.3c27.9,13.6,60.3-6.7,60.3-37.7V258.3c0-5.2-3.3-9.8-8.3-11.5
@@ -17799,7 +17818,7 @@ function Traits($$anchor, $$props) {
               var node_5 = sibling(text_2);
               {
                 var consequent_4 = ($$anchor5) => {
-                  var fragment_6 = root_11$F();
+                  var fragment_6 = root_11$G();
                   var text_3 = sibling(first_child(fragment_6));
                   template_effect(() => set_text(text_3, ` ${value() ?? ""}`));
                   append($$anchor5, fragment_6);
@@ -18039,7 +18058,7 @@ function Traits($$anchor, $$props) {
       const weaponProfs = /* @__PURE__ */ user_derived(() => getTags(get(context).traits.traits.weaponProf.selected));
       {
         const customIcon = ($$anchor3) => {
-          var svg = root_23$6();
+          var svg = root_23$5();
           append($$anchor3, svg);
         };
         let $0 = /* @__PURE__ */ user_derived(() => get(context).traits.traits?.weaponProf?.cssClass ?? "");
@@ -18073,7 +18092,7 @@ function Traits($$anchor, $$props) {
                 var node_12 = first_child(fragment_19);
                 {
                   var consequent_11 = ($$anchor5) => {
-                    var i = root_26$5();
+                    var i = root_26$6();
                     template_effect(($02) => set_attribute(i, "title", $02), [() => localize("DND5E.WEAPON.Mastery.Label")]);
                     append($$anchor5, i);
                   };
@@ -18762,6 +18781,11 @@ function ItemTableHeaderRow($$anchor, $$props) {
   pop();
 }
 delegate(["click"]);
+function isAntimagicItem(item) {
+  if (!item) return false;
+  const { system, type: type2 } = item;
+  return type2 === "spell" || type2 === "consumable" && system.type?.value === "scroll" || !!system.properties?.has?.("mgc") || !!system.activities?.some?.((activity) => activity.visibility?.requireMagic);
+}
 class ItemSummaryRuntime {
   static _itemSummaryCommands = [
     {
@@ -19165,7 +19189,7 @@ function RechargeControl($$anchor, $$props) {
 }
 delegate(["click"]);
 var root_4$1Z = /* @__PURE__ */ from_html(`<span class="inline-activity-arrow"><i class="fa-solid fa-turn-up fa-fw"></i></span> <a class="inline-activity-roll-button highlight-on-hover"><!> </a>`, 1);
-var root_11$E = /* @__PURE__ */ from_html(`<span> </span>`);
+var root_11$F = /* @__PURE__ */ from_html(`<span> </span>`);
 var root_10$J = /* @__PURE__ */ from_html(`<!> <i class="fas fa-bolt"></i>`, 1);
 var root_13$r = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
 var root_3$2n = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
@@ -19280,7 +19304,7 @@ function InlineActivitiesList($$anchor, $$props) {
                           var node_7 = first_child(fragment_9);
                           {
                             var consequent_2 = ($$anchor8) => {
-                              var span = root_11$E();
+                              var span = root_11$F();
                               var text_1 = child(span, true);
                               reset(span);
                               template_effect(() => set_text(text_1, get(remaining)));
@@ -19848,7 +19872,7 @@ var root_4$1V = /* @__PURE__ */ from_html(`<span class="unidentified-notice svel
 var root_5$1t = /* @__PURE__ */ from_html(`<div><!></div>`);
 var root_7$11 = /* @__PURE__ */ from_html(`<div class="gm-only svelte-bziew4"> </div>`);
 var root_9$T = /* @__PURE__ */ from_html(`<!> <div class="inline-wrapped-elements"><!></div>`, 1);
-var root_11$D = /* @__PURE__ */ from_html(`<span class="tag"><span class="value"> </span></span>`);
+var root_11$E = /* @__PURE__ */ from_html(`<span class="tag"><span class="value"> </span></span>`);
 var root_10$I = /* @__PURE__ */ from_html(`<!> <div><!> <!></div>`, 1);
 var root_13$q = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root$6F = /* @__PURE__ */ from_html(`<!> <div class="item-summary"><!> <div><!> <!> <div data-target="system.description.value"><!> <!></div></div> <!> <!> <!> <!></div> <!>`, 1);
@@ -20027,7 +20051,7 @@ function ItemSummary($$anchor, $$props) {
       let classes;
       var node_19 = child(div_7);
       each$1(node_19, 17, () => $$props.chatData.properties, index$1, ($$anchor3, prop2) => {
-        var span_1 = root_11$D();
+        var span_1 = root_11$E();
         var span_2 = child(span_1);
         var text_2 = child(span_2, true);
         reset(span_2);
@@ -20098,6 +20122,7 @@ var root$6E = /* @__PURE__ */ from_html(`<div><div><!></div> <!></div>`);
 function ItemTableRow($$anchor, $$props) {
   push($$props, true);
   let item = prop($$props, "item", 3, null), favoriteId = prop($$props, "favoriteId", 3, null), contextMenu = prop($$props, "contextMenu", 3, null), cssClass = prop($$props, "cssClass", 3, ""), hidden = prop($$props, "hidden", 3, false), getDragData = prop($$props, "getDragData", 3, null);
+  let suppressed = /* @__PURE__ */ user_derived(() => tryGetSheetContext()?.antimagic && isAntimagicItem(item()));
   const emptyChatData = { description: "", properties: [] };
   const expandedItemData = getContext(CONSTANTS.SVELTE_CONTEXT.EXPANDED_ITEM_DATA);
   const expandedItems = getContext(CONSTANTS.SVELTE_CONTEXT.EXPANDED_ITEMS);
@@ -20172,6 +20197,7 @@ function ItemTableRow($$anchor, $$props) {
   attribute_effect(
     div_1,
     () => ({
+      "data-magic-suppressed": get(suppressed) || void 0,
       class: `item-table-row ${cssClass() ?? "" ?? ""}`,
       "data-context-menu": contextMenu()?.type,
       onmousedown: $$props.onMouseDown,
@@ -22440,6 +22466,9 @@ function EquipmentSheet$1($$anchor, $$props) {
   reset(header);
   var node_5 = sibling(header, 2);
   Tabs(node_5, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -22749,7 +22778,7 @@ var root_2$3m = /* @__PURE__ */ from_html(`<button type="button" class="inline-i
 var root_5$1q = /* @__PURE__ */ from_html(`<div class="item-controls add-button"><button type="button" class="inline-icon-button"><i class="fas fa-plus"></i> </button></div>`);
 var root_6$1l = /* @__PURE__ */ from_html(`<div role="presentation"></div>`);
 var root_1$3$ = /* @__PURE__ */ from_html(`<li class="items-header main-controls advancement flex-row justify-content-space-between"><div class="item-controls configuration-mode-control"><!></div> <!></li>`);
-var root_11$C = /* @__PURE__ */ from_html(`<div><button type="button" class="inline-transparent-button"> </button></div>`);
+var root_11$D = /* @__PURE__ */ from_html(`<div><button type="button" class="inline-transparent-button"> </button></div>`);
 var root_12$F = /* @__PURE__ */ from_html(`<div class="item-checkmark"><i class="fas fa-check-circle"></i></div>`);
 var root_13$p = /* @__PURE__ */ from_html(`<div class="item-warning"><i class="fas fa-exclamation-triangle"></i></div>`);
 var root_15$l = /* @__PURE__ */ from_html(`<div class="flexrow"><!></div>`);
@@ -22904,7 +22933,7 @@ function ItemAdvancementTab$1($$anchor, $$props) {
     var node_6 = sibling(h3, 2);
     {
       var consequent_6 = ($$anchor3) => {
-        var div_3 = root_11$C();
+        var div_3 = root_11$D();
         var button_2 = child(div_3);
         var text_6 = child(button_2, true);
         reset(button_2);
@@ -26436,6 +26465,7 @@ delegate(["click"]);
 function ItemTableRowV2($$anchor, $$props) {
   push($$props, true);
   let item = prop($$props, "item", 3, null), contextMenu = prop($$props, "contextMenu", 3, null), rowClass = prop($$props, "rowClass", 3, ""), hidden = prop($$props, "hidden", 3, false);
+  let suppressed = /* @__PURE__ */ user_derived(() => tryGetSheetContext()?.antimagic && isAntimagicItem(item()));
   const emptyChatData = { description: "", properties: [] };
   const expandedItemData = getContext(CONSTANTS.SVELTE_CONTEXT.EXPANDED_ITEM_DATA);
   const expandedItems = getContext(CONSTANTS.SVELTE_CONTEXT.EXPANDED_ITEMS);
@@ -26519,6 +26549,7 @@ function ItemTableRowV2($$anchor, $$props) {
     };
     let $0 = /* @__PURE__ */ user_derived(() => ({ ["data-item-id"]: item()?.id }));
     let $1 = /* @__PURE__ */ user_derived(() => ({
+      ["data-magic-suppressed"]: get(suppressed) || void 0,
       ["data-context-menu"]: contextMenu()?.type,
       ["data-tidy-table-row"]: "",
       ["data-tidy-draggable"]: "",
@@ -27360,10 +27391,10 @@ var root_1$3N = /* @__PURE__ */ from_html(`<p class="unidentified-notice svelte-
 var root_7$Z = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
 var root_8$_ = /* @__PURE__ */ from_html(`<i class="fas fa-bolt"></i>`);
 var root_6$1i = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_17$h = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
+var root_17$g = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
 var root_19$f = /* @__PURE__ */ from_html(`<i style="margin-left: auto; align-self: center;"></i>`);
 var root_15$k = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_23$5 = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
+var root_23$4 = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
 var root_24$4 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
 var root_14$q = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 var root_13$o = /* @__PURE__ */ from_html(`<!> <!>`, 1);
@@ -27556,7 +27587,7 @@ function ContainerContentsSections($$anchor, $$props) {
                               return item();
                             },
                             children: ($$anchor9, $$slotProps2) => {
-                              var span_1 = root_17$h();
+                              var span_1 = root_17$g();
                               var text_5 = child(span_1, true);
                               reset(span_1);
                               template_effect(() => {
@@ -27624,7 +27655,7 @@ function ContainerContentsSections($$anchor, $$props) {
                               });
                             };
                             var alternate = ($$anchor9) => {
-                              var span_2 = root_23$5();
+                              var span_2 = root_23$4();
                               append($$anchor9, span_2);
                             };
                             if_block(node_19, ($$render) => {
@@ -29125,11 +29156,11 @@ var root_5$1i = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_1$3F = /* @__PURE__ */ from_html(`<!> <div class="form-group stacked"><label> </label> <!> <!></div> <!> <div class="form-group stacked"><label> </label> <!></div>`, 1);
 var root_9$O = /* @__PURE__ */ from_html(`<li> </li>`);
 var root_10$G = /* @__PURE__ */ from_html(`<li> </li>`);
-var root_11$B = /* @__PURE__ */ from_html(`<li> </li>`);
+var root_11$C = /* @__PURE__ */ from_html(`<li> </li>`);
 var root_8$Y = /* @__PURE__ */ from_html(`<h4 class="properties-header"> </h4> <ol><!> <!> <!></ol>`, 1);
 var root_14$p = /* @__PURE__ */ from_html(`<li><!></li>`);
 var root_12$E = /* @__PURE__ */ from_html(`<section class="concealed-content-animation-container"><h4 class="properties-header"> </h4> <ol></ol></section>`);
-var root_17$g = /* @__PURE__ */ from_html(`<article class="editor-container svelte-ygdue0"><!></article>`);
+var root_17$f = /* @__PURE__ */ from_html(`<article class="editor-container svelte-ygdue0"><!></article>`);
 var root_19$e = /* @__PURE__ */ from_html(`<article class="editor-container svelte-ygdue0"><!></article>`);
 var root$5K = /* @__PURE__ */ from_html(`<div><div class="item-properties svelte-ygdue0"><!> <!> <!> <!> <div class="flex-column small-gap"><div class="form-group section stretch"><div class="properties-header flex-grow-1 flex-row extra-small-gap justify-content-space-between align-items-center"><label> </label> <a class="inline-icon-button"><i class="fa-solid fa-search"></i></a></div> <!></div> <div class="form-group section stretch"><div class="properties-header flex-grow-1 flex-row extra-small-gap justify-content-space-between align-items-center"><label> </label> <a class="inline-icon-button"><i class="fa-solid fa-search"></i></a></div> <!></div></div></div> <!> <!></div> <!>`, 1);
 function ItemDescriptionWithSidebarTab($$anchor, $$props) {
@@ -29394,7 +29425,7 @@ function ItemDescriptionWithSidebarTab($$anchor, $$props) {
       var node_14 = sibling(node_13, 2);
       each$1(node_14, 17, () => get(context).labels.damages ?? [], index$1, ($$anchor3, damage) => {
         const label = /* @__PURE__ */ user_derived(() => get(damage).label);
-        var li_2 = root_11$B();
+        var li_2 = root_11$C();
         var text_7 = child(li_2, true);
         reset(li_2);
         template_effect(() => set_text(text_7, get(label)));
@@ -29565,7 +29596,7 @@ function ItemDescriptionWithSidebarTab($$anchor, $$props) {
       var fragment_10 = comment();
       var node_22 = first_child(fragment_10);
       key(node_22, () => get(context).enriched.unidentified, ($$anchor3) => {
-        var article = root_17$g();
+        var article = root_17$f();
         var node_23 = child(article);
         {
           let $0 = /* @__PURE__ */ user_derived(() => ({ editable: get(context).editable }));
@@ -32184,7 +32215,7 @@ var root_4$1E = /* @__PURE__ */ from_html(`<div class="form-group split-group"><
 var root_6$1d = /* @__PURE__ */ from_html(`<div class="form-group label-top"><label> </label> <div class="form-fields"><!></div></div>`);
 var root_10$D = /* @__PURE__ */ from_html(`<p class="hint"> </p>`);
 var root_8$U = /* @__PURE__ */ from_html(`<div class="form-group"><label> </label> <div class="form-fields"><!></div> <!></div>`);
-var root_11$A = /* @__PURE__ */ from_html(`<div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div>`, 1);
+var root_11$B = /* @__PURE__ */ from_html(`<div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div>`, 1);
 var root_14$o = /* @__PURE__ */ from_html(`<div class="form-group"><label> </label> <div class="form-fields"><!></div></div>`);
 var root$5B = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <!> <div class="form-group"><label> </label> <!></div> <div class="form-group"><label> </label> <!></div> <div class="form-group spell-components stacked"><label for=""> </label> <!></div> <!> <div class="form-group"><label> </label> <div class="form-fields"><div class="form-group label-top"><label> </label> <div class="form-fields"><!></div></div> <!></div></div> <!> <h3 class="form-header"> </h3> <!> <!> <!> <!> <!>`, 1);
 function ItemSpellDetailsTab$1($$anchor, $$props) {
@@ -32621,7 +32652,7 @@ function ItemSpellDetailsTab$1($$anchor, $$props) {
       append($$anchor2, div_17);
     };
     var consequent_5 = ($$anchor2) => {
-      var fragment_6 = root_11$A();
+      var fragment_6 = root_11$B();
       var div_19 = first_child(fragment_6);
       var label_12 = child(div_19);
       var text_15 = child(label_12, true);
@@ -33293,8 +33324,8 @@ var root_12$D = /* @__PURE__ */ from_html(`<div class="form-group"><label> </lab
 var root_15$j = /* @__PURE__ */ from_html(`<div class="form-group label-top"><label> </label> <!></div>`);
 var root_14$n = /* @__PURE__ */ from_html(`<div class="form-group split-group"><label for=""> </label> <div class="form-fields"><div class="form-group label-top"><label> </label> <!></div> <div class="form-group label-top"><label> </label> <!></div> <!></div></div> <div class="form-group"><label> </label> <!></div>`, 1);
 var root_18$f = /* @__PURE__ */ from_html(`<div class="form-group label-top"><label> </label> <!></div>`);
-var root_17$f = /* @__PURE__ */ from_html(`<div class="form-group split-group"><label for=""> </label> <div class="form-fields"><!> <div class="form-group label-top"><label> </label> <!></div></div></div>`);
-var root_21$c = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <!>`, 1);
+var root_17$e = /* @__PURE__ */ from_html(`<div class="form-group split-group"><label for=""> </label> <div class="form-fields"><!> <div class="form-group label-top"><label> </label> <!></div></div></div>`);
+var root_21$d = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <!>`, 1);
 var root_1$3t = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <!> <div class="form-group"><label> </label> <!></div> <!> <!> <div class="form-group"><label> </label> <!> <p class="hint"> </p></div> <div class="form-group stacked weapon-properties"><label for=""> </label> <!></div> <!> <!> <h3 class="form-header"> </h3> <!> <!> <h3 class="form-header"> </h3> <div class="form-fields"><p class="hint"> </p></div> <!> <!> <!>`, 1);
 function ItemWeaponDetailsTab$1($$anchor, $$props) {
   push($$props, true);
@@ -33894,7 +33925,7 @@ function ItemWeaponDetailsTab$1($$anchor, $$props) {
           append($$anchor3, fragment_8);
         };
         var alternate = ($$anchor3) => {
-          var div_19 = root_17$f();
+          var div_19 = root_17$e();
           var label_15 = child(div_19);
           var text_19 = child(label_15, true);
           reset(label_15);
@@ -34030,7 +34061,7 @@ function ItemWeaponDetailsTab$1($$anchor, $$props) {
       var node_27 = sibling(node_26, 2);
       {
         var consequent_10 = ($$anchor3) => {
-          var fragment_12 = root_21$c();
+          var fragment_12 = root_21$d();
           var h3_3 = first_child(fragment_12);
           var text_24 = child(h3_3, true);
           reset(h3_3);
@@ -34220,7 +34251,7 @@ var root_7$U = /* @__PURE__ */ from_html(`<div class="form-group split-group"><l
 var root_9$L = /* @__PURE__ */ from_html(`<div class="form-group"><label> </label> <div class="form-fields"><!></div> <p class="hint"> </p></div>`);
 var root_12$C = /* @__PURE__ */ from_html(`<div class="details flexrow"><img/> <!> <div class="list-controls flexrow"><button type="button" class="icon-button"><i class="fa-solid fa-trash"></i></button></div></div>`);
 var root_14$m = /* @__PURE__ */ from_html(`<div class="quantity"><span class="separator">&times;</span> <!></div>`);
-var root_11$z = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <p class="hint"> </p> <div><ul class="separated-list single-item facility-craft"><li><!></li></ul> <!></div>`, 1);
+var root_11$A = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <p class="hint"> </p> <div><ul class="separated-list single-item facility-craft"><li><!></li></ul> <!></div>`, 1);
 var root_15$i = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group split-group"><label> </label> <div class="form-fields"><div class="form-group label-top"><label> </label> <div class="form-fields"><div class="form-fields"><!></div></div></div> <div class="form-group label-top"><label> </label> <div class="form-fields"><div class="form-fields"><!></div></div></div></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!> <span class="sep unit">&percnt;</span></div></div>`, 1);
 var root_1$3r = /* @__PURE__ */ from_html(`<h3 class="form-header"> </h3> <!> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <!> <!> <h3 class="form-header"> </h3> <div class="form-group"><label> </label> <div class="form-fields"><!></div></div> <div class="form-group split-group"><label> </label> <div class="form-fields"><div class="form-group label-top"><label> </label> <div class="form-fields"><div class="form-fields"><!></div></div></div> <div class="form-group label-top"><label> </label> <div class="form-fields"><div class="form-fields"><!></div></div></div></div></div> <!> <!>`, 1);
 function ItemFacilityDetailsTab$1($$anchor, $$props) {
@@ -34799,7 +34830,7 @@ function ItemFacilityDetailsTab$1($$anchor, $$props) {
       var node_19 = sibling(div_33, 2);
       {
         var consequent_5 = ($$anchor3) => {
-          var fragment_8 = root_11$z();
+          var fragment_8 = root_11$A();
           var h3_2 = first_child(fragment_8);
           var text_26 = child(h3_2, true);
           reset(h3_2);
@@ -35416,6 +35447,9 @@ function BackgroundSheet$1($$anchor, $$props) {
   reset(header);
   var node_3 = sibling(header, 2);
   Tabs(node_3, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -35519,6 +35553,9 @@ function ClassSheet$1($$anchor, $$props) {
   reset(header);
   var node_3 = sibling(header, 2);
   Tabs(node_3, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -35643,6 +35680,9 @@ function ConsumableSheet$1($$anchor, $$props) {
   reset(header);
   var node_6 = sibling(header, 2);
   Tabs(node_6, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -35750,6 +35790,9 @@ function ContainerSheet$1($$anchor, $$props) {
   reset(header);
   var node_5 = sibling(header, 2);
   Tabs(node_5, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -35874,6 +35917,9 @@ function FacilitySheet$1($$anchor, $$props) {
   reset(header);
   var node_4 = sibling(header, 2);
   Tabs(node_4, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36010,6 +36056,9 @@ function FeatSheet$1($$anchor, $$props) {
   reset(header);
   var node_4 = sibling(header, 2);
   Tabs(node_4, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36168,6 +36217,9 @@ function LootSheet$1($$anchor, $$props) {
   reset(header);
   var node_5 = sibling(header, 2);
   Tabs(node_5, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36280,6 +36332,9 @@ function SpellSheet$1($$anchor, $$props) {
   reset(header);
   var node_3 = sibling(header, 2);
   Tabs(node_3, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36386,6 +36441,9 @@ function SubclassSheet$1($$anchor, $$props) {
   reset(header);
   var node_3 = sibling(header, 2);
   Tabs(node_3, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36496,6 +36554,9 @@ function ToolSheet$1($$anchor, $$props) {
   reset(header);
   var node_5 = sibling(header, 2);
   Tabs(node_5, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36606,6 +36667,9 @@ function WeaponSheet$1($$anchor, $$props) {
   reset(header);
   var node_5 = sibling(header, 2);
   Tabs(node_5, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -36709,6 +36773,9 @@ function SpeciesSheet$1($$anchor, $$props) {
   reset(header);
   var node_3 = sibling(header, 2);
   Tabs(node_3, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -37094,26 +37161,26 @@ var root_3$27 = /* @__PURE__ */ from_html(`<li class="pill centered"><span> </sp
 var root_6$19 = /* @__PURE__ */ from_html(`<li class="pill centered"> </li>`);
 var root_10$B = /* @__PURE__ */ from_html(`<option> </option>`);
 var root_9$K = /* @__PURE__ */ from_html(`<option class="none"> </option> <!>`, 1);
-var root_11$y = /* @__PURE__ */ from_html(`<div> </div>`);
+var root_11$z = /* @__PURE__ */ from_html(`<div> </div>`);
 var root_7$S = /* @__PURE__ */ from_html(`<div class="item-rarity-container"><!></div>`);
 var root_12$B = /* @__PURE__ */ from_html(`<div> </div>`);
 var root_13$n = /* @__PURE__ */ from_html(`<div class="image-subtitle disabled"> </div>`);
 var root_14$l = /* @__PURE__ */ from_html(`<li><span role="meter" aria-valuemin="0"><span class="label"><!> <span class="separator">/</span> <!></span></span></li>`);
 var root_15$h = /* @__PURE__ */ from_html(`<li><!></li>`);
 var root_19$d = /* @__PURE__ */ from_html(`<li><!></li>`);
-var root_23$4 = /* @__PURE__ */ from_html(`<li><!></li>`);
+var root_23$3 = /* @__PURE__ */ from_html(`<li><!></li>`);
 var root_25$7 = /* @__PURE__ */ from_html(`<li><!></li>`);
 var root_32$3 = /* @__PURE__ */ from_html(`<li class="pill"> </li>`);
 var root_31$2 = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
-var root_33$3 = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
+var root_33$2 = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
 var root_39$2 = /* @__PURE__ */ from_html(`<span class="centered"> </span>`);
 var root_40$1 = /* @__PURE__ */ from_html(`<span class="centered text-normal color-text-disabled">&mdash;</span>`);
 var root_38$2 = /* @__PURE__ */ from_html(`<span class="centered text-normal"> </span> <!>`, 1);
-var root_36$1 = /* @__PURE__ */ from_html(`<li><a role="button" tabindex="0" class="pill interactive centered wrapped copy-to-clipboard"><!></a></li>`);
+var root_36$2 = /* @__PURE__ */ from_html(`<li><a role="button" tabindex="0" class="pill interactive centered wrapped copy-to-clipboard"><!></a></li>`);
 var root_35$3 = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
 var root_42$1 = /* @__PURE__ */ from_html(`<li class="pill centered"> </li>`);
 var root_41 = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
-var root_30$3 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
+var root_30$4 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_44$1 = /* @__PURE__ */ from_html(`<div><h4> </h4> <div class="pills stacked"><a role="button" tabindex="0" data-tooltip="TIDY5E.Section.SectionSelectorChooseSectionTooltip"><span class="text-normal"> </span> <span class="hyphens-auto"> </span></a> <a role="button" tabindex="0" data-tooltip="TIDY5E.Section.SectionSelectorChooseActionSectionTooltip"><span class="text-normal"> </span> <span class="hyphens-auto"> </span></a></div></div>`);
 var root$5i = /* @__PURE__ */ from_html(`<aside><div><div><img class="item-image"/> <!></div> <!></div> <ul class="pills stacked"><!> <!> <!> <!> <!></ul> <!> <!> <!> <!></aside>`);
 function Sidebar($$anchor, $$props) {
@@ -37334,7 +37401,7 @@ function Sidebar($$anchor, $$props) {
         };
         var d_1 = /* @__PURE__ */ user_derived(() => get(context).unlocked && (!get(unidentified) || FoundryAdapter.isInGmEditMode(get(context).document)));
         var alternate = ($$anchor3) => {
-          var div_3 = root_11$y();
+          var div_3 = root_11$z();
           var text_8 = child(div_3, true);
           reset(div_3);
           template_effect(() => {
@@ -37544,7 +37611,7 @@ function Sidebar($$anchor, $$props) {
   var node_16 = sibling(node_13, 2);
   {
     var consequent_11 = ($$anchor2) => {
-      var li_6 = root_23$4();
+      var li_6 = root_23$3();
       var node_17 = child(li_6);
       PillSwitch(node_17, {
         get checked() {
@@ -37639,7 +37706,7 @@ function Sidebar($$anchor, $$props) {
   var node_23 = sibling(node_21, 2);
   {
     var consequent_21 = ($$anchor2) => {
-      var fragment_15 = root_30$3();
+      var fragment_15 = root_30$4();
       var node_24 = first_child(fragment_15);
       {
         var consequent_15 = ($$anchor3) => {
@@ -37667,7 +37734,7 @@ function Sidebar($$anchor, $$props) {
       var node_25 = sibling(node_24, 2);
       {
         var consequent_16 = ($$anchor3) => {
-          var div_7 = root_33$3();
+          var div_7 = root_33$2();
           var h4_1 = child(div_7);
           var text_20 = child(h4_1);
           reset(h4_1);
@@ -37699,7 +37766,7 @@ function Sidebar($$anchor, $$props) {
           reset(h4_2);
           var ul_3 = sibling(h4_2, 2);
           each$1(ul_3, 21, () => get(scaleValues), index$1, ($$anchor4, scaleValue) => {
-            var li_9 = root_36$1();
+            var li_9 = root_36$2();
             var a = child(li_9);
             var node_28 = child(a);
             {
@@ -39707,7 +39774,7 @@ var root_1$36 = /* @__PURE__ */ from_html(`<li class="pill"><span class="centere
 var root_2$2O = /* @__PURE__ */ from_html(`<li class="pill"><span class="centered text-normal"> </span> <span class="hyphens-auto centered"> </span></li>`);
 var root_6$18 = /* @__PURE__ */ from_html(`<div><h4> </h4> <!></div>`);
 var root_8$R = /* @__PURE__ */ from_html(`<div><h4> </h4> <ul class="pills stacked"></ul></div>`);
-var root_11$x = /* @__PURE__ */ from_html(`<div class="school" data-tooltip=""><!></div>`);
+var root_11$y = /* @__PURE__ */ from_html(`<div class="school" data-tooltip=""><!></div>`);
 var root_10$z = /* @__PURE__ */ from_html(`<div class="common-fields"><!></div>`);
 var root_12$z = /* @__PURE__ */ from_html(`<div class="item-header-summary"></div>`);
 var root_14$k = /* @__PURE__ */ from_html(`<div class="spell-classes"> </div>`);
@@ -39873,7 +39940,7 @@ function SpellSheet($$anchor, $$props) {
       var node_7 = child(div_6);
       {
         var consequent_1 = ($$anchor3) => {
-          var div_7 = root_11$x();
+          var div_7 = root_11$y();
           var node_8 = child(div_7);
           Dnd5eIcon(node_8, {
             get src() {
@@ -40317,7 +40384,7 @@ var root_10$y = /* @__PURE__ */ from_html(`<a class="button button-borderless bu
 var root_12$y = /* @__PURE__ */ from_html(`<span class="text-normal"> </span>`);
 var root_13$m = /* @__PURE__ */ from_html(`<span class="hyphens-auto"> </span>`);
 var root_14$j = /* @__PURE__ */ from_html(`<span class="text-normal"> </span>`);
-var root_11$w = /* @__PURE__ */ from_html(`<li><span class="pill centered wrapped"><!> <!> <!></span></li>`);
+var root_11$x = /* @__PURE__ */ from_html(`<li><span class="pill centered wrapped"><!> <!> <!></span></li>`);
 var root_15$g = /* @__PURE__ */ from_html(`<li><span class="pill"><span class="text-normal"> </span></span></li>`);
 var root_1$33 = /* @__PURE__ */ from_html(`<div><h4 class="flex-row-space-between"> <!></h4> <ul class="pills stacked"><li><span class="pill"> </span></li> <!></ul></div> <div><h4 class="flex-row-space-between"> <!></h4> <ul class="pills stacked"></ul></div> <div><h4 class="flex-row-space-between"> <!></h4> <ul class="pills stacked"></ul></div>`, 1);
 var root$4_ = /* @__PURE__ */ from_html(`<!> <!> <main class="item-content"><div class="sheet-header"><div class="identity-info"><div class="item-name-wrapper flex-row extra-small-gap align-items-center"><!></div></div></div> <!> <hr class="golden-fade"/> <!></main>`, 1);
@@ -40502,7 +40569,7 @@ function SpeciesSheet($$anchor, $$props) {
         () => get(sensesInfo),
         index$1,
         ($$anchor3, info) => {
-          var li_4 = root_11$w();
+          var li_4 = root_11$x();
           var span_8 = child(li_4);
           var node_9 = child(span_8);
           {
@@ -42717,11 +42784,11 @@ function TidyAdvancementTableRow($$anchor, $$props) {
 var root_4$1t = /* @__PURE__ */ from_html(`<h3><!></h3>`);
 var root_10$x = /* @__PURE__ */ from_html(`<!> <a class="tidy-table-button"><i class="fas fa-plus"></i></a>`, 1);
 var root_3$1_ = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
-var root_17$e = /* @__PURE__ */ from_html(`<i></i>`);
+var root_17$d = /* @__PURE__ */ from_html(`<i></i>`);
 var root_16$j = /* @__PURE__ */ from_html(`<div class="item-name"><div class="cell-text"><div class="cell-name"><!> <!></div> <div class="advancement-cell-context"></div></div></div>`);
 var root_19$c = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
-var root_20$9 = /* @__PURE__ */ from_html(`<span class="color-text-disabled">&mdash;</span>`);
-var root_22$8 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_20$a = /* @__PURE__ */ from_html(`<span class="color-text-disabled">&mdash;</span>`);
+var root_22$9 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_15$f = /* @__PURE__ */ from_html(`<span class="tidy-table-row-use-button disabled"><img class="item-image"/></span> <!> <!> <!>`, 1);
 var root_25$6 = /* @__PURE__ */ from_html(`<button type="button" class="button button-primary"><i class="fas fa-plus"></i> </button>`);
 function ItemAdvancementTab($$anchor, $$props) {
@@ -42936,7 +43003,7 @@ function ItemAdvancementTab($$anchor, $$props) {
                     html(node_10, () => get(advancement).title);
                     var node_11 = sibling(node_10, 2);
                     each$1(node_11, 17, () => get(advancement).tags, index$1, ($$anchor7, tag) => {
-                      var i = root_17$e();
+                      var i = root_17$d();
                       template_effect(
                         ($0) => {
                           set_class(i, 1, clsx(get(tag).iconClass));
@@ -42975,7 +43042,7 @@ function ItemAdvancementTab($$anchor, $$props) {
                       };
                       var d_1 = /* @__PURE__ */ user_derived(() => !isNil(get(advancement).value));
                       var alternate_1 = ($$anchor7) => {
-                        var span_2 = root_20$9();
+                        var span_2 = root_20$a();
                         append($$anchor7, span_2);
                       };
                       if_block(node_13, ($$render) => {
@@ -42992,7 +43059,7 @@ function ItemAdvancementTab($$anchor, $$props) {
                   var consequent_6 = ($$anchor6) => {
                     TidyTableCell($$anchor6, spread_props({ class: "tidy-table-actions" }, () => get(columnSpecs).actions, {
                       children: ($$anchor7, $$slotProps) => {
-                        var fragment_17 = root_22$8();
+                        var fragment_17 = root_22$9();
                         var node_15 = first_child(fragment_17);
                         {
                           var consequent_5 = ($$anchor8) => {
@@ -48060,7 +48127,16 @@ function TidyExtensibleDocumentSheetMixin(sheetType, BaseApplication) {
         unlocked: this.sheetMode === CONSTANTS.SHEET_MODE_EDIT && this.isEditable
       };
       TidyHooks.tidy5eSheetsSheetModeConfiguring(this, this.element, sheetModeConfig);
-      return { ...context, unlocked: sheetModeConfig.unlocked };
+      const doc = this.document;
+      const isActor = doc.documentName === "Actor";
+      const actor = isActor ? doc : doc.actor;
+      const antimagic = actor?.statuses?.has("antimagic") === true;
+      return {
+        ...context,
+        antimagic,
+        showAntimagicNotice: antimagic && (isActor || isAntimagicItem(doc)),
+        unlocked: sheetModeConfig.unlocked
+      };
     }
     async _renderHTML(context, options2) {
       const result = await super._renderHTML(context, options2);
@@ -50602,7 +50678,7 @@ var root_7$M = /* @__PURE__ */ from_html(`<button type="button" class="button"><
 var root_2$2r = /* @__PURE__ */ from_html(`<div class="form-group"><label for=""> </label> <div class="form-fields vertical"></div></div>`);
 var root_1$2I = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!></fieldset>`, 2);
 var root_10$v = /* @__PURE__ */ from_html(`<button type="button" class="button listbox-option-button option-show" data-testid="section-config-show"><i class="far fa-eye fa-fw"></i> </button>`);
-var root_11$v = /* @__PURE__ */ from_html(`<button type="button" class="button listbox-option-button option-hide" data-testid="section-config-hide"><i class="far fa-eye-slash fa-fw"></i> </button>`);
+var root_11$w = /* @__PURE__ */ from_html(`<button type="button" class="button listbox-option-button option-hide" data-testid="section-config-hide"><i class="far fa-eye-slash fa-fw"></i> </button>`);
 var root_9$F = /* @__PURE__ */ from_html(`<span data-testid="section-config-item-label"> </span> <!>`, 1);
 var root$4f = /* @__PURE__ */ from_html(`<div class="dialog-content-container flexcol"><h2> </h2> <!> <fieldset class="section-config-container"><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!></fieldset></div> <div class="button-bar"><button type="button" class="button button-secondary button-large use-default-btn" data-testid="section-config-use-default"><i class="fas fa-rotate-left"></i> </button> <button type="button" class="button button-secondary button-large apply-changes-btn" data-testid="section-config-apply-changes"> </button> <button type="button" data-testid="section-config-save-changes" class="button button-primary button-large button-save save-changes-btn"><i class="fas fa-save"></i> </button></div>`, 3);
 function ConfigureSections($$anchor, $$props) {
@@ -50755,7 +50831,7 @@ function ConfigureSections($$anchor, $$props) {
           append($$anchor3, button_1);
         };
         var alternate = ($$anchor3) => {
-          var button_2 = root_11$v();
+          var button_2 = root_11$w();
           var text_9 = sibling(child(button_2));
           reset(button_2);
           template_effect(
@@ -51709,7 +51785,7 @@ var root_8$L = /* @__PURE__ */ from_html(`<span class="font-label-medium pin-nam
 var root_10$u = /* @__PURE__ */ from_html(`<!> <div class="pin-container"><!></div>`, 1);
 var root_13$l = /* @__PURE__ */ from_html(`<span class="inline-uses color-text-default charged-text"><!> <span class="divider color-text-gold-emphasis">/</span> <span class="uses-max"> </span> <i class="fas fa-bolt"></i></span>`);
 var root_16$i = /* @__PURE__ */ from_html(`<span class="inline-uses color-text-default"><!> <span class="divider color-text-gold-emphasis">/</span> <span class="uses-max"> </span></span>`);
-var root_11$u = /* @__PURE__ */ from_html(`<div><!></div>`);
+var root_11$v = /* @__PURE__ */ from_html(`<div><!></div>`);
 var root_18$e = /* @__PURE__ */ from_html(`<div><span class="subtitle font-default-medium color-text-lighter"> </span></div>`);
 var root_6$10 = /* @__PURE__ */ from_html(`<div class="pin-name-container flexrow"><!></div> <!>`, 1);
 var root_19$b = /* @__PURE__ */ from_html(`<a class="button button-icon-only button-borderless highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a>`);
@@ -51982,7 +52058,7 @@ function SheetPinItem$1($$anchor, $$props) {
           append($$anchor3, fragment_4);
         };
         var consequent_12 = ($$anchor3) => {
-          var div_7 = root_11$u();
+          var div_7 = root_11$v();
           var node_8 = child(div_7);
           {
             var consequent_6 = ($$anchor4) => {
@@ -54789,7 +54865,7 @@ var root_5$Y = /* @__PURE__ */ from_html(`<div class="gm-only color-text-lighter
 var root_6$_ = /* @__PURE__ */ from_html(`<span class="color-text-lightest"> </span>`);
 var root_8$J = /* @__PURE__ */ from_html(`<span class="tag"><span class="value"> </span></span>`);
 var root_7$H = /* @__PURE__ */ from_html(`<!> <!>`, 1);
-var root_11$t = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_11$u = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root$3Y = /* @__PURE__ */ from_html(`<!> <div class="editor-rendered-content"><!> <div><!> <!> <!></div> <div class="inline-wrapped-elements user-select-text"><div class="left-aligned-elements"><!></div> <div class="right-aligned-elements"><!></div></div></div> <!>`, 1);
 function TidyItemSummary($$anchor, $$props) {
   push($$props, true);
@@ -54935,7 +55011,7 @@ function TidyItemSummary($$anchor, $$props) {
   var node_12 = sibling(div, 2);
   {
     var consequent_8 = ($$anchor2) => {
-      var fragment_7 = root_11$t();
+      var fragment_7 = root_11$u();
       var node_13 = first_child(fragment_7);
       {
         var consequent_7 = ($$anchor3) => {
@@ -55839,7 +55915,7 @@ var root_6$Y = /* @__PURE__ */ from_html(`<div> </div>`);
 var root_8$H = /* @__PURE__ */ from_html(`<span class="font-data-medium"> </span>`);
 var root_4$19 = /* @__PURE__ */ from_html(`<div><div class="header flexshrink"><a role="button" tabindex="0" class="name font-title-small"> </a> <i data-tooltip="DND5E.SpellAbility" class="fa-solid fa-chess-queen primary-icon color-text-gold-emphasis"></i></div> <div class="info pills flex1"><!> <div class="pill pill-medium"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><span class="sign font-label-medium color-text-lightest"> </span><span class="font-data-medium"> </span></span></div> <div class="attack pill pill-medium"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><span class="sign font-label-medium color-text-lightest"> </span><span class="font-data-medium"> </span></span></div> <div class="save pill pill-medium hide-collapsed"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><span class="font-data-medium"> </span></span></div> <div><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><!></span></div></div></div>`);
 var root_10$s = /* @__PURE__ */ from_html(`<span class="label uppercase"><!></span>`);
-var root_11$s = /* @__PURE__ */ from_html(`<span class="label font-label-medium color-text-gold uppercase"> </span>`);
+var root_11$t = /* @__PURE__ */ from_html(`<span class="label font-label-medium color-text-gold uppercase"> </span>`);
 var root_13$k = /* @__PURE__ */ from_html(`<span class="font-data-medium"> </span>`);
 var root_9$C = /* @__PURE__ */ from_html(`<div><div class="header flexshrink"><a role="button" tabindex="0" class="name font-title-small"> </a> <i data-tooltip="DND5E.SpellAbility" class="fa-solid fa-chess-queen primary-icon color-text-gold-emphasis"></i></div> <div class="info pills flex1"><div class="spellcasting-ability"><!> <span class="value"><span class="sign font-label-medium color-text-lightest"> </span><span class="font-data-medium"> </span></span></div> <div class="divider-dot"></div> <div class="attack"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><span class="sign font-label-medium color-text-lightest"> </span><span class="font-data-medium"> </span></span></div> <div class="divider-dot"></div> <div class="save"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><span class="font-data-medium"> </span></span></div> <div class="divider-dot"></div> <div class="level"><span class="label font-label-medium color-text-lighter"> </span> <span class="value"><!></span></div></div></div>`);
 function SpellcastingNpcSummaryCard($$anchor, $$props) {
@@ -56046,7 +56122,7 @@ function SpellcastingNpcSummaryCard($$anchor, $$props) {
           append($$anchor3, span_14);
         };
         var consequent_5 = ($$anchor3) => {
-          var span_15 = root_11$s();
+          var span_15 = root_11$t();
           var text_13 = child(span_15, true);
           reset(span_15);
           template_effect(() => set_text(text_13, $$props.info.ability.abbreviation));
@@ -56713,14 +56789,14 @@ var root_1$2j = /* @__PURE__ */ from_html(`<div class="list-content"><div class=
 var root_12$x = /* @__PURE__ */ from_html(`<i class="sub-entry-icon fa-solid fa-arrow-turn-down-right color-text-lighter"></i>`);
 var root_13$j = /* @__PURE__ */ from_html(`<i data-tooltip="DND5E.SubclassMismatchWarn" class="fa-solid fa-link-slash color-text-lighter"></i>`);
 var root_14$i = /* @__PURE__ */ from_html(`<div class="list-controls"><button type="button" class="button button-borderless button-icon-only" data-tooltip=""><i class="fa-solid fa-edit"></i></button> <button type="button" class="button button-borderless button-icon-only"><i class="fa-solid fa-ellipsis-vertical fa-fw"></i></button></div>`);
-var root_11$r = /* @__PURE__ */ from_html(`<div role="listitem" class="list-entry list-sub-entry" data-tidy-draggable=""><div class="list-label"></div> <div class="list-content"><div class="list-values"><!> <a class="item-image-link" role="button" tabindex="0" data-keyboard-focus=""><img class="item-image flex0"/></a> <span class="trait-name font-label-medium"> </span></div> <!></div></div>`);
+var root_11$s = /* @__PURE__ */ from_html(`<div role="listitem" class="list-entry list-sub-entry" data-tidy-draggable=""><div class="list-label"></div> <div class="list-content"><div class="list-values"><!> <a class="item-image-link" role="button" tabindex="0" data-keyboard-focus=""><img class="item-image flex0"/></a> <span class="trait-name font-label-medium"> </span></div> <!></div></div>`);
 var root_15$e = /* @__PURE__ */ from_html(`<div class="list-entry"><div class="list-label"> </div> <div class="list-content"><div class="list-values trait-item"><i class="sub-entry-icon fa-solid fa-arrow-turn-down-right color-text-lighter"></i> <button type="button" class="button button-primary" data-tooltip=""><i class="fa-solid fa-book-atlas"></i> </button> <button type="button" class="button button-secondary" data-tooltip=""> </button></div></div></div>`);
 var root_16$h = /* @__PURE__ */ from_html(`<div class="list-entry"><div class="list-label"><h4 class="font-weight-label"> </h4></div> <div class="list-content"><div class="list-values trait-item empty-state-container empty-classes"><button type="button" class="button button-tertiary" data-tooltip="DND5E.ClassAdd"><i class="fa-solid fa-plus"></i> </button></div></div></div>`);
 var root_18$d = /* @__PURE__ */ from_html(`<div class="list-entry" role="listitem" data-tidy-draggable=""><div class="list-label"><h4 class="font-weight-label"> </h4></div> <!></div>`);
 var root_19$a = /* @__PURE__ */ from_html(`<div class="list-entry" role="listitem" data-tidy-draggable=""><div class="list-label"></div> <!></div> <!>`, 1);
-var root_21$b = /* @__PURE__ */ from_html(`<h4 class="font-weight-label"> </h4>`);
-var root_20$8 = /* @__PURE__ */ from_html(`<div class="list-entry"><div class="list-label"><!></div> <div class="list-content"><button type="button" class="button button-secondary" data-tooltip=""><i class="fa-solid fa-book-atlas"></i> </button> <div class="list-values trait-item"><button type="button"><i class="fa-solid fa-plus"></i> </button></div></div></div>`);
-var root_17$d = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
+var root_21$c = /* @__PURE__ */ from_html(`<h4 class="font-weight-label"> </h4>`);
+var root_20$9 = /* @__PURE__ */ from_html(`<div class="list-entry"><div class="list-label"><!></div> <div class="list-content"><button type="button" class="button button-secondary" data-tooltip=""><i class="fa-solid fa-book-atlas"></i> </button> <div class="list-values trait-item"><button type="button"><i class="fa-solid fa-plus"></i> </button></div></div></div>`);
+var root_17$c = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 function ActorTraitClasses($$anchor, $$props) {
   push($$props, true);
   const classContent = ($$anchor2, $$arg0) => {
@@ -56894,7 +56970,7 @@ function ActorTraitClasses($$anchor, $$props) {
   };
   const subclassListEntry = ($$anchor2, subclass = noop, $$arg1) => {
     let orphaned = /* @__PURE__ */ derived_safe_equal(() => fallback($$arg1?.(), false));
-    var div_6 = root_11$r();
+    var div_6 = root_11$s();
     var div_7 = sibling(child(div_6), 2);
     var div_8 = child(div_7);
     var node_8 = child(div_8);
@@ -57059,7 +57135,7 @@ function ActorTraitClasses($$anchor, $$props) {
       append($$anchor2, div_14);
     };
     var alternate_1 = ($$anchor2) => {
-      var fragment_6 = root_17$d();
+      var fragment_6 = root_17$c();
       var node_11 = first_child(fragment_6);
       {
         var consequent_11 = ($$anchor3) => {
@@ -57114,12 +57190,12 @@ function ActorTraitClasses($$anchor, $$props) {
       var node_17 = sibling(node_14, 2);
       {
         var consequent_13 = ($$anchor3) => {
-          var div_21 = root_20$8();
+          var div_21 = root_20$9();
           var div_22 = child(div_21);
           var node_18 = child(div_22);
           {
             var consequent_12 = ($$anchor4) => {
-              var h4_2 = root_21$b();
+              var h4_2 = root_21$c();
               var text_9 = child(h4_2, true);
               reset(h4_2);
               template_effect(($0) => set_text(text_9, $0), [() => localize("TYPES.Item.class")]);
@@ -57827,7 +57903,7 @@ var root_6$U = /* @__PURE__ */ from_html(`<span><!><!><!></span>`);
 var root_10$q = /* @__PURE__ */ from_html(`<span class="label font-label-medium"> </span>`);
 var root_1$2g = /* @__PURE__ */ from_html(`<!> <!> <span class="label font-label-medium"> </span> <!> <!>`, 1);
 var root_12$w = /* @__PURE__ */ from_html(`<a role="button" tabindex="0" data-keyboard-focus="" class="button button-borderless"><!></a>`);
-var root_11$q = /* @__PURE__ */ from_html(`<li data-tooltip-direction="UP"><!></li>`);
+var root_11$r = /* @__PURE__ */ from_html(`<li data-tooltip-direction="UP"><!></li>`);
 var root$3P = /* @__PURE__ */ from_html(`<!> <ul class="pills"></ul>`, 1);
 function ActorTraitPills($$anchor, $$props) {
   push($$props, true);
@@ -57968,7 +58044,7 @@ function ActorTraitPills($$anchor, $$props) {
   var ul = sibling(node_9, 2);
   each$1(ul, 21, () => $$props.values, index$1, ($$anchor2, value) => {
     const onClick = /* @__PURE__ */ user_derived(() => get(value).onClick);
-    var li = root_11$q();
+    var li = root_11$r();
     var node_10 = child(li);
     {
       var consequent_8 = ($$anchor3) => {
@@ -60344,18 +60420,18 @@ var root_4$Z = /* @__PURE__ */ from_html(`<section class="name"><!></section>`);
 var root_5$P = /* @__PURE__ */ from_html(`<section class="name"><h2 class="bastion-name font-title-medium"> </h2></section>`);
 var root_8$B = /* @__PURE__ */ from_html(`<img class="facility-image"/>`);
 var root_9$v = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.hirelings"><div class="sub-header font-label-medium color-text-lighter"> </div> <ul class="slots hirelings unlist"></ul></div>`);
-var root_11$p = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.defenders"><div class="sub-header font-label-medium color-text-lighter"> </div> <ul class="slots facility-occupants defenders"></ul></div>`);
+var root_11$q = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.defenders"><div class="sub-header font-label-medium color-text-lighter"> </div> <ul class="slots facility-occupants defenders"></ul></div>`);
 var root_13$g = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.trade.creatures"><div class="sub-header font-label-medium color-text-lighter"> </div> <ul class="slots creatures"></ul></div>`);
 var root_6$Q = /* @__PURE__ */ from_html(`<li><div class="facility-header"><a class="facility-header-details" role="button" data-keyboard-focus="" tabindex="0"><!> <div class="title-and-subtitle"><span class="title"> </span> <span class="subtitle"></span></div></a> <a class="facility-menu highlight-on-hover" aria-label="TODO: Add label" role="button" data-keyboard-focus="" tabindex="0"><i class="fas fa-ellipsis-vertical"></i></a></div> <!> <!> <!> <!></li>`);
 var root_15$d = /* @__PURE__ */ from_html(`<li class="facility empty"><a class="button button-tertiary" role="button" data-keyboard-focus="" tabindex="0"><i class="fas fa-building-columns"></i> </a></li>`);
 var root_18$c = /* @__PURE__ */ from_html(`<img class="facility-image"/>`);
 var root_16$g = /* @__PURE__ */ from_html(`<li><div class="facility-header"><a class="facility-header-details" role="button" data-keyboard-focus="" tabindex="0"><!> <div class="title-and-subtitle"><span class="title"> </span> <span class="subtitle"></span></div></a> <a class="facility-menu highlight-on-hover" aria-label="TODO: Add label" role="button" data-keyboard-focus="" tabindex="0"><i class="fas fa-ellipsis-vertical"></i></a></div> <!></li>`);
-var root_20$7 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-trowel"></i>`);
-var root_21$a = /* @__PURE__ */ from_html(`<i class="fas fa-chess-rook"></i>`);
+var root_20$8 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-trowel"></i>`);
+var root_21$b = /* @__PURE__ */ from_html(`<i class="fas fa-chess-rook"></i>`);
 var root_19$9 = /* @__PURE__ */ from_html(`<div class="facility empty"><a class="button button-tertiary" role="button" data-keyboard-focus="" tabindex="0"><!> </a></div>`);
-var root_22$7 = /* @__PURE__ */ from_html(`<section class="roster defenders"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-shield"></i> </h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="roster-list unlist"></ul></section>`, 2);
-var root_26$4 = /* @__PURE__ */ from_html(`<section class="roster hirelings"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-users"></i> </h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="roster-list unlist"></ul></section>`, 2);
-var root_30$2 = /* @__PURE__ */ from_html(`<section class="roster creatures"><h3><i class="fa-solid fa-horse-head"></i> </h3> <ul class="roster-list unlist"></ul></section>`);
+var root_22$8 = /* @__PURE__ */ from_html(`<section class="roster defenders"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-shield"></i> </h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="roster-list unlist"></ul></section>`, 2);
+var root_26$5 = /* @__PURE__ */ from_html(`<section class="roster hirelings"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-users"></i> </h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="roster-list unlist"></ul></section>`, 2);
+var root_30$3 = /* @__PURE__ */ from_html(`<section class="roster creatures"><h3><i class="fa-solid fa-horse-head"></i> </h3> <ul class="roster-list unlist"></ul></section>`);
 var root_34$1 = /* @__PURE__ */ from_html(`<a class="button button-borderless button-icon-only flexshrink"><i class="fa-solid fa-feather"></i></a>`);
 var root_35$2 = /* @__PURE__ */ from_html(`<div class="editor"><div data-field="system.bastion.description" class="user-select-text"></div></div>`);
 var root_3$1o = /* @__PURE__ */ from_html(`<!> <section class="facility-panels"><section class="facilities special"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-building-columns"></i> <span class="counter"><span> </span> <span class="divider color-text-gold font-default-medium">/</span> <span class="max color-text-default font-label-medium"> </span></span></h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="facility-list unlist"><!> <!></ul></section> <section class="facilities basic"><div class="bastion-header"><h3 class="font-title-small"><i class="fa-solid fa-house-turret"></i> <span class="counter"><span> </span> <span class="divider color-text-gold font-default-medium">/</span> <span class="max color-text-default font-label-medium"> </span></span></h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <ul class="facility-list unlist"><!> <!></ul></section></section> <!> <!> <!> <section class="description"><div class="bastion-header"><h3 class="font-title-small flexrow"><i class="fa-solid fa-books flexshrink"></i> <span class="flex1"> </span> <!></h3> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></div> <!></section>`, 3);
@@ -60594,7 +60670,7 @@ function CharacterBastionTab$1($$anchor, $$props) {
         var node_8 = sibling(node_7, 2);
         {
           var consequent_5 = ($$anchor4) => {
-            var div_6 = root_11$p();
+            var div_6 = root_11$q();
             var div_7 = child(div_6);
             var text_6 = child(div_7, true);
             reset(div_7);
@@ -60820,12 +60896,12 @@ function CharacterBastionTab$1($$anchor, $$props) {
         var node_16 = child(a_5);
         {
           var consequent_8 = ($$anchor4) => {
-            var i = root_20$7();
+            var i = root_20$8();
             append($$anchor4, i);
           };
           var d_4 = /* @__PURE__ */ user_derived(() => get(available).label.includes("build"));
           var alternate_2 = ($$anchor4) => {
-            var i_1 = root_21$a();
+            var i_1 = root_21$b();
             append($$anchor4, i_1);
           };
           if_block(node_16, ($$render) => {
@@ -60847,7 +60923,7 @@ function CharacterBastionTab$1($$anchor, $$props) {
       var node_17 = sibling(section_2, 2);
       {
         var consequent_10 = ($$anchor3) => {
-          var section_5 = root_22$7();
+          var section_5 = root_22$8();
           var div_14 = child(section_5);
           var h3_2 = child(div_14);
           var text_14 = sibling(child(h3_2));
@@ -60903,7 +60979,7 @@ function CharacterBastionTab$1($$anchor, $$props) {
       var node_20 = sibling(node_17, 2);
       {
         var consequent_12 = ($$anchor3) => {
-          var section_6 = root_26$4();
+          var section_6 = root_26$5();
           var div_15 = child(section_6);
           var h3_3 = child(div_15);
           var text_15 = sibling(child(h3_3));
@@ -60959,7 +61035,7 @@ function CharacterBastionTab$1($$anchor, $$props) {
       var node_23 = sibling(node_20, 2);
       {
         var consequent_14 = ($$anchor3) => {
-          var section_7 = root_30$2();
+          var section_7 = root_30$3();
           var h3_4 = child(section_7);
           var text_16 = sibling(child(h3_4));
           reset(h3_4);
@@ -61633,7 +61709,7 @@ var root_6$P = /* @__PURE__ */ from_html(`<span class="max color-text-default fo
 var root_7$B = /* @__PURE__ */ from_html(`<button type="button" class="button button-icon-only button-borderless flexshrink decrementer"><i class="fa-solid fa-hexagon-plus"></i></button>`);
 var root_1$23 = /* @__PURE__ */ from_html(`<div class="npc-score-tracker card"><div class="card-header flexrow"><h3> </h3></div> <div class="card-content flexrow"><!> <span class="uses flexrow"><!> <span class="separator color-text-lightest flexshrink">/</span> <!></span> <!></div></div>`);
 var root_9$u = /* @__PURE__ */ from_html(`<button type="button" class="button button-icon-only button-borderless flexshrink"><i class="fa-solid fa-hexagon-minus"></i></button>`);
-var root_11$o = /* @__PURE__ */ from_html(`<span class="value color-text-default font-label-large"> </span>`);
+var root_11$p = /* @__PURE__ */ from_html(`<span class="value color-text-default font-label-large"> </span>`);
 var root_13$f = /* @__PURE__ */ from_html(`<span class="max color-text-default font-label-large"> </span>`);
 var root_14$f = /* @__PURE__ */ from_html(`<button type="button" class="button button-icon-only button-borderless flexshrink"><i class="fa-solid fa-hexagon-plus"></i></button>`);
 var root_8$A = /* @__PURE__ */ from_html(`<div class="npc-score-tracker list-entry"><h4 class="font-label-medium bordered"><i></i> </h4> <div class="flexrow"><!> <span><!> <span class="separator color-text-lightest flexshrink">/</span> <!></span> <!></div></div>`);
@@ -61817,7 +61893,7 @@ function NpcScoreTrackerCard($$anchor, $$props) {
           }
         };
         var alternate_2 = ($$anchor3) => {
-          var span_4 = root_11$o();
+          var span_4 = root_11$p();
           var text_4 = child(span_4, true);
           reset(span_4);
           template_effect(() => {
@@ -61909,7 +61985,7 @@ var root_10$m = /* @__PURE__ */ from_html(`<h4 class="font-label-medium bordered
 var root_12$u = /* @__PURE__ */ from_html(`<span class="font-label-large color-text-default flexshrink"> </span>`);
 var root_8$z = /* @__PURE__ */ from_html(`<!> <div class="card-content flexrow lair-initiative"><span class="font-label-medium color-text-lighter flexshrink"> </span> <!></div>`, 1);
 var root_16$f = /* @__PURE__ */ from_html(`<div class="npc-score-tracker card lair-tracker"><!></div>`);
-var root_17$c = /* @__PURE__ */ from_html(`<div class="npc-score-tracker card lair-tracker"><!></div>`);
+var root_17$b = /* @__PURE__ */ from_html(`<div class="npc-score-tracker card lair-tracker"><!></div>`);
 var root$3A = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
 function Legendaries($$anchor, $$props) {
   push($$props, true);
@@ -62193,7 +62269,7 @@ function Legendaries($$anchor, $$props) {
           append($$anchor3, div_4);
         };
         var alternate_4 = ($$anchor3) => {
-          var div_5 = root_17$c();
+          var div_5 = root_17$b();
           var node_12 = child(div_5);
           lairActions(node_12);
           reset(div_5);
@@ -63466,8 +63542,8 @@ var root_9$q = /* @__PURE__ */ from_html(`<div class="inventory-empty empty-stat
 var root_15$c = /* @__PURE__ */ from_html(`<h3> </h3> <span class="table-header-count"> </span>`, 1);
 var root_14$d = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_18$b = /* @__PURE__ */ from_html(`<div class="inventory-empty empty-state-container"><button type="button" class="button button-tertiary"><i class="fas fa-plus"></i> </button></div>`);
-var root_22$6 = /* @__PURE__ */ from_html(`<a class="item-name" role="button" data-keyboard-focus="" tabindex="0"><span class="cell-text"><span class="cell-name"> </span> <span class="cell-context"> </span></span></a>`);
-var root_21$9 = /* @__PURE__ */ from_html(`<div class="highlight"></div> <a><img class="item-image"/> <span class="roll-prompt"><i class="fa fa-dice-d20"></i></span></a> <!> <!>`, 1);
+var root_22$7 = /* @__PURE__ */ from_html(`<a class="item-name" role="button" data-keyboard-focus="" tabindex="0"><span class="cell-text"><span class="cell-name"> </span> <span class="cell-context"> </span></span></a>`);
+var root_21$a = /* @__PURE__ */ from_html(`<div class="highlight"></div> <a><img class="item-image"/> <span class="roll-prompt"><i class="fa fa-dice-d20"></i></span></a> <!> <!>`, 1);
 var root$3u = /* @__PURE__ */ from_html(`<div class="tab-content"><!> <!> <div class="tidy-table-container"></div></div>`);
 function VehicleStatblockTab($$anchor, $$props) {
   push($$props, true);
@@ -63819,7 +63895,7 @@ function VehicleStatblockTab($$anchor, $$props) {
                 each$1(node_12, 17, () => get(section).members, index$1, ($$anchor6, member) => {
                   {
                     const children = ($$anchor7) => {
-                      var fragment_16 = root_21$9();
+                      var fragment_16 = root_21$a();
                       var a = sibling(first_child(fragment_16), 2);
                       var img = child(a);
                       next(2);
@@ -63829,7 +63905,7 @@ function VehicleStatblockTab($$anchor, $$props) {
                         primary: true,
                         class: "item-label text-cell",
                         children: ($$anchor8, $$slotProps) => {
-                          var a_1 = root_22$6();
+                          var a_1 = root_22$7();
                           var span_4 = child(a_1);
                           var span_5 = child(span_4);
                           var text_7 = child(span_5, true);
@@ -65400,7 +65476,7 @@ var root_8$w = /* @__PURE__ */ from_html(`<div class="divider-dot"></div>`);
 var root_7$x = /* @__PURE__ */ from_html(`<div class="class-names"><span class="font-label-medium color-text-gold-emphasis"> </span> <span class="font-data-medium color-text-default"> </span></div> <!>`, 1);
 var root_6$J = /* @__PURE__ */ from_html(`<div class="separated-list"></div>`);
 var root_10$i = /* @__PURE__ */ from_html(`<div class="class-names"><span class="font-label-medium color-text-gold-emphasis"> </span> <span class="font-data-medium color-text-default"> </span> <div class="divider-dot"></div></div>`);
-var root_11$n = /* @__PURE__ */ from_html(`<span class="cr"><span class="font-label-medium color-text-gold-emphasis"> </span> <span class="font-data-medium color-text-default"> </span></span> <div class="divider-dot"></div>`, 1);
+var root_11$o = /* @__PURE__ */ from_html(`<span class="cr"><span class="font-label-medium color-text-gold-emphasis"> </span> <span class="font-data-medium color-text-default"> </span></span> <div class="divider-dot"></div>`, 1);
 var root_12$r = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <span class="creature-type"><span class="font-label-medium color-text-gold-emphasis"> </span></span>`, 1);
 var root_9$o = /* @__PURE__ */ from_html(`<span class="separated-list"><!> <!> <span class="size"><span class="font-label-medium color-text-gold-emphasis"> </span></span> <!></span>`);
 var root_13$d = /* @__PURE__ */ from_html(`<span class="font-label-medium color-text-gold-emphasis"> </span>`);
@@ -65531,7 +65607,7 @@ function GroupMemberNameColumn($$anchor, $$props) {
           {
             var consequent_5 = ($$anchor4) => {
               const formattedCr = /* @__PURE__ */ user_derived(() => dnd5e.utils.formatCR($$props.member.actor.system.details.cr));
-              var fragment_4 = root_11$n();
+              var fragment_4 = root_11$o();
               var span_5 = first_child(fragment_4);
               var span_6 = child(span_5);
               var text_5 = child(span_6, true);
@@ -67701,9 +67777,9 @@ var root_9$m = /* @__PURE__ */ from_html(`<span><span class="font-label-medium c
 var root_10$h = /* @__PURE__ */ from_html(`<span><span class="font-label-medium color-text-gold"> </span></span> <div></div>`, 1);
 var root_12$p = /* @__PURE__ */ from_html(`<span class="color-text-lighter font-label-medium dc"> </span> <span class="color-text-default font-data-medium"> </span>`, 1);
 var root_13$c = /* @__PURE__ */ from_html(`<div class="divider-dot"></div>`);
-var root_11$m = /* @__PURE__ */ from_html(`<span class="class"><span class="color-text-gold font-label-medium"> </span> <span class="color-text-default font-data-medium"> </span> <!></span> <!>`, 1);
+var root_11$n = /* @__PURE__ */ from_html(`<span class="class"><span class="color-text-gold font-label-medium"> </span> <span class="color-text-default font-data-medium"> </span> <!></span> <!>`, 1);
 var root_16$e = /* @__PURE__ */ from_html(`<span class="label font-label-medium color-text-default flexshrink"> </span>`);
-var root_17$b = /* @__PURE__ */ from_html(`<div class="xp-bar xp meter progress" data-tidy-sheet-part="xp-bar"><span class="xp-bar-current"></span></div>`);
+var root_17$a = /* @__PURE__ */ from_html(`<div class="xp-bar xp meter progress" data-tidy-sheet-part="xp-bar"><span class="xp-bar-current"></span></div>`);
 var root_14$b = /* @__PURE__ */ from_html(`<div class="xp-container" data-tidy-sheet-part="xp-container"><div class="xp-label flexrow"><span class="label font-label-medium color-text-gold flexshrink"> </span> <!> <span class="separator flexshrink">/</span> <span class="label font-body-medium color-text-lighter flexshrink"> </span></div> <!></div>`);
 var root$35 = /* @__PURE__ */ from_html(`<div class="actor-details-subtitle-row" data-tidy-sheet-part="actor-details-row"><div class="actor-subtitle flexrow" data-tidy-sheet-part="subtitle-row"><!> <!> <!> <!> <!> <!> <!> <!></div> <!></div>`);
 function CharacterSubtitle($$anchor, $$props) {
@@ -67822,7 +67898,7 @@ function CharacterSubtitle($$anchor, $$props) {
   }
   var node_9 = sibling(node_8, 2);
   each$1(node_9, 17, () => get(context).classes, index$1, ($$anchor2, entry, i) => {
-    var fragment_9 = root_11$m();
+    var fragment_9 = root_11$n();
     var span_13 = first_child(fragment_9);
     var span_14 = child(span_13);
     var text_9 = child(span_14, true);
@@ -67917,7 +67993,7 @@ function CharacterSubtitle($$anchor, $$props) {
       var node_14 = sibling(div_7, 2);
       {
         var consequent_9 = ($$anchor3) => {
-          var div_8 = root_17$b();
+          var div_8 = root_17$a();
           var span_21 = child(div_8);
           reset(div_8);
           template_effect(() => {
@@ -68245,23 +68321,23 @@ var root_5$I = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.ArmorConfi
 var root_7$u = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.InitiativeConfig" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button>`);
 var root_9$l = /* @__PURE__ */ from_html(`<i class="active-concentration-icon fas fa-arrow-rotate-left fa-spin fa-spin-reverse color-text-gold-emphasis"></i>`);
 var root_10$g = /* @__PURE__ */ from_html(`<i class="fas fa-head-side-brain color-text-gold"></i>`);
-var root_11$l = /* @__PURE__ */ from_html(`<span class="modifier font-label-medium color-text-lightest"> </span> <span class="value font-data-medium color-text-default"> </span>`, 1);
+var root_11$m = /* @__PURE__ */ from_html(`<span class="modifier font-label-medium color-text-lightest"> </span> <span class="value font-data-medium color-text-default"> </span>`, 1);
 var root_12$o = /* @__PURE__ */ from_html(`<div class="config-container"><button data-tooltip="" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button></div>`);
 var root_8$u = /* @__PURE__ */ from_html(`<div class="concentration flexcol"><div class="flexrow concentration-bonus"><!> <!></div> <button type="button" class="unbutton concentration-roll-button" data-has-roll-modes=""><span class="label font-label-medium color-text-gold"> </span></button></div>`);
 var root_4$M = /* @__PURE__ */ from_html(`<div class="ac-container flexcol"><div class="shield" data-attribution="attributes.ac" data-attribution-caption="DND5E.ArmorClass" data-tooltip-direction="DOWN"><span class="ac-value color-text-default"> </span> <span class="ac-label font-label-medium color-text-gold">AC</span> <!></div> <div class="ability-labels flexcol"><span class="label font-label-medium color-text-gold"> </span> <span class="divider"></span> <span class="label font-label-medium color-text-gold"> </span></div></div> <!> <div class="initiative-container flexcol"><div class="initiative score" data-tooltip="DND5E.Initiative"><button type="button" class="initiative-roll-button" data-has-roll-modes=""> </button> <!> <div class="initiative-bonus flexrow"><span class="modifier color-text-lightest"> </span> <span class="bonus color-text-default"> </span></div></div> <!></div>`, 1);
 var root_13$b = /* @__PURE__ */ from_html(`<div class="max-hp-override-container"><span class="font-default-small color-text-lighter"> </span> <span class="font-default-small color-text-lighter"> </span></div>`);
 var root_15$a = /* @__PURE__ */ from_html(`<div class="temp-hp label pointer"><span class="modifier font-label-large color-text-lighter">+</span> <span class="value font-data-large color-text-default" data-tooltip="DND5E.HitPointsTemp"> </span></div>`);
 var root_16$d = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.HitPointsTemp" type="button" class="button button-borderless button-icon-only temp-hp"><i class="fas fa-hand-holding-heart"></i></button>`);
-var root_17$a = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.HitPointsConfig" type="button"><i class="fas fa-cog"></i></button>`);
+var root_17$9 = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.HitPointsConfig" type="button"><i class="fas fa-cog"></i></button>`);
 var root_18$a = /* @__PURE__ */ from_html(`<div class="hp-overlay-bar flexrow"><span class="font-label-medium color-text-gold">Max</span> <!> <span class="font-label-medium color-text-gold">Temp</span> <!> <button aria-label="Close HP overlay" type="button" class="button-borderless button-icon-only"><i class="fas fa-times"></i></button> <button data-tooltip="DND5E.HitPointsConfig" type="button"><i class="fas fa-cog"></i></button></div>`);
-var root_21$8 = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.HitDiceConfig" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button>`);
-var root_22$5 = /* @__PURE__ */ from_html(`<div><button type="button" class="button button-borderless button-icon-only" data-tooltip=""><i class="fas fa-heart-pulse"></i> <span class="value"> </span></button></div>`);
+var root_21$9 = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.HitDiceConfig" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button>`);
+var root_22$6 = /* @__PURE__ */ from_html(`<div><button type="button" class="button button-borderless button-icon-only" data-tooltip=""><i class="fas fa-heart-pulse"></i> <span class="value"> </span></button></div>`);
 var root_24$3 = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.DeathSaveConfigure" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button>`);
 var root_25$5 = /* @__PURE__ */ from_html(`<button type="button" class="button button-borderless button-icon-only button-death-saves" data-tooltip=""><i class="fas fa-skull"></i></button>`);
-var root_23$3 = /* @__PURE__ */ from_html(`<div><!></div>`);
-var root_20$6 = /* @__PURE__ */ from_html(`<button type="button" class="unbutton hd-row" data-tooltip="DND5E.HitDiceConfig"><div class="meter progress hit-die view-only"><span class="label"><div class="value" data-tooltip="TIDY5E.HitDice.Current.Label"> </div> <div class="separator">/</div> <div class="max" data-tooltip="TIDY5E.HitDice.Max.Label"> </div> <div class="hd-label" data-tooltip="DND5E.HitDice"> </div></span> <!></div></button> <!> <!>`, 1);
-var root_26$3 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-caret-left"></i> <i class="fa-solid fa-sidebar-flip"></i>`, 1);
-var root_27$3 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-sidebar"></i> <i class="fa-solid fa-caret-right"></i>`, 1);
+var root_23$2 = /* @__PURE__ */ from_html(`<div><!></div>`);
+var root_20$7 = /* @__PURE__ */ from_html(`<button type="button" class="unbutton hd-row" data-tooltip="DND5E.HitDiceConfig"><div class="meter progress hit-die view-only"><span class="label"><div class="value" data-tooltip="TIDY5E.HitDice.Current.Label"> </div> <div class="separator">/</div> <div class="max" data-tooltip="TIDY5E.HitDice.Max.Label"> </div> <div class="hd-label" data-tooltip="DND5E.HitDice"> </div></span> <!></div></button> <!> <!>`, 1);
+var root_26$4 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-caret-left"></i> <i class="fa-solid fa-sidebar-flip"></i>`, 1);
+var root_27$2 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-sidebar"></i> <i class="fa-solid fa-caret-right"></i>`, 1);
 var root$30 = /* @__PURE__ */ from_html(`<header class="sheet-header flexcol"><div class="sheet-header-content flexrow"><div class="actor-details-container flexcol"><div><div class="flexcol flex1"><div class="actor-details-name-row" data-tidy-sheet-part="name-header-row"><!> <!></div> <!></div> <div class="level-container flex0 flexrow"><!> <div class="level-block"><span class="level bonus font-data-xlarge color-text-default" data-tooltip="DND5E.Level"> </span> <div class="proficiency-bonus flexrow" data-tooltip="DND5E.ProficiencyBonus"><span class="label font-label-medium color-text-gold"> </span> <span class="modifier font-label-medium color-text-lightest"> </span> <span class="value font-data-medium color-text-default"> </span></div></div></div></div> <!></div> <div class="actor-vitals-container"><!> <div class="actor-vitals theme-dark"><div class="hp-row flexrow"><div class="meter progress hit-points"><button type="button" class="label pointer"><div class="value"> </div> <div class="separator">/</div> <div class="max"> </div> <!></button> <!></div> <!> <!></div> <div class="actor-vitals-row"><!></div></div></div></div> <div class="tabs-row"><a class="sidebar-toggle button button-borderless"><!></a> <!></div></header> <div class="sheet-body"><div class="main-content"><div data-tidy-sheet-part="sidebar-container"><!></div> <!></div></div>`, 1);
 function CharacterSheet$1($$anchor, $$props) {
   push($$props, true);
@@ -68516,7 +68592,7 @@ function CharacterSheet$1($$anchor, $$props) {
           var node_10 = sibling(node_9, 2);
           {
             var consequent_5 = ($$anchor4) => {
-              var fragment_4 = root_11$l();
+              var fragment_4 = root_11$m();
               var span_9 = first_child(fragment_4);
               var text_11 = child(span_9, true);
               reset(span_9);
@@ -68698,7 +68774,7 @@ function CharacterSheet$1($$anchor, $$props) {
       append($$anchor2, fragment_5);
     };
     var consequent_11 = ($$anchor2) => {
-      var button_9 = root_17$a();
+      var button_9 = root_17$9();
       template_effect(
         ($0) => {
           set_attribute(button_9, "aria-label", $0);
@@ -68836,7 +68912,7 @@ function CharacterSheet$1($$anchor, $$props) {
       });
     };
     var alternate_3 = ($$anchor2) => {
-      var fragment_7 = root_20$6();
+      var fragment_7 = root_20$7();
       var button_12 = first_child(fragment_7);
       var div_28 = child(button_12);
       var span_15 = child(div_28);
@@ -68853,7 +68929,7 @@ function CharacterSheet$1($$anchor, $$props) {
       var node_20 = sibling(span_15, 2);
       {
         var consequent_14 = ($$anchor3) => {
-          var button_13 = root_21$8();
+          var button_13 = root_21$9();
           template_effect(($0) => set_attribute(button_13, "aria-label", $0), [() => localize("DND5E.HitDiceConfig")]);
           delegated("click", button_13, () => FoundryAdapter.renderHitDiceConfig(get(context).actor));
           append($$anchor3, button_13);
@@ -68867,7 +68943,7 @@ function CharacterSheet$1($$anchor, $$props) {
       var node_21 = sibling(button_12, 2);
       {
         var consequent_15 = ($$anchor3) => {
-          var div_32 = root_22$5();
+          var div_32 = root_22$6();
           var button_14 = child(div_32);
           var span_16 = sibling(child(button_14), 2);
           var text_22 = child(span_16, true);
@@ -68893,7 +68969,7 @@ function CharacterSheet$1($$anchor, $$props) {
       var node_22 = sibling(node_21, 2);
       {
         var consequent_18 = ($$anchor3) => {
-          var div_33 = root_23$3();
+          var div_33 = root_23$2();
           var node_23 = child(div_33);
           {
             var consequent_16 = ($$anchor4) => {
@@ -68968,12 +69044,12 @@ function CharacterSheet$1($$anchor, $$props) {
   var node_24 = child(a);
   {
     var consequent_19 = ($$anchor2) => {
-      var fragment_8 = root_26$3();
+      var fragment_8 = root_26$4();
       next(2);
       append($$anchor2, fragment_8);
     };
     var alternate_4 = ($$anchor2) => {
-      var fragment_9 = root_27$3();
+      var fragment_9 = root_27$2();
       next(2);
       append($$anchor2, fragment_9);
     };
@@ -76126,7 +76202,7 @@ var root_7$r = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <span 
 var root_8$o = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <span class="creature-type"><span class="font-label-medium color-text-gold"> </span></span>`, 1);
 var root_9$j = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <span class="species"><span class="font-label-medium color-text-gold"> </span></span>`, 1);
 var root_10$f = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <span class="alignment"><span class="font-label-medium color-text-gold"> </span></span>`, 1);
-var root_11$k = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <div class="xp-container"><span class="label font-label-medium color-text-gold flexshrink"> </span> <span class="label font-label-medium color-text-default flexshrink"> </span></div>`, 1);
+var root_11$l = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <div class="xp-container"><span class="label font-label-medium color-text-gold flexshrink"> </span> <span class="label font-label-medium color-text-default flexshrink"> </span></div>`, 1);
 var root_13$a = /* @__PURE__ */ from_html(`<i class="active-concentration-icon fas fa-arrow-rotate-left fa-spin fa-spin-reverse"></i>`);
 var root_16$c = /* @__PURE__ */ from_html(`<div class="config-container"><button data-tooltip="" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button></div>`);
 var root_12$n = /* @__PURE__ */ from_html(`<div class="divider-dot"></div> <div class="concentration flexrow"><div class="flexrow concentration-bonus"><button type="button" class="unbutton concentration-roll-button header-control" data-has-roll-modes=""><!> <span class="label font-label-medium color-text-gold"><!></span> <span class="flexrow"><span class="modifier font-label-medium color-text-lightest"> </span> <span class="value font-data-medium color-text-default"> </span></span></button> <!></div></div>`, 1);
@@ -76249,7 +76325,7 @@ function NpcSubtitle($$anchor, $$props) {
   var node_11 = sibling(node_10, 2);
   {
     var consequent_7 = ($$anchor2) => {
-      var fragment_6 = root_11$k();
+      var fragment_6 = root_11$l();
       var div_4 = sibling(first_child(fragment_6), 2);
       var span_13 = child(div_4);
       var text_8 = child(span_13, true);
@@ -77182,7 +77258,7 @@ var root_12$m = /* @__PURE__ */ from_html(`<div><button type="button" class="but
 var root_10$e = /* @__PURE__ */ from_html(`<div class="actor-vitals-row"><!></div>`);
 var root_15$9 = /* @__PURE__ */ from_html(`<button data-tooltip="DND5E.ArmorConfig" type="button" class="button button-borderless button-icon-only button-config"><i class="fas fa-cog"></i></button>`);
 var root_16$b = /* @__PURE__ */ from_html(`<i class="fa-solid fa-caret-left"></i> <i class="fa-solid fa-sidebar-flip"></i>`, 1);
-var root_17$9 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-sidebar"></i> <i class="fa-solid fa-caret-right"></i>`, 1);
+var root_17$8 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-sidebar"></i> <i class="fa-solid fa-caret-right"></i>`, 1);
 var root$2u = /* @__PURE__ */ from_html(`<header class="sheet-header flexcol"><div class="sheet-header-content flexrow"><div class="actor-details-container flexcol"><div class="actor-context-row flexrow"><div class="flexcol flex1"><div class="actor-details-name-row"><!> <div data-tidy-sheet-part="sheet-header-actions-container"><!></div></div> <!></div> <div class="level-container challenge-rating flex0 flexrow"><label class="label font-label-medium color-text-gold-emphasis"> </label> <!></div></div> <!></div> <div class="actor-vitals-container"><!> <div><!> <!></div> <div class="shield" data-attribution="attributes.ac" data-attribution-caption="DND5E.ArmorClass" data-tooltip-direction="DOWN"><span class="ac-label font-label-medium color-text-gold"> </span> <span class="ac-value color-text-default"> </span> <!></div></div></div> <div class="tabs-row"><a class="sidebar-toggle button button-borderless"><!></a> <!></div></header> <div class="sheet-body"><div class="main-content"><div><!></div> <!></div></div>`, 1);
 function NpcSheet$1($$anchor, $$props) {
   push($$props, true);
@@ -77630,7 +77706,7 @@ function NpcSheet$1($$anchor, $$props) {
       append($$anchor2, fragment_8);
     };
     var alternate_4 = ($$anchor2) => {
-      var fragment_9 = root_17$9();
+      var fragment_9 = root_17$8();
       next(2);
       append($$anchor2, fragment_9);
     };
@@ -78433,6 +78509,336 @@ function localizeConfigLabel(config) {
   const label = typeof config === "string" ? config : config?.label ?? "";
   return typeof label === "string" ? FoundryAdapter.localize(label) : "";
 }
+const BASTION_EVENTS_TABLE_UUID = "Compendium.dnd-dungeon-masters-guide.tables.RollTable.dmgBastionEvents";
+function getUnlockThresholdLevel() {
+  const { basic, special } = CONFIG.DND5E.facilities.advancement;
+  return Math.min(
+    ...Object.keys(basic).map(Number),
+    ...Object.keys(special).map(Number)
+  );
+}
+function characterHasBastionTab(actor) {
+  const { enabled } = systemSettings.value.bastionConfiguration;
+  return enabled && actor?.system?.details?.level >= getUnlockThresholdLevel();
+}
+async function prepareFacilities(actor) {
+  const allDefenders = [];
+  const basic = [];
+  const special = [];
+  const byId = /* @__PURE__ */ new Map();
+  for (const facility of Object.values(actor.itemTypes.facility)) {
+    const chosenFacilityContext = await buildChosenFacilityContext(facility);
+    allDefenders.push(
+      ...chosenFacilityContext.defenders.map((occupant) => {
+        const actor2 = occupant.actor;
+        if (!actor2) return null;
+        const { img, name, uuid } = actor2;
+        return { img, name, uuid, facility: facility.id };
+      }).filter((d) => !!d)
+    );
+    if (chosenFacilityContext.isSpecial) {
+      special.push(chosenFacilityContext);
+    } else {
+      basic.push(chosenFacilityContext);
+    }
+    byId.set(facility.id, chosenFacilityContext);
+  }
+  const facilities = {
+    basic: { chosen: basic, available: [], value: 0, max: 0 },
+    special: { chosen: special, available: [], value: 0, max: 0 }
+  };
+  [CONSTANTS.FACILITY_TYPE_BASIC, CONSTANTS.FACILITY_TYPE_SPECIAL].forEach(
+    (type2) => {
+      const group = facilities[type2];
+      const config = CONFIG.DND5E.facilities.advancement[type2];
+      let [, available] = Object.entries(config).reverse().find(([level]) => {
+        return level <= actor.system.details.level;
+      }) ?? [];
+      group.value = group.chosen.filter(
+        ({ free }) => type2 === CONSTANTS.FACILITY_TYPE_BASIC || !free
+      ).length;
+      group.max = available ?? 0;
+      available = (available ?? 0) - group.value;
+      group.available = Array.fromRange(Math.max(0, available)).map(() => {
+        return { label: `DND5E.FACILITY.AvailableFacility.${type2}.free` };
+      });
+    }
+  );
+  if (!facilities.basic.available.length) {
+    facilities.basic.available.push({
+      label: "DND5E.FACILITY.AvailableFacility.basic.build"
+    });
+  }
+  return {
+    defenders: allDefenders,
+    facilities,
+    byId
+  };
+}
+async function buildChosenFacilityContext(facility) {
+  const { id, img, labels, name, system } = facility;
+  const {
+    building,
+    craft,
+    defenders,
+    disabled,
+    free,
+    hirelings,
+    level,
+    order,
+    progress,
+    size,
+    trade,
+    type: type2
+  } = system;
+  const subtitle = [];
+  if (!isNil(order, "")) {
+    subtitle.push(CONFIG.DND5E.facilities.orders[order]?.label ?? order);
+  }
+  if (trade.stock.max) {
+    subtitle.push(`${trade.stock.value ?? 0} &sol; ${trade.stock.max}`);
+  }
+  subtitle.push(
+    building.built ? CONFIG.DND5E.facilities.sizes[size].label : FoundryAdapter.localize("DND5E.FACILITY.Build.Unbuilt")
+  );
+  if (!isNil(level)) {
+    subtitle.push(FoundryAdapter.localize("DND5E.LevelNumber", { level }));
+  }
+  const chosenFacilityContext = {
+    building,
+    craft: craft.item ? await fromUuid(craft.item) : null,
+    creatures: await prepareFacilityOccupants(trade.creatures),
+    defenders: await prepareFacilityOccupants(defenders),
+    disabled,
+    executing: CONFIG.DND5E.facilities.orders[progress.order]?.icon,
+    facility,
+    free,
+    hirelings: await prepareFacilityOccupants(hirelings),
+    id,
+    img: foundry.utils.getRoute(img),
+    isSpecial: type2.value === CONSTANTS.FACILITY_TYPE_SPECIAL,
+    labels,
+    name,
+    progress,
+    subtitle: subtitle.join(" &bull; ")
+  };
+  return chosenFacilityContext;
+}
+function calculateOccupancy(facilities, slot2) {
+  return facilities.reduce(
+    (totals, facility) => {
+      const facilityOccupants = facility[slot2];
+      totals.max += facilityOccupants.length;
+      for (const occupant of facilityOccupants) {
+        if (occupant.uuid) {
+          totals.occupants.push(occupant.uuid);
+        }
+      }
+      return totals;
+    },
+    { slot: slot2, max: 0, occupants: [] }
+  );
+}
+function getBastionDisplayName(actor) {
+  return actor.system.bastion?.name?.trim() || actor.name;
+}
+async function rollBastionEvent(actor) {
+  const table = await fromUuid(BASTION_EVENTS_TABLE_UUID);
+  const speaker = ChatMessage.getSpeaker(actor ? { actor } : {});
+  if (table) {
+    await table.draw({
+      displayChat: true,
+      messageOptions: { speaker }
+    });
+    return;
+  }
+  const roll = await new Roll("1d100").evaluate();
+  await roll.toMessage({
+    speaker,
+    flavor: FoundryAdapter.localize("TIDY5E.BASTION.Group.Action.RollEvent")
+  });
+}
+async function completeOrder(facility) {
+  const progress = facility.system.progress;
+  if (facility.system.disabled || isNil(progress?.order, "") || !progress.max) {
+    return;
+  }
+  const remaining = Math.max(0, progress.max - (progress.value ?? 0));
+  const { order, gold, items } = await dnd5e.bastion.advanceTurn(facility, {
+    duration: remaining
+  });
+  if (!order || order === "maintain") {
+    return;
+  }
+  await ChatMessage.implementation.create({
+    speaker: ChatMessage.implementation.getSpeaker({ actor: facility.parent }),
+    system: {
+      gold: { value: gold ?? 0, claimed: false },
+      items: items ?? [],
+      orders: [{ id: facility.id, order }]
+    },
+    type: "bastionTurn"
+  });
+}
+async function cancelFacilityOrder(facility, order) {
+  const { progress, trade } = facility.system;
+  const updates = {};
+  if (order === "trade" && trade?.pending) {
+    updates["system.trade.pending"] = {
+      creatures: [],
+      operation: null,
+      value: null,
+      stocked: false
+    };
+  }
+  if (progress.order === order) {
+    updates["system.progress"] = { value: 0, max: null, order: "", paid: false };
+  }
+  if (Object.keys(updates).length) await facility.update(updates);
+}
+async function confirmCompleteOrder() {
+  return !!await foundry.applications.api.DialogV2.confirm({
+    content: FoundryAdapter.localize(
+      "TIDY5E.BASTION.Group.Confirm.CompleteOrder"
+    ),
+    rejectClose: false,
+    window: {
+      icon: "fa-solid fa-flag-checkered",
+      title: "TIDY5E.BASTION.Group.Action.CompleteOrder"
+    }
+  });
+}
+async function issueMaintainOrder(actor) {
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: FoundryAdapter.localize("TIDY5E.BASTION.Group.MaintainOrder.Chat", {
+      bastionName: getBastionDisplayName(actor)
+    })
+  });
+  await rollBastionEvent(actor);
+}
+async function advanceBastions(actors, options2) {
+  const duration = options2?.duration;
+  const maintainUuids = options2?.maintainUuids ?? /* @__PURE__ */ new Set();
+  const advanced = [];
+  for (const actor of actors) {
+    if (!actor.system.isCharacter || !actor.itemTypes.facility.length) {
+      continue;
+    }
+    if (maintainUuids.has(actor.uuid)) {
+      await issueMaintainOrder(actor);
+      continue;
+    }
+    await dnd5e.bastion.advanceAllFacilities(actor, { duration });
+    advanced.push(actor);
+  }
+  return advanced;
+}
+function getOrderCost(chosen) {
+  const order = chosen.progress.order;
+  const system = chosen.facility.system;
+  if (order === "build") {
+    return CONFIG.DND5E.facilities.sizes[system.building.size]?.value ?? null;
+  }
+  if (order === "craft" || order === "harvest") {
+    const price = chosen.craft?.system?.price?.value;
+    if (typeof price !== "number") {
+      return null;
+    }
+    const quantity = order === "harvest" ? system.craft?.quantity ?? 1 : 1;
+    return price * quantity;
+  }
+  return null;
+}
+function prepareFacilityOccupants(occupants) {
+  const { max: max2, value } = occupants;
+  return Promise.all(
+    Array.fromRange(max2).map(async (i) => {
+      const uuid = value[i];
+      if (uuid) {
+        const actor = await fromUuid(uuid);
+        return {
+          actor,
+          uuid
+        };
+      }
+      return {
+        actor: void 0,
+        uuid: void 0
+      };
+    })
+  );
+}
+function addFacilityOccupant(facility, prop2, actorUuid) {
+  const { max: max2, value } = foundry.utils.getProperty(facility, prop2);
+  if (value.length + 1 > max2) {
+    return;
+  }
+  return facility.update({ [`${prop2}.value`]: [...value, actorUuid] });
+}
+function getFacilitiesWithOpenSlot(actor, slot2) {
+  const prop2 = FacilityOccupantSlotPropsMap[slot2];
+  return Object.values(actor.itemTypes.facility).filter((facility) => {
+    if (facility.system.type.value !== CONSTANTS.FACILITY_TYPE_SPECIAL) {
+      return false;
+    }
+    const { max: max2, value } = foundry.utils.getProperty(facility, prop2) ?? {};
+    return max2 > 0 && value.length < max2;
+  });
+}
+function deleteOccupant(facility, prop2, index2) {
+  let { value } = foundry.utils.getProperty(facility, prop2);
+  value = value.filter((_, i) => i !== index2);
+  return facility.update({ [`${prop2}.value`]: value });
+}
+function useFacility(args) {
+  const { actor, facilityId, event: event2, sheet } = args;
+  const facility = actor.items.get(facilityId);
+  if (facility?.system.disabled) {
+    return;
+  }
+  return facility?.use({
+    legacy: false,
+    chooseActivity: true,
+    event: event2,
+    options: { sheet }
+  });
+}
+async function addFacility(args) {
+  const {
+    actor,
+    facilityType,
+    event: event2,
+    ignoreLevelRestriction = false,
+    onSelected
+  } = args;
+  if (!TidyHooks.tidy5eSheetsAddFacilityClicked(
+    event2,
+    actor,
+    CONSTANTS.ITEM_TYPE_FACILITY
+  )) {
+    return;
+  }
+  const otherType = facilityType === CONSTANTS.FACILITY_TYPE_BASIC ? CONSTANTS.FACILITY_TYPE_SPECIAL : CONSTANTS.FACILITY_TYPE_BASIC;
+  const filters = {
+    locked: {
+      types: /* @__PURE__ */ new Set([CONSTANTS.ITEM_TYPE_FACILITY]),
+      additional: {
+        type: { [facilityType]: 1, [otherType]: -1 },
+        ...ignoreLevelRestriction ? {} : { level: { max: actor.system.details.level } }
+      }
+    }
+  };
+  const result = await dnd5e.applications.CompendiumBrowser.selectOne({
+    filters
+  });
+  if (result) {
+    onSelected(
+      game.items.fromCompendium(await fromUuid(result), { keepId: true }),
+      event2
+    );
+  }
+}
 function resolveRow(element2) {
   const memberUuid = element2.closest(
     "[data-member-uuid]"
@@ -78503,7 +78909,7 @@ function configureGroupBastionFacilityContextMenu(element2, app) {
       // Runs the system's order evaluation so gold and crafted items are awarded.
       name: "TIDY5E.BASTION.Group.Action.CompleteOrder",
       icon: '<i class="fa-solid fa-clipboard-check fa-fw"></i>',
-      condition: () => FoundryAdapter.userIsGm() && canModify() && !isNil(facility.system.progress?.order, ""),
+      condition: () => FoundryAdapter.userIsGm() && canModify() && !facility.system.disabled && !isNil(facility.system.progress?.order, ""),
       group: "common",
       callback: () => app.completeMemberFacilityOrder(facility)
     },
@@ -78514,9 +78920,7 @@ function configureGroupBastionFacilityContextMenu(element2, app) {
       icon: '<i class="fa-solid fa-xmark fa-fw"></i>',
       condition: () => canModify() && !isNil(facility.system.progress?.order, ""),
       group: "common",
-      callback: () => facility.update({
-        "system.progress": { value: 0, max: null, order: "" }
-      })
+      callback: () => cancelFacilityOrder(facility, facility.system.progress.order)
     },
     {
       name: "TIDY5E.ContextMenuActionDelete",
@@ -80884,7 +81288,7 @@ var root_10$c = /* @__PURE__ */ from_html(`<div class="quantity flexrow"><span c
 var root_7$o = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <p class="hint"> </p> <div><ul class="unlist single-item facility-craft"><li><!></li></ul> <!></div></fieldset>`, 2);
 var root_12$l = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_13$8 = /* @__PURE__ */ from_html(`<!> <span class="sep unit">&percnt;</span>`, 1);
-var root_11$j = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!> <!> <!> <!></fieldset>`, 2);
+var root_11$k = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!> <!> <!> <!></fieldset>`, 2);
 var root$2k = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!> <!> <!> <!> <!></fieldset> <fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!> <!></fieldset> <!> <!>`, 3);
 function ItemFacilityDetailsTab($$anchor, $$props) {
   push($$props, true);
@@ -81414,7 +81818,7 @@ function ItemFacilityDetailsTab($$anchor, $$props) {
   var node_23 = sibling(node_18, 2);
   {
     var consequent_5 = ($$anchor2) => {
-      var fieldset_3 = root_11$j();
+      var fieldset_3 = root_11$k();
       var legend_3 = child(fieldset_3);
       var text_4 = child(legend_3);
       sibling(text_4);
@@ -83529,7 +83933,7 @@ function ItemToolDetailsTab($$anchor, $$props) {
 var root_4$v = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_8$l = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
 var root_7$m = /* @__PURE__ */ from_html(`<!> <!>`, 1);
-var root_11$i = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_11$j = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_14$9 = /* @__PURE__ */ from_html(`<fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!></fieldset>`, 2);
 var root$2b = /* @__PURE__ */ from_html(`<fieldset><!></fieldset> <fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!> <!> <!> <!> <div class="form-group stacked weapon-properties checkbox-grid"><label for=""> </label> <div class="form-fields"><!></div></div> <!> <!></fieldset> <fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <!></fieldset> <!> <fieldset><legend> <fe-tidy-classic-gold-underline></fe-tidy-classic-gold-underline></legend> <div class="form-fields"><p class="hint"> </p></div> <!></fieldset> <!> <!>`, 3);
 function ItemWeaponDetailsTab($$anchor, $$props) {
@@ -83928,7 +84332,7 @@ function ItemWeaponDetailsTab($$anchor, $$props) {
         label: "DND5E.RangeDistance",
         groupClasses: "split-group",
         children: ($$anchor3, $$slotProps) => {
-          var fragment_11 = root_11$i();
+          var fragment_11 = root_11$j();
           var node_16 = first_child(fragment_11);
           {
             var consequent_7 = ($$anchor4) => {
@@ -84585,11 +84989,11 @@ var root_6$s = /* @__PURE__ */ from_html(`<i class="fa-solid fa-pencil"></i>`);
 var root_5$u = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_7$l = /* @__PURE__ */ from_html(`<button type="button" class="attribute-pin-name truncate transparent-button"> </button>`);
 var root_8$k = /* @__PURE__ */ from_html(`<div class="pin-container-capacity svelte-e8g53z"><!></div>`);
-var root_11$h = /* @__PURE__ */ from_html(`<span class="charged-text"><!> <span class="divider">/</span> <span class="max"> </span> <i class="fas fa-bolt"></i></span>`);
+var root_11$i = /* @__PURE__ */ from_html(`<span class="charged-text"><!> <span class="divider">/</span> <span class="max"> </span> <i class="fas fa-bolt"></i></span>`);
 var root_14$8 = /* @__PURE__ */ from_html(`<!> <span class="divider">/</span> <span class="max"> </span>`, 1);
 var root_9$f = /* @__PURE__ */ from_html(`<div><!></div>`);
 var root_16$a = /* @__PURE__ */ from_html(`<div class="attribute-counter"><span class="pin-activities-count"> </span></div>`);
-var root_17$8 = /* @__PURE__ */ from_html(`<a class="attribute-pins-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a>`);
+var root_17$7 = /* @__PURE__ */ from_html(`<a class="attribute-pins-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a>`);
 var root$2a = /* @__PURE__ */ from_html(`<div role="button" tabindex="0" class="sheet-pin attribute-pin" data-tidy-draggable=""><div class="attribute-document-image"><!></div> <div class="attribute-pin-details"><div class="attribute-pin-name-container"><!></div> <!></div> <!></div>`);
 function SheetPinItem($$anchor, $$props) {
   push($$props, true);
@@ -84805,7 +85209,7 @@ function SheetPinItem($$anchor, $$props) {
           });
         };
         var consequent_6 = ($$anchor3) => {
-          var span_3 = root_11$h();
+          var span_3 = root_11$i();
           var node_8 = child(span_3);
           TextInput(node_8, {
             get document() {
@@ -84912,7 +85316,7 @@ function SheetPinItem($$anchor, $$props) {
   var node_10 = sibling(div_3, 2);
   {
     var consequent_13 = ($$anchor2) => {
-      var a = root_17$8();
+      var a = root_17$7();
       delegated("click", a, (ev) => EventHelper.triggerContextMenu(ev, "[data-item-id]"));
       append($$anchor2, a);
     };
@@ -86450,7 +86854,7 @@ var root_8$g = /* @__PURE__ */ from_html(`<button type="button" class="item-cont
 var root_9$c = /* @__PURE__ */ from_html(`<i class="fas fa-bolt svelte-eiuhmx"></i> <!>`, 1);
 var root_5$q = /* @__PURE__ */ from_html(`<a data-tidy-draggable="" data-tidy-grid-item=""><div class="item-name svelte-eiuhmx"><div><i class="fa fa-dice-d20 svelte-eiuhmx"></i></div> <div role="presentation" aria-hidden="true"><i class="fas fa-question svelte-eiuhmx"></i></div></div> <!> <!> <!> <div class="item-stats svelte-eiuhmx"><div class="item-detail item-uses svelte-eiuhmx"><!></div> <span><!></span></div></a>`);
 var root_12$k = /* @__PURE__ */ from_html(`<i></i>`);
-var root_11$g = /* @__PURE__ */ from_html(`<button type="button" class="footer-command icon-button svelte-eiuhmx"><!> </button>`);
+var root_11$h = /* @__PURE__ */ from_html(`<button type="button" class="footer-command icon-button svelte-eiuhmx"><!> </button>`);
 var root_10$a = /* @__PURE__ */ from_html(`<div class="items-footer svelte-eiuhmx"><button type="button" class="footer-command icon-button svelte-eiuhmx"><i class="fas fa-plus-circle svelte-eiuhmx"></i></button> <!></div>`);
 var root_4$r = /* @__PURE__ */ from_html(`<div class="items svelte-eiuhmx"><!> <!></div>`);
 function InventoryGrid($$anchor, $$props) {
@@ -86634,11 +87038,12 @@ function InventoryGrid($$anchor, $$props) {
         reset(div_4);
         reset(a);
         template_effect(
-          ($02, $1, $2) => {
+          ($02, $1, $2, $3) => {
             classes = set_class(a, 1, `item ${$02 ?? ""}`, "svelte-eiuhmx", classes, { hidden: get(hidden) });
             set_attribute(a, "aria-hidden", get(hidden));
             set_attribute(a, "data-context-menu", CONSTANTS.CONTEXT_MENU_TYPE_ITEMS);
             set_attribute(a, "data-tidy-sheet-part", CONSTANTS.SHEET_PARTS.ITEM_USE_COMMAND);
+            set_attribute(a, "data-magic-suppressed", $1);
             set_attribute(a, "data-item-id", item().id);
             set_attribute(a, "tabindex", settings.value.useAccessibleKeyboardSupport ? 0 : -1);
             set_attribute(a, "data-info-card", item() ? "item" : null);
@@ -86646,12 +87051,13 @@ function InventoryGrid($$anchor, $$props) {
             classes_1 = set_class(div_2, 1, "item-image svelte-eiuhmx", null, classes_1, { conceal: item().system.identified === false });
             set_style(div_2, `background-image: url('${item().img ?? ""}');`);
             classes_2 = set_class(div_3, 1, "unidentified-glyph no-transition svelte-eiuhmx", null, classes_2, { conceal: item().system.identified === false });
-            set_attribute(div_5, "title", `${$1 ?? ""}: ${item().system.uses?.value ?? ""}/${item().system.uses?.max ?? ""} `);
+            set_attribute(div_5, "title", `${$2 ?? ""}: ${item().system.uses?.value ?? ""}/${item().system.uses?.max ?? ""} `);
             classes_3 = set_class(span_1, 1, "item-quantity svelte-eiuhmx", null, classes_3, { isStack: item().isStack });
-            set_attribute(span_1, "title", $2);
+            set_attribute(span_1, "title", $3);
           },
           [
             () => getInventoryRowClasses(item()),
+            () => get(context).antimagic && isAntimagicItem(item()) || void 0,
             () => localize("DND5E.Uses"),
             () => localize("DND5E.Quantity")
           ]
@@ -86671,7 +87077,7 @@ function InventoryGrid($$anchor, $$props) {
           var button_1 = child(div_6);
           var node_8 = sibling(button_1, 2);
           each$1(node_8, 17, () => get(customCommands), index$1, ($$anchor4, command) => {
-            var button_2 = root_11$g();
+            var button_2 = root_11$h();
             var node_9 = child(button_2);
             {
               var consequent_4 = ($$anchor5) => {
@@ -87061,320 +87467,6 @@ function GroupInventoryTab($$anchor, $$props) {
   append($$anchor, fragment);
   pop();
 }
-const BASTION_EVENTS_TABLE_UUID = "Compendium.dnd-dungeon-masters-guide.tables.RollTable.dmgBastionEvents";
-function getUnlockThresholdLevel() {
-  const { basic, special } = CONFIG.DND5E.facilities.advancement;
-  return Math.min(
-    ...Object.keys(basic).map(Number),
-    ...Object.keys(special).map(Number)
-  );
-}
-function characterHasBastionTab(actor) {
-  const { enabled } = systemSettings.value.bastionConfiguration;
-  return enabled && actor?.system?.details?.level >= getUnlockThresholdLevel();
-}
-async function prepareFacilities(actor) {
-  const allDefenders = [];
-  const basic = [];
-  const special = [];
-  const byId = /* @__PURE__ */ new Map();
-  for (const facility of Object.values(actor.itemTypes.facility)) {
-    const chosenFacilityContext = await buildChosenFacilityContext(facility);
-    allDefenders.push(
-      ...chosenFacilityContext.defenders.map((occupant) => {
-        const actor2 = occupant.actor;
-        if (!actor2) return null;
-        const { img, name, uuid } = actor2;
-        return { img, name, uuid, facility: facility.id };
-      }).filter((d) => !!d)
-    );
-    if (chosenFacilityContext.isSpecial) {
-      special.push(chosenFacilityContext);
-    } else {
-      basic.push(chosenFacilityContext);
-    }
-    byId.set(facility.id, chosenFacilityContext);
-  }
-  const facilities = {
-    basic: { chosen: basic, available: [], value: 0, max: 0 },
-    special: { chosen: special, available: [], value: 0, max: 0 }
-  };
-  [CONSTANTS.FACILITY_TYPE_BASIC, CONSTANTS.FACILITY_TYPE_SPECIAL].forEach(
-    (type2) => {
-      const group = facilities[type2];
-      const config = CONFIG.DND5E.facilities.advancement[type2];
-      let [, available] = Object.entries(config).reverse().find(([level]) => {
-        return level <= actor.system.details.level;
-      }) ?? [];
-      group.value = group.chosen.filter(
-        ({ free }) => type2 === CONSTANTS.FACILITY_TYPE_BASIC || !free
-      ).length;
-      group.max = available ?? 0;
-      available = (available ?? 0) - group.value;
-      group.available = Array.fromRange(Math.max(0, available)).map(() => {
-        return { label: `DND5E.FACILITY.AvailableFacility.${type2}.free` };
-      });
-    }
-  );
-  if (!facilities.basic.available.length) {
-    facilities.basic.available.push({
-      label: "DND5E.FACILITY.AvailableFacility.basic.build"
-    });
-  }
-  return {
-    defenders: allDefenders,
-    facilities,
-    byId
-  };
-}
-async function buildChosenFacilityContext(facility) {
-  const { id, img, labels, name, system } = facility;
-  const {
-    building,
-    craft,
-    defenders,
-    disabled,
-    free,
-    hirelings,
-    level,
-    order,
-    progress,
-    size,
-    trade,
-    type: type2
-  } = system;
-  const subtitle = [];
-  if (!isNil(order, "")) {
-    subtitle.push(CONFIG.DND5E.facilities.orders[order]?.label ?? order);
-  }
-  if (trade.stock.max) {
-    subtitle.push(`${trade.stock.value ?? 0} &sol; ${trade.stock.max}`);
-  }
-  subtitle.push(
-    building.built ? CONFIG.DND5E.facilities.sizes[size].label : FoundryAdapter.localize("DND5E.FACILITY.Build.Unbuilt")
-  );
-  if (!isNil(level)) {
-    subtitle.push(FoundryAdapter.localize("DND5E.LevelNumber", { level }));
-  }
-  const chosenFacilityContext = {
-    building,
-    craft: craft.item ? await fromUuid(craft.item) : null,
-    creatures: await prepareFacilityOccupants(trade.creatures),
-    defenders: await prepareFacilityOccupants(defenders),
-    disabled,
-    executing: CONFIG.DND5E.facilities.orders[progress.order]?.icon,
-    facility,
-    free,
-    hirelings: await prepareFacilityOccupants(hirelings),
-    id,
-    img: foundry.utils.getRoute(img),
-    isSpecial: type2.value === CONSTANTS.FACILITY_TYPE_SPECIAL,
-    labels,
-    name,
-    progress,
-    subtitle: subtitle.join(" &bull; ")
-  };
-  return chosenFacilityContext;
-}
-function calculateOccupancy(facilities, slot2) {
-  return facilities.reduce(
-    (totals, facility) => {
-      const facilityOccupants = facility[slot2];
-      totals.max += facilityOccupants.length;
-      for (const occupant of facilityOccupants) {
-        if (occupant.uuid) {
-          totals.occupants.push(occupant.uuid);
-        }
-      }
-      return totals;
-    },
-    { slot: slot2, max: 0, occupants: [] }
-  );
-}
-function getBastionDisplayName(actor) {
-  return actor.system.bastion?.name?.trim() || actor.name;
-}
-async function rollBastionEvent(actor) {
-  const table = await fromUuid(BASTION_EVENTS_TABLE_UUID);
-  const speaker = ChatMessage.getSpeaker(actor ? { actor } : {});
-  if (table) {
-    await table.draw({
-      displayChat: true,
-      messageOptions: { speaker }
-    });
-    return;
-  }
-  const roll = await new Roll("1d100").evaluate();
-  await roll.toMessage({
-    speaker,
-    flavor: FoundryAdapter.localize("TIDY5E.BASTION.Group.Action.RollEvent")
-  });
-}
-async function completeOrder(facility) {
-  const progress = facility.system.progress;
-  if (isNil(progress?.order, "") || !progress.max) {
-    return;
-  }
-  const remaining = Math.max(0, progress.max - (progress.value ?? 0));
-  const { order, gold, items } = await dnd5e.bastion.advanceTurn(facility, {
-    duration: remaining
-  });
-  if (!order || order === "maintain") {
-    return;
-  }
-  await ChatMessage.implementation.create({
-    speaker: ChatMessage.implementation.getSpeaker({ actor: facility.parent }),
-    system: {
-      gold: { value: gold ?? 0, claimed: false },
-      items: items ?? [],
-      orders: [{ id: facility.id, order }]
-    },
-    type: "bastionTurn"
-  });
-}
-async function confirmCompleteOrder() {
-  return !!await foundry.applications.api.DialogV2.confirm({
-    content: FoundryAdapter.localize(
-      "TIDY5E.BASTION.Group.Confirm.CompleteOrder"
-    ),
-    rejectClose: false,
-    window: {
-      icon: "fa-solid fa-flag-checkered",
-      title: "TIDY5E.BASTION.Group.Action.CompleteOrder"
-    }
-  });
-}
-async function issueMaintainOrder(actor) {
-  await ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: FoundryAdapter.localize("TIDY5E.BASTION.Group.MaintainOrder.Chat", {
-      bastionName: getBastionDisplayName(actor)
-    })
-  });
-  await rollBastionEvent(actor);
-}
-async function advanceBastions(actors, options2) {
-  const duration = options2?.duration ?? systemSettings.value.bastionConfiguration.duration;
-  const maintainUuids = options2?.maintainUuids ?? /* @__PURE__ */ new Set();
-  const advanced = [];
-  for (const actor of actors) {
-    if (!actor.system.isCharacter || !actor.itemTypes.facility.length) {
-      continue;
-    }
-    if (maintainUuids.has(actor.uuid)) {
-      await issueMaintainOrder(actor);
-      continue;
-    }
-    await dnd5e.bastion.advanceAllFacilities(actor, { duration });
-    advanced.push(actor);
-  }
-  return advanced;
-}
-function getOrderCost(chosen) {
-  const order = chosen.progress.order;
-  const system = chosen.facility.system;
-  if (order === "build") {
-    return CONFIG.DND5E.facilities.sizes[system.building.size]?.value ?? null;
-  }
-  if (order === "craft" || order === "harvest") {
-    const price = chosen.craft?.system?.price?.value;
-    if (typeof price !== "number") {
-      return null;
-    }
-    const quantity = order === "harvest" ? system.craft?.quantity ?? 1 : 1;
-    return price * quantity;
-  }
-  return null;
-}
-function prepareFacilityOccupants(occupants) {
-  const { max: max2, value } = occupants;
-  return Promise.all(
-    Array.fromRange(max2).map(async (i) => {
-      const uuid = value[i];
-      if (uuid) {
-        const actor = await fromUuid(uuid);
-        return {
-          actor,
-          uuid
-        };
-      }
-      return {
-        actor: void 0,
-        uuid: void 0
-      };
-    })
-  );
-}
-function addFacilityOccupant(facility, prop2, actorUuid) {
-  const { max: max2, value } = foundry.utils.getProperty(facility, prop2);
-  if (value.length + 1 > max2) {
-    return;
-  }
-  return facility.update({ [`${prop2}.value`]: [...value, actorUuid] });
-}
-function getFacilitiesWithOpenSlot(actor, slot2) {
-  const prop2 = FacilityOccupantSlotPropsMap[slot2];
-  return Object.values(actor.itemTypes.facility).filter((facility) => {
-    if (facility.system.type.value !== CONSTANTS.FACILITY_TYPE_SPECIAL) {
-      return false;
-    }
-    const { max: max2, value } = foundry.utils.getProperty(facility, prop2) ?? {};
-    return max2 > 0 && value.length < max2;
-  });
-}
-function deleteOccupant(facility, prop2, index2) {
-  let { value } = foundry.utils.getProperty(facility, prop2);
-  value = value.filter((_, i) => i !== index2);
-  return facility.update({ [`${prop2}.value`]: value });
-}
-function useFacility(args) {
-  const { actor, facilityId, event: event2, sheet } = args;
-  const facility = actor.items.get(facilityId);
-  if (facility?.system.disabled) {
-    return;
-  }
-  return facility?.use({
-    legacy: false,
-    chooseActivity: true,
-    event: event2,
-    options: { sheet }
-  });
-}
-async function addFacility(args) {
-  const {
-    actor,
-    facilityType,
-    event: event2,
-    ignoreLevelRestriction = false,
-    onSelected
-  } = args;
-  if (!TidyHooks.tidy5eSheetsAddFacilityClicked(
-    event2,
-    actor,
-    CONSTANTS.ITEM_TYPE_FACILITY
-  )) {
-    return;
-  }
-  const otherType = facilityType === CONSTANTS.FACILITY_TYPE_BASIC ? CONSTANTS.FACILITY_TYPE_SPECIAL : CONSTANTS.FACILITY_TYPE_BASIC;
-  const filters = {
-    locked: {
-      types: /* @__PURE__ */ new Set([CONSTANTS.ITEM_TYPE_FACILITY]),
-      additional: {
-        type: { [facilityType]: 1, [otherType]: -1 },
-        ...ignoreLevelRestriction ? {} : { level: { max: actor.system.details.level } }
-      }
-    }
-  };
-  const result = await dnd5e.applications.CompendiumBrowser.selectOne({
-    filters
-  });
-  if (result) {
-    onSelected(
-      game.items.fromCompendium(await fromUuid(result), { keepId: true }),
-      event2
-    );
-  }
-}
 var root_2$U = /* @__PURE__ */ from_html(`<button type="button"><span class="value"> </span><span class="separator">&sol;</span><span class="max"> </span></button>`);
 var root_3$z = /* @__PURE__ */ from_html(`<div class="bastion-occupancy svelte-ewoee2"><span class="value"> </span><span class="separator">&sol;</span><span class="max"> </span></div>`);
 var root_4$q = /* @__PURE__ */ from_html(`<span class="color-text-lightest">&mdash;</span>`);
@@ -87545,7 +87637,7 @@ function GroupBastionProgress($$anchor, $$props) {
   const localize = FoundryAdapter.localize;
   let icon = /* @__PURE__ */ user_derived(() => getTidyFacilityIcon($$props.progress.order));
   let orderLabel = /* @__PURE__ */ user_derived(() => CONFIG.DND5E.facilities.orders[$$props.progress.order]?.label ?? $$props.progress.order);
-  let canAdjustProgress = /* @__PURE__ */ user_derived(() => FoundryAdapter.userIsGm() && get(context).unlocked && $$props.progress.max > 0 && !!$$props.memberUuid && !!$$props.facilityId);
+  let canAdjustProgress = /* @__PURE__ */ user_derived(() => FoundryAdapter.userIsGm() && get(context).unlocked && !$$props.disabled && $$props.progress.max > 0 && !!$$props.memberUuid && !!$$props.facilityId);
   function adjust(toAdjust) {
     get(context).actor.sheet.adjustMemberFacilityProgress({
       memberUuid: $$props.memberUuid,
@@ -87721,6 +87813,9 @@ function GroupBastionFacilityRow($$anchor, $$props) {
     baseWidth: "10rem",
     children: ($$anchor2, $$slotProps) => {
       GroupBastionProgress($$anchor2, {
+        get disabled() {
+          return $$props.chosen.disabled;
+        },
         get progress() {
           return $$props.chosen.progress;
         },
@@ -88102,6 +88197,9 @@ function GroupBastionOrderRow($$anchor, $$props) {
     baseWidth: "10rem",
     children: ($$anchor2, $$slotProps) => {
       GroupBastionProgress($$anchor2, {
+        get disabled() {
+          return $$props.order.facility.system.disabled;
+        },
         get progress() {
           return $$props.order.progress;
         },
@@ -88775,12 +88873,12 @@ function EffectTableRow($$anchor, $$props) {
   append($$anchor, div);
   pop();
 }
-var root_11$f = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
+var root_11$g = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
 var root_10$8 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_18$9 = /* @__PURE__ */ from_html(`<!> <a class="truncate flex-row align-items-center flex-1"><span class="align-self-center truncate flex-1"> </span></a>`, 1);
 var root_19$8 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
-var root_20$5 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
-var root_17$7 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
+var root_20$6 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
+var root_17$6 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_15$7 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root$1K = /* @__PURE__ */ from_html(`<div class="scroll-container flex-column small-gap"><!> <!></div>`);
 function ActorEffectsTab($$anchor, $$props) {
@@ -88874,7 +88972,7 @@ function ActorEffectsTab($$anchor, $$props) {
                           primary: true,
                           children: ($$anchor8, $$slotProps2) => {
                             next();
-                            var fragment_10 = root_11$f();
+                            var fragment_10 = root_11$g();
                             var text_2 = first_child(fragment_10);
                             var span = sibling(text_2);
                             var text_3 = child(span, true);
@@ -88938,7 +89036,7 @@ function ActorEffectsTab($$anchor, $$props) {
                       {
                         const children = ($$anchor8, $$arg0) => {
                           let toggleSummary = () => ($$arg0?.()).toggleSummary;
-                          var fragment_16 = root_17$7();
+                          var fragment_16 = root_17$6();
                           var node_10 = first_child(fragment_16);
                           {
                             let $02 = /* @__PURE__ */ user_derived(() => ({
@@ -88996,7 +89094,7 @@ function ActorEffectsTab($$anchor, $$props) {
                           ItemTableCell(node_13, {
                             baseWidth: "7.5rem",
                             children: ($$anchor9, $$slotProps) => {
-                              var span_3 = root_20$5();
+                              var span_3 = root_20$6();
                               var text_8 = child(span_3, true);
                               reset(span_3);
                               template_effect(() => {
@@ -89127,15 +89225,11 @@ const defaultGroupClassicTabs = [
       if (!systemSettings.value.bastionConfiguration.enabled) {
         return false;
       }
-      const members = context.bastionsContext.members;
-      if (!members.length) {
-        return false;
-      }
       if (FoundryAdapter.userIsGm()) {
         return true;
       }
       const threshold = getUnlockThresholdLevel();
-      return members.some((m) => m.level >= threshold);
+      return context.bastionsContext.members.some((m) => m.level >= threshold);
     },
     layout: "classic"
   },
@@ -89981,11 +90075,11 @@ function DeleteOrOpenActivity($$anchor, $$props) {
 var root_3$t = /* @__PURE__ */ from_html(`<span class="spell-primary-column-label svelte-xny97z"> <span class="item-table-count"> </span></span> <!>`, 1);
 var root_6$k = /* @__PURE__ */ from_html(`<i class="fas fa-mortar-pestle"></i>`);
 var root_8$b = /* @__PURE__ */ from_html(`<i class="fas fa-hat-wizard"></i>`);
-var root_11$e = /* @__PURE__ */ from_html(`<i class="fas fa-mortar-pestle"></i>`);
+var root_11$f = /* @__PURE__ */ from_html(`<i class="fas fa-mortar-pestle"></i>`);
 var root_2$M = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!> <!> <!>`, 1);
-var root_22$4 = /* @__PURE__ */ from_html(`<i class="linked-source-tooltip-icon fa-solid fa-circle-info fa-fw"></i>`);
-var root_21$7 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> <!></span>`);
-var root_23$2 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><!></span>`);
+var root_22$5 = /* @__PURE__ */ from_html(`<i class="linked-source-tooltip-icon fa-solid fa-circle-info fa-fw"></i>`);
+var root_21$8 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> <!></span>`);
+var root_23$1 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><!></span>`);
 var root_24$2 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><span class="inline-item-uses"><span class="uses-value"> </span> / <span class="uses-max"> </span></span></span>`);
 var root_25$4 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><!></span>`);
 var root_19$7 = /* @__PURE__ */ from_html(`<!> <!> <div class="primary-cell-extras"><!> <!></div>`, 1);
@@ -90168,7 +90262,7 @@ function SpellbookList($$anchor, $$props) {
                     return get($02);
                   },
                   children: ($$anchor5, $$slotProps2) => {
-                    var i_2 = root_11$e();
+                    var i_2 = root_11$f();
                     append($$anchor5, i_2);
                   },
                   $$slots: { default: true }
@@ -90291,12 +90385,12 @@ function SpellbookList($$anchor, $$props) {
                     return spell();
                   },
                   children: ($$anchor6, $$slotProps2) => {
-                    var span_2 = root_21$7();
+                    var span_2 = root_21$8();
                     var text_5 = child(span_2);
                     var node_14 = sibling(text_5);
                     {
                       var consequent_6 = ($$anchor7) => {
-                        var i_3 = root_22$4();
+                        var i_3 = root_22$5();
                         template_effect(($03) => set_attribute(i_3, "title", $03), [
                           () => localize("TIDY5E.Activities.Cast.SourceHintText", { itemName: spell().system.linkedActivity.item.name })
                         ]);
@@ -90320,7 +90414,7 @@ function SpellbookList($$anchor, $$props) {
                 var node_15 = child(div);
                 {
                   var consequent_7 = ($$anchor6) => {
-                    var span_3 = root_23$2();
+                    var span_3 = root_23$1();
                     var node_16 = child(span_3);
                     ItemUses(node_16, {
                       get item() {
@@ -91000,7 +91094,7 @@ var root_8$9 = /* @__PURE__ */ from_html(`<i class="fa fa-dice-d20 svelte-1qc5u4
 var root_6$i = /* @__PURE__ */ from_html(`<a data-tidy-draggable="" data-tidy-grid-item=""><!> <div class="spell-name svelte-1qc5u4r"><div class="spell-image svelte-1qc5u4r"><!> <svelte-css-wrapper style="display: contents"><!></svelte-css-wrapper></div></div></a>`);
 var root_10$7 = /* @__PURE__ */ from_html(`<button type="button" class="footer-command icon-button svelte-1qc5u4r"><i class="fas fa-plus-circle svelte-1qc5u4r"></i></button>`);
 var root_12$f = /* @__PURE__ */ from_html(`<i></i>`);
-var root_11$d = /* @__PURE__ */ from_html(`<button type="button" class="footer-command icon-button svelte-1qc5u4r"><!> </button>`);
+var root_11$e = /* @__PURE__ */ from_html(`<button type="button" class="footer-command icon-button svelte-1qc5u4r"><!> </button>`);
 var root_9$8 = /* @__PURE__ */ from_html(`<div class="spells-footer svelte-1qc5u4r"><!> <!></div>`);
 var root_5$m = /* @__PURE__ */ from_html(`<div class="spells svelte-1qc5u4r"><!> <!></div>`);
 var root$1z = /* @__PURE__ */ from_html(`<section><!></section>`);
@@ -91118,18 +91212,22 @@ function SpellbookGrid($$anchor, $$props) {
         reset(div_1);
         reset(a);
         template_effect(
-          ($02) => {
+          ($02, $1) => {
             classes = set_class(a, 1, `spell ${$02 ?? ""}`, "svelte-1qc5u4r", classes, { hidden: get(hidden) });
             set_attribute(a, "aria-hidden", get(hidden));
             set_attribute(a, "data-context-menu", CONSTANTS.CONTEXT_MENU_TYPE_ITEMS);
             set_attribute(a, "data-tidy-sheet-part", CONSTANTS.SHEET_PARTS.ITEM_USE_COMMAND);
+            set_attribute(a, "data-magic-suppressed", $1);
             set_attribute(a, "data-item-id", item().id);
             set_attribute(a, "tabindex", settings.value.useAccessibleKeyboardSupport ? 0 : -1);
             set_attribute(a, "data-info-card", item() ? "item" : null);
             set_attribute(a, "data-info-card-entity-uuid", item()?.uuid ?? null);
             set_style(div_2, `background-image: url('${spellImgUrl() ?? ""}');`);
           },
-          [() => FoundryAdapter.getSpellRowClasses(item())]
+          [
+            () => FoundryAdapter.getSpellRowClasses(item()),
+            () => get(context).antimagic && isAntimagicItem(item()) || void 0
+          ]
         );
         delegated("click", a, (event2) => FoundryAdapter.actorTryUseItem(item(), event2));
         delegated("contextmenu", a, (event2) => FoundryAdapter.onActorItemButtonContextMenu(item(), { event: event2 }));
@@ -91168,7 +91266,7 @@ function SpellbookGrid($$anchor, $$props) {
           }
           var node_8 = sibling(node_7, 2);
           each$1(node_8, 17, () => get(customCommands), index$1, ($$anchor4, command) => {
-            var button_1 = root_11$d();
+            var button_1 = root_11$e();
             var node_9 = child(button_1);
             {
               var consequent_4 = ($$anchor5) => {
@@ -91408,16 +91506,16 @@ class DocumentTabSectionConfigApplication extends DocumentSheetDialog() {
 }
 var root_1$R = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_12$e = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
-var root_11$c = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_27$2 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-link-slash align-self-center"></i>`);
+var root_11$d = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
+var root_27$1 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-link-slash align-self-center"></i>`);
 var root_25$3 = /* @__PURE__ */ from_html(`<!> <!> <span class="truncate flex-1"> </span>`, 1);
-var root_23$1 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
-var root_33$2 = /* @__PURE__ */ from_html(`<span> </span>`);
+var root_23 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
+var root_33$1 = /* @__PURE__ */ from_html(`<span> </span>`);
 var root_32$1 = /* @__PURE__ */ from_html(`<!> <i class="fas fa-bolt"></i>`, 1);
 var root_35$1 = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
-var root_22$3 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_21$6 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
-var root_20$4 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_22$4 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
+var root_21$7 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_20$5 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_47 = /* @__PURE__ */ from_html(`<i class="fas fa-caret-up"></i>`);
 var root_48$1 = /* @__PURE__ */ from_html(`<i class="fas fa-caret-down"></i>`);
 var root_46 = /* @__PURE__ */ from_html(`<h2><button type="button" class="transparent-button spellbook-title toggle-spellbook svelte-1n3ct2k"> <!></button></h2>`);
@@ -91623,7 +91721,7 @@ function NpcAbilitiesTab($$anchor, $$props) {
               const header = ($$anchor5) => {
                 ItemTableHeaderRow($$anchor5, {
                   children: ($$anchor6, $$slotProps) => {
-                    var fragment_11 = root_11$c();
+                    var fragment_11 = root_11$d();
                     var node_13 = first_child(fragment_11);
                     ItemTableColumn(node_13, {
                       primary: true,
@@ -91718,22 +91816,22 @@ function NpcAbilitiesTab($$anchor, $$props) {
                 });
               };
               const body = ($$anchor5) => {
-                var fragment_20 = root_20$4();
+                var fragment_20 = root_20$5();
                 var node_18 = first_child(fragment_20);
                 each$1(node_18, 17, () => get(featureEntries), ({ item, ctx }) => item.id, ($$anchor6, $$item) => {
                   let item = () => get($$item).item;
                   let ctx = () => get($$item).ctx;
-                  var fragment_21 = root_21$6();
+                  var fragment_21 = root_21$7();
                   var node_19 = first_child(fragment_21);
                   {
                     const children = ($$anchor7, $$arg0) => {
                       let toggleSummary = () => ($$arg0?.()).toggleSummary;
-                      var fragment_22 = root_22$3();
+                      var fragment_22 = root_22$4();
                       var node_20 = first_child(fragment_22);
                       ItemTableCell(node_20, {
                         primary: true,
                         children: ($$anchor8, $$slotProps) => {
-                          var fragment_23 = root_23$1();
+                          var fragment_23 = root_23();
                           var node_21 = first_child(fragment_23);
                           {
                             let $03 = /* @__PURE__ */ user_derived(() => !get(context).editable);
@@ -91784,7 +91882,7 @@ function NpcAbilitiesTab($$anchor, $$props) {
                               var node_25 = sibling(node_24, 2);
                               {
                                 var consequent_10 = ($$anchor10) => {
-                                  var i = root_27$2();
+                                  var i = root_27$1();
                                   append($$anchor10, i);
                                 };
                                 if_block(node_25, ($$render) => {
@@ -91856,7 +91954,7 @@ function NpcAbilitiesTab($$anchor, $$props) {
                                   var node_29 = first_child(fragment_30);
                                   {
                                     var consequent_13 = ($$anchor11) => {
-                                      var span_2 = root_33$2();
+                                      var span_2 = root_33$1();
                                       var text_7 = child(span_2, true);
                                       reset(span_2);
                                       template_effect(() => set_text(text_7, get(remaining)));
@@ -92287,7 +92385,7 @@ function NpcAbilitiesTab($$anchor, $$props) {
 delegate(["click"]);
 var root_2$H = /* @__PURE__ */ from_html(`<div class="filter-option-group"><label class="filter-option flex-row no-gap align-items-center"><input type="checkbox"/> <span> </span></label></div>`);
 var root_1$Q = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_11$b = /* @__PURE__ */ from_html(`<div><!></div>`);
+var root_11$c = /* @__PURE__ */ from_html(`<div><!></div>`);
 var root$1w = /* @__PURE__ */ from_html(`<!> <!> <div class="scroll-container flex-column small-gap"><!></div> <!>`, 1);
 function NpcSpellbookTab($$anchor, $$props) {
   push($$props, true);
@@ -92469,7 +92567,7 @@ function NpcSpellbookTab($$anchor, $$props) {
               var consequent_3 = ($$anchor5) => {
                 const expandedOverride = /* @__PURE__ */ user_derived(() => get(searchCriteria).trim() !== "" ? get(visibleItemCount) > 0 : void 0);
                 const unavailable = /* @__PURE__ */ user_derived(() => get(searchCriteria).trim() !== "" && get(visibleItemCount) === 0 && !!get(section).slots);
-                var div_2 = root_11$b();
+                var div_2 = root_11$c();
                 let classes;
                 var node_11 = child(div_2);
                 {
@@ -93118,10 +93216,10 @@ function ActorConditions($$anchor, $$props) {
   pop();
 }
 var root_12$d = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
-var root_11$a = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
+var root_11$b = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_19$6 = /* @__PURE__ */ from_html(`<!> <a class="truncate flex-row align-items-center flex-1"><span class="align-self-center truncate flex-1"> </span></a>`, 1);
-var root_20$3 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
-var root_21$5 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
+var root_20$4 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
+var root_21$6 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
 var root_18$7 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_16$8 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root$1t = /* @__PURE__ */ from_html(`<!> <div class="scroll-container flex-column small-gap"><!> <!> <!></div>`, 1);
@@ -93229,7 +93327,7 @@ function NpcEffectsTab($$anchor, $$props) {
                   const header = ($$anchor6) => {
                     ItemTableHeaderRow($$anchor6, {
                       children: ($$anchor7, $$slotProps) => {
-                        var fragment_11 = root_11$a();
+                        var fragment_11 = root_11$b();
                         var node_6 = first_child(fragment_11);
                         ItemTableColumn(node_6, {
                           primary: true,
@@ -93338,7 +93436,7 @@ function NpcEffectsTab($$anchor, $$props) {
                           ItemTableCell(node_13, {
                             baseWidth: "12.5rem",
                             children: ($$anchor9, $$slotProps) => {
-                              var span_2 = root_20$3();
+                              var span_2 = root_20$4();
                               var text_7 = child(span_2, true);
                               reset(span_2);
                               template_effect(() => {
@@ -93353,7 +93451,7 @@ function NpcEffectsTab($$anchor, $$props) {
                           ItemTableCell(node_14, {
                             baseWidth: "7.5rem",
                             children: ($$anchor9, $$slotProps) => {
-                              var span_3 = root_21$5();
+                              var span_3 = root_21$6();
                               var text_8 = child(span_3, true);
                               reset(span_3);
                               template_effect(() => {
@@ -93757,16 +93855,16 @@ function ActorJournalTab($$anchor, $$props) {
 delegate(["click"]);
 var root_1$N = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_7$c = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_20$2 = /* @__PURE__ */ from_html(` <!>`, 1);
-var root_22$2 = /* @__PURE__ */ from_html(` <!>`, 1);
+var root_20$3 = /* @__PURE__ */ from_html(` <!>`, 1);
+var root_22$3 = /* @__PURE__ */ from_html(` <!>`, 1);
 var root_18$6 = /* @__PURE__ */ from_html(`<div class="flex-1 min-width-0"><div class="truncate flex-1"> </div> <small class="svelte-a96ewx"><!></small></div>`);
-var root_26$2 = /* @__PURE__ */ from_html(`<span> </span>`);
+var root_26$3 = /* @__PURE__ */ from_html(`<span> </span>`);
 var root_25$2 = /* @__PURE__ */ from_html(`<!> <i class="fas fa-bolt"></i>`, 1);
 var root_29$1 = /* @__PURE__ */ from_html(`<div> </div> <small class="svelte-a96ewx"> </small>`, 1);
-var root_30$1 = /* @__PURE__ */ from_html(`<div> </div> <small class="svelte-a96ewx"> </small>`, 1);
+var root_30$2 = /* @__PURE__ */ from_html(`<div> </div> <small class="svelte-a96ewx"> </small>`, 1);
 var root_24$1 = /* @__PURE__ */ from_html(`<div class="item-uses svelte-a96ewx"><!> <!></div>`);
 var root_16$7 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
-var root_33$1 = /* @__PURE__ */ from_html(`<div class="flex-column-truncate svelte-a96ewx"> </div>`);
+var root_33 = /* @__PURE__ */ from_html(`<div class="flex-column-truncate svelte-a96ewx"> </div>`);
 var root_34 = /* @__PURE__ */ from_html(`<small class="flex-column-truncate svelte-a96ewx"> </small>`);
 var root_32 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_37$2 = /* @__PURE__ */ from_html(`<span class="flex-column-truncate svelte-a96ewx"> </span> <small class="flex-column-truncate dc-ability-text svelte-a96ewx"> </small>`, 1);
@@ -94006,7 +94104,7 @@ function ActorActionsTab($$anchor, $$props) {
                               append($$anchor9, text_5);
                             };
                             var consequent_5 = ($$anchor9) => {
-                              var fragment_19 = root_20$2();
+                              var fragment_19 = root_20$3();
                               var text_6 = first_child(fragment_19);
                               var node_19 = sibling(text_6);
                               {
@@ -94024,7 +94122,7 @@ function ActorActionsTab($$anchor, $$props) {
                               append($$anchor9, fragment_19);
                             };
                             var alternate = ($$anchor9) => {
-                              var fragment_21 = root_22$2();
+                              var fragment_21 = root_22$3();
                               var text_8 = first_child(fragment_21);
                               var node_20 = sibling(text_8);
                               {
@@ -94071,7 +94169,7 @@ function ActorActionsTab($$anchor, $$props) {
                               var node_23 = first_child(fragment_23);
                               {
                                 var consequent_7 = ($$anchor10) => {
-                                  var span = root_26$2();
+                                  var span = root_26$3();
                                   var text_10 = child(span, true);
                                   reset(span);
                                   template_effect(() => set_text(text_10, get(remaining)));
@@ -94119,7 +94217,7 @@ function ActorActionsTab($$anchor, $$props) {
                                   append($$anchor10, fragment_26);
                                 };
                                 var alternate_1 = ($$anchor10) => {
-                                  var fragment_27 = root_30$1();
+                                  var fragment_27 = root_30$2();
                                   var div_5 = first_child(fragment_27);
                                   var text_13 = child(div_5);
                                   reset(div_5);
@@ -94182,7 +94280,7 @@ function ActorActionsTab($$anchor, $$props) {
                       var node_27 = first_child(fragment_29);
                       {
                         var consequent_14 = ($$anchor8) => {
-                          var div_6 = root_33$1();
+                          var div_6 = root_33();
                           var text_16 = child(div_6, true);
                           reset(div_6);
                           template_effect(() => {
@@ -95298,11 +95396,11 @@ var root_5$h = /* @__PURE__ */ from_html(` <span class="item-table-count"> </spa
 var root_4$g = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_13$7 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
 var root_12$c = /* @__PURE__ */ from_html(`<!> <!>`, 1);
-var root_17$6 = /* @__PURE__ */ from_html(`<span> </span>`);
+var root_17$5 = /* @__PURE__ */ from_html(`<span> </span>`);
 var root_16$6 = /* @__PURE__ */ from_html(`<!> <i class="fas fa-bolt"></i>`, 1);
 var root_19$5 = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
-var root_21$4 = /* @__PURE__ */ from_html(`<span> </span>`);
-var root_11$9 = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
+var root_21$5 = /* @__PURE__ */ from_html(`<span> </span>`);
+var root_11$a = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
 var root_9$6 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_29 = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
 var root_28$2 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!>`, 1);
@@ -95397,7 +95495,7 @@ function VehicleAttributesTab($$anchor, $$props) {
               {
                 const children = ($$anchor6, $$arg0) => {
                   let toggleSummary = () => ($$arg0?.()).toggleSummary;
-                  var fragment_10 = root_11$9();
+                  var fragment_10 = root_11$a();
                   var node_6 = first_child(fragment_10);
                   ItemTableCell(node_6, {
                     primary: true,
@@ -95463,7 +95561,7 @@ function VehicleAttributesTab($$anchor, $$props) {
                           var node_11 = first_child(fragment_14);
                           {
                             var consequent_2 = ($$anchor9) => {
-                              var span_2 = root_17$6();
+                              var span_2 = root_17$5();
                               var text_5 = child(span_2, true);
                               reset(span_2);
                               template_effect(() => set_text(text_5, get(remaining)));
@@ -95507,7 +95605,7 @@ function VehicleAttributesTab($$anchor, $$props) {
                       var node_13 = first_child(fragment_16);
                       {
                         var consequent_5 = ($$anchor8) => {
-                          var span_4 = root_21$4();
+                          var span_4 = root_21$5();
                           var text_6 = child(span_4, true);
                           reset(span_4);
                           template_effect(($02) => set_text(text_6, $02), [() => localizedActivationLabel(item())]);
@@ -96318,7 +96416,7 @@ function VehiclePassengersAndCrewTab($$anchor, $$props) {
 }
 delegate(["click", "change"]);
 var root_1$K = /* @__PURE__ */ from_html(`<!> <!> <!> <!>`, 1);
-var root_11$8 = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
+var root_11$9 = /* @__PURE__ */ from_html(` <span class="item-table-count"> </span>`, 1);
 var root_13$5 = /* @__PURE__ */ from_html(`<div class="attunement-and-currency"><!></div> <!>`, 1);
 var root$1k = /* @__PURE__ */ from_html(`<!> <!> <div class="tidy-inventory-container scroll-container flex-column small-gap"><!></div> <!>`, 1);
 function VehicleCargoTab($$anchor, $$props) {
@@ -96446,7 +96544,7 @@ function VehicleCargoTab($$anchor, $$props) {
                     {
                       const primaryColumn = ($$anchor7) => {
                         next();
-                        var fragment_11 = root_11$8();
+                        var fragment_11 = root_11$9();
                         var text_1 = first_child(fragment_11);
                         var span = sibling(text_1);
                         var text_2 = child(span, true);
@@ -96636,10 +96734,10 @@ var root_4$e = /* @__PURE__ */ from_html(`<span> </span>&nbsp;`, 1);
 var root_2$B = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!> <!>`, 1);
 var root_12$a = /* @__PURE__ */ from_html(`<button type="button" class="inline-transparent-button"><img class="encounter-member-list-item-image"/></button> <button type="button" class="encounter-member-name transparent-button highlight-on-hover"> </button>`, 1);
 var root_16$5 = /* @__PURE__ */ from_html(`<span class="text-body" data-attribution="attributes.movement" data-attribution-caption="DND5E.Speed"> </span>`);
-var root_17$5 = /* @__PURE__ */ from_html(`<span class="text-body semibold" data-attribution="attributes.ac" data-attribution-caption="DND5E.ArmorClass"> </span>`);
-var root_21$3 = /* @__PURE__ */ from_html(`&nbsp;—&nbsp; <span class="text-body semibold"> </span>&nbsp; <abbr> </abbr>`, 1);
-var root_20$1 = /* @__PURE__ */ from_html(`<abbr class="text-body-secondary"> </abbr>&nbsp; <span class="text-body semibold"> </span> <!>`, 1);
-var root_11$7 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!> <!>`, 1);
+var root_17$4 = /* @__PURE__ */ from_html(`<span class="text-body semibold" data-attribution="attributes.ac" data-attribution-caption="DND5E.ArmorClass"> </span>`);
+var root_21$4 = /* @__PURE__ */ from_html(`&nbsp;—&nbsp; <span class="text-body semibold"> </span>&nbsp; <abbr> </abbr>`, 1);
+var root_20$2 = /* @__PURE__ */ from_html(`<abbr class="text-body-secondary"> </abbr>&nbsp; <span class="text-body semibold"> </span> <!>`, 1);
+var root_11$8 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!> <!>`, 1);
 var root_9$5 = /* @__PURE__ */ from_html(`<div class="flex-column no-gap"></div>`);
 var root$1j = /* @__PURE__ */ from_html(`<section class="encounter-member-list-section"><!></section>`);
 function EncounterMemberList($$anchor, $$props) {
@@ -96774,7 +96872,7 @@ function EncounterMemberList($$anchor, $$props) {
               return get($02);
             },
             children: ($$anchor4, $$slotProps) => {
-              var fragment_9 = root_11$7();
+              var fragment_9 = root_11$8();
               var node_8 = first_child(fragment_9);
               TidyTableCell$1(node_8, {
                 class: "flex-row small-gap",
@@ -96887,7 +96985,7 @@ function EncounterMemberList($$anchor, $$props) {
               var node_13 = sibling(node_11, 2);
               TidyTableCell$1(node_13, {
                 children: ($$anchor5, $$slotProps2) => {
-                  var span_2 = root_17$5();
+                  var span_2 = root_17$4();
                   var text_7 = child(span_2, true);
                   reset(span_2);
                   template_effect(() => {
@@ -96907,7 +97005,7 @@ function EncounterMemberList($$anchor, $$props) {
                       var node_15 = first_child(fragment_15);
                       {
                         var consequent_3 = ($$anchor7) => {
-                          var fragment_16 = root_20$1();
+                          var fragment_16 = root_20$2();
                           var abbr = first_child(fragment_16);
                           var text_8 = child(abbr, true);
                           reset(abbr);
@@ -96917,7 +97015,7 @@ function EncounterMemberList($$anchor, $$props) {
                           var node_16 = sibling(span_3, 2);
                           {
                             var consequent_2 = ($$anchor8) => {
-                              var fragment_17 = root_21$3();
+                              var fragment_17 = root_21$4();
                               var span_4 = sibling(first_child(fragment_17));
                               var text_10 = child(span_4, true);
                               reset(span_4);
@@ -99621,15 +99719,15 @@ var root_6$c = /* @__PURE__ */ from_html(`<i class="fas fa-weight-hanging"></i>`
 var root_7$b = /* @__PURE__ */ from_html(`<i class="fas fa-bolt"></i>`);
 var root_2$A = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!>`, 1);
 var root_16$4 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
-var root_17$4 = /* @__PURE__ */ from_html(`<div class="item-detail weapon-mastery svelte-1y27zgd"><i class="item-state-icon fas fa-circle-star highlighted"></i></div>`);
+var root_17$3 = /* @__PURE__ */ from_html(`<div class="item-detail weapon-mastery svelte-1y27zgd"><i class="item-state-icon fas fa-circle-star highlighted"></i></div>`);
 var root_19$3 = /* @__PURE__ */ from_html(`<div class="item-detail attunement svelte-1y27zgd"><i></i></div>`);
 var root_18$4 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_14$4 = /* @__PURE__ */ from_html(`<!> <!> <!> <div class="primary-cell-extras"><!> <!></div>`, 1);
-var root_22$1 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
+var root_22$2 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
 var root_25$1 = /* @__PURE__ */ from_html(`<span class="text-body-tertiary">&mdash;</span>`);
 var root_13$4 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!> <!>`, 1);
 var root_12$8 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
-var root_11$6 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_11$7 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root$1c = /* @__PURE__ */ from_html(`<section class="inventory-list-section svelte-1y27zgd"><!></section>`);
 function InventoryList($$anchor, $$props) {
   push($$props, true);
@@ -99814,7 +99912,7 @@ function InventoryList($$anchor, $$props) {
       });
     };
     const body = ($$anchor2) => {
-      var fragment_8 = root_11$6();
+      var fragment_8 = root_11$7();
       var node_9 = first_child(fragment_8);
       each$1(node_9, 17, () => get(itemEntries), ({ item, ctx, itemName }) => item.id, ($$anchor3, $$item) => {
         let item = () => get($$item).item;
@@ -99886,7 +99984,7 @@ function InventoryList($$anchor, $$props) {
                     const mastery = /* @__PURE__ */ user_derived(() => CONFIG.DND5E.weaponMasteries?.[item().system.mastery]);
                     const masteryReference = /* @__PURE__ */ user_derived(() => settings.value.referenceTooltipMastery ? get(mastery)?.reference : void 0);
                     const masteryTooltip = /* @__PURE__ */ user_derived(() => get(mastery)?.label ? localize("TIDY5E.ITEM.Weapon.Mastery.Label", { mastery: get(mastery).label }) : localize("DND5E.WEAPON.Mastery.Label"));
-                    var div_1 = root_17$4();
+                    var div_1 = root_17$3();
                     var i_2 = child(div_1);
                     reset(div_1);
                     template_effect(() => {
@@ -99956,7 +100054,7 @@ function InventoryList($$anchor, $$props) {
                       return get($03);
                     },
                     children: ($$anchor6, $$slotProps) => {
-                      var span_1 = root_22$1();
+                      var span_1 = root_22$2();
                       var text_4 = child(span_1, true);
                       reset(span_1);
                       template_effect(($04) => set_text(text_4, $04), [
@@ -100436,9 +100534,9 @@ var root_2$y = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
 var root_14$2 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
 var root_15$5 = /* @__PURE__ */ from_html(`<div class="primary-cell-uses"><!></div>`);
 var root_16$2 = /* @__PURE__ */ from_html(`<div class="primary-cell-uses"><div class="inline-item-uses"><span class="uses-value"> </span> / <span class="uses-max"> </span></div></div>`);
-var root_17$3 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><!></span>`);
+var root_17$2 = /* @__PURE__ */ from_html(`<span class="primary-cell-uses"><!></span>`);
 var root_12$7 = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
-var root_11$5 = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
+var root_11$6 = /* @__PURE__ */ from_html(`<!> <!> <!>`, 1);
 var root$1b = /* @__PURE__ */ from_html(`<section class="spellbook-list-section"><!></section>`);
 function FavoriteSpellsList($$anchor, $$props) {
   push($$props, true);
@@ -100554,7 +100652,7 @@ function FavoriteSpellsList($$anchor, $$props) {
         {
           const children = ($$anchor4, $$arg0) => {
             let toggleSummary = () => ($$arg0?.()).toggleSummary;
-            var fragment_8 = root_11$5();
+            var fragment_8 = root_11$6();
             var node_7 = first_child(fragment_8);
             ItemTableCell(node_7, {
               primary: true,
@@ -100634,7 +100732,7 @@ function FavoriteSpellsList($$anchor, $$props) {
                     append($$anchor6, div_1);
                   };
                   var consequent_4 = ($$anchor6) => {
-                    var span_5 = root_17$3();
+                    var span_5 = root_17$2();
                     var node_12 = child(span_5);
                     ActivityUses(node_12, {
                       get activity() {
@@ -101021,10 +101119,10 @@ var root_6$9 = /* @__PURE__ */ from_html(`<i class="fas fa-user"></i>`);
 var root_7$7 = /* @__PURE__ */ from_html(`<i class="fas fa-horse-head"></i>`);
 var root_2$v = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 var root_12$6 = /* @__PURE__ */ from_html(`<span class="truncate flex-1"> </span>`);
-var root_11$4 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
+var root_11$5 = /* @__PURE__ */ from_html(`<!> <!>`, 1);
 var root_15$4 = /* @__PURE__ */ from_html(`<div data-tooltip-direction="UP"><!></div>`);
 var root_18$3 = /* @__PURE__ */ from_html(`<div data-tooltip-direction="UP"><!></div>`);
-var root_21$2 = /* @__PURE__ */ from_html(`<div data-tooltip-direction="UP"><!></div>`);
+var root_21$3 = /* @__PURE__ */ from_html(`<div data-tooltip-direction="UP"><!></div>`);
 var root_10$3 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 var root$19 = /* @__PURE__ */ from_html(`<!> <section class="facility-list-section"><!></section>`, 1);
 function FavoriteFacilitiesList($$anchor, $$props) {
@@ -101144,7 +101242,7 @@ function FavoriteFacilitiesList($$anchor, $$props) {
             ItemTableCell(node_8, {
               primary: true,
               children: ($$anchor5, $$slotProps) => {
-                var fragment_8 = root_11$4();
+                var fragment_8 = root_11$5();
                 var node_9 = first_child(fragment_8);
                 {
                   let $02 = /* @__PURE__ */ user_derived(() => !get(context).editable && (!ctx()?.chosen?.disabled || FoundryAdapter.userIsGm()));
@@ -101263,7 +101361,7 @@ function FavoriteFacilitiesList($$anchor, $$props) {
             ItemTableCell(node_17, {
               baseWidth: creaturesWidth,
               children: ($$anchor5, $$slotProps) => {
-                var div_2 = root_21$2();
+                var div_2 = root_21$3();
                 var node_18 = child(div_2);
                 {
                   var consequent_3 = ($$anchor6) => {
@@ -101334,10 +101432,10 @@ delegate(["mouseover"]);
 var root_5$d = /* @__PURE__ */ from_html(`<i class="fas fa-bolt"></i>`);
 var root_7$6 = /* @__PURE__ */ from_html(`<i class="fas fa-wand-sparkles"></i> <i class="fas fa-shield"></i>`, 1);
 var root_2$u = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
-var root_11$3 = /* @__PURE__ */ from_html(`<a class="item-table-image-button"><img/> <i class="fa fa-dice-d20 roll-indicator"></i></a> <span class="truncate"> </span>`, 1);
+var root_11$4 = /* @__PURE__ */ from_html(`<a class="item-table-image-button"><img/> <i class="fa fa-dice-d20 roll-indicator"></i></a> <span class="truncate"> </span>`, 1);
 var root_12$5 = /* @__PURE__ */ from_html(`<a> </a>`);
 var root_15$3 = /* @__PURE__ */ from_html(`<span>—</span>`);
-var root_17$2 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
+var root_17$1 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
 var root_18$2 = /* @__PURE__ */ from_html(`<span class="truncate"> </span>`);
 var root_10$2 = /* @__PURE__ */ from_html(`<!> <!> <!> <!> <!>`, 1);
 function FavoriteActivitiesList($$anchor, $$props) {
@@ -101443,7 +101541,7 @@ function FavoriteActivitiesList($$anchor, $$props) {
               TidyTableCell$1(node_6, {
                 primary: true,
                 children: ($$anchor5, $$slotProps2) => {
-                  var fragment_10 = root_11$3();
+                  var fragment_10 = root_11$4();
                   var a = first_child(fragment_10);
                   var img = child(a);
                   next(2);
@@ -101513,7 +101611,7 @@ function FavoriteActivitiesList($$anchor, $$props) {
                   var node_11 = first_child(fragment_13);
                   {
                     var consequent_1 = ($$anchor6) => {
-                      var span_2 = root_17$2();
+                      var span_2 = root_17$1();
                       var text_5 = child(span_2, true);
                       reset(span_2);
                       template_effect(($02) => set_text(text_5, $02), [
@@ -101982,7 +102080,7 @@ function FacilityOccupant($$anchor, $$props) {
       EventHelper.triggerContextMenu(event2, "[data-actor-uuid]");
       return;
     }
-    $$props.occupant.sheet.render(true);
+    $$props.occupant?.sheet.render(true);
   }
   async function onSlotClick(ev) {
     if (!TidyHooks.tidy5eSheetsFacilityEmptyOccupantSlotClicked(ev, get(context).actor.items.get($$props.facilityId), $$props.type, $$props.prop)) {
@@ -102097,7 +102195,7 @@ function FacilityRosterOccupant($$anchor, $$props) {
       EventHelper.triggerContextMenu(event2, "[data-actor-uuid]");
       return;
     }
-    $$props.occupant.sheet.render(true);
+    $$props.occupant?.sheet.render(true);
   }
   const localize = FoundryAdapter.localize;
   let name = /* @__PURE__ */ user_derived(() => $$props.occupant ? $$props.occupant.name : localize("TIDY5E.BrokenLink"));
@@ -102229,18 +102327,21 @@ var root_2$o = /* @__PURE__ */ from_html(`<div class="document-name"> </div>`);
 var root_5$b = /* @__PURE__ */ from_html(`<img class="facility-image"/>`);
 var root_6$8 = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.hirelings"><div class="sub-header"> </div> <ul class="slots hirelings"></ul></div>`);
 var root_8$5 = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.defenders"><div class="sub-header"> </div> <ul class="slots facility-occupants defenders"></ul></div>`);
-var root_10$1 = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.trade.creatures"><div class="sub-header"> </div> <ul class="slots creatures"></ul></div>`);
+var root_12$4 = /* @__PURE__ */ from_html(`<button type="button" class="unbuttoned"><i class="fa-solid fa-hourglass-half"></i></button>`);
+var root_13$2 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-hourglass-half"></i>`);
+var root_11$3 = /* @__PURE__ */ from_html(`<li class="slot occupant-slot creature pending"><!></li>`);
+var root_10$1 = /* @__PURE__ */ from_html(`<div class="facility-occupants" data-prop="system.trade.creatures"><div class="sub-header"> </div> <ul class="slots creatures"><!> <!></ul></div>`);
 var root_3$f = /* @__PURE__ */ from_html(`<li><div class="facility-header"><a class="facility-header-details"><!> <div class="title-and-subtitle"><span class="title"> </span> <span class="subtitle"></span></div></a> <a class="facility-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a></div> <!> <!> <!> <!></li>`);
-var root_12$4 = /* @__PURE__ */ from_html(`<li class="facility empty"><a class="highlight-on-hover"><i class="fas fa-building-columns"></i> </a></li>`);
-var root_15$2 = /* @__PURE__ */ from_html(`<img class="facility-image"/>`);
-var root_13$2 = /* @__PURE__ */ from_html(`<li><div class="facility-header"><a class="facility-header-details"><!> <div class="title-and-subtitle"><span class="title"> </span> <span class="subtitle"></span></div></a> <a class="facility-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a></div> <!></li>`);
-var root_17$1 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-trowel"></i>`);
-var root_18$1 = /* @__PURE__ */ from_html(`<i class="fas fa-chess-rook"></i>`);
-var root_16$1 = /* @__PURE__ */ from_html(`<div class="facility empty"><a class="highlight-on-hover"><!> </a></div>`);
-var root_19$2 = /* @__PURE__ */ from_html(`<section class="roster defenders"><h3><i class="fa-solid fa-shield"></i> </h3> <ul class="roster-list"></ul></section>`);
-var root_23 = /* @__PURE__ */ from_html(`<section class="roster hirelings"><h3><i class="fa-solid fa-users"></i> </h3> <ul class="roster-list"></ul></section>`);
-var root_27$1 = /* @__PURE__ */ from_html(`<section class="roster creatures"><h3><i class="fa-solid fa-horse-head"></i> </h3> <ul class="roster-list"></ul></section>`);
-var root_33 = /* @__PURE__ */ from_html(`<div class="editor"><div data-field="system.bastion.description" class="user-select-text"></div></div>`);
+var root_15$2 = /* @__PURE__ */ from_html(`<li class="facility empty"><a class="highlight-on-hover"><i class="fas fa-building-columns"></i> </a></li>`);
+var root_18$1 = /* @__PURE__ */ from_html(`<img class="facility-image"/>`);
+var root_16$1 = /* @__PURE__ */ from_html(`<li><div class="facility-header"><a class="facility-header-details"><!> <div class="title-and-subtitle"><span class="title"> </span> <span class="subtitle"></span></div></a> <a class="facility-menu highlight-on-hover"><i class="fas fa-ellipsis-vertical"></i></a></div> <!></li>`);
+var root_20$1 = /* @__PURE__ */ from_html(`<i class="fa-solid fa-trowel"></i>`);
+var root_21$2 = /* @__PURE__ */ from_html(`<i class="fas fa-chess-rook"></i>`);
+var root_19$2 = /* @__PURE__ */ from_html(`<div class="facility empty"><a class="highlight-on-hover"><!> </a></div>`);
+var root_22$1 = /* @__PURE__ */ from_html(`<section class="roster defenders"><h3><i class="fa-solid fa-shield"></i> </h3> <ul class="roster-list"></ul></section>`);
+var root_26$2 = /* @__PURE__ */ from_html(`<section class="roster hirelings"><h3><i class="fa-solid fa-users"></i> </h3> <ul class="roster-list"></ul></section>`);
+var root_30$1 = /* @__PURE__ */ from_html(`<section class="roster creatures"><h3><i class="fa-solid fa-horse-head"></i> </h3> <ul class="roster-list"></ul></section>`);
+var root_36$1 = /* @__PURE__ */ from_html(`<div class="editor"><div data-field="system.bastion.description" class="user-select-text"></div></div>`);
 var root$15 = /* @__PURE__ */ from_html(`<div class="bastion-container scroll-container"><section class="name"><!></section> <section class="facility-panels"><section class="facilities special"><h3><i class="fas fa-building-columns"></i> <span class="counter"><span class="value"> </span> / <span class="max"> </span></span></h3> <ul class="facility-list"><!> <!></ul></section> <section class="facilities basic"><h3><i class="fas fa-chess-rook"></i> </h3> <ul class="facility-list"><!> <!></ul></section></section> <!> <!> <!> <section class="description"><h3><i class="fa-solid fa-books"></i> Description</h3> <!></section></div>`);
 function CharacterBastionTab($$anchor, $$props) {
   push($$props, true);
@@ -102260,6 +102361,16 @@ function CharacterBastionTab($$anchor, $$props) {
   function isSvg(iconPath) {
     return basicSvgFilePathRegex.test(iconPath?.trim());
   }
+  async function cancelPendingTrade(facility, uuid) {
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "DND5E.Bastion.Trade.Cancel" },
+      content: FoundryAdapter.localize("DND5E.Bastion.Trade.Invalid"),
+      rejectClose: false
+    });
+    if (confirmed && get(context).unlocked && get(context).editable && facility.system.trade.pending?.creatures.includes(uuid)) {
+      await cancelFacilityOrder(facility, "trade");
+    }
+  }
   async function addFacility2(ev, type2) {
     if (!TidyHooks.tidy5eSheetsAddFacilityClicked(ev, get(context).actor, type2)) {
       return;
@@ -102277,7 +102388,7 @@ function CharacterBastionTab($$anchor, $$props) {
       }
     });
     if (result) {
-      get(context).actor.sheet._onDropItemCreate(await fromUuid(result));
+      get(context).actor.sheet._onDropItemCreate(await fromUuid(result), ev, "copy");
     }
   }
   function useFacility2(event2, chosen) {
@@ -102461,13 +102572,39 @@ function CharacterBastionTab($$anchor, $$props) {
     }
     var node_5 = sibling(node_4, 2);
     {
-      var consequent_5 = ($$anchor3) => {
+      var consequent_6 = ($$anchor3) => {
         var div_8 = root_10$1();
         var div_9 = child(div_8);
         var text_7 = child(div_9, true);
         reset(div_9);
         var ul_3 = sibling(div_9, 2);
-        each$1(ul_3, 21, () => get(chosen).creatures, index$1, ($$anchor4, $$item, index2) => {
+        var node_6 = child(ul_3);
+        each$1(node_6, 17, () => get(chosen).facility.system.trade.pending?.creatures ?? [], index$1, ($$anchor4, uuid) => {
+          var li_1 = root_11$3();
+          var node_7 = child(li_1);
+          {
+            var consequent_5 = ($$anchor5) => {
+              var button = root_12$4();
+              template_effect(($0) => set_attribute(button, "aria-label", $0), [() => localize("DND5E.Bastion.Trade.Cancel")]);
+              delegated("click", button, () => cancelPendingTrade(get(chosen).facility, get(uuid)));
+              append($$anchor5, button);
+            };
+            var alternate_1 = ($$anchor5) => {
+              var i = root_13$2();
+              template_effect(($0) => set_attribute(i, "aria-label", $0), [() => localize("DND5E.Bastion.Trade.Pending")]);
+              append($$anchor5, i);
+            };
+            if_block(node_7, ($$render) => {
+              if (get(context).editable && get(context).unlocked) $$render(consequent_5);
+              else $$render(alternate_1, -1);
+            });
+          }
+          reset(li_1);
+          template_effect(($0) => set_attribute(li_1, "data-tooltip", $0), [() => localize("DND5E.Bastion.Trade.Pending")]);
+          append($$anchor4, li_1);
+        });
+        var node_8 = sibling(node_6, 2);
+        each$1(node_8, 17, () => get(chosen).creatures, index$1, ($$anchor4, $$item, index2) => {
           let actor = () => get($$item).actor;
           let uuid = () => get($$item).uuid;
           FacilityOccupant($$anchor4, {
@@ -102496,11 +102633,11 @@ function CharacterBastionTab($$anchor, $$props) {
         append($$anchor3, div_8);
       };
       if_block(node_5, ($$render) => {
-        if (get(chosen).creatures.length) $$render(consequent_5);
+        if (get(chosen).creatures.length || get(chosen).facility.system.trade.pending?.creatures?.length) $$render(consequent_6);
       });
     }
-    var node_6 = sibling(node_5, 2);
-    FacilityOrderProgressTracker(node_6, {
+    var node_9 = sibling(node_5, 2);
+    FacilityOrderProgressTracker(node_9, {
       get chosen() {
         return get(chosen);
       }
@@ -102531,16 +102668,16 @@ function CharacterBastionTab($$anchor, $$props) {
     delegated("click", a_1, (ev) => EventHelper.triggerContextMenu(ev, "[data-item-id]"));
     append($$anchor2, li);
   });
-  var node_7 = sibling(node_1, 2);
-  each$1(node_7, 17, () => get(context).facilities.special.available, index$1, ($$anchor2, available) => {
-    var li_1 = root_12$4();
-    var a_2 = child(li_1);
+  var node_10 = sibling(node_1, 2);
+  each$1(node_10, 17, () => get(context).facilities.special.available, index$1, ($$anchor2, available) => {
+    var li_2 = root_15$2();
+    var a_2 = child(li_2);
     var text_8 = sibling(child(a_2));
     reset(a_2);
-    reset(li_1);
+    reset(li_2);
     template_effect(($0) => set_text(text_8, ` ${$0 ?? ""}`), [() => localize(get(available).label)]);
     delegated("click", a_2, (ev) => get(context).editable && addFacility2(ev, CONSTANTS.FACILITY_TYPE_SPECIAL));
-    append($$anchor2, li_1);
+    append($$anchor2, li_2);
   });
   reset(ul);
   reset(section_2);
@@ -102549,18 +102686,18 @@ function CharacterBastionTab($$anchor, $$props) {
   var text_9 = sibling(child(h3_1));
   reset(h3_1);
   var ul_4 = sibling(h3_1, 2);
-  var node_8 = child(ul_4);
-  each$1(node_8, 17, () => get(context).facilities.basic.chosen, index$1, ($$anchor2, chosen) => {
+  var node_11 = child(ul_4);
+  each$1(node_11, 17, () => get(context).facilities.basic.chosen, index$1, ($$anchor2, chosen) => {
     const bgImg = /* @__PURE__ */ user_derived(() => get(chosen).img.includes("systems/dnd5e/icons/svg/items/facility.svg") ? "modules/female_edition/tidy-classic/public/images/facility-default-background.webp" : get(chosen).img);
     const img = /* @__PURE__ */ user_derived(() => !get(chosen).disabled ? get(chosen).img : get(context).config.facilities.orders.repair.icon);
-    var li_2 = root_13$2();
+    var li_3 = root_16$1();
     let classes_1;
-    set_attribute(li_2, "data-info-card", "item");
-    var div_10 = child(li_2);
+    set_attribute(li_3, "data-info-card", "item");
+    var div_10 = child(li_3);
     var a_3 = child(div_10);
-    var node_9 = child(a_3);
+    var node_12 = child(a_3);
     {
-      var consequent_6 = ($$anchor3) => {
+      var consequent_7 = ($$anchor3) => {
         InlineSvg($$anchor3, {
           class: "facility-image",
           get svgUrl() {
@@ -102569,20 +102706,20 @@ function CharacterBastionTab($$anchor, $$props) {
         });
       };
       var d_3 = /* @__PURE__ */ user_derived(() => isSvg(get(img)));
-      var alternate_1 = ($$anchor3) => {
-        var img_2 = root_15$2();
+      var alternate_2 = ($$anchor3) => {
+        var img_2 = root_18$1();
         template_effect(() => {
           set_attribute(img_2, "src", get(img));
           set_attribute(img_2, "alt", get(chosen).name);
         });
         append($$anchor3, img_2);
       };
-      if_block(node_9, ($$render) => {
-        if (get(d_3)) $$render(consequent_6);
-        else $$render(alternate_1, -1);
+      if_block(node_12, ($$render) => {
+        if (get(d_3)) $$render(consequent_7);
+        else $$render(alternate_2, -1);
       });
     }
-    var div_11 = sibling(node_9, 2);
+    var div_11 = sibling(node_12, 2);
     var span_5 = child(div_11);
     var text_10 = child(span_5, true);
     reset(span_5);
@@ -102593,21 +102730,21 @@ function CharacterBastionTab($$anchor, $$props) {
     reset(a_3);
     var a_4 = sibling(a_3, 2);
     reset(div_10);
-    var node_10 = sibling(div_10, 2);
-    FacilityOrderProgressTracker(node_10, {
+    var node_13 = sibling(div_10, 2);
+    FacilityOrderProgressTracker(node_13, {
       get chosen() {
         return get(chosen);
       }
     });
-    reset(li_2);
+    reset(li_3);
     template_effect(
       ($0) => {
-        classes_1 = set_class(li_2, 1, "facility basic", null, classes_1, $0);
-        set_attribute(li_2, "data-item-id", get(chosen).id);
-        set_attribute(li_2, "data-facility-id", get(chosen).id);
-        set_attribute(li_2, "data-context-menu", CONSTANTS.CONTEXT_MENU_TYPE_ITEMS);
-        set_style(li_2, `--underlay: url('${get(bgImg) ?? ""}')`);
-        set_attribute(li_2, "data-info-card-entity-uuid", get(chosen).facility.uuid);
+        classes_1 = set_class(li_3, 1, "facility basic", null, classes_1, $0);
+        set_attribute(li_3, "data-item-id", get(chosen).id);
+        set_attribute(li_3, "data-facility-id", get(chosen).id);
+        set_attribute(li_3, "data-context-menu", CONSTANTS.CONTEXT_MENU_TYPE_ITEMS);
+        set_style(li_3, `--underlay: url('${get(bgImg) ?? ""}')`);
+        set_attribute(li_3, "data-info-card-entity-uuid", get(chosen).facility.uuid);
         set_text(text_10, get(chosen).name);
       },
       [
@@ -102623,29 +102760,29 @@ function CharacterBastionTab($$anchor, $$props) {
     delegated("mousedown", a_3, (ev) => FoundryAdapter.editOnMiddleClick(ev, get(chosen).facility));
     delegated("click", a_3, (ev) => get(context).editable && useFacility2(ev, get(chosen)));
     delegated("click", a_4, (ev) => EventHelper.triggerContextMenu(ev, "[data-item-id]"));
-    append($$anchor2, li_2);
+    append($$anchor2, li_3);
   });
-  var node_11 = sibling(node_8, 2);
-  each$1(node_11, 17, () => get(context).facilities.basic.available, index$1, ($$anchor2, available) => {
-    var div_12 = root_16$1();
+  var node_14 = sibling(node_11, 2);
+  each$1(node_14, 17, () => get(context).facilities.basic.available, index$1, ($$anchor2, available) => {
+    var div_12 = root_19$2();
     var a_5 = child(div_12);
-    var node_12 = child(a_5);
+    var node_15 = child(a_5);
     {
-      var consequent_7 = ($$anchor3) => {
-        var i = root_17$1();
-        append($$anchor3, i);
-      };
-      var d_4 = /* @__PURE__ */ user_derived(() => get(available).label.includes("build"));
-      var alternate_2 = ($$anchor3) => {
-        var i_1 = root_18$1();
+      var consequent_8 = ($$anchor3) => {
+        var i_1 = root_20$1();
         append($$anchor3, i_1);
       };
-      if_block(node_12, ($$render) => {
-        if (get(d_4)) $$render(consequent_7);
-        else $$render(alternate_2, -1);
+      var d_4 = /* @__PURE__ */ user_derived(() => get(available).label.includes("build"));
+      var alternate_3 = ($$anchor3) => {
+        var i_2 = root_21$2();
+        append($$anchor3, i_2);
+      };
+      if_block(node_15, ($$render) => {
+        if (get(d_4)) $$render(consequent_8);
+        else $$render(alternate_3, -1);
       });
     }
-    var text_11 = sibling(node_12);
+    var text_11 = sibling(node_15);
     reset(a_5);
     reset(div_12);
     template_effect(($0) => set_text(text_11, ` ${$0 ?? ""}`), [() => localize(get(available).label)]);
@@ -102655,24 +102792,24 @@ function CharacterBastionTab($$anchor, $$props) {
   reset(ul_4);
   reset(section_3);
   reset(section_1);
-  var node_13 = sibling(section_1, 2);
+  var node_16 = sibling(section_1, 2);
   {
-    var consequent_9 = ($$anchor2) => {
-      var section_4 = root_19$2();
+    var consequent_10 = ($$anchor2) => {
+      var section_4 = root_22$1();
       var h3_2 = child(section_4);
       var text_12 = sibling(child(h3_2));
       reset(h3_2);
       var ul_5 = sibling(h3_2, 2);
       each$1(ul_5, 21, () => get(context).facilities.special.chosen, index$1, ($$anchor3, chosen) => {
         var fragment_6 = comment();
-        var node_14 = first_child(fragment_6);
-        each$1(node_14, 17, () => get(chosen).defenders, index$1, ($$anchor4, $$item, index2) => {
+        var node_17 = first_child(fragment_6);
+        each$1(node_17, 17, () => get(chosen).defenders, index$1, ($$anchor4, $$item, index2) => {
           let actor = () => get($$item).actor;
           let uuid = () => get($$item).uuid;
           var fragment_7 = comment();
-          var node_15 = first_child(fragment_7);
+          var node_18 = first_child(fragment_7);
           {
-            var consequent_8 = ($$anchor5) => {
+            var consequent_9 = ($$anchor5) => {
               FacilityRosterOccupant($$anchor5, {
                 get occupant() {
                   return actor();
@@ -102691,8 +102828,8 @@ function CharacterBastionTab($$anchor, $$props) {
                 }
               });
             };
-            if_block(node_15, ($$render) => {
-              if (uuid()) $$render(consequent_8);
+            if_block(node_18, ($$render) => {
+              if (uuid()) $$render(consequent_9);
             });
           }
           append($$anchor4, fragment_7);
@@ -102704,28 +102841,28 @@ function CharacterBastionTab($$anchor, $$props) {
       template_effect(($0) => set_text(text_12, ` ${$0 ?? ""}`), [() => localize("TIDY5E.Facilities.Defenders.Label")]);
       append($$anchor2, section_4);
     };
-    if_block(node_13, ($$render) => {
-      if (get(hasDefenders)) $$render(consequent_9);
+    if_block(node_16, ($$render) => {
+      if (get(hasDefenders)) $$render(consequent_10);
     });
   }
-  var node_16 = sibling(node_13, 2);
+  var node_19 = sibling(node_16, 2);
   {
-    var consequent_11 = ($$anchor2) => {
-      var section_5 = root_23();
+    var consequent_12 = ($$anchor2) => {
+      var section_5 = root_26$2();
       var h3_3 = child(section_5);
       var text_13 = sibling(child(h3_3));
       reset(h3_3);
       var ul_6 = sibling(h3_3, 2);
       each$1(ul_6, 21, () => get(context).facilities.special.chosen, index$1, ($$anchor3, chosen) => {
         var fragment_9 = comment();
-        var node_17 = first_child(fragment_9);
-        each$1(node_17, 17, () => get(chosen).hirelings, index$1, ($$anchor4, $$item, index2) => {
+        var node_20 = first_child(fragment_9);
+        each$1(node_20, 17, () => get(chosen).hirelings, index$1, ($$anchor4, $$item, index2) => {
           let actor = () => get($$item).actor;
           let uuid = () => get($$item).uuid;
           var fragment_10 = comment();
-          var node_18 = first_child(fragment_10);
+          var node_21 = first_child(fragment_10);
           {
-            var consequent_10 = ($$anchor5) => {
+            var consequent_11 = ($$anchor5) => {
               FacilityRosterOccupant($$anchor5, {
                 get occupant() {
                   return actor();
@@ -102744,8 +102881,8 @@ function CharacterBastionTab($$anchor, $$props) {
                 }
               });
             };
-            if_block(node_18, ($$render) => {
-              if (uuid()) $$render(consequent_10);
+            if_block(node_21, ($$render) => {
+              if (uuid()) $$render(consequent_11);
             });
           }
           append($$anchor4, fragment_10);
@@ -102757,28 +102894,28 @@ function CharacterBastionTab($$anchor, $$props) {
       template_effect(($0) => set_text(text_13, ` ${$0 ?? ""}`), [() => localize("TIDY5E.Facilities.Hirelings.Label")]);
       append($$anchor2, section_5);
     };
-    if_block(node_16, ($$render) => {
-      if (get(hasHirelings)) $$render(consequent_11);
+    if_block(node_19, ($$render) => {
+      if (get(hasHirelings)) $$render(consequent_12);
     });
   }
-  var node_19 = sibling(node_16, 2);
+  var node_22 = sibling(node_19, 2);
   {
-    var consequent_13 = ($$anchor2) => {
-      var section_6 = root_27$1();
+    var consequent_14 = ($$anchor2) => {
+      var section_6 = root_30$1();
       var h3_4 = child(section_6);
       var text_14 = sibling(child(h3_4));
       reset(h3_4);
       var ul_7 = sibling(h3_4, 2);
       each$1(ul_7, 21, () => get(context).facilities.special.chosen, index$1, ($$anchor3, chosen) => {
         var fragment_12 = comment();
-        var node_20 = first_child(fragment_12);
-        each$1(node_20, 17, () => get(chosen).creatures, index$1, ($$anchor4, $$item, index2) => {
+        var node_23 = first_child(fragment_12);
+        each$1(node_23, 17, () => get(chosen).creatures, index$1, ($$anchor4, $$item, index2) => {
           let actor = () => get($$item).actor;
           let uuid = () => get($$item).uuid;
           var fragment_13 = comment();
-          var node_21 = first_child(fragment_13);
+          var node_24 = first_child(fragment_13);
           {
-            var consequent_12 = ($$anchor5) => {
+            var consequent_13 = ($$anchor5) => {
               FacilityRosterOccupant($$anchor5, {
                 get occupant() {
                   return actor();
@@ -102797,8 +102934,8 @@ function CharacterBastionTab($$anchor, $$props) {
                 }
               });
             };
-            if_block(node_21, ($$render) => {
-              if (uuid()) $$render(consequent_12);
+            if_block(node_24, ($$render) => {
+              if (uuid()) $$render(consequent_13);
             });
           }
           append($$anchor4, fragment_13);
@@ -102810,17 +102947,17 @@ function CharacterBastionTab($$anchor, $$props) {
       template_effect(($0) => set_text(text_14, ` ${$0 ?? ""}`), [() => localize("TIDY5E.Facilities.Creatures.Label")]);
       append($$anchor2, section_6);
     };
-    if_block(node_19, ($$render) => {
-      if (get(hasCreatures)) $$render(consequent_13);
+    if_block(node_22, ($$render) => {
+      if (get(hasCreatures)) $$render(consequent_14);
     });
   }
-  var section_7 = sibling(node_19, 2);
-  var node_22 = sibling(child(section_7), 2);
-  key(node_22, () => get(context).bastion.description, ($$anchor2) => {
+  var section_7 = sibling(node_22, 2);
+  var node_25 = sibling(child(section_7), 2);
+  key(node_25, () => get(context).bastion.description, ($$anchor2) => {
     var fragment_15 = comment();
-    var node_23 = first_child(fragment_15);
+    var node_26 = first_child(fragment_15);
     {
-      var consequent_14 = ($$anchor3) => {
+      var consequent_15 = ($$anchor3) => {
         SheetEditorV2($$anchor3, {
           get documentUuid() {
             return get(context).document.uuid;
@@ -102836,8 +102973,8 @@ function CharacterBastionTab($$anchor, $$props) {
           }
         });
       };
-      var alternate_3 = ($$anchor3) => {
-        var div_13 = root_33();
+      var alternate_4 = ($$anchor3) => {
+        var div_13 = root_36$1();
         var div_14 = child(div_13);
         html(div_14, () => get(context).bastion.description, true);
         reset(div_14);
@@ -102845,9 +102982,9 @@ function CharacterBastionTab($$anchor, $$props) {
         action(div_13, ($$node, $$action_arg) => manageSecrets?.($$node, $$action_arg), () => ({ document: get(context).document }));
         append($$anchor3, div_13);
       };
-      if_block(node_23, ($$render) => {
-        if (get(context).unlocked) $$render(consequent_14);
-        else $$render(alternate_3, -1);
+      if_block(node_26, ($$render) => {
+        if (get(context).unlocked) $$render(consequent_15);
+        else $$render(alternate_4, -1);
       });
     }
     append($$anchor2, fragment_15);
@@ -113191,6 +113328,9 @@ function CharacterSheetFull($$anchor, $$props) {
   reset(header);
   var node_20 = sibling(header, 2);
   Tabs(node_20, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -115393,7 +115533,10 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
      * Handle the final creation of dropped Item data on the Actor.
      */
     async _onDropItemCreate(itemData, event2, behavior) {
-      let items = itemData instanceof Array ? itemData : [itemData];
+      let items = Array.isArray(itemData) ? itemData : [itemData];
+      const options2 = { event: event2, behavior: behavior ?? event2?._behavior ?? "copy" };
+      if (TidyHooks.dnd5eDropCreateItems(this, items, options2) === false) return [];
+      behavior = options2.behavior;
       const itemsWithoutAdvancement = items.filter((i) => !hasAdvancement(i.system.advancement));
       const multipleAdvancements = items.length - itemsWithoutAdvancement.length > 1;
       if (multipleAdvancements && !game.settings.get("dnd5e", "disableAdvancements")) {
@@ -118162,6 +118305,9 @@ function NpcSheetFull($$anchor, $$props) {
   reset(header);
   var node_17 = sibling(header, 2);
   Tabs(node_17, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -119742,6 +119888,9 @@ function VehicleSheetFull($$anchor, $$props) {
   reset(header);
   var node_14 = sibling(header, 2);
   Tabs(node_14, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -121983,6 +122132,9 @@ function GroupSheet($$anchor, $$props) {
   reset(header);
   var node_11 = sibling(header, 2);
   Tabs(node_11, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },
@@ -122226,7 +122378,10 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
      * Handle the final creation of dropped Item data on the Actor.
      */
     async _onDropItemCreate(itemData, event2, behavior) {
-      let items = itemData instanceof Array ? itemData : [itemData];
+      let items = Array.isArray(itemData) ? itemData : [itemData];
+      const options2 = { event: event2, behavior: behavior ?? event2?._behavior ?? "copy" };
+      if (TidyHooks.dnd5eDropCreateItems(this, items, options2) === false) return [];
+      behavior = options2.behavior;
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );
@@ -123425,7 +123580,7 @@ class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(TidyExtensibleDo
       return;
     }
     const { value, max: max2 } = facility.system.progress;
-    if (Number.isNaN(toAdjust) || !max2) {
+    if (facility.system.disabled || Number.isNaN(toAdjust) || !max2) {
       return;
     }
     const next2 = Math.clamp(value + toAdjust, 0, max2);
@@ -124097,6 +124252,9 @@ function EncounterSheet($$anchor, $$props) {
   reset(header);
   var node_6 = sibling(header, 2);
   Tabs(node_6, {
+    get magicSuppressed() {
+      return get(context).showAntimagicNotice;
+    },
     get tabs() {
       return get(context).tabs;
     },

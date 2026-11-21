@@ -42,18 +42,12 @@ const defaultGroupClassicTabs: RegisteredTab<GroupSheetClassicContext>[] = [
         return false;
       }
 
-      const members = context.bastionsContext.members;
-
-      if (!members.length) {
-        return false;
-      }
-
       if (FoundryAdapter.userIsGm()) {
         return true;
       }
 
       const threshold = getUnlockThresholdLevel();
-      return members.some((m) => m.level >= threshold);
+      return context.bastionsContext.members.some((m) => m.level >= threshold);
     },
     layout: 'classic',
   },

@@ -148,7 +148,7 @@
     </section>
   </div>
 </header>
-<Tabs tabs={context.tabs} bind:selectedTabId sheet={context.actor.sheet} />
+<Tabs magicSuppressed={context.showAntimagicNotice} tabs={context.tabs} bind:selectedTabId sheet={context.actor.sheet} />
 <section class="tidy-sheet-body">
   <TabContents tabs={context.tabs} {selectedTabId} />
 </section>

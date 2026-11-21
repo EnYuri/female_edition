@@ -39,7 +39,7 @@
       EventHelper.triggerContextMenu(event, '[data-actor-uuid]');
       return;
     }
-    occupant.sheet.render(true);
+    occupant?.sheet.render(true);
   }
 
   async function onSlotClick(ev: Event) {

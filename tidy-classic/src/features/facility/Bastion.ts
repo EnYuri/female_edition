@@ -242,7 +242,7 @@ export async function rollBastionEvent(actor?: Actor5e): Promise<void> {
 export async function completeOrder(facility: Item5e): Promise<void> {
   const progress = facility.system.progress;
 
-  if (isNil(progress?.order, '') || !progress.max) {
+  if (facility.system.disabled || isNil(progress?.order, '') || !progress.max) {
     return;
   }
 
@@ -266,6 +266,24 @@ export async function completeOrder(facility: Item5e): Promise<void> {
     },
     type: 'bastionTurn',
   });
+}
+
+/** Cancel an order in one document update, releasing any reserved trade slots. */
+export async function cancelFacilityOrder(facility: Item5e, order: string) {
+  const { progress, trade } = facility.system;
+  const updates: Record<string, unknown> = {};
+
+  if (order === 'trade' && trade?.pending) {
+    updates['system.trade.pending'] = {
+      creatures: [], operation: null, value: null, stocked: false,
+    };
+  }
+  // Older cancellations can leave pending creatures after progress was cleared.
+  // Removing those reservations must preserve any newer, unrelated order.
+  if (progress.order === order) {
+    updates['system.progress'] = { value: 0, max: null, order: '', paid: false };
+  }
+  if (Object.keys(updates).length) await facility.update(updates);
 }
 
 /** Confirm before completing an order from a one-click control like +. */
@@ -307,8 +325,8 @@ export async function advanceBastions(
     maintainUuids?: Set<string>;
   }
 ): Promise<Actor5e[]> {
-  const duration =
-    options?.duration ?? systemSettings.value.bastionConfiguration.duration;
+  // Let dnd5e choose elapsed days for calendar-driven and manual turns.
+  const duration = options?.duration;
   const maintainUuids = options?.maintainUuids ?? new Set<string>();
 
   const advanced: Actor5e[] = [];

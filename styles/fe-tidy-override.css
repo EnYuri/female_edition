@@ -316,3 +316,12 @@ span.flex-row.align-items-center.extra-small-gap {
   flex: 0 0 auto;
   margin-left: 0.5rem;
 }
+
+.tidy5e-sheet.classic .classic-antimagic-notice {
+  padding: 0.2rem 0.5rem;
+  font-weight: bold;
+}
+
+.tidy5e-sheet.classic [data-magic-suppressed] :is(.item-name, .spell-name) {
+  opacity: 0.7;
+}

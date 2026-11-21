@@ -1,4 +1,5 @@
 {
+  "TIDY5E.ClassicAntimagicWarning": "Magic is suppressed by an antimagic field.",
   "TIDY5E.ModuleName": "Tidy 5e Sheets",
   "TIDY5E.ClassicMoveSourceChanged": "Advancement completed, but the source item changed in the meantime and was not deleted.",
   "TIDY5E.ClassicMoveDeleteFailed": "Advancement completed, but the source item could not be deleted. Please check the source.",

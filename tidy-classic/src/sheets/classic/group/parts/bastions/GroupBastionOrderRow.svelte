@@ -55,6 +55,7 @@
 
   <TidyTableCell class="bastion-order-progress" baseWidth="10rem">
     <GroupBastionProgress
+      disabled={order.facility.system.disabled}
       progress={order.progress}
       craft={order.craft}
       memberUuid={order.member.uuid}

@@ -1168,10 +1168,13 @@ export function Tidy5eActorSheetClassicV2Base<
      */
     async _onDropItemCreate(
       itemData: Item5e[] | Item5e,
-      event: DragEvent,
+      event: DragEvent & { _behavior?: DropEffectValue },
       behavior?: DropEffectValue
     ): Promise<Item5e[]> {
-      let items = itemData instanceof Array ? itemData : [itemData];
+      let items = Array.isArray(itemData) ? itemData : [itemData];
+      const options = { event, behavior: behavior ?? event?._behavior ?? 'copy' };
+      if (TidyHooks.dnd5eDropCreateItems(this, items, options) === false) return [];
+      behavior = options.behavior;
       const itemsWithoutAdvancement = items.filter(
         (i) => !hasAdvancement(i.system.advancement)
       );

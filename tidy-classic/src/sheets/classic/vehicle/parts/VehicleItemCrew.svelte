@@ -159,10 +159,15 @@
         border-style: solid;
       }
 
-      &.broken {
-        border-color: var(--t5e-warning-accent-color, #994040);
-        color: var(--t5e-warning-accent-color, #994040);
+      &:disabled {
+        opacity: 0.55;
       }
+    }
+
+    .crew-slot.broken .crew-slot-button {
+      border-style: dotted;
+      border-color: var(--t5e-warning-accent-color, #994040);
+      color: var(--t5e-warning-accent-color, #994040);
     }
 
     .crew-slot-unassign {

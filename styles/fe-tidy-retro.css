@@ -882,9 +882,6 @@ body.fe-retro-theme .tidy5e-sheet {
      upstream-13.x path. */
   --t5e-secret-background: var(--fe-tidy-mono-hover) !important;
   --t5e-secret-revealed-background: var(--fe-tidy-state-fill) !important;
-  --t5e-facility-card-background:
-    var(--fe-tidy-tone-scanline),
-    var(--underlay) 40%, var(--fe-tidy-mono-bg) !important;
   --t5e-facility-card-blend-mode: normal, normal !important;
   --t5e-meter-background: var(--fe-tidy-mono-surface-2) !important;
   --t5e-filter-include-color: var(--fe-tidy-mono-text) !important;
@@ -3451,12 +3448,18 @@ body.fe-retro-theme .tidy5e-sheet.application.classic section.secret.revealed {
    scanline scrim so the card still reads as a framed picture. */
 body.fe-retro-theme .tidy5e-sheet.application.classic.actor
   .tidy-tab.bastion .facility:not(.empty) {
-  background:
-    var(--fe-tidy-tone-scanline),
-    var(--underlay) 40%,
-    #000 !important;
+  /* Resolve the per-card art here. A dark scrim keeps pale ink legible on white art. */
+  --t5e-facility-card-background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 82%) 0 1px, rgb(0 0 0 / 88%) 1px 3px),
+    var(--underlay, none) 40%, #000 !important;
+  background: var(--t5e-facility-card-background) !important;
   background-blend-mode: normal, normal !important;
   background-size: auto, cover !important;
+}
+
+body.fe-retro-theme .tidy5e-sheet.application.classic.actor
+  .tidy-tab.bastion .facility-header .title {
+  color: var(--fe-tidy-mono-text) !important;
 }
 
 body.fe-retro-theme .tidy5e-sheet.application.classic.actor
@@ -3475,7 +3478,9 @@ body.fe-retro-theme .tidy5e-sheet.application.classic.actor
 /* The meter fill is a smooth gradient upstream — hatch it. */
 body.fe-retro-theme .tidy5e-sheet.application.classic.actor
   .facility-progress-meter::before {
-  background: var(--fe-tidy-tone-hatch) !important;
+  background: repeating-linear-gradient(
+    45deg, rgb(from var(--fe-dx3rd-accent, #fff) r g b / 0.32) 0 2px,
+    rgb(0 0 0 / 0.30) 2px 4px) !important;
 }
 
 /* HP/resource bar fill — keep the bar's own colour (set inline per bar via

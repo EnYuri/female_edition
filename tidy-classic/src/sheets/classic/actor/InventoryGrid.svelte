@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isAntimagicItem } from 'src/features/item/antimagic';
   import type {
     CharacterSheetContext,
     InventorySection,
@@ -126,6 +127,7 @@
           ondragstart={(ev) => handleDragStart(ev, item)}
           data-tidy-draggable
           data-tidy-sheet-part={CONSTANTS.SHEET_PARTS.ITEM_USE_COMMAND}
+          data-magic-suppressed={context.antimagic && isAntimagicItem(item) || undefined}
           data-item-id={item.id}
           tabindex={settings.value.useAccessibleKeyboardSupport ? 0 : -1}
           data-tidy-grid-item

@@ -14,6 +14,7 @@
   >;
 
   interface Props {
+    magicSuppressed?: boolean;
     tabs: TabStripInfo[];
     selectedTabId?: string | undefined;
     extraTabs?: SvelteSet<string>;
@@ -27,6 +28,7 @@
   }
 
   let {
+    magicSuppressed = false,
     tabs,
     selectedTabId = $bindable(),
     extraTabs,
@@ -125,6 +127,13 @@
 
   let itemCountContext = $derived({ ...tabContext, document: sheet.document });
 </script>
+
+{#if magicSuppressed}
+  <div class="classic-antimagic-notice" role="status">
+    <i class="fa-solid fa-ban" aria-hidden="true"></i>
+    {localize('TIDY5E.ClassicAntimagicWarning')}
+  </div>
+{/if}
 
 <div
   role="tablist"

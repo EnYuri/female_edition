@@ -312,10 +312,14 @@
 .vehicle-item-crew.svelte-18vw5gr .crew-slot-button.crew-member:where(.svelte-18vw5gr) {
   border-style: solid;
 }
-/* (unused) .vehicle-item-crew .crew-slot-button.broken {
+.vehicle-item-crew.svelte-18vw5gr .crew-slot-button:where(.svelte-18vw5gr):disabled {
+  opacity: 0.55;
+}
+.vehicle-item-crew.svelte-18vw5gr .crew-slot.broken:where(.svelte-18vw5gr) .crew-slot-button:where(.svelte-18vw5gr) {
+  border-style: dotted;
   border-color: var(--t5e-warning-accent-color, #994040);
   color: var(--t5e-warning-accent-color, #994040);
-}*/
+}
 .vehicle-item-crew.svelte-18vw5gr .crew-slot-unassign:where(.svelte-18vw5gr) {
   display: flex;
   padding: 0;

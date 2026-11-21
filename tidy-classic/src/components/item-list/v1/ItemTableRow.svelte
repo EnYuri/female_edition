@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tryGetSheetContext } from 'src/sheets/sheet-context.svelte';
+  import { isAntimagicItem } from 'src/features/item/antimagic';
   import { type Actor5e, type OnItemToggledFn } from 'src/types/types';
   import ItemSummary from '../ItemSummary.svelte';
   import { warn } from 'src/utils/logging';
@@ -39,6 +41,8 @@
     rowAttributes,
     children,
   }: Props = $props();
+
+  let suppressed = $derived(tryGetSheetContext()?.antimagic && isAntimagicItem(item));
 
   const emptyChatData: ItemChatData = {
     description: '',
@@ -131,6 +135,7 @@
   {...containerAttributes}
 >
   <div
+    data-magic-suppressed={suppressed || undefined}
     class="item-table-row {cssClass ?? ''}"
     data-context-menu={contextMenu?.type}
     onmousedown={onMouseDown}
