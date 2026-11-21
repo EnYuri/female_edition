@@ -8,7 +8,7 @@ const bundle = read('dist/tidy-classic.js');
 
 test('a GM can open Bastions on a new Classic group while player level and world settings still apply', () => {
   const groupTab = bundle.slice(bundle.indexOf('component: GroupBastionsTab,'));
-  const enabled = groupTab.match(/enabled: (\(context\) => \{[\s\S]*?\n    \}),/);
+  const enabled = groupTab.match(/enabled: (\(context\) => \{[\s\S]*?\n {4}\}),/);
   assert.ok(enabled);
   const config = { enabled: true };
   let gm = true;

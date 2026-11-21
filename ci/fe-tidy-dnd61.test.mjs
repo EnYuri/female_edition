@@ -6,7 +6,7 @@ import { isAntimagicItem } from '../tidy-classic/src/features/item/antimagic.js'
 const bundle = readFileSync(new URL('../tidy-classic/dist/tidy-classic.js', import.meta.url), 'utf8');
 
 test('both Classic drop paths deliver full documents and can veto a move before any writes', async () => {
-  const handlers = [...bundle.matchAll(/^    async _onDropItemCreate\([^\n]+\n[\s\S]*?^    \}/gm)]
+  const handlers = [...bundle.matchAll(/^ {4}async _onDropItemCreate\([^\n]+\n[\s\S]*?^ {4}\}/gm)]
     .map(match => match[0]).filter(body => body.includes('TidyHooks.dnd5eDropCreateItems'));
   assert.equal(handlers.length, 2);
   for (const handler of handlers) {
@@ -54,7 +54,7 @@ test('Classic antimagic presentation recognizes spells, scrolls, magic items and
 });
 
 test('rider tooltips use activity metadata when present and the enchant type on older systems', () => {
-  const method = bundle.match(/^  static getRiderEffectParentNames\(item\) \{[\s\S]*?^  \}/m)?.[0];
+  const method = bundle.match(/^ {2}static getRiderEffectParentNames\(item\) \{[\s\S]*?^ {2}\}/m)?.[0];
   assert.ok(method);
   const Helper = Function(`return class { ${method} }`)();
   const effects = [{ _id: 'parent', riders: { effect: ['child'] } }];
