@@ -375,12 +375,11 @@ body.fe-retro-theme .sidebar-tab :is(h1, h2, h3, h4, h5) {
 body.fe-retro-theme .sidebar-tab :is(a, li, label) { color: var(--fe-ac-57) !important; }
 body.fe-retro-theme .sidebar-tab :is(a:hover, li:hover) { color: var(--fe-ac-80) !important; }
 
-/* Sidebar directories keep every entry mounted (thousands of rows in large
-   worlds) — offscreen rows skip layout/paint. DOM order/scrollHeight stay
-   intact via contain-intrinsic-size, so Foundry's directory scroll behaves
-   unchanged; only render cost drops. Not applied to .chat-message — the chat
-   merge/sticky-scroll logic measures message layout. */
-body.fe-retro-theme #sidebar .directory-item {
+/* Skip offscreen directory rows in large worlds. Playlist entries and their
+   enclosing folders can contain hundreds of tracks. On a repeat toggle, core
+   replaces the list and immediately restores scrollTop. A fresh 30px estimate
+   for those containers clamps that scroll before the tracks are laid out. */
+body.fe-retro-theme #sidebar .directory-item:not(.playlists-sidebar *) {
   content-visibility: auto;
   contain-intrinsic-size: auto 30px;
 }

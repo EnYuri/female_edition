@@ -1,4 +1,5 @@
 import { feLocalize, feFormat } from "./fe-i18n.js";
+import "./fe-playlist-repeat.js";
 import { feRegisterSetting } from "./fe-settings-data.js";
 // female_edition: Music feature — entry point (in module.json).
 //
