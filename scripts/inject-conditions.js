@@ -91,6 +91,11 @@ function feMovementKey(type) {
 
 function feBuildConditions() {
   const mkOverride = (key, value) => feBuildAEChange(key, FE_AE_MODE_OVERRIDE, value, 20);
+  // midi-qol renamed the save flags in 13.0.38 and removed the aliases in 13.0.49.
+  const midiVersion = game.modules.get("midi-qol")?.version;
+  const saveFlag = midiVersion && foundry.utils.isNewerVersion("13.0.38", midiVersion)
+    ? "flags.midi-qol.disadvantage.ability.save"
+    : "flags.midi-qol.disadvantage.save";
 
   return [
     {
@@ -105,9 +110,7 @@ function feBuildConditions() {
         mkOverride(feMovementKey("climb"), 0),
         mkOverride(feMovementKey("burrow"), 0),
         mkOverride("flags.midi-qol.disadvantage.attack.all", 1),
-        mkOverride("flags.midi-qol.disadvantage.ability.save.int", 1),
-        mkOverride("flags.midi-qol.disadvantage.ability.save.wis", 1),
-        mkOverride("flags.midi-qol.disadvantage.ability.save.cha", 1),
+        ...["int", "wis", "cha"].map(ability => mkOverride(`${saveFlag}.${ability}`, 1)),
       ]
     },
     {

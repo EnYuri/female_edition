@@ -496,7 +496,7 @@ export const FoundryAdapter = {
     let prof = actor.system.attributes.prof ?? 0;
     let spellAbility = context.system.attributes.spellcasting;
     let abilityMod =
-      (spellAbility != '' ? actor.system.abilities[spellAbility].mod : 0) ?? 0;
+      actor.system.abilities?.[spellAbility]?.mod ?? 0;
     let spellAttackMod = prof + abilityMod;
     let spellAttackText =
       spellAttackMod > 0 ? '+' + spellAttackMod : spellAttackMod;

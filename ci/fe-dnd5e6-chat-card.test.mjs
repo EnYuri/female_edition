@@ -513,6 +513,32 @@ test("custom conditions spell their movement AE keys for the running dnd5e", () 
   assert.deepEqual(offenders, [], "a hard-coded pre-6.0 movement AE key is back");
 });
 
+test("custom condition selects the save disadvantage flags understood by the installed midi-qol", async () => {
+  const previous = { Hooks: globalThis.Hooks, CONFIG: globalThis.CONFIG, game: globalThis.game, foundry: globalThis.foundry };
+  let init;
+  try {
+    globalThis.Hooks = { once(name, fn) { if (name === "init") init = fn; } };
+    globalThis.foundry = { utils: { isNewerVersion: (a, b) => a.localeCompare(b, "en", { numeric: true }) > 0 } };
+    await import("../scripts/inject-conditions.js");
+    for (const [version, group] of [
+      ["13.0.37", "ability.save"], ["13.0.38", "save"], ["13.0.49", "save"], ["14.7.0", "save"], [null, "save"],
+    ]) {
+      const types = {};
+      globalThis.CONFIG = { DND5E: { conditionTypes: types } };
+      globalThis.game = {
+        modules: new Map(version ? [["midi-qol", { version }]] : []),
+        settings: { register() {}, get: (_module, key) => key === "injectCustomConditions" ? true : "" },
+      };
+      init();
+      const keys = types.condfemalemating.changes.map(change => change.key).filter(key => key.startsWith("flags."));
+      assert.deepEqual(keys, ["attack.all", ...["int", "wis", "cha"].map(id => `${group}.${id}`)]
+        .map(suffix => `flags.midi-qol.disadvantage.${suffix}`));
+    }
+  } finally {
+    Object.assign(globalThis, previous);
+  }
+});
+
 test("custom damage types register into every table dnd5e still offers", () => {
   // dnd5e 6.0 has only `damageTypes`; dr/di/dv read it through
   // CONFIG.DND5E.traits.<dr|di|dv>.configKey, so ONE registration covers all three —

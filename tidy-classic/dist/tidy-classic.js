@@ -17260,6 +17260,16 @@ function SkillsList($$anchor, $$props) {
   pop();
 }
 delegate(["click", "contextmenu"]);
+function getRollBonus(actor, actionType, kind) {
+  const system = actor?.system;
+  if (!system) return "";
+  const usesRolls = system.schema?.fields?.rolls || "rolls" in system;
+  const bonus = usesRolls ? system.rolls?.[kind]?.[actionType]?.bonus : system.bonuses?.[actionType]?.[kind];
+  return typeof bonus === "string" ? bonus : "";
+}
+function getActorAttackBonus(actor, actionType) {
+  return getRollBonus(actor, actionType, "attack");
+}
 function spellUsesSourceItem(spell) {
   return !!spell?.system?.schema?.fields?.sourceItem;
 }
@@ -17294,23 +17304,6 @@ function buildSpellSourceClassUpdate(spell, classIdentifier) {
     return { "system.sourceItem": id ? `class:${id}` : "" };
   }
   return { "system.sourceClass": id };
-}
-function readFirstDefined(root2, ...paths) {
-  for (const path of paths) {
-    const value = foundry.utils.getProperty(root2 ?? {}, path);
-    if (value !== void 0) return value;
-  }
-  return void 0;
-}
-function getActorAttackBonus(actor, actionType) {
-  const bonus = readFirstDefined(
-    actor?.system,
-    `rolls.attack.${actionType}.bonus`,
-    // dnd5e >= 6.0
-    `bonuses.${actionType}.attack`
-    // dnd5e <= 5.x
-  );
-  return typeof bonus === "string" ? bonus : "";
 }
 function buildItemRarityUpdate(item, rarity) {
   if (item?.system?.schema?.fields?.rarities) {
@@ -21017,16 +21010,19 @@ function getMaxPreparedSpellsSampleFormulas() {
     }
   ];
 }
+function getSpellAbilityModifier(actor, ability) {
+  return ability ? actor.system.abilities?.[ability]?.mod ?? 0 : actor.system.attributes.spell?.mod ?? 0;
+}
 function calculateSpellAttackAndDc(actor, spellClass) {
   try {
-    const rollData = actor.getRollData();
     const prof = actor.system.attributes.prof ?? 0;
     const spellAbility = coalesce(
       spellClass?.system?.spellcasting?.ability,
       actor.system.attributes.spellcasting
     );
-    const abilityMod = (spellAbility != "" ? actor.system.abilities[spellAbility].mod : actor.system.attributes.spell.mod) ?? 0;
+    const abilityMod = getSpellAbilityModifier(actor, spellAbility);
     const spellAttackMod = prof + abilityMod;
+    const rollData = { ...actor.getRollData(), mod: abilityMod, prof };
     const rawRsak = Roll.replaceFormulaData(
       getActorAttackBonus(actor, "rsak"),
       rollData,
@@ -21048,10 +21044,10 @@ function calculateSpellAttackAndDc(actor, spellClass) {
       msakTotal = "+" + msakTotal;
     }
     const abilityName = CONFIG.DND5E.abilities[spellAbility]?.label ?? FoundryAdapter.localize("DND5E.None");
-    const hasSpellcastingProgression = !isNil(spellClass?.system.spellcasting.progression) && spellClass?.system.spellcasting.progression !== CONSTANTS.SPELLCASTING_PROGRESSION_NONE;
+    const hasSpellcastingProgression = !isNil(spellClass?.system.spellcasting?.progression) && spellClass?.system.spellcasting?.progression !== CONSTANTS.SPELLCASTING_PROGRESSION_NONE;
     return {
-      dc: hasSpellcastingProgression ? spellClass?.system.spellcasting.save : actor.system.attributes.spell.dc,
-      dcTooltip: getDcTooltip(actor, spellAbility),
+      dc: hasSpellcastingProgression ? spellClass?.system.spellcasting.save : actor.system.attributes.spell?.dc ?? "",
+      dcTooltip: getDcTooltip(actor, spellAbility, rollData),
       meleeMod: msakTotal,
       meleeTooltip: buildAttackModTooltip(
         abilityName,
@@ -21076,7 +21072,7 @@ function calculateSpellAttackAndDc(actor, spellClass) {
       actor
     });
     return {
-      dc: actor.system.attributes.spell.dc,
+      dc: actor.system.attributes.spell?.dc ?? "",
       dcTooltip: "",
       meleeMod: "",
       meleeTooltip: "",
@@ -21117,9 +21113,8 @@ function calculateDeterministicBonus(rawBonus) {
   if (deterministicRawBonus.length == 0) {
     return 0;
   }
-  let bonusRoll = Roll.fromTerms([new foundry.dice.terms.NumericTerm(0)]);
   try {
-    bonusRoll = Roll.fromTerms(deterministicRawBonus);
+    const bonusRoll = Roll.fromTerms(deterministicRawBonus);
     let bonusTotal = 0;
     if (Roll.validate(bonusRoll.formula)) {
       bonusTotal = bonusRoll.evaluateSync({ allowInteractive: false }).total;
@@ -21130,9 +21125,9 @@ function calculateDeterministicBonus(rawBonus) {
     return 0;
   }
 }
-function getDcTooltip(actor, spellAbility) {
+function getDcTooltip(actor, spellAbility, rollData = actor.getRollData()) {
   const base = 8;
-  const abilityMod = (spellAbility != "" ? actor.system.abilities[spellAbility].mod : 0) ?? 0;
+  const abilityMod = getSpellAbilityModifier(actor, spellAbility);
   const abilityName = CONFIG.DND5E.abilities[spellAbility]?.label ?? FoundryAdapter.localize("DND5E.None");
   const prof = actor.system.attributes.prof ?? 0;
   let tooltip = base.toString();
@@ -21146,11 +21141,10 @@ function getDcTooltip(actor, spellAbility) {
       "DND5E.ProficiencyBonus"
     )})`;
   }
-  const rawBonus = actor.system.bonuses.spell.dc?.toString()?.trim();
-  if (!isNil(rawBonus, "") && Roll.validate(rawBonus)) {
-    const bonusRoll = new Roll(rawBonus);
-    bonusRoll.evaluateSync({ allowInteractive: false });
-    const bonusTotal = bonusRoll.total;
+  const rawBonus = actor.system.bonuses?.spell?.dc?.toString()?.trim();
+  if (rawBonus) {
+    const formula = Roll.replaceFormulaData(rawBonus, rollData, { missing: 0, warn: false });
+    const bonusTotal = calculateDeterministicBonus(formula);
     if (bonusTotal !== 0) {
       tooltip += bonusTotal < 0 ? " - " : " + ";
       tooltip += `${Math.abs(bonusTotal)} (${FoundryAdapter.localize(
@@ -21171,12 +21165,9 @@ async function rollRawSpellAttack(ev, actor, attackType, spellcastingAbility) {
   let flavorKey = attackType === "rsak" ? "TIDY5E.ActorRangedSpellAttackFlavorText" : attackType === "msak" ? "TIDY5E.ActorMeleeSpellAttackFlavorText" : "TIDY5E.ActorSpellAttackFlavorText";
   let flavor = FoundryAdapter.localize(flavorKey);
   const messageConfig = {
-    rollMode: game.settings.get("core", "rollMode"),
     data: {
-      "flags.dnd5e.roll": {
-        type: "attack"
-      },
-      speaker: ChatMessage.getSpeaker({ actor }),
+      ..."attack" in CONFIG.ChatMessage.dataModels ? { type: "attack" } : { flags: { dnd5e: { roll: { type: "attack" } } } },
+      speaker: CONFIG.ChatMessage.documentClass.getSpeaker({ actor }),
       flavor
     }
   };
@@ -21196,20 +21187,23 @@ async function rollRawSpellAttack(ev, actor, attackType, spellcastingAbility) {
 }
 function getSpellAttackRoll(actor, attackType, spellcastingAbility) {
   const effectiveAttackType = attackType ?? "rsak";
-  const rollData = {};
   const parts = [];
-  const filteredClass = actor.sheet.classSpellbookFilter;
-  spellcastingAbility ??= actor.classes?.[filteredClass]?.system.spellcasting?.ability;
-  const spellcastingMod = actor.system.abilities[spellcastingAbility]?.mod;
-  if (spellcastingAbility !== "none" && spellcastingMod) {
+  const classAbility = spellcastingAbility || FoundryAdapter.getFilteredClassOrOriginal(actor)?.system?.spellcasting?.ability;
+  const ability = coalesce(classAbility, actor.system.attributes.spellcasting);
+  const rollData = {
+    mod: getSpellAbilityModifier(actor, ability),
+    prof: actor.system.attributes.prof ?? 0
+  };
+  if (rollData.mod) {
     parts.push("@mod");
-    rollData.mod = spellcastingMod;
   }
   parts.push("@prof");
-  rollData.prof = actor.system.attributes.prof;
   const actorBonusAttack = getActorAttackBonus(actor, effectiveAttackType);
   if (actorBonusAttack) {
-    parts.push(actorBonusAttack);
+    parts.push(Roll.replaceFormulaData(actorBonusAttack, { ...actor.getRollData(), ...rollData }, {
+      missing: 0,
+      warn: false
+    }));
   }
   return {
     parts,
@@ -110509,7 +110503,7 @@ const FoundryAdapter = {
     );
     let prof = actor.system.attributes.prof ?? 0;
     let spellAbility = context.system.attributes.spellcasting;
-    let abilityMod = (spellAbility != "" ? actor.system.abilities[spellAbility].mod : 0) ?? 0;
+    let abilityMod = actor.system.abilities?.[spellAbility]?.mod ?? 0;
     let spellAttackMod = prof + abilityMod;
     let spellAttackText = spellAttackMod > 0 ? "+" + spellAttackMod : spellAttackMod;
     let spellAttackTextTooltip = `${prof} (prof.)+${abilityMod} (${spellAbility})`;

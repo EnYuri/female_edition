@@ -40,6 +40,7 @@ test("every setting key and menu reset value has a central registration definiti
   }
   assert.equal(FE_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
   assert.equal(FE_MENU_DEFAULTS[S.CHAT_CARD_ICON_CROP], true);
+  assert.equal(FE_MENU_DEFAULTS[CP.USE_TOKEN], false);
   assert.equal(FE_SETTING_DEFINITIONS[S.CHAT_CARD_ICON_CROP].scope, "client");
   assert.equal(FE_DEFAULTS[S.COMBAT_TRACKER_CENTER_TURN], true);
   assert.equal(FE_DEFAULTS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT], true);

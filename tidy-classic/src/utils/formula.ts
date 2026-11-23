@@ -89,23 +89,25 @@ export function getMaxPreparedSpellsSampleFormulas(): MaxPreparedSpellFormula[] 
   ];
 }
 
+function getSpellAbilityModifier(actor: Actor5e, ability: string): number {
+  return ability
+    ? actor.system.abilities?.[ability]?.mod ?? 0
+    : actor.system.attributes.spell?.mod ?? 0;
+}
+
 export function calculateSpellAttackAndDc(
   actor: Actor5e,
   spellClass: Item5e
 ): SpellCalculations {
   try {
-    const rollData = actor.getRollData();
-
     const prof = actor.system.attributes.prof ?? 0;
     const spellAbility = coalesce(
       spellClass?.system?.spellcasting?.ability,
       actor.system.attributes.spellcasting
     );
-    const abilityMod =
-      (spellAbility != ''
-        ? actor.system.abilities[spellAbility].mod
-        : actor.system.attributes.spell.mod) ?? 0;
+    const abilityMod = getSpellAbilityModifier(actor, spellAbility);
     const spellAttackMod = prof + abilityMod;
+    const rollData = { ...actor.getRollData(), mod: abilityMod, prof };
 
     const rawRsak = Roll.replaceFormulaData(
       getActorAttackBonus(actor, 'rsak'),
@@ -141,15 +143,15 @@ export function calculateSpellAttackAndDc(
       ]?.label ?? FoundryAdapter.localize('DND5E.None');
 
     const hasSpellcastingProgression =
-      !isNil(spellClass?.system.spellcasting.progression) &&
-      spellClass?.system.spellcasting.progression !==
+      !isNil(spellClass?.system.spellcasting?.progression) &&
+      spellClass?.system.spellcasting?.progression !==
         CONSTANTS.SPELLCASTING_PROGRESSION_NONE;
 
     return {
       dc: hasSpellcastingProgression
         ? spellClass?.system.spellcasting.save
-        : actor.system.attributes.spell.dc,
-      dcTooltip: getDcTooltip(actor, spellAbility),
+        : actor.system.attributes.spell?.dc ?? '',
+      dcTooltip: getDcTooltip(actor, spellAbility, rollData),
       meleeMod: msakTotal,
       meleeTooltip: buildAttackModTooltip(
         abilityName,
@@ -175,7 +177,7 @@ export function calculateSpellAttackAndDc(
     });
 
     return {
-      dc: actor.system.attributes.spell.dc,
+      dc: actor.system.attributes.spell?.dc ?? '',
       dcTooltip: '',
       meleeMod: '',
       meleeTooltip: '',
@@ -244,9 +246,8 @@ function calculateDeterministicBonus(rawBonus: string): number {
     return 0;
   }
 
-  let bonusRoll = Roll.fromTerms([new foundry.dice.terms.NumericTerm(0)]);
   try {
-    bonusRoll = Roll.fromTerms(deterministicRawBonus);
+    const bonusRoll = Roll.fromTerms(deterministicRawBonus);
 
     let bonusTotal = 0;
     if (Roll.validate(bonusRoll.formula)) {
@@ -259,11 +260,10 @@ function calculateDeterministicBonus(rawBonus: string): number {
   }
 }
 
-export function getDcTooltip(actor: Actor5e, spellAbility: string) {
+export function getDcTooltip(actor: Actor5e, spellAbility: string, rollData = actor.getRollData()) {
   const base = 8;
 
-  const abilityMod =
-    (spellAbility != '' ? actor.system.abilities[spellAbility].mod : 0) ?? 0;
+  const abilityMod = getSpellAbilityModifier(actor, spellAbility);
   const abilityName =
     CONFIG.DND5E.abilities[spellAbility as keyof typeof CONFIG.DND5E.abilities]
       ?.label ?? FoundryAdapter.localize('DND5E.None');
@@ -283,11 +283,10 @@ export function getDcTooltip(actor: Actor5e, spellAbility: string) {
     )})`;
   }
 
-  const rawBonus = actor.system.bonuses.spell.dc?.toString()?.trim();
-  if (!isNil(rawBonus, '') && Roll.validate(rawBonus)) {
-    const bonusRoll = new Roll(rawBonus);
-    bonusRoll.evaluateSync({ allowInteractive: false });
-    const bonusTotal = bonusRoll.total;
+  const rawBonus = actor.system.bonuses?.spell?.dc?.toString()?.trim();
+  if (rawBonus) {
+    const formula = Roll.replaceFormulaData(rawBonus, rollData, { missing: 0, warn: false });
+    const bonusTotal = calculateDeterministicBonus(formula);
 
     if (bonusTotal !== 0) {
       tooltip += bonusTotal < 0 ? ' - ' : ' + ';
@@ -326,12 +325,11 @@ export async function rollRawSpellAttack(
   let flavor = FoundryAdapter.localize(flavorKey);
 
   const messageConfig: BasicRollMessageConfiguration = {
-    rollMode: game.settings.get('core', 'rollMode'),
     data: {
-      'flags.dnd5e.roll': {
-        type: 'attack',
-      },
-      speaker: ChatMessage.getSpeaker({ actor: actor }),
+      ...('attack' in CONFIG.ChatMessage.dataModels
+        ? { type: 'attack' }
+        : { flags: { dnd5e: { roll: { type: 'attack' } } } }),
+      speaker: CONFIG.ChatMessage.documentClass.getSpeaker({ actor }),
       flavor,
     },
   };
@@ -367,31 +365,29 @@ function getSpellAttackRoll(
 ): BasicRollConfiguration {
   const effectiveAttackType = attackType ?? 'rsak';
 
-  const rollData: Record<string, any> = {};
-
   const parts: string[] = [];
 
   // Ability score modifier
-  const filteredClass = actor.sheet.classSpellbookFilter;
-
-  spellcastingAbility ??=
-    actor.classes?.[filteredClass]?.system.spellcasting?.ability;
-
-  const spellcastingMod = actor.system.abilities[spellcastingAbility!]?.mod;
-
-  if (spellcastingAbility !== 'none' && spellcastingMod) {
+  const classAbility = spellcastingAbility || FoundryAdapter.getFilteredClassOrOriginal(actor)?.system?.spellcasting?.ability;
+  const ability = coalesce(classAbility, actor.system.attributes.spellcasting);
+  const rollData = {
+    mod: getSpellAbilityModifier(actor, ability),
+    prof: actor.system.attributes.prof ?? 0,
+  };
+  if (rollData.mod) {
     parts.push('@mod');
-    rollData.mod = spellcastingMod;
   }
 
   // Add proficiency bonus.
   parts.push('@prof');
-  rollData.prof = actor.system.attributes.prof;
 
   // Actor-level global bonus to attack rolls
   const actorBonusAttack = getActorAttackBonus(actor, effectiveAttackType);
   if (actorBonusAttack) {
-    parts.push(actorBonusAttack);
+    // Resolve actor references locally; only the roll's own data goes into chat.
+    parts.push(Roll.replaceFormulaData(actorBonusAttack, { ...actor.getRollData(), ...rollData }, {
+      missing: 0, warn: false
+    }));
   }
 
   return {

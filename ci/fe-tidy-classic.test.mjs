@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { getActorAttackBonus, getActorDamageBonus } from "../tidy-classic/src/foundry/actor-roll-bonuses.js";
 
 /** Every file under `dir`, recursively, as absolute paths. */
 function walk(dir) {
@@ -241,13 +242,18 @@ test("the fork does not whisper Tidy 5e's own announcements", () => {
   assert.doesNotMatch(main, /ChatMessage\.create/);
 });
 
-test("dnd5e 6.0's moved schema paths are read through the compat shim", () => {
-  // `system.bonuses.<type>.attack` became `system.rolls.attack.<type>.bonus`, and
-  // dnd5e's own `shimBonusData` skips exactly these (`if (!container) continue;`), so a
-  // direct read is a TypeError that takes out the whole sheet context.
-  const compat = read("tidy-classic/src/foundry/dnd5e-compat.ts");
-  assert.match(compat, /rolls\.attack\.\$\{actionType\}\.bonus/);
-  assert.match(compat, /bonuses\.\$\{actionType\}\.attack/);
+test("Classic reads attack and damage bonuses from the actor's schema, even when unset", () => {
+  const legacy = { bonuses: { rsak: { attack: "@prof", damage: "1d4" } } };
+  assert.equal(getActorAttackBonus({ system: legacy }, "rsak"), "@prof");
+  assert.equal(getActorDamageBonus({ system: legacy }, "rsak"), "1d4");
+  for (const system of [{ schema: { fields: { rolls: {} } } }, { rolls: {} }]) {
+    Object.defineProperty(system, "bonuses", { get() { throw new Error("read a legacy bonus"); } });
+    assert.equal(getActorAttackBonus({ system }, "rsak"), "");
+    assert.equal(getActorDamageBonus({ system }, "msak"), "");
+    system.rolls = { attack: { rsak: { bonus: "+2" } }, damage: { msak: { bonus: "@mod" } } };
+    assert.equal(getActorAttackBonus({ system }, "rsak"), "+2");
+    assert.equal(getActorDamageBonus({ system }, "msak"), "@mod");
+  }
 
   for (const p of [
     "tidy-classic/src/utils/formula.ts",

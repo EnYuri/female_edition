@@ -567,7 +567,7 @@ function registerPlaylistSeekControls() {
   // game.mjs runs setup (:740) → initializeUI (:764) → ready (:779) — so a patch
   // installed at `ready` would be captured by nobody and silently never run.
   Hooks.once("setup", () => {
-    const PD = CONFIG?.ui?.playlists;
+    const PD = getPlaylistDirectoryClass();
     const original = PD?.prototype?.updateTimestamps;
     if (typeof original !== "function") {
       // Degrade, don't break: sliders still seek and still refresh on every hook
@@ -771,18 +771,12 @@ function registerPlaylistSeekControls() {
   });
 }
 
+function getPlaylistDirectoryClass() {
+  return CONFIG.ui.playlists ?? foundry.applications.sidebar.tabs.PlaylistDirectory;
+}
+
 /** Auto-inject the sidebar (Playlists tab) button */
 function registerSidebarButton() {
-  function getPlaylistDirectoryClass() {
-    return (
-      globalThis.CONFIG?.ui?.playlists ??
-      foundry?.applications?.sidebar?.tabs?.PlaylistDirectory ??
-      foundry?.applications?.sidebar?.PlaylistDirectory ??
-      globalThis?.PlaylistDirectory ??
-      null
-    );
-  }
-
   // 1) Official Header Controls (ApplicationV2)
   Hooks.on("getHeaderControlsApplicationV2", (app, controls) => {
     const PD = getPlaylistDirectoryClass();
