@@ -9,6 +9,7 @@ import type {
 import { unmount } from 'svelte';
 import { CoarseReactivityProvider } from 'src/features/reactivity/CoarseReactivityProvider.svelte';
 import { applyThemeToApplication } from 'src/utils/applications.svelte';
+import { applyTidySheetClasses } from 'src/utils/sheet-classes.js';
 import { ThemeQuadrone } from 'src/theme/theme-quadrone.svelte';
 import type { Unsubscribable } from 'src/foundry/TidyHooks.types';
 import type {
@@ -138,6 +139,7 @@ export function SvelteApplicationMixin<
 
     async _renderFrame(options: ApplicationRenderOptions) {
       const element = await super._renderFrame(options);
+      if (element.classList.contains(CONSTANTS.MODULE_ID)) applyTidySheetClasses(element);
 
       EventHelper.subscribeToDynamicContentRenderEvents(element, () => {
         this.#throttleSoftRendering();

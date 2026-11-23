@@ -1,14 +1,13 @@
 export const CONSTANTS = {
   /**
    * Stays `tidy5e-sheet` on purpose, and is used for exactly two things now: document
-   * FLAGS and the sheet's CSS classes.
+   * FLAGS and the public sheet identity in app.options.classes.
    *
    * Flags, because every actor and item in an existing world already stores its Tidy
    * state under `flags["tidy5e-sheet"]` — favourites, pinned attributes, section configs,
    * sheet preferences. Renaming the namespace would orphan all of it.
    *
-   * CSS classes, because `.tidy5e-sheet` is what every stylesheet targets, ours included
-   * (female_edition's retro rules in `styles/fe-dnd5e-compat.css`).
+   * Classic frames use .fe-tidy-sheet for styling so official Tidy can coexist.
    *
    * SETTINGS do NOT use this — see SETTINGS_NAMESPACE.
    */

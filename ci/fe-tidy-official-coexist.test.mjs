@@ -3,9 +3,37 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyTidySheetClasses } from '../tidy-classic/src/utils/sheet-classes.js';
 
 const root = fileURLToPath(new URL('../tidy-classic/src/', import.meta.url));
 const read = (p) => readFileSync(join(root, p), 'utf8');
+
+test('Classic frames and detached menus opt out of the official Quadrone CSS root', (t) => {
+  const modules = new Map();
+  const previous = globalThis.game;
+  globalThis.game = { modules };
+  t.after(() => { globalThis.game = previous; });
+
+  for (const active of [false, true]) {
+    modules.set('tidy5e-sheet', { active });
+    for (const layout of ['classic', 'quadrone']) {
+      const classes = new Set([layout, 'tidy5e-sheet']);
+      applyTidySheetClasses({ classList: {
+        contains: name => classes.has(name),
+        add: name => classes.add(name),
+        toggle: (name, on) => on ? classes.add(name) : classes.delete(name),
+      } });
+      assert.ok(classes.has('fe-tidy-sheet'));
+      assert.equal(classes.has('tidy5e-sheet'), layout === 'quadrone' || !active);
+    }
+  }
+
+  assert.match(read('mixins/SvelteApplicationMixin.svelte.ts'), /applyTidySheetClasses\(element\)/);
+  assert.match(read('context-menu/FloatingContextMenu.ts'), /applyTidySheetClasses\(html\)/);
+  const globals = read('../styles/tidy5e-classic-global.css');
+  assert.match(globals, /\.fe-tidy-sheet\.application:where\(\.classic\)/);
+  assert.doesNotMatch(globals, /\.tidy5e-sheet(?![\w-])/);
+});
 
 // Both modules once inserted <style id="tidy5e-sheets-quadrone-theme-settings"> and
 // shared the world-rule identifier, so this fork's world theme wiped tidy 14's.

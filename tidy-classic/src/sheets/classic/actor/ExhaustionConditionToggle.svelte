@@ -80,7 +80,7 @@
   }
 
   :global(
-    .tidy5e-sheet.classic .tidy-inline-quantity-tracker .command
+    .fe-tidy-sheet.classic .tidy-inline-quantity-tracker .command
   ) {
     display: flex;
     align-items: center;
@@ -91,7 +91,7 @@
   }
 
   :global(
-    .tidy5e-sheet.classic
+    .fe-tidy-sheet.classic
       .tidy-inline-quantity-tracker
       .quantity-tracker-input-wrapper
   ) {
@@ -101,7 +101,7 @@
   }
 
   :global(
-    .tidy5e-sheet.classic
+    .fe-tidy-sheet.classic
       .tidy-inline-quantity-tracker
       input.quantity-tracker-input
   ) {

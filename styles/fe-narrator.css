@@ -108,7 +108,7 @@
   opacity: 0;
 }
 
-/* Non-narrator viewers get no pause/close; copy obeys the narratorAllowCopy setting. */
+/* Non-narrator viewers get no pause/close; copy obeys the narratorShowCopyButton setting. */
 #fe-narrator.fe-nt-observer .fe-nt-pause,
 #fe-narrator.fe-nt-observer .fe-nt-close,
 #fe-narrator.fe-nt-no-copy .fe-nt-copy {

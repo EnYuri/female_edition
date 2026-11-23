@@ -196,7 +196,7 @@
 </TabFooter>
 
 <style lang="less">
-  :global(.tidy5e-sheet .spellbook-footer) {
+  :global(.fe-tidy-sheet .spellbook-footer) {
     min-height: 2.5rem;
   }
 

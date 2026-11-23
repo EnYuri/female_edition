@@ -122,7 +122,7 @@ export function infoCardEventWatcher(
   args: InfoCardWatcherArgs
 ) {
   $effect(() => {
-    const sheetNode = node.closest<HTMLElement>(`.tidy5e-sheet`);
+    const sheetNode = node.closest<HTMLElement>(`.fe-tidy-sheet`);
 
     if (!sheetNode) {
       warn('Unable to wire up info card watcher. Sheet element not found.');

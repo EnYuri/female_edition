@@ -43,7 +43,7 @@ const _FN_TYPE_FLAG     = "narratorType";
 // ── Settings cache ───────────────────────────────────────────────────────────
 let _fnEnabled       = FE_DEFAULTS.narratorEnabled;
 let _fnDurationMult  = FE_DEFAULTS.narratorDurationMult;
-let _fnAllowCopy     = FE_DEFAULTS.narratorAllowCopy;
+let _fnShowCopyButton = FE_DEFAULTS.narratorShowCopyButton;
 let _fnPermNarrate   = FE_DEFAULTS.narratorPermNarrate; // CONST.USER_ROLES.GAMEMASTER
 let _fnPermDescribe  = FE_DEFAULTS.narratorPermDescribe;
 let _fnPermAs        = FE_DEFAULTS.narratorPermAs;
@@ -84,7 +84,10 @@ function _fnRegisterSettings() {
       else _fnOrderChatCommandsWithCgmp();
     });
   feRegisterSetting("narratorDurationMult", (v) => { _fnDurationMult = v; });
-  feRegisterSetting("narratorAllowCopy", (v) => { _fnAllowCopy = v; });
+  feRegisterSetting("narratorShowCopyButton", (v) => {
+    _fnShowCopyButton = v;
+    _fn.el?.classList.toggle("fe-nt-no-copy", !v);
+  });
   feRegisterSetting("narratorPermNarrate", (v) => { _fnPermNarrate = Number(v); });
   feRegisterSetting("narratorPermDescribe", (v) => { _fnPermDescribe = Number(v); });
   feRegisterSetting("narratorPermAs", (v) => { _fnPermAs = Number(v); });
@@ -95,13 +98,20 @@ function _fnRegisterSettings() {
   feRegisterSetting(_FN_STATE, (state) => _fnController(state));
 }
 
-
+async function _fnRemoveOldCopySettings() {
+  if (game.user !== game.users.activeGM) return;
+  const worldSettings = game.settings.storage.get("world");
+  for (const key of ["narratorAllowCopy", "narratorCopyHideMigrated"]) {
+    const obsolete = worldSettings.find(setting => setting.key === `${_FN_MODULE}.${key}`);
+    if (obsolete) await obsolete.delete();
+  }
+}
 
 function _fnLoadSettings() {
   _fnEnabled      = game.settings.get(_FN_MODULE, "narratorEnabled")
     && !feIsConflictFeatureSuppressed(FE_CONFLICT_FEATURE.NARRATOR);
   _fnDurationMult = game.settings.get(_FN_MODULE, "narratorDurationMult");
-  _fnAllowCopy    = game.settings.get(_FN_MODULE, "narratorAllowCopy");
+  _fnShowCopyButton = game.settings.get(_FN_MODULE, "narratorShowCopyButton");
   _fnPermNarrate  = Number(game.settings.get(_FN_MODULE, "narratorPermNarrate"));
   _fnPermDescribe = Number(game.settings.get(_FN_MODULE, "narratorPermDescribe"));
   _fnPermAs       = Number(game.settings.get(_FN_MODULE, "narratorPermAs"));
@@ -245,7 +255,7 @@ function _fnController(state) {
     _fn.content.style.top = "0px";
     const h = Math.min(_fn.content.offsetHeight || 0, 310);
     _fn.el.classList.remove("fe-nt-empty");
-    _fn.el.classList.toggle("fe-nt-no-copy", !_fnAllowCopy);
+    _fn.el.classList.toggle("fe-nt-no-copy", !_fnShowCopyButton);
     _fn.buttons.style.top = `calc(50% + ${60 + h / 2}px)`;
     // Fade in via WAAPI only when coming from a hidden state; a back-to-back
     // replacement swaps content instantly (no flash to 0).
@@ -587,6 +597,7 @@ Hooks.once("setup", () => {
 });
 
 Hooks.on("ready", () => {
+  _fnRemoveOldCopySettings().catch(err => console.warn("female_edition: Could not remove obsolete narrator copy settings", err));
   _fnLoadSettings();
   _fn.isNarrator = !!(game.user.hasPermission?.("SETTINGS_MODIFY") && game.user.role >= _fnPermNarrate);
   if (_fnEnabled) {

@@ -11,7 +11,7 @@ import { isNil } from 'src/utils/data';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import chroma from 'chroma-js';
 
-const tidyStyleTagId = 'tidy5e-sheet-theme';
+const tidyStyleTagId = 'fe-tidy-classic-theme';
 
 export function getThemeV2(doc?: any) {
   let theme: string | undefined = undefined;
@@ -46,7 +46,7 @@ export function applyThemeColorsToHead(variables: Record<string, string>) {
       'beforeend',
       `
     <style id="${tidyStyleTagId}">
-      .tidy5e-sheet.classic {
+      .fe-tidy-sheet.classic {
         ${Object.entries(variables)
           .filter(([_, value]) => !isNil(value?.trim(), ''))
           .map(([variable, value]) => `${variable}: ${value};`)

@@ -146,7 +146,7 @@ body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.d
 body.fe-retro-theme :is(.window-app, .application)
   input[type="checkbox"]:not(
     :is(.double-cross-3rd, .dx3rd-emanim, .dx3rd, .item-extend-dialog, .dx3rd-casting-dialog,
-        .dx3rd-scene-open-dialog, .dnd5e, .dnd5e2, .tidy5e-sheet) *
+        .dx3rd-scene-open-dialog, .dnd5e, .dnd5e2, .fe-tidy-sheet, .tidy5e-sheet) *
   ) {
   --checkbox-background-color: var(--fe-ac-70) !important;
   --checkbox-checked-color: var(--fe-dx3rd-accent, #ffffff) !important;

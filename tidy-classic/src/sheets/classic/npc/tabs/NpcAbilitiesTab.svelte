@@ -499,7 +499,7 @@
     flex: 1;
   }
 
-  :global(.tidy5e-sheet .abilities-footer) {
+  :global(.fe-tidy-sheet .abilities-footer) {
     flex: 0;
   }
 

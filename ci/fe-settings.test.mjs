@@ -48,6 +48,9 @@ test("every setting key and menu reset value has a central registration definiti
   assert.equal(FE_SETTING_DEFINITIONS[S.CORE_UI_FILEPICKER_UPLOAD_CURRENT].restricted, true);
   assert.ok(!FE_RELOAD_REQUIRED_KEYS.includes(S.CORE_UI_FILEPICKER_UPLOAD_CURRENT));
   assert.ok(!constants.FE_GM_PRIORITY_EXCLUDED_KEYS.has(S.CHAT_CARD_ICON_CROP));
+  assert.equal(FE_MENU_DEFAULTS.narratorShowCopyButton, false);
+  assert.ok(!Object.hasOwn(FE_SETTING_DEFINITIONS, "narratorAllowCopy"));
+  assert.ok(!Object.hasOwn(FE_SETTING_DEFINITIONS, "narratorCopyHideMigrated"));
   for (const key of ["feGmPriorityOverrides", "feGmPriorityBackup", "feWorldSettings", "narratorState", "ceMusicAutoInitDone"]) {
     assert.equal(Object.hasOwn(FE_MENU_DEFAULTS, key), false, key);
   }

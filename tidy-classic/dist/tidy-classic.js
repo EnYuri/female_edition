@@ -6577,14 +6577,13 @@ function quickInsertSection(section, actor) {
 const CONSTANTS = {
   /**
    * Stays `tidy5e-sheet` on purpose, and is used for exactly two things now: document
-   * FLAGS and the sheet's CSS classes.
+   * FLAGS and the public sheet identity in app.options.classes.
    *
    * Flags, because every actor and item in an existing world already stores its Tidy
    * state under `flags["tidy5e-sheet"]` — favourites, pinned attributes, section configs,
    * sheet preferences. Renaming the namespace would orphan all of it.
    *
-   * CSS classes, because `.tidy5e-sheet` is what every stylesheet targets, ours included
-   * (female_edition's retro rules in `styles/fe-dnd5e-compat.css`).
+   * Classic frames use .fe-tidy-sheet for styling so official Tidy can coexist.
    *
    * SETTINGS do NOT use this — see SETTINGS_NAMESPACE.
    */
@@ -9937,7 +9936,7 @@ Object.assign(chroma, {
   scales,
   valid
 });
-const tidyStyleTagId = "tidy5e-sheet-theme";
+const tidyStyleTagId = "fe-tidy-classic-theme";
 function getThemeV2(doc) {
   let theme = void 0;
   if (doc) {
@@ -9965,7 +9964,7 @@ function applyThemeColorsToHead(variables) {
       "beforeend",
       `
     <style id="${tidyStyleTagId}">
-      .tidy5e-sheet.classic {
+      .fe-tidy-sheet.classic {
         ${Object.entries(variables).filter(([_, value]) => !isNil(value?.trim(), "")).map(([variable, value]) => `${variable}: ${value};`).join("\n")}
       }
     </style>
@@ -10109,6 +10108,12 @@ function applySheetAttributesToWindow(documentName, documentUuid, type2, element
   element2?.setAttribute("data-document-name", documentName);
   element2?.setAttribute("data-document-type", type2);
   element2?.setAttribute("data-document-uuid", documentUuid);
+}
+function applyTidySheetClasses(element2) {
+  const classes = element2.classList;
+  classes.add("fe-tidy-sheet");
+  const isolateClassic = classes.contains("classic") && game.modules.get("tidy5e-sheet")?.active;
+  classes.toggle("tidy5e-sheet", !isolateClassic);
 }
 function bg3CommonActionSection(item) {
   if (!item.actor || game.modules.get("tidy5e-sheet")?.active || !game.modules.get("bg3-inspired-hotbar")?.active || !game.modules.get("chris-premades")?.active || item.getFlag("chris-premades", "info")?.source !== "chris-premades") return;
@@ -12635,6 +12640,7 @@ function SvelteApplicationMixin(BaseApplication) {
     }
     async _renderFrame(options2) {
       const element2 = await super._renderFrame(options2);
+      if (element2.classList.contains(CONSTANTS.MODULE_ID)) applyTidySheetClasses(element2);
       EventHelper.subscribeToDynamicContentRenderEvents(element2, () => {
         this.#throttleSoftRendering();
       });
@@ -21965,7 +21971,8 @@ class FloatingContextMenu extends foundry.applications.ux.ContextMenu {
     this.#layout = options2.layout;
   }
   _setPosition(html2, target, options2) {
-    html2.classList.add("floating", "tidy5e-sheet", this.#layout, "context");
+    html2.classList.add("floating", this.#layout, "context");
+    applyTidySheetClasses(html2);
     return this._setFixedPosition(html2, target, options2);
   }
 }
@@ -39373,7 +39380,7 @@ class Tooltip {
   static show(target, markup, theme) {
     game.tooltip.activate(target, {
       html: markup,
-      cssClass: `tidy5e-sheet application quadrone tooltip themed theme-${theme}`
+      cssClass: `fe-tidy-sheet tidy5e-sheet application quadrone tooltip themed theme-${theme}`
     });
   }
   static hide() {
@@ -114213,7 +114220,7 @@ function getRootFontSizePx() {
 }
 function infoCardEventWatcher(node, args) {
   user_effect(() => {
-    const sheetNode = node.closest(`.tidy5e-sheet`);
+    const sheetNode = node.closest(`.fe-tidy-sheet`);
     if (!sheetNode) {
       warn("Unable to wire up info card watcher. Sheet element not found.");
       return;
@@ -125456,7 +125463,7 @@ Hooks.once("setup", async () => {
   const style = document.createElement("style");
   style.id = "tidy5e-classic-generated-styles";
   document.head.append(style);
-  style.textContent = Object.entries(CONFIG.DND5E.currencies).map(([key2, val]) => `.tidy5e-sheet .currency.${key2} { --currency-icon-url: url("${formatResourcePathForCss(val.icon)}"); }`).join("\n\n");
+  style.textContent = Object.entries(CONFIG.DND5E.currencies).map(([key2, val]) => `.fe-tidy-sheet .currency.${key2} { --currency-icon-url: url("${formatResourcePathForCss(val.icon)}"); }`).join("\n\n");
 });
 function registerCustomTidyRollRequests() {
   const requests = CONFIG.DND5E?.requests;

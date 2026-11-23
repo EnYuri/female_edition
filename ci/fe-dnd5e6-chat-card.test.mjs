@@ -129,7 +129,7 @@ test("tidy Classic rules are KEPT for tidy 13.x worlds", () => {
   // "classic" at all). These rules simply stop matching there — they are backward
   // compatibility for a world still on 13.x and for the maintained tidy-classic
   // fork, not dead code to delete. They now live in styles/fe-tidy-retro.css.
-  assert.match(TIDY_RETRO, /\.tidy5e-sheet\.application\.classic/);
+  assert.match(TIDY_RETRO, /:is\(\.fe-tidy-sheet, \.tidy5e-sheet\)\.application\.classic/);
 });
 
 test("tidy Quadrone retro rules reach item/group/encounter/tooltip sheets too", () => {
@@ -163,7 +163,7 @@ test("the centralized --t5e-* remap is present and every token declaration wins"
   // floating Classic context menu is not an .application. All seven Classic
   // sheet classes (character/npc/vehicle/item/container/group/encounter) and
   // the detached info card ride on that one scope.
-  const block = TIDY_RETRO.match(/body\.fe-retro-theme \.tidy5e-sheet \{([\s\S]*?)\n\}/);
+  const block = TIDY_RETRO.match(/body\.fe-retro-theme :is\(\.fe-tidy-sheet, \.tidy5e-sheet\) \{([\s\S]*?)\n\}/);
   assert.ok(block, "the centralized .tidy5e-sheet variable remap is gone");
 
   // layouts(7) loses to tidy's modules(9) for normal declarations regardless of

@@ -1,5 +1,5 @@
 /* Tidy 5e Sheets - numeric values can look better with the light face */
-:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .ability-score,
     .ability-scores :is(.score, .value, .mod, .bonus),
@@ -21,7 +21,7 @@
 /* If Tidy exposes font-family variables, override them first for broad coverage.
  * (These vars may differ by Tidy version; unused vars are harmless.)
  */
-:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
+:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
   --t5e-title-font-family: var(--fe-font-primary) !important;
   --t5e-body-font-family: var(--fe-font-secondary) !important;
   --t5e-font-family-title: var(--fe-font-primary) !important;
@@ -47,7 +47,7 @@
 }
 
 /* Large headings / labels (actor name, ability labels, tab titles) */
-:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .tidy5e-sheet-header,
     .sheet-header,
@@ -69,7 +69,7 @@
 }
 
 /* Small list content (skills, items, features, actions, etc.) */
-:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .skills,
     .skill-list,
@@ -89,7 +89,7 @@
 }
 
 /* Ensure nested text nodes inside those lists inherit Geurimilgi, while icons keep FA. */
-:is(.tidy5e, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .skills,
     .skill-list,
@@ -119,7 +119,7 @@
  */
 
 /* Ability score blocks (numbers/labels inside the block) */
-.tidy5e-sheet.application:where(.classic) :is(.block-score, .block-score > *) {
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) :is(.block-score, .block-score > *) {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
   /* Requested: +2px for classic tidy5e block-score readability */
@@ -128,7 +128,7 @@
 }
 
 /* Actor level indicator in classic actor sheets */
-:is(.sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
+:is(.sheet, .fe-tidy-sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
   font-size: 1em !important;
@@ -139,7 +139,7 @@
  * HP/resources/xp/movement — force Bold Geurimilgi for numeric overlays and key trackers.
  * (Selectors vary by Tidy5e version; include a few best-effort aliases.)
  */
-:is(.tidy5e-sheet, .sheet).application:where(.classic)
+:is(:is(.fe-tidy-sheet, .tidy5e-sheet), .sheet).application:where(.classic)
   :is(
     .portrait-hp,
     .portrait-hp.svelte,
@@ -157,7 +157,7 @@
 
 
 /* Tidy info-card description (classic): force Geurimilgi Regular */
-.tidy5e-sheet.application:where(.classic) .tidy-info-card .info-card-description {
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .tidy-info-card .info-card-description {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 400 !important;
   font-size: 1em !important;
@@ -186,12 +186,12 @@ span.flex-row.align-items-center.extra-small-gap {
    forcing a 1em line-height here pins the AC value to the top edge. Every
    other dnd5e .badge is grid/flex-centered and unaffected by line-height.
    The retro theme styles .ac-badge itself from layer(layouts). */
-:is(.dnd5e2, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge:not(.ac-badge), .chip) {
+:is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge:not(.ac-badge), .chip) {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
 
-:is(.dnd5e2, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
+:is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
@@ -201,14 +201,14 @@ span.flex-row.align-items-center.extra-small-gap {
  * Tidy5e Classic: Item summary text
  * - The summary area is often longer-form text; use the more readable font.
  * ------------------------------------------------------------------------- */
-.tidy5e-sheet.application:where(.classic) .item-summary,
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary,
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .item-summary
   :is(p, li, span, div, a, em, strong, b, u, small, label) {
   font-family: var(--fe-font-secondary) !important;
 }
 
-.tidy5e-sheet.application:where(.classic) .item-summary {
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary {
   font-weight: var(--fe-font-weight-body) !important;
 }
 
@@ -221,7 +221,7 @@ span.flex-row.align-items-center.extra-small-gap {
  * Info cards keep Tidy's native column layout: their content must flex and
  * scroll within the height used by Tidy's placement calculations.
  * ------------------------------------------------------------------------- */
-.tidy5e-sheet.application:where(.classic) .item-summary > button {
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary > button {
   display: inline-flex !important;
   margin: 0 4px 4px 0 !important;
   vertical-align: middle !important;
@@ -242,14 +242,14 @@ span.flex-row.align-items-center.extra-small-gap {
    `.tidy-form .form-group` rules (`.form-group > * { flex: 2 1 0% }`,
    `.form-group .hint { flex: 0 0 100% }`) which otherwise park the control
    on a full-width line of its own at the bottom-right. */
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group {
   flex-wrap: wrap;
   align-items: flex-start;
 }
 
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > label {
@@ -262,7 +262,7 @@ span.flex-row.align-items-center.extra-small-gap {
    its name. `.form-fields` is width:100% + justify-content:flex-end in
    classic (its own bottom line); shrink it to content so the margin can
    park it. */
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > .form-fields {
@@ -271,14 +271,14 @@ span.flex-row.align-items-center.extra-small-gap {
   width: auto;
 }
 
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > .form-fields:has(input[type='checkbox']) {
   margin-left: auto;
 }
 
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > .form-fields:not(:has(input[type='checkbox'])) {
@@ -290,7 +290,7 @@ span.flex-row.align-items-center.extra-small-gap {
 
 /* The inner control is `width: 100%` (classic's actor-sheet rule), so the
    field stretches to the row's full width — cap it at a sensible size. */
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > .form-fields:not(:has(input[type='checkbox']))
@@ -298,7 +298,7 @@ span.flex-row.align-items-center.extra-small-gap {
   max-width: 20rem;
 }
 
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > .hint {
@@ -306,7 +306,7 @@ span.flex-row.align-items-center.extra-small-gap {
   margin-left: 0;
 }
 
-.tidy5e-sheet.application:where(.classic)
+:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .special-traits-container.tidy-form
   .form-group
   > select {
@@ -317,11 +317,11 @@ span.flex-row.align-items-center.extra-small-gap {
   margin-left: 0.5rem;
 }
 
-.tidy5e-sheet.classic .classic-antimagic-notice {
+:is(.fe-tidy-sheet, .tidy5e-sheet).classic .classic-antimagic-notice {
   padding: 0.2rem 0.5rem;
   font-weight: bold;
 }
 
-.tidy5e-sheet.classic [data-magic-suppressed] :is(.item-name, .spell-name) {
+:is(.fe-tidy-sheet, .tidy5e-sheet).classic [data-magic-suppressed] :is(.item-name, .spell-name) {
   opacity: 0.7;
 }

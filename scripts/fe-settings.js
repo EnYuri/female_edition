@@ -203,7 +203,7 @@ function feRegisterSettingsMenu({
         // Narrator (standalone — migrated; all world/GM)
         narratorEnabled:      feRead("narratorEnabled"),
         narratorDurationMult: feRead("narratorDurationMult"),
-        narratorAllowCopy:    feRead("narratorAllowCopy"),
+        narratorShowCopyButton: feRead("narratorShowCopyButton"),
         narratorPermNarrate:  feRead("narratorPermNarrate"),
         narratorPermDescribe: feRead("narratorPermDescribe"),
         narratorPermAs:       feRead("narratorPermAs"),
@@ -738,7 +738,7 @@ function feRegisterSettingsMenu({
           // Narrator — all world/GM
           ...(game.user?.isGM ? [
             bool("narratorEnabled"), num("narratorDurationMult"),
-            bool("narratorAllowCopy"),
+            bool("narratorShowCopyButton"),
             num("narratorPermNarrate"), num("narratorPermDescribe"), num("narratorPermAs"),
           ] : []),
 

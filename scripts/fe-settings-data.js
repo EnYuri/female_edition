@@ -331,7 +331,7 @@ const FE_DEFAULTS = {
   "ceMusicAutoInitDone": false,
   "narratorEnabled": true,
   "narratorDurationMult": 1,
-  "narratorAllowCopy": true,
+  "narratorShowCopyButton": false,
   "narratorPermNarrate": 4,
   "narratorPermDescribe": 4,
   "narratorPermAs": 4,
@@ -671,7 +671,7 @@ const FE_MENU_DEFAULTS = Object.freeze(Object.fromEntries(
   "ihMaxUpscale",
   "narratorEnabled",
   "narratorDurationMult",
-  "narratorAllowCopy",
+  "narratorShowCopyButton",
   "narratorPermNarrate",
   "narratorPermDescribe",
   "narratorPermAs",
@@ -1735,7 +1735,7 @@ const FE_SETTING_DEFINITIONS = {
     range: {"min":0.25,"max":4,"step":0.25},
     type: Number,
   },
-  "narratorAllowCopy": {
+  "narratorShowCopyButton": {
     name: "FE.SettingsData.narratorAllowCopy.name",
     scope: "world",
     config: false,

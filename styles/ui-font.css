@@ -905,7 +905,7 @@ body.fe-fonts-enabled .tidy5e-sheet.application.quadrone
    .double-cross-3rd / .dx3rd (dx3rd sheet roots) — previously §5 was
    scoped to dnd5e/tidy5e only, so dx3rd sheet descriptions never got the
    secondary split and only fell through to §3's global primary font. */
-body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .tidy5e-sheet, .dx3rd-emanim, .double-cross-3rd, .dx3rd) :is(
+body.fe-fonts-enabled :is(.dnd5e, .dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .dx3rd-emanim, .double-cross-3rd, .dx3rd) :is(
   .editor-content,
   .description,
   .summary,

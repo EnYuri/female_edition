@@ -1,3 +1,4 @@
+import { applyTidySheetClasses } from 'src/utils/sheet-classes.js';
 import { CONSTANTS } from 'src/constants';
 import { normalizeContextMenuEntries } from 'src/foundry/core-compat';
 
@@ -58,7 +59,8 @@ export default class FloatingContextMenu extends foundry.applications.ux
   }
 
   _setPosition(html: any, target: any, options: any) {
-    html.classList.add('floating', 'tidy5e-sheet', this.#layout, 'context');
+    html.classList.add('floating', this.#layout, 'context');
+    applyTidySheetClasses(html);
     return this._setFixedPosition(html, target, options);
   }
 }

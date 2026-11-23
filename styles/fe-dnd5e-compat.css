@@ -460,7 +460,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e.fe-accent-text-override
       #sidebar #chat, #chat-notifications, :is(.chat-popout #chat, #chat-popout, .chat-popout), .chat-message, .chat-card)
   :is(span, div, p, a, button, label, td, th, dt, dd, li, small, em, strong, b,
       h1, h2, h3, h4, h5, h6, .label, .name, .title, .value, .mod,
-      .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link):not(.key):not(:where(#context-menu, .context-menu, .tidy5e-sheet.context) *) {
+      .roboto-condensed-upper, .message-sender, .flavor-text):not(.dice-total):not([class*="fa-"]):not(.fa):not(.fas):not(.far):not(.fab):not(.content-link):not(.key):not(:where(#context-menu, .context-menu, .fe-tidy-sheet.context, .tidy5e-sheet.context) *) {
   color: var(--fe-ac-90, #e6e6e6) !important;
   transition: none !important;
 }

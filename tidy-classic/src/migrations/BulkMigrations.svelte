@@ -62,7 +62,7 @@
     margin-bottom: -0.5rem;
   }
 
-  :global(.tidy-sheet-body) {
+  :global(:where(.fe-tidy-sheet) .tidy-sheet-body) {
     grid-area: body;
     overflow-y: scroll;
     padding-top: 0.5rem;

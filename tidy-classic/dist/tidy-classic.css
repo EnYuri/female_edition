@@ -1312,7 +1312,7 @@ label.svelte-2ijbjz {
 .no-spells-container.svelte-1yr7vo1 .create-spell-btn:where(.svelte-1yr7vo1):hover {
   background-color: var(--t5e-light-color);
 }
-.tidy5e-sheet .spellbook-footer {
+.fe-tidy-sheet .spellbook-footer {
   min-height: 2.5rem;
 }
 .secondary-footer-field.svelte-9mwcoc {
@@ -1489,7 +1489,7 @@ p.svelte-9mwcoc {
 section.svelte-1n3ct2k {
   flex: 1;
 }
-.tidy5e-sheet .abilities-footer {
+.fe-tidy-sheet .abilities-footer {
   flex: 0;
 }
 .npc-abilities-content.svelte-1n3ct2k {
@@ -1668,7 +1668,7 @@ section.svelte-1n3ct2k {
   margin: 0;
 }
 
-    .tidy5e-sheet.classic .tidy-inline-quantity-tracker .command
+    .fe-tidy-sheet.classic .tidy-inline-quantity-tracker .command
    {
   display: flex;
   align-items: center;
@@ -1678,7 +1678,7 @@ section.svelte-1n3ct2k {
   color: var(--t5e-tertiary-color);
 }
 
-    .tidy5e-sheet.classic
+    .fe-tidy-sheet.classic
       .tidy-inline-quantity-tracker
       .quantity-tracker-input-wrapper
    {
@@ -1687,7 +1687,7 @@ section.svelte-1n3ct2k {
   flex: none;
 }
 
-    .tidy5e-sheet.classic
+    .fe-tidy-sheet.classic
       .tidy-inline-quantity-tracker
       input.quantity-tracker-input
    {
@@ -2228,7 +2228,7 @@ label.svelte-17aer27 {
   margin-left: -0.5rem;
   margin-bottom: -0.5rem;
 }
-.tidy-sheet-body {
+:where(.fe-tidy-sheet) .tidy-sheet-body {
   grid-area: body;
   overflow-y: scroll;
   padding-top: 0.5rem;

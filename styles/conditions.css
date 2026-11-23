@@ -1,5 +1,5 @@
 /* In case the Effects tab ever becomes class-distinguished */
-.tidy5e-sheet .effects [data-condition-id="condfemalemating"],
-.tidy5e-sheet .effects-tab [data-condition-id="condfemalemating"] {
+:is(.fe-tidy-sheet, .tidy5e-sheet) .effects [data-condition-id="condfemalemating"],
+:is(.fe-tidy-sheet, .tidy5e-sheet) .effects-tab [data-condition-id="condfemalemating"] {
   display: none !important;
 }

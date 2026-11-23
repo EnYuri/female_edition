@@ -206,7 +206,7 @@ Hooks.once('setup', async () => {
   style.textContent = Object.entries(CONFIG.DND5E.currencies)
     .map(
       ([key, val]) =>
-        `.tidy5e-sheet .currency.${key} { --currency-icon-url: url("${formatResourcePathForCss(
+        `.fe-tidy-sheet .currency.${key} { --currency-icon-url: url("${formatResourcePathForCss(
           (val as any).icon
         )}"); }`
     )
