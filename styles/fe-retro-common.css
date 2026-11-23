@@ -462,13 +462,13 @@ body.fe-retro-theme .chat-controls :is([data-action="sendMessage"], .chat-send, 
    Guarding here instead of escalating specificity follows the precedent already
    set by the :not(.double-cross-3rd) system guards above. */
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.window-header button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.window-header button):not(.fe-sp-face-tab, :where(.playlists-sidebar [data-action="soundRepeat"])):not(:is(color-picker, file-picker, formula-input, .input-group) > *) {
   background: #000 !important;
   color: var(--fe-ac-70) !important;
   border-color: var(--fe-ac-33) !important;
 }
 
-body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.fe-sp-face-tab):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
+body.fe-retro-theme :is(.window-app, .application):not(.double-cross-3rd):not(.dx3rd-emanim):not(.dx3rd) button:not(.dnd5e2.sheet.item :is(.unbutton, .button-icon-only, .button-borderless, .config-button, .control-button)):not([disabled]):not(.transparent-button):not(.transparent-inline):not(.transparent-inline-icon):not(.inline-transparent-button):not(.item-list-button):not(.inline-icon-button):not(.fe-sp-face-tab, :where(.playlists-sidebar [data-action="soundRepeat"])):not(:is(color-picker, file-picker, formula-input, .input-group) > *):hover {
   background: var(--fe-ac-12) !important;
   border-color: var(--fe-ac-70) !important;
 }
@@ -548,18 +548,24 @@ body.fe-retro-theme #file-picker .fe-fp-sort-dir:hover:not(:disabled) {
   color: var(--fe-ac-90) !important;
 }
 
-body.fe-retro-theme .sound-controls
-  :is(button[data-action="soundRepeat"].inactive, a[data-action="soundRepeat"].inactive) {
-  color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / 0.28) !important;
+/* Keep the repeat state visible against the same dark surface in the sidebar
+   and its popout. The volume toggle paints its glyph in a nested <i>. */
+body.fe-retro-theme .playlists-sidebar .sound-controls [data-action="soundRepeat"] {
+  background: #000 !important;
+  color: var(--fe-repeat-color, var(--fe-ac-90)) !important;
   filter: none !important;
   box-shadow: none !important;
 }
 
-body.fe-retro-theme .sound-controls
-  :is(button[data-action="soundRepeat"]:not(.inactive), a[data-action="soundRepeat"]:not(.inactive)) {
-  color: var(--fe-ac-80) !important;
-  filter: none !important;
-  box-shadow: none !important;
+body.fe-retro-theme .playlists-sidebar .sound-controls [data-action="soundRepeat"].inactive {
+  --fe-repeat-color: rgb(from var(--fe-ac-70) r g b / 0.65);
+}
+
+body.fe-retro-theme .playlists-sidebar
+  :is(.sound-controls [data-action="soundRepeat"], .sound-playback .fe-music-volume-toggle):is(:hover, :focus-visible):not(:disabled) {
+  background: var(--fe-ac-12) !important;
+  border-color: var(--fe-ac-70) !important;
+  color: var(--fe-repeat-color, var(--fe-ac-90)) !important;
 }
 
 body.fe-retro-theme :is([class*="subtle"], .hint, .notes) { color: var(--fe-ac-t33) !important; }

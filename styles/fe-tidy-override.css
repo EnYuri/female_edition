@@ -1,5 +1,5 @@
 /* Tidy 5e Sheets - numeric values can look better with the light face */
-:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:where(body.fe-fonts-enabled) :is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .ability-score,
     .ability-scores :is(.score, .value, .mod, .bonus),
@@ -21,7 +21,7 @@
 /* If Tidy exposes font-family variables, override them first for broad coverage.
  * (These vars may differ by Tidy version; unused vars are harmless.)
  */
-:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
+:where(body.fe-fonts-enabled) :is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item) {
   --t5e-title-font-family: var(--fe-font-primary) !important;
   --t5e-body-font-family: var(--fe-font-secondary) !important;
   --t5e-font-family-title: var(--fe-font-primary) !important;
@@ -47,7 +47,7 @@
 }
 
 /* Large headings / labels (actor name, ability labels, tab titles) */
-:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:where(body.fe-fonts-enabled) :is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .tidy5e-sheet-header,
     .sheet-header,
@@ -69,7 +69,7 @@
 }
 
 /* Small list content (skills, items, features, actions, etc.) */
-:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:where(body.fe-fonts-enabled) :is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .skills,
     .skill-list,
@@ -89,7 +89,7 @@
 }
 
 /* Ensure nested text nodes inside those lists inherit Geurimilgi, while icons keep FA. */
-:is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
+:where(body.fe-fonts-enabled) :is(.tidy5e, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e2, .tidy5e-sheet-actor, .tidy5e-sheet-item)
   :is(
     .skills,
     .skill-list,
@@ -119,16 +119,23 @@
  */
 
 /* Ability score blocks (numbers/labels inside the block) */
-:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) :is(.block-score, .block-score > *) {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) :is(.block-score, .block-score > *) {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
-  /* Requested: +2px for classic tidy5e block-score readability */
-  font-size: calc(1em + 2px) !important;
   line-height: 1.1 !important;
 }
 
+/* Apply the 2px increase once. The input and roll button share the block's size. */
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .block-score {
+  font-size: calc(1em + 2px) !important;
+}
+
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .block-score > * {
+  font-size: inherit !important;
+}
+
 /* Actor level indicator in classic actor sheets */
-:is(.sheet, .fe-tidy-sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic):where(.actor) .level {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
   font-size: 1em !important;
@@ -139,7 +146,7 @@
  * HP/resources/xp/movement — force Bold Geurimilgi for numeric overlays and key trackers.
  * (Selectors vary by Tidy5e version; include a few best-effort aliases.)
  */
-:is(:is(.fe-tidy-sheet, .tidy5e-sheet), .sheet).application:where(.classic)
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   :is(
     .portrait-hp,
     .portrait-hp.svelte,
@@ -157,7 +164,7 @@
 
 
 /* Tidy info-card description (classic): force Geurimilgi Regular */
-:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .tidy-info-card .info-card-description {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .tidy-info-card .info-card-description {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 400 !important;
   font-size: 1em !important;
@@ -165,15 +172,14 @@
 }
 
 /* Additional Geurimilgi targets requested */
-.origin-points,
-.profile-temp {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet) :is(.origin-points, .profile-temp) {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 400 !important;
   font-size: 1em !important;
   line-height: 1.1 !important;
 }
 
-span.flex-row.align-items-center.extra-small-gap {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet) span.flex-row.align-items-center.extra-small-gap {
   font-family: var(--fe-font-secondary) !important;
   font-weight: 700 !important;
   font-size: 1em !important;
@@ -186,12 +192,12 @@ span.flex-row.align-items-center.extra-small-gap {
    forcing a 1em line-height here pins the AC value to the top edge. Every
    other dnd5e .badge is grid/flex-centered and unaffected by line-height.
    The retro theme styles .ac-badge itself from layer(layouts). */
-:is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge:not(.ac-badge), .chip) {
+:where(body.fe-fonts-enabled) :is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) :is(.tag, .pill, .badge:not(.ac-badge), .chip) {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
 
-:is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
+:where(body.fe-fonts-enabled) :is(.dnd5e2, .fe-tidy-sheet, .tidy5e-sheet, .tidy5e) .card-buttons :is(a, button) {
   line-height: calc(1em + var(--fe-inline-leading, 2px)) !important;
   padding-block: var(--fe-inline-pad-y, 1px) !important;
 }
@@ -201,14 +207,14 @@ span.flex-row.align-items-center.extra-small-gap {
  * Tidy5e Classic: Item summary text
  * - The summary area is often longer-form text; use the more readable font.
  * ------------------------------------------------------------------------- */
-:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary,
-:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary,
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic)
   .item-summary
   :is(p, li, span, div, a, em, strong, b, u, small, label) {
   font-family: var(--fe-font-secondary) !important;
 }
 
-:is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary {
+:where(body.fe-fonts-enabled) :is(.fe-tidy-sheet, .tidy5e-sheet).application:where(.classic) .item-summary {
   font-weight: var(--fe-font-weight-body) !important;
 }
 

@@ -10,14 +10,10 @@ test("the FilePicker sort direction icon stays visible on the retro hover surfac
   assert.match(SORT_JS, /fa-arrow-up-short-wide/);
   assert.match(SORT_JS, /fa-arrow-down-wide-short/);
 
-  const start = RETRO_CSS.indexOf("/* FilePicker sort direction:");
-  const end = RETRO_CSS.indexOf("body.fe-retro-theme .sound-controls", start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-
-  const rules = RETRO_CSS.slice(start, end);
-  assert.match(rules, /#file-picker \.fe-fp-sort-dir\s*\{[\s\S]*?color:\s*var\(--fe-ac-70\) !important/);
-  assert.match(rules, /#file-picker \.fe-fp-sort-dir:hover:not\(:disabled\)\s*\{[\s\S]*?background-color:\s*var\(--fe-ac-12\) !important/);
-  assert.match(rules, /border-color:\s*var\(--fe-ac-70\) !important/);
-  assert.match(rules, /color:\s*var\(--fe-ac-90\) !important/);
+  const base = RETRO_CSS.match(/body\.fe-retro-theme #file-picker \.fe-fp-sort-dir\s*\{([^}]+)\}/)?.[1] ?? "";
+  const hover = RETRO_CSS.match(/body\.fe-retro-theme #file-picker \.fe-fp-sort-dir:hover:not\(:disabled\)\s*\{([^}]+)\}/)?.[1] ?? "";
+  assert.match(base, /\bcolor:\s*var\(--fe-ac-70\) !important/);
+  assert.match(hover, /background-color:\s*var\(--fe-ac-12\) !important/);
+  assert.match(hover, /border-color:\s*var\(--fe-ac-70\) !important/);
+  assert.match(hover, /(?:^|;)\s*color:\s*var\(--fe-ac-90\) !important/);
 });
