@@ -150,7 +150,7 @@
   {@render children?.({ toggleSummary })}
 
   {#snippet afterRow()}
-    <ExpandableContainer expanded={showSummary}>
+    <ExpandableContainer expanded={showSummary} deferRendering>
       <ItemSummary chatData={chatData ?? emptyChatData} {item} />
     </ExpandableContainer>
   {/snippet}

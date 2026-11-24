@@ -135,6 +135,7 @@
     {#if visibleItemCount > 0 && section.show}
       <ItemTable
         key={section.key}
+        data-custom-section={section.custom ? true : null}
         expandedOverride={searchCriteria.trim() !== '' ? true : undefined}
       >
         {#snippet header()}

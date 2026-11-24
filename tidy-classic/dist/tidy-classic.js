@@ -12731,7 +12731,7 @@ function SvelteApplicationMixin(BaseApplication) {
      * @returns any non-Svelte sheet parts that need to be rendered to the sheet.
      */
     async _renderHTML(context, options2) {
-      this._context.data = context;
+      if (!options2.soft || this._context.data !== context) this._context.data = context;
       if (options2.isFirstRender) {
         const content = this.windowContent;
         this.#components.push(this._createComponent(content, context));
@@ -18567,38 +18567,31 @@ function ExpandableContainer($$anchor, $$props) {
     "class",
     "deferRendering"
   ]);
-  let overflowYHidden = /* @__PURE__ */ state(!expanded());
+  let previousExpanded = untrack(() => expanded());
+  let overflowYHidden = /* @__PURE__ */ state(!previousExpanded);
   let expandableContainer;
-  let renderContents = /* @__PURE__ */ state(proxy(expanded()));
-  onMount(() => {
-    const controller = new AbortController();
-    expandableContainer.addEventListener(
-      "transitionstart",
-      (ev) => {
-        if (ev.target === expandableContainer) {
-          set(overflowYHidden, true);
-        }
-      },
-      { signal: controller.signal, passive: true }
-    );
-    expandableContainer.addEventListener(
-      "transitionend",
-      (ev) => {
-        if (ev.target === expandableContainer) {
-          set(overflowYHidden, !expanded());
-          set(renderContents, expanded());
-        }
-      },
-      { signal: controller.signal, passive: true }
-    );
-    return () => {
-      controller.abort();
-    };
-  });
+  let renderContents = /* @__PURE__ */ state(proxy(previousExpanded));
   user_effect(() => {
-    if (expanded()) {
-      set(renderContents, true);
-    }
+    const open = expanded();
+    if (open === previousExpanded) return;
+    previousExpanded = open;
+    if (open) set(renderContents, true);
+    set(overflowYHidden, true);
+    let current = true;
+    const settle = () => {
+      if (!current) return;
+      set(overflowYHidden, !open);
+      set(renderContents, open, true);
+    };
+    const frame = requestAnimationFrame(() => {
+      const transition2 = expandableContainer.getAnimations().find((animation2) => "transitionProperty" in animation2 && animation2.transitionProperty === "grid-template-rows");
+      if (transition2) transition2.finished.then(settle, settle);
+      else settle();
+    });
+    return () => {
+      current = false;
+      cancelAnimationFrame(frame);
+    };
   });
   var div = root$6T();
   attribute_effect(div, () => ({
@@ -20336,7 +20329,7 @@ function ItemTableRow($$anchor, $$props) {
       set(showSummary, false);
       return;
     }
-    set(chatData, await item().getChatData({ secrets: actor.isOwner }), true);
+    if (!get(showSummary)) set(chatData, await item().getChatData({ secrets: actor.isOwner }), true);
     set(showSummary, !get(showSummary));
     onItemToggled?.(item().id, get(showSummary), location);
   }
@@ -20428,6 +20421,7 @@ function ItemTableRow($$anchor, $$props) {
         get expanded() {
           return get(showSummary);
         },
+        deferRendering: true,
         children: ($$anchor3, $$slotProps) => {
           {
             let $0 = /* @__PURE__ */ user_derived(() => get(chatData) ?? emptyChatData);
@@ -26736,6 +26730,7 @@ function ItemTableRowV2($$anchor, $$props) {
         get expanded() {
           return get(showSummary);
         },
+        deferRendering: true,
         children: ($$anchor3, $$slotProps) => {
           {
             let $02 = /* @__PURE__ */ user_derived(() => get(chatData) ?? emptyChatData);
@@ -27615,10 +27610,7 @@ function ContainerContentsSections($$anchor, $$props) {
     let result = [];
     result.push({ component: ItemEditControl, getProps: (item) => ({ item }) });
     if (unlocked()) {
-      result.push({
-        component: ItemDeleteControl,
-        getProps: (item) => ({ item, deleteFn: () => item.deleteDialog() })
-      });
+      result.push({ component: ItemDeleteControl, getProps: (item) => ({ item }) });
     }
     return result;
   });
@@ -76180,12 +76172,11 @@ function Tidy5eActorSheetQuadroneBase(sheetType) {
       }
       if (behavior === "move" && this.actor.uuid === document2.parent?.uuid) {
         const removingFromContainer = !isNil(document2.system.container);
-        if (removingFromContainer) {
-          await document2.update({ "system.container": null });
-        }
-        const itemData = document2.toObject();
-        const initialSortResult = await FoundryAdapter.onSortItemForActor(this.actor, event2, itemData, !removingFromContainer, sortKeyOverride);
-        return initialSortResult;
+        return FoundryAdapter.onSortItemForActor(this.actor, event2, document2._source, {
+          allowSectionTransfer: !removingFromContainer,
+          removeFromContainer: removingFromContainer,
+          sortKey: sortKeyOverride
+        });
       }
       return this._onDropItemCreate(document2, event2, behavior);
     }
@@ -94638,7 +94629,7 @@ function ActorActionsTab($$anchor, $$props) {
                         children: ($$anchor8, $$slotProps) => {
                           {
                             let $03 = /* @__PURE__ */ user_derived(() => TidyFlags.actionFilterOverride.get(get(actionItem).item));
-                            let $12 = /* @__PURE__ */ user_derived(() => isItemInActionList(get(actionItem).item));
+                            let $13 = /* @__PURE__ */ user_derived(() => isItemInActionList(get(actionItem).item));
                             ActionFilterOverrideControl($$anchor8, {
                               get item() {
                                 return get(actionItem).item;
@@ -94647,7 +94638,7 @@ function ActorActionsTab($$anchor, $$props) {
                                 return get($03);
                               },
                               get active() {
-                                return get($12);
+                                return get($13);
                               }
                             });
                           }
@@ -94665,7 +94656,7 @@ function ActorActionsTab($$anchor, $$props) {
                   type: CONSTANTS.CONTEXT_MENU_TYPE_ITEMS,
                   uuid: get(actionItem).item.uuid
                 }));
-                let $1 = /* @__PURE__ */ user_derived(() => !searchResults.show(get(actionItem).item.uuid));
+                let $12 = /* @__PURE__ */ user_derived(() => !searchResults.show(get(actionItem).item.uuid));
                 ItemTableRow(node_13, {
                   get item() {
                     return get(actionItem).item;
@@ -94675,7 +94666,7 @@ function ActorActionsTab($$anchor, $$props) {
                     return get($02);
                   },
                   get hidden() {
-                    return get($1);
+                    return get($12);
                   },
                   children,
                   $$slots: { default: true }
@@ -94723,13 +94714,17 @@ function ActorActionsTab($$anchor, $$props) {
             });
             append($$anchor4, fragment_13);
           };
-          let $0 = /* @__PURE__ */ user_derived(() => get(searchCriteria).trim() !== "" ? true : void 0);
+          let $0 = /* @__PURE__ */ user_derived(() => get(section).custom ? true : null);
+          let $1 = /* @__PURE__ */ user_derived(() => get(searchCriteria).trim() !== "" ? true : void 0);
           ItemTable($$anchor3, {
             get key() {
               return get(section).key;
             },
-            get expandedOverride() {
+            get "data-custom-section"() {
               return get($0);
+            },
+            get expandedOverride() {
+              return get($1);
             },
             header,
             body,
@@ -99205,7 +99200,7 @@ class TableRowActionsRuntime {
         result.push({ component: EditButton, props: (args) => ({ doc: args.data }) });
         result.push({
           component: DeleteButton,
-          props: (args) => ({ doc: args.data, deleteFn: () => args.data.deleteDialog() })
+          props: (args) => ({ doc: args.data })
         });
       } else if (context.hasActor && itemParent?.type === CONSTANTS.SHEET_TYPE_CHARACTER) {
         result.push({
@@ -110155,6 +110150,10 @@ function initSettings() {
   });
 }
 const quadroneSheetRegex = /Tidy.*Quadrone/;
+const systemDeleteDialog = Object.getOwnPropertyDescriptor(
+  globalThis.dnd5e?.documents?.Item5e?.prototype ?? {},
+  "deleteDialog"
+)?.value;
 const FoundryAdapter = {
   deepClone(obj) {
     return foundry.utils.deepClone(obj);
@@ -110916,25 +110915,9 @@ const FoundryAdapter = {
       }
     ).render(true);
   },
-  async onActorItemDelete(actor, item) {
-    if (actor?.system.metadata?.supportsAdvancement && !game.settings.get("dnd5e", "disableAdvancements")) {
-      const manager = dnd5e.applications.advancement.AdvancementManager.forDeletedItem(
-        actor,
-        item.id
-      );
-      if (manager.steps.length) {
-        try {
-          const shouldRemoveAdvancements = await dnd5e.applications.advancement.AdvancementConfirmationDialog.forDelete(
-            item
-          );
-          if (shouldRemoveAdvancements) {
-            return manager.render(true);
-          }
-          return item.delete({ shouldRemoveAdvancements });
-        } catch (err) {
-          return;
-        }
-      }
+  onActorItemDelete(actor, item) {
+    if (actor?.system.metadata?.supportsAdvancement && item.type !== "class" && !hasAdvancement(item.system.advancement) && systemDeleteDialog && item.deleteDialog === systemDeleteDialog && !game.settings.get("dnd5e", "disableAdvancements") && (!("contentsCount" in item.system) || item.type === "container" && item.isEmbedded && !item.pack && item.system.contents?.size === 0)) {
+      return Object.getPrototypeOf(dnd5e.documents.Item5e.prototype).deleteDialog.call(item);
     }
     return item.deleteDialog();
   },
@@ -111152,49 +111135,42 @@ const FoundryAdapter = {
   /**
    * Handle a drop event for an existing embedded Item to sort that Item relative to its siblings
    */
-  onSortItemForActor(actor, event2, itemData, allowSectionTransfer = true, sortKeyOverride) {
+  onSortItemForActor(actor, event2, itemData, { allowSectionTransfer = true, removeFromContainer = false, sortKey = "sort" } = {}) {
     const eventTarget = event2.target;
     if (!eventTarget) {
       return;
     }
-    const items = actor.items;
-    const source2 = items.get(itemData._id).toObject();
     const dropTarget = eventTarget.closest("[data-item-id]");
-    if (!dropTarget) return;
-    const target = items.get(dropTarget.dataset.itemId).toObject();
-    if (source2._id === target._id) return;
-    const siblings = [];
-    for (let el of Array.from(dropTarget.parentElement.children)) {
-      if (el instanceof HTMLElement) {
-        const siblingId = el.dataset.itemId;
-        if (siblingId && siblingId !== source2.id) {
-          siblings.push(
-            target._id === siblingId ? target : items.get(el.dataset.itemId).toObject()
-          );
-        }
-      }
+    const sourceItem = actor.items.get(itemData._id);
+    if (!sourceItem) return;
+    const targetItem = dropTarget && actor.items.get(dropTarget.dataset.itemId);
+    if (dropTarget && (!targetItem || !dropTarget.parentElement)) return;
+    const sourceChanges = allowSectionTransfer && eventTarget.closest("[data-tidy-section-key]") ? FoundryAdapter.getSectionUpdateForDropTarget(eventTarget, itemData) : {};
+    if (removeFromContainer) sourceChanges["system.container"] = null;
+    if (!dropTarget || targetItem === sourceItem) {
+      if (Object.keys(sourceChanges).length) return sourceItem.update(sourceChanges);
+      return;
     }
-    if (!isNil(sortKeyOverride)) {
-      source2[sortKeyOverride] = FoundryAdapter.getProperty(source2, sortKeyOverride);
-      target[sortKeyOverride] = FoundryAdapter.getProperty(target, sortKeyOverride);
-      siblings.forEach((sibling2) => sibling2[sortKeyOverride] = FoundryAdapter.getProperty(sibling2, sortKeyOverride));
+    const sortEntry = (item) => ({
+      _id: item.id,
+      [sortKey]: foundry.utils.getProperty(item._source, sortKey)
+    });
+    const source2 = sortEntry(sourceItem);
+    const target = sortEntry(targetItem);
+    const siblings = [];
+    for (const row of dropTarget.parentElement.children) {
+      const sibling2 = actor.items.get(row.getAttribute("data-item-id"));
+      if (sibling2 && sibling2 !== sourceItem) {
+        siblings.push(sibling2 === targetItem ? target : sortEntry(sibling2));
+      }
     }
     const sortUpdates = foundry.utils.performIntegerSort(source2, {
       target,
       siblings,
-      sortKey: sortKeyOverride
+      sortKey
     });
     const updateData = sortUpdates.map((u) => {
-      const update2 = u.update;
-      update2._id = u.target._id;
-      if (update2._id === source2._id && allowSectionTransfer) {
-        const sectionUpdate = FoundryAdapter.getSectionUpdateForDropTarget(
-          eventTarget,
-          itemData
-        );
-        foundry.utils.mergeObject(update2, sectionUpdate);
-      }
-      return update2;
+      return u.target === source2 ? { ...u.update, ...sourceChanges, _id: source2._id } : { ...u.update, _id: u.target._id };
     });
     return actor.updateEmbeddedDocuments("Item", updateData);
   },
@@ -111462,11 +111438,11 @@ function checkImport(summary) {
     throw new Error(summary.getNotificationMeta?.().message ?? "전리품 임포트가 중단되었습니다.");
   }
 }
-async function stageLoot(api, actor, loot, id, checkAuthority) {
+async function stageLootDocuments(api, actor, entityInfos, coinItems) {
   const staged = actor.clone({}, { parent: null, pack: null });
   const before = staged.toObject();
   const importers = /* @__PURE__ */ new Map();
-  for (const { page, entity, options: options2 } of loot.entityInfos ?? []) {
+  for (const { page, entity, options: options2 } of entityInfos) {
     let importer = importers.get(page);
     if (!importer) {
       importer = await api.importer.pGetImporter({ page });
@@ -111476,17 +111452,12 @@ async function stageLoot(api, actor, loot, id, checkAuthority) {
     const opts = new api.importer.ImportOpts({ actor: staged, isSpellScroll: options2?.isSpellScroll });
     checkImport(await importer.pImportEntry(entity, opts, { quantity: options2?.quantity }));
   }
-  const currency = Object.fromEntries(Object.entries(loot.currency ?? {}).filter(([key2, value]) => Object.hasOwn(CONFIG.DND5E.currencies, key2) && Number.isFinite(value) && value > 0));
-  const update2 = {};
-  if (Object.keys(currency).length && actor.type === "npc" && api.config.getValue("currency", "isNpcUseCurrencySheetItems")) {
+  if (coinItems) {
     const importer = await api.importer.pGetImporter({ page: "items.html" });
-    checkImport(await importer.pImportCurrency(currency, new api.importer.ImportOpts({ actor: staged })));
-  } else {
-    for (const [key2, amount] of Object.entries(currency)) {
-      update2["system.currency." + key2] = (actor.system.currency?.[key2] ?? 0) + amount;
-    }
+    checkImport(await importer.pImportCurrency(coinItems, new api.importer.ImportOpts({ actor: staged })));
   }
   const equals2 = foundry.utils.equals ?? foundry.utils.objectsEqual;
+  const update2 = {};
   const legacySource = game.release?.generation < 14 ? actor.toObject() : null;
   for (const field of ["items", "effects"]) {
     const originals = new Map(before[field].map((data) => [data._id, data]));
@@ -111506,6 +111477,18 @@ async function stageLoot(api, actor, loot, id, checkAuthority) {
       legacyRecords?.set(doc.id, data);
     }
     if (changes.length) update2[field] = legacyRecords ? [...legacyRecords.values()] : changes;
+  }
+  return update2;
+}
+async function stageLoot(api, actor, loot, id, checkAuthority) {
+  const coins = Object.entries(loot.currency ?? {}).filter(([key2, value]) => Object.hasOwn(CONFIG.DND5E.currencies, key2) && Number.isFinite(value) && value > 0);
+  const coinItems = coins.length && actor.type === "npc" && api.config.getValue("currency", "isNpcUseCurrencySheetItems") ? Object.fromEntries(coins) : null;
+  const entities = loot.entityInfos ?? [];
+  const update2 = entities.length || coinItems ? await stageLootDocuments(api, actor, entities, coinItems) : {};
+  if (!coinItems) {
+    for (const [key2, amount] of coins) {
+      update2["system.currency." + key2] = (actor.system.currency?.[key2] ?? 0) + amount;
+    }
   }
   if (!Object.keys(update2).length) return null;
   checkAuthority();
@@ -115838,27 +115821,7 @@ function Tidy5eActorSheetClassicV2Base(sheetType) {
       }
       const item = await Item.implementation.fromDropData(data);
       if (behavior === "move" && this.actor.uuid === item.parent?.uuid) {
-        const removingFromContainer = !isNil(item.system.container);
-        if (removingFromContainer) {
-          await item.update({ "system.container": null });
-        }
-        const itemData = item.toObject();
-        const sourceSection = foundry.utils.getProperty(itemData, TidyFlags.section.prop);
-        const targetSection = event2.target?.closest('[data-tidy-section-key][data-custom-section="true"]')?.getAttribute("data-tidy-section-key");
-        const isMovedToNewSection = !isNil(targetSection?.trim(), "") && sourceSection !== targetSection;
-        const isMovedToDefaultSection = !isNil(sourceSection?.trim(), "") && isNil(targetSection?.trim(), "");
-        const initialSortResult = await FoundryAdapter.onSortItemForActor(this.actor, event2, itemData);
-        if (removingFromContainer) {
-          return initialSortResult;
-        }
-        if (isMovedToNewSection) {
-          TidyFlags.section.set(item, targetSection);
-          return;
-        } else if (isMovedToDefaultSection) {
-          TidyFlags.section.unset(item);
-          return;
-        }
-        return initialSortResult;
+        return FoundryAdapter.onSortItemForActor(this.actor, event2, item._source, { removeFromContainer: !!item.system.container });
       }
       return this._onDropItemCreate(item, event2, behavior);
     }
@@ -116127,6 +116090,7 @@ class Tidy5eCharacterSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET
     return component2;
   }
   async _prepareContext(options2 = {}) {
+    if (options2.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     this._concentration = this.actor.concentration;
     const defaultDocumentContext = await super._prepareContext(options2);
     const characterPreferences = UserSheetPreferencesService.getByType(this.actor.type);
@@ -118979,6 +118943,7 @@ class Tidy5eNpcSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET_TYPE_
     return component2;
   }
   async _prepareContext(options2 = {}) {
+    if (options2.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     this._concentration = this.actor.concentration;
     const defaultDocumentContext = await super._prepareContext(options2);
     const npcPreferences = UserSheetPreferencesService.getByType(this.actor.type);
@@ -120447,6 +120412,7 @@ class Tidy5eVehicleSheet extends Tidy5eActorSheetClassicV2Base(CONSTANTS.SHEET_T
     return component2;
   }
   async _prepareContext(options2 = {}) {
+    if (options2.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     const defaultDocumentContext = await super._prepareContext(options2);
     const vehiclePreferences = UserSheetPreferencesService.getByType(this.actor.type);
     const actionListSortMode = vehiclePreferences.tabs?.[CONSTANTS.TAB_ACTOR_ACTIONS]?.sort ?? "m";
@@ -122689,34 +122655,9 @@ function Tidy5eActorSheetBaseMixin(BaseApplication) {
       }
       const item = await Item.implementation.fromDropData(data);
       if (behavior === "move" && this.actor.uuid === item.parent?.uuid) {
-        const removingFromContainer = !isNil(item.system.container);
-        if (removingFromContainer) {
-          await item.update({ "system.container": null });
-        }
-        const itemData = item.toObject();
-        const sourceSection = foundry.utils.getProperty(
-          itemData,
-          TidyFlags.section.prop
-        );
-        const targetSection = event2.target?.closest('[data-tidy-section-key][data-custom-section="true"]')?.getAttribute("data-tidy-section-key");
-        const isMovedToNewSection = !isNil(targetSection?.trim(), "") && sourceSection !== targetSection;
-        const isMovedToDefaultSection = !isNil(sourceSection?.trim(), "") && isNil(targetSection?.trim(), "");
-        const initialSortResult = await FoundryAdapter.onSortItemForActor(
-          this.actor,
-          event2,
-          itemData
-        );
-        if (removingFromContainer) {
-          return initialSortResult;
-        }
-        if (isMovedToNewSection) {
-          TidyFlags.section.set(item, targetSection);
-          return;
-        } else if (isMovedToDefaultSection) {
-          TidyFlags.section.unset(item);
-          return;
-        }
-        return initialSortResult;
+        return FoundryAdapter.onSortItemForActor(this.actor, event2, item._source, {
+          removeFromContainer: !!item.system.container
+        });
       }
       return this._onDropItemCreate(item, event2, behavior);
     }
@@ -123116,6 +123057,7 @@ class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(TidyExtensibleDo
     return [sheetLock, infoCard];
   }
   async _prepareContext(options2) {
+    if (options2?.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
     const documentSheetContext = await super._prepareContext(options2);
     let xp = void 0;
@@ -123136,7 +123078,6 @@ class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(TidyExtensibleDo
       groupAbilities,
       groupMasteries
     } = this.#prepareMembers();
-    this.actor.toObject();
     const editable = this.isEditable;
     const summary = this.#getSummary(stats);
     const movement = this.#prepareMovementSpeed();
@@ -124185,6 +124126,7 @@ class Tidy5eContainerSheetClassic extends TidyExtensibleDocumentSheetMixin(CONST
     return component2;
   }
   async _prepareContext(options2) {
+    if (options2?.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
     const documentSheetContext = await super._prepareContext(options2);
     const rollData = this.item.getRollData();
@@ -124734,6 +124676,7 @@ class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(TidyExtensib
     return [sheetLock, infoCard];
   }
   async _prepareContext(options2) {
+    if (options2?.soft && !options2.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
     const documentSheetContext = await super._prepareContext(options2);
     let xp = void 0;
@@ -124752,7 +124695,6 @@ class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(TidyExtensib
       groupLanguages,
       groupSkills
     } = await this.#prepareMembers();
-    this.actor.toObject();
     const editable = this.isEditable;
     const summary = this.#getSummary(stats);
     const sheetPreferences = UserSheetPreferencesService.getByType(this.actor.type);

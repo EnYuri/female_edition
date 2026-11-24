@@ -319,7 +319,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
 body.fe-retro-theme.fe-retro-system-dx3rd-fvtt
   :is(.chat-popout, #chat-log, .chat-log, ol.chat-log, #chat-notifications, #fe-chat-export-log)
   :is(.chat-message, .message).fe-has-user-color.dx3rd-sheet-roll-message > .message-content {
-  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
+  border: 1px solid var(--fe-retro-card-outline, rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1))) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dx3rd-fvtt

@@ -197,6 +197,7 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
   async _prepareContext(
     options: TidyDocumentSheetRenderOptions
   ): Promise<EncounterSheetClassicContext> {
+    if (options?.soft && !options.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
 
     const documentSheetContext = (await super._prepareContext(
@@ -228,8 +229,6 @@ export class Tidy5eEncounterSheetClassic extends Tidy5eActorSheetBaseMixin(
       groupLanguages,
       groupSkills,
     } = await this.#prepareMembers();
-
-    const source = this.actor.toObject();
 
     const editable = this.isEditable;
 

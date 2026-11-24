@@ -282,7 +282,9 @@ export function SvelteApplicationMixin<
       context: TContext,
       options: ApplicationRenderOptions
     ): Promise<RenderResult<TContext>> {
-      this._context.data = context;
+      // A deferred row requests the render hooks for its new DOM. Reassigning
+      // the same context would invalidate every Svelte subscriber on the sheet.
+      if (!options.soft || this._context.data !== context) this._context.data = context;
 
       if (options.isFirstRender) {
         const content = this.windowContent;

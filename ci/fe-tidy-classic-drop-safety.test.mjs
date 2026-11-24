@@ -165,6 +165,17 @@ test('enchantment drops retain the appropriate origin for both dnd5e schemas', (
   assert.equal(modernData.origin, null);
 });
 
+test('Classic action sections expose their own drop target and leave the inventory flag to the adapter', () => {
+  const read = path => readFileSync(new URL('../tidy-classic/src/' + path, import.meta.url), 'utf8');
+  assert.match(read('sheets/classic/actor/tabs/ActorActionsTab.svelte'),
+    /<ItemTable\s+key=\{section.key\}\s+data-custom-section=\{section.custom \? true : null\}/);
+  for (const file of ['sheets/classic/Tidy5eActorSheetClassicV2Base.svelte.ts', 'mixins/Tidy5eActorSheetBaseMixin.ts']) {
+    const drop = read(file).split('async _onDropItem(')[1].split('async _onDropItemCreate(')[0];
+    assert.match(drop, /return FoundryAdapter\.onSortItemForActor\(/);
+    assert.doesNotMatch(drop, /TidyFlags\.section\.(set|unset)|item\.update\(/);
+  }
+});
+
 test('the Classic call sites use the guarded move, scroll, and enchantment paths', () => {
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const base = read('../tidy-classic/src/sheets/classic/Tidy5eActorSheetClassicV2Base.svelte.ts');

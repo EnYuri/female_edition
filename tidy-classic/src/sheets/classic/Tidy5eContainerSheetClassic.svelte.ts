@@ -147,6 +147,7 @@ export class Tidy5eContainerSheetClassic extends TidyExtensibleDocumentSheetMixi
   async _prepareContext(
     options: ApplicationRenderOptions
   ): Promise<ContainerSheetClassicContext> {
+    if (options?.soft && !options.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
 
     const documentSheetContext = await super._prepareContext(options);

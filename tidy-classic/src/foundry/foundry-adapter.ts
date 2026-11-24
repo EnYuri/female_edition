@@ -17,7 +17,7 @@ import { settings, type CurrentSettings } from 'src/settings/settings.svelte';
 import { debug, error } from 'src/utils/logging';
 import { TidyFlags } from './TidyFlags';
 import { TidyHooks } from './TidyHooks';
-import { isNil } from 'src/utils/data';
+import { hasAdvancement, isNil } from 'src/utils/data';
 import { clamp } from 'src/utils/numbers';
 import { processInputChangeDelta } from 'src/utils/form';
 import { calculateSpellAttackAndDc } from 'src/utils/formula';
@@ -38,6 +38,11 @@ import {
 } from 'src/foundry/dnd5e-compat';
 
 const quadroneSheetRegex = /Tidy.*Quadrone/;
+// Keep the system method's identity before module init hooks install wrappers.
+// libWrapper uses an accessor, so only a plain method can take the fast path.
+const systemDeleteDialog = Object.getOwnPropertyDescriptor(
+  globalThis.dnd5e?.documents?.Item5e?.prototype ?? {}, 'deleteDialog'
+)?.value;
 export type DocumentSheetConstructor = new (...args: any[]) => InstanceType<
   ReturnType<typeof TidyExtensibleDocumentSheetMixin>
 >;
@@ -1009,37 +1014,21 @@ export const FoundryAdapter = {
       }
     ).render(true);
   },
-  async onActorItemDelete(actor: Actor5e, item: Item5e) {
-    // If item has advancement, handle it separately
+  onActorItemDelete(actor: Actor5e, item: Item5e) {
+    // Item5e probes for reverse advancement steps by cloning the entire actor.
+    // For an ordinary item its only remaining action is the core confirmation.
     if (
       actor?.system.metadata?.supportsAdvancement &&
-      !game.settings.get('dnd5e', 'disableAdvancements')
+      item.type !== 'class' &&
+      !hasAdvancement(item.system.advancement) &&
+      systemDeleteDialog && item.deleteDialog === systemDeleteDialog &&
+      !game.settings.get('dnd5e', 'disableAdvancements') &&
+      (!('contentsCount' in item.system) ||
+        (item.type === 'container' && item.isEmbedded && !item.pack && item.system.contents?.size === 0))
     ) {
-      const manager =
-        dnd5e.applications.advancement.AdvancementManager.forDeletedItem(
-          actor,
-          item.id
-        );
-
-      if (manager.steps.length) {
-        try {
-          const shouldRemoveAdvancements =
-            await dnd5e.applications.advancement.AdvancementConfirmationDialog.forDelete(
-              item
-            );
-
-          if (shouldRemoveAdvancements) {
-            return manager.render(true);
-          }
-
-          return item.delete({ shouldRemoveAdvancements });
-        } catch (err) {
-          // This dialog throws an exception when you click cancel. We'll ignore it.
-          return;
-        }
-      }
+      return Object.getPrototypeOf(dnd5e.documents.Item5e.prototype).deleteDialog.call(item);
     }
-
+    // dnd5e handles class levels, advancement reversal and container contents.
     return item.deleteDialog();
   },
   getActivationTypeLabel(activationType: string) {
@@ -1333,8 +1322,8 @@ export const FoundryAdapter = {
     actor: Actor5e,
     event: Event,
     itemData: any,
-    allowSectionTransfer: boolean = true,
-    sortKeyOverride?: string
+    { allowSectionTransfer = true, removeFromContainer = false, sortKey = 'sort' }:
+      { allowSectionTransfer?: boolean; removeFromContainer?: boolean; sortKey?: string } = {}
   ): any {
     const eventTarget = event.target as HTMLElement | null;
 
@@ -1343,58 +1332,47 @@ export const FoundryAdapter = {
     }
 
     // Get the drag source and drop target
-    const items = actor.items;
-    const source = items.get(itemData._id).toObject();
-
     const dropTarget = eventTarget.closest<HTMLElement>('[data-item-id]');
-    if (!dropTarget) return;
-    const target = items.get(dropTarget.dataset.itemId).toObject();
+    const sourceItem = actor.items.get(itemData._id);
+    if (!sourceItem) return;
+    const targetItem = dropTarget && actor.items.get(dropTarget.dataset.itemId);
+    if (dropTarget && (!targetItem || !dropTarget.parentElement)) return;
 
-    // Don't sort on yourself
-    if (source._id === target._id) return;
-
-    // Identify sibling items based on adjacent HTML elements
-    const siblings = [];
-    for (let el of Array.from(dropTarget.parentElement!.children)) {
-      if (el instanceof HTMLElement) {
-        const siblingId = el.dataset.itemId;
-        if (siblingId && siblingId !== source.id) {
-          // performIntegerSort does object reference comparison rather 
-          // than by an ID, so the same reference must be used.
-          siblings.push(
-            target._id === siblingId
-              ? target
-              : items.get(el.dataset.itemId).toObject(),
-          );
-        }
-      }
+    const sourceChanges = allowSectionTransfer && eventTarget.closest('[data-tidy-section-key]')
+      ? FoundryAdapter.getSectionUpdateForDropTarget(eventTarget, itemData) : {};
+    if (removeFromContainer) sourceChanges['system.container'] = null;
+    if (!dropTarget || targetItem === sourceItem) {
+      if (Object.keys(sourceChanges).length) return sourceItem.update(sourceChanges);
+      return;
     }
 
-    if (!isNil(sortKeyOverride)) {
-      source[sortKeyOverride] = FoundryAdapter.getProperty(source, sortKeyOverride);
-      target[sortKeyOverride] = FoundryAdapter.getProperty(target, sortKeyOverride);
-      siblings.forEach(sibling => sibling[sortKeyOverride] = FoundryAdapter.getProperty(sibling, sortKeyOverride));
+    // Core compares the target by reference and reads even dotted sort keys
+    // literally. Project those two fields without serializing each item's data.
+    const sortEntry = (item: Item5e) => ({
+      _id: item.id,
+      [sortKey]: foundry.utils.getProperty(item._source, sortKey),
+    });
+    const source = sortEntry(sourceItem);
+    const target = sortEntry(targetItem);
+    const siblings = [];
+    for (const row of dropTarget.parentElement!.children) {
+      const sibling = actor.items.get(row.getAttribute('data-item-id'));
+      if (sibling && sibling !== sourceItem) {
+        siblings.push(sibling === targetItem ? target : sortEntry(sibling));
+      }
     }
 
     // Perform the sort
     const sortUpdates = foundry.utils.performIntegerSort(source, {
       target,
       siblings,
-      sortKey: sortKeyOverride
+      sortKey,
     });
 
     const updateData = sortUpdates.map((u: any) => {
-      const update = u.update;
-      update._id = u.target._id;
-      if (update._id === source._id && allowSectionTransfer) {
-        const sectionUpdate = FoundryAdapter.getSectionUpdateForDropTarget(
-          eventTarget,
-          itemData,
-        );
-        foundry.utils.mergeObject(update, sectionUpdate);
-      }
-
-      return update;
+      return u.target === source
+        ? { ...u.update, ...sourceChanges, _id: source._id }
+        : { ...u.update, _id: u.target._id };
     });
 
     // Perform the update

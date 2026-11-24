@@ -1603,21 +1603,11 @@ export function Tidy5eActorSheetQuadroneBase<
       // Handle moving out of container & item sorting
       if (behavior === 'move' && this.actor.uuid === document.parent?.uuid) {
         const removingFromContainer = !isNil(document.system.container);
-        if (removingFromContainer) {
-          await document.update({ 'system.container': null });
-        }
-
-        const itemData = document.toObject();
-
-        const initialSortResult = await FoundryAdapter.onSortItemForActor(
-          this.actor,
-          event,
-          itemData,
-          !removingFromContainer,
-          sortKeyOverride,
-        );
-
-        return initialSortResult;
+        return FoundryAdapter.onSortItemForActor(this.actor, event, document._source, {
+          allowSectionTransfer: !removingFromContainer,
+          removeFromContainer: removingFromContainer,
+          sortKey: sortKeyOverride,
+        });
       }
 
       return this._onDropItemCreate(document, event, behavior);

@@ -104,7 +104,7 @@ function lootFixture() {
   ] };
   return { live, writes, notes, imports, fail: mode => { failure = mode; },
     journal: () => handlePlutoniumSheetDrop(sheet, {}, { type: 'JournalEntryPage' }, { flags: { plutonium: { type: 'loot', loot } } }),
-    drop: () => handlePlutoniumSheetDrop(sheet, {}, { type: 've-Loot', data: loot }),
+    drop: (data = loot) => handlePlutoniumSheetDrop(sheet, {}, { type: 've-Loot', data }),
   };
 }
 
@@ -126,6 +126,23 @@ test('failed or cancelled loot leaves no partial currency or items, then retries
   assert.equal(f.live.items.get('scroll').data.quantity, 2);
   assert.deepEqual(f.imports.at(-1), ['scroll', true, 2]);
   assert.equal(f.live.system.currency.gp, 5);
+});
+
+test('currency-only and empty loot skip actor staging unless coins are embedded items', async t => {
+  const f = lootFixture();
+  const clone = t.mock.method(f.live, 'clone');
+  await f.drop({ currency: { gp: 0, unknown: 2 } });
+  assert.equal(f.writes.length, 0);
+  await f.drop({ currency: { gp: 3 } });
+  assert.equal(f.live.system.currency.gp, 5);
+  assert.equal(f.writes.length, 1);
+  assert.equal(clone.mock.callCount(), 0);
+  f.live.type = 'npc';
+  await f.drop({ currency: { gp: 4 } });
+  assert.equal(clone.mock.callCount(), 1);
+  assert.equal(f.live.system.currency.gp, 5);
+  assert.equal(f.live.items.get('coins').data.gp, 4);
+  assert.deepEqual(f.notes, []);
 });
 
 test('overlapping local drops see the preceding commit; NPC currency stays an item', async () => {

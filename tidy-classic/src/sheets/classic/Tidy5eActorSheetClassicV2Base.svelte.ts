@@ -10,7 +10,6 @@ import {
 import { CoarseReactivityProvider } from 'src/features/reactivity/CoarseReactivityProvider.svelte';
 import { FoundryAdapter } from 'src/foundry/foundry-adapter';
 import { TidyHooks } from 'src/foundry/TidyHooks';
-import { TidyFlags } from 'src/foundry/TidyFlags';
 import type { DropEffectValue } from 'src/mixins/DragAndDropBaseMixin';
 import { SvelteApplicationMixin } from 'src/mixins/SvelteApplicationMixin.svelte';
 import {
@@ -1123,47 +1122,9 @@ export function Tidy5eActorSheetClassicV2Base<
 
       // Handle moving out of container & item sorting
       if (behavior === 'move' && this.actor.uuid === item.parent?.uuid) {
-        const removingFromContainer = !isNil(item.system.container);
-        if (removingFromContainer) {
-          await item.update({ 'system.container': null });
-        }
-
-        const itemData = item.toObject();
-
-        const sourceSection = foundry.utils.getProperty(
-          itemData,
-          TidyFlags.section.prop
-        );
-
-        const targetSection = (event.target as HTMLElement | null)
-          ?.closest('[data-tidy-section-key][data-custom-section="true"]')
-          ?.getAttribute('data-tidy-section-key');
-
-        const isMovedToNewSection =
-          !isNil(targetSection?.trim(), '') && sourceSection !== targetSection;
-
-        const isMovedToDefaultSection =
-          !isNil(sourceSection?.trim(), '') && isNil(targetSection?.trim(), '');
-
-        const initialSortResult = await FoundryAdapter.onSortItemForActor(
-          this.actor,
-          event,
-          itemData
-        );
-
-        if (removingFromContainer) {
-          return initialSortResult;
-        }
-
-        if (isMovedToNewSection) {
-          TidyFlags.section.set(item, targetSection);
-          return;
-        } else if (isMovedToDefaultSection) {
-          TidyFlags.section.unset(item);
-          return;
-        }
-
-        return initialSortResult;
+        return FoundryAdapter.onSortItemForActor(this.actor, event, item._source, {
+          removeFromContainer: !!item.system.container,
+        });
       }
 
       return this._onDropItemCreate(item, event, behavior);

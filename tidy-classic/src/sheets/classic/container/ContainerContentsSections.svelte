@@ -88,10 +88,7 @@
     if (unlocked) {
       result.push({
         component: ItemDeleteControl,
-        getProps: (item: Item5e) => ({
-          item,
-          deleteFn: () => item.deleteDialog(),
-        }),
+        getProps: (item: Item5e) => ({ item }),
       });
     }
 

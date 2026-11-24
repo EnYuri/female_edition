@@ -36,7 +36,7 @@ import VehicleSheetClassicRuntime from 'src/runtime/actor/VehicleSheetClassicRun
 import { Inventory } from 'src/features/sections/Inventory';
 import { ItemFilterRuntime } from 'src/runtime/item/ItemFilterRuntime.svelte';
 import { Tidy5eActorSheetClassicV2Base } from './Tidy5eActorSheetClassicV2Base.svelte';
-import type { ApplicationConfiguration } from 'src/types/application.types';
+import type { ApplicationConfiguration, ApplicationRenderOptions } from 'src/types/application.types';
 import { mapGetOrInsert } from 'src/utils/map';
 
 export class Tidy5eVehicleSheet
@@ -163,7 +163,8 @@ export class Tidy5eVehicleSheet
     return component;
   }
 
-  async _prepareContext(options = {}) {
+  async _prepareContext(options: ApplicationRenderOptions = {}) {
+    if (options.soft && !options.isFirstRender && this._context.data) return this._context.data;
     const defaultDocumentContext = await super._prepareContext(options);
 
     const vehiclePreferences = UserSheetPreferencesService.getByType(

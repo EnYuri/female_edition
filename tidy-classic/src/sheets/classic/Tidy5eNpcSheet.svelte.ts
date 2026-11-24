@@ -45,7 +45,7 @@ import { splitSemicolons } from 'src/utils/array';
 import NpcSheetClassicRuntime from 'src/runtime/actor/NpcSheetClassicRuntime.svelte';
 import { ItemFilterRuntime } from 'src/runtime/item/ItemFilterRuntime.svelte';
 import { Tidy5eActorSheetClassicV2Base } from './Tidy5eActorSheetClassicV2Base.svelte';
-import type { ApplicationConfiguration } from 'src/types/application.types';
+import type { ApplicationConfiguration, ApplicationRenderOptions } from 'src/types/application.types';
 import { mapGetOrInsert } from 'src/utils/map';
 
 export class Tidy5eNpcSheet
@@ -166,7 +166,8 @@ export class Tidy5eNpcSheet
     return component;
   }
 
-  async _prepareContext(options = {}) {
+  async _prepareContext(options: ApplicationRenderOptions = {}) {
+    if (options.soft && !options.isFirstRender && this._context.data) return this._context.data;
     this._concentration = this.actor.concentration;
 
     const defaultDocumentContext = await super._prepareContext(options);

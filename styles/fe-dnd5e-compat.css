@@ -141,11 +141,11 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   /* User-color-less (= master narration/NPC) messages use the same
      lightness/alpha as players — see the fe-dx3rd-compat.css §14 header
      comment for the rationale. */
-  border-color: var(--fe-ac-90) !important;
+  border-color: var(--fe-retro-message-outline, var(--fe-ac-90)) !important;
   color: var(--fe-ac-90, #e6e6e6) !important;
 }
 
-body.fe-retro-theme.fe-retro-system-dnd5e
+body.fe-retro-theme.fe-retro-system-dnd5e:not(.fe-accent-text-override)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   border-color: rgb(var(--fe-user-color-rgb, 230 230 230) / 0.82) !important;
@@ -183,7 +183,7 @@ body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card) {
-  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
+  border: 1px solid var(--fe-retro-card-outline, rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1))) !important;
 }
 
 body.fe-retro-theme.fe-retro-system-dnd5e
@@ -2084,11 +2084,11 @@ body.fe-retro-theme.fe-retro-system-dnd5e
 body.fe-retro-theme.fe-retro-system-dnd5e
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, .chat-popout)
   :is(.message, .chat-message).compact {
-  border-color: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b /
-                    var(--fe-dx3rd-card-border-alpha, 1)) !important;
+  border-color: var(--fe-retro-message-outline, rgb(from var(--fe-dx3rd-accent, #ffffff) r g b /
+                    var(--fe-dx3rd-card-border-alpha, 1))) !important;
 }
 
-body.fe-retro-theme.fe-retro-system-dnd5e
+body.fe-retro-theme.fe-retro-system-dnd5e:not(.fe-accent-text-override)
   :is(#chat-log, .chat-log, ol.chat-log, #chat-notifications, .chat-popout)
   :is(.message, .chat-message).compact.fe-has-user-color {
   border-color: rgb(var(--fe-user-color-rgb, 255 255 255) /

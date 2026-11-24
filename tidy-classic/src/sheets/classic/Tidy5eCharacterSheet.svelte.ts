@@ -60,7 +60,7 @@ import { ItemContext } from 'src/features/item/ItemContext';
 import * as Bastion from 'src/features/facility/Bastion';
 import { ItemFilterRuntime } from 'src/runtime/item/ItemFilterRuntime.svelte';
 import { Tidy5eActorSheetClassicV2Base } from './Tidy5eActorSheetClassicV2Base.svelte';
-import type { ApplicationConfiguration } from 'src/types/application.types';
+import type { ApplicationConfiguration, ApplicationRenderOptions } from 'src/types/application.types';
 import { mapGetOrInsert } from 'src/utils/map';
 import { buildRelativeUuid } from 'src/foundry/core-compat';
 
@@ -182,7 +182,8 @@ export class Tidy5eCharacterSheet
     return component;
   }
 
-  async _prepareContext(options = {}): Promise<CharacterSheetContext> {
+  async _prepareContext(options: ApplicationRenderOptions = {}): Promise<CharacterSheetContext> {
+    if (options.soft && !options.isFirstRender && this._context.data) return this._context.data;
     this._concentration = this.actor.concentration;
 
     const defaultDocumentContext = await super._prepareContext(options);

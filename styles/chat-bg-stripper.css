@@ -95,6 +95,13 @@ body:not(.fe-chatcard-custom-font) {
  * dnd5e/midi-qol item/spell/feature cards often render description text small and light.
  * Increase size, line-height, and darken text inside the collapsible description box.
  */
+/* Plutonium's night mode picks heading ink for the whole window. Imported
+ * headings can live on a light card inside that window or on a dark sheet. */
+:is(.chat-message .message-content, #chat-notifications .message-content, .application.sheet, .fe-tidy-sheet)
+  .ve-rd__h {
+  color: inherit;
+}
+
 /*
  * NOTE:
  *  - We target the *description/details* region only, not headers/buttons.
@@ -860,7 +867,8 @@ body.fe-system-msg-color #chat-notifications
   :is(section.card-header.description, .card-header.description, section.card-description, .card-description)
   :is(section.details.card-content, .details.card-content, .details.collapsible-content.card-content, .card-content, .collapsible-content)
   .wrapper :is(p, li) {
-  margin: 0 0 0.55em 0;
+  /* Imported hanging lists pair a negative text-indent with an inline margin. */
+  margin-block: 0 0.55em;
 }
 :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log)
   .chat-message

@@ -93,6 +93,10 @@ export type ConditionType = {
 export type ToolConfig = { ability: string; id: string };
 
 export type CONFIG = {
+  queries: Record<
+    string,
+    (data: object, context: { user: typeof game.user; timeout?: number }) => unknown
+  >;
   debug: {
     applications: boolean;
     audio: boolean;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { EventHelper } from 'src/utils/events';
-  import { onMount, untrack, type Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
 
   type Props = {
@@ -22,51 +22,37 @@
     ...rest
   }: Props = $props();
 
-  let overflowYHidden = $state(!expanded);
+  let previousExpanded = untrack(() => expanded);
+  let overflowYHidden = $state(!previousExpanded);
   let expandableContainer: HTMLElement;
-
-  let renderContents = $state<boolean>(expanded);
-
-  onMount(() => {
-    const controller = new AbortController();
-
-    expandableContainer.addEventListener(
-      'transitionstart',
-      (ev) => {
-        if (ev.target === expandableContainer) {
-          overflowYHidden = true;
-        }
-      },
-      {
-        signal: controller.signal,
-        passive: true,
-      },
-    );
-
-    expandableContainer.addEventListener(
-      'transitionend',
-      (ev) => {
-        if (ev.target === expandableContainer) {
-          overflowYHidden = !expanded;
-          renderContents = expanded;
-        }
-      },
-      {
-        signal: controller.signal,
-        passive: true,
-      },
-    );
-
-    return () => {
-      controller.abort();
-    };
-  });
+  let renderContents = $state(previousExpanded);
 
   $effect(() => {
-    if (expanded) {
-      renderContents = true;
-    }
-  })
+    const open = expanded;
+    if (open === previousExpanded) return;
+    previousExpanded = open;
+    if (open) renderContents = true;
+    overflowYHidden = true;
+
+    // Only the grid transition controls clipping. It may be disabled, or
+    // cancelled halfway through when a sheet tab becomes hidden.
+    let current = true;
+    const settle = () => {
+      if (!current) return;
+      overflowYHidden = !open;
+      renderContents = open;
+    };
+    const frame = requestAnimationFrame(() => {
+      const transition = expandableContainer.getAnimations().find(animation =>
+        'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows');
+      if (transition) transition.finished.then(settle, settle);
+      else settle();
+    });
+    return () => {
+      current = false;
+      cancelAnimationFrame(frame);
+    };
+  });
 </script>
 
 <div

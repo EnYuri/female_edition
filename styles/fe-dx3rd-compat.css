@@ -348,14 +348,14 @@ body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
   .chat-message:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   background:       #000000 !important;
   background-image: none    !important;
-  border-color:     var(--fe-ac-90) !important;
+  border-color:     var(--fe-retro-message-outline, var(--fe-ac-90)) !important;
   color:            var(--fe-ac-90) !important;
 }
 
 /* Messages with a user color → only the outline overrides to the user
    color (alpha same as above).
    Fallback 230 230 230 = --fe-ac-90's lightness — see header comment. */
-body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt)
+body.fe-retro-theme:is(.fe-retro-system-dx3rd, .fe-retro-system-dx3rd-fvtt):not(.fe-accent-text-override)
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color:not(.narrator-chat):not(.fe-narrator-chat):not(.round-marker):not(.fe-round-marker-chat):not([data-fe-is-round-marker="1"]):not(:has(.round-marker)) {
   border-color: rgb(var(--fe-user-color-rgb, 230 230 230) / 0.82) !important;
@@ -475,7 +475,7 @@ body.fe-retro-theme.fe-retro-system-dx3rd
   :is(#chat-log, .chat-log, ol.chat-log)
   .chat-message.fe-has-user-color
   :is(.chat-card, .midi-chat-card, .dnd5e.chat-card, .dnd5e2.chat-card, .dx3rd-item-chat, .dx3rd-item-info) {
-  border: 1px solid rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1)) !important;
+  border: 1px solid var(--fe-retro-card-outline, rgb(var(--fe-user-color-rgb, 255 255 255) / var(--fe-dx3rd-card-border-alpha, 1))) !important;
 }
 
 /* Messages without a user color → card border = accent (white) + alpha.

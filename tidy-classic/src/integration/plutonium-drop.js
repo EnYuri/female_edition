@@ -16,13 +16,13 @@ function checkImport(summary) {
   }
 }
 
-async function stageLoot(api, actor, loot, id, checkAuthority) {
+async function stageLootDocuments(api, actor, entityInfos, coinItems) {
   // A detached clone has no ID. Plutonium routes embedded creations and stack
   // updates on it through its temporary-document path, including pack contents.
   const staged = actor.clone({}, { parent: null, pack: null });
   const before = staged.toObject();
   const importers = new Map();
-  for (const { page, entity, options } of loot.entityInfos ?? []) {
+  for (const { page, entity, options } of entityInfos) {
     let importer = importers.get(page);
     if (!importer) {
       importer = await api.importer.pGetImporter({ page });
@@ -33,22 +33,15 @@ async function stageLoot(api, actor, loot, id, checkAuthority) {
     checkImport(await importer.pImportEntry(entity, opts, { quantity: options?.quantity }));
   }
 
-  const currency = Object.fromEntries(Object.entries(loot.currency ?? {}).filter(([key, value]) =>
-    Object.hasOwn(CONFIG.DND5E.currencies, key) && Number.isFinite(value) && value > 0));
-  const update = {};
-  if (Object.keys(currency).length && actor.type === 'npc' &&
-      api.config.getValue('currency', 'isNpcUseCurrencySheetItems')) {
+  if (coinItems) {
     const importer = await api.importer.pGetImporter({ page: 'items.html' });
-    checkImport(await importer.pImportCurrency(currency, new api.importer.ImportOpts({ actor: staged })));
-  } else {
-    for (const [key, amount] of Object.entries(currency)) {
-      update['system.currency.' + key] = (actor.system.currency?.[key] ?? 0) + amount;
-    }
+    checkImport(await importer.pImportCurrency(coinItems, new api.importer.ImportOpts({ actor: staged })));
   }
 
   // Foundry merges embedded records by _id on a parent update. Write only
   // changed records; keep transferred effects on their owning item.
   const equals = foundry.utils.equals ?? foundry.utils.objectsEqual;
+  const update = {};
   const legacySource = game.release?.generation < 14 ? actor.toObject() : null;
   for (const field of ['items', 'effects']) {
     const originals = new Map(before[field].map(data => [data._id, data]));
@@ -68,6 +61,21 @@ async function stageLoot(api, actor, loot, id, checkAuthority) {
       legacyRecords?.set(doc.id, data);
     }
     if (changes.length) update[field] = legacyRecords ? [...legacyRecords.values()] : changes;
+  }
+  return update;
+}
+
+async function stageLoot(api, actor, loot, id, checkAuthority) {
+  const coins = Object.entries(loot.currency ?? {}).filter(([key, value]) =>
+    Object.hasOwn(CONFIG.DND5E.currencies, key) && Number.isFinite(value) && value > 0);
+  const coinItems = coins.length && actor.type === 'npc' && api.config.getValue('currency', 'isNpcUseCurrencySheetItems')
+    ? Object.fromEntries(coins) : null;
+  const entities = loot.entityInfos ?? [];
+  const update = entities.length || coinItems ? await stageLootDocuments(api, actor, entities, coinItems) : {};
+  if (!coinItems) {
+    for (const [key, amount] of coins) {
+      update['system.currency.' + key] = (actor.system.currency?.[key] ?? 0) + amount;
+    }
   }
   if (!Object.keys(update).length) return null;
   checkAuthority();

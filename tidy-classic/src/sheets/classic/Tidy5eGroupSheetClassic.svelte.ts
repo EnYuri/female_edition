@@ -218,6 +218,7 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
   async _prepareContext(
     options: TidyDocumentSheetRenderOptions
   ): Promise<GroupSheetClassicContext> {
+    if (options?.soft && !options.isFirstRender && this._context.data) return this._context.data;
     this.itemFilterService.refreshFilters();
 
     const documentSheetContext = (await super._prepareContext(
@@ -251,8 +252,6 @@ export class Tidy5eGroupSheetClassic extends Tidy5eActorSheetBaseMixin(
       groupAbilities,
       groupMasteries,
     } = this.#prepareMembers();
-
-    const source = this.actor.toObject();
 
     const editable = this.isEditable;
 

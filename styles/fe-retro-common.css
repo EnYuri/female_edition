@@ -759,6 +759,16 @@ body.fe-retro-theme .fe-stage-dock:not(.fe-stage-dock--inset) .fe-stage-portrait
   bottom: calc(100% + var(--fe-dx3rd-border-width, 10px)) !important;
 }
 
+/* Cover core's inline OOC border as well as cards drawn inside a message.
+ * Only change color so collapsed merge edges keep their zero width. */
+body.fe-retro-theme.fe-accent-text-override
+  :is(#chat-log, .chat-log, #chat-notifications, .chat-popout, #fe-chat-export-log)
+  :is(.chat-message, .message):where(:not(.fe-system-msg, .narrator-chat, .fe-narrator-chat, .round-marker, .fe-round-marker-chat, [data-fe-is-round-marker="1"], :has(.round-marker))) {
+  --fe-retro-card-outline: rgb(from var(--fe-dx3rd-accent, #ffffff) r g b / var(--fe-dx3rd-card-border-alpha, 1));
+  --fe-retro-message-outline: var(--fe-group-outline-color, var(--fe-dx3rd-accent, #ffffff));
+  border-color: var(--fe-retro-message-outline) !important;
+}
+
 /* ── Dice · inline rolls ───────────────────────────────────── */
 body.fe-retro-theme .dice-roll :is(.dice-formula, .dice-total) {
   border-color: var(--fe-dx3rd-accent, #ffffff) !important;

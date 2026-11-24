@@ -291,7 +291,7 @@ body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-expor
 }
 
 /* With a user color, use that color */
-body.fe-chat-group-outline :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color {
+body.fe-chat-group-outline:not(:where(.fe-retro-theme.fe-accent-text-override)) :is(#chat-log, .chat-log, ol.chat-log, #fe-chat-export-log) .chat-message.fe-has-user-color {
   --fe-group-outline-color: rgb(var(--fe-user-color-rgb, 255 255 255) / 0.6);
 }
 

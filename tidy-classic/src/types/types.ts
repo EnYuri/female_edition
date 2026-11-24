@@ -802,10 +802,10 @@ export type SpecialTraits = {
   sections: SpecialTraitSection[];
 };
 
-export type DocumentSheetV2Context = {
+export type DocumentSheetV2Context<TDocument = any> = {
   antimagic: boolean;
   showAntimagicNotice: boolean;
-  document: any;
+  document: TDocument;
   /**
    * Whether or not the sheet can be edited, regardless of lock/sensitive field settings.
    * When this boolean is `false`, then the sheet is effectively hard locked.
@@ -1087,15 +1087,7 @@ export type GroupableSelectOption = {
 };
 
 /* Quadrone Types */
-export type DocumentSheetQuadroneContext<TDocument> = {
-  document: TDocument;
-  editable: boolean;
-  fields: any;
-  rootId: string;
-  source: any;
-  unlocked: boolean;
-  user: any;
-};
+export type DocumentSheetQuadroneContext<TDocument> = DocumentSheetV2Context<TDocument>;
 
 export type ActorSizeContext = {
   key: string;

@@ -73,7 +73,7 @@
       return;
     }
 
-    chatData = await item.getChatData({ secrets: actor.isOwner });
+    if (!showSummary) chatData = await item.getChatData({ secrets: actor.isOwner });
     showSummary = !showSummary;
     onItemToggled?.(item.id, showSummary, location);
   }
@@ -154,7 +154,7 @@
     {@render children?.({ toggleSummary })}
   </div>
   {#if item}
-    <ExpandableContainer expanded={showSummary}>
+    <ExpandableContainer expanded={showSummary} deferRendering>
       <ItemSummary chatData={chatData ?? emptyChatData} {item} />
     </ExpandableContainer>
   {/if}
